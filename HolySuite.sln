@@ -3,13 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Holylog", "..\Holylog\Holylog.csproj", "{07621F99-4841-4078-8528-412490F8C4ED}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Holylog", "Holylog\Holylog.csproj", "{07621F99-4841-4078-8528-412490F8C4ED}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HolylandParser", "..\HolylandParser\HolylandParser.csproj", "{1D1813F7-ED5F-4C95-ABBB-6DAE446A699B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HolylandParser", "HolylandParser\HolylandParser.csproj", "{1D1813F7-ED5F-4C95-ABBB-6DAE446A699B}"
 EndProject
-Project("{6141683F-8A12-4E36-9623-2EB02B2C2303}") = "HolyGatorInstallshield", "..\HolyGatorInstallshield\HolyGatorInstallshield.isproj", "{EF00D301-B098-45C8-B8F3-47F6CDE69625}"
+Project("{6141683F-8A12-4E36-9623-2EB02B2C2303}") = "HolyGatorInstallshield", "HolyGatorInstallshield\HolyGatorInstallshield.isproj", "{EF00D301-B098-45C8-B8F3-47F6CDE69625}"
 EndProject
-Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "HolyGatorInstaller", "..\HolyGatorInstaller\HolyGatorInstaller.vdproj", "{158B0E00-6824-4AD1-9DBA-7E9E83492E45}"
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "HolyGatorInstaller", "HolyGatorInstaller\HolyGatorInstaller.vdproj", "{158B0E00-6824-4AD1-9DBA-7E9E83492E45}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
