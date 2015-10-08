@@ -25,11 +25,12 @@ namespace LIPO
         public Form1()
         {
             InitializeComponent();
+            
             stations = new List<Station>(6);            
 
             var xml = XDocument.Load(@"stations.xml");
             var query = from c in xml.Root.Descendants("station")
-                        where (int)c.Attribute("id") < 7
+                        //where (int)c.Attribute("id") < 7
                         select new Station
                         {
                             Name = c.Element("name").Value,
@@ -40,7 +41,7 @@ namespace LIPO
 
             foreach (Station s in stations)
             {
-                s.SetStation();
+                s.InitializeStation(new Size(150, 150));
                 MainPanel.Controls.Add(s.btn);
             }
                                     
@@ -53,7 +54,10 @@ namespace LIPO
         void bw_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             toolStripStatusLabel1.Text = "Busy...";
-            bw.RunWorkerAsync();
+            if(!bw.IsBusy)
+                bw.RunWorkerAsync();
+            //System.Threading.Thread.Sleep(2000);
+            //toolStripStatusLabel1.Text = "Done";
         }
 
         void bw_DoWork(object sender, DoWorkEventArgs e)
@@ -62,8 +66,6 @@ namespace LIPO
             {
                 Pinger(s.btn, s.IP);
             }
-            toolStripStatusLabel1.Text = "Done";
-            System.Threading.Thread.Sleep(2000);
         }
 
         public static bool Ping(string ip)
@@ -87,7 +89,6 @@ namespace LIPO
             {
                 return false;
             }
-
         }
 
         private void Pinger(Button sender, string ip)
@@ -132,10 +133,9 @@ namespace LIPO
             IP = this.IP;
         }
 
-        public void SetStation()
+        public void InitializeStation(Size BtnSize)
         {
-            btn.Width = 150;
-            btn.Height = 150;
+            btn.Size = BtnSize;
             btn.Text = this.Name;
         }
     }
