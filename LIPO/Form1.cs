@@ -32,27 +32,18 @@ namespace LIPO
                         where (int)c.Attribute("id") < 7
                         select new Station
                         {
-                            stationName = c.Element("name").Value,
-                            stationIP = c.Element("ip").Value
+                            Name = c.Element("name").Value,
+                            IP = c.Element("ip").Value,
+                            btn = new Button()
                         };            
             stations.InsertRange(0,query);
 
-            if (stations.Count < 6)
+            foreach (Station s in stations)
             {
-                for (int i=6-stations.Count; i > 0; i--)
-                {
-                    stations.Add(new Station());
-                }
+                s.SetStation();
+                MainPanel.Controls.Add(s.btn);
             }
-            
-            button1.Text = stations[0].stationName;
-            button2.Text = stations[1].stationName;
-            button3.Text = stations[2].stationName;
-            button4.Text = stations[3].stationName;
-            button5.Text = stations[4].stationName;
-            button6.Text = stations[5].stationName;
-            
-            
+                                    
             bw = new BackgroundWorker();
             bw.DoWork += bw_DoWork;
             bw.RunWorkerCompleted += bw_RunWorkerCompleted;
@@ -67,12 +58,10 @@ namespace LIPO
 
         void bw_DoWork(object sender, DoWorkEventArgs e)
         {
-            Pinger(button1, stations[0].stationIP);
-            Pinger(button2, stations[1].stationIP);
-            Pinger(button3, stations[2].stationIP);
-            Pinger(button4, stations[3].stationIP);
-            Pinger(button5, stations[4].stationIP);
-            Pinger(button6, stations[5].stationIP);
+            foreach (Station s in stations)
+            {
+                Pinger(s.btn, s.IP);
+            }
             toolStripStatusLabel1.Text = "Done";
             System.Threading.Thread.Sleep(2000);
         }
@@ -83,7 +72,7 @@ namespace LIPO
             IPAddress address;
             if (IPAddress.TryParse(ip, out address))
             {
-                PingReply reply = pingSender.Send(address);
+                PingReply reply = pingSender.Send(address,1000);
 
                 if (reply.Status == IPStatus.Success)
                 {
@@ -115,72 +104,39 @@ namespace LIPO
 
         private void setStation(int index)
         {
-            Settings settings = new Settings(stations[index].stationName, stations[index].stationIP);
+            Settings settings = new Settings(stations[index].Name, stations[index].IP);
             settings.ShowDialog();
             if (settings.DialogResult == System.Windows.Forms.DialogResult.OK)
             {
-                stations[index].stationName = settings.StationName;
-                stations[index].stationIP = settings.StationIP;
+                stations[index].Name = settings.StationName;
+                stations[index].IP = settings.StationIP;
+                stations[index].btn.Text = settings.StationName;
             }
-        }
-
-        private void button1_Click(object sender, EventArgs e)
-        {
-            setStation(0);
-            ((Button)sender).Text = stations[0].stationName;
-        }
-
-        private void button2_Click(object sender, EventArgs e)
-        {
-            setStation(1);
-            ((Button)sender).Text = stations[1].stationName;
-        }
-
-        private void button3_Click(object sender, EventArgs e)
-        {
-            setStation(2);
-            ((Button)sender).Text = stations[2].stationName;
-        }
-
-        private void button4_Click(object sender, EventArgs e)
-        {
-            setStation(3);
-            ((Button)sender).Text = stations[3].stationName;
-        }
-
-        private void button5_Click(object sender, EventArgs e)
-        {
-            setStation(4);
-            ((Button)sender).Text = stations[4].stationName;
-        }
-
-        private void button6_Click(object sender, EventArgs e)
-        {
-            setStation(5);
-            ((Button)sender).Text = stations[5].stationName;
-        }
-        
-
-        private void propertiesToolStripMenuItem_Click(object sender, EventArgs e)
-        {
-            
         }
     }
     public class Station
     {
-        public string stationName { get; set; }
-        public string stationIP { get; set; }
+        public Button btn { get; set; }
+        public string Name { get; set; }
+        public string IP { get; set; }
 
         public Station()
         {
-            stationName = "";
-            stationIP = "";
+            Name = "";
+            IP = "";
         }
 
         public Station(string Name, string IP)
         {
-            stationName = Name;
-            stationIP = IP;
+            Name = this.Name;
+            IP = this.IP;
+        }
+
+        public void SetStation()
+        {
+            btn.Width = 150;
+            btn.Height = 150;
+            btn.Text = this.Name;
         }
     }
 }
