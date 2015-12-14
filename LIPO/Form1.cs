@@ -53,19 +53,19 @@ namespace LIPO
 
         void bw_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            toolStripStatusLabel1.Text = "Busy...";
+            toolStripStatusLabel1.Text = "Done";
             if(!bw.IsBusy)
-                bw.RunWorkerAsync();
-            //System.Threading.Thread.Sleep(2000);
-            //toolStripStatusLabel1.Text = "Done";
+                bw.RunWorkerAsync();            
         }
 
         void bw_DoWork(object sender, DoWorkEventArgs e)
         {
+            toolStripStatusLabel1.Text = "Busy...";
             foreach (Station s in stations)
             {
                 Pinger(s.btn, s.IP);
             }
+            System.Threading.Thread.Sleep(2000);
         }
 
         public static bool Ping(string ip)
