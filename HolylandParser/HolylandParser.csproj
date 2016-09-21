@@ -52,10 +52,10 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup>
-    <ManifestCertificateThumbprint>F8CE5222FA900A7C29E5431F737D2668DD95AB5E</ManifestCertificateThumbprint>
+    <ManifestCertificateThumbprint>374AAEDFD967882C7340510D2D2A36A1F41CDACE</ManifestCertificateThumbprint>
   </PropertyGroup>
   <PropertyGroup>
-    <ManifestKeyFile>HolylandParser_TemporaryKey.pfx</ManifestKeyFile>
+    <ManifestKeyFile>HolylandParser_1_TemporaryKey.pfx</ManifestKeyFile>
   </PropertyGroup>
   <PropertyGroup>
     <GenerateManifests>true</GenerateManifests>
@@ -74,7 +74,6 @@
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
-    <Reference Include="Microsoft.CSharp" />
     <Reference Include="System.Data" />
     <Reference Include="System.Deployment" />
     <Reference Include="System.Drawing" />
@@ -105,6 +104,7 @@
       <DependentUpon>Resources.resx</DependentUpon>
       <DesignTime>True</DesignTime>
     </Compile>
+    <None Include="HolylandParser_1_TemporaryKey.pfx" />
     <None Include="HolylandParser_TemporaryKey.pfx" />
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">
