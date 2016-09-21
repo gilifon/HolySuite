@@ -5,6 +5,8 @@ VisualStudioVersion = 12.0.31101.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HolylandParser", "HolylandParser\HolylandParser.csproj", "{1D1813F7-ED5F-4C95-ABBB-6DAE446A699B}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HolyLogger", "HolyLogger\HolyLogger.csproj", "{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		CD_ROM|Any CPU = CD_ROM|Any CPU
@@ -24,6 +26,16 @@ Global
 		{1D1813F7-ED5F-4C95-ABBB-6DAE446A699B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{1D1813F7-ED5F-4C95-ABBB-6DAE446A699B}.SingleImage|Any CPU.ActiveCfg = Release|Any CPU
 		{1D1813F7-ED5F-4C95-ABBB-6DAE446A699B}.SingleImage|Any CPU.Build.0 = Release|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.CD_ROM|Any CPU.ActiveCfg = Release|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.CD_ROM|Any CPU.Build.0 = Release|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.DVD-5|Any CPU.ActiveCfg = Debug|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.DVD-5|Any CPU.Build.0 = Debug|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.SingleImage|Any CPU.ActiveCfg = Release|Any CPU
+		{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}.SingleImage|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
