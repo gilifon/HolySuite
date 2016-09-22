@@ -22,14 +22,18 @@ namespace HolyLogger
     /// </summary>
     public partial class MainWindow : Window
     {
+
+        private SQLiteConnection con = null;
+
         public MainWindow()
         {
             InitializeComponent();
             TB_MyCallsign.Focus();
 
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
-            Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2; 
+            Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
 
+            
             //RefreshDateTime_Btn_MouseUp(null, null);
             try
             {
@@ -37,7 +41,7 @@ namespace HolyLogger
                 //string path = (System.IO.Path.GetDirectoryName(executable));
                 //AppDomain.CurrentDomain.SetData("DataDirectory", path);
 
-                SQLiteConnection con = new SQLiteConnection(@"Data Source = C:\Users\gill\Source\Repos\HolySuite\HolyLogger\Data\logDB.db;Version=3");
+                con = new SQLiteConnection(@"Data Source = C:\Users\gill\Source\Repos\HolySuite\HolyLogger\Data\logDB.db;Version=3");
                 con.Open();
             }
             catch (Exception e)
@@ -66,7 +70,10 @@ namespace HolyLogger
 
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
-            MessageBox.Show("saved");
+            if (con != null )
+            {
+                MessageBox.Show("saved");
+            }
             ClearBtn_Click(null, null);
         }
 
