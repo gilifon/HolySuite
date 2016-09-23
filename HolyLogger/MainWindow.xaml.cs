@@ -14,16 +14,40 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using System.Data.SQLite;
+using Xceed.Wpf.Controls;
+using System.Collections.ObjectModel;
+using System.ComponentModel;
 
 namespace HolyLogger
 {
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void RaisePropertyChanged(string propertyName)
+        {
+            var handler = PropertyChanged;
+            if (handler != null)
+            {
+                handler(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
 
-        private SQLiteConnection con = null;
+        DataAccess dal = new DataAccess();
+        public ObservableCollection<QSO> Qsos;
+
+        private string _NumOfQSOs;
+        public string NumOfQSOs
+        {
+            get { return _NumOfQSOs; }
+            set
+            {
+                _NumOfQSOs = value;
+                RaisePropertyChanged("NumOfQSOs");
+            }
+        }
 
         public MainWindow()
         {
@@ -33,24 +57,11 @@ namespace HolyLogger
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
             Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
 
+            QSOTimeStamp.Value = DateTime.UtcNow;
+            Qsos = dal.GetAllQSOs();
+            DataContext = Qsos;
             
-            //RefreshDateTime_Btn_MouseUp(null, null);
-            try
-            {
-                //string executable = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                //string path = (System.IO.Path.GetDirectoryName(executable));
-                //AppDomain.CurrentDomain.SetData("DataDirectory", path);
-
-                con = new SQLiteConnection(@"Data Source = C:\Users\gill\Source\Repos\HolySuite\HolyLogger\Data\logDB.db;Version=3");
-                con.Open();
-            }
-            catch (Exception e)
-            {
-
-                MessageBox.Show("Failed to open DB");
-            }
-            
-
+            UpdateNumOfQSOs();            
         }
 
         private void Lock_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -64,20 +75,28 @@ namespace HolyLogger
 
         private void RefreshDateTime_Btn_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            DatePicker_QsoDate.SelectedDate = DateTime.Today;
-            TB_QsoTime.Text = DateTime.Now.ToLongTimeString();
+            QSOTimeStamp.Value = DateTime.UtcNow;
         }
 
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (con != null )
-            {
-                MessageBox.Show("saved");
-            }
+            QSO qso = new QSO();
+            qso.comment = "";
+            qso.dx_callsign = TB_DXCallsign.Text;
+            qso.exchange = TB_Exchange.Text;
+            qso.frequency = TB_Frequency.Text;
+            qso.my_callsign = TB_MyCallsign.Text;
+            qso.my_square = TB_MyGrid.Text;
+            qso.rst_rcvd = TB_RSTRcvd.Text;
+            qso.rst_sent = TB_RSTSent.Text;
+            qso.timestamp = QSOTimeStamp.Value.Value;
+            dal.Insert(qso);
+            Qsos.Insert(0, qso);
             ClearBtn_Click(null, null);
+            UpdateNumOfQSOs();
         }
 
-        private void QRZBtn_Click(object sender, RoutedEventArgs e)
+        private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
         {
             string url = "http://www.qrz.com";
             if (!string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
@@ -117,6 +136,16 @@ namespace HolyLogger
                 ((TextBox)sender).SelectionLength = 1;
             }
         }
-      
+
+        private void UpdateNumOfQSOs()
+        {
+            NumOfQSOs = dal.GetQsoCount().ToString();
+        }
+
+        private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            Application.Current.Shutdown();
+        }
+
     }
 }
