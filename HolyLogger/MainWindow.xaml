@@ -86,12 +86,12 @@
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="10,117,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="23" Margin="81,119,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="O02HG" />
         <Label Content="RST Sent" HorizontalAlignment="Left" Margin="215,116,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="23" Margin="293,119,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" />
+        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="23" Margin="288,119,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" />
         <Label Content="RST Rcvd" HorizontalAlignment="Left" Margin="339,116,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="23" Margin="403,119,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" />
 
-        <Label Content="Time Stamp" HorizontalAlignment="Left" Margin="215,81,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <xctk:DateTimeUpDown x:Name="QSOTimeStamp" Format="Custom" FormatString="HH:mm:ss dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="293,87,0,0" Grid.Row="1" VerticalAlignment="Top" Width="150"/>
+        <Label Content="Timestamp" HorizontalAlignment="Left" Margin="215,81,0,0" VerticalAlignment="Top" Grid.Row="1" />
+        <xctk:DateTimeUpDown x:Name="QSOTimeStamp" Format="Custom" FormatString="HH:mm:ss dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="288,87,0,0" Grid.Row="1" VerticalAlignment="Top" Width="155"/>
 
         <Image x:Name="RefreshDateTime_Btn" ToolTip="Refresh TimeStamo to current time" HorizontalAlignment="Left" Height="20" Margin="448,87,0,0" VerticalAlignment="Top" Width="20" Source="Images/refresh.png" Stretch="None" MouseUp="RefreshDateTime_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
 
@@ -111,7 +111,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Time Stamp" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Timestamp" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=niceTimestamp}"  HorizontalAlignment="Center" Padding="5" />
@@ -167,7 +167,7 @@
 
             </DataGrid.Columns>
         </DataGrid>
-        
+
 
     </Grid>
 
