@@ -151,6 +151,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </ApplicationDefinition>
+    <Compile Include="ADIFParser.cs" />
     <Compile Include="DataAccess.cs" />
     <Compile Include="QSO.cs" />
     <Page Include="MainWindow.xaml">

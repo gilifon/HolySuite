@@ -8,7 +8,7 @@ namespace HolyLogger
 {
     public class QSO
     {
-        public string id { get; set; }
+        public int id { get; set; }
         public string my_callsign { get; set; }
         public string my_square { get; set; }
         public string frequency { get; set; }

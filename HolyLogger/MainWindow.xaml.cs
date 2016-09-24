@@ -17,6 +17,8 @@ using System.Data.SQLite;
 using Xceed.Wpf.Controls;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using Microsoft.Win32;
+using System.Collections.Specialized;
 
 namespace HolyLogger
 {
@@ -26,6 +28,7 @@ namespace HolyLogger
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
         public event PropertyChangedEventHandler PropertyChanged;
+
         protected void RaisePropertyChanged(string propertyName)
         {
             var handler = PropertyChanged;
@@ -59,9 +62,22 @@ namespace HolyLogger
 
             QSOTimeStamp.Value = DateTime.UtcNow;
             Qsos = dal.GetAllQSOs();
+            Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
             
             UpdateNumOfQSOs();            
+        }
+
+        void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        {
+            if (e.Action == NotifyCollectionChangedAction.Remove)
+            {
+                foreach (QSO qso in e.OldItems)
+                {
+                    dal.Delete(qso.id);    
+                }
+                UpdateNumOfQSOs();  
+            }
         }
 
         private void Lock_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -81,7 +97,7 @@ namespace HolyLogger
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
             QSO qso = new QSO();
-            qso.comment = "";
+            qso.comment = TB_Comment.Text;
             qso.dx_callsign = TB_DXCallsign.Text;
             qso.exchange = TB_Exchange.Text;
             qso.frequency = TB_Frequency.Text;
@@ -90,8 +106,8 @@ namespace HolyLogger
             qso.rst_rcvd = TB_RSTRcvd.Text;
             qso.rst_sent = TB_RSTSent.Text;
             qso.timestamp = QSOTimeStamp.Value.Value;
-            dal.Insert(qso);
-            Qsos.Insert(0, qso);
+            QSO q = dal.Insert(qso);
+            Qsos.Insert(0, q);
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
         }
@@ -112,6 +128,7 @@ namespace HolyLogger
             TB_Exchange.Text = string.Empty;
             TB_RSTSent.Text = "59";
             TB_RSTRcvd.Text = "59";
+            TB_Comment.Text = string.Empty;
             RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
         }
@@ -145,6 +162,85 @@ namespace HolyLogger
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
+        }
+
+        private void ExpotMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string adif = GenerateAdif(dal.GetAllQSOs());
+            // Displays a SaveFileDialog so the user can save the Image
+            // assigned to Button2.
+            SaveFileDialog saveFileDialog1 = new SaveFileDialog();
+            saveFileDialog1.Filter = "ADIF File|*.adi";
+            saveFileDialog1.Title = "Export ADIF";
+            saveFileDialog1.ShowDialog();
+
+            // If the file name is not an empty string open it for saving.
+            try
+            {
+                if (saveFileDialog1.FileName != "")
+                {
+                    // Saves the Image via a FileStream created by the OpenFile method.
+                    System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
+                    StreamWriter sw = new StreamWriter(fs);
+                    sw.Write(adif);
+                    sw.Close();
+                    fs.Close();
+                }
+                MessageBox.Show("File created successfully!");
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Export failed: " + ex.Message);
+            }
+            
+        }
+
+        private string GenerateAdif(IList<QSO> qso_list)  
+        {
+            StringBuilder adif = new StringBuilder(200);
+            adif.AppendLine("<ADIF_VERS:3>2.2 ");
+            adif.AppendLine("<PROGRAMID:14>HolylandLogger ");
+            adif.AppendLine("<PROGRAMVERSION:15>Version 1.0.0.0 ");
+            adif.AppendLine("<EOH>");
+            adif.AppendLine();
+
+            foreach (QSO qso in qso_list)
+            {
+                string date = qso.timestamp.ToString("yyyyMMdd");
+                string time = qso.timestamp.ToString("HHmmss");
+
+                adif.AppendFormat("<call:{0}>{1} ", qso.dx_callsign.Length, qso.dx_callsign);
+                adif.AppendFormat("<srx_string:{0}>{1} ", qso.exchange.Length, qso.exchange);
+                adif.AppendFormat("<freq:{0}>{1} ", qso.frequency.Length, qso.frequency);
+                adif.AppendFormat("<station_callsign:{0}>{1} ", qso.my_callsign.Length, qso.my_callsign);
+                adif.AppendFormat("<operator:{0}>{1} ", qso.my_callsign.Length, qso.my_callsign);
+                adif.AppendFormat("<stx_string :{0}>{1} ", qso.my_square.Length, qso.my_square);
+                adif.AppendFormat("<rst_rcvd:{0}>{1} ", qso.rst_rcvd.Length, qso.rst_rcvd);
+                adif.AppendFormat("<rst_sent:{0}>{1} ", qso.rst_sent.Length, qso.rst_sent);
+                adif.AppendFormat("<qso_date:{0}>{1} ", date.Length, date);
+                adif.AppendFormat("<time_on:{0}>{1} ", time.Length, time);
+                adif.AppendFormat("<time_off:{0}>{1} ", time.Length, time);
+                adif.AppendFormat("<comment:{0}>{1} ", qso.comment.Length, qso.comment);
+                adif.AppendLine("<EOR>");
+            }
+
+            return adif.ToString();
+        }
+
+        private void QSODataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Delete)
+            {
+                MessageBoxResult messageBoxResult = System.Windows.MessageBox.Show("Are you sure?", "Delete Confirmation", System.Windows.MessageBoxButton.YesNo);
+                if (messageBoxResult == MessageBoxResult.Yes)
+                {
+                    
+                }
+                else
+                {
+                    e.Handled = true;
+                }
+            }
         }
 
     }

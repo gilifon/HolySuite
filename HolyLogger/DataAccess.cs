@@ -30,7 +30,7 @@ namespace HolyLogger
             }
         }
 
-        public void Insert(QSO qso)
+        public QSO Insert(QSO qso)
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
@@ -47,6 +47,25 @@ namespace HolyLogger
                 try
                 {
                     insertSQL.ExecuteNonQuery();
+                    ObservableCollection<QSO> top1 = GetTopQSOs(1);
+                    return top1.FirstOrDefault();
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.Message);
+                }
+            }
+            return null;
+        }
+        public void Delete(int Id)
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                SQLiteCommand deleteSQL = new SQLiteCommand("DELETE FROM qso WHERE Id = ?", con);
+                deleteSQL.Parameters.Add(new SQLiteParameter("Id", Id));
+                try
+                {
+                    deleteSQL.ExecuteNonQuery();
                 }
                 catch (Exception ex)
                 {
@@ -65,7 +84,34 @@ namespace HolyLogger
                     while (rdr.Read())
                     {
                         QSO q = new QSO();
-                        q.id = rdr["Id"].ToString();
+                        q.id = int.Parse(rdr["Id"].ToString());
+                        q.comment = (string)rdr["comment"];
+                        q.dx_callsign = (string)rdr["dx_callsign"];
+                        q.exchange = (string)rdr["exchange"];
+                        q.frequency = (string)rdr["frequency"];
+                        q.my_callsign = (string)rdr["my_callsign"];
+                        q.my_square = (string)rdr["my_square"];
+                        q.rst_rcvd = (string)rdr["rst_rcvd"];
+                        q.rst_sent = (string)rdr["rst_sent"];
+                        q.timestamp = DateTime.Parse((string)rdr["timestamp"]);
+                        qso_list.Add(q);
+                    }
+                }
+            }
+            return qso_list;
+        }
+        public ObservableCollection<QSO> GetTopQSOs(int i)
+        {
+            ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
+            string stm = "SELECT * FROM qso ORDER BY Id DESC LIMIT " + i;
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            {
+                using (SQLiteDataReader rdr = cmd.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        QSO q = new QSO();
+                        q.id = int.Parse(rdr["Id"].ToString());
                         q.comment = (string)rdr["comment"];
                         q.dx_callsign = (string)rdr["dx_callsign"];
                         q.exchange = (string)rdr["exchange"];
