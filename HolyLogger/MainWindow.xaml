@@ -83,13 +83,13 @@
             <ComboBoxItem Name="op_digi">DIGI</ComboBoxItem>
         </ComboBox>
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,105,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="23" Margin="81,109,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="4Z4GX" />
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="23" Margin="81,109,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" />
         <Image x:Name="QRZBtn" ToolTip="Open the QRZ.COM page of the DX station" HorizontalAlignment="Left" Height="24" Margin="186,108,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" >
 
         </Image>
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,141,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="23" Margin="81,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="O02HG" />
+        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="23" Margin="81,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" />
         <Label Content="RST Sent" HorizontalAlignment="Left" Margin="215,142,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="23" Margin="288,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" />
         <Label Content="RST Rcvd" HorizontalAlignment="Left" Margin="339,142,0,0" VerticalAlignment="Top" Grid.Row="1" />
@@ -104,7 +104,7 @@
         <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="477,147,0,0" VerticalAlignment="Top" Width="134" Grid.Row="1" Click="AddBtn_Click" />
         <Button x:Name="ClearBtn" Content="Clear (F5)" HorizontalAlignment="Left" Margin="477,113,0,0" VerticalAlignment="Top" Width="134" Grid.Row="1" Click="ClearBtn_Click" />
         <Label Content="Comment" HorizontalAlignment="Left" Margin="6,179,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="23" Margin="81,182,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="530" Grid.Row="1" Text="Send QSL direct" />
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="23" Margin="81,182,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="530" Grid.Row="1" Text="" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown">
