@@ -43,7 +43,7 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
-                        <MenuItem Header="Help">
+                        <MenuItem Header="Help" Click="MenuItem_Click">
                             <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some non important info..">
                                 <MenuItem.Icon>
                                     <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>

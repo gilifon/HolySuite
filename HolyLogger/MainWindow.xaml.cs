@@ -243,5 +243,11 @@ namespace HolyLogger
             }
         }
 
+        private void MenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            AboutWindow about = new AboutWindow();
+            about.Show();
+        }
+
     }
 }
