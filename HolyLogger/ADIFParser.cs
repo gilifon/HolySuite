@@ -4,349 +4,519 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using MoreLinq;
 
-namespace DXCC_Counter
+namespace HolyLogger
 {
-    class ADIFParser
+    public class ADIFParser
     {
-        public string RawFile { get; set; }
-        public string TableName { get; set; }
-        public string Reference { get; set; }
+        private int _result;
+        public int Result { get { return _result; } }
 
-        public IList<QSO> QSO_List { get { return _QSO_List; } }
-        private IList<QSO> _QSO_List;
+        private string _description;
+        public string Description { get { return _description; } }
 
-        public ProjectType Project { get; set; }
+        public string logType { get; set; }
+
+        private string m_fileText;
+        private List<QSO> m_qsoList;
+
+        private string m_template = @"
+<style>
+    body{
+
+}
+th,td
+    {
+        border-style:solid;
+        border-width:1px;
+        border-color:black;
+    }
+</style>
+
+<table cellpadding='0' cellspacing='0' style='border-style:solid; border-width:1px; border-color:black'>
+    <thead>
+        <tr>
+            <th style='width:150px; text-align:center'>Band</th>
+            <th style='width:150px; text-align:center'>QSO</th>
+            <th style='width:150px; text-align:center'>Points</th>
+            <th style='width:150px; text-align:center'>Squares</th>
+            <th style='width:150px; text-align:center'>DXCC</th>
+            <th style='width:150px; text-align:center'>Score</th>
+        </tr>
+    </thead>
+    <tbody>
+        <tr>
+            <td style='width:150px; text-align:center'>10</td>
+<td style='width:150px; text-align:center'>~QSO10~</td>            
+<td style='width:150px; text-align:center'>~POINTS10~</td>
+            
+            <td style='width:150px; text-align:center'>~SQUARES10~</td>
+            <td style='width:150px; text-align:center'>~DXCC10~</td>
+            <td style='width:150px; text-align:center'></td>
+        </tr>
+        <tr>
+            <td style='width:150px; text-align:center'>15</td>
+<td style='width:150px; text-align:center'>~QSO15~</td>            
+<td style='width:150px; text-align:center'>~POINTS15~</td>
+            
+            <td style='width:150px; text-align:center'>~SQUARES15~</td>
+            <td style='width:150px; text-align:center'>~DXCC15~</td>
+            <td style='width:150px; text-align:center'></td>
+        </tr>
+        <tr>
+            <td style='width:150px; text-align:center'>20</td>
+<td style='width:150px; text-align:center'>~QSO20~</td>            
+<td style='width:150px; text-align:center'>~POINTS20~</td>
+            
+            <td style='width:150px; text-align:center'>~SQUARES20~</td>
+            <td style='width:150px; text-align:center'>~DXCC20~</td>
+            <td style='width:150px; text-align:center'></td>
+        </tr>
+        <tr>
+            <td style='width:150px; text-align:center'>40</td>
+<td style='width:150px; text-align:center'>~QSO40~</td>            
+<td style='width:150px; text-align:center'>~POINTS40~</td>
+            
+            <td style='width:150px; text-align:center'>~SQUARES40~</td>
+            <td style='width:150px; text-align:center'>~DXCC40~</td>
+            <td style='width:150px; text-align:center'></td>
+        </tr>
+        <tr>
+            <td style='width:150px; text-align:center'>80</td>
+<td style='width:150px; text-align:center'>~QSO80~</td>            
+<td style='width:150px; text-align:center'>~POINTS80~</td>
+            
+            <td style='width:150px; text-align:center'>~SQUARES80~</td>
+            <td style='width:150px; text-align:center'>~DXCC80~</td>
+            <td style='width:150px; text-align:center'></td>
+        </tr>
+        <tr>
+            <td style='width:150px; text-align:center'>160</td>
+<td style='width:150px; text-align:center'>~QSO160~</td>            
+<td style='width:150px; text-align:center'>~POINTS160~</td>
+            
+            <td style='width:150px; text-align:center'>~SQUARES160~</td>
+            <td style='width:150px; text-align:center'>~DXCC160~</td>
+            <td style='width:150px; text-align:center'></td>
+        </tr>
+        <tr>
+            <td style='width:150px; text-align:center'>Total</td>
+<td style='width:150px; text-align:center'>~QSO~</td>            
+<td style='width:150px; text-align:center'>~POINTS~</td>
+            
+            <td style='width:150px; text-align:center'>~SQUARES~</td>
+            <td style='width:150px; text-align:center'>~DXCC~</td>
+            <td style='width:150px; text-align:center'>~SCORE~</td>
+        </tr>
+    </tbody>
+</table><br /><br /><hr>";
+        private string m_templateRes;
+        public string Template { get { return m_templateRes; } }
 
         //patterns
-        private string address_pattern = @"<address:(\d{1,2})(?::[a-z]{1})?>";
-        private string band_pattern = @"<band:(\d{1,2})(?::[a-z]{1})?>";
         private string call_pattern = @"<call:(\d{1,2})(?::[a-z]{1})?>";
-        private string commant_pattern = @"<comment:(\d{1,2})(?::[a-z]{1})?>";
-        private string cont_pattern = @"<cont:(\d{1,2})(?::[a-z]{1})?>";
-        private string country_pattern = @"<country:(\d{1,2})(?::[a-z]{1})?>";
-        private string cqz_pattern = @"<cqz:(\d{1,2})(?::[a-z]{1})?>";
-        private string dxcc_pattern = @"<dxcc:(\d{1,2})(?::[a-z]{1})?>";
-        private string email_pattern = @"<email:(\d{1,2})(?::[a-z]{1})?>";
-        private string freq_pattern = @"<freq:(\d{1,2})(?::[a-z]{1})?>";
-        private string gridsquare_pattern = @"<gridsquare:(\d{1,2})(?::[a-z]{1})?>";
-        private string ituz_pattern = @"<ituz:(\d{1,2})(?::[a-z]{1})?>";
+        private string date_pattern = @"<qso_date:(\d{1,2})(?::[a-z]{1})?>";
+        private string time_pattern = @"<time_on:(\d{1,2})(?::[a-z]{1})?>";
+        private string band_pattern = @"<band:(\d{1,2})(?::[a-z]{1})?>";
         private string mode_pattern = @"<mode:(\d{1,2})(?::[a-z]{1})?>";
-        private string name_pattern = @"<name:(\d)(?::[a-z]{1})?>";
-        private string pfx_pattern = @"<pfx:(\d{1,2})(?::[a-z]{1})?>";
-        private string qth_pattern = @"<qth:(\d{1,2})(?::[a-z]{1})?>";
-        private string rst_rcvd_pattern = @"<rst_rcvd:(\d{1,2})(?::[a-z]{1})?>";
-        private string rst_sent_pattern = @"<rst_sent:(\d{1,2})(?::[a-z]{1})?>";
-        private string timeoff_pattern = @"<time_off:(\d{1,2})(?::[a-z]{1})?>";
-        private string timeon_pattern = @"<time_on:(\d{1,2})(?::[a-z]{1})?>";
-        private string qso_date_pattern = @"<qso_date:(\d{1,2})(?::[a-z]{1})?>";
+        private string commant_pattern = @"<comment:(\d{1,2})(?::[a-z]{1})?>";
+        private string dxcc_pattern = @"<dxcc:(\d{1,2})(?::[a-z]{1})?>";
+        private string freq_pattern = @"<freq:(\d{1,2})(?::[a-z]{1})?>";
+        private string srx_pattern = @"<srx_string:(\d{1,2})(?::[a-z]{1})?>";
+        //private string name_pattern = @"<name:(\d)(?::[a-z]{1})?>";
 
-        public ADIFParser()
-            : this("")
+
+        public ADIFParser(string rawData, string logType)
         {
+            m_fileText = rawData;
+            this.logType = logType;
+            m_qsoList = new List<QSO>();
         }
 
-        public ADIFParser(string adif)
+        public void Parse()
         {
-            this.RawFile = adif;
-            _QSO_List = new List<QSO>(200);
+            PopulateQSOList();
+            CalculateResult();
         }
 
-        private void convertFreqToBand(QSO qso)
+        private void PopulateQSOList()
         {
-            double parsedFreq;
-            if (!double.TryParse(qso.freq, out parsedFreq)) return;
-            if (parsedFreq < 30)
-            {
-                if (parsedFreq > 0 && parsedFreq < 2) qso.band = "160M";
-                if (parsedFreq > 2 && parsedFreq < 5) qso.band = "80M";
-                if (parsedFreq > 5 && parsedFreq < 8) qso.band = "40M";
-                if (parsedFreq > 10 && parsedFreq < 11) qso.band = "30M";
-                if (parsedFreq > 12 && parsedFreq < 16) qso.band = "20M";
-                if (parsedFreq > 19 && parsedFreq < 23) qso.band = "15M";
-                if (parsedFreq > 24 && parsedFreq < 25) qso.band = "15M";
-                if (parsedFreq > 25 && parsedFreq < 30) qso.band = "10M";
-            }
-            else
-            {
-                if (parsedFreq > 0 && parsedFreq < 2000) qso.band = "160M";
-                if (parsedFreq > 2000 && parsedFreq < 5000) qso.band = "80M";
-                if (parsedFreq > 5000 && parsedFreq < 8000) qso.band = "40M";
-                if (parsedFreq > 10000 && parsedFreq < 11000) qso.band = "30M";
-                if (parsedFreq > 12000 && parsedFreq < 16000) qso.band = "20M";
-                if (parsedFreq > 19000 && parsedFreq < 23000) qso.band = "15M";
-                if (parsedFreq > 24000 && parsedFreq < 25000) qso.band = "12M";
-                if (parsedFreq > 25000 && parsedFreq < 30000) qso.band = "10M";
-            }
-
-        }
-
-        public bool Parse()
-        {
-            _QSO_List.Clear();
+            m_qsoList.Clear();
             //Remove Line breakers
-            string oneLiner = Regex.Replace(RawFile, "\r\n", "");
+            string oneLiner = Regex.Replace(m_fileText, "\r\n", "");
             oneLiner = Regex.Replace(oneLiner, "\r", "");
             oneLiner = Regex.Replace(oneLiner, "\n", "");
 
             //Splite the Header
             string[] spliteHeader = Regex.Split(oneLiner, "<EOH>", RegexOptions.IgnoreCase);
 
-            if (spliteHeader.Length < 2) return false;
-
             //Get the body
             string body = spliteHeader[1];
 
             //Splite body to lines
-            string[] raw_qso_string_array = Regex.Split(body, "<EOR>", RegexOptions.IgnoreCase);
+            string[] rows = Regex.Split(body, "<EOR>", RegexOptions.IgnoreCase);
 
-            foreach (string raw_qso in raw_qso_string_array)
+            foreach (string row in rows)
             {
                 //skip empty rows
-                if (string.IsNullOrEmpty(raw_qso)) continue;
+                if (string.IsNullOrEmpty(row)) continue;
 
-                QSO qso = new QSO();
+                QSO qso_row = new QSO();
 
-                Regex regex = new Regex(address_pattern, RegexOptions.IgnoreCase);
-                Match match = regex.Match(raw_qso);
+                Regex regex = new Regex(band_pattern, RegexOptions.IgnoreCase);
+                Match match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.address = Regex.Split(raw_qso, address_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(band_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.band = Regex.Split(raw_qso, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
                 regex = new Regex(call_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
+                match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.call = Regex.Split(raw_qso, call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.Call = Regex.Split(row, call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    qso_row.DXCC = qso_row.Call.Substring(0, 2);
                 }
 
-                regex = new Regex(commant_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
+                regex = new Regex(date_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.comment = Regex.Split(raw_qso, commant_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(cont_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.cont = Regex.Split(raw_qso, cont_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(country_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.country = Regex.Split(raw_qso, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(cqz_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.cqz = Regex.Split(raw_qso, cqz_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.dxcc = Regex.Split(raw_qso, dxcc_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(email_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.email = Regex.Split(raw_qso, email_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(freq_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.freq = Regex.Split(raw_qso, freq_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(gridsquare_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.gridsquare = Regex.Split(raw_qso, gridsquare_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                regex = new Regex(ituz_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.ituz = Regex.Split(raw_qso, ituz_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.Date = Regex.Split(row, date_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
                 regex = new Regex(mode_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
+                match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.mode = Regex.Split(raw_qso, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.Mode = Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
-                regex = new Regex(name_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
+                regex = new Regex(time_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.name = Regex.Split(raw_qso, name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.Time = Regex.Split(row, time_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
-                regex = new Regex(pfx_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
+                regex = new Regex(commant_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.pfx = Regex.Split(raw_qso, pfx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.Comment = Regex.Split(row, commant_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
-                regex = new Regex(qth_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
+                regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.qth = Regex.Split(raw_qso, qth_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.DXCC = Regex.Split(row, dxcc_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
-                regex = new Regex(rst_rcvd_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
+                regex = new Regex(srx_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.rst_rcvd = Regex.Split(raw_qso, rst_rcvd_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.SRX = Regex.Split(row, srx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
-                regex = new Regex(rst_sent_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
+                regex = new Regex(freq_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso.rst_sent = Regex.Split(raw_qso, rst_sent_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
+                    qso_row.Freq = Regex.Split(row, freq_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
-                regex = new Regex(timeoff_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.time_off = Regex.Split(raw_qso, timeoff_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
 
-                regex = new Regex(timeon_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.time_on = Regex.Split(raw_qso, timeon_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
 
-                regex = new Regex(qso_date_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(raw_qso);
-                if (match.Success)
-                {
-                    qso.qso_date = Regex.Split(raw_qso, qso_date_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Replace("'", "_");
-                }
-
-                if (string.IsNullOrWhiteSpace(qso.band) && !string.IsNullOrWhiteSpace(qso.freq))
-                {
-                    convertFreqToBand(qso);
-                }
-
-                _QSO_List.Add(qso);
+                qso_row.StandartizeQSO();
+                m_qsoList.Add(qso_row);
             }
-            return true;
         }
-
-        public string GenerateInsert()
+        private void CalculateResult()
         {
-            //validations
-            if (string.IsNullOrWhiteSpace(TableName)) return "";
-            if (_QSO_List.Count == 0) return "";
-            string refTable = "";
-
-            switch (Project)
+            StringBuilder log = new StringBuilder();
+            IEnumerable<QSO> validQSOs;
+            if (logType == "foreign")
             {
-                case ProjectType._4XFF:
-                    refTable = "`wwff_ref`";
-                    break;
-                case ProjectType._4X4TRAIL:
-                    refTable = "`section`";
-                    break;
-                default:
-                    break;
+                validQSOs = m_qsoList.Where(p => p.IsValid && p.IsIsraeli).DistinctBy(p => p.HASH);
+            }
+            else
+            {
+                validQSOs = m_qsoList.Where(p => p.IsValid).DistinctBy(p => p.HASH);
             }
 
-            StringBuilder sb = new StringBuilder("INSERT IGNORE INTO `", 500);
-            sb.Append(TableName);
-            sb.Append("` (`address`, `band`, `call`, `comment`, `cont`, `country`, `cqz`, `dxcc`, `email`, `freq`, `gridsquare`, `ituz`, `mode`, `name`, `pfx`, `qso_date`, `qth`, `rst_rcvd`, `rst_sent`, `time_off`, `time_on`, " + refTable + ") VALUES ");
 
-            foreach (QSO qso in _QSO_List)
+            log.Append("You sent a total of "); log.Append(m_qsoList.Count()); log.Append(" QSO's, "); log.Append(validQSOs.Count()); log.Append(" are valid\r\n");
+            log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
+
+            int single_point = validQSOs.Count(p => p.Band.Contains("10") || p.Band.Contains("15") || p.Band.Contains("20"));
+            int double_point = validQSOs.Count(p => p.Band.Contains("40") || p.Band.Contains("80") || p.Band.Contains("160"));
+            int total_points = single_point + double_point * 2;
+            log.Append("You get a score of: "); log.Append(total_points); log.Append(" points\r\n");
+            log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
+
+            var DistinctContacts10 = validQSOs.Where(p => p.Band.Contains("10")).DistinctBy(p => p.HASH);
+            log.Append(DistinctContacts10.Count()); log.Append(" distinct Contacts on 10m\r\n");
+            var DistinctContacts15 = validQSOs.Where(p => p.Band.Contains("15")).DistinctBy(p => p.HASH);
+            log.Append(DistinctContacts15.Count()); log.Append(" distinct Contacts on 15m\r\n");
+            var DistinctContacts20 = validQSOs.Where(p => p.Band.Contains("20")).DistinctBy(p => p.HASH);
+            log.Append(DistinctContacts20.Count()); log.Append(" distinct Contacts on 20m\r\n");
+            var DistinctContacts40 = validQSOs.Where(p => p.Band.Contains("40")).DistinctBy(p => p.HASH);
+            log.Append(DistinctContacts40.Count()); log.Append(" distinct Contacts on 40m\r\n");
+            var DistinctContacts80 = validQSOs.Where(p => p.Band.Contains("80")).DistinctBy(p => p.HASH);
+            log.Append(DistinctContacts80.Count()); log.Append(" distinct Contacts on 80m\r\n");
+            var DistinctContacts160 = validQSOs.Where(p => p.Band.Contains("160")).DistinctBy(p => p.HASH);
+            log.Append(DistinctContacts160.Count()); log.Append(" distinct Contacts on 160m\r\n");
+            int AllBandContacts = DistinctContacts10.Count() + DistinctContacts15.Count() + DistinctContacts20.Count() + DistinctContacts40.Count() + DistinctContacts80.Count() + DistinctContacts160.Count();
+            log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
+
+            var DistinctSquares10 = validQSOs.Where(p => p.Band.Contains("10") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            log.Append(DistinctSquares10.Count()); log.Append(" distinct squares on 10m\r\n");
+            var DistinctSquares15 = validQSOs.Where(p => p.Band.Contains("15") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            log.Append(DistinctSquares15.Count()); log.Append(" distinct squares on 15m\r\n");
+            var DistinctSquares20 = validQSOs.Where(p => p.Band.Contains("20") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            log.Append(DistinctSquares20.Count()); log.Append(" distinct squares on 20m\r\n");
+            var DistinctSquares40 = validQSOs.Where(p => p.Band.Contains("40") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            log.Append(DistinctSquares40.Count()); log.Append(" distinct squares on 40m\r\n");
+            var DistinctSquares80 = validQSOs.Where(p => p.Band.Contains("80") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            log.Append(DistinctSquares80.Count()); log.Append(" distinct squares on 80m\r\n");
+            var DistinctSquares160 = validQSOs.Where(p => p.Band.Contains("160") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            log.Append(DistinctSquares160.Count()); log.Append(" distinct squares on 160m\r\n");
+            int AllBandSquares = DistinctSquares10.Count() + DistinctSquares15.Count() + DistinctSquares20.Count() + DistinctSquares40.Count() + DistinctSquares80.Count() + DistinctSquares160.Count();
+            //log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
+            log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
+            int IsraeliOn10 = DistinctSquares10.Count() > 0 ? 1 : 0;
+            int IsraeliOn15 = DistinctSquares15.Count() > 0 ? 1 : 0;
+            int IsraeliOn20 = DistinctSquares20.Count() > 0 ? 1 : 0;
+            int IsraeliOn40 = DistinctSquares40.Count() > 0 ? 1 : 0;
+            int IsraeliOn80 = DistinctSquares80.Count() > 0 ? 1 : 0;
+            int IsraeliOn160 = DistinctSquares160.Count() > 0 ? 1 : 0;
+            int AllBandIsraeliStations = IsraeliOn10 + IsraeliOn15 + IsraeliOn20 + IsraeliOn40 + IsraeliOn80 + IsraeliOn160;
+            //log.Append("You have contacted Israeli stations on "); log.Append(AllBandIsraeliStations); log.Append(" bands\r\n");
+
+            var DistinctDXCC10 = validQSOs.Where(p => p.Band.Contains("10") && !p.IsIsraeli).DistinctBy(p => p.DXCC.ToLower());
+            log.Append(DistinctDXCC10.Count()); log.Append(" distinct DXCC on 10m\r\n");
+            var DistinctDXCC15 = validQSOs.Where(p => p.Band.Contains("15") && !p.IsIsraeli).DistinctBy(p => p.DXCC.ToLower());
+            log.Append(DistinctDXCC15.Count()); log.Append(" distinct DXCC on 15m\r\n");
+            var DistinctDXCC20 = validQSOs.Where(p => p.Band.Contains("20") && !p.IsIsraeli).DistinctBy(p => p.DXCC.ToLower());
+            log.Append(DistinctDXCC20.Count()); log.Append(" distinct DXCC on 20m\r\n");
+            var DistinctDXCC40 = validQSOs.Where(p => p.Band.Contains("40") && !p.IsIsraeli).DistinctBy(p => p.DXCC.ToLower());
+            log.Append(DistinctDXCC40.Count()); log.Append(" distinct DXCC on 40m\r\n");
+            var DistinctDXCC80 = validQSOs.Where(p => p.Band.Contains("80") && !p.IsIsraeli).DistinctBy(p => p.DXCC.ToLower());
+            log.Append(DistinctDXCC80.Count()); log.Append(" distinct DXCC on 80m\r\n");
+            var DistinctDXCC160 = validQSOs.Where(p => p.Band.Contains("160") && !p.IsIsraeli).DistinctBy(p => p.DXCC.ToLower());
+            log.Append(DistinctDXCC160.Count()); log.Append(" distinct DXCC on 160m\r\n");
+            int AllBandDXCC = DistinctDXCC10.Count() + DistinctDXCC15.Count() + DistinctDXCC20.Count() + DistinctDXCC40.Count() + DistinctDXCC80.Count() + DistinctDXCC160.Count();
+            //log.Append(AllBandDXCC); log.Append(" DXCC in all bands\r\n");
+            log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
+
+            if (logType.ToLower() == "foreign")
             {
-                sb.Append("(");
-                sb.Append("'"); sb.Append(qso.address); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.band); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.call); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.comment); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.cont); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.country); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.cqz); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.dxcc); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.email); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.freq); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.gridsquare); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.ituz); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.name); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.pfx); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.qso_date); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.qth); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.time_off); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.time_on); sb.Append("',");
-                sb.Append("'"); sb.Append(Reference); sb.Append("'),");
+                log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
+                log.Append("You have contacted Israeli stations on "); log.Append(AllBandIsraeliStations); log.Append(" bands\r\n");
+                log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
+                _result = total_points * (AllBandSquares + AllBandIsraeliStations);
             }
-            sb.Remove(sb.Length - 1, 1);
-            return sb.ToString();
+            else if (logType.ToLower() == "israeli")
+            {
+                log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
+                log.Append(AllBandDXCC); log.Append(" DXCC entities in all bands\r\n");
+                log.Append("You have contacted Israeli stations on "); log.Append(AllBandIsraeliStations); log.Append(" bands\r\n");
+                log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
+                _result = total_points * (AllBandSquares + AllBandIsraeliStations + AllBandDXCC);
+            }
+            log.Append("Your total score is "); log.Append(_result); log.Append("\r\n");
+            log.Append("\r\n"); log.Append("\r\n"); log.Append("Thank you for sending the log. Good luck in the contest");
+            _description = log.ToString();
+
+            string t_Template = m_template;
+            t_Template = t_Template.Replace("~QSO10~", DistinctContacts10.Count().ToString());
+            t_Template = t_Template.Replace("~QSO15~", DistinctContacts15.Count().ToString());
+            t_Template = t_Template.Replace("~QSO20~", DistinctContacts20.Count().ToString());
+            t_Template = t_Template.Replace("~QSO40~", DistinctContacts40.Count().ToString());
+            t_Template = t_Template.Replace("~QSO80~", DistinctContacts80.Count().ToString());
+            t_Template = t_Template.Replace("~QSO160~", DistinctContacts160.Count().ToString());
+
+            t_Template = t_Template.Replace("~POINTS10~", DistinctContacts10.Count().ToString());
+            t_Template = t_Template.Replace("~POINTS15~", DistinctContacts15.Count().ToString());
+            t_Template = t_Template.Replace("~POINTS20~", DistinctContacts20.Count().ToString());
+            t_Template = t_Template.Replace("~POINTS40~", (DistinctContacts40.Count() * 2).ToString());
+            t_Template = t_Template.Replace("~POINTS80~", (DistinctContacts80.Count() * 2).ToString());
+            t_Template = t_Template.Replace("~POINTS160~", (DistinctContacts160.Count() * 2).ToString());
+
+            t_Template = t_Template.Replace("~SQUARES10~", DistinctSquares10.Count().ToString());
+            t_Template = t_Template.Replace("~SQUARES15~", DistinctSquares15.Count().ToString());
+            t_Template = t_Template.Replace("~SQUARES20~", DistinctSquares20.Count().ToString());
+            t_Template = t_Template.Replace("~SQUARES40~", DistinctSquares40.Count().ToString());
+            t_Template = t_Template.Replace("~SQUARES80~", DistinctSquares80.Count().ToString());
+            t_Template = t_Template.Replace("~SQUARES160~", DistinctSquares160.Count().ToString());
+
+            t_Template = t_Template.Replace("~DXCC10~", (DistinctDXCC10.Count() + IsraeliOn10).ToString());
+            t_Template = t_Template.Replace("~DXCC15~", (DistinctDXCC15.Count() + IsraeliOn15).ToString());
+            t_Template = t_Template.Replace("~DXCC20~", (DistinctDXCC20.Count() + IsraeliOn20).ToString());
+            t_Template = t_Template.Replace("~DXCC40~", (DistinctDXCC40.Count() + IsraeliOn40).ToString());
+            t_Template = t_Template.Replace("~DXCC80~", (DistinctDXCC80.Count() + IsraeliOn80).ToString());
+            t_Template = t_Template.Replace("~DXCC160~", (DistinctDXCC160.Count() + IsraeliOn160).ToString());
+
+            t_Template = t_Template.Replace("~QSO~", validQSOs.Count().ToString());
+            t_Template = t_Template.Replace("~POINTS~", total_points.ToString());
+            t_Template = t_Template.Replace("~SQUARES~", AllBandSquares.ToString());
+            t_Template = t_Template.Replace("~DXCC~", (AllBandDXCC + AllBandIsraeliStations).ToString());
+            t_Template = t_Template.Replace("~SCORE~", _result.ToString());
+
+
+            //string[] log_lines = Regex.Split(log.ToString().Replace("-----------------------------------------------------------------------------------------------------------","<hr>"), "\r\n");
+            StringBuilder FinalTemplate = new StringBuilder(t_Template);
+            //foreach (var row in log_lines)
+            //{
+            //    FinalTemplate.AppendLine(row + "<br />");   
+            //}
+            m_templateRes = FinalTemplate.ToString();
         }
 
-        
-    }
+        public string getErrors()
+        {
+            var invalidQSOs = m_qsoList.Where(p => !p.IsValid);
+            StringBuilder s = new StringBuilder();
+            foreach (QSO qso in invalidQSOs)
+            {
+                s.Append(qso.ERROR);
+                s.Append("\r\n");
+            }
+            return s.ToString();
+        }
 
-    internal class QSO
-    {
-        public string address { get; set; }
-        public string band { get; set; }
-        public string call { get; set; }
-        public string comment { get; set; }
-        public string cont { get; set; }
-        public string country { get; set; }
-        public string cqz { get; set; }
-        public string dxcc { get; set; }
-        public string email { get; set; }
-        public string freq { get; set; }
-        public string gridsquare { get; set; }
-        public string ituz { get; set; }
-        public string mode { get; set; }
-        public string name { get; set; }
-        public string pfx { get; set; }
-        public string qso_date { get; set; }
-        public string qth { get; set; }
-        public string rst_rcvd { get; set; }
-        public string rst_sent { get; set; }
-        public string time_off { get; set; }
-        public string time_on { get; set; }        
-    }
 
-    internal enum ProjectType
-    {
-        _4XFF = 0, _4X4TRAIL
+        private class QSO
+        {
+            public bool IsIsraeli { get; set; }
+            public bool IsValid { get; set; }
+            public string Call { get; set; }
+            public string Date { get; set; }
+            public string Time { get; set; }
+            public string Band { get; set; }
+            public string Mode { get; set; }
+            public string Name { get; set; }
+            public string Freq { get; set; }
+            public string Comment { get; set; }
+            public string DXCC { get; set; }
+            public string SRX { get; set; }
+            public string HASH { get; set; }
+            public string ERROR { get; set; }
+
+
+            public void StandartizeQSO()
+            {
+                IsValid = false;
+                IsIsraeli = !string.IsNullOrEmpty(Call) && (Call.StartsWith("4X", true, System.Globalization.CultureInfo.CurrentCulture) || Call.StartsWith("4Z", true, System.Globalization.CultureInfo.CurrentCulture));
+                string pattern = @"([a-zA-Z]{1})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
+                Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
+                if (!string.IsNullOrEmpty(SRX))
+                {
+                    Match match = regex.Match(SRX);
+                    if (match.Success)
+                    {
+                        this.SRX = match.Groups[1].Value + match.Groups[2].Value + match.Groups[3].Value;
+                        IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && IsIsraeli;
+                        if (IsValid && IsIsraeli)
+                            HASH = Call + Band + Mode + SRX;
+                        else if (IsValid && !IsIsraeli)
+                            HASH = Call + Band + Mode;
+                    }
+                    else
+                    {
+                        pattern = @"(\d+)";
+                        regex = new Regex(pattern, RegexOptions.IgnoreCase);
+                        match = regex.Match(SRX);
+                        if (match.Success)
+                        {
+                            this.SRX = match.Groups[1].Value;
+                            IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && !IsIsraeli;
+                            if (IsValid && IsIsraeli)
+                                HASH = Call + Band + Mode + SRX;
+                            else if (IsValid && !IsIsraeli)
+                                HASH = Call + Band + Mode;
+                        }
+                        else
+                        {
+                            IsValid = false;
+                        }
+                    }
+                }
+                else
+                {
+                    IsValid = false;
+                }
+            }
+            private bool IsValidBand()
+            {
+                if (string.IsNullOrEmpty(Band) && !string.IsNullOrEmpty(Freq))
+                {
+                    convertFreqToBand();
+                }
+                bool isValid = !string.IsNullOrEmpty(Band) && (Band.Contains("10") || Band.Contains("15") || Band.Contains("20") || Band.Contains("40") || Band.Contains("80") || Band.Contains("160"));
+                if (!isValid) this.ERROR += "Band is not valid: " + Band + " - ";
+                return isValid;
+
+            }
+            private bool IsValidMode()
+            {
+                bool isValid = !string.IsNullOrEmpty(Mode) && (Mode.ToLower().Contains("ssb") || Mode.ToLower().Contains("lsb") || Mode.ToLower().Contains("usb") || Mode.ToLower().Contains("cw") || Mode.ToLower().Contains("rtty") || Mode.ToLower().Contains("psk"));
+                if (!isValid) this.ERROR += "Mode is not valid: " + Mode + " - ";
+                return isValid;
+            }
+            private bool IsValidCall()
+            {
+                bool isValid = !string.IsNullOrEmpty(Call);
+                if (!isValid) this.ERROR += "Call is empty -";
+                return isValid;
+            }
+            private bool IsValidComment()
+            {
+                bool isValid = !string.IsNullOrEmpty(Comment);
+                if (!isValid) this.ERROR += "Comment is empty -";
+                return isValid;
+            }
+            private bool IsValidSRX()
+            {
+                bool isValid = !string.IsNullOrEmpty(SRX);
+                if (!isValid) this.ERROR += "SRX is empty -";
+                return isValid;
+            }
+            private bool IsValidDXCC()
+            {
+                return true;
+                //bool isValid = !string.IsNullOrEmpty(DXCC);
+                //if (!isValid) this.ERROR += "DXCC is empty -";
+                //return isValid;
+            }
+
+            private void convertFreqToBand()
+            {
+                double parsedFreq;
+                if (!double.TryParse(Freq, out parsedFreq)) return;
+                if (parsedFreq < 30)
+                {
+                    if (parsedFreq > 0 && parsedFreq < 2) Band = "160";
+                    if (parsedFreq > 2 && parsedFreq < 5) Band = "80";
+                    if (parsedFreq > 5 && parsedFreq < 10) Band = "40";
+                    if (parsedFreq > 12 && parsedFreq < 16) Band = "20";
+                    if (parsedFreq > 19 && parsedFreq < 23) Band = "15";
+                    if (parsedFreq > 25 && parsedFreq < 30) Band = "10";
+                }
+                else
+                {
+                    if (parsedFreq > 0 && parsedFreq < 2000) Band = "160";
+                    if (parsedFreq > 2000 && parsedFreq < 5000) Band = "80";
+                    if (parsedFreq > 5000 && parsedFreq < 10000) Band = "40";
+                    if (parsedFreq > 12000 && parsedFreq < 16000) Band = "20";
+                    if (parsedFreq > 19000 && parsedFreq < 23000) Band = "15";
+                    if (parsedFreq > 25000 && parsedFreq < 30000) Band = "10";
+                }
+
+            }
+        }
     }
 }

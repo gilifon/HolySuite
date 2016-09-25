@@ -37,9 +37,14 @@
                             </MenuItem>
                         </MenuItem>
                         <MenuItem Header="Tools">
-                            <MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
+                            <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
                                 <MenuItem.Icon>
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>-->
+                            <MenuItem x:Name="MyScoreMenuItem" Header="My Score" ToolTip="Calculate your score based on the current log" Click="MyScoreMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/trophy.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
@@ -75,7 +80,7 @@
         <TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="O01ZF" />
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Station' info and Frequency" HorizontalAlignment="Left" Height="20" Margin="591,21,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="Frequency" HorizontalAlignment="Left" Margin="407,18,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Height="23" Margin="477,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" Grid.Row="1" Text="14.220.000" />
+        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Height="23" Margin="477,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" Grid.Row="1" Text="14.220000" />
         <Label Content="Mode" HorizontalAlignment="Left" Margin="6,54,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <ComboBox x:Name="CB_Mode" Text="Mode" HorizontalAlignment="Left" Margin="82,58,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99">
             <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>

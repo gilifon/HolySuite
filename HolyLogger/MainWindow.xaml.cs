@@ -356,6 +356,14 @@ namespace HolyLogger
             return allOK;
         }
 
+        private void MyScoreMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string adif = GenerateAdif(dal.GetAllQSOs());
+            ADIFParser p = new ADIFParser(adif, "israeli");
+            p.Parse();
+            MessageBox.Show("Your score is: " + p.Result.ToString());
+        }
+
        
     }
 }
