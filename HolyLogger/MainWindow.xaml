@@ -24,7 +24,7 @@
                                     <Image Source="Images/export.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show QSO Statistics">
+                            <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show QSO Statistics" Visibility="Collapsed">
                                 <MenuItem.Icon>
                                     <Image Source="Images/statistics.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>

@@ -14,14 +14,20 @@ namespace HolyLogger
     /// </summary>
     public partial class App : Application
     {
-        public Mutex Mutex;
+        Mutex myMutex;
         public App()
         {
-            bool isOnlyInstance = false;
-            Mutex = new Mutex(true, @"MarkdownMonster", out isOnlyInstance);
-            if (!isOnlyInstance)
+     
+        }
+
+        private void Application_Startup(object sender, StartupEventArgs e)
+        {
+            bool aIsNewInstance = false;
+            myMutex = new Mutex(true, "HolyLoggerApplication", out aIsNewInstance);
+            if (!aIsNewInstance)
             {
-                Environment.Exit(0);
+                MessageBox.Show("Holyland logger is already open...");
+                App.Current.Shutdown();
             }
         }
     }

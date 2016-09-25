@@ -27,16 +27,18 @@ namespace HolyLogger
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        #region INotifyProprtyChanged
         public event PropertyChangedEventHandler PropertyChanged;
-
-        protected void RaisePropertyChanged(string propertyName)
+        protected void OnPropertyChanged(string propertyName)
         {
-            var handler = PropertyChanged;
-            if (handler != null)
+            if (PropertyChanged != null)
             {
-                handler(this, new PropertyChangedEventArgs(propertyName));
+                PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
             }
         }
+        #endregion
+
+       
 
         DataAccess dal = new DataAccess();
         public ObservableCollection<QSO> Qsos;
@@ -48,9 +50,12 @@ namespace HolyLogger
             set
             {
                 _NumOfQSOs = value;
-                RaisePropertyChanged("NumOfQSOs");
+                OnPropertyChanged("NumOfQSOs");
             }
         }
+
+       
+
 
         public MainWindow()
         {
@@ -96,6 +101,7 @@ namespace HolyLogger
 
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
+            if (!Validate()) return;
             QSO qso = new QSO();
             qso.comment = TB_Comment.Text;
             qso.dx_callsign = TB_DXCallsign.Text;
@@ -249,5 +255,93 @@ namespace HolyLogger
             about.Show();
         }
 
+        private bool Validate()
+        {
+            bool allOK = true;
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            {
+                allOK = false;
+                TB_DXCallsign.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+            else
+            {
+                TB_DXCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
+            }
+
+
+            if (string.IsNullOrWhiteSpace(TB_Exchange.Text))
+            {
+                allOK = false;
+                TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+            else
+            {
+                TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+            }
+
+            if (string.IsNullOrWhiteSpace(TB_Frequency.Text))
+            {
+                allOK = false;
+                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+            else
+            {
+                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.LightGray;
+            }
+            
+            if (string.IsNullOrWhiteSpace(TB_MyCallsign.Text))
+            {
+                allOK = false;
+                TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+            else
+            {
+                TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
+            }
+
+            if (string.IsNullOrWhiteSpace(TB_MyGrid.Text))
+            {
+                allOK = false;
+                TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+            else
+            {
+                TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.LightGray;
+            }
+
+            if (string.IsNullOrWhiteSpace(TB_RSTRcvd.Text))
+            {
+                allOK = false;
+                TB_RSTRcvd.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+            else
+            {
+                TB_RSTRcvd.BorderBrush = System.Windows.Media.Brushes.LightGray;
+            }
+
+            if (string.IsNullOrWhiteSpace(TB_RSTSent.Text))
+            {
+                allOK = false;
+                TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+            else
+            {
+                TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.LightGray;
+            }
+
+            if (string.IsNullOrWhiteSpace(QSOTimeStamp.Text))
+            {
+                allOK = false;
+                QSOTimeStamp.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+            else
+            {
+                QSOTimeStamp.BorderBrush = System.Windows.Media.Brushes.LightGray;
+            }
+
+            return allOK;
+        }
+
+       
     }
 }
