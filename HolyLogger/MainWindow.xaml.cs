@@ -38,9 +38,9 @@ namespace HolyLogger
         }
         #endregion
 
-       
 
-        DataAccess dal = new DataAccess();
+
+        DataAccess dal;
         public ObservableCollection<QSO> Qsos;
 
         private string _NumOfQSOs;
@@ -60,6 +60,17 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
+
+            try
+            {
+                dal = new DataAccess();
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Failed to connect to DB: " + e.Message);
+                throw;
+            }
+            
             TB_MyCallsign.Focus();
 
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
