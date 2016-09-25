@@ -119,7 +119,7 @@ namespace HolyLogger
             qso.dx_callsign = TB_DXCallsign.Text;
             qso.mode = CB_Mode.Text;
             qso.exchange = TB_Exchange.Text;
-            qso.frequency = TB_Frequency.Text;
+            qso.frequency = TB_Frequency.Text.Replace(",","");
             qso.my_callsign = TB_MyCallsign.Text;
             qso.my_square = TB_MyGrid.Text;
             qso.rst_rcvd = TB_RSTRcvd.Text;
@@ -137,7 +137,15 @@ namespace HolyLogger
             if (!string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
                 url += "/db/" + TB_DXCallsign.Text;
 
-            System.Diagnostics.Process.Start(@"chrome.exe", url);
+            try
+            {
+                System.Diagnostics.Process.Start(url);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Please install 'Chrome' and try again");
+            }
+            
         }
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
