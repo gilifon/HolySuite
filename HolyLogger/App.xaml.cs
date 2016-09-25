@@ -30,5 +30,6 @@ namespace HolyLogger
                 App.Current.Shutdown();
             }
         }
+
     }
 }

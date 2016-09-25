@@ -17,11 +17,11 @@ namespace HolyLogger
         {
             try
             {
-                string executable = System.Reflection.Assembly.GetExecutingAssembly().Location;
-                string path = (System.IO.Path.GetDirectoryName(executable));
-                AppDomain.CurrentDomain.SetData("DataDirectory", path);
+                //string executable = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                //string path = (System.IO.Path.GetDirectoryName(executable));
+                //AppDomain.CurrentDomain.SetData("DataDirectory", path);
 
-                con = new SQLiteConnection(@"Data Source = |DataDirectory|\..\..\Data\logDB.db;Version=3");
+                con = new SQLiteConnection(@"Data Source = Data\logDB.db;Version=3");
                 con.Open();
             }
             catch (Exception e)

@@ -372,6 +372,11 @@ namespace HolyLogger
             MessageBox.Show("Your score is: " + p.Result.ToString());
         }
 
+        private void Window_Closed(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.Save();
+        }
+
        
     }
 }
