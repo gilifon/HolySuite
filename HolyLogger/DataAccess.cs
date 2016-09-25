@@ -34,7 +34,7 @@ namespace HolyLogger
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,dx_callsign,rst_rcvd,rst_sent,timestamp,exchange,comment) VALUES (?,?,?,?,?,?,?,?,?)", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,dx_callsign,rst_rcvd,rst_sent,timestamp,mode,exchange,comment) VALUES (?,?,?,?,?,?,?,?,?,?)", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.my_callsign));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.my_square));
                 insertSQL.Parameters.Add(new SQLiteParameter("frequency", qso.frequency));
@@ -42,6 +42,7 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("rst_rcvd", qso.rst_rcvd));
                 insertSQL.Parameters.Add(new SQLiteParameter("rst_sent", qso.rst_sent));
                 insertSQL.Parameters.Add(new SQLiteParameter("timestamp", qso.timestamp));
+                insertSQL.Parameters.Add(new SQLiteParameter("mode", qso.mode));
                 insertSQL.Parameters.Add(new SQLiteParameter("exchange", qso.exchange));
                 insertSQL.Parameters.Add(new SQLiteParameter("comment", qso.comment));
                 try
@@ -87,6 +88,7 @@ namespace HolyLogger
                         q.id = int.Parse(rdr["Id"].ToString());
                         q.comment = (string)rdr["comment"];
                         q.dx_callsign = (string)rdr["dx_callsign"];
+                        q.mode = (string)rdr["mode"];
                         q.exchange = (string)rdr["exchange"];
                         q.frequency = (string)rdr["frequency"];
                         q.my_callsign = (string)rdr["my_callsign"];
@@ -114,6 +116,7 @@ namespace HolyLogger
                         q.id = int.Parse(rdr["Id"].ToString());
                         q.comment = (string)rdr["comment"];
                         q.dx_callsign = (string)rdr["dx_callsign"];
+                        q.mode = (string)rdr["mode"];
                         q.exchange = (string)rdr["exchange"];
                         q.frequency = (string)rdr["frequency"];
                         q.my_callsign = (string)rdr["my_callsign"];

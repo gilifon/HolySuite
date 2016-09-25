@@ -16,6 +16,7 @@ namespace HolyLogger
         public string rst_rcvd { get; set; }
         public string rst_sent { get; set; }
         public DateTime timestamp { get; set; }
+        public string mode { get; set; }
         public string exchange { get; set; }
         public string comment { get; set; }
 

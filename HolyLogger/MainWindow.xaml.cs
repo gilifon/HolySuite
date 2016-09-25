@@ -90,6 +90,7 @@ namespace HolyLogger
             TB_MyCallsign.IsEnabled = !(TB_MyCallsign.IsEnabled);
             TB_MyGrid.IsEnabled = !(TB_MyGrid.IsEnabled);
             TB_Frequency.IsEnabled = !(TB_Frequency.IsEnabled);
+            CB_Mode.IsEnabled = !(CB_Mode.IsEnabled);
             if (TB_MyGrid.IsEnabled) ((Image)sender).Opacity = 1;
             else ((Image)sender).Opacity = 0.5;
         }
@@ -105,6 +106,7 @@ namespace HolyLogger
             QSO qso = new QSO();
             qso.comment = TB_Comment.Text;
             qso.dx_callsign = TB_DXCallsign.Text;
+            qso.mode = CB_Mode.Text;
             qso.exchange = TB_Exchange.Text;
             qso.frequency = TB_Frequency.Text;
             qso.my_callsign = TB_MyCallsign.Text;
@@ -218,6 +220,7 @@ namespace HolyLogger
                 adif.AppendFormat("<call:{0}>{1} ", qso.dx_callsign.Length, qso.dx_callsign);
                 adif.AppendFormat("<srx_string:{0}>{1} ", qso.exchange.Length, qso.exchange);
                 adif.AppendFormat("<freq:{0}>{1} ", qso.frequency.Length, qso.frequency);
+                adif.AppendFormat("<mode:{0}>{1} ", qso.mode.Length, qso.mode);
                 adif.AppendFormat("<station_callsign:{0}>{1} ", qso.my_callsign.Length, qso.my_callsign);
                 adif.AppendFormat("<operator:{0}>{1} ", qso.my_callsign.Length, qso.my_callsign);
                 adif.AppendFormat("<stx_string :{0}>{1} ", qso.my_square.Length, qso.my_square);
