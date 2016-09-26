@@ -54,9 +54,6 @@ namespace HolyLogger
             }
         }
 
-       
-
-
         public MainWindow()
         {
             InitializeComponent();
