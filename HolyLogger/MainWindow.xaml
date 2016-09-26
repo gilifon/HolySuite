@@ -66,9 +66,14 @@
                 <StatusBarItem>
                     <TextBlock Text="# of QSO's: " />
                 </StatusBarItem>
-
                 <StatusBarItem>
                     <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock Text="Score: " />
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock x:Name="L_score" Text="{Binding Score, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}"/>
                 </StatusBarItem>
             </StatusBar>
         </DockPanel>

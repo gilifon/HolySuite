@@ -54,8 +54,18 @@ namespace HolyLogger
             }
         }
 
-       
+        private string _Score;
+        public string Score
+        {
+            get { return _Score; }
+            set
+            {
+                _Score = value;
+                OnPropertyChanged("Score");
+            }
+        }
 
+        ADIFParser p;
 
         public MainWindow()
         {
@@ -81,7 +91,7 @@ namespace HolyLogger
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
             
-            UpdateNumOfQSOs();            
+            UpdateNumOfQSOs();
         }
 
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -183,7 +193,9 @@ namespace HolyLogger
 
         private void UpdateNumOfQSOs()
         {
+            parseAdif();
             NumOfQSOs = dal.GetQsoCount().ToString();
+            Score = p.Result.ToString();
         }
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -366,10 +378,15 @@ namespace HolyLogger
 
         private void MyScoreMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string adif = GenerateAdif(dal.GetAllQSOs());
-            ADIFParser p = new ADIFParser(adif, "israeli");
-            p.Parse();
+            parseAdif();
             MessageBox.Show("Your score is: " + p.Result.ToString());
+        }
+
+        private void parseAdif()
+        {
+            string adif = GenerateAdif(dal.GetAllQSOs());
+            p = new ADIFParser(adif, "israeli");
+            p.Parse();
         }
 
         private void Window_Closed(object sender, EventArgs e)
