@@ -91,7 +91,7 @@ namespace HolyLogger
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
             
-            UpdateNumOfQSOs();
+            UpdateNumOfQSOs();            
         }
 
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -385,7 +385,7 @@ namespace HolyLogger
         private void parseAdif()
         {
             string adif = GenerateAdif(dal.GetAllQSOs());
-            p = new ADIFParser(adif, "israeli");
+            p = new ADIFParser(adif, ADIFParser.Operator.Israeli);
             p.Parse();
         }
 

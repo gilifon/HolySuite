@@ -23,9 +23,9 @@ namespace HolyLogger
         Mutex myMutex;
         public AboutWindow()
         {
-            
-
             InitializeComponent();
+            Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
+            Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
         }
 
         private void Window_About_Loaded(object sender, RoutedEventArgs e)
