@@ -364,7 +364,7 @@ namespace HolyLogger
         private void MyScoreMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string adif = GenerateAdif(dal.GetAllQSOs());
-            ADIFParser p = new ADIFParser(adif, "israeli");
+            ADIFParser p = new ADIFParser(adif, ADIFParser.Operator.Israeli);
             p.Parse();
             MessageBox.Show("Your score is: " + p.Result.ToString());
         }

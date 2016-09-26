@@ -16,7 +16,7 @@ namespace HolyLogger
         private string _description;
         public string Description { get { return _description; } }
 
-        public string logType { get; set; }
+        public Operator logType { get; set; }
 
         private string m_fileText;
         private List<QSO> m_qsoList;
@@ -127,7 +127,7 @@ th,td
         //private string name_pattern = @"<name:(\d)(?::[a-z]{1})?>";
 
 
-        public ADIFParser(string rawData, string logType)
+        public ADIFParser(string rawData, Operator logType)
         {
             m_fileText = rawData;
             this.logType = logType;
@@ -237,12 +237,12 @@ th,td
         private void CalculateResult()
         {
             StringBuilder log = new StringBuilder();
-            IEnumerable<QSO> validQSOs;
-            if (logType == "foreign")
+            IEnumerable<QSO> validQSOs = null;
+            if (logType == Operator.Foreign)
             {
                 validQSOs = m_qsoList.Where(p => p.IsValid && p.IsIsraeli).DistinctBy(p => p.HASH);
             }
-            else
+            else if (logType == Operator.Israeli)
             {
                 validQSOs = m_qsoList.Where(p => p.IsValid).DistinctBy(p => p.HASH);
             }
@@ -312,14 +312,14 @@ th,td
             //log.Append(AllBandDXCC); log.Append(" DXCC in all bands\r\n");
             log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
 
-            if (logType.ToLower() == "foreign")
+            if (logType == Operator.Foreign)
             {
                 log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
                 log.Append("You have contacted Israeli stations on "); log.Append(AllBandIsraeliStations); log.Append(" bands\r\n");
                 log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
                 _result = total_points * (AllBandSquares + AllBandIsraeliStations);
             }
-            else if (logType.ToLower() == "israeli")
+            else if (logType == Operator.Israeli)
             {
                 log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
                 log.Append(AllBandDXCC); log.Append(" DXCC entities in all bands\r\n");
@@ -517,6 +517,11 @@ th,td
                 }
 
             }
+        }
+
+        public enum Operator
+        {
+            Israeli = 0, Foreign
         }
     }
 }

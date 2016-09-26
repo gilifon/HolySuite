@@ -6,7 +6,7 @@
       <Value Profile="(Default)">4Z1KD</Value>
     </Setting>
     <Setting Name="my_square" Type="System.String" Scope="User">
-      <Value Profile="(Default)">O02ZF</Value>
+      <Value Profile="(Default)">O01ZF</Value>
     </Setting>
   </Settings>
 </SettingsFile>
