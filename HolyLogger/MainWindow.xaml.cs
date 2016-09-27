@@ -79,6 +79,7 @@ namespace HolyLogger
         }
 
         ADIFParser p;
+        SignboardWindow signboard = null;
 
         public MainWindow()
         {
@@ -428,8 +429,27 @@ namespace HolyLogger
                 
         }
 
+        private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyGrid.Text);
+            signboard.Show();
+        }
 
-        
+        private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (signboard != null)
+            {
+                signboard.signboardData.Callsign = TB_MyCallsign.Text;
+            }
+        }
+
+        private void TB_MyGrid_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (signboard != null)
+            {
+                signboard.signboardData.Square = TB_MyGrid.Text;
+            }
+        }
 
        
     }

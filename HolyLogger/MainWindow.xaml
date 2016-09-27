@@ -42,6 +42,11 @@
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
+                            <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/sign.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <MenuItem x:Name="MyScoreMenuItem" Header="My Score" ToolTip="Calculate your score based on the current log" Click="MyScoreMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/trophy.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -80,9 +85,9 @@
 
 
         <Label Content="My Callsign" HorizontalAlignment="Left" Margin="6,18,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="23" Margin="81,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_callsign}"  />
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="23" Margin="81,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_callsign}" TextChanged="TB_MyCallsign_TextChanged"  />
         <Label Content="My Square" HorizontalAlignment="Left" Margin="216,18,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" />
+        <TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" TextChanged="TB_MyGrid_TextChanged" />
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Station' info and Frequency" HorizontalAlignment="Left" Height="20" Margin="591,21,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="Frequency" HorizontalAlignment="Left" Margin="407,18,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <xctk:MaskedTextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="477,21,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,99" PromptChar="0" Text="1422000" Width="100" Height="23" TextChanged="TB_Frequency_TextChanged"/>
