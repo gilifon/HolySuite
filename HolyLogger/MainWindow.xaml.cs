@@ -255,6 +255,7 @@ namespace HolyLogger
             adif.AppendLine("<PROGRAMID:14>HolylandLogger ");
             //adif.AppendLine("<PROGRAMVERSION:15>Version 1.0.0.0 ");
             adif.AppendFormat("<PROGRAMVERSION:{0}>{1} ", Version.Length, Version);
+            adif.AppendLine();
             adif.AppendLine("<EOH>");
             adif.AppendLine();
 
