@@ -388,6 +388,30 @@ th,td
             return s.ToString();
         }
 
+        public static string convertFreqToBand(string freq)
+        {
+            double parsedFreq;
+            if (!double.TryParse(freq, out parsedFreq)) return string.Empty;
+            if (parsedFreq < 30)
+            {
+                if (parsedFreq > 0 && parsedFreq < 2) return "160";
+                if (parsedFreq > 2 && parsedFreq < 5) return "80";
+                if (parsedFreq > 5 && parsedFreq < 10) return "40";
+                if (parsedFreq > 12 && parsedFreq < 16) return "20";
+                if (parsedFreq > 19 && parsedFreq < 23) return "15";
+                if (parsedFreq > 25 && parsedFreq < 30) return "10";
+            }
+            else
+            {
+                if (parsedFreq > 0 && parsedFreq < 2000) return "160";
+                if (parsedFreq > 2000 && parsedFreq < 5000) return "80";
+                if (parsedFreq > 5000 && parsedFreq < 10000) return "40";
+                if (parsedFreq > 12000 && parsedFreq < 16000) return "20";
+                if (parsedFreq > 19000 && parsedFreq < 23000) return "15";
+                if (parsedFreq > 25000 && parsedFreq < 30000) return "10";
+            }
+            return string.Empty;
+        }
 
         private class QSO
         {
@@ -454,7 +478,7 @@ th,td
             {
                 if (string.IsNullOrEmpty(Band) && !string.IsNullOrEmpty(Freq))
                 {
-                    convertFreqToBand();
+                    Band = convertFreqToBand(Freq);
                 }
                 bool isValid = !string.IsNullOrEmpty(Band) && (Band.Contains("10") || Band.Contains("15") || Band.Contains("20") || Band.Contains("40") || Band.Contains("80") || Band.Contains("160"));
                 if (!isValid) this.ERROR += "Band is not valid: " + Band + " - ";
@@ -493,32 +517,32 @@ th,td
                 //return isValid;
             }
 
-            private void convertFreqToBand()
-            {
-                double parsedFreq;
-                if (!double.TryParse(Freq, out parsedFreq)) return;
-                if (parsedFreq < 30)
-                {
-                    if (parsedFreq > 0 && parsedFreq < 2) Band = "160";
-                    if (parsedFreq > 2 && parsedFreq < 5) Band = "80";
-                    if (parsedFreq > 5 && parsedFreq < 10) Band = "40";
-                    if (parsedFreq > 12 && parsedFreq < 16) Band = "20";
-                    if (parsedFreq > 19 && parsedFreq < 23) Band = "15";
-                    if (parsedFreq > 25 && parsedFreq < 30) Band = "10";
-                }
-                else
-                {
-                    if (parsedFreq > 0 && parsedFreq < 2000) Band = "160";
-                    if (parsedFreq > 2000 && parsedFreq < 5000) Band = "80";
-                    if (parsedFreq > 5000 && parsedFreq < 10000) Band = "40";
-                    if (parsedFreq > 12000 && parsedFreq < 16000) Band = "20";
-                    if (parsedFreq > 19000 && parsedFreq < 23000) Band = "15";
-                    if (parsedFreq > 25000 && parsedFreq < 30000) Band = "10";
-                }
+            //private void convertFreqToBand()
+            //{
+            //    double parsedFreq;
+            //    if (!double.TryParse(Freq, out parsedFreq)) return;
+            //    if (parsedFreq < 30)
+            //    {
+            //        if (parsedFreq > 0 && parsedFreq < 2) Band = "160";
+            //        if (parsedFreq > 2 && parsedFreq < 5) Band = "80";
+            //        if (parsedFreq > 5 && parsedFreq < 10) Band = "40";
+            //        if (parsedFreq > 12 && parsedFreq < 16) Band = "20";
+            //        if (parsedFreq > 19 && parsedFreq < 23) Band = "15";
+            //        if (parsedFreq > 25 && parsedFreq < 30) Band = "10";
+            //    }
+            //    else
+            //    {
+            //        if (parsedFreq > 0 && parsedFreq < 2000) Band = "160";
+            //        if (parsedFreq > 2000 && parsedFreq < 5000) Band = "80";
+            //        if (parsedFreq > 5000 && parsedFreq < 10000) Band = "40";
+            //        if (parsedFreq > 12000 && parsedFreq < 16000) Band = "20";
+            //        if (parsedFreq > 19000 && parsedFreq < 23000) Band = "15";
+            //        if (parsedFreq > 25000 && parsedFreq < 30000) Band = "10";
+            //    }
 
-            }
+            //}
         }
-
+        
         public enum Operator
         {
             Israeli = 0, Foreign

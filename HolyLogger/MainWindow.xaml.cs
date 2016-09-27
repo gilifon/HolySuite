@@ -410,6 +410,12 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
+        private void TB_Frequency_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (TB_Band != null)
+            TB_Band.Text = ADIFParser.convertFreqToBand(TB_Frequency.Text.Replace(",",""));
+        }
+
        
     }
 }
