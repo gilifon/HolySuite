@@ -104,8 +104,9 @@ namespace HolyLogger
             Qsos = dal.GetAllQSOs();
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
-            
-            UpdateNumOfQSOs();            
+
+            UpdateNumOfQSOs();
+            TB_Frequency_TextChanged(null, null);
         }
 
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -413,8 +414,22 @@ namespace HolyLogger
         private void TB_Frequency_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (TB_Band != null)
-            TB_Band.Text = ADIFParser.convertFreqToBand(TB_Frequency.Text.Replace(",",""));
+            {
+                string band = ADIFParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+                if (!string.IsNullOrWhiteSpace(band))
+                {
+                    TB_Band.Text = ADIFParser.convertFreqToBand(TB_Frequency.Text.Replace(",", "")) + "M";
+                }
+                else
+                {
+                    TB_Band.Text = string.Empty;
+                }
+            }
+                
         }
+
+
+        
 
        
     }
