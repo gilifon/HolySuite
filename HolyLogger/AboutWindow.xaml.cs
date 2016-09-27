@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -26,6 +27,7 @@ namespace HolyLogger
             InitializeComponent();
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
             Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
+            L_Version.Text = "Version " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
         }
 
         private void Window_About_Loaded(object sender, RoutedEventArgs e)

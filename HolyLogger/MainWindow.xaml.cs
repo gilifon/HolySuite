@@ -19,6 +19,8 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Microsoft.Win32;
 using System.Collections.Specialized;
+using System.Diagnostics;
+using System.Reflection;
 
 namespace HolyLogger
 {
@@ -65,12 +67,24 @@ namespace HolyLogger
             }
         }
 
+        private string _Version;
+        public string Version
+        {
+            get { return _Version; }
+            set
+            {
+                _Version = value;
+                OnPropertyChanged("Version");
+            }
+        }
+
         ADIFParser p;
 
         public MainWindow()
         {
             InitializeComponent();
-
+            Version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            
             try
             {
                 dal = new DataAccess();
@@ -239,7 +253,8 @@ namespace HolyLogger
             StringBuilder adif = new StringBuilder(200);
             adif.AppendLine("<ADIF_VERS:3>2.2 ");
             adif.AppendLine("<PROGRAMID:14>HolylandLogger ");
-            adif.AppendLine("<PROGRAMVERSION:15>Version 1.0.0.0 ");
+            //adif.AppendLine("<PROGRAMVERSION:15>Version 1.0.0.0 ");
+            adif.AppendFormat("<PROGRAMVERSION:{0}>{1} ", Version.Length, Version);
             adif.AppendLine("<EOH>");
             adif.AppendLine();
 

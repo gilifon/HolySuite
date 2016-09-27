@@ -7,7 +7,7 @@
         <Image HorizontalAlignment="Left" Height="100" Margin="25,10,0,0" VerticalAlignment="Top" Width="100" Source="Images/crown100.png"/>
         <StackPanel HorizontalAlignment="Left" Height="95" Margin="138,10,0,0" VerticalAlignment="Top" Width="194">
             <TextBlock HorizontalAlignment="Left" Margin="0,0,0,0" TextWrapping="Wrap" Text="Holyland Contest Logger - Basic" VerticalAlignment="Top"/>
-            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Version 1.0.0.1" VerticalAlignment="Top"/>
+            <TextBlock x:Name="L_Version" HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Version 1.0.0.1" VerticalAlignment="Top"/>
             <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Design &amp; Development - Gil 4Z1KD" VerticalAlignment="Top" />
             <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="sep. 2016" VerticalAlignment="Top" />
         </StackPanel>
