@@ -5,7 +5,7 @@
         xmlns:xcdg="http://schemas.xceed.com/wpf/xaml/datagrid"
         x:Class="HolyLogger.MainWindow"
         xmlns:local="clr-namespace:HolyLogger"
-        Title="Holyland Contest Logger" Height="480" MinHeight="480" Width="640" MinWidth="640" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed">
+        Title="Holyland Contest Logger" Height="480" MinHeight="480" Width="640" MinWidth="640" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
 
     <Grid ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
@@ -87,27 +87,29 @@
         <Label Content="My Callsign" HorizontalAlignment="Left" Margin="6,18,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="23" Margin="81,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_callsign}" TextChanged="TB_MyCallsign_TextChanged"  />
         <Label Content="My Square" HorizontalAlignment="Left" Margin="216,18,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" TextChanged="TB_MyGrid_TextChanged" />
-        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Station' info and Frequency" HorizontalAlignment="Left" Height="20" Margin="591,21,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
-        <Label Content="Frequency" HorizontalAlignment="Left" Margin="407,18,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <xctk:MaskedTextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="477,21,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,99" PromptChar="0" Text="1422000" Width="100" Height="23" TextChanged="TB_Frequency_TextChanged"/>
+        <!--<TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" TextChanged="TB_MyGrid_TextChanged" />-->
+        <xctk:MaskedTextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Margin="288,21,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" HidePromptOnLeave ="false" Mask="L-00-LL" PromptChar="#" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" Width="100" Height="23" TextChanged="TB_MyGrid_TextChanged"/>
+        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Station' info and Frequency" HorizontalAlignment="Left" Height="20" Margin="407,21,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="Mode" HorizontalAlignment="Left" Margin="6,54,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <ComboBox x:Name="CB_Mode" Text="Mode" HorizontalAlignment="Left" Margin="82,58,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99">
+        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="82,58,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99">
+            <ComboBoxItem Name="op_am">AM</ComboBoxItem>
             <ComboBoxItem Name="op_cw">CW</ComboBoxItem>
-            <ComboBoxItem Name="op_psk31">PSK31</ComboBoxItem>
-            <ComboBoxItem Name="op_psk63">PSK63</ComboBoxItem>
-            <ComboBoxItem Name="op_psk125">PSK125</ComboBoxItem>
-            <ComboBoxItem Name="op_rtty">RTTY</ComboBoxItem>
+            <ComboBoxItem Name="op_digi">DIGI</ComboBoxItem>
+            <ComboBoxItem Name="op_fm">FM</ComboBoxItem>
             <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>
         </ComboBox>
+        <Label Content="Frequency" HorizontalAlignment="Left" Margin="218,55,0,0" VerticalAlignment="Top" Grid.Row="1" />
+        <xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="288,58,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" Width="100" Height="23" TextChanged="TB_Frequency_TextChanged"/>
+        <Label Content="Band" HorizontalAlignment="Left" Margin="407,54,0,0" VerticalAlignment="Top" Grid.Row="1" />
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="23" Margin="449,57,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,105,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="23" Margin="81,109,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" />
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="23" Margin="81,109,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" />
         <Image x:Name="QRZBtn" ToolTip="Open the QRZ.COM page of the DX station" HorizontalAlignment="Left" Height="24" Margin="186,108,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" >
 
         </Image>
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,141,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="23" Margin="81,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" />
+        <xctk:MaskedTextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Margin="81,145,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" HidePromptOnLeave ="false" Mask="000" PromptChar="0" Text="" Width="100" Height="23"/>
         <Label Content="RST Sent" HorizontalAlignment="Left" Margin="215,142,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="23" Margin="288,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" />
         <Label Content="RST Rcvd" HorizontalAlignment="Left" Margin="339,142,0,0" VerticalAlignment="Top" Grid.Row="1" />
@@ -198,8 +200,8 @@
 
             </DataGrid.Columns>
         </DataGrid>
-        <Label Content="Band" HorizontalAlignment="Left" Margin="407,54,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="23" Margin="477,57,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" />
+        
+
 
 
 
