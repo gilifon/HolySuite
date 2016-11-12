@@ -5,7 +5,7 @@
         xmlns:xcdg="http://schemas.xceed.com/wpf/xaml/datagrid"
         x:Class="HolyLogger.MainWindow"
         xmlns:local="clr-namespace:HolyLogger"
-        Title="Holyland Contest Logger" Height="480" MinHeight="480" Width="640" MinWidth="640" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
+        Title="HolyLogger - 4X/4Z Log application" Height="480" MinHeight="480" Width="640" MinWidth="640" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
 
     <Grid ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
@@ -92,10 +92,10 @@
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Station' info and Frequency" HorizontalAlignment="Left" Height="20" Margin="407,21,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="Mode" HorizontalAlignment="Left" Margin="6,54,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="82,58,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99">
-            <ComboBoxItem Name="op_am">AM</ComboBoxItem>
+            <!--<ComboBoxItem Name="op_am">AM</ComboBoxItem>-->
             <ComboBoxItem Name="op_cw">CW</ComboBoxItem>
             <ComboBoxItem Name="op_digi">DIGI</ComboBoxItem>
-            <ComboBoxItem Name="op_fm">FM</ComboBoxItem>
+            <!--<ComboBoxItem Name="op_fm">FM</ComboBoxItem>-->
             <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>
         </ComboBox>
         <Label Content="Frequency" HorizontalAlignment="Left" Margin="218,55,0,0" VerticalAlignment="Top" Grid.Row="1" />

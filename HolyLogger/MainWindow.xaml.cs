@@ -22,6 +22,10 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
+using System.Net.Http;
+using System.Net.Http.Headers;
+using System.Net;
+
 
 namespace HolyLogger
 {
@@ -88,7 +92,9 @@ namespace HolyLogger
         {
             InitializeComponent();
             Version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
-            
+            QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
+            TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
+
             try
             {
                 dal = new DataAccess();
@@ -98,7 +104,7 @@ namespace HolyLogger
                 MessageBox.Show("Failed to connect to DB: " + e.Message);
                 throw;
             }
-            
+
             TB_MyCallsign.Focus();
 
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
@@ -154,10 +160,72 @@ namespace HolyLogger
             qso.rst_rcvd = TB_RSTRcvd.Text;
             qso.rst_sent = TB_RSTSent.Text;
             qso.timestamp = QSOTimeStamp.Value.Value;
+            if (Properties.Settings.Default.live_log) PostQSO(qso);
             QSO q = dal.Insert(qso);
             Qsos.Insert(0, q);
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
+        }
+
+        private void PostQSO(QSO qso)
+        {
+            //using (var client = new HttpClient())
+            //{
+            //    // Send HTTP requests
+            //    client.BaseAddress = new Uri("http://www.iarc.org/xmas/");
+            //    client.DefaultRequestHeaders.Accept.Clear();
+            //    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            //    try
+            //    {
+            //        // HTTP POST
+            //        var response = await client.PostAsJsonAsync("Server/AddLog.php", GenerateInsert(qso));
+            //        response.EnsureSuccessStatusCode(); // Throw if not a success code.
+            //    }
+            //    catch (HttpRequestException e)
+            //    {
+            //        System.Windows.Forms.MessageBox.Show("Failed: " + e.Message);
+            //    }
+            //}
+
+            //************************************************** ASYNC ********************************************//
+            using (WebClient client = new WebClient())
+            {
+                client.UploadValuesAsync(new Uri("http://www.iarc.org/xmas/Server/AddLog.php"), new NameValueCollection()
+                    {
+                        { "insertlog", GenerateInsert(qso) }
+                    });
+            }
+
+            //************************************************** SYNC ********************************************//
+            //using (WebClient client = new WebClient())
+            //{
+            //    byte[] response =
+            //    client.UploadValues("http://iarc.org/xmas/Server/AddLog.php", new NameValueCollection()
+            //        {
+            //            { "insertlog", GenerateInsert(qso) }
+            //        });
+            //    string result = System.Text.Encoding.UTF8.GetString(response);
+            //    MessageBox.Show(result);
+            //}
+        }
+        private string GenerateInsert(QSO qso)
+        {
+            StringBuilder sb = new StringBuilder("INSERT IGNORE INTO `log` ", 500);
+            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
+            sb.Append("(");
+            sb.Append("'"); sb.Append(qso.my_callsign); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.dx_callsign); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.comment); sb.Append("')");
+            string result = sb.ToString();
+            return result;
         }
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
@@ -337,29 +405,33 @@ namespace HolyLogger
             //{
             //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
             //}
-            if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && TB_Exchange.Text != "000")
+
+            if (Properties.Settings.Default.validation_enabled)
             {
-                if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
+                if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && TB_Exchange.Text != "000")
                 {
-                    if (validSquares.Contains(TB_Exchange.Text))
+                    if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
                     {
-                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                        if (validSquares.Contains(TB_Exchange.Text))
+                        {
+                            TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                        }
+                        else
+                        {
+                            allOK = false;
+                            TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
+                        }
                     }
                     else
                     {
-                        allOK = false;
-                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
+                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
                     }
                 }
                 else
                 {
-                    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    allOK = false;
+                    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
                 }
-            }
-            else
-            {
-                allOK = false;
-                TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
             }
 
             if (string.IsNullOrWhiteSpace(TB_Frequency.Text))

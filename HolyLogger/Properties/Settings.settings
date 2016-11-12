@@ -8,5 +8,14 @@
     <Setting Name="my_square" Type="System.String" Scope="User">
       <Value Profile="(Default)">O01ZF</Value>
     </Setting>
+    <Setting Name="show_qrz" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="validation_enabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="live_log" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
