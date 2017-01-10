@@ -25,7 +25,9 @@ using System.Threading;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Net;
-
+using System.Xml.Linq;
+using System.Xml;
+using System.Xml.XPath;
 
 namespace HolyLogger
 {
@@ -83,6 +85,30 @@ namespace HolyLogger
             }
         }
 
+        private string _Country;
+        public string Country
+        {
+            get { return _Country; }
+            set
+            {
+                _Country = value;
+                OnPropertyChanged("Country");
+            }
+        }
+
+        private string _FName;
+        public string FName
+        {
+            get { return _FName; }
+            set
+            {
+                _FName = value;
+                OnPropertyChanged("FName");
+            }
+        }
+
+        public string SessionKey { get; set; }
+
         ADIFParser p;
         SignboardWindow signboard = null;
 
@@ -117,6 +143,7 @@ namespace HolyLogger
 
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
+            LoginToQRZ();
         }
 
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -160,7 +187,7 @@ namespace HolyLogger
             qso.rst_rcvd = TB_RSTRcvd.Text;
             qso.rst_sent = TB_RSTSent.Text;
             qso.timestamp = QSOTimeStamp.Value.Value;
-            if (Properties.Settings.Default.live_log) PostQSO(qso);
+            //if (Properties.Settings.Default.live_log) PostQSO(qso);
             QSO q = dal.Insert(qso);
             Qsos.Insert(0, q);
             ClearBtn_Click(null, null);
@@ -169,25 +196,6 @@ namespace HolyLogger
 
         private void PostQSO(QSO qso)
         {
-            //using (var client = new HttpClient())
-            //{
-            //    // Send HTTP requests
-            //    client.BaseAddress = new Uri("http://www.iarc.org/xmas/");
-            //    client.DefaultRequestHeaders.Accept.Clear();
-            //    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            //    try
-            //    {
-            //        // HTTP POST
-            //        var response = await client.PostAsJsonAsync("Server/AddLog.php", GenerateInsert(qso));
-            //        response.EnsureSuccessStatusCode(); // Throw if not a success code.
-            //    }
-            //    catch (HttpRequestException e)
-            //    {
-            //        System.Windows.Forms.MessageBox.Show("Failed: " + e.Message);
-            //    }
-            //}
-
             //************************************************** ASYNC ********************************************//
             using (WebClient client = new WebClient())
             {
@@ -551,6 +559,11 @@ namespace HolyLogger
             }
         }
 
+        private void ConnectToQRZ_Click(object sender, RoutedEventArgs e)
+        {
+            LoginToQRZ();
+        }
+
         private void TB_MyGrid_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (signboard != null)
@@ -576,6 +589,80 @@ namespace HolyLogger
                 TB_Exchange.PromptChar = '0';
             }
         }
+        private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
+        {
+            getQrzData();
+        }
+        private bool LoginToQRZ()
+        {
+            if (string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_username) || string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_password))
+            {
+                SessionKey = "";
+                return false;
+            }
+            try
+            {
+                WebRequest request = WebRequest.Create("http://xmldata.qrz.com/xml/current/?username=" + Properties.Settings.Default.qrz_username + ";password=" + Properties.Settings.Default.qrz_password);
+                WebResponse response = request.GetResponse();
+                string status = ((HttpWebResponse)response).StatusDescription;
+                Stream dataStream = response.GetResponseStream();
+                StreamReader reader = new StreamReader(dataStream);
+                string responseFromServer = reader.ReadToEnd();
+
+                XElement xml = XElement.Parse(responseFromServer);
+                XElement element = xml.Elements().FirstOrDefault();
+                SessionKey = element.Elements().FirstOrDefault().Value;
+
+                reader.Close();
+                response.Close();
+                return true;
+            }
+            catch (Exception)
+            {
+                SessionKey = "";
+                return false;
+            }
+        }
+
+        private void getQrzData()
+        {
+            if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            {
+                try
+                {
+                    string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
+                    WebRequest request = WebRequest.Create(baseRequest + SessionKey + ";callsign=" + TB_DXCallsign.Text);
+                    WebResponse response = request.GetResponse();
+                    string status = ((HttpWebResponse)response).StatusDescription;
+                    Stream dataStream = response.GetResponseStream();
+                    StreamReader reader = new StreamReader(dataStream);
+                    string responseFromServer = reader.ReadToEnd();
+                    XDocument xDoc = XDocument.Parse(responseFromServer);
+                    IEnumerable<XElement> country = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "country");
+                    if (country.Count() > 0)
+                        Country = country.FirstOrDefault().Value;
+                    else
+                        Country = "";
+
+                    IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
+                    if (fname.Count() > 0)
+                        FName = fname.FirstOrDefault().Value;
+                    else
+                        FName = "";
+
+                    IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                    if (lname.Count() > 0)
+                        FName += " " + lname.FirstOrDefault().Value;
+                }
+                catch (Exception)
+                {
+                    Country = "";
+                    FName = "";
+                }
+            }
+        }
+
+
 
 
         //-------------------------------------- OmniRig Section ---------------------------------------------//
@@ -803,9 +890,9 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                Mouse.OverrideCursor = null;
-                MessageBox.Show(ex.Message);
-                throw;
+                //Mouse.OverrideCursor = null;
+                //MessageBox.Show(ex.Message);
+                //throw;
             }
         }
 
@@ -924,9 +1011,11 @@ namespace HolyLogger
             }
         }
 
+
+
+
         #endregion
 
         
-
     }
 }

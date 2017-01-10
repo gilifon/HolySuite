@@ -5,12 +5,12 @@
         xmlns:xcdg="http://schemas.xceed.com/wpf/xaml/datagrid"
         x:Class="HolyLogger.MainWindow"
         xmlns:local="clr-namespace:HolyLogger"
-        Title="HolyLogger - 4X/4Z Log application" Height="480" MinHeight="480" Width="640" MinWidth="640" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
+        Title="HolyLogger - 4X/4Z Log application" Height="544" MinHeight="520" Width="640" MinWidth="640" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
 
     <Grid ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
-            <RowDefinition Height="220" />
+            <RowDefinition Height="260" />
             <RowDefinition Height="*" />
             <RowDefinition Height="20" />
         </Grid.RowDefinitions>
@@ -50,6 +50,11 @@
                             <MenuItem x:Name="MyScoreMenuItem" Header="My Score" ToolTip="Calculate your score based on the current log" Click="MyScoreMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/trophy.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="ConnectToQRZ" Header="Connect To QRZ" ToolTip="Connect to QRZ.COM XML service" Click="ConnectToQRZ_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
@@ -103,7 +108,7 @@
         <Label Content="Band" HorizontalAlignment="Left" Margin="407,54,0,0" VerticalAlignment="Top" Grid.Row="1" />
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="23" Margin="449,57,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,105,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="23" Margin="81,109,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" />
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="23" Margin="81,109,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" />
         <Image x:Name="QRZBtn" ToolTip="Open the QRZ.COM page of the DX station" HorizontalAlignment="Left" Height="24" Margin="186,108,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" >
 
         </Image>
@@ -123,8 +128,12 @@
         <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,94,0,0" VerticalAlignment="Top" Width="601" Grid.Row="1" />
         <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="477,147,0,0" VerticalAlignment="Top" Width="134" Grid.Row="1" Click="AddBtn_Click" />
         <Button x:Name="ClearBtn" Content="Clear (F5)" HorizontalAlignment="Left" Margin="477,113,0,0" VerticalAlignment="Top" Width="134" Grid.Row="1" Click="ClearBtn_Click" />
-        <Label Content="Comment" HorizontalAlignment="Left" Margin="6,179,0,0" VerticalAlignment="Top" Grid.Row="1" />
-        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="23" Margin="81,182,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="530" Grid.Row="1" Text="" />
+        <Label Content="Name" HorizontalAlignment="Left" Margin="6,180,0,0" VerticalAlignment="Top" Grid.Row="1" />
+        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="23" Margin="81,182,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="247" CharacterCasing="Upper" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" IsEnabled="False" />
+        <Label Content="Country" HorizontalAlignment="Left" Margin="339,179,0,0" VerticalAlignment="Top" Grid.Row="1" />
+        <TextBox x:Name="TB_DX_Name_Copy" HorizontalAlignment="Left" Height="23" Margin="403,182,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="208" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" IsEnabled="False" />
+        <Label Content="Comment" HorizontalAlignment="Left" Margin="4,216,0,0" VerticalAlignment="Top" Grid.Row="1" />
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="23" Margin="82,219,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="529" Grid.Row="1" Text="" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown">
@@ -201,6 +210,7 @@
             </DataGrid.Columns>
         </DataGrid>
         
+
 
 
 
