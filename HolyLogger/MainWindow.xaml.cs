@@ -265,6 +265,8 @@ namespace HolyLogger
             TB_RSTSent.Text = "59";
             TB_RSTRcvd.Text = "59";
             TB_Comment.Text = string.Empty;
+            FName = string.Empty;
+            Country = string.Empty;
             RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
         }
@@ -660,6 +662,10 @@ namespace HolyLogger
                     FName = "";
                 }
             }
+            else {
+                Country = "";
+                FName = "";
+            }
         }
 
 
@@ -971,6 +977,7 @@ namespace HolyLogger
             RX = Rig.GetRxFrequency().ToString();
             TX = Rig.GetTxFrequency().ToString();
             Frequency = Rig.Freq.ToString();
+            if (Rig.Freq < 10000000) Frequency = Frequency.Insert(0, "0");
             switch (Rig.Mode)
             {
                 case (OmniRig.RigParamX)PM_CW_L:

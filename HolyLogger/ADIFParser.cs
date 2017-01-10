@@ -394,21 +394,27 @@ th,td
             if (!double.TryParse(freq, out parsedFreq)) return string.Empty;
             if (parsedFreq < 30)
             {
-                if (parsedFreq > 0 && parsedFreq < 2) return "160";
-                if (parsedFreq > 2 && parsedFreq < 5) return "80";
-                if (parsedFreq > 5 && parsedFreq < 10) return "40";
-                if (parsedFreq > 12 && parsedFreq < 16) return "20";
-                if (parsedFreq > 19 && parsedFreq < 23) return "15";
-                if (parsedFreq > 25 && parsedFreq < 30) return "10";
+                if (parsedFreq > 0 && parsedFreq <= 2) return "160";
+                if (parsedFreq > 2 && parsedFreq <= 5) return "80";
+                if (parsedFreq > 5 && parsedFreq <= 10) return "40";
+                if (parsedFreq > 10 && parsedFreq <= 11) return "30";
+                if (parsedFreq > 12 && parsedFreq <= 16) return "20";
+                if (parsedFreq > 18 && parsedFreq <= 19) return "17";
+                if (parsedFreq > 20 && parsedFreq <= 23) return "15";
+                if (parsedFreq > 24 && parsedFreq <= 25) return "12";
+                if (parsedFreq > 27 && parsedFreq <= 30) return "10";
             }
             else
             {
-                if (parsedFreq > 0 && parsedFreq < 2000) return "160";
-                if (parsedFreq > 2000 && parsedFreq < 5000) return "80";
-                if (parsedFreq > 5000 && parsedFreq < 10000) return "40";
-                if (parsedFreq > 12000 && parsedFreq < 16000) return "20";
-                if (parsedFreq > 19000 && parsedFreq < 23000) return "15";
-                if (parsedFreq > 25000 && parsedFreq < 30000) return "10";
+                if (parsedFreq > 0 && parsedFreq <= 2000) return "160";
+                if (parsedFreq > 2000 && parsedFreq <= 5000) return "80";
+                if (parsedFreq > 5000 && parsedFreq <= 10000) return "40";
+                if (parsedFreq > 10000 && parsedFreq <= 11000) return "30";
+                if (parsedFreq > 12000 && parsedFreq <= 16000) return "20";
+                if (parsedFreq > 18000 && parsedFreq <= 19000) return "17";
+                if (parsedFreq > 20000 && parsedFreq <= 23000) return "15";
+                if (parsedFreq > 24000 && parsedFreq <= 25000) return "12";
+                if (parsedFreq > 27000 && parsedFreq <= 30000) return "10";
             }
             return string.Empty;
         }
