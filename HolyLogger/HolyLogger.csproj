@@ -174,6 +174,9 @@
     </Compile>
     <Compile Include="ADIFParser.cs" />
     <Compile Include="DataAccess.cs" />
+    <Compile Include="PropertiesWindow.xaml.cs">
+      <DependentUpon>PropertiesWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="QSO.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="SignboardWindow.xaml.cs">
@@ -195,6 +198,10 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Page Include="PropertiesWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="SignboardWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -290,6 +297,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Data\CreateScript.sql" />
+    <Resource Include="Images\settings.png" />
     <Content Include="lib\Interop.OmniRig.dll" />
     <Resource Include="Images\sign.png" />
     <Resource Include="Images\empty20.png" />

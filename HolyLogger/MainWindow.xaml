@@ -57,8 +57,14 @@
                                     <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <Separator />
+                            <MenuItem x:Name="PropertiesMenuItem" Header="Properties" ToolTip="Open properties window" Click="PropertiesMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/settings.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                         </MenuItem>
-                        <MenuItem Header="Help" Click="MenuItem_Click" FontSize="16">
+                        <MenuItem Header="Help" Click="AboutMenuItem_Click" FontSize="16">
                             <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some non important info..">
                                 <MenuItem.Icon>
                                     <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>

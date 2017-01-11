@@ -407,7 +407,7 @@ namespace HolyLogger
             }
         }
 
-        private void MenuItem_Click(object sender, RoutedEventArgs e)
+        private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
         {
             AboutWindow about = new AboutWindow();
             about.Show();
@@ -533,6 +533,18 @@ namespace HolyLogger
         {
             parseAdif();
             MessageBox.Show("Your score is: " + p.Result.ToString());
+        }
+
+        private void PropertiesMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            PropertiesWindow PropertiesWindow = new PropertiesWindow();
+            PropertiesWindow.Closed += PropertiesWindow_Closed;
+            PropertiesWindow.Show();
+        }
+
+        private void PropertiesWindow_Closed(object sender, EventArgs e)
+        {
+            LoginToQRZ();
         }
 
         private void parseAdif()
@@ -1050,8 +1062,9 @@ namespace HolyLogger
 
 
 
+
         #endregion
 
-        
+       
     }
 }
