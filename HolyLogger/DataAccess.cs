@@ -34,10 +34,11 @@ namespace HolyLogger
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,dx_callsign,rst_rcvd,rst_sent,timestamp,mode,exchange,comment) VALUES (?,?,?,?,?,?,?,?,?,?)", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,timestamp,mode,exchange,comment) VALUES (?,?,?,?,?,?,?,?,?,?,?)", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.my_callsign));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.my_square));
                 insertSQL.Parameters.Add(new SQLiteParameter("frequency", qso.frequency));
+                insertSQL.Parameters.Add(new SQLiteParameter("band", qso.band));
                 insertSQL.Parameters.Add(new SQLiteParameter("dx_callsign", qso.dx_callsign));
                 insertSQL.Parameters.Add(new SQLiteParameter("rst_rcvd", qso.rst_rcvd));
                 insertSQL.Parameters.Add(new SQLiteParameter("rst_sent", qso.rst_sent));
@@ -91,6 +92,7 @@ namespace HolyLogger
                         q.mode = (string)rdr["mode"];
                         q.exchange = (string)rdr["exchange"];
                         q.frequency = (string)rdr["frequency"];
+                        q.band = (string)rdr["band"];
                         q.my_callsign = (string)rdr["my_callsign"];
                         q.my_square = (string)rdr["my_square"];
                         q.rst_rcvd = (string)rdr["rst_rcvd"];
@@ -119,6 +121,7 @@ namespace HolyLogger
                         q.mode = (string)rdr["mode"];
                         q.exchange = (string)rdr["exchange"];
                         q.frequency = (string)rdr["frequency"];
+                        q.band = (string)rdr["band"];
                         q.my_callsign = (string)rdr["my_callsign"];
                         q.my_square = (string)rdr["my_square"];
                         q.rst_rcvd = (string)rdr["rst_rcvd"];

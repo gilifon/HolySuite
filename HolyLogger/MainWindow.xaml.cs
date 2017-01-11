@@ -63,6 +63,17 @@ namespace HolyLogger
             }
         }
 
+        private string _IsOmniRigEnabled;
+        public string IsOmniRigEnabled
+        {
+            get { return _IsOmniRigEnabled; }
+            set
+            {
+                _IsOmniRigEnabled = value;
+                OnPropertyChanged("IsOmniRigEnabled");
+            }
+        }
+
         private string _Score;
         public string Score
         {
@@ -131,6 +142,11 @@ namespace HolyLogger
                 throw;
             }
 
+            TB_4xExchange.Mask = "";
+            TB_4xExchange.Text = "";
+            TB_4xExchange.Mask = "L-00-LL";
+            TB_4xExchange.PromptChar = '#';
+
             TB_MyCallsign.Focus();
 
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
@@ -180,8 +196,16 @@ namespace HolyLogger
             qso.comment = TB_Comment.Text;
             qso.dx_callsign = TB_DXCallsign.Text;
             qso.mode = CB_Mode.Text;
-            qso.exchange = TB_Exchange.Text;
+            if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
+            {
+                qso.exchange = TB_4xExchange.Text;
+            }
+            else
+            {
+                qso.exchange = TB_Exchange.Text;
+            }
             qso.frequency = TB_Frequency.Text.Replace(",","");
+            qso.band = ADIFParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
             qso.my_callsign = TB_MyCallsign.Text;
             qso.my_square = TB_MyGrid.Text;
             qso.rst_rcvd = TB_RSTRcvd.Text;
@@ -256,15 +280,12 @@ namespace HolyLogger
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
         {
             //TB_Frequency.Text = string.Empty;
-            TB_Exchange.Mask = "";
-            TB_Exchange.Text = "000";
-            TB_Exchange.Mask = "000";
-            TB_Exchange.PromptChar = '0';
-
-            TB_DXCallsign.Text = string.Empty;
+            TB_DXCallsign.Clear();
+            TB_4xExchange.Clear();
+            TB_Exchange.Clear();
             TB_RSTSent.Text = "59";
             TB_RSTRcvd.Text = "59";
-            TB_Comment.Text = string.Empty;
+            TB_Comment.Clear();
             FName = string.Empty;
             Country = string.Empty;
             RefreshDateTime_Btn_MouseUp(null, null);
@@ -418,92 +439,93 @@ namespace HolyLogger
 
             if (Properties.Settings.Default.validation_enabled)
             {
-                if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && TB_Exchange.Text != "000")
+                if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
                 {
-                    if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
+                    if (validSquares.Contains(TB_4xExchange.Text))
                     {
-                        if (validSquares.Contains(TB_Exchange.Text))
-                        {
-                            TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
-                        }
-                        else
-                        {
-                            allOK = false;
-                            TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
-                        }
+                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
                     }
                     else
                     {
-                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                        allOK = false;
+                        TB_4xExchange.BorderBrush = System.Windows.Media.Brushes.Red;
                     }
                 }
                 else
                 {
+                    if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && TB_Exchange.Text != "000")
+                    {
+                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    }
+                    else
+                    {
+                        allOK = false;
+                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
+                    }
+
+                }
+
+
+                if (string.IsNullOrWhiteSpace(TB_Frequency.Text))
+                {
                     allOK = false;
-                    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
+                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
+                }
+                else
+                {
+                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                }
+
+                if (string.IsNullOrWhiteSpace(TB_MyCallsign.Text))
+                {
+                    allOK = false;
+                    TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.Red;
+                }
+                else
+                {
+                    TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                }
+
+                if (string.IsNullOrWhiteSpace(TB_MyGrid.Text) || !validSquares.Contains(TB_MyGrid.Text))
+                {
+                    allOK = false;
+                    TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.Red;
+                }
+                else
+                {
+                    TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                }
+
+                if (string.IsNullOrWhiteSpace(TB_RSTRcvd.Text))
+                {
+                    allOK = false;
+                    TB_RSTRcvd.BorderBrush = System.Windows.Media.Brushes.Red;
+                }
+                else
+                {
+                    TB_RSTRcvd.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                }
+
+                if (string.IsNullOrWhiteSpace(TB_RSTSent.Text))
+                {
+                    allOK = false;
+                    TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.Red;
+                }
+                else
+                {
+                    TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                }
+
+                if (string.IsNullOrWhiteSpace(QSOTimeStamp.Text))
+                {
+                    allOK = false;
+                    QSOTimeStamp.BorderBrush = System.Windows.Media.Brushes.Red;
+                }
+                else
+                {
+                    QSOTimeStamp.BorderBrush = System.Windows.Media.Brushes.LightGray;
                 }
             }
-
-            if (string.IsNullOrWhiteSpace(TB_Frequency.Text))
-            {
-                allOK = false;
-                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
-            }
-            else
-            {
-                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.LightGray;
-            }
-            
-            if (string.IsNullOrWhiteSpace(TB_MyCallsign.Text))
-            {
-                allOK = false;
-                TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.Red;
-            }
-            else
-            {
-                TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
-            }
-
-            if (string.IsNullOrWhiteSpace(TB_MyGrid.Text) || !validSquares.Contains(TB_MyGrid.Text))
-            {
-                allOK = false;
-                TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.Red;
-            }
-            else
-            {
-                TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.LightGray;
-            }
-
-            if (string.IsNullOrWhiteSpace(TB_RSTRcvd.Text))
-            {
-                allOK = false;
-                TB_RSTRcvd.BorderBrush = System.Windows.Media.Brushes.Red;
-            }
-            else
-            {
-                TB_RSTRcvd.BorderBrush = System.Windows.Media.Brushes.LightGray;
-            }
-
-            if (string.IsNullOrWhiteSpace(TB_RSTSent.Text))
-            {
-                allOK = false;
-                TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.Red;
-            }
-            else
-            {
-                TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.LightGray;
-            }
-
-            if (string.IsNullOrWhiteSpace(QSOTimeStamp.Text))
-            {
-                allOK = false;
-                QSOTimeStamp.BorderBrush = System.Windows.Media.Brushes.Red;
-            }
-            else
-            {
-                QSOTimeStamp.BorderBrush = System.Windows.Media.Brushes.LightGray;
-            }
-
             return allOK;
         }
 
@@ -574,26 +596,31 @@ namespace HolyLogger
             }
         }
 
+        private void TB_Exchange_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            if (!char.IsDigit(e.Text, e.Text.Length - 1))
+                e.Handled = true;
+        }
+
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
             {
-                TB_Exchange.Mask = "";
-                TB_Exchange.Text = "";
-                TB_Exchange.Mask = "L-00-LL";
-                TB_Exchange.PromptChar = '#';
+                TB_Exchange.Visibility = Visibility.Hidden;
+                TB_4xExchange.Visibility = Visibility.Visible;
             }
             else
             {
-                TB_Exchange.Mask = "";
-                TB_Exchange.Text = "";
-                TB_Exchange.Mask = "000";
-                TB_Exchange.PromptChar = '0';
+                TB_Exchange.Visibility = Visibility.Visible;
+                TB_4xExchange.Visibility = Visibility.Hidden;
             }
+            
         }
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
             getQrzData();
+            var dups = from qso in Qsos where qso.dx_callsign == TB_DXCallsign.Text && qso.band+"M" == TB_Band.Text && qso.mode == Mode  select qso;
+            if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
         }
         private bool LoginToQRZ()
         {
@@ -899,6 +926,7 @@ namespace HolyLogger
                 //Mouse.OverrideCursor = null;
                 //MessageBox.Show(ex.Message);
                 //throw;
+                Status = "Not installed";
             }
         }
 
@@ -1017,6 +1045,7 @@ namespace HolyLogger
                     break;
             }
         }
+
 
 
 

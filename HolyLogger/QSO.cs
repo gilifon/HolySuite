@@ -19,6 +19,7 @@ namespace HolyLogger
         public string mode { get; set; }
         public string exchange { get; set; }
         public string comment { get; set; }
+        public string band { get; set; }
 
         public string niceTimestamp
         {
