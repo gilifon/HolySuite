@@ -37,18 +37,6 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("O01ZF")]
-        public string my_square {
-            get {
-                return ((string)(this["my_square"]));
-            }
-            set {
-                this["my_square"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool show_qrz {
             get {
@@ -104,6 +92,18 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["qrz_password"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("N01ZF")]
+        public string my_square {
+            get {
+                return ((string)(this["my_square"]));
+            }
+            set {
+                this["my_square"] = value;
             }
         }
     }

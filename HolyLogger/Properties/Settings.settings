@@ -5,9 +5,6 @@
     <Setting Name="my_callsign" Type="System.String" Scope="User">
       <Value Profile="(Default)">4Z1KD</Value>
     </Setting>
-    <Setting Name="my_square" Type="System.String" Scope="User">
-      <Value Profile="(Default)">O01ZF</Value>
-    </Setting>
     <Setting Name="show_qrz" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
@@ -22,6 +19,9 @@
     </Setting>
     <Setting Name="qrz_password" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="my_square" Type="System.String" Scope="User">
+      <Value Profile="(Default)">N01ZF</Value>
     </Setting>
   </Settings>
 </SettingsFile>
