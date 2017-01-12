@@ -829,7 +829,7 @@ namespace HolyLogger
         /// <summary>
         /// Mode
         /// </summary>
-        private string mMode;
+        private string mMode = "SSB";
 
         /// <summary>
         /// Mode
