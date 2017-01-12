@@ -28,6 +28,7 @@ using System.Net;
 using System.Xml.Linq;
 using System.Xml;
 using System.Xml.XPath;
+using System.Runtime.InteropServices;
 
 namespace HolyLogger
 {
@@ -36,6 +37,12 @@ namespace HolyLogger
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        [DllImport("user32.dll")]
+        internal static extern IntPtr SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")]
+        internal static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+        
+
         #region INotifyProprtyChanged
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName)
@@ -273,8 +280,7 @@ namespace HolyLogger
             catch (Exception)
             {
                 MessageBox.Show("Please install 'Chrome' and try again");
-            }
-            
+            }   
         }
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
