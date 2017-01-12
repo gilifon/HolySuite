@@ -64,8 +64,13 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
-                        <MenuItem Header="Help" Click="AboutMenuItem_Click" FontSize="16">
-                            <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some non important info..">
+                        <MenuItem Header="Help" FontSize="16">
+                            <MenuItem x:Name="OmnirigMenuItem" Header="Omni-Rig web page" ToolTip="Go to Omni-Rig website" Click="OmnirigMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>

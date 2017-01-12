@@ -593,6 +593,20 @@ namespace HolyLogger
             signboard.Show();
         }
 
+        private void OmnirigMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string url = "http://www.dxatlas.com/OmniRig/";
+            
+            try
+            {
+                System.Diagnostics.Process.Start(url);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Please install 'Chrome' and try again");
+            }
+        }
+
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (signboard != null)
@@ -1069,8 +1083,9 @@ namespace HolyLogger
 
 
 
+
         #endregion
 
-       
+        
     }
 }
