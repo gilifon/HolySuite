@@ -85,7 +85,7 @@
     <Prefer32Bit>true</Prefer32Bit>
   </PropertyGroup>
   <PropertyGroup>
-    <ApplicationIcon>crown100.ico</ApplicationIcon>
+    <ApplicationIcon>HolyLogger icon.ico</ApplicationIcon>
   </PropertyGroup>
   <PropertyGroup>
     <TargetZone>LocalIntranet</TargetZone>
@@ -266,6 +266,7 @@
     <Content Include="Data\CreateScript.sql" />
     <Resource Include="Images\settings.png" />
     <Resource Include="Images\OmniRigIcon.gif" />
+    <Resource Include="HolyLogger icon.ico" />
     <Content Include="lib\Interop.OmniRig.dll" />
     <Resource Include="Images\sign.png" />
     <Resource Include="Images\empty20.png" />

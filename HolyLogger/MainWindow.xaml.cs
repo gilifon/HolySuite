@@ -37,12 +37,6 @@ namespace HolyLogger
     /// </summary>
     public partial class MainWindow : Window, INotifyPropertyChanged
     {
-        [DllImport("user32.dll")]
-        internal static extern IntPtr SetForegroundWindow(IntPtr hWnd);
-        [DllImport("user32.dll")]
-        internal static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-        
-
         #region INotifyProprtyChanged
         public event PropertyChangedEventHandler PropertyChanged;
         protected void OnPropertyChanged(string propertyName)
@@ -53,8 +47,6 @@ namespace HolyLogger
             }
         }
         #endregion
-
-
 
         DataAccess dal;
         public ObservableCollection<QSO> Qsos;
@@ -1030,7 +1022,7 @@ namespace HolyLogger
 
         private void ShowRigParams()
         {
-            if (Rig == null)
+            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
                 return;
             }
