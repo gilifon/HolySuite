@@ -24,6 +24,11 @@
                                     <Image Source="Images/export.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <MenuItem x:Name="UploadMenuItem" Header="Send log" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show QSO Statistics" Visibility="Collapsed">
                                 <MenuItem.Icon>
                                     <Image Source="Images/statistics.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -52,7 +57,7 @@
                                     <Image Source="Images/trophy.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem x:Name="ConnectToQRZ" Header="Connect To QRZ" ToolTip="Connect to QRZ.COM XML service" Click="ConnectToQRZ_Click">
+                            <MenuItem x:Name="ConnectToQRZ" Header="Reconnect To QRZ Service" ToolTip="Reconnect to QRZ.COM XML service" Click="ConnectToQRZ_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
@@ -112,7 +117,7 @@
         <Label Content="My Square" HorizontalAlignment="Left" Margin="216,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" TextChanged="TB_MyGrid_TextChanged" />-->
         <xctk:MaskedTextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Margin="307,16,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" HidePromptOnLeave ="false" Mask="L-00-LL" PromptChar="#" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" Width="100" Height="24" TextChanged="TB_MyGrid_TextChanged" FontSize="16"/>
-        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Station' info and Frequency" HorizontalAlignment="Left" Height="20" Margin="422,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="20" Margin="422,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="Mode" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16">
             <!--<ComboBoxItem Name="op_am">AM</ComboBoxItem>-->

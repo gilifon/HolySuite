@@ -3,32 +3,19 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-using System.Data.SQLite;
-using Xceed.Wpf.Controls;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using Microsoft.Win32;
 using System.Collections.Specialized;
-using System.Diagnostics;
 using System.Reflection;
 using System.Threading;
-using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Net;
 using System.Xml.Linq;
-using System.Xml;
-using System.Xml.XPath;
-using System.Runtime.InteropServices;
+using System.Net.Http;
+using System.Threading.Tasks;
 
 namespace HolyLogger
 {
@@ -354,11 +341,33 @@ namespace HolyLogger
             
         }
 
+        private async void UploadMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string result = await UploadLogToIARC();
+            System.Windows.Forms.MessageBox.Show("Only active during the log upload period");
+        }
+
+        private async Task<string> UploadLogToIARC()
+        {
+            string adif = GenerateAdif(dal.GetAllQSOs());
+            using (var client = new HttpClient())
+            {
+                var values = new Dictionary<string, string>
+                {
+                    { "adif", adif }
+                };
+                var content = new FormUrlEncodedContent(values);
+                var response = await client.PostAsync("http://www.iarc.org/uploadAdif.php", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                return responseString;
+            }
+        }
+
         private string GenerateAdif(IList<QSO> qso_list)  
         {
             StringBuilder adif = new StringBuilder(200);
             adif.AppendLine("<ADIF_VERS:3>2.2 ");
-            adif.AppendLine("<PROGRAMID:14>HolylandLogger ");
+            adif.AppendLine("<PROGRAMID:10>HolyLogger ");
             //adif.AppendLine("<PROGRAMVERSION:15>Version 1.0.0.0 ");
             adif.AppendFormat("<PROGRAMVERSION:{0}>{1} ", Version.Length, Version);
             adif.AppendLine();
@@ -1069,6 +1078,7 @@ namespace HolyLogger
                     break;
             }
         }
+
 
 
 

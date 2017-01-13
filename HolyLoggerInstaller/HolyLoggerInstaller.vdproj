@@ -39,6 +39,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_AE65972D46834BE08A62172D048D8169"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_B6CF327F69CB4D9C8C321BB1D6B8B3C4"
         "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
@@ -59,6 +65,12 @@
         {
         "MsmKey" = "8:_DA84F8075A1DC6590F496504CBF0463B"
         "OwnerKey" = "8:_76D9F51D74FA4766A65F0F2622537E34"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_DD55697E8A704CAB853F44A063593F0A"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -152,6 +164,14 @@
             "PrerequisitesLocation" = "2:1"
             "Url" = "8:"
             "ComponentsUrl" = "8:"
+                "Items"
+                {
+                    "{EDC2488A-8267-493A-A98E-7D9C3B36CDF3}:.NETFramework,Version=v4.5"
+                    {
+                    "Name" = "8:Microsoft .NET Framework 4.5 (x86 and x64)"
+                    "ProductCode" = "8:.NETFramework,Version=v4.5"
+                    }
+                }
             }
         }
         "Release"
@@ -296,6 +316,26 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_AE65972D46834BE08A62172D048D8169"
+            {
+            "SourcePath" = "8:..\\HolyLogger\\Images\\HolyLogger icon.png"
+            "TargetName" = "8:HolyLogger icon.png"
+            "Tag" = "8:"
+            "Folder" = "8:_F7F14BD67C0F468AB5E847BA15354996"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_B6CF327F69CB4D9C8C321BB1D6B8B3C4"
             {
             "SourcePath" = "8:..\\HolyLogger\\bin\\Release\\lib\\x86\\SQLite.Interop.dll"
@@ -376,6 +416,26 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_DD55697E8A704CAB853F44A063593F0A"
+            {
+            "SourcePath" = "8:..\\HolyLogger\\Images\\HolyLogger icon.ico"
+            "TargetName" = "8:HolyLogger icon.ico"
+            "Tag" = "8:"
+            "Folder" = "8:_F7F14BD67C0F468AB5E847BA15354996"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_E8C198907FA04AB4A0E8B1A2B462F072"
@@ -520,6 +580,17 @@
                             }
                         }
                     }
+                    "{9EF0B969-E518-4E46-987F-47570745A589}:_F7F14BD67C0F468AB5E847BA15354996"
+                    {
+                    "Name" = "8:Images"
+                    "AlwaysCreate" = "11:FALSE"
+                    "Condition" = "8:"
+                    "Transitive" = "11:FALSE"
+                    "Property" = "8:_18B9DF6197E449D487D0A40399910F74"
+                        "Folders"
+                        {
+                        }
+                    }
                 }
             }
             "{1525181F-901A-416C-8A58-119130FE478E}:_B13F399319BE4FA8ACA8402E39B99663"
@@ -531,6 +602,17 @@
             "Property" = "8:ProgramMenuFolder"
                 "Folders"
                 {
+                    "{9EF0B969-E518-4E46-987F-47570745A589}:_9B2690F97DD243A694B565D2A6E09F46"
+                    {
+                    "Name" = "8:HolyLogger"
+                    "AlwaysCreate" = "11:FALSE"
+                    "Condition" = "8:"
+                    "Transitive" = "11:FALSE"
+                    "Property" = "8:_3D8E7298840047588A67D945F490D169"
+                        "Folders"
+                        {
+                        }
+                    }
                 }
             }
             "{1525181F-901A-416C-8A58-119130FE478E}:_BAC436BA7A4D4AF6A5CCF1DCB69AA6B9"
@@ -560,24 +642,24 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{E1994D18-3AD8-4153-9A0A-42DE452F0484}"
-        "PackageCode" = "8:{C26E7387-2463-4EF0-A0DC-6C7BA928032A}"
+        "ProductCode" = "8:{9B3152B5-7609-46E7-8839-E0FE11BD20B6}"
+        "PackageCode" = "8:{7C19F148-4D04-4362-AD27-25E6C0B3E1D5}"
         "UpgradeCode" = "8:{AE5CDA9E-F43B-4DA1-BEA8-402CA0A17140}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
-        "RemovePreviousVersions" = "11:FALSE"
+        "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:FALSE"
-        "ProductVersion" = "8:1.0.0"
+        "ProductVersion" = "8:1.0.4"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
         "Title" = "8:HolyLogger"
-        "Subject" = "8:"
+        "Subject" = "8:A super simple, one click, easy to use logging application for Holyland contest participants."
         "ARPCONTACT" = "8:Gil 4Z1KD"
         "Keywords" = "8:"
         "ARPCOMMENTS" = "8:"
-        "ARPURLINFOABOUT" = "8:"
+        "ARPURLINFOABOUT" = "8:https://qrz.com/db/4Z1KD"
         "ARPPRODUCTICON" = "8:_76D9F51D74FA4766A65F0F2622537E34"
         "ARPIconIndex" = "3:32512"
         "SearchPath" = "8:"
@@ -681,9 +763,23 @@
         }
         "Shortcut"
         {
+            "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_36D5F2292AA447C9962E48904479207A"
+            {
+            "Name" = "8:HolyLogger"
+            "Arguments" = "8:"
+            "Description" = "8:"
+            "ShowCmd" = "3:1"
+            "IconIndex" = "3:32512"
+            "Transitive" = "11:FALSE"
+            "Target" = "8:_76D9F51D74FA4766A65F0F2622537E34"
+            "Folder" = "8:_9B2690F97DD243A694B565D2A6E09F46"
+            "WorkingFolder" = "8:_5C1056FC54EE4AE9B18CA2A37B27F7B1"
+            "Icon" = "8:_76D9F51D74FA4766A65F0F2622537E34"
+            "Feature" = "8:"
+            }
             "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_E8071C4FF6FC405AB37C01AC89108BB9"
             {
-            "Name" = "8:Holy Logger"
+            "Name" = "8:HolyLogger"
             "Arguments" = "8:"
             "Description" = "8:"
             "ShowCmd" = "3:1"
