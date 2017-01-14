@@ -118,6 +118,17 @@ namespace HolyLogger
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
+            if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
+            {
+                TB_MyGrid.Clear();
+                TB_MyGrid.IsEnabled = false;
+            }
+            else
+            {
+                TB_MyGrid.IsEnabled = true;
+                TB_MyGrid.Text = Properties.Settings.Default.my_square;
+            }
+
             try
             {
                 dal = new DataAccess();
@@ -523,14 +534,17 @@ namespace HolyLogger
                     TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
                 }
 
-                if (string.IsNullOrWhiteSpace(TB_MyGrid.Text) || !validSquares.Contains(TB_MyGrid.Text))
+                if (TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z"))
                 {
-                    allOK = false;
-                    TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.Red;
-                }
-                else
-                {
-                    TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    if (string.IsNullOrWhiteSpace(TB_MyGrid.Text) || !validSquares.Contains(TB_MyGrid.Text))
+                    {
+                        allOK = false;
+                        TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.Red;
+                    }
+                    else
+                    {
+                        TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    }
                 }
 
                 if (string.IsNullOrWhiteSpace(TB_RSTRcvd.Text))
@@ -643,6 +657,18 @@ namespace HolyLogger
             if (signboard != null)
             {
                 signboard.signboardData.Callsign = TB_MyCallsign.Text;
+            }
+
+            if (TB_MyGrid == null) return;
+            if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
+            {
+                TB_MyGrid.Clear();
+                TB_MyGrid.IsEnabled = false;
+            }
+            else
+            {
+                TB_MyGrid.IsEnabled = true;
+                TB_MyGrid.Text = Properties.Settings.Default.my_square;
             }
         }
 
