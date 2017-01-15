@@ -953,7 +953,7 @@ namespace HolyLogger
                     SelectRig(1);
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 //Mouse.OverrideCursor = null;
                 //MessageBox.Show(ex.Message);
