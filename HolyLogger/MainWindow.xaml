@@ -5,14 +5,14 @@
         xmlns:xcdg="http://schemas.xceed.com/wpf/xaml/datagrid"
         x:Class="HolyLogger.MainWindow"
         xmlns:local="clr-namespace:HolyLogger"
-        Title="HolyLogger - 4X/4Z Log application" Height="560" MinHeight="560" Width="700" MinWidth="700" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
+        Title="HolyLogger - 4X/4Z Log application" Height="560" MinHeight="560" Width="760" MinWidth="760" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
 
     <Grid ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
             <RowDefinition Height="250" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="20" />
+            <RowDefinition Height="25" />
         </Grid.RowDefinitions>
         <DockPanel Grid.Row="0">
             <ToolBarTray DockPanel.Dock="Top">
@@ -52,20 +52,9 @@
                                     <Image Source="Images/sign.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem x:Name="MyScoreMenuItem" Header="My Score" ToolTip="Calculate your score based on the current log" Click="MyScoreMenuItem_Click">
+                            <MenuItem x:Name="PropertiesMenuItem" Header="QRZ Service" ToolTip="Insert your QRZ.COM credentials" Click="PropertiesMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/trophy.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="ConnectToQRZ" Header="Reconnect To QRZ Service" ToolTip="Reconnect to QRZ.COM XML service" Click="ConnectToQRZ_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <Separator />
-                            <MenuItem x:Name="PropertiesMenuItem" Header="Properties" ToolTip="Open properties window" Click="PropertiesMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/settings.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/qrz_mini_icon.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
@@ -127,7 +116,7 @@
             <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>
         </ComboBox>
         <Label Content="Frequency" HorizontalAlignment="Left" Margin="216,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="307,54,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" Width="100" Height="23" TextChanged="TB_Frequency_TextChanged" FontSize="16"/>
+        <xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="307,54,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" Width="100" Height="23" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="8"/>
         <Label Content="Band" HorizontalAlignment="Left" Margin="422,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="23" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
@@ -138,7 +127,7 @@
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <xctk:MaskedTextBox x:Name="TB_4xExchange" HorizontalAlignment="Left" Margin="102,140,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="" Width="100" Height="24" FontSize="16"/>
-        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="24" Margin="102,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" />
+        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="24" Margin="102,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="4" />
         <Label Content="RST Sent" HorizontalAlignment="Left" Margin="242,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="339,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
         <Label Content="RST Rcvd" HorizontalAlignment="Left" Margin="393,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />

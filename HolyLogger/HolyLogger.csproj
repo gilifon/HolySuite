@@ -100,6 +100,10 @@
       <HintPath>..\packages\morelinq.1.4.0\lib\net35\MoreLinq.dll</HintPath>
       <Private>True</Private>
     </Reference>
+    <Reference Include="Newtonsoft.Json, Version=9.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.9.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Data" />
     <Reference Include="System.Data.SQLite, Version=1.0.103.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
@@ -143,6 +147,7 @@
       <DependentUpon>PropertiesWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="QSO.cs" />
+    <Compile Include="Services.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="SignboardWindow.xaml.cs">
       <DependentUpon>SignboardWindow.xaml</DependentUpon>
@@ -268,7 +273,8 @@
     <Resource Include="Images\HolyLogger icon.ico" />
     <Resource Include="Images\HolyLogger icon.png" />
     <Resource Include="Images\upload_log.png" />
-    <Content Include="lib\Interop.OmniRig.dll" />
+    <Resource Include="Images\qrz_mini_icon.png" />
+    <None Include="lib\Interop.OmniRig.dll" />
     <Resource Include="Images\sign.png" />
     <Resource Include="Images\empty20.png" />
   </ItemGroup>

@@ -104,7 +104,16 @@ namespace HolyLogger
             }
         }
 
-        public string SessionKey { get; set; }
+        private string _SessionKey;
+        public string SessionKey
+        {
+            get { return _SessionKey; }
+            set
+            {
+                _SessionKey = value;
+            }
+        }
+        
 
         ADIFParser p;
         SignboardWindow signboard = null;
@@ -156,7 +165,7 @@ namespace HolyLogger
 
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
-            LoginToQRZ();
+            Services.LoginToQRZ(out _SessionKey);
         }
 
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -501,7 +510,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && TB_Exchange.Text != "000")
+                    if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && int.Parse(TB_Exchange.Text) != 0)
                     {
                         TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
                     }
@@ -595,7 +604,8 @@ namespace HolyLogger
 
         private void PropertiesWindow_Closed(object sender, EventArgs e)
         {
-            LoginToQRZ();
+            if (String.IsNullOrWhiteSpace(SessionKey))
+                Services.LoginToQRZ(out _SessionKey);
         }
 
         private void parseAdif()
@@ -674,7 +684,7 @@ namespace HolyLogger
 
         private void ConnectToQRZ_Click(object sender, RoutedEventArgs e)
         {
-            LoginToQRZ();
+            Services.LoginToQRZ(out _SessionKey);
         }
 
         private void TB_MyGrid_TextChanged(object sender, TextChangedEventArgs e)
@@ -711,37 +721,7 @@ namespace HolyLogger
             var dups = from qso in Qsos where qso.dx_callsign == TB_DXCallsign.Text && qso.band+"M" == TB_Band.Text && qso.mode == Mode  select qso;
             if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
         }
-        private bool LoginToQRZ()
-        {
-            if (string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_username) || string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_password))
-            {
-                SessionKey = "";
-                return false;
-            }
-            try
-            {
-                WebRequest request = WebRequest.Create("http://xmldata.qrz.com/xml/current/?username=" + Properties.Settings.Default.qrz_username + ";password=" + Properties.Settings.Default.qrz_password);
-                WebResponse response = request.GetResponse();
-                string status = ((HttpWebResponse)response).StatusDescription;
-                Stream dataStream = response.GetResponseStream();
-                StreamReader reader = new StreamReader(dataStream);
-                string responseFromServer = reader.ReadToEnd();
-
-                XElement xml = XElement.Parse(responseFromServer);
-                XElement element = xml.Elements().FirstOrDefault();
-                SessionKey = element.Elements().FirstOrDefault().Value;
-
-                reader.Close();
-                response.Close();
-                return true;
-            }
-            catch (Exception)
-            {
-                SessionKey = "";
-                return false;
-            }
-        }
-
+        
         private void getQrzData()
         {
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
@@ -771,6 +751,10 @@ namespace HolyLogger
                     IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
                     if (lname.Count() > 0)
                         FName += " " + lname.FirstOrDefault().Value;
+
+                    string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
+                    if (SessionKey != key) Services.LoginToQRZ(out _SessionKey);
+
                 }
                 catch (Exception)
                 {
