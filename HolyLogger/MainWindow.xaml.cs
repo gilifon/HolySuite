@@ -717,7 +717,11 @@ namespace HolyLogger
         }
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
-            getQrzData();
+            if (!String.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            {
+                RefreshDateTime_Btn_MouseUp(null, null);
+                getQrzData();
+            }
             var dups = from qso in Qsos where qso.dx_callsign == TB_DXCallsign.Text && qso.band+"M" == TB_Band.Text && qso.mode == Mode  select qso;
             if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
         }
