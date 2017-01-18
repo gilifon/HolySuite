@@ -84,13 +84,7 @@
                 <StatusBarItem>
                     <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}"  Margin="10,0,0,0"/>
                 </StatusBarItem>
-                <StatusBarItem>
-                    <TextBlock Text="Score: " Margin="15,0,0,0"/>
-                </StatusBarItem>
-                <StatusBarItem>
-                    <TextBlock x:Name="L_score" Text="{Binding Score, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" Margin="10,0,0,0"/>
-                </StatusBarItem>
-
+                
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Omni-Rig: "/>
@@ -118,6 +112,8 @@
         <Label Content="Frequency" HorizontalAlignment="Left" Margin="216,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="307,54,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" Width="100" Height="23" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="8"/>
         <Label Content="Band" HorizontalAlignment="Left" Margin="422,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <Label Content="Score" HorizontalAlignment="Left" Margin="459,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <Label Content="{Binding Score, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="523,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="23" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="24" Margin="101,101,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" FontSize="16" />

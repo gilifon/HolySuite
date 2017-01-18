@@ -250,12 +250,13 @@ namespace HolyLogger
         private string GenerateInsert(QSO qso)
         {
             StringBuilder sb = new StringBuilder("INSERT IGNORE INTO `log` ", 500);
-            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
+            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
             sb.Append("(");
             sb.Append("'"); sb.Append(qso.my_callsign); sb.Append("',");
             sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
             sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
             sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.band); sb.Append("',");
             sb.Append("'"); sb.Append(qso.dx_callsign); sb.Append("',");
             sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
             sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
@@ -268,7 +269,7 @@ namespace HolyLogger
         private string GenerateMultipleInsert(IList<QSO> qsos)
         {
             StringBuilder sb = new StringBuilder("INSERT INTO `log` ", 500);
-            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
+            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
             foreach (QSO qso in qsos)
             {
                 sb.Append("(");
@@ -276,6 +277,7 @@ namespace HolyLogger
                 sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.band); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.dx_callsign); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
