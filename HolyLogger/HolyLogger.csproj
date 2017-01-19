@@ -126,6 +126,10 @@
     <Reference Include="WindowsBase" />
     <Reference Include="PresentationCore" />
     <Reference Include="PresentationFramework" />
+    <Reference Include="WpfAnimatedGif, Version=1.4.14.0, Culture=neutral, processorArchitecture=MSIL">
+      <HintPath>..\packages\WpfAnimatedGif.1.4.14\lib\net\WpfAnimatedGif.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="Xceed.Wpf.ListBox">
       <HintPath>..\packages\Xceed.Wpf.ListBox.3.1.16356.12170\lib\net40\Xceed.Wpf.ListBox.dll</HintPath>
       <Private>False</Private>
@@ -276,6 +280,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Data\CreateScript.sql" />
+    <Resource Include="Images\spinner.gif" />
     <Resource Include="Images\settings.png" />
     <Resource Include="Images\OmniRigIcon.gif" />
     <Resource Include="HolyLogger icon.ico" />

@@ -101,8 +101,10 @@ namespace HolyLogger
             if (!string.IsNullOrWhiteSpace(CategoryOperator) && !string.IsNullOrWhiteSpace(CategoryMode) && !string.IsNullOrWhiteSpace(CategoryPower) && !string.IsNullOrWhiteSpace(Email) && !string.IsNullOrWhiteSpace(Handle))
             {
                 if (SendLog != null)
+                {
                     SendLog(this, e);
-                this.Close();
+                    Spinner.Visibility = Visibility.Visible;
+                }
             }
             else
             {

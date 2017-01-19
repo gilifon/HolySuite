@@ -3,6 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:gif="http://wpfanimatedgif.codeplex.com"
         xmlns:local="clr-namespace:HolyLogger"
         mc:Ignorable="d"
         Title="Send Log" Height="350" MinHeight="350" MaxHeight="350" Width="400" MinWidth="400" MaxWidth="400" Icon="Images/crown.png">
@@ -32,16 +33,16 @@
         </ComboBox>
 
         <Label x:Name="title_info" Content="Personal Info" HorizontalAlignment="Left" Margin="10,162,0,0" VerticalAlignment="Top" FontSize="16" FontWeight="Bold"/>
-        
+
         <Label x:Name="LHandle" Content="Name" HorizontalAlignment="Left" Margin="10,195,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_Handle" HorizontalAlignment="Left" Height="24" Margin="107,200,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="265" Text="{Binding Handle, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" FontSize="16"  />
-        
+        <TextBox x:Name="TB_Handle" HorizontalAlignment="Left" Height="30" Margin="107,195,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="265" Text="{Binding Handle, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" FontSize="16"  />
+
         <Label x:Name="LEmail" Content="Email" HorizontalAlignment="Left" Margin="10,226,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="24" Margin="107,231,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="265" Text="{Binding Email, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" FontSize="16"  />
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="30" Margin="107,231,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="265" Text="{Binding Email, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" FontSize="16"  />
 
         <Button x:Name="SendLogBtn" Content="Save" HorizontalAlignment="Left" Margin="297,273,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="SendLogBtn_Click"/>
         <Button x:Name="CancelBtn" Content="Cancel" HorizontalAlignment="Left" Margin="217,273,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="CancelBtn_Click"/>
-        
+        <Image x:Name="Spinner" gif:ImageBehavior.AnimatedSource="Images\spinner.gif" HorizontalAlignment="Left" Margin="161,273,0,0" VerticalAlignment="Top" Source="Images/spinner.gif" Height="32" Width="32" Visibility="Hidden"/>
 
 
     </Grid>

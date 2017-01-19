@@ -392,7 +392,7 @@ namespace HolyLogger
             LogUploadWindow w = (LogUploadWindow)sender;
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, w.Email, w.Handle, country);
             string UploadLogToIARC_result = await UploadLogToIARC();
-
+            w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
 
@@ -425,9 +425,16 @@ namespace HolyLogger
                     { "insertlog", insert }
                 };
                 var content = new FormUrlEncodedContent(values);
-                var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
-                var responseString = await response.Content.ReadAsStringAsync();
-                return responseString;
+                try
+                {
+                    var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    return responseString;
+                }
+                catch (Exception)
+                {
+                    return "Connection with server failed! Check your internet connection";
+                }
             }
         }
 
@@ -442,9 +449,17 @@ namespace HolyLogger
                     { "insertlog", insert }
                 };
                 var content = new FormUrlEncodedContent(values);
-                var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
-                var responseString = await response.Content.ReadAsStringAsync();
-                return responseString;
+                try
+                {
+                    var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    return responseString;
+                }
+                catch (Exception)
+                {
+                    return "Connection with server failed! Check your internet connection";
+                }
+                
             }
         }
 
