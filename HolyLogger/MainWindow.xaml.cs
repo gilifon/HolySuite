@@ -201,7 +201,7 @@ namespace HolyLogger
             QSO qso = new QSO();
             qso.comment = TB_Comment.Text;
             qso.dx_callsign = TB_DXCallsign.Text;
-            qso.mode = CB_Mode.Text;
+            qso.mode = Mode;
             if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
             {
                 qso.exchange = TB_4xExchange.Text;
@@ -234,18 +234,6 @@ namespace HolyLogger
                         { "insertlog", GenerateInsert(qso) }
                     });
             }
-
-            //************************************************** SYNC ********************************************//
-            //using (WebClient client = new WebClient())
-            //{
-            //    byte[] response =
-            //    client.UploadValues("http://iarc.org/xmas/Server/AddLog.php", new NameValueCollection()
-            //        {
-            //            { "insertlog", GenerateInsert(qso) }
-            //        });
-            //    string result = System.Text.Encoding.UTF8.GetString(response);
-            //    MessageBox.Show(result);
-            //}
         }
         private string GenerateInsert(QSO qso)
         {
@@ -385,7 +373,35 @@ namespace HolyLogger
             
         }
 
-        private async void UploadMenuItem_Click(object sender, RoutedEventArgs e)
+        private void UploadMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            LogUploadWindow l = new LogUploadWindow();
+            l.SendLog += L_SendLog;
+            l.Show();
+        }
+
+        private async void L_SendLog(object sender, EventArgs e)
+        {
+            if (Qsos.Count == 0)
+            {
+                System.Windows.Forms.MessageBox.Show("You can not upload empty log");
+                return;
+            }
+            string bareCallsign = getBareCallsign(Qsos.First().my_callsign);
+            string country = getHamQth(bareCallsign);
+            LogUploadWindow w = (LogUploadWindow)sender;
+            string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, w.Email, w.Handle, country);
+            string UploadLogToIARC_result = await UploadLogToIARC();
+
+            System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
+        }
+
+        private string getBareCallsign(string callsign)
+        {
+            return callsign;
+        }
+
+        public async void UploadLog()
         {
             if (Qsos.Count == 0)
             {
@@ -401,6 +417,23 @@ namespace HolyLogger
         {
             string insert = GenerateMultipleInsert(dal.GetAllQSOs());
 
+            //************************************************** ASYNC ********************************************//
+            using (var client = new HttpClient())
+            {
+                var values = new Dictionary<string, string>
+                {
+                    { "insertlog", insert }
+                };
+                var content = new FormUrlEncodedContent(values);
+                var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                return responseString;
+            }
+        }
+
+        private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
+        {
+            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "'";
             //************************************************** ASYNC ********************************************//
             using (var client = new HttpClient())
             {
@@ -773,7 +806,37 @@ namespace HolyLogger
                 FName = "";
             }
         }
+        private string getHamQth(string callsign)
+        {
+            if (!string.IsNullOrWhiteSpace(callsign))
+            {
+                try
+                {
+                    string baseRequest = "http://www.hamqth.com/dxcc.php?callsign=";
+                    WebRequest request = WebRequest.Create(baseRequest + callsign);
+                    WebResponse response = request.GetResponse();
+                    string status = ((HttpWebResponse)response).StatusDescription;
+                    Stream dataStream = response.GetResponseStream();
+                    StreamReader reader = new StreamReader(dataStream);
+                    string responseFromServer = reader.ReadToEnd();
+                    XDocument xDoc = XDocument.Parse(responseFromServer);
+                    IEnumerable<XElement> country = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                    if (country.Count() > 0)
+                        return country.FirstOrDefault().Value;
+                    else
+                        return "";
 
+                }
+                catch (Exception)
+                {
+                    return "";
+                }
+            }
+            else
+            {
+                return "";
+            }
+        }
 
 
 
