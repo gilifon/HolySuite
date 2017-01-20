@@ -142,6 +142,8 @@ th,td
 
         private void PopulateQSOList()
         {
+            DXCCManager manager = new DXCCManager();
+            
             m_qsoList.Clear();
             //Remove Line breakers
             string oneLiner = Regex.Replace(m_fileText, "\r\n", "");
@@ -176,7 +178,7 @@ th,td
                 if (match.Success)
                 {
                     qso_row.Call = Regex.Split(row, call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                    qso_row.DXCC = qso_row.Call.Substring(0, 2);
+                    qso_row.DXCC = manager.GetEntity(qso_row.Call);
                 }
 
                 regex = new Regex(date_pattern, RegexOptions.IgnoreCase);

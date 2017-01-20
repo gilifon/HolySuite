@@ -123,6 +123,7 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
+            DXCCManager m = new DXCCManager();
             Version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
@@ -388,7 +389,7 @@ namespace HolyLogger
                 return;
             }
             string bareCallsign = getBareCallsign(Qsos.First().my_callsign);
-            string country = getHamQth(bareCallsign);
+            string country = Services.getHamQth(bareCallsign);
             LogUploadWindow w = (LogUploadWindow)sender;
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, w.Email, w.Handle, country);
             string UploadLogToIARC_result = await UploadLogToIARC();
@@ -775,95 +776,73 @@ namespace HolyLogger
             var dups = from qso in Qsos where qso.dx_callsign == TB_DXCallsign.Text && qso.band+"M" == TB_Band.Text && qso.mode == Mode  select qso;
             if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
         }
-        
-        private void getQrzData()
+
+        private async void getQrzData()
         {
+            DXCCManager manager = new DXCCManager();
+            Country = manager.GetEntity(TB_DXCallsign.Text);
+
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
-                try
-                {
-                    string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
-                    WebRequest request = WebRequest.Create(baseRequest + SessionKey + ";callsign=" + TB_DXCallsign.Text);
-                    WebResponse response = request.GetResponse();
-                    string status = ((HttpWebResponse)response).StatusDescription;
-                    Stream dataStream = response.GetResponseStream();
-                    StreamReader reader = new StreamReader(dataStream);
-                    string responseFromServer = reader.ReadToEnd();
-                    XDocument xDoc = XDocument.Parse(responseFromServer);
-                    IEnumerable<XElement> country = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "country");
-                    if (country.Count() > 0)
-                        Country = country.FirstOrDefault().Value;
-                    else
-                        Country = "";
 
-                    IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
-                    if (fname.Count() > 0)
-                        FName = fname.FirstOrDefault().Value;
-                    else
+                /*****************************/
+                using (var client = new HttpClient())
+                {
+                    try
+                    {
+                        string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
+                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + TB_DXCallsign.Text);
+                        var responseFromServer = await response.Content.ReadAsStringAsync();
+                        XDocument xDoc = XDocument.Parse(responseFromServer);
+
+                        //IEnumerable<XElement> country = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "country");
+                        //if (country.Count() > 0)
+                        //    Country = country.FirstOrDefault().Value;
+                        //else
+                        //    Country = "";
+
+                        IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
+                        if (fname.Count() > 0)
+                            FName = fname.FirstOrDefault().Value;
+                        else
+                            FName = "";
+
+                        IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                        if (lname.Count() > 0)
+                            FName += " " + lname.FirstOrDefault().Value;
+
+                        string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
+                        if (SessionKey != key) Services.LoginToQRZ(out _SessionKey);
+                    }
+
+                    catch (Exception)
+                    {
+                        //Country = "";
                         FName = "";
-
-                    IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
-                    if (lname.Count() > 0)
-                        FName += " " + lname.FirstOrDefault().Value;
-
-                    string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
-                    if (SessionKey != key) Services.LoginToQRZ(out _SessionKey);
+                    }
 
                 }
-                catch (Exception)
-                {
-                    Country = "";
-                    FName = "";
-                }
-            }
-            else {
-                Country = "";
-                FName = "";
-            }
-        }
-        private string getHamQth(string callsign)
-        {
-            if (!string.IsNullOrWhiteSpace(callsign))
-            {
-                try
-                {
-                    string baseRequest = "http://www.hamqth.com/dxcc.php?callsign=";
-                    WebRequest request = WebRequest.Create(baseRequest + callsign);
-                    WebResponse response = request.GetResponse();
-                    string status = ((HttpWebResponse)response).StatusDescription;
-                    Stream dataStream = response.GetResponseStream();
-                    StreamReader reader = new StreamReader(dataStream);
-                    string responseFromServer = reader.ReadToEnd();
-                    XDocument xDoc = XDocument.Parse(responseFromServer);
-                    IEnumerable<XElement> country = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
-                    if (country.Count() > 0)
-                        return country.FirstOrDefault().Value;
-                    else
-                        return "";
-
-                }
-                catch (Exception)
-                {
-                    return "";
-                }
+                /*****************************/
             }
             else
             {
-                return "";
+                //Country = "";
+                FName = "";
             }
         }
+
 
 
 
         //-------------------------------------- OmniRig Section ---------------------------------------------//
-        #region OmniRig
+            #region OmniRig
 
-        #region Property
+            #region Property
 
 
-        /// <summary>
-        /// RX
-        /// </summary>
+            /// <summary>
+            /// RX
+            /// </summary>
         public const string FLD_RX = "RX";
 
         /// <summary>

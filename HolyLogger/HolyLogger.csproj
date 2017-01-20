@@ -149,6 +149,7 @@
     </Compile>
     <Compile Include="ADIFParser.cs" />
     <Compile Include="DataAccess.cs" />
+    <Compile Include="DXCCManager.cs" />
     <Compile Include="LogUploadWindow.xaml.cs">
       <DependentUpon>LogUploadWindow.xaml</DependentUpon>
     </Compile>

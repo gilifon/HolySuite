@@ -48,5 +48,37 @@ namespace HolyLogger
                 return false;
             }
         }
+        
+        public static string getHamQth(string callsign)
+        {
+            if (!string.IsNullOrWhiteSpace(callsign))
+            {
+                try
+                {
+                    string baseRequest = "http://www.hamqth.com/dxcc.php?callsign=";
+                    WebRequest request = WebRequest.Create(baseRequest + callsign);
+                    WebResponse response = request.GetResponse();
+                    string status = ((HttpWebResponse)response).StatusDescription;
+                    Stream dataStream = response.GetResponseStream();
+                    StreamReader reader = new StreamReader(dataStream);
+                    string responseFromServer = reader.ReadToEnd();
+                    XDocument xDoc = XDocument.Parse(responseFromServer);
+                    IEnumerable<XElement> country = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                    if (country.Count() > 0)
+                        return country.FirstOrDefault().Value;
+                    else
+                        return "";
+
+                }
+                catch (Exception)
+                {
+                    return "";
+                }
+            }
+            else
+            {
+                return "";
+            }
+        }
     }
 }

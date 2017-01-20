@@ -84,7 +84,7 @@
                 <StatusBarItem>
                     <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}"  Margin="10,0,0,0"/>
                 </StatusBarItem>
-                
+
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Omni-Rig: "/>
@@ -96,13 +96,13 @@
 
 
         <Label Content="My Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="24" Margin="102,16,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_callsign}" TextChanged="TB_MyCallsign_TextChanged" FontSize="16"  />
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="102,16,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_callsign}" TextChanged="TB_MyCallsign_TextChanged" FontSize="16"  />
         <Label Content="My Square" HorizontalAlignment="Left" Margin="216,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" TextChanged="TB_MyGrid_TextChanged" />-->
-        <xctk:MaskedTextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Margin="307,16,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" HidePromptOnLeave ="false" Mask="L-00-LL" PromptChar="#" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" Width="100" Height="24" TextChanged="TB_MyGrid_TextChanged" FontSize="16"/>
+        <xctk:MaskedTextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Margin="307,16,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" HidePromptOnLeave ="false" Mask="L-00-LL" PromptChar="#" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" Width="100" Height="28" TextChanged="TB_MyGrid_TextChanged" FontSize="16"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="20" Margin="422,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="Mode" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16">
+        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28">
             <!--<ComboBoxItem Name="op_am">AM</ComboBoxItem>-->
             <ComboBoxItem Name="op_cw">CW</ComboBoxItem>
             <ComboBoxItem Name="op_digi">DIGI</ComboBoxItem>
@@ -110,27 +110,27 @@
             <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>
         </ComboBox>
         <Label Content="Frequency" HorizontalAlignment="Left" Margin="216,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="307,54,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" Width="100" Height="23" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="8"/>
+        <xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="307,54,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="8"/>
         <Label Content="Band" HorizontalAlignment="Left" Margin="422,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="Score" HorizontalAlignment="Left" Margin="459,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="523,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="23" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" />
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="24" Margin="101,101,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" FontSize="16" />
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" FontSize="16" />
         <Image x:Name="QRZBtn" ToolTip="Open the QRZ.COM page of the DX station" HorizontalAlignment="Left" Height="24" Margin="206,101,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" >
 
         </Image>
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <xctk:MaskedTextBox x:Name="TB_4xExchange" HorizontalAlignment="Left" Margin="102,140,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="" Width="100" Height="24" FontSize="16"/>
-        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="24" Margin="102,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="4" />
+        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="102,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="4" />
         <Label Content="RST Sent" HorizontalAlignment="Left" Margin="242,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="339,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
         <Label Content="RST Rcvd" HorizontalAlignment="Left" Margin="393,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="477,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
 
         <Label Content="Timestamp" HorizontalAlignment="Left" Margin="242,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <xctk:DateTimeUpDown x:Name="QSOTimeStamp" Format="Custom" FormatString="HH:mm:ss dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="339,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="178" FontSize="16"/>
+        <xctk:DateTimeUpDown x:Name="QSOTimeStamp" Format="Custom" FormatString="HH:mm:ss dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="339,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="178" FontSize="16" Height="28"/>
 
         <Image x:Name="RefreshDateTime_Btn" ToolTip="Refresh TimeStamo to current time" HorizontalAlignment="Left" Height="20" Margin="523,103,0,0" VerticalAlignment="Top" Width="20" Source="Images/refresh.png" Stretch="None" MouseUp="RefreshDateTime_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
 
@@ -138,11 +138,11 @@
         <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="567,139,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="AddBtn_Click" FontSize="16" />
         <Button x:Name="ClearBtn" Content="Clear (F5)" HorizontalAlignment="Left" Margin="567,100,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" />
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,175,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="23" Margin="101,179,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="227" CharacterCasing="Upper" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" IsEnabled="False" FontSize="16" />
+        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="101,179,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="227" CharacterCasing="Upper" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" IsEnabled="False" FontSize="16" />
         <Label Content="Country" HorizontalAlignment="Left" Margin="339,175,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DX_Name_Copy" HorizontalAlignment="Left" Height="23" Margin="422,179,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="248" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" IsEnabled="False" FontSize="16" />
+        <TextBox x:Name="TB_DX_Name_Copy" HorizontalAlignment="Left" Height="28" Margin="422,179,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="248" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" IsEnabled="False" FontSize="16" />
         <Label Content="Comment" HorizontalAlignment="Left" Margin="4,212,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="23" Margin="101,216,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="569" Grid.Row="1" Text="" FontSize="16" />
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="101,216,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="569" Grid.Row="1" Text="" FontSize="16" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16">
