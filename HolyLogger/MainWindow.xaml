@@ -164,7 +164,7 @@
                 <DataGridTemplateColumn Header="Callsign" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Path=dx_callsign}" HorizontalAlignment="Center" Padding="5" />
+                            <TextBlock Text="{Binding Path=callsign}" HorizontalAlignment="Center" Padding="5" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

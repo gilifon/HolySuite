@@ -18,6 +18,8 @@ using System.Net.Http;
 using System.Threading.Tasks;
 using DXCCManager;
 using HolyParser;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
 
 namespace HolyLogger
 {
@@ -126,7 +128,6 @@ namespace HolyLogger
         {
             InitializeComponent();
             RadioEntityManager m = new RadioEntityManager();
-            Version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
@@ -203,11 +204,11 @@ namespace HolyLogger
             if (!Validate()) return;
             QSO qso = new QSO();
             qso.comment = TB_Comment.Text;
-            qso.dx_callsign = TB_DXCallsign.Text;
+            qso.callsign = TB_DXCallsign.Text;
             qso.mode = Mode;
             if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
             {
-                qso.exchange = TB_4xExchange.Text;
+                qso.exchange = TB_4xExchange.Text.Replace("-", "");
             }
             else
             {
@@ -215,8 +216,8 @@ namespace HolyLogger
             }
             qso.frequency = TB_Frequency.Text.Replace(",","");
             qso.band = LogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
-            qso.my_callsign = TB_MyCallsign.Text;
-            qso.my_square = TB_MyGrid.Text;
+            qso.my_call = TB_MyCallsign.Text;
+            qso.my_square = TB_MyGrid.Text.Replace("-","");
             qso.rst_rcvd = TB_RSTRcvd.Text;
             qso.rst_sent = TB_RSTSent.Text;
             qso.timestamp = QSOTimeStamp.Value.Value;
@@ -243,12 +244,12 @@ namespace HolyLogger
             StringBuilder sb = new StringBuilder("INSERT IGNORE INTO `log` ", 500);
             sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
             sb.Append("(");
-            sb.Append("'"); sb.Append(qso.my_callsign); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.my_call); sb.Append("',");
             sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
             sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
             sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
             sb.Append("'"); sb.Append(qso.band); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.dx_callsign); sb.Append("',");
+            sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
             sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
             sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
             sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
@@ -264,12 +265,12 @@ namespace HolyLogger
             foreach (QSO qso in qsos)
             {
                 sb.Append("(");
-                sb.Append("'"); sb.Append(qso.my_callsign); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.my_call); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.band); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.dx_callsign); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
@@ -347,7 +348,7 @@ namespace HolyLogger
 
         private void ExpotMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string adif = GenerateAdif(dal.GetAllQSOs());
+            string adif = Services.GenerateAdif(dal.GetAllQSOs());
             // Displays a SaveFileDialog so the user can save the Image
             // assigned to Button2.
             SaveFileDialog saveFileDialog1 = new SaveFileDialog();
@@ -390,7 +391,7 @@ namespace HolyLogger
                 System.Windows.Forms.MessageBox.Show("You can not upload empty log");
                 return;
             }
-            string bareCallsign = getBareCallsign(Qsos.First().my_callsign);
+            string bareCallsign = getBareCallsign(Qsos.First().my_call);
             string country = Services.getHamQth(bareCallsign);
             LogUploadWindow w = (LogUploadWindow)sender;
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, w.Email, w.Handle, country);
@@ -464,41 +465,6 @@ namespace HolyLogger
                 }
                 
             }
-        }
-
-        private string GenerateAdif(IList<QSO> qso_list)  
-        {
-            StringBuilder adif = new StringBuilder(200);
-            adif.AppendLine("<ADIF_VERS:3>2.2 ");
-            adif.AppendLine("<PROGRAMID:10>HolyLogger ");
-            //adif.AppendLine("<PROGRAMVERSION:15>Version 1.0.0.0 ");
-            adif.AppendFormat("<PROGRAMVERSION:{0}>{1} ", Version.Length, Version);
-            adif.AppendLine();
-            adif.AppendLine("<EOH>");
-            adif.AppendLine();
-
-            foreach (QSO qso in qso_list)
-            {
-                string date = qso.timestamp.ToString("yyyyMMdd");
-                string time = qso.timestamp.ToString("HHmmss");
-
-                adif.AppendFormat("<call:{0}>{1} ", qso.dx_callsign.Length, qso.dx_callsign);
-                adif.AppendFormat("<srx_string:{0}>{1} ", qso.exchange.Length, qso.exchange);
-                adif.AppendFormat("<freq:{0}>{1} ", qso.frequency.Length, qso.frequency);
-                adif.AppendFormat("<mode:{0}>{1} ", qso.mode.Length, qso.mode);
-                adif.AppendFormat("<station_callsign:{0}>{1} ", qso.my_callsign.Length, qso.my_callsign);
-                adif.AppendFormat("<operator:{0}>{1} ", qso.my_callsign.Length, qso.my_callsign);
-                adif.AppendFormat("<stx_string :{0}>{1} ", qso.my_square.Length, qso.my_square);
-                adif.AppendFormat("<rst_rcvd:{0}>{1} ", qso.rst_rcvd.Length, qso.rst_rcvd);
-                adif.AppendFormat("<rst_sent:{0}>{1} ", qso.rst_sent.Length, qso.rst_sent);
-                adif.AppendFormat("<qso_date:{0}>{1} ", date.Length, date);
-                adif.AppendFormat("<time_on:{0}>{1} ", time.Length, time);
-                adif.AppendFormat("<time_off:{0}>{1} ", time.Length, time);
-                adif.AppendFormat("<comment:{0}>{1} ", qso.comment.Length, qso.comment);
-                adif.AppendLine("<EOR>");
-            }
-
-            return adif.ToString();
         }
 
         private void QSODataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
@@ -663,7 +629,7 @@ namespace HolyLogger
 
         private void parseAdif()
         {
-            string adif = GenerateAdif(dal.GetAllQSOs());
+            string adif = Services.GenerateAdif(dal.GetAllQSOs());
             p = new LogParser(adif, (LogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? LogParser.Operator.Israeli : LogParser.Operator.Foreign);
             p.Parse();
         }
@@ -775,7 +741,7 @@ namespace HolyLogger
                 RefreshDateTime_Btn_MouseUp(null, null);
                 getQrzData();
             }
-            var dups = from qso in Qsos where qso.dx_callsign == TB_DXCallsign.Text && qso.band+"M" == TB_Band.Text && qso.mode == Mode  select qso;
+            var dups = from qso in Qsos where qso.callsign == TB_DXCallsign.Text && qso.band+"M" == TB_Band.Text && qso.mode == Mode  select qso;
             if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
         }
 
@@ -1183,6 +1149,7 @@ namespace HolyLogger
                     break;
             }
         }
+
 
 
 

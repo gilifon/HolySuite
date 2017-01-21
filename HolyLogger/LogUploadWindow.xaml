@@ -15,9 +15,10 @@
         <Label x:Name="title_categories" Content="Categories" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" FontSize="16" FontWeight="Bold"/>
         <Label x:Name="L_Mode" Content="Mode" HorizontalAlignment="Left" Margin="10,41,0,0" VerticalAlignment="Top" FontSize="16"/>
         <ComboBox x:Name="CB_Mode" Text="{Binding CategoryMode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="107,46,0,0" VerticalAlignment="Top" Width="99" FontSize="16">
+            <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>
             <ComboBoxItem Name="op_cw">CW</ComboBoxItem>
             <ComboBoxItem Name="op_digi">DIGI</ComboBoxItem>
-            <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>
+            <ComboBoxItem Name="op_mix">MIX</ComboBoxItem>
         </ComboBox>
 
         <Label x:Name="L_Operator" Content="Operator" HorizontalAlignment="Left" Margin="10,73,0,0" VerticalAlignment="Top" FontSize="16"/>

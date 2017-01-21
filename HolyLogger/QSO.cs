@@ -9,10 +9,10 @@ namespace HolyLogger
     public class QSO
     {
         public int id { get; set; }
-        public string my_callsign { get; set; }
+        public string my_call { get; set; }
         public string my_square { get; set; }
         public string frequency { get; set; }
-        public string dx_callsign { get; set; }
+        public string callsign { get; set; }
         public string rst_rcvd { get; set; }
         public string rst_sent { get; set; }
         public DateTime timestamp { get; set; }
