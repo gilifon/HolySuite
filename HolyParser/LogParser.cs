@@ -5,10 +5,11 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MoreLinq;
+using DXCCManager;
 
-namespace HolyLogger
+namespace HolyParser
 {
-    public class ADIFParser
+    public class LogParser
     {
         private int _result;
         public int Result { get { return _result; } }
@@ -127,7 +128,7 @@ th,td
         //private string name_pattern = @"<name:(\d)(?::[a-z]{1})?>";
 
 
-        public ADIFParser(string rawData, Operator logType)
+        public LogParser(string rawData, Operator logType)
         {
             m_fileText = rawData;
             this.logType = logType;
@@ -142,8 +143,8 @@ th,td
 
         private void PopulateQSOList()
         {
-            DXCCManager manager = new DXCCManager();
-            
+            RadioEntityManager manager = new RadioEntityManager();
+
             m_qsoList.Clear();
             //Remove Line breakers
             string oneLiner = Regex.Replace(m_fileText, "\r\n", "");
@@ -259,32 +260,32 @@ th,td
             log.Append("You get a score of: "); log.Append(total_points); log.Append(" points\r\n");
             log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
 
-            var DistinctContacts10 = validQSOs.Where(p => p.Band.Contains("10")).DistinctBy(p => p.HASH);
-            log.Append(DistinctContacts10.Count()); log.Append(" distinct Contacts on 10m\r\n");
-            var DistinctContacts15 = validQSOs.Where(p => p.Band.Contains("15")).DistinctBy(p => p.HASH);
-            log.Append(DistinctContacts15.Count()); log.Append(" distinct Contacts on 15m\r\n");
-            var DistinctContacts20 = validQSOs.Where(p => p.Band.Contains("20")).DistinctBy(p => p.HASH);
-            log.Append(DistinctContacts20.Count()); log.Append(" distinct Contacts on 20m\r\n");
-            var DistinctContacts40 = validQSOs.Where(p => p.Band.Contains("40")).DistinctBy(p => p.HASH);
-            log.Append(DistinctContacts40.Count()); log.Append(" distinct Contacts on 40m\r\n");
-            var DistinctContacts80 = validQSOs.Where(p => p.Band.Contains("80")).DistinctBy(p => p.HASH);
-            log.Append(DistinctContacts80.Count()); log.Append(" distinct Contacts on 80m\r\n");
-            var DistinctContacts160 = validQSOs.Where(p => p.Band.Contains("160")).DistinctBy(p => p.HASH);
-            log.Append(DistinctContacts160.Count()); log.Append(" distinct Contacts on 160m\r\n");
-            int AllBandContacts = DistinctContacts10.Count() + DistinctContacts15.Count() + DistinctContacts20.Count() + DistinctContacts40.Count() + DistinctContacts80.Count() + DistinctContacts160.Count();
-            log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
+            //var DistinctContacts10 = validQSOs.Where(p => p.Band.Contains("10")).DistinctBy(p => p.HASH);
+            //log.Append(DistinctContacts10.Count()); log.Append(" distinct Contacts on 10m\r\n");
+            //var DistinctContacts15 = validQSOs.Where(p => p.Band.Contains("15")).DistinctBy(p => p.HASH);
+            //log.Append(DistinctContacts15.Count()); log.Append(" distinct Contacts on 15m\r\n");
+            //var DistinctContacts20 = validQSOs.Where(p => p.Band.Contains("20")).DistinctBy(p => p.HASH);
+            //log.Append(DistinctContacts20.Count()); log.Append(" distinct Contacts on 20m\r\n");
+            //var DistinctContacts40 = validQSOs.Where(p => p.Band.Contains("40")).DistinctBy(p => p.HASH);
+            //log.Append(DistinctContacts40.Count()); log.Append(" distinct Contacts on 40m\r\n");
+            //var DistinctContacts80 = validQSOs.Where(p => p.Band.Contains("80")).DistinctBy(p => p.HASH);
+            //log.Append(DistinctContacts80.Count()); log.Append(" distinct Contacts on 80m\r\n");
+            //var DistinctContacts160 = validQSOs.Where(p => p.Band.Contains("160")).DistinctBy(p => p.HASH);
+            //log.Append(DistinctContacts160.Count()); log.Append(" distinct Contacts on 160m\r\n");
+            //int AllBandContacts = DistinctContacts10.Count() + DistinctContacts15.Count() + DistinctContacts20.Count() + DistinctContacts40.Count() + DistinctContacts80.Count() + DistinctContacts160.Count();
+            //log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
 
-            var DistinctSquares10 = validQSOs.Where(p => p.Band.Contains("10") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            var DistinctSquares10 = validQSOs.Where(p => p.Band.Contains("10") && p.IsIsraeli).DistinctBy(p => p.SRX.ToLower());
             log.Append(DistinctSquares10.Count()); log.Append(" distinct squares on 10m\r\n");
-            var DistinctSquares15 = validQSOs.Where(p => p.Band.Contains("15") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            var DistinctSquares15 = validQSOs.Where(p => p.Band.Contains("15") && p.IsIsraeli).DistinctBy(p => p.SRX.ToLower());
             log.Append(DistinctSquares15.Count()); log.Append(" distinct squares on 15m\r\n");
-            var DistinctSquares20 = validQSOs.Where(p => p.Band.Contains("20") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            var DistinctSquares20 = validQSOs.Where(p => p.Band.Contains("20") && p.IsIsraeli).DistinctBy(p => p.SRX.ToLower());
             log.Append(DistinctSquares20.Count()); log.Append(" distinct squares on 20m\r\n");
-            var DistinctSquares40 = validQSOs.Where(p => p.Band.Contains("40") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            var DistinctSquares40 = validQSOs.Where(p => p.Band.Contains("40") && p.IsIsraeli).DistinctBy(p => p.SRX.ToLower());
             log.Append(DistinctSquares40.Count()); log.Append(" distinct squares on 40m\r\n");
-            var DistinctSquares80 = validQSOs.Where(p => p.Band.Contains("80") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            var DistinctSquares80 = validQSOs.Where(p => p.Band.Contains("80") && p.IsIsraeli).DistinctBy(p => p.SRX.ToLower());
             log.Append(DistinctSquares80.Count()); log.Append(" distinct squares on 80m\r\n");
-            var DistinctSquares160 = validQSOs.Where(p => p.Band.Contains("160") && p.IsIsraeli).DistinctBy(p => p.Comment.ToLower());
+            var DistinctSquares160 = validQSOs.Where(p => p.Band.Contains("160") && p.IsIsraeli).DistinctBy(p => p.SRX.ToLower());
             log.Append(DistinctSquares160.Count()); log.Append(" distinct squares on 160m\r\n");
             int AllBandSquares = DistinctSquares10.Count() + DistinctSquares15.Count() + DistinctSquares20.Count() + DistinctSquares40.Count() + DistinctSquares80.Count() + DistinctSquares160.Count();
             //log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
@@ -334,19 +335,19 @@ th,td
             _description = log.ToString();
 
             string t_Template = m_template;
-            t_Template = t_Template.Replace("~QSO10~", DistinctContacts10.Count().ToString());
-            t_Template = t_Template.Replace("~QSO15~", DistinctContacts15.Count().ToString());
-            t_Template = t_Template.Replace("~QSO20~", DistinctContacts20.Count().ToString());
-            t_Template = t_Template.Replace("~QSO40~", DistinctContacts40.Count().ToString());
-            t_Template = t_Template.Replace("~QSO80~", DistinctContacts80.Count().ToString());
-            t_Template = t_Template.Replace("~QSO160~", DistinctContacts160.Count().ToString());
+            //t_Template = t_Template.Replace("~QSO10~", DistinctContacts10.Count().ToString());
+            //t_Template = t_Template.Replace("~QSO15~", DistinctContacts15.Count().ToString());
+            //t_Template = t_Template.Replace("~QSO20~", DistinctContacts20.Count().ToString());
+            //t_Template = t_Template.Replace("~QSO40~", DistinctContacts40.Count().ToString());
+            //t_Template = t_Template.Replace("~QSO80~", DistinctContacts80.Count().ToString());
+            //t_Template = t_Template.Replace("~QSO160~", DistinctContacts160.Count().ToString());
 
-            t_Template = t_Template.Replace("~POINTS10~", DistinctContacts10.Count().ToString());
-            t_Template = t_Template.Replace("~POINTS15~", DistinctContacts15.Count().ToString());
-            t_Template = t_Template.Replace("~POINTS20~", DistinctContacts20.Count().ToString());
-            t_Template = t_Template.Replace("~POINTS40~", (DistinctContacts40.Count() * 2).ToString());
-            t_Template = t_Template.Replace("~POINTS80~", (DistinctContacts80.Count() * 2).ToString());
-            t_Template = t_Template.Replace("~POINTS160~", (DistinctContacts160.Count() * 2).ToString());
+            //t_Template = t_Template.Replace("~POINTS10~", DistinctContacts10.Count().ToString());
+            //t_Template = t_Template.Replace("~POINTS15~", DistinctContacts15.Count().ToString());
+            //t_Template = t_Template.Replace("~POINTS20~", DistinctContacts20.Count().ToString());
+            //t_Template = t_Template.Replace("~POINTS40~", (DistinctContacts40.Count() * 2).ToString());
+            //t_Template = t_Template.Replace("~POINTS80~", (DistinctContacts80.Count() * 2).ToString());
+            //t_Template = t_Template.Replace("~POINTS160~", (DistinctContacts160.Count() * 2).ToString());
 
             t_Template = t_Template.Replace("~SQUARES10~", DistinctSquares10.Count().ToString());
             t_Template = t_Template.Replace("~SQUARES15~", DistinctSquares15.Count().ToString());
@@ -421,6 +422,11 @@ th,td
             return string.Empty;
         }
 
+        public static bool IsIsraeliStation(string callsign)
+        {
+            return !string.IsNullOrEmpty(callsign) && (callsign.StartsWith("4X", true, System.Globalization.CultureInfo.CurrentCulture) || callsign.StartsWith("4Z", true, System.Globalization.CultureInfo.CurrentCulture));
+        }
+
         private class QSO
         {
             public bool IsIsraeli { get; set; }
@@ -442,7 +448,7 @@ th,td
             public void StandartizeQSO()
             {
                 IsValid = false;
-                IsIsraeli = !string.IsNullOrEmpty(Call) && (Call.StartsWith("4X", true, System.Globalization.CultureInfo.CurrentCulture) || Call.StartsWith("4Z", true, System.Globalization.CultureInfo.CurrentCulture));
+                IsIsraeli = IsIsraeliStation(Call);// !string.IsNullOrEmpty(Call) && (Call.StartsWith("4X", true, System.Globalization.CultureInfo.CurrentCulture) || Call.StartsWith("4Z", true, System.Globalization.CultureInfo.CurrentCulture));
                 string pattern = @"([a-zA-Z]{1})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
                 Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
                 if (!string.IsNullOrEmpty(SRX))
@@ -482,6 +488,7 @@ th,td
                     IsValid = false;
                 }
             }
+
             private bool IsValidBand()
             {
                 if (string.IsNullOrEmpty(Band) && !string.IsNullOrEmpty(Freq))
@@ -550,7 +557,7 @@ th,td
 
             //}
         }
-        
+
         public enum Operator
         {
             Israeli = 0, Foreign

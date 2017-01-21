@@ -5,12 +5,12 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace HolyLogger
+namespace DXCCManager
 {
-    public class DXCCManager
+    public class RadioEntityManager
     {
         private List<DXCC> DXCCs;
-        
+
         private List<string> Entities = new List<string>() {
             "7J0|Japan (Shin'etsu), Guest Operators|AS|-9|36.65N|138.19E|45|25||R|=339",
             "7J1|Japan (Kanto), Guest Operators|AS|-9|35.70N|139.80E|45|25||R|=339",
@@ -5865,14 +5865,14 @@ namespace HolyLogger
             "ZC6|Palestine (no DXCC credit!)|AS|-2|31.30N|34.27E|39|20||R|1994/01/01-1999/01/31=0"
         };
 
-        public DXCCManager()
+        public RadioEntityManager()
         {
             DXCCs = new List<DXCC>(5851);
             foreach (string dxcc in Entities)
             {
                 string[] dxccInfo = dxcc.Split('|');
                 List<string> parsedPrefixes = ParsePrefix(dxccInfo[0]);
-                string rawEntity = dxccInfo[1].Split(',')[0];   
+                string rawEntity = dxccInfo[1].Split(',')[0];
                 DXCCs.Add(new DXCC() { entity = rawEntity, prefixes = parsedPrefixes });
             }
         }
@@ -5902,6 +5902,4 @@ namespace HolyLogger
             public string entity { get; set; }
         }
     }
-
-    
 }
