@@ -24,10 +24,54 @@ namespace HolyContestManager
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
-    public partial class MainWindow : Window
+    public partial class MainWindow : Window, INotifyPropertyChanged
     {
+        #region INotifyProprtyChanged
+        public event PropertyChangedEventHandler PropertyChanged;
+        protected void OnPropertyChanged(string propertyName)
+        {
+            if (PropertyChanged != null)
+            {
+                PropertyChanged(this, new PropertyChangedEventArgs(propertyName));
+            }
+        }
+        #endregion
+
         public HolylandData RawData{ get; set; }
         private List<Participant> Report { get; set; }
+
+        private string _CategoryOperator = "Single OP";
+        public string CategoryOperator
+        {
+            get { return _CategoryOperator; }
+            set
+            {
+                _CategoryOperator = value;
+                OnPropertyChanged("CategoryOperator");
+            }
+        }
+
+        private string _CategoryMode = "SSB";
+        public string CategoryMode
+        {
+            get { return _CategoryMode; }
+            set
+            {
+                _CategoryMode = value;
+                OnPropertyChanged("CategoryMode");
+            }
+        }
+
+        private string _CategoryPower = "HIGH";
+        public string CategoryPower
+        {
+            get { return _CategoryPower; }
+            set
+            {
+                _CategoryPower = value;
+                OnPropertyChanged("CategoryPower");
+            }
+        }
 
         public MainWindow()
         {
@@ -79,7 +123,7 @@ namespace HolyContestManager
                 Report.Add(n);
                 (sender as BackgroundWorker).ReportProgress(100*a/z);
             }
-            
+            Report = Report.OrderBy(p => p.score).ToList();
         }
 
         private void GetData()
