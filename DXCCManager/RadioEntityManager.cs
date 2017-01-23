@@ -9,7 +9,8 @@ namespace DXCCManager
 {
     public class RadioEntityManager
     {
-        private List<DXCC> DXCCs;
+        private List<DXCC> RawDXCCs;
+        private List<DXCC> FinalDXCCs;
 
         private List<string> Entities = new List<string>() {
             "7J0|Japan (Shin'etsu), Guest Operators|AS|-9|36.65N|138.19E|45|25||R|=339",
@@ -1390,7 +1391,7 @@ namespace DXCCManager
             "U9Y%|Russia (Asiatic), Altayskiy kray (AL), World War II. Veteran|AS|-7|52.77N|82.62E|31|18||R|=15",
             "U9Z%|Russia (Asiatic), Respublika Altay (GA), World War II. Veteran|AS|-7|50.92N|86.92E|31|18||R|=15",
             "4J[1346] 4L[1346] EK[1346] EM[1346]|Russia (European)|EU|-4|55.70N|36.97E|29|16||R|-1993/12/31=54",
-            "4K0|Drifting Ice Station, Russian Arctica (no DXCC credit!)|AS|-3|84.0N|96.0E|75|19||R|-1993/12/31",
+            "4K0|Drifting Ice Station, Russian Arctica (no DXCC credit!)|AS|-3|84.0N|96.0E|75|19||R|-1993/12/31=0",
             "4K0 4L9 4L0 RA7# UA7#|Russia (Asiatic)|AS|-8|59.88N|91.67E|22|18||R|-1993/12/31=15",
             "4K3|Russia (European), EU Islands|EU|-3|75N|60E|20|16||R|-1993/12/31=54",
             "4K4[ABPQ] 4J9 4J0 4K9|Russia (Asiatic)|AS|-8|59.88N|91.67E|22|18||R|-1993/12/31=15",
@@ -5696,7 +5697,7 @@ namespace DXCCManager
             "ZP9|Paraguay, Alto Parana, Itapua|SA|4|27S|56W|14|11||R|=132",
             "EZ4 EZ7|Saar|EU|-1|49.25N|6.98E|28|14||R|-1949/03/31=210",
             "9S4|Germany|EU|-1|52N|7E|28|14||R|1957/04/01-1957/12/01=81",
-            "D[2-7]|Germany|EU|-1|52N|7E|28|14|81|R|-1949/12/31",
+            "D[2-7]|Germany|EU|-1|52N|7E|28|14|81|R|-1949/12/31=0",
             "EK1|Tangier|AF|0|35.79N|5.80W|37|33||R|-1952/01/01=264",
             "DM2%%B DT2%%B Y2[1-8]%B|Germany (Eastern part), Schwerin, Private Station|EU|-1|53.64N|11.39E|28|14||R|-1973/09/16=81",
             "DM2%%C DT2%%C Y2[1-8]%C|Germany (Eastern part), Neubrandenburg, Private Station|EU|-1|53.56N|13.27E|28|14||R|-1973/09/16=81",
@@ -5867,14 +5868,31 @@ namespace DXCCManager
 
         public RadioEntityManager()
         {
-            DXCCs = new List<DXCC>(5851);
+            RawDXCCs = new List<DXCC>(5851);
+            FinalDXCCs = new List<DXCC>(5851);
+
             foreach (string dxcc in Entities)
             {
                 string[] dxccInfo = dxcc.Split('|');
                 string parsedPrefixes = ParsePrefix(dxccInfo[0]);
                 string rawEntity = dxccInfo[1].Split(',')[0];
-                DXCCs.Add(new DXCC() { entity = rawEntity, prefixes = parsedPrefixes });
+                string id = dxccInfo[dxccInfo.Length-1].Split('=')[1];
+                if (id != "0")
+                    RawDXCCs.Add(new DXCC() { id = id, entity = rawEntity, prefixes = parsedPrefixes });
             }
+            IEnumerable<IGrouping<string, string>> DXCC_Group_By_Id = RawDXCCs.GroupBy(p => p.id, p => p.prefixes);
+            foreach (IGrouping<string, string> DXCCGroup in DXCC_Group_By_Id)
+            {
+
+                StringBuilder sb = new StringBuilder();
+                foreach (string pfx in DXCCGroup)
+                {
+                    sb.Append(pfx + "|");
+                }
+                DXCC c = new DXCC() { id = DXCCGroup.Key, entity = DXCCGroup.Key, prefixes = sb.ToString().TrimEnd('|') };
+                FinalDXCCs.Add(c);
+            }
+
         }
 
         private string ParsePrefix(string rawPrefix)
@@ -5885,7 +5903,7 @@ namespace DXCCManager
 
         public string GetEntity(string callsign)
         {
-            foreach (DXCC item in DXCCs)
+            foreach (DXCC item in FinalDXCCs)
             {
 
                 if (!string.IsNullOrWhiteSpace(item.prefixes) && Regex.IsMatch(callsign, "^" + item.prefixes + ".*"))
@@ -5900,6 +5918,7 @@ namespace DXCCManager
 
         private struct DXCC
         {
+            public string id { get; set; }
             public string prefixes { get; set; }
             public string entity { get; set; }
         }

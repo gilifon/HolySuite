@@ -39,8 +39,9 @@ namespace HolyContestManager
 
         public HolylandData RawData{ get; set; }
         private List<Participant> Report { get; set; }
+        private List<Participant> FilteredReport { get; set; }
 
-        private string _CategoryOperator = "Single OP";
+        private string _CategoryOperator = "No Filter";
         public string CategoryOperator
         {
             get { return _CategoryOperator; }
@@ -51,7 +52,7 @@ namespace HolyContestManager
             }
         }
 
-        private string _CategoryMode = "SSB";
+        private string _CategoryMode = "No Filter";
         public string CategoryMode
         {
             get { return _CategoryMode; }
@@ -62,7 +63,7 @@ namespace HolyContestManager
             }
         }
 
-        private string _CategoryPower = "HIGH";
+        private string _CategoryPower = "No Filter";
         public string CategoryPower
         {
             get { return _CategoryPower; }
@@ -73,28 +74,59 @@ namespace HolyContestManager
             }
         }
 
+        private string _CategoryStation = "No Filter";
+        public string CategoryStation
+        {
+            get { return _CategoryStation; }
+            set
+            {
+                _CategoryStation = value;
+                OnPropertyChanged("CategoryStation");
+            }
+        }
+
+        private string _CategoryOrigin = "No Filter";
+        public string CategoryOrigin
+        {
+            get { return _CategoryOrigin; }
+            set
+            {
+                _CategoryOrigin = value;
+                OnPropertyChanged("CategoryOrigin");
+            }
+        }
+        
+
+        private BackgroundWorker bg;
+
         public MainWindow()
         {
             Report = new List<Participant>(200);
-            
+            FilteredReport = new List<Participant>(200);
             InitializeComponent();
-            GetData();
-            //CalculatePoints();
-        }
-
-        private void CalculatePoints()
-        {
-            BackgroundWorker bg = new BackgroundWorker();
+            //GetData();
+            bg = new BackgroundWorker();
             bg.WorkerReportsProgress = true;
             bg.DoWork += Bg_DoWork;
             bg.RunWorkerCompleted += Bg_RunWorkerCompleted;
             bg.ProgressChanged += Bg_ProgressChanged;
-            bg.RunWorkerAsync();
+        }
+
+        private void GetData()
+        {
+            WebRequest request = WebRequest.Create("http://www.iarc.org/ws/get_holyland_data.php");
+            WebResponse response = request.GetResponse();
+            string status = ((HttpWebResponse)response).StatusDescription;
+            Stream dataStream = response.GetResponseStream();
+            StreamReader reader = new StreamReader(dataStream);
+            string responseFromServer = reader.ReadToEnd();
+
+            RawData = JsonConvert.DeserializeObject<HolylandData>(responseFromServer);
         }
 
         private void Bg_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            DataContext = Report;
+            DataContext = FilteredReport;
             pbStatus.Value = 0;
         }
 
@@ -105,6 +137,8 @@ namespace HolyContestManager
 
         private void Bg_DoWork(object sender, DoWorkEventArgs e)
         {
+            Report.Clear();
+            GetData();
             int a = 0;
             int z = RawData.participants.Count();
             foreach (Participant p in RawData.participants)
@@ -124,27 +158,82 @@ namespace HolyContestManager
                 (sender as BackgroundWorker).ReportProgress(100*a/z);
             }
             Report = Report.OrderBy(p => p.score).ToList();
+            FilteredReport = new List<Participant>(Report);
         }
 
-        private void GetData()
+        private void CalculateBtn_Click(object sender, RoutedEventArgs e)
         {
-            WebRequest request = WebRequest.Create("http://www.iarc.org/ws/get_holyland_data.php");
-            WebResponse response = request.GetResponse();
-            string status = ((HttpWebResponse)response).StatusDescription;
-            Stream dataStream = response.GetResponseStream();
-            StreamReader reader = new StreamReader(dataStream);
-            string responseFromServer = reader.ReadToEnd();
-
-            RawData = JsonConvert.DeserializeObject<HolylandData>(responseFromServer);
+            if (!bg.IsBusy)
+                bg.RunWorkerAsync();
         }
+        
 
-        private void button_Click(object sender, RoutedEventArgs e)
+        private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            //pbStatus.Minimum = 0;
-            //pbStatus.Maximum = RawData.participants.Count();
-
-            CalculatePoints();
+            if (e.AddedItems.Count == 0) return;
+            string val = (e.AddedItems[0] as ComboBoxItem).Content as string;
+            CategoryMode = val ?? CategoryMode;
+            FilterReport();
         }
+        
+        private void CB_Operator_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems.Count == 0) return;
+            string val = (e.AddedItems[0] as ComboBoxItem).Content as string;
+            CategoryOperator = val ?? CategoryOperator;
+            FilterReport();
+        }
+
+        private void CB_Power_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems.Count == 0) return;
+            string val = (e.AddedItems[0] as ComboBoxItem).Content as string;
+            CategoryPower = val ?? CategoryPower;
+            FilterReport();
+        }
+
+        private void CB_Station_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems.Count == 0) return;
+            string val = (e.AddedItems[0] as ComboBoxItem).Content as string;
+            CategoryStation = val ?? CategoryStation;
+            FilterReport();
+        }
+
+        private void CB_Origin_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (e.AddedItems.Count == 0) return;
+            string val = (e.AddedItems[0] as ComboBoxItem).Content as string;
+            CategoryOrigin = val ?? CategoryOrigin;
+            FilterReport();
+        }
+
+        private void FilterReport()
+        {
+            if (FilteredReport == null) return;
+            FilteredReport = new List<Participant>(Report);
+            if (CategoryMode != "No Filter")
+                FilteredReport.RemoveAll(p => p.category_mode.ToLower() != CategoryMode.ToLower());
+            if (CategoryOperator != "No Filter")
+                FilteredReport.RemoveAll(p => p.category_op.ToLower() != CategoryOperator.ToLower());
+            if (CategoryPower != "No Filter")
+                FilteredReport.RemoveAll(p => p.category_power.ToLower() != CategoryPower.ToLower());
+            if (CategoryOrigin == "Israeli")
+                FilteredReport.RemoveAll(p => !HolyLogParser.IsIsraeliStation(p.callsign));
+            else if (CategoryOrigin == "Foreign")
+                FilteredReport.RemoveAll(p => HolyLogParser.IsIsraeliStation(p.callsign));
+
+            //if (CategoryStation != "No Filter")
+            //    if (CategoryStation == "Fixed" || CategoryStation == "Portable")
+            //        FilteredReport.RemoveAll(p => p.squers != "1");
+            //    else if (CategoryStation == "Mobile")
+            //        FilteredReport.RemoveAll(p => p.squers == "1");
+
+            DataContext = FilteredReport.OrderBy(p => p.score).ToList();
+            //Console.WriteLine("Category: " + CategoryMode + " : " + CategoryOperator + " : " + CategoryPower + " : " + CategoryStation);
+        }
+
+        
     }
 
     public struct HolylandData
@@ -154,7 +243,7 @@ namespace HolyContestManager
         public List<QSO> log { get; set; }
     }
 
-    public struct Participant
+    public struct Participant : ICloneable
     {
         public int id { get; set; }
         public string callsign { get; set; }
@@ -168,6 +257,11 @@ namespace HolyContestManager
         public string mults { get; set; }
         public string squers { get; set; }
         public string score { get; set; }
+
+        public object Clone()
+        {
+            return new Participant() { callsign = this.callsign };
+        }
     }
 
     public class QSO

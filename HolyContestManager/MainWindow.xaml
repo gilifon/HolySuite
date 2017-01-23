@@ -99,26 +99,42 @@
             </DataGrid.Columns>
         </DataGrid>
         <ProgressBar Minimum="0" Maximum="100" Name="pbStatus" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,526,0,0" Width="703" Height="25"/>
-        <Button x:Name="button" Content="Calculate Results" HorizontalAlignment="Left" Margin="718,526,0,0" VerticalAlignment="Top" Width="124" Height="25" Click="button_Click"/>
+        <Button x:Name="CalculateBtn" Content="Calculate Results" HorizontalAlignment="Left" Margin="718,526,0,0" VerticalAlignment="Top" Width="124" Height="25" Click="CalculateBtn_Click"/>
 
-        <Label x:Name="L_Mode" Content="Mode" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding CategoryMode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="67,10,0,0" VerticalAlignment="Top" Width="99" FontSize="16">
-            <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>
+        <Label x:Name="L_Mode" Content="Mode" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <ComboBox x:Name="CB_Mode" Text="{Binding CategoryMode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="67,10,0,0" VerticalAlignment="Top" Width="90" FontSize="16" SelectionChanged="CB_Mode_SelectionChanged">
+            <ComboBoxItem Name="op_clear_mode" IsSelected="True">No Filter</ComboBoxItem>
+            <ComboBoxItem Name="op_ssb" >SSB</ComboBoxItem>
             <ComboBoxItem Name="op_cw">CW</ComboBoxItem>
             <ComboBoxItem Name="op_digi">DIGI</ComboBoxItem>
             <ComboBoxItem Name="op_mix">MIX</ComboBoxItem>
         </ComboBox>
 
-        <Label x:Name="L_Operator" Content="Operator" HorizontalAlignment="Left" Margin="184,10,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <ComboBox x:Name="CB_Operator" Text="{Binding CategoryOperator, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="263,10,0,0" VerticalAlignment="Top" Width="99" FontSize="16">
-            <ComboBoxItem Name="op_single" IsSelected="True">Single OP</ComboBoxItem>
-            <ComboBoxItem Name="op_multi">Multi OP</ComboBoxItem>
+        <Label x:Name="L_Operator" Content="Operator" HorizontalAlignment="Left" Margin="171,8,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <ComboBox x:Name="CB_Operator" Text="{Binding CategoryOperator, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="250,10,0,0" VerticalAlignment="Top" Width="90" FontSize="16" SelectionChanged="CB_Operator_SelectionChanged">
+            <ComboBoxItem Name="op_clear_operator" IsSelected="True">No Filter</ComboBoxItem>
+            <ComboBoxItem Name="op_single">Single-OP</ComboBoxItem>
+            <ComboBoxItem Name="op_multi">Multi-OP</ComboBoxItem>
             <ComboBoxItem Name="op_checklog">Checklog</ComboBoxItem>
         </ComboBox>
-        <Label x:Name="L_Power" Content="Power" HorizontalAlignment="Left" Margin="386,10,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <ComboBox x:Name="CB_Power" Text="{Binding CategoryPower, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="445,10,0,0" VerticalAlignment="Top" Width="99" FontSize="16">
-            <ComboBoxItem Name="op_high" IsSelected="True">HIGH</ComboBoxItem>
+        <Label x:Name="L_Power" Content="Power" HorizontalAlignment="Left" Margin="354,8,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <ComboBox x:Name="CB_Power" Text="{Binding CategoryPower, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="413,10,0,0" VerticalAlignment="Top" Width="90" FontSize="16" SelectionChanged="CB_Power_SelectionChanged">
+            <ComboBoxItem Name="op_clear_power" IsSelected="True">No Filter</ComboBoxItem>
+            <ComboBoxItem Name="op_high">HIGH</ComboBoxItem>
             <ComboBoxItem Name="op_qrp">QRP</ComboBoxItem>
+        </ComboBox>
+        <Label x:Name="L_Station" Content="Station" HorizontalAlignment="Left" Margin="517,8,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <ComboBox x:Name="CB_Station" Text="{Binding CategoryStation, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="582,10,0,0" VerticalAlignment="Top" Width="90" FontSize="16" SelectionChanged="CB_Station_SelectionChanged">
+            <ComboBoxItem Name="op_clear_station" IsSelected="True">No Filter</ComboBoxItem>
+            <ComboBoxItem Name="op_fixed">Fixed</ComboBoxItem>
+            <ComboBoxItem Name="op_mobile">Mobile</ComboBoxItem>
+            <ComboBoxItem Name="op_portable">Portable</ComboBoxItem>
+        </ComboBox>
+        <Label x:Name="L_Station_Copy" Content="Origin" HorizontalAlignment="Left" Margin="686,8,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <ComboBox x:Name="CB_Origin" Text="{Binding CategoryOrigin, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="745,10,0,0" VerticalAlignment="Top" Width="90" FontSize="16" SelectionChanged="CB_Origin_SelectionChanged">
+            <ComboBoxItem x:Name="op_clear_origin" IsSelected="True" Content="No Filter"/>
+            <ComboBoxItem x:Name="op_israeli">Israeli</ComboBoxItem>
+            <ComboBoxItem x:Name="op_foreign">Foreign</ComboBoxItem>
         </ComboBox>
 
 
