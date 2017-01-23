@@ -5,9 +5,9 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HolyContestManager"
         mc:Ignorable="d"
-        Title="Holyland Contest Manager" Height="600" Width="800" MinWidth="800" MinHeight="600">
+        Title="Holyland Contest Manager" Height="600" Width="860" MinWidth="860" MinHeight="600">
     <Grid>
-        <DataGrid x:Name="ResultDataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" FontSize="16">
+        <DataGrid x:Name="ResultDataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" FontSize="16" Margin="0,0,0,49">
             <DataGrid.Columns>
                 <DataGridTemplateColumn Header="Callsign" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
@@ -87,7 +87,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>-->
-                
+
                 <DataGridTemplateColumn Header="Score" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -98,5 +98,7 @@
 
             </DataGrid.Columns>
         </DataGrid>
+        <ProgressBar Minimum="0" Maximum="100" Name="pbStatus" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,526,0,0" Width="703" Height="25"/>
+        <Button x:Name="button" Content="Calculate Results" HorizontalAlignment="Left" Margin="718,526,0,0" VerticalAlignment="Top" Width="124" Height="25" Click="button_Click"/>
     </Grid>
 </Window>

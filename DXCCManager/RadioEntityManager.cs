@@ -141,7 +141,7 @@ namespace DXCCManager
             "TO|France|EU|-1|49N|2E|27|14||R|1983/01/01-1983/12/31=227",
             "TP TP#CE TP##CE|France, European Council Strassbourg|EU|-1|48.59N|7.77E|27|14||R|=227",
             "F0|France, Class 3|EU|-1|49N|2E|27|14||R|2000/09/21-=227",
-            "F1 F4%%%|France, Class 2|EU|-1|49N|2E|27|14||R|2000/09/21-=227",
+            "F1 F[458]%%%|France, Class 2|EU|-1|49N|2E|27|14||R|2000/09/21-=227",
             "G#% G[FLY]#%|England, Special or Contest Station|EU|0|51.53N|0.12W|27|14||R|1996/06/01-=223",
             "M#% M[EFGLVY]#%|England, Special or Contest Station|EU|0|51.53N|0.12W|27|14||R|1984/01/01-=223",
             "G/%%% G/%%%% G/%%%%% G/%%%%%% G/%%%%%%% G/%%%%%%%%|England, CEPT|EU|0|51.53N|0.12W|27|14||R|=223",
@@ -627,7 +627,7 @@ namespace DXCCManager
             "R[A-Z][67] RB6 RC6 RD6 RE6 RF6|Russia (European), South, Black Sea Region|EU|-4|45.37N|39.43E|29|16||R|1994/01/01-2010/01/20=54",
             "R[A-Z]8|Russia (Asiatic), Far East, Baikal Region|AS|-7|52.79N|104.78E|32|18||R|1994/01/01-2010/01/20=15",
             "R[A-Z]9|Russia (Asiatic), Southwest Siberia|AS|-6|58.70N|61.33E|30|17||R|1994/01/01-2010/01/20=15",
-            "RA2 R[D-Z]2|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|-2010/01/20=126",
+            "RA2 R[D-Z]2|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|-2010/01/20=126",
             "R[BCDFGHIJLMOPQRTY]0A U[B-I]0A|Russia (Asiatic), Krasnoyarskiy kray (KK)|AS|-8|59.88N|91.67E|32|18||R|1992/06/01-2010/01/20=15",
             "R[BCDFGHIJLMOPQRTY]0A[W-Z]%|Russia (Asiatic), Krasnoyarskiy kray (KK), Club Station|AS|-8|59.88N|91.67E|32|18||R|1992/06/01-2010/01/20=15",
             "R[BCDFGHIJLMOPQRTY]0B|Russia (Asiatic), Taymyrskiy avtonomnyy okrug (TM)|AS|-7|69.41N|86.20E|32|18||R|1992/06/01-2010/01/20=15",
@@ -893,9 +893,9 @@ namespace DXCCManager
             "R1 R3 R4 R6 R7|Russia (European), Special Station|EU|-3|56.00N|38.00E|29|16||R|-2010/01/20=54",
             "R## R[A-Z]## U## U[A-I]##|Russia (European), Special Station|EU|-3|56.00N|38.00E|29|16||R|=54",
             "R2[A-EG-JL-Z] U2[A-EG-JL-Z]|Russia (European), Special Station|EU|-3|56.00N|38.00E|29|16||R|-2010/01/20=54",
-            "R2[FK][A-Z] R[ACDFGJ-OQT-Z]2[FK] U2[FK] UA2[FK]|Kaliningrad (Koenigsberg), 1st Class(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
-            "R2[FK][A-V][A-Z] R[ACDFGJ-OQT-Z]2[FK][A-V][A-Z] UA2[FK][A-V][A-Z]|Kaliningrad (Koenigsberg), 2nd Class(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
-            "R2[FK][W-Z][A-Z] R[ACDFGJ-OQT-Z]2[FK][W-Z][A-Z] UA2[FK][W-Z][A-Z] |Kaliningrad (Koenigsberg), Club Station(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "R2[FK][A-Z] R[ACDFGJ-OQT-Z]2[FK] U2[FK] UA2[FK]|Kaliningrad (Koenigsberg), 1st Class(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "R2[FK][A-V][A-Z] R[ACDFGJ-OQT-Z]2[FK][A-V][A-Z] UA2[FK][A-V][A-Z]|Kaliningrad (Koenigsberg), 2nd Class(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "R2[FK][W-Z][A-Z] R[ACDFGJ-OQT-Z]2[FK][W-Z][A-Z] UA2[FK][W-Z][A-Z]Kaliningrad (Koenigsberg), Club Station(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "R290|Russia (Asiatic), Sverdlovskaya oblast' (SV), 290th Anniversary of Ekaterinburg City|AS|-6|58.70N|61.33E|30|17||R|2013/08/01-2013/11/17=15",
             "R3[1-8][A-Z]|Russia (European), Novgorodskaya oblast' (NV), HF Championship of the Russian Federation|EU|-4|58.43N|32.38E|29|16||R|2012/07/19-2012/07/22=54",
             "R31A[A-Z] R52B[A-Z]|Russia (European), Moskovskaya oblast' (MO), Open VHF Championship Moscow Shchelkovo-2012|EU|-4|55.70N|36.97E|29|16||R|2012/08/09=54",
@@ -908,7 +908,7 @@ namespace DXCCManager
             "R65P[A-Z]|Russia (European), 65th Anniversary of Kursk Battle|EU|-3|51.74N|36.19E|29|16||R|2008/01/01-2008/12/31=54",
             "R65S[A-Z]|Russia (European), 65th Anniversary of Stalingrad Battle|EU|-3|48.717N|44.50E|29|16||R|2008/01/01-2008/12/31=54",
             "R7 R8 R9 R0 U7 U8 U9 U0|Russia (Asiatic), Special Station|AS|-8|59.88N|91.67E|22|18||R|-2010/01/20=15",
-            "R750|Kaliningrad (Koenigsberg), 750th Anniversary(KA) |EU|-3|54.427N|20.3058E|29|15||R|-1992/05/31=126",
+            "R750|Kaliningrad (Koenigsberg), 750th Anniversary(KA)EU|-3|54.427N|20.3058E|29|15||R|-1992/05/31=126",
             "R8# R9# R0#|Russia (Asiatic), Special Station|AS|-8|59.88N|91.67E|22|18||R|-2010/01/20=15",
             "R8T U8T|Russia (Asiatic), Ust' Ordynskiy Buryatskiy avtonomnyy okrug (UO)|AS|-7|52.79N|104.78E|32|18||R|-2010/01/20=15",
             "R8V U8V|Russia (Asiatic), Aginskiy Buryatskiy avtonomnyy okrug (AB)|AS|-10|54.00N|118.00E|32|18||R|-2010/01/20=15",
@@ -943,8 +943,8 @@ namespace DXCCManager
             "UA1[T-U] R1[T-U] U1[T-U]|Russia (European), Novgorodskaya oblast' (NV)|EU|-4|58.43N|32.38E|29|16||R|-2010/01/20=54",
             "UA1[W-X] R1[W-X] U1[W-X]|Russia (European), Pskovskaya oblast' (PS)|EU|-4|57.32N|29.25E|29|16||R|-2010/01/20=54",
             "UA1[Y-Z] R1[Y-Z] U1[Y-Z]|Russia (European), Murmanskaya oblast' (MU)|EU|-4|68.03N|34.57E|19|16||R|-2010/01/20=54",
-            "UA2 U2 UA2F U2F|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|-2010/01/20=126",
-            "UA2F[W-Z]% R[AEKNSUVWXZ]2F[W-Z]%|Kaliningrad (Koenigsberg), Club Station(KA) |EU|-3|54.427N|20.3058E|29|15||R|=126",
+            "UA2 U2 UA2F U2F|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|-2010/01/20=126",
+            "UA2F[W-Z]% R[AEKNSUVWXZ]2F[W-Z]%|Kaliningrad (Koenigsberg), Club Station(KA)EU|-3|54.427N|20.3058E|29|15||R|=126",
             "UA3[A-CFH] R3[A-CFH] U3[A-CFH]|Russia (European), Gorod Moskva (MA)|EU|-4|55.75N|37.62E|29|16||R|-2010/01/20=54",
             "UA3D R3D U3D|Russia (European), Moskovskaya oblast' (MO)|EU|-3|56.00N|38.00E|29|16||R|-2010/01/20=54",
             "UA3E R3E U3E|Russia (European), Orlovskaya oblast' (OR)|EU|-4|52.85N|36.43E|29|16||R|-2010/01/20=54",
@@ -1015,7 +1015,7 @@ namespace DXCCManager
             "UA[89]X R[89]X U[89]X|Russia (European), Respublika Komi (KO)|AS|-4|64.28N|54.47E|19|17||R|2011/12/01-=54",
             "UA9Y R9Y U9Y|Russia (Asiatic), Altayskiy kray (AL)|AS|-7|52.77N|82.62E|31|18||R|-2010/01/20=15",
             "UA9Z R9Z U9Z|Russia (Asiatic), Respublika Altay (GA)|AS|-7|50.92N|86.92E|31|18||R|-2010/01/20=15",
-            "U[BCDFG]2[FK]%%|Kaliningrad (Koenigsberg), 3rd Class(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "U[BCDFG]2[FK]%%|Kaliningrad (Koenigsberg), 3rd Class(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "U[B-I]0A|Russia (Asiatic), Krasnoyarskiy kray (KK)|AS|-8|59.88N|91.67E|32|18||R|1994/01/01-2010/01/20=15",
             "U[B-I]0A[W-Z]%|Russia (Asiatic), Krasnoyarskiy kray (KK), Club Station|AS|-8|59.88N|91.67E|32|18||R|1994/01/01-2010/01/20=15",
             "U[B-I]0B|Russia (Asiatic), Taymyrskiy avtonomnyy okrug (TM)|AS|-7|69.41N|86.20E|32|18||R|1994/01/01-2010/01/20=15",
@@ -1195,14 +1195,14 @@ namespace DXCCManager
             "U[B-I]9Y[W-Z]%|Russia (Asiatic), Altayskiy kray (AL), Club Station|AS|-7|52.77N|82.62E|31|18||R|1994/01/01-2010/01/20=15",
             "U[B-I]9Z|Russia (Asiatic), Respublika Altay (GA)|AS|-7|50.92N|86.92E|31|18||R|1994/01/01-2010/01/20=15",
             "U[B-I]9Z[W-Z]%|Russia (Asiatic), Respublika Altay (GA), Club Station|AS|-7|50.92N|86.92E|31|18||R|1994/01/01-2010/01/20=15",
-            "U[EHI]2[FK]%%|Kaliningrad (Koenigsberg), 4th Class(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "U[EHI]2[FK]%%|Kaliningrad (Koenigsberg), 4th Class(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "UE1 UE3 UE4 UE6|Russia (European), Special Station|EU|-3|56.00N|38.00E|29|16||R|-2010/01/20=54",
             "UE50?|Russia (Asiatic)|AS|-8|59.88N|91.67E|22|18||R|-2010/01/20=15",
             "UE65[A-Z] R65B[A-Z]|Russia (European), 65th Anniversary of Bryansk Liberation|EU|-3|53.31N|34.304E|29|16||R|2008/01/01-2008/12/31=54",
             "UE[890][0-9]|Russia (Asiatic), Special Station|AS|-8|59.88N|91.67E|22|18||R|=15",
-            "UE80M% UE80N% |Russia (Asiatic), Omskaya oblast' (OM), Special Station|AS|-7|56.22N|73.27E|30|17||R|1994/01/01-2010/01/20=15",
+            "UE80M% UE80N%Russia (Asiatic), Omskaya oblast' (OM), Special Station|AS|-7|56.22N|73.27E|30|17||R|1994/01/01-2010/01/20=15",
             "UK[1346]|Russia (European)|EU|-3|56N|37E|19|16||R|-1993/12/31=54",
-            "UK2F 4[J-L]2F E[KM-ORU-Z]2F|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|-1993/12/31=126",
+            "UK2F 4[J-L]2F E[KM-ORU-Z]2F|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|-1993/12/31=126",
             "UK9 UK0|Russia (Asiatic), Club Station|AS|-8|59.88N|91.67E|22|18||R|-1992/12/31=15",
             "UN1[A-Z]%|Russia (European), Respublika Kareliya (KL)|EU|-4|63.82N|33.00E|19|16||R|-1993/12/31=54",
             "UPOL#|Drifting Ice Station, Russian Arctica (no DXCC credit!)|AS|-3|84.0N|96.0E|75|19||R|=0",
@@ -1234,7 +1234,7 @@ namespace DXCCManager
             "U[VWZ]1[T-U]|Russia (European), Novgorodskaya oblast' (NV)|EU|-4|58.43N|32.38E|29|16||R|-1993/12/31=54",
             "U[VWZ]1[W-X]|Russia (European), Pskovskaya oblast' (PS)|EU|-4|57.32N|29.25E|29|16||R|-1993/12/31=54",
             "U[VWZ]1[Y-Z]|Russia (European), Murmanskaya oblast' (MU)|EU|-4|68.03N|34.57E|19|16||R|-1993/12/31=54",
-            "U[VWZ]2|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|-1992/05/31=126",
+            "U[VWZ]2|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|-1992/05/31=126",
             "U[VWZ]3[A-CFH]|Russia (European), Gorod Moskva (MA)|EU|-4|55.75N|37.62E|29|16||R|-1993/12/31=54",
             "U[VWZ]3D|Russia (European), Moskovskaya oblast' (MO)|EU|-3|56.00N|38.00E|29|16||R|-1993/12/31=54",
             "U[VWZ]3E|Russia (European), Orlovskaya oblast' (OR)|EU|-4|52.85N|36.43E|29|16||R|-1993/12/31=54",
@@ -1297,7 +1297,7 @@ namespace DXCCManager
             "U[VWZ]9Y|Russia (Asiatic), Altayskiy kray (AL)|AS|-7|52.77N|82.62E|31|18||R|-1993/12/31=15",
             "U[VWZ]9Z|Russia (Asiatic), Respublika Altay (GA)|AS|-7|50.92N|86.92E|31|18||R|-1993/12/31=15",
             "UX1A|Russia (European), Gorod Leningrad (SP), Club Station|EU|-4|59.95N|30.30E|29|16||R|1991/09/05-1993/12/31=54",
-            "UZ2F%%|Kaliningrad (Koenigsberg), Club Station(KA) |EU|-3|54.427N|20.3058E|29|15||R|-1992/05/31=126",
+            "UZ2F%%|Kaliningrad (Koenigsberg), Club Station(KA)EU|-3|54.427N|20.3058E|29|15||R|-1992/05/31=126",
             "U0A%|Russia (Asiatic), Krasnoyarskiy kray (KK), World War II. Veteran|AS|-8|59.88N|91.67E|32|18||R|=15",
             "U0B%|Russia (Asiatic), Taymyrskiy avtonomnyy okrug (TM), World War II. Veteran|AS|-7|69.41N|86.20E|32|18||R|=15",
             "U0C%|Russia (Asiatic), Khabarovskiy kray (HK), World War II. Veteran|AS|-11|54.80N|136.83E|33|19||R|=15",
@@ -1496,7 +1496,7 @@ namespace DXCCManager
             "R1[Y-Z][W-Z][A-Z] R[ACDFGJ-OQT-Z]1[Y-Z][W-Z][A-Z]|Russia (European), Murmanskaya oblast' (MU), Club Station|EU|-4|68.03N|34.57E|19|16||R|2010/01/21-=54",
             "R[235][A-C][A-Z] R[235][A-C][A-Z] R[ACDFGJ-OQT-Z][235][A-C] U[A-I][235][A-C]|Russia (European), Gorod Moskva (MA), 1st Class|EU|-4|55.75N|37.62E|29|16||R|2010/01/21-=54",
             "R[235][A-C][A-V][A-Z] R[ACDFGJ-OQT-Z][235][A-C][A-V][A-Z] UA[235][A-C][A-V][A-Z]|Russia (European), Gorod Moskva (MA), 2nd Class|EU|-4|55.75N|37.62E|29|16||R|2010/01/21-=54",
-            "R[235][A-C][W-Z][A-Z] R[ACDFGJ-OQT-Z][235][A-C][W-Z][A-Z] |Russia (European), Gorod Moskva (MA), Club Station|EU|-4|55.75N|37.62E|29|16||R|2010/01/21-=54",
+            "R[235][A-C][W-Z][A-Z] R[ACDFGJ-OQT-Z][235][A-C][W-Z][A-Z]Russia (European), Gorod Moskva (MA), Club Station|EU|-4|55.75N|37.62E|29|16||R|2010/01/21-=54",
             "R[235][DH] R[ACDFGJ-OQT-Z][235][DH] U[A-I][235][DH]|Russia (European), Moskovskaya oblast' (MO), 1st Class|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
             "R[235][DH][A-V][A-Z] R[ACDFGJ-OQT-Z][235][DH][A-V][A-Z] UA[235][DH][A-V][A-Z]|Russia (European), Moskovskaya oblast' (MO), 2nd Class|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
             "R[235][DH][W-Z][A-Z] R[ACDFGJ-OQT-Z][235][DH][W-Z][A-Z]|Russia (European), Moskovskaya oblast' (MO), Club Station|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
@@ -1970,7 +1970,7 @@ namespace DXCCManager
             "R#%/8 R#%%/8 R#%%%/8 R#%%%%/8|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|2010/01/21-=15",
             "R#%/9 R#%%/9 R#%%%/9 R#%%%%/9|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|=15",
             "R#%/1 R#%%/1 R#%%%/1 R#%%%%/1|Russia (European), North Territory|EU|-4|60.05N|31.75E|29|16||R|=54",
-            "R#%/2 R#%%/2 R#%%%/2 R#%%%%/2|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "R#%/2 R#%%/2 R#%%%/2 R#%%%%/2|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "R#%/3 R#%%/3 R#%%%/3 R#%%%%/3|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|=54",
             "R#%/5 R#%%/5 R#%%%/5 R#%%%%/5|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
             "R#%/4 R#%%/4 R#%%%/4 R#%%%%/4|Russia (European), Volha Territory|EU|-4|53.25N|44.57E|29|16||R|=54",
@@ -1980,7 +1980,7 @@ namespace DXCCManager
             "R##%/8 R##%%/8 R##%%%/8 R##%%%%/8|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|2010/01/21-=15",
             "R##%/9 R##%%/9 R##%%%/9 R##%%%%/9|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|=15",
             "R##%/1 R##%%/1 R##%%%/1 R##%%%%/1|Russia (European), North Territory|EU|-4|60.05N|31.75E|29|16||R|=54",
-            "R##%/2 R##%%/2 R##%%%/2 R##%%%%/2|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "R##%/2 R##%%/2 R##%%%/2 R##%%%%/2|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "R##%/3 R##%%/3 R##%%%/3 R##%%%%/3|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|=54",
             "R##%/5 R##%%/5 R##%%%/5 R##%%%%/5|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
             "R##%/4 R##%%/4 R##%%%/4 R##%%%%/4|Russia (European), Volha Territory|EU|-4|53.25N|44.57E|29|16||R|=54",
@@ -1990,7 +1990,7 @@ namespace DXCCManager
             "R[A-Z]##%/8 R[A-Z]##%%/8 R[A-Z]##%%%/8 R[A-Z]##%%%%/8|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|2010/01/21-=15",
             "R[A-Z]##%/9 R[A-Z]##%%/9 R[A-Z]##%%%/9 R[A-Z]##%%%%/9|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|=15",
             "R[A-Z]##%/1 R[A-Z]##%%/1 R[A-Z]##%%%/1 R[A-Z]##%%%%/1|Russia (European), North Territory|EU|-4|60.05N|31.75E|29|16||R|=54",
-            "R[A-Z]##%/2 R[A-Z]##%%/2 R[A-Z]##%%%/2 R[A-Z]##%%%%/2|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "R[A-Z]##%/2 R[A-Z]##%%/2 R[A-Z]##%%%/2 R[A-Z]##%%%%/2|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "R[A-Z]##%/3 R[A-Z]##%%/3 R[A-Z]##%%%/3 R[A-Z]##%%%%/3|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|=54",
             "R[A-Z]##%/5 R[A-Z]##%%/5 R[A-Z]##%%%/5 R[A-Z]##%%%%/5|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
             "R[A-Z]##%/4 R[A-Z]##%%/4 R[A-Z]##%%%/4 R[A-Z]##%%%%/4|Russia (European), Volha Territory|EU|-4|53.25N|44.57E|29|16||R|=54",
@@ -2000,7 +2000,7 @@ namespace DXCCManager
             "R[A-Z][1-90]%/8 R[A-Z][1-90]%%/8 R[A-Z][1-90]%%%/8 R[A-Z][1-90]%%%%/8|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|2010/01/21-=15",
             "R[A-Z][1-90]%/9 R[A-Z][1-90]%%/9 R[A-Z][1-90]%%%/9 R[A-Z][1-90]%%%%/9|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|=15",
             "R[A-Z][1-90]%/1 R[A-Z][1-90]%%/1 R[A-Z][1-90]%%%/1 R[A-Z][1-90]%%%%/1|Russia (European), North Territory|EU|-4|60.05N|31.75E|29|16||R|=54",
-            "R[A-Z][1-90]%/2 R[A-Z][1-90]%%/2 R[A-Z][1-90]%%%/2 R[A-Z][1-90]%%%%/2|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "R[A-Z][1-90]%/2 R[A-Z][1-90]%%/2 R[A-Z][1-90]%%%/2 R[A-Z][1-90]%%%%/2|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "R[A-Z][1-90]%/3 R[A-Z][1-90]%%/3 R[A-Z][1-90]%%%/3 R[A-Z][1-90]%%%%/3|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|=54",
             "R[A-Z][1-90]%/5 R[A-Z][1-90]%%/5 R[A-Z][1-90]%%%/5 R[A-Z][1-90]%%%%/5|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
             "R[A-Z][1-90]%/4 R[A-Z][1-90]%%/4 R[A-Z][1-90]%%%/4 R[A-Z][1-90]%%%%/4|Russia (European), Volha Territory|EU|-4|53.25N|44.57E|29|16||R|=54",
@@ -2018,7 +2018,7 @@ namespace DXCCManager
             "U[1-90]%/8 U[1-90]%%/8 U[1-90]%%%/8 U[1-90]%%%%/8|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|2010/01/21-=15",
             "U[1-90]%/9 U[1-90]%%/9 U[1-90]%%%/9 U[1-90]%%%%/9|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|=15",
             "U[1-90]%/1 U[1-90]%%/1 U[1-90]%%%/1 U[1-90]%%%%/1|Russia (European), North Territory|EU|-4|60.05N|31.75E|29|16||R|=54",
-            "U[1-90]%/2 U[1-90]%%/2 U[1-90]%%%/2 U[1-90]%%%%/2|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "U[1-90]%/2 U[1-90]%%/2 U[1-90]%%%/2 U[1-90]%%%%/2|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "U[1-90]%/3 U[1-90]%%/3 U[1-90]%%%/3 U[1-90]%%%%/3|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|=54",
             "U[1-90]%/5 U[1-90]%%/5 U[1-90]%%%/5 U[1-90]%%%%/5|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
             "U[1-90]%/4 U[1-90]%%/4 U[1-90]%%%/4 U[1-90]%%%%/4|Russia (European), Volha Territory|EU|-4|53.25N|44.57E|29|16||R|=54",
@@ -2028,7 +2028,7 @@ namespace DXCCManager
             "U[A-Z][1-90]%/8 U[A-Z][1-90]%%/8 U[A-Z][1-90]%%%/8 U[A-Z][1-90]%%%%/8|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|2010/01/21-=15",
             "U[A-Z][1-90]%/9 U[A-Z][1-90]%%/9 U[A-Z][1-90]%%%/9 U[A-Z][1-90]%%%%/9|Russia (Asiatic), Siberia|AS|-6|58.70N|61.33E|30|17||R|=15",
             "U[A-Z][1-90]%/1 U[A-Z][1-90]%%/1 U[A-Z][1-90]%%%/1 U[A-Z][1-90]%%%%/1|Russia (European), North Territory|EU|-4|60.05N|31.75E|29|16||R|=54",
-            "U[A-Z][1-90]%/2 U[A-Z][1-90]%%/2 U[A-Z][1-90]%%%/2 U[A-Z][1-90]%%%%/2|Kaliningrad (Koenigsberg)(KA) |EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
+            "U[A-Z][1-90]%/2 U[A-Z][1-90]%%/2 U[A-Z][1-90]%%%/2 U[A-Z][1-90]%%%%/2|Kaliningrad (Koenigsberg)(KA)EU|-3|54.427N|20.3058E|29|15||R|2010/01/21-=126",
             "U[A-Z][1-90]%/3 U[A-Z][1-90]%%/3 U[A-Z][1-90]%%%/3 U[A-Z][1-90]%%%%/3|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|=54",
             "U[A-Z][1-90]%/5 U[A-Z][1-90]%%/5 U[A-Z][1-90]%%%/5 U[A-Z][1-90]%%%%/5|Russia (European), Moscow Territory|EU|-4|55.70N|36.97E|29|16||R|2010/01/21-=54",
             "U[A-Z][1-90]%/4 U[A-Z][1-90]%%/4 U[A-Z][1-90]%%%/4 U[A-Z][1-90]%%%%/4|Russia (European), Volha Territory|EU|-4|53.25N|44.57E|29|16||R|=54",
@@ -2356,7 +2356,7 @@ namespace DXCCManager
             "4O0 4O## 4O#%%%%|Montenegro, Special Event Station|EU|-1|42.26N|19.2E|28|15||R|2007/05/16-=514",
             "YU6# YT6# YZ6#|Serbia and Montenegro, Special Event Station|EU|-1|45N|21E|28|15||R|2003/02/05-2006/06/27=296",
             "Z6|Kosovo  (provisional, counts as Serbia)|EU|-1|42.68N|21.15E|28|15||R|2012/09/17-=296",
-            "S5[0-9]%%%%|Slovenia, Special Station|EU|-1|46.06N|14.50E|28|15||R|1991/06/26-=499",
+            "S5[0-9]|Slovenia, Special Station|EU|-1|46.06N|14.50E|28|15||R|1991/06/26-=499",
             "H5|South Africa, Republic (Bantustan) of Bophutatswana|AF|-2|25.83S|25.61E|57|38||R|1977/12/06-1994/04/27=462",
             "S4|South Africa, Republic (Bantustan) of Ciskei|AF|-2|32.83S|27.33E|57|38||R|1982/12/04-1994/04/27=462",
             "S8|South Africa, Republic (Bantustan) of Transkei|AF|-2|31.59S|28.79E|57|38||R|1976/10/26-1994/04/27=462",
@@ -2549,7 +2549,7 @@ namespace DXCCManager
             "VP3|British Guyana|SA|4|6.83N|58.16W|12|09||R|-1966/12/31=129",
             "9A##|Croatia, Special Station|EU|-1|45.80N|15.94E|28|15||R|1991/06/26-=497",
             "9G5|Ghana, Guest Operators|AF|0|5.58N|0.20W|46|35||R|=424",
-            "9H0 9H##|Malta, Special Station|EU|-1|35.90N|14.51E|28|15||R|=257",
+            "9H[01] 9H##|Malta, Special Station|EU|-1|35.90N|14.51E|28|15||R|=257",
             "9H3|Malta, Guest Operators|EU|-1|35.90N|14.51E|28|15||R|=257",
             "9H4|Malta, Gozo Island|EU|-1|36.05N|14.24E|28|15||R|=257",
             "9H5|Malta, VHF Class|EU|-1|35.90N|14.51E|28|15||R|=257",
@@ -3430,7 +3430,7 @@ namespace DXCCManager
             "EA## EB## EC## ED## EE## EF##|Spain, Special Station|EU|-1|41.416N|3.70W|37|14||R|=281",
             "EG## EH## AM## AN## AO##|Spain, Special Station|EU|-1|41.416N|3.70W|37|14||R|=281",
             "EI#V%%|Ireland, Guest Operators|EU|0|53.35N|6.10W|27|14||R|=245",
-            "EI#[A-UW-Z]%% EI##|Ireland, Special Station|EU|0|53.35N|6.10W|27|14||R|=245",
+            "EI#[A-UW-Z]%% EI#%% EI##|Ireland, Special Station|EU|0|53.35N|6.10W|27|14||R|=245",
             "EJ|Ireland, Aran, Blasket Isl.|EU|0|55.00N|8.53W|27|14||R|=245",
             "EJ2|Ireland, Saltee Isl.|EU|0|52.12N|6.62W|27|14||R|=245",
             "4J0 4J4 4J7 4J1700G EK6[CG] EK7D|Armenia|AS|-4|40N|45E|29|21||R|1991/09/22-1993/12/31=14",
@@ -3636,8 +3636,8 @@ namespace DXCCManager
             "H44 H4[1-9]|Solomon Islands|OC|-11|9S|160E|51|28||R|1979/01/01-=185",
             "H40|Temotu Province|OC|-11|10.71S|166.0E|51|32||R|1998/04/01-=507",
             "HA[0-9][A-Z][A-Z] HA[0-9][A-Z][A-Z][A-Z]|Hungary|EU|-1|47.52N|19.06E|28|15||R|=239",
-            "HA[0-9]% HG[0-9]% |Hungary, Contest Station|EU|-1|47.52N|19.06E|28|15||R|=239",
-            "HA[0-9]K[A-Z][A-Z] HG[0-9]K[A-Z][A-Z] |Hungary, Club Station|EU|-1|47.52N|19.06E|28|15||R|=239",
+            "HA[0-9]% HG[0-9]%Hungary, Contest Station|EU|-1|47.52N|19.06E|28|15||R|=239",
+            "HA[0-9]K[A-Z][A-Z] HG[0-9]K[A-Z][A-Z]Hungary, Club Station|EU|-1|47.52N|19.06E|28|15||R|=239",
             "HA[A-Z][0-9] HG[A-Z][0-9] HA[0-9][0-9] HG[0-9][0-9] HG[0-9] HA[0-9]%%%% HG[0-9]%%%%|Hungary, Special Station|EU|-1|47.52N|19.06E|28|15||R|=239",
             "HA0% HG0%|Hungary, Contest Station, province HA, SA|EU|-1|47.56N|21.63E|28|15||R|-2006/05/16=239",
             "HA1% HG1%|Hungary, Contest Station, province GY, VA, ZA|EU|-1|47.70N|17.63E|28|15||R|-2006/05/16=239",
@@ -4225,7 +4225,7 @@ namespace DXCCManager
             "LX6|Luxembourg, Novice Station|EU|-1|49.62N|6.13E|27|14||R|2007/01/01-=254",
             "LX6|Luxembourg, Special Station|EU|-1|49.62N|6.13E|27|14||R|-2006/12/31=254",
             "LX9|Luxembourg, Club Station|EU|-1|49.62N|6.13E|27|14||R|=254",
-            "LY## LY[05-9]|Lithuania, Special Station|EU|-2|55N|25E|29|15||R|=146",
+            "LY## LY[025-9]|Lithuania, Special Station|EU|-2|55N|25E|29|15||R|=146",
             "UP RP UP[0-9][BP] RP[0-9][BP]|Lithuania|EU|-2|55N|25E|29|15||R|-1993/12/31=146",
             "UP30|Lithuania, Special Station|EU|-2|55N|25E|29|15||R|-1976/01/01=146",
             "UK2[BP] 4[JL]2[BP] E[KM-ORU-Z]2[BP]|Lithuania|EU|-2|55N|25E|29|15||R|-1993/12/31=146",
@@ -4344,7 +4344,7 @@ namespace DXCCManager
             "OI9A% OI9A%%|Finland, Lappland, Military Club|EU|-2|66.50N|26.00E|18|15||R|=224",
             "O[F-J][1-9]#|Finland, Special Station|EU|-2|60N|24E|18|15||R|=224",
             "OJ[1-8]%|Finland, WRTC 2002 Station|EU|-2|60N|24E|18|15||R|2002/07/13-2002/07/14=224",
-            "OF0 OG0 OI0|Aland Islands, Special Station|EU|-2|60.14N|19.87E|18|15||R|=5",
+            "O[FGIH]0|Aland Islands, Special Station|EU|-2|60.14N|19.87E|18|15||R|=5",
             "OK|Czech Republic|EU|-1|50.07N|14.42E|28|15||R|1993/01/01-=503",
             "OK#K%% OK#O%% OK#R%%|Czech Republic, Club Station|EU|-1|50.07N|14.42E|28|15||R|1993/01/01-=503",
             "OK0|Czech Republic, Special & PTT Station|EU|-1|50.07N|14.42E|28|15||R|1993/01/01-=503",
@@ -5667,7 +5667,7 @@ namespace DXCCManager
             "KH5K AH5K NH5K WH5K|Kingman Reef|OC|11|6.3711N|162.4110W|61|31||R|=134",
             "KH7K AH7K NH7K WH7K|Kure Island|OC|10|28.4164N|178.3279W|61|31||R|=138",
             "KH8S AH8S NH8S WH8S|Swain's Island|OC|11|11.0575S|171.0780W|62|32||R|2006/07/22-=515",
-            "AH[6-7] KH[6-7] NH[6-7] WH[6-7] |Hawaii|OC|10|21.33N|157.84W|61|31||R|=110",
+            "AH[6-7] KH[6-7] NH[6-7] WH[6-7]Hawaii|OC|10|21.33N|157.84W|61|31||R|=110",
             "AH8 KH8 NH8 WH8|American Samoa|OC|11|14.2793S|170.7008W|62|32||R|=9",
             "AH9 KH9 NH9 WH9|Wake Island|OC|-12|19.298N|166.6307E|65|31||R|=297",
             "AL[0-9] KL[0-9] NL[0-9] WL[0-9] AL## KL## NL## WL##|Alaska|NA|8|60N|150W|1|01||R|=6",
@@ -5871,34 +5871,36 @@ namespace DXCCManager
             foreach (string dxcc in Entities)
             {
                 string[] dxccInfo = dxcc.Split('|');
-                List<string> parsedPrefixes = ParsePrefix(dxccInfo[0]);
+                string parsedPrefixes = ParsePrefix(dxccInfo[0]);
                 string rawEntity = dxccInfo[1].Split(',')[0];
                 DXCCs.Add(new DXCC() { entity = rawEntity, prefixes = parsedPrefixes });
             }
         }
 
-        private List<string> ParsePrefix(string rawPrefix)
+        private string ParsePrefix(string rawPrefix)
         {
-            List<string> prefixes = rawPrefix.Split(' ').ToList();
-            return prefixes.Select(x => x.Replace("#", "[0-9]")).Select(x => x.Replace("%", "[a-zA-Z]")).ToList();
+            //List<string> prefixes = rawPrefix.Split(' ').ToList();
+            return rawPrefix.Replace("#", "[0-9]").Replace("%", "[a-zA-Z]").Replace(" ", "|").Replace("||","|");
         }
 
         public string GetEntity(string callsign)
         {
             foreach (DXCC item in DXCCs)
             {
-                foreach (string pfx in item.prefixes)
-                {
-                    if (!string.IsNullOrWhiteSpace(pfx) && Regex.IsMatch(callsign, "^" + pfx + ".*"))
-                        return item.entity;
-                }
+
+                if (!string.IsNullOrWhiteSpace(item.prefixes) && Regex.IsMatch(callsign, "^" + item.prefixes + ".*"))
+                    return item.entity;
+
             }
-            return "Unknown";
+            //var dxcc = DXCCs.Where(p => (!string.IsNullOrWhiteSpace(p.prefixes) && Regex.IsMatch(callsign, "^" + p.prefixes + ".*"))).FirstOrDefault();
+            //return dxcc.entity;
+
+            return callsign.Length > 2 ? callsign.Substring(0, 2) : "Unkown";
         }
 
         private struct DXCC
         {
-            public List<string> prefixes { get; set; }
+            public string prefixes { get; set; }
             public string entity { get; set; }
         }
     }

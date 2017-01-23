@@ -3,6 +3,7 @@ using MoreLinq;
 using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -31,20 +32,44 @@ namespace HolyContestManager
         public MainWindow()
         {
             Report = new List<Participant>(200);
-            DataContext = Report;
+            
             InitializeComponent();
             GetData();
-            CalculatePoints();
+            //CalculatePoints();
         }
 
         private void CalculatePoints()
         {
+            BackgroundWorker bg = new BackgroundWorker();
+            bg.WorkerReportsProgress = true;
+            bg.DoWork += Bg_DoWork;
+            bg.RunWorkerCompleted += Bg_RunWorkerCompleted;
+            bg.ProgressChanged += Bg_ProgressChanged;
+            bg.RunWorkerAsync();
+        }
+
+        private void Bg_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            DataContext = Report;
+            pbStatus.Value = 0;
+        }
+
+        private void Bg_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            pbStatus.Value = e.ProgressPercentage;
+        }
+
+        private void Bg_DoWork(object sender, DoWorkEventArgs e)
+        {
+            int a = 0;
+            int z = RawData.participants.Count();
             foreach (Participant p in RawData.participants)
             {
+                a++;
                 IEnumerable<QSO> qsos = from q in RawData.log where q.my_call == p.callsign select q;
                 int numOfSquers = qsos.DistinctBy(q => q.my_square).Count();
 
-                LogParser lop = new LogParser(Services.GenerateAdif(qsos), LogParser.IsIsraeliStation(p.callsign) ? LogParser.Operator.Israeli : LogParser.Operator.Foreign);
+                HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
                 lop.Parse();
 
                 Participant n = p;
@@ -52,7 +77,9 @@ namespace HolyContestManager
                 n.score = lop.Result.ToString();
                 n.squers = numOfSquers.ToString();
                 Report.Add(n);
+                (sender as BackgroundWorker).ReportProgress(100*a/z);
             }
+            
         }
 
         private void GetData()
@@ -65,6 +92,14 @@ namespace HolyContestManager
             string responseFromServer = reader.ReadToEnd();
 
             RawData = JsonConvert.DeserializeObject<HolylandData>(responseFromServer);
+        }
+
+        private void button_Click(object sender, RoutedEventArgs e)
+        {
+            //pbStatus.Minimum = 0;
+            //pbStatus.Maximum = RawData.participants.Count();
+
+            CalculatePoints();
         }
     }
 
