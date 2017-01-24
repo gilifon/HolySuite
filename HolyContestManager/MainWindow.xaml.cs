@@ -152,19 +152,26 @@ namespace HolyContestManager
 
                 Participant n = p;
                 n.qsos = qsos.Count().ToString();
-                n.score = lop.Result.ToString();
+                n.score = lop.Result;
                 n.squers = numOfSquers.ToString();
                 Report.Add(n);
                 (sender as BackgroundWorker).ReportProgress(100*a/z);
             }
-            Report = Report.OrderBy(p => p.score).ToList();
+            Report = Report.OrderByDescending(p => p.score).ToList();
             FilteredReport = new List<Participant>(Report);
         }
 
         private void CalculateBtn_Click(object sender, RoutedEventArgs e)
         {
             if (!bg.IsBusy)
+            {
+                CategoryMode = "No Filter";
+                CategoryOperator = "No Filter";
+                CategoryOrigin= "No Filter";
+                CategoryPower = "No Filter";
+                CategoryStation = "No Filter";
                 bg.RunWorkerAsync();
+            }
         }
         
 
@@ -229,7 +236,7 @@ namespace HolyContestManager
             //    else if (CategoryStation == "Mobile")
             //        FilteredReport.RemoveAll(p => p.squers == "1");
 
-            DataContext = FilteredReport.OrderBy(p => p.score).ToList();
+            DataContext = FilteredReport.OrderByDescending(p => p.score).ToList();
             //Console.WriteLine("Category: " + CategoryMode + " : " + CategoryOperator + " : " + CategoryPower + " : " + CategoryStation);
         }
 
@@ -256,7 +263,7 @@ namespace HolyContestManager
         public string qsos { get; set; }
         public string mults { get; set; }
         public string squers { get; set; }
-        public string score { get; set; }
+        public int score { get; set; }
 
         public object Clone()
         {
