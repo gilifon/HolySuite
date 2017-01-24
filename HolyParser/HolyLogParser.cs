@@ -145,7 +145,7 @@ th,td
 
         private void PopulateQSOList()
         {
-            RadioEntityManager manager = new RadioEntityManager();
+            RadioEntityResolver rem = new RadioEntityResolver();
 
             m_qsoList.Clear();
             //Remove Line breakers
@@ -181,7 +181,8 @@ th,td
                 if (match.Success)
                 {
                     qso_row.Call = Regex.Split(row, call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                    qso_row.DXCC = manager.GetEntity(qso_row.Call);
+                    //rem.GetEntityAsync(qso_row.Call);
+                    qso_row.DXCC = rem.GetEntity(qso_row.Call);
                 }
 
                 regex = new Regex(date_pattern, RegexOptions.IgnoreCase);
@@ -239,6 +240,12 @@ th,td
                 m_qsoList.Add(qso_row);
             }
         }
+
+        private void Manager_Complete(object sender, EventArgs e)
+        {
+            
+        }
+
         private void CalculateResult()
         {
             StringBuilder log = new StringBuilder();

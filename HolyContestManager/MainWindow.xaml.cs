@@ -8,6 +8,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -101,6 +102,29 @@ namespace HolyContestManager
 
         public MainWindow()
         {
+            //DirectoryInfo d = new DirectoryInfo(@"C:\Users\gill\Desktop\holylandLogs2016");
+            //FileInfo[] infos = d.GetFiles();
+            //infos = infos.ToList().OrderByDescending(p => p.Length).ToArray();
+            //int x = 1;
+            //foreach (FileInfo f in infos)
+            //{
+            //    if (f.Extension.ToLower() != ".adi")
+            //    {
+            //        File.Move(f.FullName, f.DirectoryName + "\\" + x.ToString() + ".log");
+            //        x++;
+            //    }
+            //}
+            //FileInfo[] infos2 = d.GetFiles();
+            //foreach (FileInfo f in infos2)
+            //{
+            //    string readText = File.ReadAllText(f.FullName);
+            //    if (!readText.Contains("START-OF-LOG"))
+            //    {
+            //        f.Delete();
+            //    }
+            //}
+
+
             Report = new List<Participant>(200);
             FilteredReport = new List<Participant>(200);
             InitializeComponent();
@@ -138,7 +162,7 @@ namespace HolyContestManager
         private void Bg_DoWork(object sender, DoWorkEventArgs e)
         {
             Report.Clear();
-            GetData();
+            
             int a = 0;
             int z = RawData.participants.Count();
             foreach (Participant p in RawData.participants)
@@ -163,6 +187,7 @@ namespace HolyContestManager
 
         private void CalculateBtn_Click(object sender, RoutedEventArgs e)
         {
+            GetData();
             if (!bg.IsBusy)
             {
                 CategoryMode = "No Filter";

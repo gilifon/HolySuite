@@ -127,7 +127,7 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
-            RadioEntityManager m = new RadioEntityManager();
+            RadioEntityResolver rem = new RadioEntityResolver();
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
@@ -747,8 +747,8 @@ namespace HolyLogger
 
         private async void getQrzData()
         {
-            RadioEntityManager manager = new RadioEntityManager();
-            Country = manager.GetEntity(TB_DXCallsign.Text);
+            RadioEntityResolver rem = new RadioEntityResolver();
+            Country = rem.GetEntity(TB_DXCallsign.Text);
 
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
