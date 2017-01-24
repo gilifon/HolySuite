@@ -255,12 +255,15 @@ namespace HolyContestManager
             else if (CategoryOrigin == "Foreign")
                 FilteredReport.RemoveAll(p => HolyLogParser.IsIsraeliStation(p.callsign));
 
-            //if (CategoryStation != "No Filter")
-            //    if (CategoryStation == "Fixed" || CategoryStation == "Portable")
-            //        FilteredReport.RemoveAll(p => p.squers != "1");
-            //    else if (CategoryStation == "Mobile")
-            //        FilteredReport.RemoveAll(p => p.squers == "1");
-
+            if (CategoryStation != "No Filter")
+            {
+                if (CategoryStation == "Fixed" || CategoryStation == "Portable")
+                    FilteredReport.RemoveAll(p => int.Parse(p.squers) > 1);
+                else if (CategoryStation == "Mobile 5")
+                    FilteredReport.RemoveAll(p => int.Parse(p.squers) <= 1);
+                else if (CategoryStation == "Mobile 5+")
+                    FilteredReport.RemoveAll(p => int.Parse(p.squers) <= 5);
+            }
             DataContext = FilteredReport.OrderByDescending(p => p.score).ToList();
             //Console.WriteLine("Category: " + CategoryMode + " : " + CategoryOperator + " : " + CategoryPower + " : " + CategoryStation);
         }

@@ -91,6 +91,17 @@ namespace HolyLogger
             }
         }
 
+        private string _Callsign;
+        public string Callsign
+        {
+            get { return _Callsign; }
+            set
+            {
+                _Callsign = value;
+                OnPropertyChanged("Callsign");
+            }
+        }
+
         public LogUploadWindow()
         {
             InitializeComponent();
@@ -98,7 +109,7 @@ namespace HolyLogger
 
         private void SendLogBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(CategoryOperator) && !string.IsNullOrWhiteSpace(CategoryMode) && !string.IsNullOrWhiteSpace(CategoryPower) && !string.IsNullOrWhiteSpace(Email) && !string.IsNullOrWhiteSpace(Handle))
+            if (!string.IsNullOrWhiteSpace(CategoryOperator) && !string.IsNullOrWhiteSpace(CategoryMode) && !string.IsNullOrWhiteSpace(CategoryPower) && !string.IsNullOrWhiteSpace(Email) && !string.IsNullOrWhiteSpace(Handle) && !string.IsNullOrWhiteSpace(Callsign))
             {
                 if (SendLog != null)
                 {
