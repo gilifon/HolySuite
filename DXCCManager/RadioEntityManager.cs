@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -7,10 +8,16 @@ using System.Threading.Tasks;
 
 namespace DXCCManager
 {
+    public delegate void EntityManagerProgressHandler(object sender, EventArgs e);
     public class RadioEntityManager
     {
+        public event EntityManagerProgressHandler ProgressChanged;
         private List<DXCC> RawDXCCs;
         private List<DXCC> FinalDXCCs;
+
+        BackgroundWorker bg;
+        private string Callsign;
+        private string Entity;
 
         private List<string> Entities = new List<string>() {
             "7J0|Japan (Shin'etsu), Guest Operators|AS|-9|36.65N|138.19E|45|25||R|=339",
@@ -5892,7 +5899,41 @@ namespace DXCCManager
                 DXCC c = new DXCC() { id = DXCCGroup.Key, entity = DXCCGroup.Key, prefixes = sb.ToString().TrimEnd('|') };
                 FinalDXCCs.Add(c);
             }
+            bg = new BackgroundWorker();
+            bg.WorkerReportsProgress = true;
+            bg.DoWork += Bg_DoWork;
+            //bg.RunWorkerCompleted += Bg_RunWorkerCompleted;
+            bg.ProgressChanged += Bg_ProgressChanged;
+        }
 
+        private void Bg_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            if (ProgressChanged != null)
+                ProgressChanged.Invoke(sender, e);
+        }
+
+        private void Bg_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            
+        }
+
+        private void Bg_DoWork(object sender, DoWorkEventArgs e)
+        {
+            int c = 0;
+            foreach (DXCC item in FinalDXCCs)
+            {
+                (sender as BackgroundWorker).ReportProgress(c++);
+                if (!string.IsNullOrWhiteSpace(item.prefixes) && Regex.IsMatch(Callsign, "^" + item.prefixes + ".*"))
+                {
+                    Entity = item.entity;
+                    (sender as BackgroundWorker).ReportProgress(FinalDXCCs.Count());
+                }
+            }
+            Entity = Callsign.Length > 2 ? Callsign.Substring(0, 2) : "Unkown";
+
+            // **** Alternative *********//
+            //var dxcc = DXCCs.Where(p => (!string.IsNullOrWhiteSpace(p.prefixes) && Regex.IsMatch(callsign, "^" + p.prefixes + ".*"))).FirstOrDefault();
+            //return dxcc.entity;
         }
 
         private string ParsePrefix(string rawPrefix)
@@ -5901,19 +5942,11 @@ namespace DXCCManager
             return rawPrefix.Replace("#", "[0-9]").Replace("%", "[a-zA-Z]").Replace(" ", "|").Replace("||","|");
         }
 
-        public string GetEntity(string callsign)
+        public void GetEntityAsync(string callsign)
         {
-            foreach (DXCC item in FinalDXCCs)
-            {
-
-                if (!string.IsNullOrWhiteSpace(item.prefixes) && Regex.IsMatch(callsign, "^" + item.prefixes + ".*"))
-                    return item.entity;
-
-            }
-            //var dxcc = DXCCs.Where(p => (!string.IsNullOrWhiteSpace(p.prefixes) && Regex.IsMatch(callsign, "^" + p.prefixes + ".*"))).FirstOrDefault();
-            //return dxcc.entity;
-
-            return callsign.Length > 2 ? callsign.Substring(0, 2) : "Unkown";
+            Callsign = callsign;
+            if (!bg.IsBusy)
+                bg.RunWorkerAsync();
         }
 
         private struct DXCC
