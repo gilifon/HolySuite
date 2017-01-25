@@ -391,9 +391,9 @@ namespace HolyLogger
                 System.Windows.Forms.MessageBox.Show("You can not upload empty log");
                 return;
             }
-            string bareCallsign = Services.getBareCallsign(Qsos.First().my_call);
-            string country = Services.getHamQth(bareCallsign);
             LogUploadWindow w = (LogUploadWindow)sender;
+            string bareCallsign = getBareCallsign(w.Callsign);
+            string country = Services.getHamQth(bareCallsign);
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, w.Email, w.Handle, country);
             string UploadLogToIARC_result = await UploadLogToIARC();
             w.Close();
