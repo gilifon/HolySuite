@@ -262,7 +262,7 @@ namespace HolyContestManager
                 if (CategoryStation == "Fixed")
                     FilteredReport.RemoveAll(p => int.Parse(p.squers) > 1 || p.callsign.ToLower().Contains(@"/p"));
                 else if (CategoryStation == "Mobile")
-                    FilteredReport.RemoveAll(p => int.Parse(p.squers) == 1 || p.callsign.ToLower().Contains(@"/p"));
+                    FilteredReport.RemoveAll(p => int.Parse(p.squers) < 2 || p.callsign.ToLower().Contains(@"/p"));
                 else if (CategoryStation == "Portable")
                     FilteredReport.RemoveAll(p => int.Parse(p.squers) > 1 || !p.callsign.ToLower().Contains(@"/p"));
             }

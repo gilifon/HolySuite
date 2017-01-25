@@ -5864,14 +5864,9 @@ namespace DXCCManager
             "X5|Serbia (no DXCC credit!)|EU|-1|44.80N|20.47E|28|15||R|=0",
             "ZC6|Palestine (no DXCC credit!)|AS|-2|31.30N|34.27E|39|20||R|1994/01/01-1999/01/31=0"
         };
-        public event EntityManagerProgressHandler ProgressChanged;
-        public event EntityManagerProgressHandler Complete;
+        
         private List<DXCC> RawDXCCs;
         private List<DXCC> FinalDXCCs;
-
-        BackgroundWorker bg;
-        private string Callsign;
-        private string Entity;
 
         private static Dictionary<string, Regex> regexCache = new Dictionary<string, Regex>(20);
 
@@ -5901,12 +5896,7 @@ namespace DXCCManager
                 DXCC c = new DXCC() { id = DXCCGroup.Key, entity = DXCCGroup.Key, prefixes = sb.ToString().TrimEnd('|') };
                 FinalDXCCs.Add(c);
             }
-            bg = new BackgroundWorker();
-            bg.WorkerReportsProgress = true;
-            bg.DoWork += Bg_DoWork;
-            //bg.RunWorkerCompleted += Bg_RunWorkerCompleted;
-            bg.ProgressChanged += Bg_ProgressChanged;
-
+            
             CacheRegexPatterns();
         }
 
@@ -5921,49 +5911,11 @@ namespace DXCCManager
                 }
             }
         }
-
-        private void Bg_ProgressChanged(object sender, ProgressChangedEventArgs e)
-        {
-            if (ProgressChanged != null)
-                ProgressChanged.Invoke(sender, e);
-        }
-
-        private void Bg_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
-        {
-            if (Complete != null)
-                Complete.Invoke(sender, e);
-        }
-
-        private void Bg_DoWork(object sender, DoWorkEventArgs e)
-        {
-            int c = 0;
-            foreach (DXCC item in FinalDXCCs)
-            {
-                (sender as BackgroundWorker).ReportProgress(c++);
-                if (!string.IsNullOrWhiteSpace(item.prefixes) && Regex.IsMatch(Callsign, "^" + item.prefixes + ".*"))
-                {
-                    e.Result = item.entity;
-                    (sender as BackgroundWorker).ReportProgress(FinalDXCCs.Count());
-                }
-            }
-            e.Result = Callsign.Length > 2 ? Callsign.Substring(0, 2) : "Unkown";
-
-            // **** Alternative *********//
-            //var dxcc = DXCCs.Where(p => (!string.IsNullOrWhiteSpace(p.prefixes) && Regex.IsMatch(callsign, "^" + p.prefixes + ".*"))).FirstOrDefault();
-            //return dxcc.entity;
-        }
-
+        
         private string ParsePrefix(string rawPrefix)
         {
             //List<string> prefixes = rawPrefix.Split(' ').ToList();
             return rawPrefix.Replace("#", "[0-9]").Replace("%", "[a-zA-Z]").Replace(" ", "|").Replace("||","|");
-        }
-
-        public void GetEntityAsync(string callsign)
-        {
-            Callsign = callsign;
-            if (!bg.IsBusy)
-                bg.RunWorkerAsync();
         }
         
         public string GetEntity(string callsign)

@@ -392,7 +392,7 @@ namespace HolyLogger
                 return;
             }
             LogUploadWindow w = (LogUploadWindow)sender;
-            string bareCallsign = getBareCallsign(w.Callsign);
+            string bareCallsign = Services.getBareCallsign(w.Callsign);
             string country = Services.getHamQth(bareCallsign);
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, w.Email, w.Handle, country);
             string UploadLogToIARC_result = await UploadLogToIARC();
@@ -439,7 +439,7 @@ namespace HolyLogger
 
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
         {
-            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "'";
+            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.Now.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.Now.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
             //************************************************** ASYNC ********************************************//
             using (var client = new HttpClient())
             {
