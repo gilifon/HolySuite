@@ -118,5 +118,10 @@ namespace HolyLogger
 
             return adif.ToString();
         }
+
+        public static string getBareCallsign(string callsign)
+        {
+            return callsign;
+        }
     }
 }

@@ -168,7 +168,7 @@ namespace HolyContestManager
             foreach (Participant p in RawData.participants)
             {
                 a++;
-                IEnumerable<QSO> qsos = from q in RawData.log where q.my_call == p.callsign select q;
+                IEnumerable<QSO> qsos = from q in RawData.log where Services.getBareCallsign(q.my_call) == Services.getBareCallsign(p.callsign) select q;
                 int numOfSquers = qsos.DistinctBy(q => q.my_square).Count();
 
                 HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
@@ -184,6 +184,8 @@ namespace HolyContestManager
             Report = Report.OrderByDescending(p => p.score).ToList();
             FilteredReport = new List<Participant>(Report);
         }
+
+        
 
         private void CalculateBtn_Click(object sender, RoutedEventArgs e)
         {
@@ -255,12 +257,15 @@ namespace HolyContestManager
             else if (CategoryOrigin == "Foreign")
                 FilteredReport.RemoveAll(p => HolyLogParser.IsIsraeliStation(p.callsign));
 
-            //if (CategoryStation != "No Filter")
-            //    if (CategoryStation == "Fixed" || CategoryStation == "Portable")
-            //        FilteredReport.RemoveAll(p => p.squers != "1");
-            //    else if (CategoryStation == "Mobile")
-            //        FilteredReport.RemoveAll(p => p.squers == "1");
-
+            if (CategoryStation != "No Filter")
+            {
+                if (CategoryStation == "Fixed")
+                    FilteredReport.RemoveAll(p => int.Parse(p.squers) > 1 || p.callsign.ToLower().Contains(@"/p"));
+                else if (CategoryStation == "Mobile")
+                    FilteredReport.RemoveAll(p => int.Parse(p.squers) == 1 || p.callsign.ToLower().Contains(@"/p"));
+                else if (CategoryStation == "Portable")
+                    FilteredReport.RemoveAll(p => int.Parse(p.squers) > 1 || !p.callsign.ToLower().Contains(@"/p"));
+            }
             DataContext = FilteredReport.OrderByDescending(p => p.score).ToList();
             //Console.WriteLine("Category: " + CategoryMode + " : " + CategoryOperator + " : " + CategoryPower + " : " + CategoryStation);
         }
