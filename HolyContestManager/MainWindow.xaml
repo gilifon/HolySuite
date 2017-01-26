@@ -5,11 +5,11 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HolyContestManager"
         mc:Ignorable="d"
-        Title="Holyland Contest Manager" Height="600" Width="860" MinWidth="860" MinHeight="600">
+        Title="Holyland Contest Manager" Height="620" Width="860" MinWidth="860" MinHeight="620">
     <Grid>
-        <DataGrid x:Name="ResultDataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" FontSize="16" Margin="0,46,0,49">
+        <DataGrid x:Name="ResultDataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" FontSize="16" Margin="0,45,0,65">
             <DataGrid.Columns>
-                <DataGridTemplateColumn Header="Callsign" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Callsign" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=callsign}" HorizontalAlignment="Center" Padding="5" />
@@ -17,7 +17,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Name" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Name" IsReadOnly="True" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=name}" HorizontalAlignment="Center" Padding="5" />
@@ -25,7 +25,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="E-Mail" IsReadOnly="True">
+                <DataGridTemplateColumn Header="E-Mail" IsReadOnly="True" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=email}" HorizontalAlignment="Center" Padding="5" />
@@ -33,14 +33,14 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Operator" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Operator" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=category_op}" HorizontalAlignment="Center" Padding="5" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Mode" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Mode" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=category_mode}" HorizontalAlignment="Center" Padding="5" />
@@ -48,7 +48,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Power" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Power" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=category_power}" HorizontalAlignment="Center" Padding="5" />
@@ -56,7 +56,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="# of Squers" IsReadOnly="True">
+                <DataGridTemplateColumn Header="# of Squers" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=squers}" HorizontalAlignment="Center" Padding="5" />
@@ -64,7 +64,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Country" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Country" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=country}" HorizontalAlignment="Center" Padding="5" />
@@ -72,7 +72,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="QSOs" IsReadOnly="True">
+                <DataGridTemplateColumn Header="QSOs" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=qsos}" HorizontalAlignment="Center" Padding="5" />
@@ -88,7 +88,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>-->
 
-                <DataGridTemplateColumn Header="Score" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Score" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=score}" HorizontalAlignment="Center" Padding="5" />
@@ -98,8 +98,8 @@
 
             </DataGrid.Columns>
         </DataGrid>
-        <ProgressBar Minimum="0" Maximum="100" Name="pbStatus" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="10,0,158,10" Height="25"/>
-        <Button x:Name="CalculateBtn" Content="Calculate Results" HorizontalAlignment="Right" Margin="0,0,10,10" VerticalAlignment="Bottom" Width="124" Height="25" Click="CalculateBtn_Click"/>
+        <ProgressBar Minimum="0" Maximum="100" Name="pbStatus" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Margin="10,0,155,35" Height="25"/>
+        <Button x:Name="CalculateBtn" Content="Calculate Results" HorizontalAlignment="Right" Margin="0,0,10,35" VerticalAlignment="Bottom" Width="125" Height="25" Click="CalculateBtn_Click"/>
 
         <Label x:Name="L_Mode" Content="Mode" HorizontalAlignment="Left" Margin="10,8,0,0" VerticalAlignment="Top" FontSize="16"/>
         <ComboBox x:Name="CB_Mode" Text="{Binding CategoryMode, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="67,10,0,0" VerticalAlignment="Top" Width="90" FontSize="16" SelectionChanged="CB_Mode_SelectionChanged">
@@ -136,6 +136,9 @@
             <ComboBoxItem x:Name="op_israeli">Israeli</ComboBoxItem>
             <ComboBoxItem x:Name="op_foreign">Foreign</ComboBoxItem>
         </ComboBox>
+        <StatusBar HorizontalAlignment="Stretch" Height="30" VerticalAlignment="Bottom">
+            <Label x:Name="L_Status" Content="Label" Margin="0,0,0,0" Height="30"/>
+        </StatusBar>
 
 
 

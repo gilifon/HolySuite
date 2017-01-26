@@ -98,7 +98,8 @@ namespace HolyContestManager
         }
         
 
-        private BackgroundWorker bg;
+        private BackgroundWorker CalculateWorker;
+        private BackgroundWorker GetDataWorker;
 
         public MainWindow()
         {
@@ -128,12 +129,33 @@ namespace HolyContestManager
             Report = new List<Participant>(200);
             FilteredReport = new List<Participant>(200);
             InitializeComponent();
-            //GetData();
-            bg = new BackgroundWorker();
-            bg.WorkerReportsProgress = true;
-            bg.DoWork += Bg_DoWork;
-            bg.RunWorkerCompleted += Bg_RunWorkerCompleted;
-            bg.ProgressChanged += Bg_ProgressChanged;
+
+            CalculateBtn.IsEnabled = false;
+            L_Status.Content = "Retreiving data from database";
+
+            CalculateWorker = new BackgroundWorker();
+            CalculateWorker.WorkerReportsProgress = true;
+            CalculateWorker.DoWork += CalculateWorker_DoWork;
+            CalculateWorker.RunWorkerCompleted += CalculateWorker_RunWorkerCompleted;
+            CalculateWorker.ProgressChanged += CalculateWorker_ProgressChanged;
+
+            GetDataWorker = new BackgroundWorker();
+            GetDataWorker.DoWork += GetDataWorker_DoWork;
+            GetDataWorker.RunWorkerCompleted += GetDataWorker_RunWorkerCompleted;
+            pbStatus.IsIndeterminate = true;
+            GetDataWorker.RunWorkerAsync();
+        }
+
+        private void GetDataWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            pbStatus.IsIndeterminate = false;
+            CalculateBtn.IsEnabled = true;
+            L_Status.Content = "Ready";
+        }
+
+        private void GetDataWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            GetData();
         }
 
         private void GetData()
@@ -148,18 +170,20 @@ namespace HolyContestManager
             RawData = JsonConvert.DeserializeObject<HolylandData>(responseFromServer);
         }
 
-        private void Bg_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private void CalculateWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
             DataContext = FilteredReport;
+            CalculateBtn.IsEnabled = true;
+            L_Status.Content = "Ready";
             pbStatus.Value = 0;
         }
 
-        private void Bg_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        private void CalculateWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
             pbStatus.Value = e.ProgressPercentage;
         }
 
-        private void Bg_DoWork(object sender, DoWorkEventArgs e)
+        private void CalculateWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             Report.Clear();
             
@@ -189,15 +213,17 @@ namespace HolyContestManager
 
         private void CalculateBtn_Click(object sender, RoutedEventArgs e)
         {
-            GetData();
-            if (!bg.IsBusy)
+            L_Status.Content = "Calculating";
+            CalculateBtn.IsEnabled = false;
+
+            if (!CalculateWorker.IsBusy)
             {
                 CategoryMode = "No Filter";
                 CategoryOperator = "No Filter";
                 CategoryOrigin= "No Filter";
                 CategoryPower = "No Filter";
                 CategoryStation = "No Filter";
-                bg.RunWorkerAsync();
+                CalculateWorker.RunWorkerAsync();
             }
         }
         

@@ -40,6 +40,8 @@ namespace HolyLogger
         #endregion
 
         DataAccess dal;
+        RadioEntityResolver rem;
+
         public ObservableCollection<QSO> Qsos;
 
         private string _NumOfQSOs;
@@ -118,16 +120,21 @@ namespace HolyLogger
             }
         }
         
-
         HolyLogParser p;
         SignboardWindow signboard = null;
 
+        BackgroundWorker EntityResolverWorker;
         
 
         public MainWindow()
         {
             InitializeComponent();
-            RadioEntityResolver rem = new RadioEntityResolver();
+
+            EntityResolverWorker = new BackgroundWorker();
+            EntityResolverWorker.DoWork += EntityResolverWorker_DoWork;
+            rem = new RadioEntityResolver();
+            EntityResolverWorker.RunWorkerAsync();
+
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
@@ -170,6 +177,11 @@ namespace HolyLogger
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
             Services.LoginToQRZ(out _SessionKey);
+        }
+        
+        private void EntityResolverWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            rem.GetEntity("kuku");
         }
 
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -742,7 +754,6 @@ namespace HolyLogger
 
         private async void getQrzData()
         {
-            RadioEntityResolver rem = new RadioEntityResolver();
             Country = rem.GetEntity(TB_DXCallsign.Text);
 
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
