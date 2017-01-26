@@ -215,6 +215,7 @@ namespace HolyContestManager
         {
             L_Status.Content = "Calculating";
             CalculateBtn.IsEnabled = false;
+            pbStatus.Value = 3;
 
             if (!CalculateWorker.IsBusy)
             {
