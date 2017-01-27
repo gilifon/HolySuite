@@ -36,7 +36,7 @@ namespace HolyLogger
 
         public event SendLogEventHandler SendLog;
 
-        private string _CategoryOperator = "Single OP";
+        private string _CategoryOperator = "SINGLE-OP";
         public string CategoryOperator
         {
             get { return _CategoryOperator; }

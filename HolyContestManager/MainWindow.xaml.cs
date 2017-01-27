@@ -176,6 +176,7 @@ namespace HolyContestManager
             CalculateBtn.IsEnabled = true;
             L_Status.Content = "Ready";
             pbStatus.Value = 0;
+            L_NUmOfParticipantsValue.Content = FilteredReport.Count();
         }
 
         private void CalculateWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
@@ -199,14 +200,17 @@ namespace HolyContestManager
                 lop.Parse();
 
                 Participant n = p;
-                n.qsos = qsos.Count().ToString();
+                n.qsos = lop.ValidQsos;// qsos.Count();
                 n.score = lop.Result;
-                n.squers = numOfSquers.ToString();
+                n.squers = numOfSquers;
+                n.mults = lop.Mults;
+                n.points = lop.Points;
                 Report.Add(n);
                 (sender as BackgroundWorker).ReportProgress(100*a/z);
             }
             Report = Report.OrderByDescending(p => p.score).ToList();
             FilteredReport = new List<Participant>(Report);
+
         }
 
         
@@ -287,13 +291,16 @@ namespace HolyContestManager
             if (CategoryStation != "No Filter")
             {
                 if (CategoryStation == "Fixed")
-                    FilteredReport.RemoveAll(p => int.Parse(p.squers) > 1 || p.callsign.ToLower().Contains(@"/p"));
+                    FilteredReport.RemoveAll(p => p.squers > 1 || p.callsign.ToLower().Contains(@"/p"));
                 else if (CategoryStation == "Mobile")
-                    FilteredReport.RemoveAll(p => int.Parse(p.squers) < 2 || p.callsign.ToLower().Contains(@"/p"));
+                    FilteredReport.RemoveAll(p => p.squers < 2 || p.callsign.ToLower().Contains(@"/p"));
                 else if (CategoryStation == "Portable")
-                    FilteredReport.RemoveAll(p => int.Parse(p.squers) > 1 || !p.callsign.ToLower().Contains(@"/p"));
+                    FilteredReport.RemoveAll(p => p.squers > 1 || !p.callsign.ToLower().Contains(@"/p"));
             }
             DataContext = FilteredReport.OrderByDescending(p => p.score).ToList();
+
+            if (L_NUmOfParticipantsValue != null)
+                L_NUmOfParticipantsValue.Content = FilteredReport.Count();
             //Console.WriteLine("Category: " + CategoryMode + " : " + CategoryOperator + " : " + CategoryPower + " : " + CategoryStation);
         }
 
@@ -317,9 +324,10 @@ namespace HolyContestManager
         public string email { get; set; }
         public string name { get; set; }
         public string country { get; set; }
-        public string qsos { get; set; }
-        public string mults { get; set; }
-        public string squers { get; set; }
+        public int qsos { get; set; }
+        public int mults { get; set; }
+        public int squers { get; set; }
+        public int points { get; set; }
         public int score { get; set; }
 
         public object Clone()

@@ -14,6 +14,18 @@ namespace HolyParser
         private int _result;
         public int Result { get { return _result; } }
 
+        private int _mults;
+        public int Mults { get { return _mults; } }
+
+        private int _workedSquers;
+        public int WorkedSquers { get { return _workedSquers; } }
+
+        private int _validQsos;
+        public int ValidQsos { get { return _validQsos; } }
+
+        private int _points;
+        public int Points { get { return _points; } }
+
         private string _description;
         public string Description { get { return _description; } }
 
@@ -234,16 +246,9 @@ th,td
                     qso_row.Freq = Regex.Split(row, freq_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
-
-
                 qso_row.StandartizeQSO();
                 m_qsoList.Add(qso_row);
             }
-        }
-
-        private void Manager_Complete(object sender, EventArgs e)
-        {
-            
         }
 
         private void CalculateResult()
@@ -258,7 +263,7 @@ th,td
             {
                 validQSOs = m_qsoList.Where(p => p.IsValid).DistinctBy(p => p.HASH);
             }
-
+            _validQsos = validQSOs.Count();
 
             log.Append("You sent a total of "); log.Append(m_qsoList.Count()); log.Append(" QSO's, "); log.Append(validQSOs.Count()); log.Append(" are valid\r\n");
             log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
@@ -266,6 +271,8 @@ th,td
             int single_point = validQSOs.Count(p => p.Band.Contains("10") || p.Band.Contains("15") || p.Band.Contains("20"));
             int double_point = validQSOs.Count(p => p.Band.Contains("40") || p.Band.Contains("80") || p.Band.Contains("160"));
             int total_points = single_point + double_point * 2;
+            _points = total_points;
+
             log.Append("You get a score of: "); log.Append(total_points); log.Append(" points\r\n");
             log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
 
@@ -297,6 +304,8 @@ th,td
             var DistinctSquares160 = validQSOs.Where(p => p.Band.Contains("160") && p.IsIsraeli).DistinctBy(p => p.SRX.ToLower());
             log.Append(DistinctSquares160.Count()); log.Append(" distinct squares on 160m\r\n");
             int AllBandSquares = DistinctSquares10.Count() + DistinctSquares15.Count() + DistinctSquares20.Count() + DistinctSquares40.Count() + DistinctSquares80.Count() + DistinctSquares160.Count();
+            _workedSquers = AllBandSquares;
+
             //log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
             log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
             int IsraeliOn10 = DistinctSquares10.Count() > 0 ? 1 : 0;
@@ -330,6 +339,7 @@ th,td
                 log.Append("You have contacted Israeli stations on "); log.Append(AllBandIsraeliStations); log.Append(" bands\r\n");
                 log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
                 _result = total_points * (AllBandSquares + AllBandIsraeliStations);
+                _mults = AllBandSquares + AllBandIsraeliStations;
             }
             else if (logType == Operator.Israeli)
             {
@@ -338,6 +348,7 @@ th,td
                 log.Append("You have contacted Israeli stations on "); log.Append(AllBandIsraeliStations); log.Append(" bands\r\n");
                 log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
                 _result = total_points * (AllBandSquares + AllBandIsraeliStations + AllBandDXCC);
+                _mults = AllBandSquares + AllBandIsraeliStations + AllBandDXCC;
             }
             log.Append("Your total score is "); log.Append(_result); log.Append("\r\n");
             log.Append("\r\n"); log.Append("\r\n"); log.Append("Thank you for sending the log. Good luck in the contest");

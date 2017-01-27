@@ -23,8 +23,8 @@
 
         <Label x:Name="L_Operator" Content="Operator" HorizontalAlignment="Left" Margin="10,73,0,0" VerticalAlignment="Top" FontSize="16"/>
         <ComboBox x:Name="CB_Operator" Text="{Binding CategoryOperator, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" HorizontalAlignment="Left" Margin="107,77,0,0" VerticalAlignment="Top" Width="99" FontSize="16">
-            <ComboBoxItem Name="op_single" IsSelected="True">Single OP</ComboBoxItem>
-            <ComboBoxItem Name="op_multi">Multi OP</ComboBoxItem>
+            <ComboBoxItem Name="op_single" IsSelected="True">SINGLE-OP</ComboBoxItem>
+            <ComboBoxItem Name="op_multi">MULTI-OP</ComboBoxItem>
             <ComboBoxItem Name="op_checklog">Checklog</ComboBoxItem>
         </ComboBox>
         <Label x:Name="L_Power" Content="Power" HorizontalAlignment="Left" Margin="10,105,0,0" VerticalAlignment="Top" FontSize="16"/>
@@ -36,7 +36,7 @@
         <Label x:Name="title_info" Content="Personal Info" HorizontalAlignment="Left" Margin="10,179,0,0" VerticalAlignment="Top" FontSize="16" FontWeight="Bold"/>
         
         <Label x:Name="LCallsign" Content="Callsign" HorizontalAlignment="Left" Margin="12,215,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_Callsign" HorizontalAlignment="Left" Height="30" Margin="107,215,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="265" Text="{Binding Callsign, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" FontSize="16"  />
+        <TextBox x:Name="TB_Callsign" HorizontalAlignment="Left" Height="30" Margin="107,215,0,0" TextWrapping="Wrap" CharacterCasing="Upper" VerticalAlignment="Top" Width="265" Text="{Binding Callsign, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" FontSize="16"  />
         
         <Label x:Name="LHandle" Content="Name" HorizontalAlignment="Left" Margin="12,250,0,0" VerticalAlignment="Top" FontSize="16"/>
         <TextBox x:Name="TB_Handle" HorizontalAlignment="Left" Height="30" Margin="107,250,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="265" Text="{Binding Handle, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" FontSize="16"  />

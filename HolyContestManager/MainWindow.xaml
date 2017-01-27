@@ -80,13 +80,21 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <!--<DataGridTemplateColumn Header="Mults" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Points" IsReadOnly="True" Width="*">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Path=points}" HorizontalAlignment="Center" Padding="5" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Mults" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Path=mults}" HorizontalAlignment="Center" Padding="5" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>-->
+                </DataGridTemplateColumn>
 
                 <DataGridTemplateColumn Header="Score" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
@@ -138,6 +146,8 @@
         </ComboBox>
         <StatusBar HorizontalAlignment="Stretch" Height="30" VerticalAlignment="Bottom">
             <Label x:Name="L_Status" Content="Label" Margin="0,0,0,0" Height="30"/>
+            <Label x:Name="L_NUmOfParticipants" Content="# of Participants:" Margin="30,0,0,0" Height="30"/>
+            <Label x:Name="L_NUmOfParticipantsValue" Content="0" Margin="0,0,0,0" Height="30"/>
         </StatusBar>
 
 

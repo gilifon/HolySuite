@@ -239,61 +239,7 @@ namespace HolyLogger
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
         }
-
-        private void PostQSO(QSO qso)
-        {
-            //************************************************** ASYNC ********************************************//
-            using (WebClient client = new WebClient())
-            {
-                client.UploadValuesAsync(new Uri("http://www.iarc.org/xmas/Server/AddLog.php"), new NameValueCollection()
-                    {
-                        { "insertlog", GenerateInsert(qso) }
-                    });
-            }
-        }
-        private string GenerateInsert(QSO qso)
-        {
-            StringBuilder sb = new StringBuilder("INSERT IGNORE INTO `log` ", 500);
-            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
-            sb.Append("(");
-            sb.Append("'"); sb.Append(qso.my_call); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.band); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
-            sb.Append("'"); sb.Append(qso.comment); sb.Append("')");
-            string result = sb.ToString();
-            return result;
-        }
-        private string GenerateMultipleInsert(IList<QSO> qsos)
-        {
-            StringBuilder sb = new StringBuilder("INSERT INTO `log` ", 500);
-            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
-            foreach (QSO qso in qsos)
-            {
-                sb.Append("(");
-                sb.Append("'"); sb.Append(qso.my_call); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.band); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.comment); sb.Append("'),");
-            }
-            string result = sb.ToString().TrimEnd(',');
-            result += " ON DUPLICATE KEY UPDATE my_call=my_call";
-            return result;
-        }
-
+        
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
         {
             string url = "http://www.qrz.com";
@@ -411,17 +357,30 @@ namespace HolyLogger
             w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
-        
-        public async void UploadLog()
+
+        private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
         {
-            if (Qsos.Count == 0)
+            string insert = "DELETE FROM `log` WHERE `my_call`= '" + callsign + "'; INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.Now.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.Now.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
+            //************************************************** ASYNC ********************************************//
+            using (var client = new HttpClient())
             {
-                System.Windows.Forms.MessageBox.Show("You can not upload empty log");
-                return;
+                var values = new Dictionary<string, string>
+                {
+                    { "insertlog", insert }
+                };
+                var content = new FormUrlEncodedContent(values);
+                try
+                {
+                    var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    return responseString;
+                }
+                catch (Exception)
+                {
+                    return "Connection with server failed! Check your internet connection";
+                }
+
             }
-            string result = await UploadLogToIARC();
-            //System.Windows.Forms.MessageBox.Show("Only active during the log upload period");
-            System.Windows.Forms.MessageBox.Show(result);
         }
 
         private async Task<string> UploadLogToIARC()
@@ -449,30 +408,72 @@ namespace HolyLogger
             }
         }
 
-        private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
+        private string GenerateMultipleInsert(IList<QSO> qsos)
         {
-            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.Now.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.Now.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
-            //************************************************** ASYNC ********************************************//
-            using (var client = new HttpClient())
+            StringBuilder sb = new StringBuilder("INSERT INTO `log` ", 500);
+            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
+            foreach (QSO qso in qsos)
             {
-                var values = new Dictionary<string, string>
-                {
-                    { "insertlog", insert }
-                };
-                var content = new FormUrlEncodedContent(values);
-                try
-                {
-                    var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    return responseString;
-                }
-                catch (Exception)
-                {
-                    return "Connection with server failed! Check your internet connection";
-                }
-                
+                sb.Append("(");
+                sb.Append("'"); sb.Append(qso.my_call); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.band); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.comment); sb.Append("'),");
             }
+            string result = sb.ToString().TrimEnd(',');
+            result += " ON DUPLICATE KEY UPDATE my_call=my_call";
+            return result;
         }
+
+        //public async void UploadLog()
+        //{
+        //    if (Qsos.Count == 0)
+        //    {
+        //        System.Windows.Forms.MessageBox.Show("You can not upload empty log");
+        //        return;
+        //    }
+        //    string result = await UploadLogToIARC();
+        //    //System.Windows.Forms.MessageBox.Show("Only active during the log upload period");
+        //    System.Windows.Forms.MessageBox.Show(result);
+        //}
+
+        //private void PostQSO(QSO qso)
+        //{
+        //    //************************************************** ASYNC ********************************************//
+        //    using (WebClient client = new WebClient())
+        //    {
+        //        client.UploadValuesAsync(new Uri("http://www.iarc.org/xmas/Server/AddLog.php"), new NameValueCollection()
+        //            {
+        //                { "insertlog", GenerateInsert(qso) }
+        //            });
+        //    }
+        //}
+        //private string GenerateInsert(QSO qso)
+        //{
+        //    StringBuilder sb = new StringBuilder("INSERT IGNORE INTO `log` ", 500);
+        //    sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
+        //    sb.Append("(");
+        //    sb.Append("'"); sb.Append(qso.my_call); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.band); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
+        //    sb.Append("'"); sb.Append(qso.comment); sb.Append("')");
+        //    string result = sb.ToString();
+        //    return result;
+        //}
 
         private void QSODataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
         {
