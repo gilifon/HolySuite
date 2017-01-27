@@ -44,9 +44,9 @@
         <Label x:Name="LEmail" Content="Email" HorizontalAlignment="Left" Margin="10,286,0,0" VerticalAlignment="Top" FontSize="16"/>
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="30" Margin="107,286,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="265" Text="{Binding Email, RelativeSource={RelativeSource Mode=FindAncestor, AncestorType=Window}}" FontSize="16"  />
 
-        <Button x:Name="SendLogBtn" Content="Save" HorizontalAlignment="Left" Margin="284,333,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="SendLogBtn_Click"/>
-        <Button x:Name="CancelBtn" Content="Cancel" HorizontalAlignment="Left" Margin="204,333,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="CancelBtn_Click"/>
-        <Image x:Name="Spinner" gif:ImageBehavior.AnimatedSource="Images\spinner.gif" HorizontalAlignment="Left" Margin="161,273,0,0" VerticalAlignment="Top" Source="Images/spinner.gif" Height="32" Width="32" Visibility="Hidden"/>
+        <Button x:Name="SendLogBtn" Content="Save" HorizontalAlignment="Left" Margin="297,328,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="SendLogBtn_Click"/>
+        <Button x:Name="CancelBtn" Content="Cancel" HorizontalAlignment="Left" Margin="217,328,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="CancelBtn_Click"/>
+        <Image x:Name="Spinner" gif:ImageBehavior.AnimatedSource="Images\spinner.gif" HorizontalAlignment="Left" Margin="161,326,0,0" VerticalAlignment="Top" Source="Images/spinner.gif" Height="32" Width="32" Visibility="Visible"/>
 
     </Grid>
 </Window>

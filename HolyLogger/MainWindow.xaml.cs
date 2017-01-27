@@ -360,13 +360,21 @@ namespace HolyLogger
 
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
         {
-            string insert = "DELETE FROM `log` WHERE `my_call`= '" + callsign + "'; INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.Now.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.Now.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
+            string delete = "DELETE FROM `log` WHERE `my_call`= '" + callsign + "';";
+            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.Now.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.Now.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
             //************************************************** ASYNC ********************************************//
+            string deleteResponse = await ExecuteQuery(delete);
+            string insertResponse = await ExecuteQuery(insert);
+            return insertResponse;
+        }
+
+        private async Task<string> ExecuteQuery(string query)
+        {
             using (var client = new HttpClient())
             {
                 var values = new Dictionary<string, string>
                 {
-                    { "insertlog", insert }
+                    { "insertlog", query }
                 };
                 var content = new FormUrlEncodedContent(values);
                 try
@@ -379,7 +387,6 @@ namespace HolyLogger
                 {
                     return "Connection with server failed! Check your internet connection";
                 }
-
             }
         }
 
