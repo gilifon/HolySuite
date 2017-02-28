@@ -129,6 +129,7 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
+            this.PropertyChanged += MainWindow_PropertyChanged;
 
             EntityResolverWorker = new BackgroundWorker();
             EntityResolverWorker.DoWork += EntityResolverWorker_DoWork;
@@ -178,7 +179,28 @@ namespace HolyLogger
             TB_Frequency_TextChanged(null, null);
             Services.LoginToQRZ(out _SessionKey);
         }
-        
+
+        private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            switch (e.PropertyName)
+            {
+                case FLD_Mode:
+                    if (mMode == "SSB")
+                    {
+                        TB_RSTSent.Text = "59";
+                        TB_RSTRcvd.Text = "59";
+                    }
+                    else
+                    {
+                        TB_RSTSent.Text = "599";
+                        TB_RSTRcvd.Text = "599";
+                    }
+                    break;
+                default:
+                    break;
+            }
+        }
+
         private void EntityResolverWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             rem.GetEntity("kuku");
@@ -262,8 +284,18 @@ namespace HolyLogger
             TB_DXCallsign.Clear();
             TB_4xExchange.Clear();
             TB_Exchange.Clear();
-            TB_RSTSent.Text = "59";
-            TB_RSTRcvd.Text = "59";
+
+            if (mMode == "SSB")
+            {
+                TB_RSTSent.Text = "59";
+                TB_RSTRcvd.Text = "59";
+            }
+            else
+            {
+                TB_RSTSent.Text = "599";
+                TB_RSTRcvd.Text = "599";
+            }
+
             TB_Comment.Clear();
             FName = string.Empty;
             Country = string.Empty;
