@@ -20,6 +20,7 @@ using DXCCManager;
 using HolyParser;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
+using System.Windows.Data;
 
 namespace HolyLogger
 {
@@ -119,13 +120,12 @@ namespace HolyLogger
                 _SessionKey = value;
             }
         }
-        
+
         HolyLogParser p;
         SignboardWindow signboard = null;
 
         BackgroundWorker EntityResolverWorker;
         
-
         public MainWindow()
         {
             InitializeComponent();
@@ -179,7 +179,7 @@ namespace HolyLogger
             TB_Frequency_TextChanged(null, null);
             Services.LoginToQRZ(out _SessionKey);
         }
-
+        
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             switch (e.PropertyName)
@@ -212,9 +212,9 @@ namespace HolyLogger
             {
                 foreach (QSO qso in e.OldItems)
                 {
-                    dal.Delete(qso.id);    
+                    dal.Delete(qso.id);
                 }
-                UpdateNumOfQSOs();  
+                UpdateNumOfQSOs();
             }
         }
 
@@ -248,10 +248,10 @@ namespace HolyLogger
             {
                 qso.exchange = TB_Exchange.Text;
             }
-            qso.frequency = TB_Frequency.Text.Replace(",","");
+            qso.frequency = TB_Frequency.Text.Replace(",", "");
             qso.band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
             qso.my_call = TB_MyCallsign.Text;
-            qso.my_square = TB_MyGrid.Text.Replace("-","");
+            qso.my_square = TB_MyGrid.Text.Replace("-", "");
             qso.rst_rcvd = TB_RSTRcvd.Text;
             qso.rst_sent = TB_RSTSent.Text;
             qso.timestamp = QSOTimeStamp.Value.Value;
@@ -261,7 +261,7 @@ namespace HolyLogger
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
         }
-        
+
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
         {
             string url = "http://www.qrz.com";
@@ -275,7 +275,7 @@ namespace HolyLogger
             catch (Exception)
             {
                 MessageBox.Show("Please install 'Chrome' and try again");
-            }   
+            }
         }
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
@@ -364,7 +364,7 @@ namespace HolyLogger
             {
                 MessageBox.Show("Export failed: " + ex.Message);
             }
-            
+
         }
 
         private void UploadMenuItem_Click(object sender, RoutedEventArgs e)
@@ -521,7 +521,7 @@ namespace HolyLogger
                 MessageBoxResult messageBoxResult = System.Windows.MessageBox.Show("Are you sure?", "Delete Confirmation", System.Windows.MessageBoxButton.YesNo);
                 if (messageBoxResult == MessageBoxResult.Yes)
                 {
-                    
+
                 }
                 else
                 {
@@ -705,7 +705,7 @@ namespace HolyLogger
                     TB_Band.Text = string.Empty;
                 }
             }
-                
+
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
@@ -717,7 +717,7 @@ namespace HolyLogger
         private void OmnirigMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string url = "http://www.dxatlas.com/OmniRig/";
-            
+
             try
             {
                 System.Diagnostics.Process.Start(url);
@@ -779,7 +779,7 @@ namespace HolyLogger
                 TB_Exchange.Visibility = Visibility.Visible;
                 TB_4xExchange.Visibility = Visibility.Hidden;
             }
-            
+
         }
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
@@ -788,7 +788,7 @@ namespace HolyLogger
                 RefreshDateTime_Btn_MouseUp(null, null);
                 getQrzData();
             }
-            var dups = from qso in Qsos where qso.callsign == TB_DXCallsign.Text && qso.band+"M" == TB_Band.Text && qso.mode == Mode  select qso;
+            var dups = from qso in Qsos where qso.callsign == TB_DXCallsign.Text && qso.band + "M" == TB_Band.Text && qso.mode == Mode select qso;
             if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
         }
 
@@ -849,14 +849,14 @@ namespace HolyLogger
 
 
         //-------------------------------------- OmniRig Section ---------------------------------------------//
-            #region OmniRig
+        #region OmniRig
 
-            #region Property
+        #region Property
 
 
-            /// <summary>
-            /// RX
-            /// </summary>
+        /// <summary>
+        /// RX
+        /// </summary>
         public const string FLD_RX = "RX";
 
         /// <summary>
@@ -1206,6 +1206,6 @@ namespace HolyLogger
 
         #endregion
 
-        
+
     }
 }
