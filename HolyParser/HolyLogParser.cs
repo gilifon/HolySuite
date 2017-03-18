@@ -415,7 +415,7 @@ th,td
         {
             double parsedFreq;
             if (!double.TryParse(freq, out parsedFreq)) return string.Empty;
-            if (parsedFreq < 30)
+            if (parsedFreq < 1000)
             {
                 if (parsedFreq > 0 && parsedFreq <= 2) return "160";
                 if (parsedFreq > 2 && parsedFreq <= 5) return "80";
@@ -426,6 +426,8 @@ th,td
                 if (parsedFreq > 20 && parsedFreq <= 23) return "15";
                 if (parsedFreq > 24 && parsedFreq <= 25) return "12";
                 if (parsedFreq > 27 && parsedFreq <= 30) return "10";
+                if (parsedFreq > 50 && parsedFreq <= 54) return "6";
+                if (parsedFreq > 144 && parsedFreq <= 146) return "2";
             }
             else
             {
@@ -438,6 +440,8 @@ th,td
                 if (parsedFreq > 20000 && parsedFreq <= 23000) return "15";
                 if (parsedFreq > 24000 && parsedFreq <= 25000) return "12";
                 if (parsedFreq > 27000 && parsedFreq <= 30000) return "10";
+                if (parsedFreq > 50000 && parsedFreq <= 54000) return "6";
+                if (parsedFreq > 144000 && parsedFreq <= 146000) return "2";
             }
             return string.Empty;
         }
