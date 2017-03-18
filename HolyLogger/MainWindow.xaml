@@ -4,7 +4,6 @@
         xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit" 
         xmlns:xcdg="http://schemas.xceed.com/wpf/xaml/datagrid"
         xmlns:local="clr-namespace:HolyLogger"
-        xmlns:behaviors="clr-namespace:WPFTextBoxAutoComplete;assembly=WPFTextBoxAutoComplete"
         x:Class="HolyLogger.MainWindow"
         Title="HolyLogger - 4X/4Z Log application" Height="560" MinHeight="560" Width="760" MinWidth="760" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
 
