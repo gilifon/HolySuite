@@ -21,57 +21,58 @@
                         <MenuItem Header="File" FontSize="16">
                             <MenuItem x:Name="ExpotMenuItem" Header="Export To ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExpotMenuItem_Click" >
                                 <MenuItem.Icon>
-                                    <Image Source="Images/export.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/export.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem x:Name="ExpotExlMenuItem" Header="Export To CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >
                                 <MenuItem.Icon>
-                                    <Image Source="Images/export.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/export.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <Separator />
                             <MenuItem x:Name="UploadMenuItem" Header="Send log" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show QSO Statistics" Visibility="Collapsed">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/statistics.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/statistics.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />
                             <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/exit.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/exit.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
                         <MenuItem Header="Tools" FontSize="16">
                             <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/station.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
                             <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/sign.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/sign.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem x:Name="PropertiesMenuItem" Header="QRZ Service" ToolTip="Insert your QRZ.COM credentials" Click="PropertiesMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/qrz_mini_icon.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/qrz_mini_icon.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
                         <MenuItem Header="Help" FontSize="16">
                             <MenuItem x:Name="OmnirigMenuItem" Header="Omni-Rig web page" ToolTip="Go to Omni-Rig website" Click="OmnirigMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/about.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
