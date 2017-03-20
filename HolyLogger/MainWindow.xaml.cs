@@ -250,6 +250,8 @@ namespace HolyLogger
             }
             qso.frequency = TB_Frequency.Text.Replace(",", "");
             qso.band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+            qso.country = Country;
+            qso.name = FName;
             qso.my_call = TB_MyCallsign.Text;
             qso.my_square = TB_MyGrid.Text.Replace("-", "");
             qso.rst_rcvd = TB_RSTRcvd.Text;
@@ -344,6 +346,38 @@ namespace HolyLogger
             SaveFileDialog saveFileDialog1 = new SaveFileDialog();
             saveFileDialog1.Filter = "ADIF File|*.adi";
             saveFileDialog1.Title = "Export ADIF";
+            saveFileDialog1.ShowDialog();
+
+            // If the file name is not an empty string open it for saving.
+            try
+            {
+                if (saveFileDialog1.FileName != "")
+                {
+                    // Saves the Image via a FileStream created by the OpenFile method.
+                    System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
+                    StreamWriter sw = new StreamWriter(fs);
+                    sw.Write(adif);
+                    sw.Close();
+                    fs.Close();
+                    MessageBox.Show("File created successfully!");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Export failed: " + ex.Message);
+            }
+
+        }
+
+        private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string adif = Services.GenerateCSV(dal.GetAllQSOs());
+            
+            // Displays a SaveFileDialog so the user can save the Image
+            // assigned to Button2.
+            SaveFileDialog saveFileDialog1 = new SaveFileDialog();
+            saveFileDialog1.Filter = "CSV File|*.csv";
+            saveFileDialog1.Title = "Export CSV";
             saveFileDialog1.ShowDialog();
 
             // If the file name is not an empty string open it for saving.
@@ -783,6 +817,9 @@ namespace HolyLogger
         }
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
+            TB_Exchange.Focusable = true;
+            TB_4xExchange.Focusable = true;
+
             if (!String.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 RefreshDateTime_Btn_MouseUp(null, null);
@@ -790,6 +827,7 @@ namespace HolyLogger
             }
             var dups = from qso in Qsos where qso.callsign == TB_DXCallsign.Text && qso.band + "M" == TB_Band.Text && qso.mode == Mode select qso;
             if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
+
         }
 
         private async void getQrzData()

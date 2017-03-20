@@ -13,6 +13,8 @@ namespace HolyLogger
         public string my_square { get; set; }
         public string frequency { get; set; }
         public string callsign { get; set; }
+        public string country { get; set; }
+        public string name { get; set; }
         public string rst_rcvd { get; set; }
         public string rst_sent { get; set; }
         public DateTime timestamp { get; set; }

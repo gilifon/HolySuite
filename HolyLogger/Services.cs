@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DXCCManager;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -118,7 +119,48 @@ namespace HolyLogger
 
             return adif.ToString();
         }
-        
+
+        public static string GenerateCSV(IEnumerable<QSO> qso_list)
+        {
+            StringBuilder csv = new StringBuilder(200);
+            RadioEntityResolver rem = new RadioEntityResolver();
+
+            int index = 1;
+
+            csv.AppendFormat("{0},", "No");
+            csv.AppendFormat("{0},", "Date");
+            csv.AppendFormat("{0},", "UTC Start");
+            csv.AppendFormat("{0},", "Callsign");
+            csv.AppendFormat("{0},", "Country");
+            csv.AppendFormat("{0},", "Name");
+            csv.AppendFormat("{0},", "QTH");
+            csv.AppendFormat("{0},", "Band");
+            csv.AppendFormat("{0},", "Mode");
+            csv.AppendFormat("{0},", "Rcvd");
+            csv.AppendFormat("{0},", "Sent");
+            csv.AppendFormat("{0}\r\n", "UTC End");
+
+            foreach (QSO qso in qso_list)
+            {
+                string date = qso.timestamp.ToString("dd/MM/yyyy");
+                string time = qso.timestamp.ToString("HH.mm");
+
+                csv.AppendFormat("{0},", index++);
+                csv.AppendFormat("{0},", date);
+                csv.AppendFormat("{0},", time);
+                csv.AppendFormat("{0},", qso.callsign);
+                csv.AppendFormat("{0},", rem.GetEntity(qso.callsign));
+                csv.AppendFormat("{0},", "");
+                csv.AppendFormat("{0},", "");
+                csv.AppendFormat("{0},", qso.band);
+                csv.AppendFormat("{0},", qso.mode);
+                csv.AppendFormat("{0},", qso.rst_rcvd);
+                csv.AppendFormat("{0},", qso.rst_sent);
+                csv.AppendFormat("{0}\r\n", time);
+            }
+            return csv.ToString();
+        }
+
 
         public static string getBareCallsign(string callsign)
         {
