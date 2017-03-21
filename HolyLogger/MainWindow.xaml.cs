@@ -420,6 +420,17 @@ namespace HolyLogger
             string country = Services.getHamQth(bareCallsign);
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, w.Email, w.Handle, country);
             string UploadLogToIARC_result = await UploadLogToIARC();
+
+            StringBuilder sb = new StringBuilder(200);
+            sb.Append("Dear ").Append(w.Handle).Append(",<br><br>");
+            sb.Append("Thank you for participating in the 'Holyland Contest' and for sending the log.<br>");
+            sb.Append("Please be patient, we will publish the result as soon as all the logs are received.<br><br>");
+            sb.Append("73 and Best Regards,<br>");
+            sb.Append("Gil, 4Z1KD.<br>");
+            sb.Append("Online Log Manager.<br><br><br>");
+            sb.Append("http://www.iarc.org/iarc/#HolylandResults");
+
+            string Sendemail_result = await Services.SendMail("info@iarc.org", w.Email, "Holyland Contest - your log was received", sb.ToString());
             w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
