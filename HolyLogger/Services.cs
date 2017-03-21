@@ -138,7 +138,8 @@ namespace HolyLogger
             csv.AppendFormat("{0},", "Mode");
             csv.AppendFormat("{0},", "Rcvd");
             csv.AppendFormat("{0},", "Sent");
-            csv.AppendFormat("{0}\r\n", "UTC End");
+            csv.AppendFormat("{0},", "UTC End");
+            csv.AppendFormat("{0}\r\n", "Exchange");
 
             foreach (QSO qso in qso_list)
             {
@@ -156,7 +157,8 @@ namespace HolyLogger
                 csv.AppendFormat("{0},", qso.mode);
                 csv.AppendFormat("{0},", qso.rst_rcvd);
                 csv.AppendFormat("{0},", qso.rst_sent);
-                csv.AppendFormat("{0}\r\n", time);
+                csv.AppendFormat("{0},", time);
+                csv.AppendFormat("{0}\r\n", qso.exchange);
             }
             return csv.ToString();
         }
