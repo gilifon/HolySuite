@@ -108,7 +108,9 @@ namespace HolyLogger
                 adif.AppendFormat("<mode:{0}>{1} ", qso.mode.Length, qso.mode);
                 adif.AppendFormat("<station_callsign:{0}>{1} ", qso.my_call.Length, qso.my_call);
                 adif.AppendFormat("<operator:{0}>{1} ", qso.my_call.Length, qso.my_call);
-                adif.AppendFormat("<stx_string :{0}>{1} ", qso.my_square.Length, qso.my_square);
+                adif.AppendFormat("<name:{0}>{1} ", qso.name.Length, qso.name);
+                adif.AppendFormat("<country:{0}>{1} ", qso.country.Length, qso.country);
+                adif.AppendFormat("<stx_string:{0}>{1} ", qso.my_square.Length, qso.my_square);
                 adif.AppendFormat("<rst_rcvd:{0}>{1} ", qso.rst_rcvd.Length, qso.rst_rcvd);
                 adif.AppendFormat("<rst_sent:{0}>{1} ", qso.rst_sent.Length, qso.rst_sent);
                 adif.AppendFormat("<qso_date:{0}>{1} ", date.Length, date);

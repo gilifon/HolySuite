@@ -139,8 +139,8 @@ th,td
         private string dxcc_pattern = @"<dxcc:(\d{1,2})(?::[a-z]{1})?>";
         private string freq_pattern = @"<freq:(\d{1,2})(?::[a-z]{1})?>";
         private string srx_pattern = @"<srx_string:(\d{1,2})(?::[a-z]{1})?>";
-        //private string name_pattern = @"<name:(\d)(?::[a-z]{1})?>";
-
+        private string name_pattern = @"<name:(\d)(?::[a-z]{1})?>";
+        private string country_pattern = @"<name:(\d)(?::[a-z]{1})?>";
 
         public HolyLogParser(string rawData, Operator logType)
         {
@@ -244,6 +244,20 @@ th,td
                 if (match.Success)
                 {
                     qso_row.Freq = Regex.Split(row, freq_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+
+                regex = new Regex(name_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.Name = Regex.Split(row, name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+
+                regex = new Regex(country_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.Country = Regex.Split(row, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
                 qso_row.StandartizeQSO();
@@ -461,6 +475,7 @@ th,td
             public string Band { get; set; }
             public string Mode { get; set; }
             public string Name { get; set; }
+            public string Country { get; set; }
             public string Freq { get; set; }
             public string Comment { get; set; }
             public string DXCC { get; set; }
