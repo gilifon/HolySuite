@@ -34,7 +34,7 @@ namespace HolyLogger
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,timestamp,mode,exchange,comment) VALUES (?,?,?,?,?,?,?,?,?,?,?)", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,timestamp,mode,exchange,comment,name,country) VALUES (?,?,?,?,?,?,?,?,?,?,?)", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.my_call));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.my_square));
                 insertSQL.Parameters.Add(new SQLiteParameter("frequency", qso.frequency));
@@ -46,6 +46,8 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("mode", qso.mode));
                 insertSQL.Parameters.Add(new SQLiteParameter("exchange", qso.exchange));
                 insertSQL.Parameters.Add(new SQLiteParameter("comment", qso.comment));
+                insertSQL.Parameters.Add(new SQLiteParameter("name", qso.name));
+                insertSQL.Parameters.Add(new SQLiteParameter("country", qso.country));
                 try
                 {
                     insertSQL.ExecuteNonQuery();
@@ -97,6 +99,8 @@ namespace HolyLogger
                         q.my_square = (string)rdr["my_square"];
                         q.rst_rcvd = (string)rdr["rst_rcvd"];
                         q.rst_sent = (string)rdr["rst_sent"];
+                        q.name = (string)rdr["name"];
+                        q.country = (string)rdr["country"];
                         q.timestamp = DateTime.Parse((string)rdr["timestamp"]);
                         qso_list.Add(q);
                     }
@@ -126,6 +130,8 @@ namespace HolyLogger
                         q.my_square = (string)rdr["my_square"];
                         q.rst_rcvd = (string)rdr["rst_rcvd"];
                         q.rst_sent = (string)rdr["rst_sent"];
+                        q.name = (string)rdr["name"];
+                        q.country = (string)rdr["country"];
                         q.timestamp = DateTime.Parse((string)rdr["timestamp"]);
                         qso_list.Add(q);
                     }
