@@ -152,7 +152,7 @@ namespace HolyLogger
                 csv.AppendFormat("{0},", time);
                 csv.AppendFormat("{0},", qso.callsign);
                 csv.AppendFormat("{0},", rem.GetEntity(qso.callsign));
-                csv.AppendFormat("{0},", "");
+                csv.AppendFormat("{0},", qso.name);
                 csv.AppendFormat("{0},", "");
                 csv.AppendFormat("{0},", qso.band);
                 csv.AppendFormat("{0},", qso.mode);

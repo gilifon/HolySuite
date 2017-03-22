@@ -34,7 +34,7 @@ namespace HolyLogger
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,timestamp,mode,exchange,comment,name,country) VALUES (?,?,?,?,?,?,?,?,?,?,?)", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,timestamp,mode,exchange,comment,name,country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.my_call));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.my_square));
                 insertSQL.Parameters.Add(new SQLiteParameter("frequency", qso.frequency));

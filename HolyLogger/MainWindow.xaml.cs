@@ -495,7 +495,7 @@ namespace HolyLogger
         private string GenerateMultipleInsert(IList<QSO> qsos)
         {
             StringBuilder sb = new StringBuilder("INSERT INTO `log` ", 500);
-            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
+            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`, `name`, `country`) VALUES ");
             foreach (QSO qso in qsos)
             {
                 sb.Append("(");
@@ -509,7 +509,9 @@ namespace HolyLogger
                 sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.comment); sb.Append("'),");
+                sb.Append("'"); sb.Append(qso.comment); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.name); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.country); sb.Append("'),");
             }
             string result = sb.ToString().TrimEnd(',');
             result += " ON DUPLICATE KEY UPDATE my_call=my_call";
