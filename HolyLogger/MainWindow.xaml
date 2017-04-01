@@ -126,7 +126,7 @@
         <Image x:Name="QRZBtn" ToolTip="Open the QRZ.COM page of the DX station" HorizontalAlignment="Left" Height="24" Margin="206,101,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <xctk:MaskedTextBox x:Name="TB_4xExchange" HorizontalAlignment="Left" Margin="102,140,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="" Width="100" Height="28" FontSize="16" IsTabStop="False"/>
+        <xctk:MaskedTextBox x:Name="TB_4xExchange" HorizontalAlignment="Left" Margin="102,140,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="" Width="100" Height="28" FontSize="16"/>
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="102,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="4" />
         <Label Content="RST Sent" HorizontalAlignment="Left" Margin="242,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="339,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
