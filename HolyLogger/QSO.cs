@@ -25,7 +25,7 @@ namespace HolyLogger
 
         public string niceTimestamp
         {
-            get { return timestamp.ToShortDateString() + " " + timestamp.ToLongTimeString(); }
+            get { return timestamp.ToShortDateString() + " " + timestamp.ToShortTimeString(); }
         }
 
         //public override string ToString()
