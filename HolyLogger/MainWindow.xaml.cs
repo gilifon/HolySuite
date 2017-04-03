@@ -1193,7 +1193,10 @@ namespace HolyLogger
             }
             else
             {
-                Status = Rig.StatusStr;
+                this.Dispatcher.Invoke(() =>
+                {
+                    Status = Rig.StatusStr;
+                });
             }
         }
 
@@ -1203,48 +1206,59 @@ namespace HolyLogger
             {
                 return;
             }
-            RX = Rig.GetRxFrequency().ToString();
-            TX = Rig.GetTxFrequency().ToString();
-            Frequency = Rig.Freq.ToString();
-            if (Rig.Freq < 10000000) Frequency = Frequency.Insert(0, "0");
-            switch (Rig.Mode)
+            try
             {
-                case (OmniRig.RigParamX)PM_CW_L:
-                    //cmbMode.Text = cmbMode.Items[1].ToString();
-                    Mode = "CW";
-                    break;
-                case (OmniRig.RigParamX)PM_CW_U:
-                    //cmbMode.Text = cmbMode.Items[0].ToString();
-                    Mode = "CW";
-                    break;
-                case (OmniRig.RigParamX)PM_SSB_L:
-                    //cmbMode.Text = cmbMode.Items[3].ToString();
-                    Mode = "SSB";
-                    break;
-                case (OmniRig.RigParamX)PM_SSB_U:
-                    // cmbMode.Text = cmbMode.Items[2].ToString();
-                    Mode = "SSB";
-                    break;
-                case (OmniRig.RigParamX)PM_FM:
-                    // cmbMode.Text = cmbMode.Items[7].ToString();
-                    Mode = "FM";
-                    break;
-                case (OmniRig.RigParamX)PM_AM:
-                    // cmbMode.Text = cmbMode.Items[7].ToString();
-                    Mode = "AM";
-                    break;
-                case (OmniRig.RigParamX)PM_DIG_L:
-                    // cmbMode.Text = cmbMode.Items[7].ToString();
-                    Mode = "DIGI";
-                    break;
-                case (OmniRig.RigParamX)PM_DIG_U:
-                    // cmbMode.Text = cmbMode.Items[7].ToString();
-                    Mode = "DIGI";
-                    break;
-                default:
-                    Mode = "Other";
-                    break;
+                this.Dispatcher.Invoke(() =>
+                {
+                    RX = Rig.GetRxFrequency().ToString();
+                    TX = Rig.GetTxFrequency().ToString();
+                    Frequency = Rig.Freq.ToString();
+                    if (Rig.Freq < 10000000) Frequency = Frequency.Insert(0, "0");
+                    switch (Rig.Mode)
+                    {
+                        case (OmniRig.RigParamX)PM_CW_L:
+                            //cmbMode.Text = cmbMode.Items[1].ToString();
+                            Mode = "CW";
+                            break;
+                        case (OmniRig.RigParamX)PM_CW_U:
+                            //cmbMode.Text = cmbMode.Items[0].ToString();
+                            Mode = "CW";
+                            break;
+                        case (OmniRig.RigParamX)PM_SSB_L:
+                            //cmbMode.Text = cmbMode.Items[3].ToString();
+                            Mode = "SSB";
+                            break;
+                        case (OmniRig.RigParamX)PM_SSB_U:
+                            // cmbMode.Text = cmbMode.Items[2].ToString();
+                            Mode = "SSB";
+                            break;
+                        case (OmniRig.RigParamX)PM_FM:
+                            // cmbMode.Text = cmbMode.Items[7].ToString();
+                            Mode = "FM";
+                            break;
+                        case (OmniRig.RigParamX)PM_AM:
+                            // cmbMode.Text = cmbMode.Items[7].ToString();
+                            Mode = "AM";
+                            break;
+                        case (OmniRig.RigParamX)PM_DIG_L:
+                            // cmbMode.Text = cmbMode.Items[7].ToString();
+                            Mode = "DIGI";
+                            break;
+                        case (OmniRig.RigParamX)PM_DIG_U:
+                            // cmbMode.Text = cmbMode.Items[7].ToString();
+                            Mode = "DIGI";
+                            break;
+                        default:
+                            Mode = "Other";
+                            break;
+                    }
+                });
             }
+            catch (Exception e)
+            {
+                System.Windows.Forms.MessageBox.Show("Error: " + e.Message);
+            }
+            
         }
 
 
