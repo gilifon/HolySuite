@@ -735,6 +735,10 @@ namespace HolyLogger
 
         private void Window_Closed(object sender, EventArgs e)
         {
+            OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
+            OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
+            Rig = null;
+            OmniRigEngine = null;
             Properties.Settings.Default.Save();
         }
 
