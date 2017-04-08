@@ -870,8 +870,8 @@ namespace HolyLogger
 
         private bool CompareVersions(string current, string server)
         {
-            var version1 = new Version(server.Trim());
-            var version2 = new Version(current.Trim());
+            var version1 = new Version(current.Trim());
+            var version2 = new Version(server.Trim());
 
             var result = version1.CompareTo(version2);
             if (result > 0)
