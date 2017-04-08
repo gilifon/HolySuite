@@ -806,7 +806,7 @@ namespace HolyLogger
             FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
             string CurrentVersion = fvi.FileVersion;
 
-            WebRequestHandler _webRequestHandler = new WebRequestHandler() { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.BypassCache) };
+            WebRequestHandler _webRequestHandler = new WebRequestHandler() { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.NoCacheNoStore) };
             using (var client = new HttpClient(_webRequestHandler))
             {
                 try
