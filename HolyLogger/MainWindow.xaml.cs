@@ -23,6 +23,7 @@ using Newtonsoft.Json;
 using System.Windows.Data;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
+using System.Net.Cache;
 
 namespace HolyLogger
 {
@@ -805,7 +806,8 @@ namespace HolyLogger
             FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
             string CurrentVersion = fvi.FileVersion;
 
-            using (var client = new HttpClient())
+            WebRequestHandler _webRequestHandler = new WebRequestHandler() { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.BypassCache) };
+            using (var client = new HttpClient(_webRequestHandler))
             {
                 try
                 {
@@ -839,6 +841,10 @@ namespace HolyLogger
                             }
                         }
                     }
+                    else
+                    {
+                        System.Windows.Forms.MessageBox.Show("Your version is up-to-date");
+                    }
                 }
                 catch (Exception)
                 {
@@ -864,8 +870,8 @@ namespace HolyLogger
 
         private bool CompareVersions(string current, string server)
         {
-            var version1 = new Version(server);
-            var version2 = new Version(current);
+            var version1 = new Version(server.Trim());
+            var version2 = new Version(current.Trim());
 
             var result = version1.CompareTo(version2);
             if (result > 0)
