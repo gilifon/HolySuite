@@ -65,6 +65,16 @@
                             </MenuItem>
                         </MenuItem>
                         <MenuItem Header="Help" FontSize="16">
+                            <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/update.gif" Stretch="UniformToFill" Width="20" Height="20"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="HolyLogWebsiteMenuItem" Header="HolyLogger web page" ToolTip="Go to HolyLogger website" Click="HolyLoggerMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/crown.png" Stretch="UniformToFill" Width="20" Height="20"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <MenuItem x:Name="OmnirigMenuItem" Header="Omni-Rig web page" ToolTip="Go to Omni-Rig website" Click="OmnirigMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="20" Height="20"/>

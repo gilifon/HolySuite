@@ -21,6 +21,8 @@ using HolyParser;
 using Newtonsoft.Json.Linq;
 using Newtonsoft.Json;
 using System.Windows.Data;
+using System.Diagnostics;
+using System.Text.RegularExpressions;
 
 namespace HolyLogger
 {
@@ -779,6 +781,101 @@ namespace HolyLogger
             }
         }
 
+        private void HolyLoggerMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string url = "https://4z1kd.github.io/HolyLogger/";
+
+            try
+            {
+                System.Diagnostics.Process.Start(url);
+            }
+            catch (Exception)
+            {
+                MessageBox.Show("Please install 'Chrome' and try again");
+            }
+        }
+
+        private async void UpdatesMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string tempPath = Path.GetTempPath();
+            string filename = tempPath + @"\HolyLogger_x86.msi";
+            Uri uri = new Uri("https://github.com/4Z1KD/HolyLogger/raw/master/HolyLogger_x86.msi");
+
+            System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
+            FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+            string CurrentVersion = fvi.FileVersion;
+
+            using (var client = new HttpClient())
+            {
+                try
+                {
+                    string baseRequest = "https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version";
+                    var response = await client.GetAsync(baseRequest);
+                    var responseFromServer = await response.Content.ReadAsStringAsync();
+
+                    if (CompareVersions(CurrentVersion, responseFromServer))
+                    {
+                        string messageBoxText = "Do you want to install the new version?";
+                        string caption = "New updates are available";
+                        MessageBoxButton button = MessageBoxButton.YesNoCancel;
+                        MessageBoxImage icon = MessageBoxImage.Warning;
+                        if (MessageBox.Show(messageBoxText, caption, button, icon) == MessageBoxResult.Yes)
+                        {
+                            //HolyLoggerMenuItem_Click(null, null);
+
+                            try
+                            {
+                                if (File.Exists(filename))
+                                {
+                                    File.Delete(filename);
+                                }
+                                WebClient wc = new WebClient();
+                                wc.DownloadFileAsync(uri, filename);
+                                wc.DownloadFileCompleted += new AsyncCompletedEventHandler(wc_DownloadFileCompleted);
+                            }
+                            catch (Exception ex)
+                            {
+                                MessageBox.Show(ex.Message.ToString());
+                            }
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    System.Windows.Forms.MessageBox.Show("Server busy. Please try later.");
+                }
+            }
+        }
+        private void wc_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
+        {
+            string tempPath = Path.GetTempPath();
+            string filename = tempPath + @"\HolyLogger_x86.msi";
+
+            if (e.Error == null)
+            {
+                Process.Start(filename);
+                Environment.Exit(0);
+            }
+            else
+            {
+                MessageBox.Show("Failed to download, please check your connection", "Download failed!");
+            }
+        }
+
+        private bool CompareVersions(string current, string server)
+        {
+            var version1 = new Version(server);
+            var version2 = new Version(current);
+
+            var result = version1.CompareTo(version2);
+            if (result > 0)
+                return true;
+            else if (result < 0)
+                return false;
+            else
+                return false;
+        }
+
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (signboard != null)
@@ -830,7 +927,11 @@ namespace HolyLogger
                 TB_Exchange.Visibility = Visibility.Visible;
                 TB_4xExchange.Visibility = Visibility.Hidden;
             }
-
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            {
+                TB_DXCC.Text = "";
+                TB_DX_Name.Text = "";
+            }
         }
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
