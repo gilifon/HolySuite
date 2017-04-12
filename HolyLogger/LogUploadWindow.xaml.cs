@@ -80,6 +80,17 @@ namespace HolyLogger
             }
         }
 
+        private string _EmailConf;
+        public string EmailConf
+        {
+            get { return _EmailConf; }
+            set
+            {
+                _EmailConf = value;
+                OnPropertyChanged("EmailConf");
+            }
+        }
+
         private string _Handle;
         public string Handle
         {
@@ -111,10 +122,18 @@ namespace HolyLogger
         {
             if (!string.IsNullOrWhiteSpace(CategoryOperator) && !string.IsNullOrWhiteSpace(CategoryMode) && !string.IsNullOrWhiteSpace(CategoryPower) && !string.IsNullOrWhiteSpace(Email) && !string.IsNullOrWhiteSpace(Handle) && !string.IsNullOrWhiteSpace(Callsign))
             {
-                if (SendLog != null)
+                if (Email == EmailConf)
                 {
-                    SendLog(this, e);
-                    Spinner.Visibility = Visibility.Visible;
+                    if (SendLog != null)
+                    {
+                        SendLog(this, e);
+                        Spinner.Visibility = Visibility.Visible;
+                        this.IsEnabled = false;
+                    }
+                }
+                else
+                {
+                    System.Windows.Forms.MessageBox.Show("Please confirm your Email address");
                 }
             }
             else

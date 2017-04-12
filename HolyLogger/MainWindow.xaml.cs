@@ -259,7 +259,7 @@ namespace HolyLogger
             qso.my_square = TB_MyGrid.Text.Replace("-", "");
             qso.rst_rcvd = TB_RSTRcvd.Text;
             qso.rst_sent = TB_RSTSent.Text;
-            qso.timestamp = QSOTimeStamp.Value.Value;
+            qso.timestamp = QSOTimeStamp.Value.Value.ToUniversalTime();
             //if (Properties.Settings.Default.live_log) PostQSO(qso);
             QSO q = dal.Insert(qso);
             Qsos.Insert(0, q);
@@ -440,10 +440,10 @@ namespace HolyLogger
 
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
         {
-            string delete = "DELETE FROM `log` WHERE `my_call`= '" + callsign + "';";
-            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.Now.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.Now.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
+            //string delete = "DELETE FROM `log` WHERE `my_call`= '" + callsign + "';";
+            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.UtcNow.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.UtcNow.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
             //************************************************** ASYNC ********************************************//
-            string deleteResponse = await ExecuteQuery(delete);
+            //string deleteResponse = await ExecuteQuery(delete);
             string insertResponse = await ExecuteQuery(insert);
             return insertResponse;
         }
@@ -508,7 +508,7 @@ namespace HolyLogger
                 sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.band); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.timestamp.ToUniversalTime()); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
@@ -749,10 +749,11 @@ namespace HolyLogger
         {
             if (TB_Band != null)
             {
-                string band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+                //string band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+                string band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 if (!string.IsNullOrWhiteSpace(band))
                 {
-                    TB_Band.Text = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", "")) + "M";
+                    TB_Band.Text = band + "M";
                 }
                 else
                 {
@@ -807,6 +808,17 @@ namespace HolyLogger
             string CurrentVersion = fvi.FileVersion;
 
             WebRequestHandler _webRequestHandler = new WebRequestHandler() { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.NoCacheNoStore) };
+
+            //WebClient client1 = new WebClient();
+            //client1.CachePolicy = new RequestCachePolicy(RequestCacheLevel.NoCacheNoStore);
+            //client1.DownloadStringCompleted += (sender1, args) => {
+            //    if (!args.Cancelled && args.Error == null)
+            //    {
+            //        string result = args.Result; // do something fun...
+            //    }
+            //};
+            //client1.DownloadStringAsync(new Uri("https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version"));
+
             using (var client = new HttpClient(_webRequestHandler))
             {
                 try
@@ -872,14 +884,8 @@ namespace HolyLogger
         {
             var version1 = new Version(current.Trim());
             var version2 = new Version(server.Trim());
-
-            var result = version1.CompareTo(version2);
-            if (result > 0)
-                return true;
-            else if (result < 0)
-                return false;
-            else
-                return false;
+            var result = version2.CompareTo(version1);
+            return result > 0;
         }
 
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
@@ -952,6 +958,11 @@ namespace HolyLogger
             var dups = from qso in Qsos where qso.callsign == TB_DXCallsign.Text && qso.band + "M" == TB_Band.Text && qso.mode == Mode select qso;
             if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
 
+        }
+
+        private void MenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            //System.Windows.Forms.MessageBox.Show("Test");
         }
 
         private async void getQrzData()
@@ -1380,8 +1391,9 @@ namespace HolyLogger
 
 
 
+
         #endregion
 
-
+       
     }
 }

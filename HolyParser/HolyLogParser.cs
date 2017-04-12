@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using MoreLinq;
 using DXCCManager;
+using System.Globalization;
 
 namespace HolyParser
 {
@@ -428,7 +429,9 @@ th,td
         public static string convertFreqToBand(string freq)
         {
             double parsedFreq;
-            if (!double.TryParse(freq, out parsedFreq)) return string.Empty;
+            CultureInfo provider = CultureInfo.InvariantCulture;
+
+            if (!double.TryParse(freq.Replace(".","").Replace(",",""), NumberStyles.Number, provider, out parsedFreq)) return string.Empty;
             if (parsedFreq < 1000)
             {
                 if (parsedFreq > 0 && parsedFreq <= 2) return "160";
@@ -445,17 +448,17 @@ th,td
             }
             else
             {
-                if (parsedFreq > 0 && parsedFreq <= 2000) return "160";
-                if (parsedFreq > 2000 && parsedFreq <= 5000) return "80";
-                if (parsedFreq > 5000 && parsedFreq <= 10000) return "40";
-                if (parsedFreq > 10000 && parsedFreq <= 11000) return "30";
-                if (parsedFreq > 12000 && parsedFreq <= 16000) return "20";
-                if (parsedFreq > 18000 && parsedFreq <= 19000) return "17";
-                if (parsedFreq > 20000 && parsedFreq <= 23000) return "15";
-                if (parsedFreq > 24000 && parsedFreq <= 25000) return "12";
-                if (parsedFreq > 27000 && parsedFreq <= 30000) return "10";
-                if (parsedFreq > 50000 && parsedFreq <= 54000) return "6";
-                if (parsedFreq > 144000 && parsedFreq <= 146000) return "2";
+                if (parsedFreq > 0 && parsedFreq <= 2000000) return "160";
+                if (parsedFreq > 2000000 && parsedFreq <= 5000000) return "80";
+                if (parsedFreq > 5000000 && parsedFreq <= 10000000) return "40";
+                if (parsedFreq > 10000000 && parsedFreq <= 11000000) return "30";
+                if (parsedFreq > 12000000 && parsedFreq <= 16000000) return "20";
+                if (parsedFreq > 18000000 && parsedFreq <= 19000000) return "17";
+                if (parsedFreq > 20000000 && parsedFreq <= 23000000) return "15";
+                if (parsedFreq > 24000000 && parsedFreq <= 25000000) return "12";
+                if (parsedFreq > 27000000 && parsedFreq <= 30000000) return "10";
+                if (parsedFreq > 50000000 && parsedFreq <= 54000000) return "6";
+                if (parsedFreq > 144000000 && parsedFreq <= 146000000) return "2";
             }
             return string.Empty;
         }
