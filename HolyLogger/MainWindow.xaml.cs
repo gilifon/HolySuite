@@ -823,7 +823,7 @@ namespace HolyLogger
             {
                 try
                 {
-                    string baseRequest = "https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version";
+                    string baseRequest = "https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version?v=" + DateTime.Now.Ticks;
                     var response = await client.GetAsync(baseRequest);
                     var responseFromServer = await response.Content.ReadAsStringAsync();
 

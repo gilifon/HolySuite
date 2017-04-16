@@ -99,8 +99,8 @@ namespace HolyLogger
 
             foreach (QSO qso in qso_list)
             {
-                string date = qso.timestamp.ToString("yyyyMMdd");
-                string time = qso.timestamp.ToString("HHmmss");
+                string date = qso.timestamp.ToUniversalTime().ToString("yyyyMMdd");
+                string time = qso.timestamp.ToUniversalTime().ToString("HHmmss");
 
                 adif.AppendFormat("<call:{0}>{1} ", qso.callsign.Length, qso.callsign);
                 adif.AppendFormat("<srx_string:{0}>{1} ", qso.exchange.Length, qso.exchange);
@@ -146,8 +146,8 @@ namespace HolyLogger
 
             foreach (QSO qso in qso_list)
             {
-                string date = qso.timestamp.ToString("dd/MM/yyyy");
-                string time = qso.timestamp.ToString("HH.mm");
+                string date = qso.timestamp.ToUniversalTime().ToString("dd/MM/yyyy");
+                string time = qso.timestamp.ToUniversalTime().ToString("HH.mm");
 
                 csv.AppendFormat("{0},", index++);
                 csv.AppendFormat("{0},", date);

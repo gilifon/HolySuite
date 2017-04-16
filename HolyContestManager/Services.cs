@@ -25,8 +25,8 @@ namespace HolyContestManager
 
             foreach (QSO qso in qso_list)
             {
-                string date = qso.timestamp.ToString("yyyyMMdd");
-                string time = qso.timestamp.ToString("HHmmss");
+                //string date = qso.timestamp.ToString("yyyyMMdd");
+                //string time = qso.timestamp.ToString("HHmmss");
 
                 adif.AppendFormat("<call:{0}>{1} ", qso.callsign.Length, qso.callsign);
                 adif.AppendFormat("<srx_string:{0}>{1} ", qso.exchange.Length, qso.exchange);
@@ -37,9 +37,9 @@ namespace HolyContestManager
                 adif.AppendFormat("<stx_string :{0}>{1} ", qso.my_square.Length, qso.my_square);
                 adif.AppendFormat("<rst_rcvd:{0}>{1} ", qso.rst_rcvd.Length, qso.rst_rcvd);
                 adif.AppendFormat("<rst_sent:{0}>{1} ", qso.rst_sent.Length, qso.rst_sent);
-                adif.AppendFormat("<qso_date:{0}>{1} ", date.Length, date);
-                adif.AppendFormat("<time_on:{0}>{1} ", time.Length, time);
-                adif.AppendFormat("<time_off:{0}>{1} ", time.Length, time);
+                //adif.AppendFormat("<qso_date:{0}>{1} ", date.Length, date);
+                //adif.AppendFormat("<time_on:{0}>{1} ", time.Length, time);
+                //adif.AppendFormat("<time_off:{0}>{1} ", time.Length, time);
                 adif.AppendFormat("<comment:{0}>{1} ", qso.comment.Length, qso.comment);
                 adif.AppendLine("<EOR>");
             }

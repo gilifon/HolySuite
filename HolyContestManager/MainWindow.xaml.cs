@@ -345,15 +345,15 @@ namespace HolyContestManager
         public string callsign { get; set; }
         public string rst_rcvd { get; set; }
         public string rst_sent { get; set; }
-        public DateTime timestamp { get; set; }
+        //public DateTime timestamp { get; set; }
         public string mode { get; set; }
         public string exchange { get; set; }
         public string comment { get; set; }
         public string band { get; set; }
 
-        public string niceTimestamp
-        {
-            get { return timestamp.ToShortDateString() + " " + timestamp.ToLongTimeString(); }
-        }
+        //public string niceTimestamp
+        //{
+        //    get { return timestamp.ToShortDateString() + " " + timestamp.ToLongTimeString(); }
+        //}
     }
 }
