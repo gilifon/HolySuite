@@ -36,6 +36,7 @@ namespace HolyParser
 
         private string m_fileText;
         private List<QSO> m_qsoList;
+        
 
         private string m_template = @"
 <style>
@@ -131,7 +132,10 @@ th,td
         public string Template { get { return m_templateRes; } }
 
         //patterns
-        private string call_pattern = @"<call:(\d{1,2})(?::[a-z]{1})?>";
+        private string mycall_pattern = @"<station_callsign:(\d{1,2})(?::[a-z]{1})?>";
+        private string rst_rcvd_pattern = @"<rst_rcvd:(\d{1,2})(?::[a-z]{1})?>";
+        private string rst_sent_pattern = @"<rst_sent:(\d{1,2})(?::[a-z]{1})?>";
+        private string dxcall_pattern = @"<call:(\d{1,2})(?::[a-z]{1})?>";
         private string date_pattern = @"<qso_date:(\d{1,2})(?::[a-z]{1})?>";
         private string time_pattern = @"<time_on:(\d{1,2})(?::[a-z]{1})?>";
         private string band_pattern = @"<band:(\d{1,2})(?::[a-z]{1})?>";
@@ -140,8 +144,9 @@ th,td
         private string dxcc_pattern = @"<dxcc:(\d{1,2})(?::[a-z]{1})?>";
         private string freq_pattern = @"<freq:(\d{1,2})(?::[a-z]{1})?>";
         private string srx_pattern = @"<srx_string:(\d{1,2})(?::[a-z]{1})?>";
-        private string name_pattern = @"<name:(\d)(?::[a-z]{1})?>";
-        private string country_pattern = @"<name:(\d)(?::[a-z]{1})?>";
+        private string stx_pattern = @"<stx_string:(\d{1,2})(?::[a-z]{1})?>";
+        private string name_pattern = @"<name:(\d{1,2})(?::[a-z]{1})?>";
+        private string country_pattern = @"<country:(\d{1,2})(?::[a-z]{1})?>";
 
         public HolyLogParser(string rawData, Operator logType)
         {
@@ -189,13 +194,34 @@ th,td
                     qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
-                regex = new Regex(call_pattern, RegexOptions.IgnoreCase);
+                regex = new Regex(dxcall_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso_row.Call = Regex.Split(row, call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    qso_row.DXCall = Regex.Split(row, dxcall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                     //rem.GetEntityAsync(qso_row.Call);
-                    qso_row.DXCC = rem.GetEntity(qso_row.Call);
+                    qso_row.DXCC = rem.GetEntity(qso_row.DXCall);
+                }
+
+                regex = new Regex(mycall_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.MyCall = Regex.Split(row, mycall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+
+                regex = new Regex(rst_rcvd_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.RST_RCVD = Regex.Split(row, rst_rcvd_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+
+                regex = new Regex(rst_sent_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.RST_SENT = Regex.Split(row, rst_sent_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
                 regex = new Regex(date_pattern, RegexOptions.IgnoreCase);
@@ -225,6 +251,10 @@ th,td
                 {
                     qso_row.Comment = Regex.Split(row, commant_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
+                else
+                {
+                    qso_row.Comment = "";
+                }
 
                 regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
@@ -240,6 +270,13 @@ th,td
                     qso_row.SRX = Regex.Split(row, srx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
 
+                regex = new Regex(stx_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.STX = Regex.Split(row, stx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+
                 regex = new Regex(freq_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
                 if (match.Success)
@@ -253,12 +290,20 @@ th,td
                 {
                     qso_row.Name = Regex.Split(row, name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
+                else
+                {
+                    qso_row.Name = "";
+                }
 
                 regex = new Regex(country_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
                 if (match.Success)
                 {
                     qso_row.Country = Regex.Split(row, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+                else
+                {
+                    qso_row.Country = "";
                 }
 
                 qso_row.StandartizeQSO();
@@ -414,6 +459,11 @@ th,td
             m_templateRes = FinalTemplate.ToString();
         }
 
+        public List<QSO> GetRawQSO()
+        {
+            return m_qsoList;
+        }
+
         public string getErrors()
         {
             var invalidQSOs = m_qsoList.Where(p => !p.IsValid);
@@ -446,7 +496,21 @@ th,td
                 if (parsedFreq > 50 && parsedFreq <= 54) return "6";
                 if (parsedFreq > 144 && parsedFreq <= 146) return "2";
             }
-            else
+            else if (parsedFreq < 1000000)
+            {
+                if (parsedFreq > 0 && parsedFreq <= 2000) return "160";
+                if (parsedFreq > 2000 && parsedFreq <= 5000) return "80";
+                if (parsedFreq > 5000 && parsedFreq <= 10000) return "40";
+                if (parsedFreq > 10000 && parsedFreq <= 11000) return "30";
+                if (parsedFreq > 12000 && parsedFreq <= 16000) return "20";
+                if (parsedFreq > 18000 && parsedFreq <= 19000) return "17";
+                if (parsedFreq > 20000 && parsedFreq <= 23000) return "15";
+                if (parsedFreq > 24000 && parsedFreq <= 25000) return "12";
+                if (parsedFreq > 27000 && parsedFreq <= 30000) return "10";
+                if (parsedFreq > 50000 && parsedFreq <= 54000) return "6";
+                if (parsedFreq > 144000 && parsedFreq <= 146000) return "2";
+            }
+            else if (parsedFreq < 1000000000)
             {
                 if (parsedFreq > 0 && parsedFreq <= 2000000) return "160";
                 if (parsedFreq > 2000000 && parsedFreq <= 5000000) return "80";
@@ -468,141 +532,147 @@ th,td
             return !string.IsNullOrEmpty(callsign) && (callsign.StartsWith("4X", true, System.Globalization.CultureInfo.CurrentCulture) || callsign.StartsWith("4Z", true, System.Globalization.CultureInfo.CurrentCulture));
         }
 
-        private class QSO
-        {
-            public bool IsIsraeli { get; set; }
-            public bool IsValid { get; set; }
-            public string Call { get; set; }
-            public string Date { get; set; }
-            public string Time { get; set; }
-            public string Band { get; set; }
-            public string Mode { get; set; }
-            public string Name { get; set; }
-            public string Country { get; set; }
-            public string Freq { get; set; }
-            public string Comment { get; set; }
-            public string DXCC { get; set; }
-            public string SRX { get; set; }
-            public string HASH { get; set; }
-            public string ERROR { get; set; }
-
-
-            public void StandartizeQSO()
-            {
-                IsValid = false;
-                IsIsraeli = IsIsraeliStation(Call);
-                string pattern = @"([a-zA-Z]{1})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
-                Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
-                if (!string.IsNullOrEmpty(SRX))
-                {
-                    Match match = regex.Match(SRX);
-                    if (match.Success)
-                    {
-                        this.SRX = match.Groups[1].Value + match.Groups[2].Value + match.Groups[3].Value;
-                        IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && IsIsraeli;
-                        if (IsValid && IsIsraeli)
-                            HASH = Call + Band + Mode + SRX;
-                        else if (IsValid && !IsIsraeli)
-                            HASH = Call + Band + Mode;
-                    }
-                    else
-                    {
-                        pattern = @"(\d+)";
-                        regex = new Regex(pattern, RegexOptions.IgnoreCase);
-                        match = regex.Match(SRX);
-                        if (match.Success)
-                        {
-                            this.SRX = match.Groups[1].Value;
-                            IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && !IsIsraeli;
-                            if (IsValid && IsIsraeli)
-                                HASH = Call + Band + Mode + SRX;
-                            else if (IsValid && !IsIsraeli)
-                                HASH = Call + Band + Mode;
-                        }
-                        else
-                        {
-                            IsValid = false;
-                        }
-                    }
-                }
-                else
-                {
-                    IsValid = false;
-                }
-            }
-
-            private bool IsValidBand()
-            {
-                if (string.IsNullOrEmpty(Band) && !string.IsNullOrEmpty(Freq))
-                {
-                    Band = convertFreqToBand(Freq);
-                }
-                bool isValid = !string.IsNullOrEmpty(Band) && (Band.Contains("10") || Band.Contains("15") || Band.Contains("20") || Band.Contains("40") || Band.Contains("80") || Band.Contains("160"));
-                if (!isValid) this.ERROR += "Band is not valid: " + Band + " - ";
-                return isValid;
-
-            }
-            private bool IsValidMode()
-            {
-                bool isValid = !string.IsNullOrEmpty(Mode) && (Mode.ToLower().Contains("ph") || Mode.ToLower().Contains("fm") ||Mode.ToLower().Contains("ry") || Mode.ToLower().Contains("ssb") || Mode.ToLower().Contains("lsb") || Mode.ToLower().Contains("usb") || Mode.ToLower().Contains("cw") || Mode.ToLower().Contains("rtty") || Mode.ToLower().Contains("psk"));
-                if (!isValid) this.ERROR += "Mode is not valid: " + Mode + " - ";
-                return isValid;
-            }
-            private bool IsValidCall()
-            {
-                bool isValid = !string.IsNullOrEmpty(Call);
-                if (!isValid) this.ERROR += "Call is empty -";
-                return isValid;
-            }
-            private bool IsValidComment()
-            {
-                bool isValid = !string.IsNullOrEmpty(Comment);
-                if (!isValid) this.ERROR += "Comment is empty -";
-                return isValid;
-            }
-            private bool IsValidSRX()
-            {
-                bool isValid = !string.IsNullOrEmpty(SRX);
-                if (!isValid) this.ERROR += "SRX is empty -";
-                return isValid;
-            }
-            private bool IsValidDXCC()
-            {
-                //return true;
-                bool isValid = !string.IsNullOrEmpty(DXCC);
-                if (!isValid) this.ERROR += "DXCC is empty -";
-                return isValid;
-            }
-
-            //private void convertFreqToBand()
-            //{
-            //    double parsedFreq;
-            //    if (!double.TryParse(Freq, out parsedFreq)) return;
-            //    if (parsedFreq < 30)
-            //    {
-            //        if (parsedFreq > 0 && parsedFreq < 2) Band = "160";
-            //        if (parsedFreq > 2 && parsedFreq < 5) Band = "80";
-            //        if (parsedFreq > 5 && parsedFreq < 10) Band = "40";
-            //        if (parsedFreq > 12 && parsedFreq < 16) Band = "20";
-            //        if (parsedFreq > 19 && parsedFreq < 23) Band = "15";
-            //        if (parsedFreq > 25 && parsedFreq < 30) Band = "10";
-            //    }
-            //    else
-            //    {
-            //        if (parsedFreq > 0 && parsedFreq < 2000) Band = "160";
-            //        if (parsedFreq > 2000 && parsedFreq < 5000) Band = "80";
-            //        if (parsedFreq > 5000 && parsedFreq < 10000) Band = "40";
-            //        if (parsedFreq > 12000 && parsedFreq < 16000) Band = "20";
-            //        if (parsedFreq > 19000 && parsedFreq < 23000) Band = "15";
-            //        if (parsedFreq > 25000 && parsedFreq < 30000) Band = "10";
-            //    }
-
-            //}
-        }
+        
 
         public enum Operator
         {
             Israeli = 0, Foreign
         }
+    }
+
+    public class QSO
+    {
+        public bool IsIsraeli { get; set; }
+        public bool IsValid { get; set; }
+        public string MyCall { get; set; }
+        public string DXCall { get; set; }
+        public string Date { get; set; }
+        public string Time { get; set; }
+        public string Band { get; set; }
+        public string Mode { get; set; }
+        public string Name { get; set; }
+        public string Country { get; set; }
+        public string Freq { get; set; }
+        public string Comment { get; set; }
+        public string DXCC { get; set; }
+        public string SRX { get; set; }
+        public string STX { get; set; }
+        public string HASH { get; set; }
+        public string ERROR { get; set; }
+        public string RST_RCVD { get; set; }
+        public string RST_SENT { get; set; }
+
+
+        public void StandartizeQSO()
+        {
+            IsValid = false;
+            IsIsraeli = HolyLogParser.IsIsraeliStation(DXCall);
+            string pattern = @"([a-zA-Z]{1})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
+            Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
+            if (!string.IsNullOrEmpty(SRX))//srx not empty -> good, try match
+            {
+                Match match = regex.Match(SRX);
+                if (match.Success) //srx matches grid
+                {
+                    this.SRX = match.Groups[1].Value + match.Groups[2].Value + match.Groups[3].Value;
+                    IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && IsIsraeli;
+                    if (IsValid && IsIsraeli)
+                        HASH = MyCall + DXCall + Band + Mode;
+                    //else if (IsValid && !IsIsraeli)
+                    //    HASH = DXCall + Band + Mode + STX;
+                }
+                else //srx does NOT matche grid
+                {
+                    pattern = @"(\d+)";
+                    regex = new Regex(pattern, RegexOptions.IgnoreCase);
+                    match = regex.Match(SRX);
+                    if (match.Success)
+                    {
+                        this.SRX = match.Groups[1].Value;
+                        IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && !IsIsraeli;
+                        //if (IsValid && IsIsraeli)
+                        //    HASH = MyCall + DXCall + Band + Mode + STX;
+                        if (IsValid && !IsIsraeli)
+                            HASH = MyCall + DXCall + Band + Mode;
+                    }
+                    else
+                    {
+                        IsValid = false;
+                    }
+                }
+            }
+            else
+            {
+                IsValid = false;
+            }
+        }
+
+        private bool IsValidBand()
+        {
+            if (string.IsNullOrEmpty(Band) && !string.IsNullOrEmpty(Freq))
+            {
+                Band = HolyLogParser.convertFreqToBand(Freq);
+            }
+            bool isValid = !string.IsNullOrEmpty(Band) && (Band.Contains("10") || Band.Contains("15") || Band.Contains("20") || Band.Contains("40") || Band.Contains("80") || Band.Contains("160"));
+            if (!isValid) this.ERROR += "Band is not valid: " + Band + " - ";
+            return isValid;
+
+        }
+        private bool IsValidMode()
+        {
+            bool isValid = !string.IsNullOrEmpty(Mode) && (Mode.ToLower().Contains("ph") || Mode.ToLower().Contains("fm") || Mode.ToLower().Contains("ry") || Mode.ToLower().Contains("ssb") || Mode.ToLower().Contains("lsb") || Mode.ToLower().Contains("usb") || Mode.ToLower().Contains("cw") || Mode.ToLower().Contains("rtty") || Mode.ToLower().Contains("psk") || Mode.ToLower().Contains("digi") );
+            if (!isValid) this.ERROR += "Mode is not valid: " + Mode + " - ";
+            return isValid;
+        }
+        private bool IsValidCall()
+        {
+            bool isValid = !string.IsNullOrEmpty(DXCall);
+            if (!isValid) this.ERROR += "Call is empty -";
+            return isValid;
+        }
+        private bool IsValidComment()
+        {
+            bool isValid = !string.IsNullOrEmpty(Comment);
+            if (!isValid) this.ERROR += "Comment is empty -";
+            return isValid;
+        }
+        private bool IsValidSRX()
+        {
+            bool isValid = !string.IsNullOrEmpty(SRX);
+            if (!isValid) this.ERROR += "SRX is empty -";
+            return isValid;
+        }
+        private bool IsValidDXCC()
+        {
+            //return true;
+            bool isValid = !string.IsNullOrEmpty(DXCC);
+            if (!isValid) this.ERROR += "DXCC is empty -";
+            return isValid;
+        }
+
+        //private void convertFreqToBand()
+        //{
+        //    double parsedFreq;
+        //    if (!double.TryParse(Freq, out parsedFreq)) return;
+        //    if (parsedFreq < 30)
+        //    {
+        //        if (parsedFreq > 0 && parsedFreq < 2) Band = "160";
+        //        if (parsedFreq > 2 && parsedFreq < 5) Band = "80";
+        //        if (parsedFreq > 5 && parsedFreq < 10) Band = "40";
+        //        if (parsedFreq > 12 && parsedFreq < 16) Band = "20";
+        //        if (parsedFreq > 19 && parsedFreq < 23) Band = "15";
+        //        if (parsedFreq > 25 && parsedFreq < 30) Band = "10";
+        //    }
+        //    else
+        //    {
+        //        if (parsedFreq > 0 && parsedFreq < 2000) Band = "160";
+        //        if (parsedFreq > 2000 && parsedFreq < 5000) Band = "80";
+        //        if (parsedFreq > 5000 && parsedFreq < 10000) Band = "40";
+        //        if (parsedFreq > 12000 && parsedFreq < 16000) Band = "20";
+        //        if (parsedFreq > 19000 && parsedFreq < 23000) Band = "15";
+        //        if (parsedFreq > 25000 && parsedFreq < 30000) Band = "10";
+        //    }
+
+        //}
     }
 }

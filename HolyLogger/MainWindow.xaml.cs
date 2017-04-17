@@ -24,6 +24,7 @@ using System.Windows.Data;
 using System.Diagnostics;
 using System.Text.RegularExpressions;
 using System.Net.Cache;
+using System.Globalization;
 
 namespace HolyLogger
 {
@@ -339,6 +340,42 @@ namespace HolyLogger
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Application.Current.Shutdown();
+        }
+
+        private void ImportAdifMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            CultureInfo provider = CultureInfo.InvariantCulture;
+            OpenFileDialog openFileDialog = new OpenFileDialog();
+            openFileDialog.Filter = "ADIF files (*.adi)|*.adi";
+
+            if (openFileDialog.ShowDialog() == true)
+            {
+                string RawAdif = File.ReadAllText(openFileDialog.FileName);
+                p = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
+                p.Parse();
+                List<HolyParser.QSO> rawQSOList =  p.GetRawQSO();
+                foreach (var rq in rawQSOList)
+                {
+                    QSO qso = new QSO();
+                    qso.comment = rq.Comment;
+                    qso.callsign = rq.DXCall;
+                    qso.mode = rq.Mode;
+                    qso.exchange = rq.SRX;
+                    qso.frequency = rq.Freq;
+                    qso.band = HolyLogParser.convertFreqToBand(rq.Freq.Replace(",", ""));
+                    qso.country = rq.Country;
+                    qso.name = rq.Name;
+                    qso.my_call = rq.MyCall;
+                    qso.my_square = rq.STX;
+                    qso.rst_rcvd = rq.RST_RCVD;
+                    qso.rst_sent = rq.RST_SENT;
+                    qso.timestamp = DateTime.ParseExact(rq.Date + rq.Time, "yyyyMMddHHmmss", provider).ToLocalTime();
+                    //if (Properties.Settings.Default.live_log) PostQSO(qso);
+                    QSO q = dal.Insert(qso);
+                    Qsos.Insert(0, q);
+                    UpdateNumOfQSOs();
+                }
+            }
         }
 
         private void ExpotMenuItem_Click(object sender, RoutedEventArgs e)

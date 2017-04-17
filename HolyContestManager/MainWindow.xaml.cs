@@ -190,7 +190,7 @@ namespace HolyContestManager
             
             int a = 0;
             int z = RawData.participants.Count();
-            foreach (Participant p in RawData.participants)
+            foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
                 a++;
                 IEnumerable<QSO> qsos = from q in RawData.log where Services.getBareCallsign(q.my_call) == Services.getBareCallsign(p.callsign) select q;
