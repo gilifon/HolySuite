@@ -21,7 +21,7 @@
                         <MenuItem Header="File" FontSize="16">
                             <MenuItem x:Name="ImportMenuItem" Header="Import From ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
                                 <MenuItem.Icon>
-                                    <Image Source="Images/export.png" Stretch="UniformToFill" Width="20" Height="20"/>
+                                    <Image Source="Images/import.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />

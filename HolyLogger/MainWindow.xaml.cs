@@ -369,7 +369,10 @@ namespace HolyLogger
                     qso.my_square = rq.STX;
                     qso.rst_rcvd = rq.RST_RCVD;
                     qso.rst_sent = rq.RST_SENT;
-                    qso.timestamp = DateTime.ParseExact(rq.Date + rq.Time, "yyyyMMddHHmmss", provider).ToLocalTime();
+                    if (rq.Time.Length == 4)
+                        qso.timestamp = DateTime.ParseExact(rq.Date + rq.Time, "yyyyMMddHHmm", provider).ToLocalTime();
+                    else if (rq.Time.Length == 6)
+                        qso.timestamp = DateTime.ParseExact(rq.Date + rq.Time, "yyyyMMddHHmmss", provider).ToLocalTime();
                     //if (Properties.Settings.Default.live_log) PostQSO(qso);
                     QSO q = dal.Insert(qso);
                     Qsos.Insert(0, q);

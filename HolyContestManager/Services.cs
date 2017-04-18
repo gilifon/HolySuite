@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Mail;
 using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -58,6 +59,32 @@ namespace HolyContestManager
                 return callParts[1];
             }
             return callsign;
+        }
+
+        public static async Task<string> SendMail(string from, string to, string subject, string body)
+        {
+            MailMessage mail = new MailMessage(from, to);
+            SmtpClient client = new SmtpClient();
+            client.Port = 25;
+            client.DeliveryMethod = SmtpDeliveryMethod.Network;
+            client.UseDefaultCredentials = false;
+            client.Host = "host406.hostmonster.com";
+            client.UseDefaultCredentials = false;
+            client.Credentials = new System.Net.NetworkCredential("iarcorg", "Rw6Ach!@");
+
+            mail.IsBodyHtml = true;
+            mail.Subject = subject;
+            mail.Body = body;
+
+            try
+            {
+                await client.SendMailAsync(mail);
+                return "email successfully sent";
+            }
+            catch (Exception)
+            {
+                return "Connection with server failed! Check your internet connection";
+            }
         }
     }
 }
