@@ -138,7 +138,7 @@
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="523,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" FontSize="16" />
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" KeyDown="TB_DXCallsign_KeyDown" FontSize="16" />
         <Image x:Name="QRZBtn" ToolTip="Open the QRZ.COM page of the DX station" HorizontalAlignment="Left" Height="24" Margin="206,101,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
@@ -156,7 +156,7 @@
 
         <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,89,0,0" VerticalAlignment="Top" Width="660" Grid.Row="1" />
         <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="567,139,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="AddBtn_Click" FontSize="16" />
-        <Button x:Name="ClearBtn" Content="Clear (F5)" HorizontalAlignment="Left" Margin="567,100,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" />
+        <Button x:Name="ClearBtn" Content="Clear" HorizontalAlignment="Left" Margin="567,100,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" />
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,175,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="101,179,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="227" CharacterCasing="Upper" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="False" FontSize="16" />
         <Label Content="Country" HorizontalAlignment="Left" Margin="339,175,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
@@ -165,7 +165,7 @@
         <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="101,216,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="569" Grid.Row="1" Text="" FontSize="16" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
-        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16">
+        <DataGrid x:Name="QSODataGrid" DataGridCell.Selected="DataGrid_GotFocus" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16">
             <!--<DataGrid.ContextMenu>
                 <ContextMenu >
                     <MenuItem Header="Delete" Click="MenuItem_Click" />
@@ -186,7 +186,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Callsign" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Callsign">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding callsign}" HorizontalAlignment="Center" Padding="5" />

@@ -97,13 +97,25 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("N01ZF")]
+        [global::System.Configuration.DefaultSettingValueAttribute("N02ZF")]
         public string my_square {
             get {
                 return ((string)(this["my_square"]));
             }
             set {
                 this["my_square"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool isLocked {
+            get {
+                return ((bool)(this["isLocked"]));
+            }
+            set {
+                this["isLocked"] = value;
             }
         }
     }

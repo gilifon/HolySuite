@@ -21,7 +21,10 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="my_square" Type="System.String" Scope="User">
-      <Value Profile="(Default)">N01ZF</Value>
+      <Value Profile="(Default)">N02ZF</Value>
+    </Setting>
+    <Setting Name="isLocked" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
     </Setting>
   </Settings>
 </SettingsFile>

@@ -129,7 +129,7 @@ namespace HolyLogger
         SignboardWindow signboard = null;
 
         BackgroundWorker EntityResolverWorker;
-        
+
         public MainWindow()
         {
             InitializeComponent();
@@ -143,6 +143,12 @@ namespace HolyLogger
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
+            TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
+            
+
+            if (TB_MyGrid.IsEnabled) Lock_Btn.Opacity = 1;
+            else Lock_Btn.Opacity = 0.5;
+
             if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
             {
                 TB_MyGrid.Clear();
@@ -153,6 +159,7 @@ namespace HolyLogger
                 TB_MyGrid.IsEnabled = true;
                 TB_MyGrid.Text = Properties.Settings.Default.my_square;
             }
+            TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
 
             try
             {
@@ -183,7 +190,7 @@ namespace HolyLogger
             TB_Frequency_TextChanged(null, null);
             Services.LoginToQRZ(out _SessionKey);
         }
-        
+
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
             switch (e.PropertyName)
@@ -224,8 +231,9 @@ namespace HolyLogger
 
         private void Lock_Btn_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            TB_MyCallsign.IsEnabled = !(TB_MyCallsign.IsEnabled);
-            TB_MyGrid.IsEnabled = !(TB_MyGrid.IsEnabled);
+            Properties.Settings.Default.isLocked = !Properties.Settings.Default.isLocked;
+            TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
+            TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
             //TB_Frequency.IsEnabled = !(TB_Frequency.IsEnabled);
             //CB_Mode.IsEnabled = !(CB_Mode.IsEnabled);
             if (TB_MyGrid.IsEnabled) ((Image)sender).Opacity = 1;
@@ -315,10 +323,6 @@ namespace HolyLogger
             {
                 AddBtn_Click(null, null);
             }
-            else if (e.Key == Key.F5)
-            {
-                ClearBtn_Click(null, null);
-            }
         }
 
         private void RST_GotFocus(object sender, RoutedEventArgs e)
@@ -353,7 +357,7 @@ namespace HolyLogger
                 string RawAdif = File.ReadAllText(openFileDialog.FileName);
                 p = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
                 p.Parse();
-                List<HolyParser.QSO> rawQSOList =  p.GetRawQSO();
+                List<HolyParser.QSO> rawQSOList = p.GetRawQSO();
                 foreach (var rq in rawQSOList)
                 {
                     QSO qso = new QSO();
@@ -415,7 +419,7 @@ namespace HolyLogger
         private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string adif = Services.GenerateCSV(dal.GetAllQSOs());
-            
+
             // Displays a SaveFileDialog so the user can save the Image
             // assigned to Button2.
             SaveFileDialog saveFileDialog1 = new SaveFileDialog();
@@ -604,6 +608,16 @@ namespace HolyLogger
         //    return result;
         //}
 
+        private void DataGrid_GotFocus(object sender, RoutedEventArgs e)
+        {
+            // Lookup for the source to be DataGridCell
+            if (e.OriginalSource.GetType() == typeof(DataGridCell))
+            {
+                // Starts the Edit on the row;
+                DataGrid grd = (DataGrid)sender;
+                grd.BeginEdit(e);
+            }
+        }
         private void QSODataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Delete)
@@ -654,15 +668,15 @@ namespace HolyLogger
             {
                 if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
                 {
-                    if (HolyLogParser.validSquares.Contains(TB_4xExchange.Text))
-                    {
-                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
-                    }
-                    else
-                    {
-                        allOK = false;
-                        TB_4xExchange.BorderBrush = System.Windows.Media.Brushes.Red;
-                    }
+                    //if (HolyLogParser.validSquares.Contains(TB_4xExchange.Text))
+                    //{
+                    //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    //}
+                    //else
+                    //{
+                    //    allOK = false;
+                    //    TB_4xExchange.BorderBrush = System.Windows.Media.Brushes.Red;
+                    //}
                 }
                 else
                 {
@@ -701,7 +715,7 @@ namespace HolyLogger
 
                 if (TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z"))
                 {
-                    if (string.IsNullOrWhiteSpace(TB_MyGrid.Text) || !HolyLogParser.validSquares.Contains(TB_MyGrid.Text))
+                    if (string.IsNullOrWhiteSpace(TB_MyGrid.Text))// || !HolyLogParser.validSquares.Contains(TB_MyGrid.Text))
                     {
                         allOK = false;
                         TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.Red;
@@ -926,6 +940,21 @@ namespace HolyLogger
             var version2 = new Version(server.Trim());
             var result = version2.CompareTo(version1);
             return result > 0;
+        }
+
+        private void TB_DXCallsign_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                if ((TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z")))
+                {
+                    TB_4xExchange.Focus();
+                }
+                else
+                {
+                    TB_Exchange.Focus();
+                }
+            }
         }
 
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
@@ -1420,8 +1449,9 @@ namespace HolyLogger
             {
                 System.Windows.Forms.MessageBox.Show("Error: " + e.Message);
             }
-            
+
         }
+
 
 
 
@@ -1434,6 +1464,6 @@ namespace HolyLogger
 
         #endregion
 
-       
+        
     }
 }
