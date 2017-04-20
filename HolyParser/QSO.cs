@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -9,24 +10,55 @@ namespace HolyParser
 {
     public class QSO
     {
+        [JsonProperty("id")]
+        public int id { get; set; }
         public bool IsIsraeli { get; set; }
         public bool IsValid { get; set; }
+
+        [JsonProperty("my_call")]
         public string MyCall { get; set; }
+
+        [JsonProperty("callsign")]
         public string DXCall { get; set; }
+
+        [JsonProperty("timestamp")]
         public string Date { get; set; }
+
+        //[JsonProperty("timestamp")]
         public string Time { get; set; }
+
+        [JsonProperty("band")]
         public string Band { get; set; }
+
+        [JsonProperty("mode")]
         public string Mode { get; set; }
+
+        [JsonProperty("name")]
         public string Name { get; set; }
+
+        [JsonProperty("country")]
         public string Country { get; set; }
+
+        [JsonProperty("frequency")]
         public string Freq { get; set; }
+
+        [JsonProperty("comment")]
         public string Comment { get; set; }
+
         public string DXCC { get; set; }
+
+        [JsonProperty("exchange")]
         public string SRX { get; set; }
+
+        [JsonProperty("my_square")]
         public string STX { get; set; }
         public string HASH { get; set; }
         public string ERROR { get; set; }
+
+        [JsonProperty("rst_rcvd")]
         public string RST_RCVD { get; set; }
+
+        [JsonProperty("rst_sent")]
         public string RST_SENT { get; set; }
 
 

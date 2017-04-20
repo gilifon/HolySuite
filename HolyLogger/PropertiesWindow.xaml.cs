@@ -51,7 +51,7 @@ namespace HolyLogger
             Properties.Settings.Default.qrz_password = TB_Password.Password;
             Properties.Settings.Default.qrz_username = TB_UserName.Text;
             string x;
-            if (Services.LoginToQRZ(out x))
+            if (Helper.LoginToQRZ(out x))
             {
                 System.Windows.Forms.MessageBox.Show("Connected!");
             }

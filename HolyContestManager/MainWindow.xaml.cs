@@ -274,8 +274,8 @@ namespace HolyContestManager
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
                 a++;
-                IEnumerable<QSO> qsos = from q in RawData.log where Services.getBareCallsign(q.my_call) == Services.getBareCallsign(p.callsign) select q;
-                int numOfSquers = qsos.DistinctBy(q => q.my_square).Count();
+                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                int numOfSquers = qsos.DistinctBy(q => q.STX).Count();
 
                 HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
                 lop.Parse();
@@ -416,25 +416,5 @@ namespace HolyContestManager
             return new Participant() { callsign = this.callsign };
         }
     }
-
-    public class QSO
-    {
-        public int id { get; set; }
-        public string my_call { get; set; }
-        public string my_square { get; set; }
-        public string frequency { get; set; }
-        public string callsign { get; set; }
-        public string rst_rcvd { get; set; }
-        public string rst_sent { get; set; }
-        //public DateTime timestamp { get; set; }
-        public string mode { get; set; }
-        public string exchange { get; set; }
-        public string comment { get; set; }
-        public string band { get; set; }
-
-        //public string niceTimestamp
-        //{
-        //    get { return timestamp.ToShortDateString() + " " + timestamp.ToLongTimeString(); }
-        //}
-    }
+    
 }

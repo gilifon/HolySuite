@@ -183,7 +183,7 @@ namespace HolyLogger
 
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
-            Services.LoginToQRZ(out _SessionKey);
+            Helper.LoginToQRZ(out _SessionKey);
         }
 
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -244,26 +244,27 @@ namespace HolyLogger
         {
             if (!Validate()) return;
             QSO qso = new QSO();
-            qso.comment = TB_Comment.Text;
-            qso.callsign = TB_DXCallsign.Text;
-            qso.mode = Mode;
+            qso.Comment = TB_Comment.Text;
+            qso.DXCall = TB_DXCallsign.Text;
+            qso.Mode = Mode;
             if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
             {
-                qso.exchange = TB_4xExchange.Text.Replace("-", "");
+                qso.SRX = TB_4xExchange.Text.Replace("-", "");
             }
             else
             {
-                qso.exchange = TB_Exchange.Text;
+                qso.SRX = TB_Exchange.Text;
             }
-            qso.frequency = TB_Frequency.Text.Replace(",", "");
-            qso.band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
-            qso.country = Country;
-            qso.name = FName;
-            qso.my_call = TB_MyCallsign.Text;
-            qso.my_square = TB_MyGrid.Text.Replace("-", "");
-            qso.rst_rcvd = TB_RSTRcvd.Text;
-            qso.rst_sent = TB_RSTSent.Text;
-            qso.timestamp = QSOTimeStamp.Value.Value.ToUniversalTime();
+            qso.Freq = TB_Frequency.Text.Replace(",", "");
+            qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+            qso.Country = Country;
+            qso.Name = FName;
+            qso.MyCall = TB_MyCallsign.Text;
+            qso.STX = TB_MyGrid.Text.Replace("-", "");
+            qso.RST_RCVD = TB_RSTRcvd.Text;
+            qso.RST_SENT = TB_RSTSent.Text;
+            qso.Date = QSOTimeStamp.Value.Value.ToUniversalTime().ToShortDateString();
+            qso.Time = QSOTimeStamp.Value.Value.ToUniversalTime().ToShortTimeString();
             //if (Properties.Settings.Default.live_log) PostQSO(qso);
             QSO q = dal.Insert(qso);
             Qsos.Insert(0, q);
@@ -355,25 +356,7 @@ namespace HolyLogger
                 List<HolyParser.QSO> rawQSOList = p.GetRawQSO();
                 foreach (var rq in rawQSOList)
                 {
-                    QSO qso = new QSO();
-                    qso.comment = rq.Comment;
-                    qso.callsign = rq.DXCall;
-                    qso.mode = rq.Mode;
-                    qso.exchange = rq.SRX;
-                    qso.frequency = rq.Freq;
-                    qso.band = HolyLogParser.convertFreqToBand(rq.Freq.Replace(",", ""));
-                    qso.country = rq.Country;
-                    qso.name = rq.Name;
-                    qso.my_call = rq.MyCall;
-                    qso.my_square = rq.STX;
-                    qso.rst_rcvd = rq.RST_RCVD;
-                    qso.rst_sent = rq.RST_SENT;
-                    if (rq.Time.Length == 4)
-                        qso.timestamp = DateTime.ParseExact(rq.Date + rq.Time, "yyyyMMddHHmm", provider).ToLocalTime();
-                    else if (rq.Time.Length == 6)
-                        qso.timestamp = DateTime.ParseExact(rq.Date + rq.Time, "yyyyMMddHHmmss", provider).ToLocalTime();
-                    //if (Properties.Settings.Default.live_log) PostQSO(qso);
-                    QSO q = dal.Insert(qso);
+                    QSO q = dal.Insert(rq);
                     Qsos.Insert(0, q);
                     UpdateNumOfQSOs();
                 }
@@ -541,19 +524,19 @@ namespace HolyLogger
             foreach (QSO qso in qsos)
             {
                 sb.Append("(");
-                sb.Append("'"); sb.Append(qso.my_call); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.band); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.timestamp.ToUniversalTime()); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.comment); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.name); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.country); sb.Append("'),");
+                sb.Append("'"); sb.Append(qso.MyCall.Replace("'","\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.STX.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Mode.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Freq.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Band.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.DXCall.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Date.Replace("'", "\"") + " " + qso.Time.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.RST_SENT.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.RST_RCVD.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.SRX.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Comment.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Name.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Country.Replace("'", "\"")); sb.Append("'),");
             }
             string result = sb.ToString().TrimEnd(',');
             result += " ON DUPLICATE KEY UPDATE my_call=my_call";
@@ -770,7 +753,7 @@ namespace HolyLogger
         private void PropertiesWindow_Closed(object sender, EventArgs e)
         {
             if (String.IsNullOrWhiteSpace(SessionKey))
-                Services.LoginToQRZ(out _SessionKey);
+                Helper.LoginToQRZ(out _SessionKey);
         }
 
         private void parseAdif()
@@ -974,7 +957,7 @@ namespace HolyLogger
 
         private void ConnectToQRZ_Click(object sender, RoutedEventArgs e)
         {
-            Services.LoginToQRZ(out _SessionKey);
+            Helper.LoginToQRZ(out _SessionKey);
         }
 
         private void TB_MyGrid_TextChanged(object sender, TextChangedEventArgs e)
@@ -1019,7 +1002,7 @@ namespace HolyLogger
                 RefreshDateTime_Btn_MouseUp(null, null);
                 getQrzData();
             }
-            var dups = from qso in Qsos where qso.callsign == TB_DXCallsign.Text && qso.band + "M" == TB_Band.Text && qso.mode == Mode select qso;
+            var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band + "M" == TB_Band.Text && qso.Mode == Mode select qso;
             if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
 
         }
@@ -1063,7 +1046,7 @@ namespace HolyLogger
                             FName += " " + lname.FirstOrDefault().Value;
 
                         string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
-                        if (SessionKey != key) Services.LoginToQRZ(out _SessionKey);
+                        if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
                     }
 
                     catch (Exception)
