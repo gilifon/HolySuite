@@ -305,6 +305,7 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Data\CreateScript.sql" />
+    <Resource Include="Images\eraser.png" />
     <Resource Include="Images\import.png" />
     <Resource Include="Images\update.gif" />
     <Resource Include="Images\spinner.gif" />

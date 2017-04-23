@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.SQLite;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -43,7 +44,7 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("dx_callsign", qso.DXCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("rst_rcvd", qso.RST_RCVD));
                 insertSQL.Parameters.Add(new SQLiteParameter("rst_sent", qso.RST_SENT));
-                insertSQL.Parameters.Add(new SQLiteParameter("timestamp", qso.Time));
+                insertSQL.Parameters.Add(new SQLiteParameter("timestamp", qso.Date + " " + qso.Time));
                 insertSQL.Parameters.Add(new SQLiteParameter("mode", qso.Mode));
                 insertSQL.Parameters.Add(new SQLiteParameter("exchange", qso.SRX));
                 insertSQL.Parameters.Add(new SQLiteParameter("comment", qso.Comment));
@@ -78,8 +79,24 @@ namespace HolyLogger
                 }
             }
         }
+        public void DeleteAll()
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                SQLiteCommand deleteSQL = new SQLiteCommand("DELETE FROM qso", con);
+                try
+                {
+                    deleteSQL.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.Message);
+                }
+            }
+        }
         public ObservableCollection<QSO> GetAllQSOs()
         {
+            CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
             string stm = "SELECT * FROM qso ORDER BY timestamp DESC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
@@ -89,21 +106,23 @@ namespace HolyLogger
                     while (rdr.Read())
                     {
                         QSO q = new QSO();
-                        q.id = int.Parse(rdr["Id"].ToString());
-                        q.Comment = (string)rdr["comment"];
-                        q.DXCall = (string)rdr["dx_callsign"];
-                        q.Mode = (string)rdr["mode"];
-                        q.SRX = (string)rdr["exchange"];
-                        q.Freq = (string)rdr["frequency"];
-                        q.Band = (string)rdr["band"];
-                        q.MyCall = (string)rdr["my_callsign"];
-                        q.STX = (string)rdr["my_square"];
-                        q.RST_RCVD = (string)rdr["rst_rcvd"];
-                        q.RST_SENT = (string)rdr["rst_sent"];
-                        q.Name = (string)rdr["name"];
-                        q.Country = (string)rdr["country"];
-                        q.Time = DateTime.Parse((string)rdr["timestamp"]).ToShortTimeString();
-                        q.Date = DateTime.Parse((string)rdr["timestamp"]).ToShortDateString();
+                        if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                        if (rdr["comment"] != null) q.Comment = (string)rdr["comment"];
+                        if (rdr["dx_callsign"] != null) q.DXCall = (string)rdr["dx_callsign"];
+                        if (rdr["mode"] != null) q.Mode = (string)rdr["mode"];
+                        if (rdr["exchange"] != null) q.SRX = (string)rdr["exchange"];
+                        if (rdr["frequency"] != null) q.Freq = (string)rdr["frequency"];
+                        if (rdr["band"] != null) q.Band = (string)rdr["band"];
+                        if (rdr["my_callsign"] != null) q.MyCall = (string)rdr["my_callsign"];
+                        if (rdr["my_square"] != null) q.STX = (string)rdr["my_square"];
+                        if (rdr["rst_rcvd"] != null) q.RST_RCVD = (string)rdr["rst_rcvd"];
+                        if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
+                        if (rdr["name"] != null) q.Name = (string)rdr["name"];
+                        if (rdr["country"] != null) q.Country = (string)rdr["country"];
+                        if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
+                        if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
+                        //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
+                        //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortDateString();
                         qso_list.Add(q);
                     }
                 }
@@ -112,6 +131,7 @@ namespace HolyLogger
         }
         public ObservableCollection<QSO> GetTopQSOs(int i)
         {
+            CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
             string stm = "SELECT * FROM qso ORDER BY Id DESC LIMIT " + i;
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
@@ -121,21 +141,23 @@ namespace HolyLogger
                     while (rdr.Read())
                     {
                         QSO q = new QSO();
-                        q.id = int.Parse(rdr["Id"].ToString());
-                        q.Comment = (string)rdr["comment"];
-                        q.DXCall = (string)rdr["dx_callsign"];
-                        q.Mode = (string)rdr["mode"];
-                        q.SRX = (string)rdr["exchange"];
-                        q.Freq = (string)rdr["frequency"];
-                        q.Band = (string)rdr["band"];
-                        q.MyCall = (string)rdr["my_callsign"];
-                        q.STX = (string)rdr["my_square"];
-                        q.RST_RCVD = (string)rdr["rst_rcvd"];
-                        q.RST_SENT = (string)rdr["rst_sent"];
-                        q.Name = (string)rdr["name"];
-                        q.Country = (string)rdr["country"];
-                        q.Time = DateTime.Parse((string)rdr["timestamp"]).ToShortTimeString();
-                        q.Date = DateTime.Parse((string)rdr["timestamp"]).ToShortDateString();
+                        if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                        if (rdr["comment"] != null) q.Comment = (string)rdr["comment"];
+                        if (rdr["dx_callsign"] != null) q.DXCall = (string)rdr["dx_callsign"];
+                        if (rdr["mode"] != null) q.Mode = (string)rdr["mode"];
+                        if (rdr["exchange"] != null) q.SRX = (string)rdr["exchange"];
+                        if (rdr["frequency"] != null) q.Freq = (string)rdr["frequency"];
+                        if (rdr["band"] != null) q.Band = (string)rdr["band"];
+                        if (rdr["my_callsign"] != null) q.MyCall = (string)rdr["my_callsign"];
+                        if (rdr["my_square"] != null) q.STX = (string)rdr["my_square"];
+                        if (rdr["rst_rcvd"] != null) q.RST_RCVD = (string)rdr["rst_rcvd"];
+                        if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
+                        if (rdr["name"] != null) q.Name = (string)rdr["name"];
+                        if (rdr["country"] != null) q.Country = (string)rdr["country"];
+                        if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
+                        if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
+                        //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
+                        //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortDateString();
                         qso_list.Add(q);
                     }
                 }

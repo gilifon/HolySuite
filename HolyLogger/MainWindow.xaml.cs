@@ -795,6 +795,21 @@ namespace HolyLogger
 
         }
 
+        private void ClearLogMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            MessageBoxResult messageBoxResult = System.Windows.MessageBox.Show("Are you sure?", "Delete Confirmation", System.Windows.MessageBoxButton.YesNo);
+            if (messageBoxResult == MessageBoxResult.Yes)
+            {
+                Qsos.Clear();
+                dal.DeleteAll();
+                ClearBtn_Click(null, null);
+                UpdateNumOfQSOs();
+            }
+            else
+            {
+                e.Handled = true;
+            }            
+        }
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
         {
             signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyGrid.Text);

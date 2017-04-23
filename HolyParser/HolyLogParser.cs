@@ -131,6 +131,7 @@ th,td
 
         //patterns
         private string mycall_pattern = @"<station_callsign:(\d{1,2})(?::[a-z]{1})?>";
+        private string operator_call_pattern = @"<operator:(\d{1,2})(?::[a-z]{1})?>";
         private string rst_rcvd_pattern = @"<rst_rcvd:(\d{1,2})(?::[a-z]{1})?>";
         private string rst_sent_pattern = @"<rst_sent:(\d{1,2})(?::[a-z]{1})?>";
         private string dxcall_pattern = @"<call:(\d{1,2})(?::[a-z]{1})?>";
@@ -143,6 +144,8 @@ th,td
         private string freq_pattern = @"<freq:(\d{1,2})(?::[a-z]{1})?>";
         private string srx_pattern = @"<srx_string:(\d{1,2})(?::[a-z]{1})?>";
         private string stx_pattern = @"<stx_string:(\d{1,2})(?::[a-z]{1})?>";
+        private string srx_short_pattern = @"<srx:(\d{1,2})(?::[a-z]{1})?>";
+        private string stx_short_pattern = @"<stx:(\d{1,2})(?::[a-z]{1})?>";
         private string name_pattern = @"<name:(\d{1,2})(?::[a-z]{1})?>";
         private string country_pattern = @"<country:(\d{1,2})(?::[a-z]{1})?>";
 
@@ -207,6 +210,15 @@ th,td
                 {
                     qso_row.MyCall = Regex.Split(row, mycall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
+                else
+                {
+                    regex = new Regex(operator_call_pattern, RegexOptions.IgnoreCase);
+                    match = regex.Match(row);
+                    if (match.Success)
+                    {
+                        qso_row.MyCall = Regex.Split(row, operator_call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    }
+                }
 
                 regex = new Regex(rst_rcvd_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
@@ -267,12 +279,30 @@ th,td
                 {
                     qso_row.SRX = Regex.Split(row, srx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
+                else
+                {
+                    regex = new Regex(srx_short_pattern, RegexOptions.IgnoreCase);
+                    match = regex.Match(row);
+                    if (match.Success)
+                    {
+                        qso_row.SRX = Regex.Split(row, srx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    }
+                }
 
                 regex = new Regex(stx_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
                 if (match.Success)
                 {
                     qso_row.STX = Regex.Split(row, stx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+                else
+                {
+                    regex = new Regex(stx_short_pattern, RegexOptions.IgnoreCase);
+                    match = regex.Match(row);
+                    if (match.Success)
+                    {
+                        qso_row.STX = Regex.Split(row, stx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    }
                 }
 
                 regex = new Regex(freq_pattern, RegexOptions.IgnoreCase);

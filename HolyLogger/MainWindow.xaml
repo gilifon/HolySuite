@@ -59,6 +59,11 @@
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
+                            <MenuItem x:Name="ClearLogMenuItem" Header="Clear Log" ToolTip="Clear Log" Click="ClearLogMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="20" Height="20"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/sign.png" Stretch="UniformToFill" Width="20" Height="20"/>

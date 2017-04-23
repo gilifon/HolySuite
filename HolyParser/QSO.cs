@@ -24,7 +24,7 @@ namespace HolyParser
         [JsonProperty("timestamp")]
         public string Date { get; set; }
 
-        //[JsonProperty("timestamp")]
+        [JsonProperty("time")]
         public string Time { get; set; }
 
         [JsonProperty("band")]
