@@ -18,7 +18,7 @@
             <ComboBoxItem Name="op_ssb" IsSelected="True">SSB</ComboBoxItem>
             <ComboBoxItem Name="op_cw">CW</ComboBoxItem>
             <ComboBoxItem Name="op_digi">DIGI</ComboBoxItem>
-            <ComboBoxItem Name="op_mix">MIX</ComboBoxItem>
+            <ComboBoxItem Name="op_mix">MIXED</ComboBoxItem>
         </ComboBox>
 
         <Label x:Name="L_Operator" Content="Operator" HorizontalAlignment="Left" Margin="10,73,0,0" VerticalAlignment="Top" FontSize="16"/>

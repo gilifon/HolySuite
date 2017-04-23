@@ -966,6 +966,7 @@ namespace HolyLogger
             {
                 signboard.signboardData.Square = TB_MyGrid.Text;
             }
+            
         }
 
         private void TB_Exchange_PreviewTextInput(object sender, TextCompositionEventArgs e)
