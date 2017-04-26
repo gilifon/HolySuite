@@ -66,6 +66,7 @@ namespace HolyParser
                 if (qso.SRX != null) adif.AppendFormat("<srx_string:{0}>{1} ", qso.SRX.Length, qso.SRX);
                 if (qso.Freq != null) adif.AppendFormat("<freq:{0}>{1} ", qso.Freq.Length, qso.Freq);
                 if (qso.Mode != null) adif.AppendFormat("<mode:{0}>{1} ", qso.Mode.Length, qso.Mode);
+                if (qso.Band != null) adif.AppendFormat("<band:{0}>{1} ", qso.Band.Length, qso.Band);
                 if (qso.MyCall != null) adif.AppendFormat("<station_callsign:{0}>{1} ", qso.MyCall.Length, qso.MyCall);
                 if (qso.MyCall != null) adif.AppendFormat("<operator:{0}>{1} ", qso.MyCall.Length, qso.MyCall);
                 if (qso.Name != null) adif.AppendFormat("<name:{0}>{1} ", qso.Name.Length, qso.Name);
