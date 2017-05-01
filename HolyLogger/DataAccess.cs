@@ -119,6 +119,8 @@ namespace HolyLogger
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
+                        //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmm", enUS).ToShortTimeString();
+                        //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmm", enUS).ToShortDateString();
                         if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
                         if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
                         //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
@@ -154,6 +156,8 @@ namespace HolyLogger
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
+                        //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmm", enUS).ToShortTimeString();
+                        //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmm", enUS).ToShortDateString();
                         if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
                         if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
                         //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
@@ -165,6 +169,15 @@ namespace HolyLogger
             return qso_list;
         }
         public int GetQsoCount()
+        {
+            string stm = "SELECT count(Id) FROM qso";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            {
+                cmd.CommandType = CommandType.Text;
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+        public int GetGridCount()
         {
             string stm = "SELECT count(Id) FROM qso";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))

@@ -55,6 +55,17 @@ namespace HolyLogger
             }
         }
 
+        private string _NumOfGrids;
+        public string NumOfGrids
+        {
+            get { return _NumOfGrids; }
+            set
+            {
+                _NumOfGrids = value;
+                OnPropertyChanged("NumOfGrids");
+            }
+        }
+
         private string _IsOmniRigEnabled;
         public string IsOmniRigEnabled
         {
@@ -334,6 +345,7 @@ namespace HolyLogger
         {
             parseAdif();
             NumOfQSOs = dal.GetQsoCount().ToString();
+            NumOfGrids = dal.GetGridCount().ToString();
             Score = p.Result.ToString();
         }
 
