@@ -119,10 +119,8 @@ namespace HolyLogger
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
-                        //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmm", enUS).ToShortTimeString();
-                        //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmm", enUS).ToShortDateString();
-                        if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
-                        if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
+                        if (rdr["timestamp"] != null) q.Time = (string)rdr["timestamp"];
+                        if (rdr["timestamp"] != null) q.Date = (string)rdr["timestamp"];
                         //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
                         //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortDateString();
                         qso_list.Add(q);
@@ -156,8 +154,6 @@ namespace HolyLogger
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
-                        //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmm", enUS).ToShortTimeString();
-                        //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmm", enUS).ToShortDateString();
                         if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
                         if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
                         //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();

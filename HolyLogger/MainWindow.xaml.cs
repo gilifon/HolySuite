@@ -188,6 +188,7 @@ namespace HolyLogger
             Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
 
             QSOTimeStamp.Value = DateTime.UtcNow;
+            Qsos = new ObservableCollection<QSO>();
             Qsos = dal.GetAllQSOs();
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;

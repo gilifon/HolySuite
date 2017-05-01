@@ -509,6 +509,11 @@ th,td
             double parsedFreq;
             CultureInfo provider = CultureInfo.InvariantCulture;
 
+            if (freq.IndexOf(".") > 0)
+                freq = freq.Substring(0, freq.IndexOf("."));
+            if (freq.IndexOf(",") > 0)
+                freq = freq.Substring(0, freq.IndexOf(","));
+
             if (!double.TryParse(freq.Replace(".","").Replace(",",""), NumberStyles.Number, provider, out parsedFreq)) return string.Empty;
             if (parsedFreq < 1000)
             {
