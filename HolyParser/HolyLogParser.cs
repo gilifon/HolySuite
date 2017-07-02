@@ -192,7 +192,7 @@ th,td
                 Match match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim();
                 }
 
                 regex = new Regex(dxcall_pattern, RegexOptions.IgnoreCase);

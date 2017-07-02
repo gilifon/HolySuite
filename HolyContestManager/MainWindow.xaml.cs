@@ -105,7 +105,17 @@ namespace HolyContestManager
 
         public MainWindow()
         {
-            //DirectoryInfo d = new DirectoryInfo(@"C:\Users\gill\Desktop\holylandLogs2016");
+            //DirectoryInfo d = new DirectoryInfo(@"C:\Users\gill\Desktop\holylandLogs");
+            //FileInfo[] infos = d.GetFiles();
+            //infos = infos.ToList().OrderByDescending(p => p.Length).ToArray();
+            //int x = 1;
+            //foreach (FileInfo f in infos)
+            //{
+            //    File.Move(f.FullName, f.DirectoryName + "\\kuku\\" + x.ToString() + ".txt");
+            //    x++;
+            //}
+
+            //DirectoryInfo d = new DirectoryInfo(@"C:\Users\gill\Desktop\holylandLogs");
             //FileInfo[] infos = d.GetFiles();
             //infos = infos.ToList().OrderByDescending(p => p.Length).ToArray();
             //int x = 1;
@@ -274,19 +284,34 @@ namespace HolyContestManager
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
                 a++;
-                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
-                int numOfSquers = qsos.DistinctBy(q => q.STX).Count();
+                if (p.is_manual == 0)
+                {
+                    IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                    int numOfSquers = qsos.DistinctBy(q => q.STX).Count();
 
-                HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
-                lop.Parse();
+                    HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
+                    lop.Parse();
 
-                Participant n = p;
-                n.qsos = lop.ValidQsos;// qsos.Count();
-                n.score = lop.Result;
-                n.squers = numOfSquers;
-                n.mults = lop.Mults;
-                n.points = lop.Points;
-                Report.Add(n);
+                    Participant n = p;
+                    n.qsos = lop.ValidQsos;// qsos.Count();
+                    n.score = lop.Result;
+                    n.squers = numOfSquers;
+                    n.mults = lop.Mults;
+                    n.points = lop.Points;
+
+                    Report.Add(n);
+                }
+                else
+                {
+                    Participant n = p;
+                    n.qsos = p.qsos;
+                    n.score = p.points;
+                    n.squers = 0;
+                    n.mults = 0;
+                    n.points = p.points;
+
+                    Report.Add(n);
+                }
                 (sender as BackgroundWorker).ReportProgress(100*a/z);
             }
             Report = Report.OrderByDescending(p => p.score).ToList();
@@ -410,6 +435,7 @@ namespace HolyContestManager
         public int squers { get; set; }
         public int points { get; set; }
         public int score { get; set; }
+        public int is_manual { get; set; }
 
         public object Clone()
         {
