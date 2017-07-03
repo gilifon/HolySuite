@@ -426,8 +426,8 @@ th,td
                 log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
                 log.Append("You have contacted Israeli stations on "); log.Append(AllBandIsraeliStations); log.Append(" bands\r\n");
                 log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
-                _result = total_points * (AllBandSquares + AllBandIsraeliStations);
-                _mults = AllBandSquares + AllBandIsraeliStations;
+                _result = total_points * (AllBandSquares);// + AllBandIsraeliStations);
+                _mults = AllBandSquares;// + AllBandIsraeliStations;
             }
             else if (logType == Operator.Israeli)
             {
