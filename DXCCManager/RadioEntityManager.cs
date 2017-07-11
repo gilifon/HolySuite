@@ -6234,8 +6234,9 @@ namespace DXCCManager
             {
                 string[] entityInfo = entity.Split('|');
                 string dxccName = entityInfo[1];
+                string continentName = entityInfo[2];
                 string dxccEntity = entityInfo[8];
-                RawEntities.Add(new DXCC() { entity = dxccEntity, name = dxccName});
+                RawEntities.Add(new DXCC() { entity = dxccEntity, name = dxccName, continent = continentName});
             }
 
             //generate a list of Regex friendly prefixes for each dxccEntity id
@@ -6263,7 +6264,7 @@ namespace DXCCManager
 
                 //generate a DXCC object with all the info
                 DXCC temp = RawEntities.Find(p => p.entity == DXCCGroup.Key);
-                DXCC c = new DXCC() { entity = DXCCGroup.Key, name = temp.name, prefixes = sb.ToString().TrimEnd('|') };
+                DXCC c = new DXCC() { entity = DXCCGroup.Key, name = temp.name, prefixes = sb.ToString().TrimEnd('|'), continent = temp.continent };
                 FinalDXCCs.Add(c);
             }
         }
@@ -6296,12 +6297,24 @@ namespace DXCCManager
             }
             return callsign.Length > 2 ? callsign.Substring(0, 2) : "Unkown";
         }
+        public string GetContinent(string callsign)
+        {
+            foreach (DXCC item in FinalDXCCs)
+            {
+                if (!string.IsNullOrWhiteSpace(item.prefixes) && prefixesRegexCache["^(" + item.prefixes + ".*)"].IsMatch(callsign))
+                {
+                    return item.continent;
+                }
+            }
+            return "XX";
+        }
 
         private struct DXCC
         {
             public string entity { get; set; }
             public string prefixes { get; set; }
             public string name { get; set; }
+            public string continent { get; set; }
         }
     }
 }

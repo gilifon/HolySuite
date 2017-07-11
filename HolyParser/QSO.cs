@@ -79,6 +79,10 @@ namespace HolyParser
                         HASH = MyCall + DXCall + Band + Mode;
                     //else if (IsValid && !IsIsraeli)
                     //    HASH = DXCall + Band + Mode + STX;
+                    else
+                    {
+                        int x = 5;
+                    }
                 }
                 else //srx does NOT matche grid
                 {
@@ -119,9 +123,10 @@ namespace HolyParser
         }
         private bool IsValidMode()
         {
-            bool isValid = !string.IsNullOrEmpty(Mode) && (Mode.ToLower().Contains("ph") || Mode.ToLower().Contains("fm") || Mode.ToLower().Contains("ry") || Mode.ToLower().Contains("ssb") || Mode.ToLower().Contains("lsb") || Mode.ToLower().Contains("usb") || Mode.ToLower().Contains("cw") || Mode.ToLower().Contains("rtty") || Mode.ToLower().Contains("psk") || Mode.ToLower().Contains("digi") || Mode.ToLower().Contains("ps") || Mode.ToLower().Contains("pk"));
-            if (!isValid) this.ERROR += "Mode is not valid: " + Mode + " - ";
-            return isValid;
+            return true;
+            //bool isValid = !string.IsNullOrEmpty(Mode) && (Mode.ToLower().Contains("ph") || Mode.ToLower().Contains("fm") || Mode.ToLower().Contains("ry") || Mode.ToLower().Contains("ssb") || Mode.ToLower().Contains("lsb") || Mode.ToLower().Contains("usb") || Mode.ToLower().Contains("cw") || Mode.ToLower().Contains("rtty") || Mode.ToLower().Contains("psk") || Mode.ToLower().Contains("digi") || Mode.ToLower().Contains("ps") || Mode.ToLower().Contains("pk"));
+            //if (!isValid) this.ERROR += "Mode is not valid: " + Mode + " - ";
+            //return isValid;
         }
         private bool IsValidCall()
         {
