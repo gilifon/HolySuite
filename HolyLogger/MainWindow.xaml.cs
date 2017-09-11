@@ -20,6 +20,7 @@ using HolyParser;
 using System.Diagnostics;
 using System.Net.Cache;
 using System.Globalization;
+using System.Drawing.Printing;
 
 namespace HolyLogger
 {
@@ -386,6 +387,21 @@ namespace HolyLogger
             saveFileDialog1.Title = "Export ADIF";
             saveFileDialog1.ShowDialog();
 
+            //PrintDocument p = new PrintDocument();
+            //p.PrintPage += delegate (object sender1, PrintPageEventArgs e1)
+            //{
+            //    e1.Graphics.DrawString(adif, new System.Drawing.Font("Times New Roman", 12), new System.Drawing.SolidBrush(System.Drawing.Color.Black), new System.Drawing.RectangleF(0, 0, p.DefaultPageSettings.PrintableArea.Width, p.DefaultPageSettings.PrintableArea.Height));
+            //};
+            //try
+            //{
+            //    p.Print();
+            //}
+            //catch (Exception ex)
+            //{
+            //    throw new Exception("Exception Occured While Printing", ex);
+            //}
+
+
             // If the file name is not an empty string open it for saving.
             try
             {
@@ -404,7 +420,6 @@ namespace HolyLogger
             {
                 MessageBox.Show("Export failed: " + ex.Message);
             }
-
         }
 
         private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)
