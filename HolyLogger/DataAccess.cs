@@ -154,10 +154,18 @@ namespace HolyLogger
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
-                        if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
-                        if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
-                        //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
-                        //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortDateString();
+                        try
+                        {
+                            if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
+                            if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortDateString();
+                            
+                        }
+                        catch
+                        {
+                            if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
+                            if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
+                        }
+
                         qso_list.Add(q);
                     }
                 }
@@ -175,7 +183,7 @@ namespace HolyLogger
         }
         public int GetGridCount()
         {
-            string stm = "SELECT count(Id) FROM qso";
+            string stm = "SELECT count(distinct exchange) FROM qso where dx_callsign like '4X%' or dx_callsign like '4Z%'";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             {
                 cmd.CommandType = CommandType.Text;
