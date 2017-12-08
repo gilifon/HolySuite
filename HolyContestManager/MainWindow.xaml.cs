@@ -1,4 +1,5 @@
-﻿using HolyParser;
+﻿using DXCCManager;
+using HolyParser;
 using MoreLinq;
 using Newtonsoft.Json;
 using System;
@@ -105,7 +106,17 @@ namespace HolyContestManager
 
         public MainWindow()
         {
-            //DirectoryInfo d = new DirectoryInfo(@"C:\Users\gill\Desktop\holylandLogs2016");
+            //DirectoryInfo d = new DirectoryInfo(@"C:\Users\gill\Desktop\holylandLogs");
+            //FileInfo[] infos = d.GetFiles();
+            //infos = infos.ToList().OrderByDescending(p => p.Length).ToArray();
+            //int x = 1;
+            //foreach (FileInfo f in infos)
+            //{
+            //    File.Move(f.FullName, f.DirectoryName + "\\kuku\\" + x.ToString() + ".txt");
+            //    x++;
+            //}
+
+            //DirectoryInfo d = new DirectoryInfo(@"C:\Users\gill\Desktop\holylandLogs");
             //FileInfo[] infos = d.GetFiles();
             //infos = infos.ToList().OrderByDescending(p => p.Length).ToArray();
             //int x = 1;
@@ -273,28 +284,91 @@ namespace HolyContestManager
             int z = RawData.participants.Count();
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
+                //if (p.callsign.ToLower() != "ly2ny") continue;
                 a++;
-                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
-                int numOfSquers = qsos.DistinctBy(q => q.STX).Count();
+                if (p.is_manual == 0)
+                {
+                    IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                    int numOfSquers = qsos.DistinctBy(q => q.STX).Count();
 
-                HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
-                lop.Parse();
+                    HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
+                    lop.Parse();
 
-                Participant n = p;
-                n.qsos = lop.ValidQsos;// qsos.Count();
-                n.score = lop.Result;
-                n.squers = numOfSquers;
-                n.mults = lop.Mults;
-                n.points = lop.Points;
-                Report.Add(n);
+                    Participant n = p;
+                    n.qsos = lop.ValidQsos;// qsos.Count();
+                    n.score = lop.Result;
+                    n.squers = numOfSquers;
+                    n.mults = lop.Mults;
+                    n.points = lop.Points;
+
+                    Report.Add(n);
+                }
+                else
+                {
+                    Participant n = p;
+                    n.qsos = p.qsos;
+                    n.score = p.points;
+                    n.squers = 0;
+                    n.mults = 0;
+                    n.points = p.points;
+
+                    Report.Add(n);
+                }
                 (sender as BackgroundWorker).ReportProgress(100*a/z);
             }
             Report = Report.OrderByDescending(p => p.score).ToList();
             FilteredReport = new List<Participant>(Report);
-
+            string insert_hlwtest = GenerateMultipleInsert(FilteredReport);
         }
 
-        
+        private string GenerateMultipleInsert(IList<Participant> participants)
+        {
+            StringBuilder squars = new StringBuilder(10);
+            RadioEntityResolver rem = new RadioEntityResolver();
+            StringBuilder sb = new StringBuilder("INSERT INTO `hlwtest` ", 500);
+            sb.Append("(`active`,`year`,`call`,`uniq_timestamp`,`dxcc`,`continent`,`category`,`qso`,`points`,`mults`,`score`,`operator`,`square`) VALUES ");
+            foreach (Participant p in participants)
+            {
+                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                foreach (var item in qsos.Where(xp => xp.MyCall.StartsWith("4X") || xp.MyCall.StartsWith("4Z")).Select(t => t.STX).Distinct())
+                {
+                    squars.AppendFormat("{0},", item);
+                }
+                sb.Append("(");
+                sb.Append("'"); sb.Append(0); sb.Append("',");
+                sb.Append("'"); sb.Append(2017); sb.Append("',");
+                sb.Append("'"); sb.Append(p.callsign.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append("HolyLogger:" + DateTime.Now.Ticks); sb.Append("',");
+                sb.Append("'"); sb.Append(p.country.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(rem.GetContinent(p.callsign)); sb.Append("',");
+                sb.Append("'"); sb.Append(getCategory(p)); sb.Append("',");
+                sb.Append("'"); sb.Append(p.qsos); sb.Append("',");
+                sb.Append("'"); sb.Append(p.points); sb.Append("',");
+                sb.Append("'"); sb.Append(p.mults); sb.Append("',");
+                sb.Append("'"); sb.Append(p.score); sb.Append("',");
+                sb.Append("'"); sb.Append(p.name.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(squars.ToString().TrimEnd(',')); sb.Append("'),");
+                squars.Clear();
+            }
+            string result = sb.ToString().TrimEnd(',');
+            result += " ON DUPLICATE KEY UPDATE `call`=`call`";
+            return result;
+        }
+
+        private string getCategory(Participant p)
+        {
+            if (p.category_op.ToLower() == "checklog") return "CHECKLOG";
+            if (p.category_power.ToLower() == "qrp") return "QRP";
+            if (p.category_op.ToLower() == "mobile") return "MOBILE";
+            if (p.callsign.ToLower().Contains(@"/p")) return "PORTABLE";
+            if (p.category_op.ToLower() == "multi-op") return "MULTIOP";
+            if (p.category_mode.ToLower() == "ssb") return "SSB";
+            if (p.category_mode.ToLower() == "cw") return "CW";
+            if (p.category_mode.ToLower() == "digi") return "DIGI";
+            if (p.category_mode.ToLower() == "mixed") return "MIX";
+            return "XX";
+        }
+
 
         private void CalculateBtn_Click(object sender, RoutedEventArgs e)
         {
@@ -410,6 +484,7 @@ namespace HolyContestManager
         public int squers { get; set; }
         public int points { get; set; }
         public int score { get; set; }
+        public int is_manual { get; set; }
 
         public object Clone()
         {
