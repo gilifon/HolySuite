@@ -108,9 +108,9 @@ namespace HolyParser
 
         private bool IsValidBand()
         {
-            if (string.IsNullOrEmpty(Band) && !string.IsNullOrEmpty(Freq))
+            if (string.IsNullOrEmpty(Band.Trim()) && !string.IsNullOrEmpty(Freq.Trim()))
             {
-                Band = HolyLogParser.convertFreqToBand(Freq);
+                Band = HolyLogParser.convertFreqToBand(Freq.Trim());
             }
             bool isValid = !string.IsNullOrEmpty(Band) && (Band.Contains("10") || Band.Contains("15") || Band.Contains("20") || Band.Contains("40") || Band.Contains("80") || Band.Contains("160"));
             if (!isValid) this.ERROR += "Band is not valid: " + Band + " - ";
