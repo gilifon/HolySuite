@@ -36,7 +36,7 @@ namespace HolyLogger
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,timestamp,mode,exchange,comment,name,country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,exchange,comment,name,country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
                 insertSQL.Parameters.Add(new SQLiteParameter("frequency", qso.Freq));
@@ -44,7 +44,8 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("dx_callsign", qso.DXCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("rst_rcvd", qso.RST_RCVD));
                 insertSQL.Parameters.Add(new SQLiteParameter("rst_sent", qso.RST_SENT));
-                insertSQL.Parameters.Add(new SQLiteParameter("timestamp", qso.Date + " " + qso.Time));
+                insertSQL.Parameters.Add(new SQLiteParameter("date", qso.Date));
+                insertSQL.Parameters.Add(new SQLiteParameter("time", qso.Time));
                 insertSQL.Parameters.Add(new SQLiteParameter("mode", qso.Mode));
                 insertSQL.Parameters.Add(new SQLiteParameter("exchange", qso.SRX));
                 insertSQL.Parameters.Add(new SQLiteParameter("comment", qso.Comment));
@@ -98,7 +99,7 @@ namespace HolyLogger
         {
             CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
-            string stm = "SELECT * FROM qso ORDER BY timestamp DESC";
+            string stm = "SELECT * FROM qso ORDER BY date,time DESC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             {
                 using (SQLiteDataReader rdr = cmd.ExecuteReader())
@@ -119,8 +120,8 @@ namespace HolyLogger
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
-                        if (rdr["timestamp"] != null) q.Time = (string)rdr["timestamp"];
-                        if (rdr["timestamp"] != null) q.Date = (string)rdr["timestamp"];
+                        if (rdr["time"] != null) q.Time = (string)rdr["time"];
+                        if (rdr["date"] != null) q.Date = (string)rdr["date"];
                         //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
                         //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortDateString();
                         qso_list.Add(q);
@@ -154,18 +155,8 @@ namespace HolyLogger
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
-                        try
-                        {
-                            if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
-                            if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortDateString();
-                            
-                        }
-                        catch
-                        {
-                            if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortTimeString();
-                            if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "yyyyMMdd HHmmss", enUS).ToShortDateString();
-                        }
-
+                        if (rdr["time"] != null) q.Time = DateTime.Parse((string)rdr["time"]).ToShortTimeString();
+                        if (rdr["date"] != null) q.Date = DateTime.Parse((string)rdr["date"]).ToShortDateString();
                         qso_list.Add(q);
                     }
                 }
