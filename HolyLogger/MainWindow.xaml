@@ -165,7 +165,7 @@
 
         <Image x:Name="RefreshDateTime_Btn" ToolTip="Refresh TimeStamo to current time" HorizontalAlignment="Left" Height="20" Margin="583,103,0,0" VerticalAlignment="Top" Width="20" Source="Images/refresh.png" Stretch="None" MouseUp="RefreshDateTime_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
 
-        <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,89,0,0" VerticalAlignment="Top" Width="660" Grid.Row="1" />
+        <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,89,0,0" VerticalAlignment="Top" Width="720" Grid.Row="1" />
         <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="627,139,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" />
         <Button x:Name="ClearBtn" Content="Clear" HorizontalAlignment="Left" Margin="627,100,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data"/>
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,175,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
@@ -176,7 +176,7 @@
         <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="101,216,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="629" Grid.Row="1" Text="" FontSize="16" ToolTip="Free text comments"/>
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
-        <DataGrid x:Name="QSODataGrid" DataGridCell.Selected="DataGrid_GotFocus" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16">
+        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16" MouseDoubleClick="GridRow_DoubleClick">
             <!--<DataGrid.ContextMenu>
                 <ContextMenu >
                     <MenuItem Header="Delete" Click="MenuItem_Click" />

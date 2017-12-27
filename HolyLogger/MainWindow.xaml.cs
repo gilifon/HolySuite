@@ -614,16 +614,6 @@ namespace HolyLogger
         //    return result;
         //}
 
-        private void DataGrid_GotFocus(object sender, RoutedEventArgs e)
-        {
-            // Lookup for the source to be DataGridCell
-            if (e.OriginalSource.GetType() == typeof(DataGridCell))
-            {
-                // Starts the Edit on the row;
-                DataGrid grd = (DataGrid)sender;
-                grd.BeginEdit(e);
-            }
-        }
         private void QSODataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Delete)
@@ -638,6 +628,13 @@ namespace HolyLogger
                     e.Handled = true;
                 }
             }
+        }
+
+        private void GridRow_DoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (QSODataGrid.SelectedItem == null) return;
+            var qso = QSODataGrid.SelectedItem as QSO;
+            MessageBox.Show(string.Format("Id: {0}", qso.id));
         }
 
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
