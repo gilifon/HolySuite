@@ -118,5 +118,17 @@ namespace HolyLogger.Properties {
                 this["isLocked"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool isManualMode {
+            get {
+                return ((bool)(this["isManualMode"]));
+            }
+            set {
+                this["isManualMode"] = value;
+            }
+        }
     }
 }

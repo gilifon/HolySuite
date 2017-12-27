@@ -74,6 +74,11 @@
                                     <Image Source="Images/qrz_mini_icon.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/manual.png" Stretch="UniformToFill" Width="20" Height="20"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                         </MenuItem>
                         <MenuItem Header="Help" FontSize="16">
                             <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">

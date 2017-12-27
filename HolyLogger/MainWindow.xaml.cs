@@ -142,6 +142,9 @@ namespace HolyLogger
             InitializeComponent();
             this.PropertyChanged += MainWindow_PropertyChanged;
 
+            ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
+
+
             EntityResolverWorker = new BackgroundWorker();
             EntityResolverWorker.DoWork += EntityResolverWorker_DoWork;
             rem = new RadioEntityResolver();
@@ -322,7 +325,8 @@ namespace HolyLogger
             TB_Comment.Clear();
             FName = string.Empty;
             Country = string.Empty;
-            RefreshDateTime_Btn_MouseUp(null, null);
+            if (!Properties.Settings.Default.isManualMode)
+                RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
         }
 
@@ -775,6 +779,13 @@ namespace HolyLogger
             PropertiesWindow.Show();
         }
 
+        private void ManualModeMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            Properties.Settings.Default.isManualMode = !Properties.Settings.Default.isManualMode;
+            ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
+        }
+        
+
         private void PropertiesWindow_Closed(object sender, EventArgs e)
         {
             if (String.IsNullOrWhiteSpace(SessionKey))
@@ -1040,7 +1051,8 @@ namespace HolyLogger
 
             if (!String.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
-                RefreshDateTime_Btn_MouseUp(null, null);
+                if (!Properties.Settings.Default.isManualMode)
+                    RefreshDateTime_Btn_MouseUp(null, null);
                 getQrzData();
             }
             var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band + "M" == TB_Band.Text && qso.Mode == Mode select qso;
