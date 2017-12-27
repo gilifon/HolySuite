@@ -1424,7 +1424,7 @@ namespace HolyLogger
 
         private void ShowRigParams()
         {
-            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || Properties.Settings.Default.isManualMode)
             {
                 return;
             }
