@@ -21,7 +21,7 @@ namespace HolyParser
         [JsonProperty("callsign")]
         public string DXCall { get; set; }
 
-        [JsonProperty("timestamp")]
+        [JsonProperty("date")]
         public string Date { get; set; }
 
         [JsonProperty("time")]
@@ -77,12 +77,6 @@ namespace HolyParser
                     IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && IsIsraeli;
                     if (IsValid && IsIsraeli)
                         HASH = MyCall + DXCall + Band + Mode;
-                    //else if (IsValid && !IsIsraeli)
-                    //    HASH = DXCall + Band + Mode + STX;
-                    else
-                    {
-                        int x = 5;
-                    }
                 }
                 else //srx does NOT matche grid
                 {
@@ -93,8 +87,6 @@ namespace HolyParser
                     {
                         this.SRX = match.Groups[1].Value;
                         IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && !IsIsraeli;
-                        //if (IsValid && IsIsraeli)
-                        //    HASH = MyCall + DXCall + Band + Mode + STX;
                         if (IsValid && !IsIsraeli)
                             HASH = MyCall + DXCall + Band + Mode;
                     }
@@ -112,9 +104,9 @@ namespace HolyParser
 
         private bool IsValidBand()
         {
-            if (string.IsNullOrEmpty(Band) && !string.IsNullOrEmpty(Freq))
+            if (string.IsNullOrEmpty(Band.Trim()) && !string.IsNullOrEmpty(Freq.Trim()))
             {
-                Band = HolyLogParser.convertFreqToBand(Freq);
+                Band = HolyLogParser.convertFreqToBand(Freq.Trim());
             }
             bool isValid = !string.IsNullOrEmpty(Band) && (Band.Contains("10") || Band.Contains("15") || Band.Contains("20") || Band.Contains("40") || Band.Contains("80") || Band.Contains("160"));
             if (!isValid) this.ERROR += "Band is not valid: " + Band + " - ";
@@ -153,30 +145,5 @@ namespace HolyParser
             if (!isValid) this.ERROR += "DXCC is empty -";
             return isValid;
         }
-
-        //private void convertFreqToBand()
-        //{
-        //    double parsedFreq;
-        //    if (!double.TryParse(Freq, out parsedFreq)) return;
-        //    if (parsedFreq < 30)
-        //    {
-        //        if (parsedFreq > 0 && parsedFreq < 2) Band = "160";
-        //        if (parsedFreq > 2 && parsedFreq < 5) Band = "80";
-        //        if (parsedFreq > 5 && parsedFreq < 10) Band = "40";
-        //        if (parsedFreq > 12 && parsedFreq < 16) Band = "20";
-        //        if (parsedFreq > 19 && parsedFreq < 23) Band = "15";
-        //        if (parsedFreq > 25 && parsedFreq < 30) Band = "10";
-        //    }
-        //    else
-        //    {
-        //        if (parsedFreq > 0 && parsedFreq < 2000) Band = "160";
-        //        if (parsedFreq > 2000 && parsedFreq < 5000) Band = "80";
-        //        if (parsedFreq > 5000 && parsedFreq < 10000) Band = "40";
-        //        if (parsedFreq > 12000 && parsedFreq < 16000) Band = "20";
-        //        if (parsedFreq > 19000 && parsedFreq < 23000) Band = "15";
-        //        if (parsedFreq > 25000 && parsedFreq < 30000) Band = "10";
-        //    }
-
-        //}
     }
 }
