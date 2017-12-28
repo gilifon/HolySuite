@@ -220,18 +220,6 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_B07CB5883DE086A56C1A603F3D9D56DF"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_C4388B47B8A241F2B3350569D4032BA3"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -298,6 +286,12 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_0581DD1ED7307E0803CC38566F3A3682"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -305,6 +299,12 @@
         {
         "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_722FCAEDA7F8C1809F1434B69EFE3F71"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_B07CB5883DE086A56C1A603F3D9D56DF"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -554,7 +554,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=1.0.14.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=1.0.15.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_2450D84030FEC7DAF4EDE26FE4F0ACBD"
@@ -831,7 +831,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=1.0.14.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=1.0.15.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_B07CB5883DE086A56C1A603F3D9D56DF"
@@ -1153,15 +1153,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{C02B4478-D481-45E8-A831-6855796AA2BB}"
-        "PackageCode" = "8:{639DD39C-9363-4989-987D-66ECF4116C0E}"
+        "ProductCode" = "8:{799BB7F8-7F50-4F86-B322-3D33E10D9FBD}"
+        "PackageCode" = "8:{DF477D34-D90E-43C7-9C40-DAE947C29A1F}"
         "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:1.0.15"
+        "ProductVersion" = "8:2.0.0"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
