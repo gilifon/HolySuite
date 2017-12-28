@@ -1,4 +1,5 @@
-﻿using HolyParser;
+﻿using Blue.Windows;
+using HolyParser;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -25,12 +26,25 @@ namespace HolyLogger
 
         BitmapImage x;
         BitmapImage v;
+
+        private StickyWindow _stickyWindow;
+
         public MatrixWindow()
         {
             InitializeComponent();
+            this.Loaded += MatrixWindow_Loaded; ;
             x = new BitmapImage(new Uri(x_path, UriKind.Relative));
             v = new BitmapImage(new Uri(v_path, UriKind.Relative));
             Clear();
+        }
+
+        private void MatrixWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            _stickyWindow = new StickyWindow(this);
+            _stickyWindow.StickToScreen = true;
+            _stickyWindow.StickToOther = true;
+            _stickyWindow.StickOnResize = true;
+            _stickyWindow.StickOnMove = true;
         }
 
         public void Clear()

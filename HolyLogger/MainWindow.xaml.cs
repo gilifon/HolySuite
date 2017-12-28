@@ -21,6 +21,7 @@ using System.Diagnostics;
 using System.Net.Cache;
 using System.Globalization;
 using System.Drawing.Printing;
+using Blue.Windows;
 
 namespace HolyLogger
 {
@@ -138,9 +139,12 @@ namespace HolyLogger
 
         BackgroundWorker EntityResolverWorker;
 
+        private StickyWindow _stickyWindow;
+
         public MainWindow()
         {
             InitializeComponent();
+            this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
 
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
@@ -201,6 +205,15 @@ namespace HolyLogger
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
             Helper.LoginToQRZ(out _SessionKey);
+        }
+
+        private void MainWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            _stickyWindow = new StickyWindow(this);
+            _stickyWindow.StickToScreen = true;
+            _stickyWindow.StickToOther = true;
+            _stickyWindow.StickOnResize = true;
+            _stickyWindow.StickOnMove = true;
         }
 
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Blue.Windows;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Linq;
@@ -21,10 +22,13 @@ namespace HolyLogger
     public partial class SignboardWindow : Window
     {
         public SignboardData signboardData { get; set; }
+        private StickyWindow _stickyWindow;
 
         public SignboardWindow(string call, string square)
         {
             InitializeComponent();
+            this.Loaded += SignboardWindow_Loaded; ;
+
             signboardData = new SignboardData()
             {
                 Callsign = call,
@@ -32,6 +36,17 @@ namespace HolyLogger
             };
             LayoutGrid.DataContext = signboardData;
         }
+
+        private void SignboardWindow_Loaded(object sender, RoutedEventArgs e)
+        {
+            _stickyWindow = new StickyWindow(this);
+            _stickyWindow.StickToScreen = true;
+            _stickyWindow.StickToOther = true;
+            _stickyWindow.StickOnResize = true;
+            _stickyWindow.StickOnMove = true;
+        }
+
+        
 
         public class SignboardData : INotifyPropertyChanged
         {
