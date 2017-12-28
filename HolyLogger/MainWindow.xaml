@@ -53,6 +53,18 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
+                        <MenuItem Header="View" FontSize="16">
+                            <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/sign.png" Stretch="UniformToFill" Width="20" Height="20"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="MatrixMenuItem" Header="Matrix" ToolTip="Open a matrix presentation for the DX station" Click="MatrixMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/matrix.png" Stretch="UniformToFill" Width="20" Height="20"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </MenuItem>
                         <MenuItem Header="Tools" FontSize="16">
                             <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
                                 <MenuItem.Icon>
@@ -62,11 +74,6 @@
                             <MenuItem x:Name="ClearLogMenuItem" Header="Clear Log" ToolTip="Clear Log" Click="ClearLogMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="20" Height="20"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/sign.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem x:Name="PropertiesMenuItem" Header="QRZ Service" ToolTip="Insert your QRZ.COM credentials" Click="PropertiesMenuItem_Click">
@@ -152,7 +159,7 @@
         <Label Content="Band" HorizontalAlignment="Left" Margin="422,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="Score" HorizontalAlignment="Left" Margin="459,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="523,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" />
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="161" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" KeyDown="TB_DXCallsign_KeyDown" FontSize="16" ToolTip="The DX Station Callsign"/>
         <Image x:Name="QRZBtn" ToolTip="Open the QRZ.COM page of the DX station" HorizontalAlignment="Left" Height="24" Margin="267,101,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />

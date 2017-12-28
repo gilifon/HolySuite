@@ -134,6 +134,7 @@ namespace HolyLogger
 
         HolyLogParser p;
         SignboardWindow signboard = null;
+        MatrixWindow matrix = null;
 
         BackgroundWorker EntityResolverWorker;
 
@@ -217,6 +218,7 @@ namespace HolyLogger
                         TB_RSTSent.Text = "599";
                         TB_RSTRcvd.Text = "599";
                     }
+                    UpdateMatrixDup();
                     break;
                 default:
                     break;
@@ -286,6 +288,7 @@ namespace HolyLogger
             Qsos.Insert(0, q);
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
+            ClearMatrix();
         }
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
@@ -328,6 +331,7 @@ namespace HolyLogger
             if (!Properties.Settings.Default.isManualMode)
                 RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
+            ClearMatrix();
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -766,6 +770,12 @@ namespace HolyLogger
             return allOK;
         }
 
+        private void ClearMatrix()
+        {
+            if (matrix != null)
+                matrix.ClearMatrix();
+        }
+
         private void MyScoreMenuItem_Click(object sender, RoutedEventArgs e)
         {
             parseAdif();
@@ -851,7 +861,11 @@ namespace HolyLogger
             signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyGrid.Text);
             signboard.Show();
         }
-
+        private void MatrixMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            matrix = new MatrixWindow();
+            matrix.Show();
+        }
         private void OmnirigMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string url = "http://www.dxatlas.com/OmniRig/";
@@ -992,7 +1006,6 @@ namespace HolyLogger
             {
                 signboard.signboardData.Callsign = TB_MyCallsign.Text;
             }
-
             if (TB_MyGrid == null) return;
             if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
             {
@@ -1026,6 +1039,14 @@ namespace HolyLogger
                 e.Handled = true;
         }
 
+        private void TB_Band_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            UpdateMatrixDup();
+        }
+        private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            
+        }
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
@@ -1054,10 +1075,38 @@ namespace HolyLogger
                 if (!Properties.Settings.Default.isManualMode)
                     RefreshDateTime_Btn_MouseUp(null, null);
                 getQrzData();
+                UpdateMatrix();
             }
-            var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band + "M" == TB_Band.Text && qso.Mode == Mode select qso;
-            if (dups.Count() > 0) System.Windows.Forms.MessageBox.Show("Duplicate!");
+        }
 
+
+        private void UpdateMatrix()
+        {
+            if (matrix != null)
+            {
+                var qso_list = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
+                matrix.Clear();
+                HolyLogger.Mode qsoMode;
+                int qsoBand;
+
+                foreach (var item in qso_list)
+                {
+                    Enum.TryParse(item.Mode, out qsoMode);
+                    int.TryParse(item.Band, out qsoBand);
+                    matrix.SetMatrix(qsoMode, qsoBand);
+                }
+                UpdateMatrixDup();
+            }
+        }
+        private void UpdateMatrixDup()
+        {
+            if (matrix != null)
+            {
+                matrix.ClearDup();
+                var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band + "M" == TB_Band.Text && qso.Mode == Mode select qso;
+                if (dups.Count() > 0)
+                    matrix.SetDup();
+            }
         }
 
         private void MenuItem_Click(object sender, RoutedEventArgs e)
@@ -1482,6 +1531,8 @@ namespace HolyLogger
             }
 
         }
+
+
 
 
 
