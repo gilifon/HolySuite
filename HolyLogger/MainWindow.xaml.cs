@@ -141,6 +141,8 @@ namespace HolyLogger
 
         private StickyWindow _stickyWindow;
 
+        private State state = State.New;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -185,18 +187,14 @@ namespace HolyLogger
                 MessageBox.Show("Failed to connect to DB: " + e.Message);
                 throw;
             }
-
-            TB_4xExchange.Mask = "";
-            TB_4xExchange.Text = "";
-            TB_4xExchange.Mask = "L-00-LL";
-            TB_4xExchange.PromptChar = '#';
-
+            
             TB_MyCallsign.Focus();
 
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
             Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
 
-            QSOTimeStamp.Value = DateTime.UtcNow;
+            TP_Date.Value = DateTime.UtcNow;
+            TP_Time.Value = DateTime.UtcNow;
             Qsos = new ObservableCollection<QSO>();
             Qsos = dal.GetAllQSOs();
             Qsos.CollectionChanged += Qsos_CollectionChanged;
@@ -268,40 +266,42 @@ namespace HolyLogger
 
         private void RefreshDateTime_Btn_MouseUp(object sender, MouseButtonEventArgs e)
         {
-            QSOTimeStamp.Value = DateTime.UtcNow;
+            TP_Date.Value = DateTime.UtcNow;
+            TP_Time.Value = DateTime.UtcNow;
         }
 
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
             if (!Validate()) return;
-            QSO qso = new QSO();
-            qso.Comment = TB_Comment.Text;
-            qso.DXCall = TB_DXCallsign.Text;
-            qso.Mode = Mode;
-            if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
+            if (state == State.New)
             {
-                qso.SRX = TB_4xExchange.Text.Replace("-", "");
-            }
-            else
-            {
+                QSO qso = new QSO();
+                qso.Comment = TB_Comment.Text;
+                qso.DXCall = TB_DXCallsign.Text;
+                qso.Mode = Mode;
                 qso.SRX = TB_Exchange.Text;
+                qso.Freq = TB_Frequency.Text.Replace(",", "");
+                qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+                qso.Country = Country;
+                qso.Name = FName;
+                qso.MyCall = TB_MyCallsign.Text;
+                qso.STX = TB_MyGrid.Text.Replace("-", "");
+                qso.RST_RCVD = TB_RSTRcvd.Text;
+                qso.RST_SENT = TB_RSTSent.Text;
+                qso.Date = TP_Date.Value.Value.ToUniversalTime().ToShortDateString();
+                qso.Time = TP_Time.Value.Value.ToUniversalTime().ToShortTimeString();
+                //if (Properties.Settings.Default.live_log) PostQSO(qso);
+                QSO q = dal.Insert(qso);
+                Qsos.Insert(0, q);
+                ClearBtn_Click(null, null);
+                UpdateNumOfQSOs();
+                ClearMatrix();
             }
-            qso.Freq = TB_Frequency.Text.Replace(",", "");
-            qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
-            qso.Country = Country;
-            qso.Name = FName;
-            qso.MyCall = TB_MyCallsign.Text;
-            qso.STX = TB_MyGrid.Text.Replace("-", "");
-            qso.RST_RCVD = TB_RSTRcvd.Text;
-            qso.RST_SENT = TB_RSTSent.Text;
-            qso.Date = QSOTimeStamp.Value.Value.ToUniversalTime().ToShortDateString();
-            qso.Time = QSOTimeStamp.Value.Value.ToUniversalTime().ToShortTimeString();
-            //if (Properties.Settings.Default.live_log) PostQSO(qso);
-            QSO q = dal.Insert(qso);
-            Qsos.Insert(0, q);
-            ClearBtn_Click(null, null);
-            UpdateNumOfQSOs();
-            ClearMatrix();
+            else if (state == State.Edit)
+            {
+                //TODO: implement update
+            }
+            state = State.New;
         }
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
@@ -324,7 +324,6 @@ namespace HolyLogger
         {
             //TB_Frequency.Text = string.Empty;
             TB_DXCallsign.Clear();
-            TB_4xExchange.Clear();
             TB_Exchange.Clear();
 
             if (mMode == "SSB")
@@ -345,6 +344,7 @@ namespace HolyLogger
                 RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
             ClearMatrix();
+            state = State.New;
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -655,7 +655,26 @@ namespace HolyLogger
         {
             if (QSODataGrid.SelectedItem == null) return;
             var qso = QSODataGrid.SelectedItem as QSO;
-            MessageBox.Show(string.Format("Id: {0}", qso.id));
+            LoadQsoForUpdate(qso);
+        }
+
+        private void LoadQsoForUpdate(QSO qso)
+        {
+            ClearBtn_Click(null, null);
+            state = State.Edit;
+            TB_Comment.Text = qso.Comment;
+            TB_DXCallsign.Text = qso.DXCall;
+            TB_Exchange.Text = qso.SRX;
+            Frequency = qso.Freq;
+            TB_MyCallsign.Text = qso.MyCall;
+            TB_MyGrid.Text = qso.STX;
+            TB_RSTRcvd.Text = qso.RST_RCVD;
+            TB_RSTSent.Text = qso.RST_SENT;
+            TB_DX_Name.Text = qso.Name;
+            Mode = qso.Mode;
+
+            TP_Date.Value = DateTime.Parse(qso.Date);
+            TP_Time.Value = DateTime.Parse(qso.Time);
         }
 
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
@@ -770,14 +789,23 @@ namespace HolyLogger
                     TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.LightGray;
                 }
 
-                if (string.IsNullOrWhiteSpace(QSOTimeStamp.Text))
+                if (string.IsNullOrWhiteSpace(TP_Date.Text))
                 {
                     allOK = false;
-                    QSOTimeStamp.BorderBrush = System.Windows.Media.Brushes.Red;
+                    TP_Date.BorderBrush = System.Windows.Media.Brushes.Red;
                 }
                 else
                 {
-                    QSOTimeStamp.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TP_Date.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                }
+                if (string.IsNullOrWhiteSpace(TP_Time.Text))
+                {
+                    allOK = false;
+                    TP_Time.BorderBrush = System.Windows.Media.Brushes.Red;
+                }
+                else
+                {
+                    TP_Time.BorderBrush = System.Windows.Media.Brushes.LightGray;
                 }
             }
             return allOK;
@@ -1002,14 +1030,7 @@ namespace HolyLogger
         {
             if (e.Key == Key.Enter)
             {
-                if ((TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z")))
-                {
-                    TB_4xExchange.Focus();
-                }
-                else
-                {
-                    TB_Exchange.Focus();
-                }
+                TB_Exchange.Focus();
             }
         }
 
@@ -1048,8 +1069,8 @@ namespace HolyLogger
 
         private void TB_Exchange_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
-            if (!char.IsDigit(e.Text, e.Text.Length - 1))
-                e.Handled = true;
+            //if (!char.IsDigit(e.Text, e.Text.Length - 1))
+            //    e.Handled = true;
         }
 
         private void TB_Band_TextChanged(object sender, TextChangedEventArgs e)
@@ -1062,16 +1083,6 @@ namespace HolyLogger
         }
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
-            {
-                TB_Exchange.Visibility = Visibility.Hidden;
-                TB_4xExchange.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                TB_Exchange.Visibility = Visibility.Visible;
-                TB_4xExchange.Visibility = Visibility.Hidden;
-            }
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 TB_DXCC.Text = "";
@@ -1081,11 +1092,10 @@ namespace HolyLogger
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
             TB_Exchange.Focusable = true;
-            TB_4xExchange.Focusable = true;
 
             if (!String.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
-                if (!Properties.Settings.Default.isManualMode)
+                if (!Properties.Settings.Default.isManualMode && state == State.New)
                     RefreshDateTime_Btn_MouseUp(null, null);
                 getQrzData();
                 UpdateMatrix();

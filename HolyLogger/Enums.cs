@@ -5,4 +5,9 @@ namespace HolyLogger
     {
         SSB = 0, CW, DIGI
     }
+
+    public enum State
+    {
+        New = 0, Edit
+    }
 }

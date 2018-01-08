@@ -165,21 +165,23 @@
         <Image x:Name="QRZBtn" ToolTip="Open the QRZ.COM page of the DX station" HorizontalAlignment="Left" Height="24" Margin="267,101,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <xctk:MaskedTextBox x:Name="TB_4xExchange" HorizontalAlignment="Left" Margin="102,140,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="" Width="189" Height="28" FontSize="16"/>
-        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="102,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="189" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="4" ToolTip="The Exchange sent by the DX station" />
+        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="102,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="189" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="7" ToolTip="The Exchange sent by the DX station" />
         <Label Content="RST Sent" HorizontalAlignment="Left" Margin="302,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="399,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
         <Label Content="RST Rcvd" HorizontalAlignment="Left" Margin="453,136,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="537,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
 
-        <Label Content="Timestamp" HorizontalAlignment="Left" Margin="302,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <xctk:DateTimeUpDown x:Name="QSOTimeStamp" Format="Custom" FormatString="HH:mm:ss dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="399,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="178" FontSize="16" Height="28" ToolTip="The QSO's date and time"/>
+        <Label Content="Date" HorizontalAlignment="Left" Margin="302,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="350,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="109" FontSize="16" Height="28" ToolTip="The QSO's date and time"/>
+        <Label Content="Time" HorizontalAlignment="Left" Margin="464,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm:ss" HorizontalAlignment="Left" TextAlignment="Left" Margin="513,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="90" FontSize="16" Height="28" ToolTip="The QSO's date and time"/>
 
-        <Image x:Name="RefreshDateTime_Btn" ToolTip="Refresh TimeStamo to current time" HorizontalAlignment="Left" Height="20" Margin="583,103,0,0" VerticalAlignment="Top" Width="20" Source="Images/refresh.png" Stretch="None" MouseUp="RefreshDateTime_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+
+        <Image x:Name="RefreshDateTime_Btn" ToolTip="Refresh TimeStamo to current time" HorizontalAlignment="Left" Height="20" Margin="613,101,0,0" VerticalAlignment="Top" Width="20" Source="Images/refresh.png" Stretch="None" MouseUp="RefreshDateTime_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
 
         <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,89,0,0" VerticalAlignment="Top" Width="720" Grid.Row="1" />
-        <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="627,139,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" />
-        <Button x:Name="ClearBtn" Content="Clear" HorizontalAlignment="Left" Margin="627,100,0,0" VerticalAlignment="Top" Width="103" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data"/>
+        <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="613,139,0,0" VerticalAlignment="Top" Width="117" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" />
+        <Button x:Name="ClearBtn" Content="Clear" HorizontalAlignment="Left" Margin="648,100,0,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data"/>
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,175,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="101,179,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="289" CharacterCasing="Upper" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="False" FontSize="16" />
         <Label Content="Country" HorizontalAlignment="Left" Margin="399,175,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
