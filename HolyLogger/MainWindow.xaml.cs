@@ -654,8 +654,11 @@ namespace HolyLogger
         private void GridRow_DoubleClick(object sender, MouseButtonEventArgs e)
         {
             if (QSODataGrid.SelectedItem == null) return;
-            var qso = QSODataGrid.SelectedItem as QSO;
-            LoadQsoForUpdate(qso);
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || System.Windows.Forms.MessageBox.Show("Do you want to override current QSO?", "Edit QSO", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
+            {
+                var qso = QSODataGrid.SelectedItem as QSO;
+                LoadQsoForUpdate(qso);
+            }
         }
 
         private void LoadQsoForUpdate(QSO qso)
