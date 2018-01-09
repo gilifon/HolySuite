@@ -143,6 +143,8 @@ namespace HolyLogger
 
         private State state = State.New;
 
+        QSO QsoToUpdate;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -288,20 +290,52 @@ namespace HolyLogger
                 qso.STX = TB_MyGrid.Text.Replace("-", "");
                 qso.RST_RCVD = TB_RSTRcvd.Text;
                 qso.RST_SENT = TB_RSTSent.Text;
-                qso.Date = TP_Date.Value.Value.ToUniversalTime().ToShortDateString();
-                qso.Time = TP_Time.Value.Value.ToUniversalTime().ToShortTimeString();
+                qso.Date = TP_Date.Value.Value.ToShortDateString();
+                qso.Time = TP_Time.Value.Value.ToShortTimeString();
                 //if (Properties.Settings.Default.live_log) PostQSO(qso);
                 QSO q = dal.Insert(qso);
                 Qsos.Insert(0, q);
-                ClearBtn_Click(null, null);
-                UpdateNumOfQSOs();
-                ClearMatrix();
             }
             else if (state == State.Edit)
             {
-                //TODO: implement update
+                QsoToUpdate.Comment = TB_Comment.Text;
+                QsoToUpdate.DXCall = TB_DXCallsign.Text;
+                QsoToUpdate.Mode = Mode;
+                QsoToUpdate.SRX = TB_Exchange.Text;
+                QsoToUpdate.Freq = TB_Frequency.Text.Replace(",", "");
+                QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+                QsoToUpdate.Country = Country;
+                QsoToUpdate.Name = FName;
+                QsoToUpdate.MyCall = TB_MyCallsign.Text;
+                QsoToUpdate.STX = TB_MyGrid.Text.Replace("-", "");
+                QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
+                QsoToUpdate.RST_SENT = TB_RSTSent.Text;
+                QsoToUpdate.Date = TP_Date.Value.Value.ToShortDateString();
+                QsoToUpdate.Time = TP_Time.Value.Value.ToShortTimeString();
+                dal.Update(QsoToUpdate);
+                QSO q = Qsos.FirstOrDefault(p => p.id == QsoToUpdate.id);
+                if (q != null)
+                {
+                    q.Comment = QsoToUpdate.Comment;
+                    q.DXCall = QsoToUpdate.DXCall;
+                    q.Mode = QsoToUpdate.Mode;
+                    q.SRX = QsoToUpdate.SRX;
+                    q.Freq = QsoToUpdate.Freq;
+                    q.Band = QsoToUpdate.Band;
+                    q.Country = QsoToUpdate.Country;
+                    q.Name = QsoToUpdate.Name;
+                    q.MyCall = QsoToUpdate.MyCall;
+                    q.STX = QsoToUpdate.STX;
+                    q.RST_RCVD = QsoToUpdate.RST_RCVD;
+                    q.RST_SENT = QsoToUpdate.RST_SENT;
+                    q.Date = QsoToUpdate.Date;
+                    q.Time = QsoToUpdate.Time;
+                    QSODataGrid.Items.Refresh();
+                }
             }
-            state = State.New;
+            ClearBtn_Click(null, null);
+            UpdateNumOfQSOs();
+            ClearMatrix();
         }
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
@@ -656,28 +690,28 @@ namespace HolyLogger
             if (QSODataGrid.SelectedItem == null) return;
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || System.Windows.Forms.MessageBox.Show("Do you want to override current QSO?", "Edit QSO", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
             {
-                var qso = QSODataGrid.SelectedItem as QSO;
-                LoadQsoForUpdate(qso);
+                QsoToUpdate = QSODataGrid.SelectedItem as QSO;
+                LoadQsoForUpdate();
             }
         }
 
-        private void LoadQsoForUpdate(QSO qso)
+        private void LoadQsoForUpdate()
         {
             ClearBtn_Click(null, null);
             state = State.Edit;
-            TB_Comment.Text = qso.Comment;
-            TB_DXCallsign.Text = qso.DXCall;
-            TB_Exchange.Text = qso.SRX;
-            Frequency = qso.Freq;
-            TB_MyCallsign.Text = qso.MyCall;
-            TB_MyGrid.Text = qso.STX;
-            TB_RSTRcvd.Text = qso.RST_RCVD;
-            TB_RSTSent.Text = qso.RST_SENT;
-            TB_DX_Name.Text = qso.Name;
-            Mode = qso.Mode;
+            TB_Comment.Text = QsoToUpdate.Comment;
+            TB_DXCallsign.Text = QsoToUpdate.DXCall;
+            TB_Exchange.Text = QsoToUpdate.SRX;
+            Frequency = QsoToUpdate.Freq;
+            TB_MyCallsign.Text = QsoToUpdate.MyCall;
+            TB_MyGrid.Text = QsoToUpdate.STX;
+            TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
+            TB_RSTSent.Text = QsoToUpdate.RST_SENT;
+            TB_DX_Name.Text = QsoToUpdate.Name;
+            Mode = QsoToUpdate.Mode;
 
-            TP_Date.Value = DateTime.Parse(qso.Date);
-            TP_Time.Value = DateTime.Parse(qso.Time);
+            TP_Date.Value = DateTime.Parse(QsoToUpdate.Date);
+            TP_Time.Value = DateTime.Parse(QsoToUpdate.Time);
         }
 
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)

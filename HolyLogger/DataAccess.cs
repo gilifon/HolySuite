@@ -64,6 +64,37 @@ namespace HolyLogger
             }
             return null;
         }
+        public void Update(QSO qso)
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                SQLiteCommand insertSQL = new SQLiteCommand("UPDATE qso SET my_callsign = @my_callsign ,my_square = @my_square,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,exchange = @exchange,comment = @comment,name = @name,country = @country WHERE id = @id", con);
+                insertSQL.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
+                insertSQL.Parameters.Add(new SQLiteParameter("@my_square", qso.STX));
+                insertSQL.Parameters.Add(new SQLiteParameter("@frequency", qso.Freq));
+                insertSQL.Parameters.Add(new SQLiteParameter("@band", qso.Band));
+                insertSQL.Parameters.Add(new SQLiteParameter("@dx_callsign", qso.DXCall));
+                insertSQL.Parameters.Add(new SQLiteParameter("@rst_rcvd", qso.RST_RCVD));
+                insertSQL.Parameters.Add(new SQLiteParameter("@rst_sent", qso.RST_SENT));
+                insertSQL.Parameters.Add(new SQLiteParameter("@date", qso.Date));
+                insertSQL.Parameters.Add(new SQLiteParameter("@time", qso.Time));
+                insertSQL.Parameters.Add(new SQLiteParameter("@mode", qso.Mode));
+                insertSQL.Parameters.Add(new SQLiteParameter("@exchange", qso.SRX));
+                insertSQL.Parameters.Add(new SQLiteParameter("@comment", qso.Comment));
+                insertSQL.Parameters.Add(new SQLiteParameter("@name", qso.Name));
+                insertSQL.Parameters.Add(new SQLiteParameter("@country", qso.Country));
+                insertSQL.Parameters.Add(new SQLiteParameter("@id", qso.id));
+
+                try
+                {
+                    insertSQL.ExecuteNonQuery();
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception(ex.Message);
+                }
+            }
+        }
         public void Delete(int Id)
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
