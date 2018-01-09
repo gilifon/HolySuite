@@ -275,9 +275,6 @@
     <Resource Include="Images\exit.png" />
   </ItemGroup>
   <ItemGroup>
-    <Resource Include="Images\export.png" />
-  </ItemGroup>
-  <ItemGroup>
     <Resource Include="Images\statistics.png" />
   </ItemGroup>
   <ItemGroup>
@@ -314,13 +311,15 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="Data\CreateScript.sql" />
+    <Resource Include="Images\exportA.png" />
+    <Resource Include="Images\exportX.png" />
+    <Resource Include="Images\update.png" />
     <Resource Include="Images\v.png" />
     <Resource Include="Images\x.png" />
     <Resource Include="Images\matrix.png" />
     <Resource Include="Images\manual.png" />
     <Resource Include="Images\eraser.png" />
     <Resource Include="Images\import.png" />
-    <Resource Include="Images\update.gif" />
     <Resource Include="Images\spinner.gif" />
     <Resource Include="Images\settings.png" />
     <Resource Include="Images\OmniRigIcon.gif" />

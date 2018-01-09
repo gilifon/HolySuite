@@ -27,12 +27,12 @@
                             <Separator />
                             <MenuItem x:Name="ExpotMenuItem" Header="Export To ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExpotMenuItem_Click" >
                                 <MenuItem.Icon>
-                                    <Image Source="Images/export.png" Stretch="UniformToFill" Width="20" Height="20"/>
+                                    <Image Source="Images/exportA.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem x:Name="ExpotExlMenuItem" Header="Export To CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >
                                 <MenuItem.Icon>
-                                    <Image Source="Images/export.png" Stretch="UniformToFill" Width="20" Height="20"/>
+                                    <Image Source="Images/exportX.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />
@@ -90,7 +90,7 @@
                         <MenuItem Header="Help" FontSize="16">
                             <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/update.gif" Stretch="UniformToFill" Width="20" Height="20"/>
+                                    <Image Source="Images/update.png" Stretch="UniformToFill" Width="20" Height="20"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem x:Name="HolyLogWebsiteMenuItem" Header="HolyLogger web page" ToolTip="Go to HolyLogger website" Click="HolyLoggerMenuItem_Click">
