@@ -117,5 +117,11 @@ namespace HolyLogger
         {
             L_dup.Visibility = Visibility.Visible;
         }
+
+        private void MatrixWindow1_LocationChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.MatrixWindowLeft = this.Left;
+            Properties.Settings.Default.MatrixWindowTop = this.Top;
+        }
     }
 }

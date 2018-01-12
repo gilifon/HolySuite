@@ -86,5 +86,17 @@ namespace HolyLogger
 
             public event PropertyChangedEventHandler PropertyChanged;
         }
+
+        private void SignboardWindow1_LocationChanged(object sender, EventArgs e)
+        {
+            Properties.Settings.Default.SignBoardWindowLeft = this.Left;
+            Properties.Settings.Default.SignBoardWindowTop = this.Top;
+        }
+
+        private void SignboardWindow1_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            Properties.Settings.Default.SignBoardWindowWidth = this.Width;
+            Properties.Settings.Default.SignBoardWindowHeight = this.Height;
+        }
     }
 }

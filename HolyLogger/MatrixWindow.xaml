@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HolyLogger"
         mc:Ignorable="d"
-        Title="Station Statistics" Height="330" Width="280" MinWidth="280" MinHeight="330" MaxWidth="280" MaxHeight="300">
+        Title="Station Statistics" Height="330" Width="280" MinWidth="280" MinHeight="330" MaxWidth="280" MaxHeight="300" LocationChanged="MatrixWindow1_LocationChanged">
     <Grid>
         <Label x:Name="L10" Content="10M" HorizontalAlignment="Left" Margin="17,82,0,0" VerticalAlignment="Top"/>
         <Label x:Name="L15" Content="15M" HorizontalAlignment="Left" Margin="17,117,0,0" VerticalAlignment="Top"/>

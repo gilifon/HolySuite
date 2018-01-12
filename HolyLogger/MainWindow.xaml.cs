@@ -140,16 +140,23 @@ namespace HolyLogger
         BackgroundWorker EntityResolverWorker;
 
         private StickyWindow _stickyWindow;
-
         private State state = State.New;
+        private bool NotifyVersionUpToDate = false;
 
         QSO QsoToUpdate;
 
         public MainWindow()
         {
             InitializeComponent();
+            if (Properties.Settings.Default.UpdateSettings)
+            {
+                Properties.Settings.Default.Upgrade();
+                Properties.Settings.Default.UpdateSettings = false;
+                Properties.Settings.Default.Save();
+            }
             if (Properties.Settings.Default.isAutoCheckUpdates)
             {
+                NotifyVersionUpToDate = false;
                 UpdatesMenuItem_Click(null, null);
             }
             this.Loaded += MainWindow_Loaded; ;
@@ -196,8 +203,12 @@ namespace HolyLogger
             
             TB_MyCallsign.Focus();
 
-            Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
-            Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
+            Left = Properties.Settings.Default.MainWindowLeft;
+            Top = Properties.Settings.Default.MainWindowTop;
+            Width = Properties.Settings.Default.MainWindowWidth;
+            Height = Properties.Settings.Default.MainWindowHeight;
+            
+            //WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
 
             TP_Date.Value = DateTime.UtcNow;
             TP_Time.Value = DateTime.UtcNow;
@@ -209,6 +220,15 @@ namespace HolyLogger
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
             Helper.LoginToQRZ(out _SessionKey);
+
+            if (Properties.Settings.Default.MatrixWindowIsOpen)
+            {
+                GenerateNewMatrixWindow();
+            }
+            if (Properties.Settings.Default.SignBoardWindowIsOpen)
+            {
+                GenerateNewSignboardWindow();
+            }
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -902,6 +922,8 @@ namespace HolyLogger
             OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
             Rig = null;
             OmniRigEngine = null;
+            Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
+            Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.Save();
         }
 
@@ -940,12 +962,60 @@ namespace HolyLogger
         }
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (signboard != null)
+            {
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard /* return "true" if 'w' is the window your are about to open */);
+
+                if (existingWindow != null)
+                {
+                    existingWindow.Activate();
+                }
+                else
+                {
+                    GenerateNewSignboardWindow();
+                }
+            }
+            else
+            {
+                GenerateNewSignboardWindow();
+            }
+
+        }
+        private void GenerateNewSignboardWindow()
+        {
             signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyGrid.Text);
+            signboard.Left = Properties.Settings.Default.SignBoardWindowLeft;
+            signboard.Top = Properties.Settings.Default.SignBoardWindowTop;
+            signboard.Width = Properties.Settings.Default.SignBoardWindowWidth;
+            signboard.Height = Properties.Settings.Default.SignBoardWindowHeight;
             signboard.Show();
         }
+
         private void MatrixMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (matrix != null)
+            {
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix /* return "true" if 'w' is the window your are about to open */);
+
+                if (existingWindow != null)
+                {
+                    existingWindow.Activate();
+                }
+                else
+                {
+                    GenerateNewMatrixWindow();
+                }
+            }
+            else
+            {
+                GenerateNewMatrixWindow();
+            }
+        }
+        private void GenerateNewMatrixWindow()
+        {
             matrix = new MatrixWindow();
+            matrix.Left = Properties.Settings.Default.MatrixWindowLeft;
+            matrix.Top = Properties.Settings.Default.MatrixWindowTop;
             matrix.Show();
         }
         private void OmnirigMenuItem_Click(object sender, RoutedEventArgs e)
@@ -986,23 +1056,13 @@ namespace HolyLogger
             FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
             string CurrentVersion = fvi.FileVersion;
 
-            WebRequestHandler _webRequestHandler = new WebRequestHandler() { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.NoCacheNoStore) };
-
-            //WebClient client1 = new WebClient();
-            //client1.CachePolicy = new RequestCachePolicy(RequestCacheLevel.NoCacheNoStore);
-            //client1.DownloadStringCompleted += (sender1, args) => {
-            //    if (!args.Cancelled && args.Error == null)
-            //    {
-            //        string result = args.Result; // do something fun...
-            //    }
-            //};
-            //client1.DownloadStringAsync(new Uri("https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version"));
-
+            WebRequestHandler _webRequestHandler = new WebRequestHandler() { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.BypassCache) };
+            
             using (var client = new HttpClient(_webRequestHandler))
             {
                 try
                 {
-                    string baseRequest = "https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version?v=" + DateTime.Now.Ticks;
+                    string baseRequest = "http://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version?v=" + DateTime.Now.Ticks;
                     var response = await client.GetAsync(baseRequest);
                     var responseFromServer = await response.Content.ReadAsStringAsync();
 
@@ -1034,7 +1094,14 @@ namespace HolyLogger
                     }
                     else
                     {
-                        System.Windows.Forms.MessageBox.Show("Your version is up-to-date");
+                        if (NotifyVersionUpToDate)
+                        {
+                            System.Windows.Forms.MessageBox.Show("Your version is up-to-date");
+                        }
+                        else
+                        {
+                            NotifyVersionUpToDate = true;
+                        }
                     }
                 }
                 catch (Exception)
@@ -1173,9 +1240,15 @@ namespace HolyLogger
             }
         }
 
-        private void MenuItem_Click(object sender, RoutedEventArgs e)
+        private void Window_LocationChanged(object sender, EventArgs e)
         {
-            //System.Windows.Forms.MessageBox.Show("Test");
+            Properties.Settings.Default.MainWindowLeft = this.Left;
+            Properties.Settings.Default.MainWindowTop = this.Top;
+        }
+        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            Properties.Settings.Default.MainWindowWidth = this.Width;
+            Properties.Settings.Default.MainWindowHeight = this.Height;
         }
 
         private async void getQrzData()
@@ -1595,6 +1668,8 @@ namespace HolyLogger
             }
 
         }
+
+
 
 
 

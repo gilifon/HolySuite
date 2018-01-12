@@ -243,7 +243,6 @@
       <LastGenOutput>Resources.Designer.cs</LastGenOutput>
     </EmbeddedResource>
     <None Include="app.manifest" />
-    <None Include="Data\4Z1KD_logDB.db" />
     <None Include="packages.config" />
     <None Include="Properties\app.manifest" />
     <None Include="Properties\Settings.settings">
@@ -311,7 +310,6 @@
     <Resource Include="Images\trophy.png" />
   </ItemGroup>
   <ItemGroup>
-    <Content Include="Data\CreateScript.sql" />
     <Resource Include="Images\exportA.png" />
     <Resource Include="Images\exportX.png" />
     <Resource Include="Images\update.png" />

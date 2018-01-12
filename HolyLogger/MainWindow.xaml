@@ -5,7 +5,7 @@
         xmlns:xcdg="http://schemas.xceed.com/wpf/xaml/datagrid"
         xmlns:local="clr-namespace:HolyLogger"
         x:Class="HolyLogger.MainWindow"
-        Title="HolyLogger - 4X/4Z Log application" Height="660" MinHeight="560" Width="760" MinWidth="760" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded">
+        Title="HolyLogger - 4X/4Z Log application" Height="660" MinHeight="560" Width="760" MinWidth="760" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
 
     <Grid Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
@@ -144,7 +144,7 @@
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="102,16,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" FontSize="16"  ToolTip="Your Callsign"/>
         <Label Content="My Square" HorizontalAlignment="Left" Margin="216,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" TextChanged="TB_MyGrid_TextChanged" />-->
-        <xctk:MaskedTextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Margin="307,16,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" HidePromptOnLeave ="false" Mask="L-00-LL" PromptChar="#" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="100" Height="28" TextChanged="TB_MyGrid_TextChanged" FontSize="16" ToolTip="Your current Holyland square"/>
+        <TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Margin="307,16,0,0" Grid.Row="1" TextWrapping="Wrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="100" Height="28" TextChanged="TB_MyGrid_TextChanged" FontSize="16" ToolTip="Your current Holyland square"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="20" Margin="422,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="Mode" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28" ToolTip="Select the working mode">
