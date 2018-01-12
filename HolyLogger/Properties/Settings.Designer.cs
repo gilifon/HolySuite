@@ -130,5 +130,17 @@ namespace HolyLogger.Properties {
                 this["isManualMode"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool isAutoCheckUpdates {
+            get {
+                return ((bool)(this["isAutoCheckUpdates"]));
+            }
+            set {
+                this["isAutoCheckUpdates"] = value;
+            }
+        }
     }
 }

@@ -148,6 +148,10 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
+            if (Properties.Settings.Default.isAutoCheckUpdates)
+            {
+                UpdatesMenuItem_Click(null, null);
+            }
             this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
 
@@ -1004,7 +1008,7 @@ namespace HolyLogger
 
                     if (CompareVersions(CurrentVersion, responseFromServer))
                     {
-                        string messageBoxText = "Do you want to install the new version?";
+                        string messageBoxText = "There is a new version. Do you want to install?";
                         string caption = "New updates are available";
                         MessageBoxButton button = MessageBoxButton.YesNoCancel;
                         MessageBoxImage icon = MessageBoxImage.Warning;
