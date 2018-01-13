@@ -164,7 +164,6 @@ namespace HolyLogger
 
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
 
-
             EntityResolverWorker = new BackgroundWorker();
             EntityResolverWorker.DoWork += EntityResolverWorker_DoWork;
             rem = new RadioEntityResolver();
@@ -255,7 +254,7 @@ namespace HolyLogger
                         TB_RSTSent.Text = "599";
                         TB_RSTRcvd.Text = "599";
                     }
-                    UpdateMatrixDup();
+                    UpdateDup();
                     break;
                 default:
                     break;
@@ -1205,7 +1204,7 @@ namespace HolyLogger
 
         private void TB_Band_TextChanged(object sender, TextChangedEventArgs e)
         {
-            UpdateMatrixDup();
+            UpdateDup();
         }
         private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -1249,22 +1248,29 @@ namespace HolyLogger
                     int.TryParse(item.Band, out qsoBand);
                     matrix.SetMatrix(qsoMode, qsoBand);
                 }
-                UpdateMatrixDup();
             }
+            UpdateDup();
         }
-        private void UpdateMatrixDup()
+        private void UpdateDup()
         {
-            if (matrix != null)
+            var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band + "M" == TB_Band.Text && qso.Mode == Mode select qso;
+            if (state == State.Edit)
+                dups = dups.Where(p => p.id != QsoToUpdate.id);
+
+            if (dups.Count() > 0)
             {
-                matrix.ClearDup();
-                L_Duplicate.Visibility = Visibility.Hidden;
-                var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band + "M" == TB_Band.Text && qso.Mode == Mode select qso;
-                if (state == State.Edit)
-                    dups = dups.Where(p => p.id != QsoToUpdate.id);
-                if (dups.Count() > 0)
+                L_Duplicate.Visibility = Visibility.Visible;
+                if (matrix != null)
                 {
                     matrix.SetDup();
-                    L_Duplicate.Visibility = Visibility.Visible;
+                }
+            }
+            else
+            {
+                L_Duplicate.Visibility = Visibility.Hidden;
+                if (matrix != null)
+                {
+                    matrix.ClearDup();
                 }
             }
         }
