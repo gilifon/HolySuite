@@ -3,7 +3,7 @@
   <Profiles />
   <Settings>
     <Setting Name="my_callsign" Type="System.String" Scope="User">
-      <Value Profile="(Default)">4Z1KD</Value>
+      <Value Profile="(Default)" />
     </Setting>
     <Setting Name="show_qrz" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
@@ -21,7 +21,7 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="my_square" Type="System.String" Scope="User">
-      <Value Profile="(Default)">N02ZF</Value>
+      <Value Profile="(Default)" />
     </Setting>
     <Setting Name="isLocked" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>

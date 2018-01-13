@@ -402,7 +402,7 @@ namespace HolyLogger
                 RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
             ClearMatrix();
-            state = State.New;
+            UpdateState(State.New);
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -588,7 +588,7 @@ namespace HolyLogger
                 var content = new FormUrlEncodedContent(values);
                 try
                 {
-                    var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
+                    var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     return responseString;
                 }
@@ -613,7 +613,7 @@ namespace HolyLogger
                 var content = new FormUrlEncodedContent(values);
                 try
                 {
-                    var response = await client.PostAsync("http://www.iarc.org/Holyland2017/Server/AddLog.php", content);
+                    var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     return responseString;
                 }
@@ -716,13 +716,14 @@ namespace HolyLogger
             {
                 QsoToUpdate = QSODataGrid.SelectedItem as QSO;
                 LoadQsoForUpdate();
+                UpdateMatrix();
             }
         }
 
         private void LoadQsoForUpdate()
         {
             ClearBtn_Click(null, null);
-            state = State.Edit;
+            UpdateState(State.Edit);
             TB_Comment.Text = QsoToUpdate.Comment;
             TB_DXCallsign.Text = QsoToUpdate.DXCall;
             TB_Exchange.Text = QsoToUpdate.SRX;
@@ -736,8 +737,29 @@ namespace HolyLogger
 
             TP_Date.Value = DateTime.Parse(QsoToUpdate.Date);
             TP_Time.Value = DateTime.Parse(QsoToUpdate.Time);
+
+
         }
 
+        private void UpdateState(State newState)
+        {
+            state = newState;
+            UpdateAddBtnLabel();
+        }
+
+        private void UpdateAddBtnLabel()
+        {
+            if (state == State.Edit)
+            {
+                AddBtn.Content = "Update (F1)";
+            }
+            else if (state == State.New)
+            {
+                AddBtn.Content = "Add (F1)";
+            }
+        }
+
+        
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
         {
             AboutWindow about = new AboutWindow();
@@ -756,20 +778,19 @@ namespace HolyLogger
             {
                 TB_DXCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
             }
-
-
-            //if (string.IsNullOrWhiteSpace(TB_Exchange.Text) )
-            //{
-            //    allOK = false;
-            //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
-            //}
-            //else
-            //{
-            //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
-            //}
-
+            
             if (Properties.Settings.Default.validation_enabled)
             {
+                if (string.IsNullOrWhiteSpace(TB_Exchange.Text))
+                {
+                    allOK = false;
+                    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
+                }
+                else
+                {
+                    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                }
+
                 if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
                 {
                     //if (HolyLogParser.validSquares.Contains(TB_4xExchange.Text))
@@ -784,7 +805,8 @@ namespace HolyLogger
                 }
                 else
                 {
-                    if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && int.Parse(TB_Exchange.Text) != 0)
+                    int n;
+                    if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && int.TryParse(TB_Exchange.Text, out n))
                     {
                         TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
                     }
@@ -1195,13 +1217,10 @@ namespace HolyLogger
             {
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
+                matrix.Clear();
+                L_Duplicate.Visibility = Visibility.Hidden;
             }
-        }
-        private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
-        {
-            TB_Exchange.Focusable = true;
-
-            if (!String.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            else
             {
                 if (!Properties.Settings.Default.isManualMode && state == State.New)
                     RefreshDateTime_Btn_MouseUp(null, null);
@@ -1209,7 +1228,10 @@ namespace HolyLogger
                 UpdateMatrix();
             }
         }
-
+        private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
+        {
+            TB_Exchange.Focusable = true;
+        }
 
         private void UpdateMatrix()
         {
@@ -1234,9 +1256,15 @@ namespace HolyLogger
             if (matrix != null)
             {
                 matrix.ClearDup();
+                L_Duplicate.Visibility = Visibility.Hidden;
                 var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band + "M" == TB_Band.Text && qso.Mode == Mode select qso;
+                if (state == State.Edit)
+                    dups = dups.Where(p => p.id != QsoToUpdate.id);
                 if (dups.Count() > 0)
+                {
                     matrix.SetDup();
+                    L_Duplicate.Visibility = Visibility.Visible;
+                }
             }
         }
 

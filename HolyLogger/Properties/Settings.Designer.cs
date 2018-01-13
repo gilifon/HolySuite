@@ -25,7 +25,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("4Z1KD")]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string my_callsign {
             get {
                 return ((string)(this["my_callsign"]));
@@ -97,7 +97,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("N02ZF")]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string my_square {
             get {
                 return ((string)(this["my_square"]));
