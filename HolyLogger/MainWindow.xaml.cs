@@ -1217,7 +1217,7 @@ namespace HolyLogger
             {
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
-                matrix.Clear();
+                ClearMatrix();
                 L_Duplicate.Visibility = Visibility.Hidden;
             }
             else
@@ -1235,10 +1235,11 @@ namespace HolyLogger
 
         private void UpdateMatrix()
         {
+            ClearMatrix();
+
             if (matrix != null)
             {
                 var qso_list = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
-                matrix.Clear();
                 HolyLogger.Mode qsoMode;
                 int qsoBand;
 
