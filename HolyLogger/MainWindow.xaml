@@ -173,12 +173,12 @@
         <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="537,140,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
 
         <Label Content="Date" HorizontalAlignment="Left" Margin="302,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="350,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="109" FontSize="16" Height="28" ToolTip="The QSO's date and time"/>
+        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="350,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="109" FontSize="16" Height="28" ToolTip="The QSO's date"/>
         <Label Content="Time" HorizontalAlignment="Left" Margin="464,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm:ss" HorizontalAlignment="Left" TextAlignment="Left" Margin="513,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="90" FontSize="16" Height="28" ToolTip="The QSO's date and time"/>
+        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm:ss" HorizontalAlignment="Left" TextAlignment="Left" Margin="513,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="90" FontSize="16" Height="28" ToolTip="The QSO's time"/>
 
 
-        <Image x:Name="RefreshDateTime_Btn" ToolTip="Refresh TimeStamo to current time" HorizontalAlignment="Left" Height="20" Margin="613,101,0,0" VerticalAlignment="Top" Width="20" Source="Images/refresh.png" Stretch="None" MouseUp="RefreshDateTime_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <Image x:Name="RefreshDateTime_Btn" ToolTip="Set to current time" HorizontalAlignment="Left" Height="20" Margin="613,101,0,0" VerticalAlignment="Top" Width="20" Source="Images/refresh.png" Stretch="None" MouseUp="RefreshDateTime_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
 
         <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,89,0,0" VerticalAlignment="Top" Width="720" Grid.Row="1" />
         <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="613,139,0,0" VerticalAlignment="Top" Width="117" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" />
