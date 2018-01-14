@@ -780,42 +780,29 @@ namespace HolyLogger
             
             if (Properties.Settings.Default.validation_enabled)
             {
-                if (string.IsNullOrWhiteSpace(TB_Exchange.Text))
-                {
-                    allOK = false;
-                    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
-                }
-                else
-                {
-                    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
-                }
+                //if (string.IsNullOrWhiteSpace(TB_Exchange.Text))
+                //{
+                //    allOK = false;
+                //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
+                //}
+                //else
+                //{
+                //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                //}
 
-                if (TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z"))
-                {
-                    //if (HolyLogParser.validSquares.Contains(TB_4xExchange.Text))
-                    //{
-                    //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
-                    //}
-                    //else
-                    //{
-                    //    allOK = false;
-                    //    TB_4xExchange.BorderBrush = System.Windows.Media.Brushes.Red;
-                    //}
-                }
-                else
-                {
-                    int n;
-                    if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && int.TryParse(TB_Exchange.Text, out n))
-                    {
-                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
-                    }
-                    else
-                    {
-                        allOK = false;
-                        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
-                    }
-
-                }
+                //if (!(TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z")))
+                //{
+                //    int n;
+                //    if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && int.TryParse(TB_Exchange.Text, out n))
+                //    {
+                //        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                //    }
+                //    else
+                //    {
+                //        allOK = false;
+                //        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Red;
+                //    }
+                //}
 
 
                 if (string.IsNullOrWhiteSpace(TB_Frequency.Text))
