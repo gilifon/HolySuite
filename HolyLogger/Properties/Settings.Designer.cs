@@ -145,7 +145,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        [global::System.Configuration.DefaultSettingValueAttribute("1010")]
         public double MatrixWindowLeft {
             get {
                 return ((double)(this["MatrixWindowLeft"]));
@@ -157,7 +157,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        [global::System.Configuration.DefaultSettingValueAttribute("580")]
         public double MatrixWindowTop {
             get {
                 return ((double)(this["MatrixWindowTop"]));
@@ -169,7 +169,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        [global::System.Configuration.DefaultSettingValueAttribute("1010")]
         public double SignBoardWindowLeft {
             get {
                 return ((double)(this["SignBoardWindowLeft"]));
@@ -181,7 +181,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        [global::System.Configuration.DefaultSettingValueAttribute("250")]
         public double SignBoardWindowTop {
             get {
                 return ((double)(this["SignBoardWindowTop"]));
@@ -265,7 +265,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool MatrixWindowIsOpen {
             get {
                 return ((bool)(this["MatrixWindowIsOpen"]));
@@ -277,7 +277,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool SignBoardWindowIsOpen {
             get {
                 return ((bool)(this["SignBoardWindowIsOpen"]));

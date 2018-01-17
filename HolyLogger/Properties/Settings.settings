@@ -33,16 +33,16 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="MatrixWindowLeft" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">100</Value>
+      <Value Profile="(Default)">1010</Value>
     </Setting>
     <Setting Name="MatrixWindowTop" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">100</Value>
+      <Value Profile="(Default)">580</Value>
     </Setting>
     <Setting Name="SignBoardWindowLeft" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">100</Value>
+      <Value Profile="(Default)">1010</Value>
     </Setting>
     <Setting Name="SignBoardWindowTop" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">100</Value>
+      <Value Profile="(Default)">250</Value>
     </Setting>
     <Setting Name="MainWindowLeft" Type="System.Double" Scope="User">
       <Value Profile="(Default)">250</Value>
@@ -63,10 +63,10 @@
       <Value Profile="(Default)">330</Value>
     </Setting>
     <Setting Name="MatrixWindowIsOpen" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="SignBoardWindowIsOpen" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="UpdateSettings" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>

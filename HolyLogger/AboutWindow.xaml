@@ -4,14 +4,15 @@
         Title="About" Height="180" Width="350" MinHeight="180" MaxHeight="180" MinWidth="350" MaxWidth="350" Icon="Images/about.png" Loaded="Window_About_Loaded">
     <Grid Background="#FFCBCBCB">
 
-        <Image HorizontalAlignment="Left" Height="100" Margin="25,10,0,0" VerticalAlignment="Top" Width="100" Source="Images/crown100.png"/>
-        <StackPanel HorizontalAlignment="Left" Height="95" Margin="138,10,0,0" VerticalAlignment="Top" Width="194">
+        <Image HorizontalAlignment="Left" Height="113" Margin="10,10,0,0" VerticalAlignment="Top" Width="111" Source="Images/crown100.png"/>
+        <StackPanel HorizontalAlignment="Left" Height="129" Margin="138,10,0,0" VerticalAlignment="Top" Width="194">
             <TextBlock HorizontalAlignment="Left" Margin="0,0,0,0" TextWrapping="Wrap" Text="Holyland Contest Logger - Basic" VerticalAlignment="Top"/>
             <TextBlock x:Name="L_Version" HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Version 1.0.0.1" VerticalAlignment="Top"/>
+            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Consulting &amp; QA - Dan 4Z5SL" VerticalAlignment="Top" />
             <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Design &amp; Development - Gil 4Z1KD" VerticalAlignment="Top" />
-            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="sep. 2016" VerticalAlignment="Top" />
+            <TextBlock Margin="0,5,0,0" TextWrapping="Wrap" Text="Last update: Jan 2018" VerticalAlignment="Top" HorizontalAlignment="Left" Width="114" />
+
         </StackPanel>
-        <TextBlock HorizontalAlignment="Left" Margin="25,115,0,0" TextWrapping="Wrap" Text="Dev Code: f751fa52 - 3d91 - 4e24 - beae - d41ed8f871b5" VerticalAlignment="Top" Width="305" />
 
 
     </Grid>
