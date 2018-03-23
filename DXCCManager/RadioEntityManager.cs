@@ -5195,7 +5195,7 @@ namespace DXCCManager
             "T3L|East Kiribati (Fanning & Christmas Isl.)|OC|-12|1.85N|157.71W|61|31||R|1980/01/01-1981/12/31=48",
             "T3P|Central Kiribati|OC|-12|0.16S|176.66W|62|31||R|1980/01/01-1981/12/31=31",
             "VR1P|Central Kiribati|OC|-12|0.16S|176.66W|62|31||R|-1979/12/31=31",
-            "M1 9A|San Marino|EU|-1|43.94N|12.44E|28|15||R|-1983/12/31=278",
+            "T7|San Marino|EU|-1|43.94N|12.44E|28|15||R|-1983/12/31=278",
             "T6|Afghanistan|AS|-4.5|34.53N|69.16E|40|21||R|=3",
             "T9|Prefix has been returned to the ITU, now unallocated (no DXCC credit!)|EU|-1|46N|18E|28|14||R|2008/01/01-=0",
             "T9 T9# T9[A-Z] T9/%%%% T9/%%%%% T9/%%%%%% T9/%%%%%%% T9/%%%%%%%%|Bosnia-Herzegovina|EU|-1|43.86N|18.43E|28|15||R|1991/10/16-2007/12/31=501",
