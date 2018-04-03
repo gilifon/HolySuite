@@ -1539,7 +1539,7 @@ namespace HolyLogger
             {
                 if (OmniRigEngine != null)
                 {
-                    MessageBox.Show("OmniRig Is run");
+                    MessageBox.Show("OmniRig Is running");
                 }
                 else
                 {
@@ -1645,8 +1645,11 @@ namespace HolyLogger
                 {
                     RX = Rig.GetRxFrequency().ToString();
                     TX = Rig.GetTxFrequency().ToString();
-                    Frequency = Rig.Freq.ToString();
-                    if (Rig.Freq < 10000000) Frequency = Frequency.Insert(0, "0");
+                    //Frequency = Rig.Freq.ToString();
+                    if (Rig.GetRxFrequency() < 10000000)
+                        Frequency = RX.Insert(0, "0");
+                    else
+                        Frequency = RX; ;
                     switch (Rig.Mode)
                     {
                         case (OmniRig.RigParamX)PM_CW_L:
