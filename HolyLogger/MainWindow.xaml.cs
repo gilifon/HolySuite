@@ -308,7 +308,7 @@ namespace HolyLogger
                 qso.Freq = TB_Frequency.Text.Replace(",", "");
                 qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
                 qso.Country = Country;
-                qso.Name = FName;
+                qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
                 qso.STX = TB_MyGrid.Text.Replace("-", "");
                 qso.RST_RCVD = TB_RSTRcvd.Text;
@@ -328,7 +328,7 @@ namespace HolyLogger
                 QsoToUpdate.Freq = TB_Frequency.Text.Replace(",", "");
                 QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
                 QsoToUpdate.Country = Country;
-                QsoToUpdate.Name = FName;
+                QsoToUpdate.Name = FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.STX = TB_MyGrid.Text.Replace("-", "");
                 QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
@@ -439,6 +439,7 @@ namespace HolyLogger
             CultureInfo provider = CultureInfo.InvariantCulture;
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "ADIF files (*.adi)|*.adi";
+            int faultyQSO = 0;
 
             if (openFileDialog.ShowDialog() == true)
             {
@@ -448,9 +449,20 @@ namespace HolyLogger
                 List<HolyParser.QSO> rawQSOList = p.GetRawQSO();
                 foreach (var rq in rawQSOList)
                 {
-                    QSO q = dal.Insert(rq);
-                    Qsos.Insert(0, q);
-                    UpdateNumOfQSOs();
+                    try
+                    {
+                        QSO q = dal.Insert(rq);
+                        Qsos.Insert(0, q);
+                        UpdateNumOfQSOs();
+                    }
+                    catch (Exception ex)
+                    {
+                        faultyQSO++;
+                    }
+                }
+                if (faultyQSO>0)
+                {
+                    System.Windows.Forms.MessageBox.Show(faultyQSO + " QSOs failed to load, check your ADIF file.");
                 }
             }
         }

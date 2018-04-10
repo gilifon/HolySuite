@@ -226,20 +226,20 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <!--<DataGridTemplateColumn Header="Name" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Name" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding name}" HorizontalAlignment="Center" Padding="5" />
+                            <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" Padding="5" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Country" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding country}" HorizontalAlignment="Center" Padding="5" />
+                            <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>-->
+                </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Frequency" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
