@@ -313,8 +313,10 @@ namespace HolyLogger
                 qso.STX = TB_MyGrid.Text.Replace("-", "");
                 qso.RST_RCVD = TB_RSTRcvd.Text;
                 qso.RST_SENT = TB_RSTSent.Text;
-                qso.Date = TP_Date.Value.Value.ToShortDateString();
-                qso.Time = TP_Time.Value.Value.ToShortTimeString();
+                DateTime date = TP_Date.Value.Value;
+                qso.Date = date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
+                DateTime time = TP_Time.Value.Value;
+                qso.Time = time.Hour.ToString("D2") + time.Minute.ToString("D2") + time.Second.ToString("D2");
                 //if (Properties.Settings.Default.live_log) PostQSO(qso);
                 QSO q = dal.Insert(qso);
                 Qsos.Insert(0, q);
@@ -333,8 +335,10 @@ namespace HolyLogger
                 QsoToUpdate.STX = TB_MyGrid.Text.Replace("-", "");
                 QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
                 QsoToUpdate.RST_SENT = TB_RSTSent.Text;
-                QsoToUpdate.Date = TP_Date.Value.Value.ToShortDateString();
-                QsoToUpdate.Time = TP_Time.Value.Value.ToShortTimeString();
+                DateTime date = TP_Date.Value.Value;
+                QsoToUpdate.Date = date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
+                DateTime time = TP_Time.Value.Value;
+                QsoToUpdate.Time = time.Hour.ToString("D2") + time.Minute.ToString("D2") + time.Second.ToString("D2");
                 dal.Update(QsoToUpdate);
                 QSO q = Qsos.FirstOrDefault(p => p.id == QsoToUpdate.id);
                 if (q != null)
@@ -726,7 +730,14 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || System.Windows.Forms.MessageBox.Show("Do you want to override current QSO?", "Edit QSO", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
             {
                 QsoToUpdate = QSODataGrid.SelectedItem as QSO;
-                LoadQsoForUpdate();
+                try
+                {
+                    LoadQsoForUpdate();
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.Forms.MessageBox.Show("Error! " + ex.Message);
+                }                
                 UpdateMatrix();
             }
         }
@@ -746,10 +757,21 @@ namespace HolyLogger
             TB_DX_Name.Text = QsoToUpdate.Name;
             Mode = QsoToUpdate.Mode;
 
-            TP_Date.Value = DateTime.Parse(QsoToUpdate.Date);
-            TP_Time.Value = DateTime.Parse(QsoToUpdate.Time);
+            try
+            {
+                string date = QsoToUpdate.Date.Insert(4, "/").Insert(7, "/");
+                string time = QsoToUpdate.Time.Insert(2, ":").Insert(5, ":");
 
-
+                TP_Date.Value = DateTime.Parse(date);
+                TP_Time.Value = DateTime.Parse(time);
+            }
+            catch (Exception e)
+            {
+                TP_Date.Value = DateTime.UtcNow;
+                TP_Time.Value = DateTime.UtcNow;
+                throw new Exception("Failed to parse QSO date. Value set to NOW");
+            }
+            
         }
 
         private void UpdateState(State newState)

@@ -82,7 +82,7 @@ namespace StickyWindowLibrary
 
         public Size MaximumSize
         {
-            get { return new Size(Convert.ToInt32(_window.MaxWidth), Convert.ToInt32(_window.MaxHeight)); }
+            get { return new Size(Convert.ToInt32(_window.MaxWidth == Double.PositiveInfinity?10000: _window.MaxWidth), Convert.ToInt32(_window.MaxHeight == Double.PositiveInfinity ? 10000 : _window.MaxHeight)); }
             set { 
                 _window.MaxWidth = value.Width;
                 _window.MaxHeight = value.Height;

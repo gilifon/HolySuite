@@ -153,8 +153,6 @@ namespace HolyLogger
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
                         if (rdr["time"] != null) q.Time = (string)rdr["time"];
                         if (rdr["date"] != null) q.Date = (string)rdr["date"];
-                        //if (rdr["timestamp"] != null) q.Time = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortTimeString();
-                        //if (rdr["timestamp"] != null) q.Date = DateTime.ParseExact((string)rdr["timestamp"], "dd/MM/yyyy HH:mm", enUS).ToShortDateString();
                         qso_list.Add(q);
                     }
                 }
@@ -186,8 +184,8 @@ namespace HolyLogger
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
-                        if (rdr["time"] != null) q.Time = DateTime.Parse((string)rdr["time"]).ToShortTimeString();
-                        if (rdr["date"] != null) q.Date = DateTime.Parse((string)rdr["date"]).ToShortDateString();
+                        if (rdr["time"] != null) q.Time = (string)rdr["time"];
+                        if (rdr["date"] != null) q.Date = (string)rdr["date"];
                         qso_list.Add(q);
                     }
                 }
