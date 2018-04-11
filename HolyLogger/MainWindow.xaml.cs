@@ -960,10 +960,13 @@ namespace HolyLogger
 
         private void Window_Closed(object sender, EventArgs e)
         {
-            OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
-            OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
-            Rig = null;
-            OmniRigEngine = null;
+            if (OmniRigEngine != null)
+            {
+                OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
+                OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
+                Rig = null;
+                OmniRigEngine = null;
+            }
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.Save();
