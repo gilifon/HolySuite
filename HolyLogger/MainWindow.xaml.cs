@@ -1007,10 +1007,28 @@ namespace HolyLogger
             MessageBoxResult messageBoxResult = System.Windows.MessageBox.Show("Are you sure?", "Delete Confirmation", System.Windows.MessageBoxButton.YesNo);
             if (messageBoxResult == MessageBoxResult.Yes)
             {
-                Qsos.Clear();
-                dal.DeleteAll();
-                ClearBtn_Click(null, null);
-                UpdateNumOfQSOs();
+
+                string adif = Services.GenerateAdif(dal.GetAllQSOs());
+                try
+                {
+                    // Saves the Image via a FileStream created by the OpenFile method.
+                    using (System.IO.StreamWriter file = new System.IO.StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "\\" + DateTime.Now.Ticks.ToString() + ".adif"))
+                    {
+                        file.Write(adif);
+                        file.Close();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("Backup failed: " + ex.Message);
+                }
+                finally
+                {
+                    Qsos.Clear();
+                    dal.DeleteAll();
+                    ClearBtn_Click(null, null);
+                    UpdateNumOfQSOs();
+                }
             }
             else
             {
