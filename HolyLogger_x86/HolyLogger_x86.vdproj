@@ -508,6 +508,11 @@
             "AssemblyAsmDisplayName" = "8:StickyWindow, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
+                    "_2EA269B565927E994BBAF65AA85C0CE7"
+                    {
+                    "Name" = "8:StickyWindow.dll"
+                    "Attributes" = "3:512"
+                    }
                 }
             "SourcePath" = "8:StickyWindow.dll"
             "TargetName" = "8:"
@@ -602,9 +607,14 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=2.2.3.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
+                    "_5695AA79AF0D8B8131FD6038FEA23CF0"
+                    {
+                    "Name" = "8:HolyParser.dll"
+                    "Attributes" = "3:512"
+                    }
                 }
             "SourcePath" = "8:HolyParser.dll"
             "TargetName" = "8:"
@@ -803,9 +813,14 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=2.2.2.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=2.2.3.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
+                    "_886D38044A166DA2BA48F9CBD7FA0B01"
+                    {
+                    "Name" = "8:DXCCManager.dll"
+                    "Attributes" = "3:512"
+                    }
                 }
             "SourcePath" = "8:DXCCManager.dll"
             "TargetName" = "8:"
@@ -1089,15 +1104,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{0C703654-442E-4E9B-9104-2146CC5381ED}"
-        "PackageCode" = "8:{B4A37513-D471-4DDA-9BCA-A8A5C6661914}"
+        "ProductCode" = "8:{2B384395-2F80-47F8-A865-D4BE836B6224}"
+        "PackageCode" = "8:{BC7B3D45-E8F7-45B7-A22E-9A4606642DDE}"
         "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:2.2.3"
+        "ProductVersion" = "8:2.2.4"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
