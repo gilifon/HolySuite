@@ -89,14 +89,18 @@ namespace HolyLogger
 
         private void SignboardWindow1_LocationChanged(object sender, EventArgs e)
         {
+            if (this.Left >= 0)
             Properties.Settings.Default.SignBoardWindowLeft = this.Left;
-            Properties.Settings.Default.SignBoardWindowTop = this.Top;
+            if (this.Top >= 0)
+                Properties.Settings.Default.SignBoardWindowTop = this.Top;
         }
 
         private void SignboardWindow1_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            Properties.Settings.Default.SignBoardWindowWidth = this.Width;
-            Properties.Settings.Default.SignBoardWindowHeight = this.Height;
+            if (this.Width >= 0)
+                Properties.Settings.Default.SignBoardWindowWidth = this.Width;
+            if (this.Height >= 0)
+                Properties.Settings.Default.SignBoardWindowHeight = this.Height;
         }
     }
 }

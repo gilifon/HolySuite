@@ -120,8 +120,10 @@ namespace HolyLogger
 
         private void MatrixWindow1_LocationChanged(object sender, EventArgs e)
         {
-            Properties.Settings.Default.MatrixWindowLeft = this.Left;
-            Properties.Settings.Default.MatrixWindowTop = this.Top;
+            if (this.Left >= 0)
+                Properties.Settings.Default.MatrixWindowLeft = this.Left;
+            if (this.Top >= 0)
+                Properties.Settings.Default.MatrixWindowTop = this.Top;
         }
     }
 }
