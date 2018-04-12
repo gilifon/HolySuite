@@ -29,15 +29,5 @@ namespace HolyLogger
             Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
             L_Version.Text = "Version " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
         }
-
-        private void Window_About_Loaded(object sender, RoutedEventArgs e)
-        {
-            bool aIsNewInstance = false;
-            myMutex = new Mutex(true, "AboutWindow", out aIsNewInstance);
-            if (!aIsNewInstance)
-            {
-                this.Close();
-            }
-        }
     }
 }

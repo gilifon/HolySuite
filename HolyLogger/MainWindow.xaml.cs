@@ -136,6 +136,7 @@ namespace HolyLogger
         HolyLogParser p;
         SignboardWindow signboard = null;
         MatrixWindow matrix = null;
+        AboutWindow about = null;
 
         BackgroundWorker EntityResolverWorker;
 
@@ -148,6 +149,7 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
+            UTCTimer.Content = DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
             if (Properties.Settings.Default.UpdateSettings)
             {
                 Properties.Settings.Default.Upgrade();
@@ -237,6 +239,20 @@ namespace HolyLogger
             _stickyWindow.StickToOther = true;
             _stickyWindow.StickOnResize = true;
             _stickyWindow.StickOnMove = true;
+
+            System.Timers.Timer tmr = new System.Timers.Timer();
+            tmr.Interval = 1000;//ticks every 1 second
+            tmr.Elapsed += Tmr_Elapsed;
+            tmr.Start();
+        }
+
+        private void Tmr_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            this.Dispatcher.Invoke(() =>
+            {
+                UTCTimer.Content = DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
+            });
+            
         }
 
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -791,14 +807,7 @@ namespace HolyLogger
                 AddBtn.Content = "Add (F1)";
             }
         }
-
         
-        private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            AboutWindow about = new AboutWindow();
-            about.Show();
-        }
-
         private bool Validate()
         {
             bool allOK = true;
@@ -1062,6 +1071,33 @@ namespace HolyLogger
             matrix.Left = Properties.Settings.Default.MatrixWindowLeft;
             matrix.Top = Properties.Settings.Default.MatrixWindowTop;
             matrix.Show();
+        }
+
+        private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (about != null)
+            {
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == about /* return "true" if 'w' is the window your are about to open */);
+
+                if (existingWindow != null)
+                {
+                    existingWindow.Activate();
+                }
+                else
+                {
+                    GenerateNewAboutWindow();
+                }
+            }
+            else
+            {
+                GenerateNewAboutWindow();
+            }
+
+        }
+        private void GenerateNewAboutWindow()
+        {
+            about = new AboutWindow();
+            about.Show();
         }
         private void OmnirigMenuItem_Click(object sender, RoutedEventArgs e)
         {
