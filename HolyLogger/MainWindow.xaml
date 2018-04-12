@@ -159,7 +159,6 @@
         <Label Content="Band" HorizontalAlignment="Left" Margin="422,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="Score" HorizontalAlignment="Left" Margin="459,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="523,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <Label x:Name="UTCTimer" Content="00:00:00" HorizontalAlignment="Left" Margin="661,13,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="161" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" KeyDown="TB_DXCallsign_KeyDown" FontSize="16" ToolTip="The DX Station Callsign"/>

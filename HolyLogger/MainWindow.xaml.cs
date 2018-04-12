@@ -146,10 +146,13 @@ namespace HolyLogger
 
         QSO QsoToUpdate;
 
+        System.Timers.Timer UTCTimer = new System.Timers.Timer();
+        private string title = "HolyLogger - 4X / 4Z Log application               ";
+
         public MainWindow()
         {
             InitializeComponent();
-            UTCTimer.Content = DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
+            this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
             if (Properties.Settings.Default.UpdateSettings)
             {
                 Properties.Settings.Default.Upgrade();
@@ -240,17 +243,16 @@ namespace HolyLogger
             _stickyWindow.StickOnResize = true;
             _stickyWindow.StickOnMove = true;
 
-            System.Timers.Timer tmr = new System.Timers.Timer();
-            tmr.Interval = 1000;//ticks every 1 second
-            tmr.Elapsed += Tmr_Elapsed;
-            tmr.Start();
+            UTCTimer.Interval = 1000;//ticks every 1 second
+            UTCTimer.Elapsed += UTCTimer_Elapsed;
+            UTCTimer.Start();
         }
 
-        private void Tmr_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private void UTCTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
         {
             this.Dispatcher.Invoke(() =>
             {
-                UTCTimer.Content = DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
+                this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
             });
             
         }
@@ -969,6 +971,7 @@ namespace HolyLogger
 
         private void Window_Closed(object sender, EventArgs e)
         {
+            UTCTimer.Elapsed -= UTCTimer_Elapsed;
             if (OmniRigEngine != null)
             {
                 OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
