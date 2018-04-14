@@ -207,8 +207,8 @@ namespace HolyLogger
             
             TB_MyCallsign.Focus();
 
-            Left = Properties.Settings.Default.MainWindowLeft;
-            Top = Properties.Settings.Default.MainWindowTop;
+            Left = Properties.Settings.Default.MainWindowLeft < 0 ? 0 : Properties.Settings.Default.MainWindowLeft;
+            Top = Properties.Settings.Default.MainWindowTop < 0 ? 0 : Properties.Settings.Default.MainWindowTop;
             Width = Properties.Settings.Default.MainWindowWidth;
             Height = Properties.Settings.Default.MainWindowHeight;
             
@@ -1059,8 +1059,8 @@ namespace HolyLogger
         private void GenerateNewSignboardWindow()
         {
             signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyGrid.Text);
-            signboard.Left = Properties.Settings.Default.SignBoardWindowLeft;
-            signboard.Top = Properties.Settings.Default.SignBoardWindowTop;
+            signboard.Left = Properties.Settings.Default.SignBoardWindowLeft < 0 ? 0 : Properties.Settings.Default.SignBoardWindowLeft;
+            signboard.Top = Properties.Settings.Default.SignBoardWindowTop < 0 ? 0 : Properties.Settings.Default.SignBoardWindowTop;
             signboard.Width = Properties.Settings.Default.SignBoardWindowWidth;
             signboard.Height = Properties.Settings.Default.SignBoardWindowHeight;
             signboard.Show();
@@ -1089,8 +1089,8 @@ namespace HolyLogger
         private void GenerateNewMatrixWindow()
         {
             matrix = new MatrixWindow();
-            matrix.Left = Properties.Settings.Default.MatrixWindowLeft;
-            matrix.Top = Properties.Settings.Default.MatrixWindowTop;
+            matrix.Left = Properties.Settings.Default.MatrixWindowLeft < 0 ? 0 : Properties.Settings.Default.MatrixWindowLeft;
+            matrix.Top = Properties.Settings.Default.MatrixWindowTop < 0 ? 0 : Properties.Settings.Default.MatrixWindowTop;
             matrix.Show();
         }
 
@@ -1361,8 +1361,10 @@ namespace HolyLogger
 
         private void Window_LocationChanged(object sender, EventArgs e)
         {
-            Properties.Settings.Default.MainWindowLeft = this.Left;
-            Properties.Settings.Default.MainWindowTop = this.Top;
+            if (this.Left >= 0)
+                Properties.Settings.Default.MainWindowLeft = this.Left;
+            if (this.Top >= 0)
+                Properties.Settings.Default.MainWindowTop = this.Top;
         }
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
