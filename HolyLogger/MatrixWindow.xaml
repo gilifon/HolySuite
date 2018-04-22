@@ -5,36 +5,36 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HolyLogger"
         mc:Ignorable="d"
-        Title="Station Statistics" Height="330" Width="280" MinWidth="280" MinHeight="330" MaxWidth="280" MaxHeight="300" LocationChanged="MatrixWindow1_LocationChanged" Icon="Images/matrix.png">
+        Title="Matrix" Height="330" Width="250" MinWidth="50" MinHeight="330" MaxWidth="250" MaxHeight="300" LocationChanged="MatrixWindow1_LocationChanged" Icon="Images/matrix.png">
     <Grid>
-        <Label x:Name="L10" Content="10M" HorizontalAlignment="Left" Margin="17,82,0,0" VerticalAlignment="Top"/>
-        <Label x:Name="L15" Content="15M" HorizontalAlignment="Left" Margin="17,117,0,0" VerticalAlignment="Top"/>
-        <Label x:Name="L20" Content="20M" HorizontalAlignment="Left" Margin="17,152,0,0" VerticalAlignment="Top"/>
-        <Label x:Name="L40" Content="40M" HorizontalAlignment="Left" Margin="17,187,0,0" VerticalAlignment="Top"/>
-        <Label x:Name="L80" Content="80M" HorizontalAlignment="Left" Margin="17,222,0,0" VerticalAlignment="Top"/>
-        <Label x:Name="L160" Content="160M" HorizontalAlignment="Left" Margin="17,257,0,-14" VerticalAlignment="Top"/>
-        <Label x:Name="LSSB" Content="SSB" HorizontalAlignment="Left" Margin="77,52,0,0" VerticalAlignment="Top"/>
-        <Label x:Name="LCW" Content="CW" HorizontalAlignment="Left" Margin="137,52,0,0" VerticalAlignment="Top"/>
-        <Label x:Name="LDIGI" Content="DIGI" HorizontalAlignment="Left" Margin="197,52,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="L10" Content="10M" HorizontalAlignment="Left" Margin="8,82,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="L15" Content="15M" HorizontalAlignment="Left" Margin="8,117,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="L20" Content="20M" HorizontalAlignment="Left" Margin="8,152,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="L40" Content="40M" HorizontalAlignment="Left" Margin="8,187,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="L80" Content="80M" HorizontalAlignment="Left" Margin="8,222,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="L160" Content="160M" HorizontalAlignment="Left" Margin="8,257,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="LSSB" Content="SSB" HorizontalAlignment="Left" Margin="57,52,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="LCW" Content="CW" HorizontalAlignment="Left" Margin="117,52,0,0" VerticalAlignment="Top"/>
+        <Label x:Name="LDIGI" Content="DIGI" HorizontalAlignment="Left" Margin="177,52,0,0" VerticalAlignment="Top"/>
 
-        <Image x:Name="SSB10" HorizontalAlignment="Left" Height="24" Margin="80,83,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="CW10" HorizontalAlignment="Left" Height="24" Margin="139,83,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="DIGI10" HorizontalAlignment="Left" Height="24" Margin="201,83,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="DIGI15" HorizontalAlignment="Left" Height="24" Margin="201,118,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="CW15" HorizontalAlignment="Left" Height="24" Margin="139,118,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="SSB15" HorizontalAlignment="Left" Height="24" Margin="80,118,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="SSB20" HorizontalAlignment="Left" Height="24" Margin="80,153,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="CW20" HorizontalAlignment="Left" Height="24" Margin="139,153,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="DIGI20" HorizontalAlignment="Left" Height="24" Margin="201,153,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="DIGI40" HorizontalAlignment="Left" Height="24" Margin="201,188,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="CW40" HorizontalAlignment="Left" Height="24" Margin="139,188,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="SSB40" HorizontalAlignment="Left" Height="24" Margin="80,188,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="SSB80" HorizontalAlignment="Left" Height="24" Margin="80,223,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="CW80" HorizontalAlignment="Left" Height="24" Margin="139,223,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="DIGI80" HorizontalAlignment="Left" Height="24" Margin="201,223,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="DIGI160" HorizontalAlignment="Left" Height="24" Margin="201,258,0,-13" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="CW160" HorizontalAlignment="Left" Height="24" Margin="139,258,0,-13" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Image x:Name="SSB160" HorizontalAlignment="Left" Height="24" Margin="80,258,0,-13" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
-        <Label x:Name="L_dup" Content="DUP!" HorizontalAlignment="Left" Margin="90,10,0,0" VerticalAlignment="Top" Background="White" Foreground="Red" FontSize="22" FontWeight="Bold" Visibility="Hidden"/>
+        <Image x:Name="SSB10" HorizontalAlignment="Left" Height="24" Margin="60,83,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="CW10" HorizontalAlignment="Left" Height="24" Margin="119,83,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="DIGI10" HorizontalAlignment="Left" Height="24" Margin="181,83,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="DIGI15" HorizontalAlignment="Left" Height="24" Margin="181,118,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="CW15" HorizontalAlignment="Left" Height="24" Margin="119,118,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="SSB15" HorizontalAlignment="Left" Height="24" Margin="60,118,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="SSB20" HorizontalAlignment="Left" Height="24" Margin="60,153,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="CW20" HorizontalAlignment="Left" Height="24" Margin="119,153,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="DIGI20" HorizontalAlignment="Left" Height="24" Margin="181,153,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="DIGI40" HorizontalAlignment="Left" Height="24" Margin="181,188,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="CW40" HorizontalAlignment="Left" Height="24" Margin="119,188,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="SSB40" HorizontalAlignment="Left" Height="24" Margin="60,188,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="SSB80" HorizontalAlignment="Left" Height="24" Margin="60,223,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="CW80" HorizontalAlignment="Left" Height="24" Margin="119,223,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="DIGI80" HorizontalAlignment="Left" Height="24" Margin="181,223,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="DIGI160" HorizontalAlignment="Left" Height="24" Margin="181,258,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="CW160" HorizontalAlignment="Left" Height="24" Margin="119,258,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Image x:Name="SSB160" HorizontalAlignment="Left" Height="24" Margin="60,258,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        <Label x:Name="L_dup" Content="DUP!" HorizontalAlignment="Center"  VerticalAlignment="Top" Background="White" Foreground="Red" FontSize="22" FontWeight="Bold" Visibility="Visible" HorizontalContentAlignment="Center"/>
     </Grid>
 </Window>
