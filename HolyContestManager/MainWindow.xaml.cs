@@ -140,7 +140,7 @@ namespace HolyContestManager
 
             //DoStuff();
             //sendMail();
-            SendMailingList();
+            //SendMailingList();
 
             Report = new List<Participant>(200);
             FilteredReport = new List<Participant>(200);
