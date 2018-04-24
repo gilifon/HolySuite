@@ -210,5 +210,14 @@ namespace HolyLogger
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
         }
+        public int GetDXCCCount()
+        {
+            string stm = "SELECT count(distinct country) FROM qso";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            {
+                cmd.CommandType = CommandType.Text;
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
     }
 }

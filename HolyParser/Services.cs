@@ -66,7 +66,7 @@ namespace HolyParser
                 if (qso.SRX != null) adif.AppendFormat("<srx_string:{0}>{1} ", qso.SRX.Length, qso.SRX);
                 if (qso.Freq != null) adif.AppendFormat("<freq:{0}>{1} ", qso.Freq.Length, qso.Freq);
                 if (qso.Mode != null) adif.AppendFormat("<mode:{0}>{1} ", qso.Mode.Length, qso.Mode);
-                if (qso.Band != null) adif.AppendFormat("<band:{0}>{1} ", qso.Band.Length, qso.Band);
+                if (qso.Band != null) adif.AppendFormat("<band:{0}>{1} ", qso.Band.Length + 1, qso.Band + "M");
                 if (qso.MyCall != null) adif.AppendFormat("<station_callsign:{0}>{1} ", qso.MyCall.Length, qso.MyCall);
                 if (qso.MyCall != null) adif.AppendFormat("<operator:{0}>{1} ", qso.MyCall.Length, qso.MyCall);
                 if (qso.Name != null) adif.AppendFormat("<name:{0}>{1} ", qso.Name.Length, qso.Name);
@@ -117,7 +117,7 @@ namespace HolyParser
                 csv.AppendFormat("{0},", rem.GetEntity(qso.DXCall));
                 csv.AppendFormat("{0},", qso.Name);
                 csv.AppendFormat("{0},", "");
-                csv.AppendFormat("{0},", qso.Band);
+                csv.AppendFormat("{0},", qso.Band + "M");
                 csv.AppendFormat("{0},", qso.Mode);
                 csv.AppendFormat("{0},", qso.RST_RCVD);
                 csv.AppendFormat("{0},", qso.RST_SENT);

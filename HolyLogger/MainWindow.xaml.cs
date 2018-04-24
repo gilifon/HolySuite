@@ -68,6 +68,17 @@ namespace HolyLogger
             }
         }
 
+        private string _NumOfDXCCs;
+        public string NumOfDXCCs
+        {
+            get { return _NumOfDXCCs; }
+            set
+            {
+                _NumOfDXCCs = value;
+                OnPropertyChanged("NumOfDXCCs");
+            }
+        }
+
         private string _IsOmniRigEnabled;
         public string IsOmniRigEnabled
         {
@@ -145,6 +156,7 @@ namespace HolyLogger
         private bool NotifyVersionUpToDate = false;
 
         QSO QsoToUpdate;
+        QSO QsoPreUpdate;
 
         System.Timers.Timer UTCTimer = new System.Timers.Timer();
         private string title = "HolyLogger - 4X / 4Z Log application               ";
@@ -168,6 +180,7 @@ namespace HolyLogger
             this.PropertyChanged += MainWindow_PropertyChanged;
 
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
+            L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
 
             EntityResolverWorker = new BackgroundWorker();
             EntityResolverWorker.DoWork += EntityResolverWorker_DoWork;
@@ -385,10 +398,25 @@ namespace HolyLogger
                     q.Time = QsoToUpdate.Time;
                     QSODataGrid.Items.Refresh();
                 }
+                LoadPreEditUserData();
             }
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
             ClearMatrix();
+        }
+
+        private void LoadPreEditUserData()
+        {
+            //TB_Comment.Text = QsoPreUpdate.Comment;
+            //TB_DXCallsign.Text = QsoPreUpdate.DXCall;
+            //TB_Exchange.Text = QsoPreUpdate.SRX;
+            Frequency = QsoPreUpdate.Freq;
+            TB_MyCallsign.Text = QsoPreUpdate.MyCall;
+            TB_MyGrid.Text = QsoPreUpdate.STX;
+            //TB_RSTRcvd.Text = QsoPreUpdate.RST_RCVD;
+            //TB_RSTSent.Text = QsoPreUpdate.RST_SENT;
+            //TB_DX_Name.Text = QsoPreUpdate.Name;
+            Mode = QsoPreUpdate.Mode;
         }
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
@@ -431,7 +459,13 @@ namespace HolyLogger
                 RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
             ClearMatrix();
+            if (state == State.Edit)
+            {
+                LoadPreEditUserData();
+            }
             UpdateState(State.New);
+            ShowRigStatus();
+            ShowRigParams();
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -456,6 +490,7 @@ namespace HolyLogger
             parseAdif();
             NumOfQSOs = dal.GetQsoCount().ToString();
             NumOfGrids = dal.GetGridCount().ToString();
+            NumOfDXCCs = dal.GetDXCCCount().ToString();
             Score = p.Result.ToString();
         }
 
@@ -676,7 +711,7 @@ namespace HolyLogger
                 sb.Append("'"); sb.Append(qso.STX.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Mode.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Freq.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Band.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Band.Replace("'", "\"")); sb.Append("M',");
                 sb.Append("'"); sb.Append(qso.DXCall.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Date.Replace("'", "\"") + " " + qso.Time.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.RST_SENT.Replace("'", "\"")); sb.Append("',");
@@ -758,6 +793,11 @@ namespace HolyLogger
                 QsoToUpdate = QSODataGrid.SelectedItem as QSO;
                 try
                 {
+                    if (state == State.New)
+                    {
+                        QsoPreUpdate = new QSO();
+                        HoldPreEditUserData();
+                    }                    
                     LoadQsoForUpdate();
                 }
                 catch (Exception ex)
@@ -766,6 +806,20 @@ namespace HolyLogger
                 }                
                 UpdateMatrix();
             }
+        }
+
+        private void HoldPreEditUserData()
+        {
+            QsoPreUpdate.Comment = TB_Comment.Text;
+            QsoPreUpdate.DXCall = TB_DXCallsign.Text;
+            QsoPreUpdate.SRX = TB_Exchange.Text;
+            QsoPreUpdate.Freq = Frequency;
+            QsoPreUpdate.MyCall = TB_MyCallsign.Text;
+            QsoPreUpdate.STX = TB_MyGrid.Text;
+            QsoPreUpdate.RST_RCVD = TB_RSTRcvd.Text;
+            QsoPreUpdate.RST_SENT = TB_RSTSent.Text;
+            QsoPreUpdate.Name = TB_DX_Name.Text;
+            QsoPreUpdate.Mode = Mode;
         }
 
         private void LoadQsoForUpdate()
@@ -799,7 +853,7 @@ namespace HolyLogger
             }
             
         }
-
+        
         private void UpdateState(State newState)
         {
             state = newState;
@@ -956,6 +1010,7 @@ namespace HolyLogger
         {
             Properties.Settings.Default.isManualMode = !Properties.Settings.Default.isManualMode;
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
+            L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
         }
         
 
@@ -1739,7 +1794,7 @@ namespace HolyLogger
 
         private void ShowRigParams()
         {
-            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || Properties.Settings.Default.isManualMode)
+            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || Properties.Settings.Default.isManualMode || state == State.Edit)
             {
                 return;
             }

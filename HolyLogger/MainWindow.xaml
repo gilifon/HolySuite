@@ -12,7 +12,7 @@
             <RowDefinition Height="30" />
             <RowDefinition Height="250" />
             <RowDefinition Height="*" />
-            <RowDefinition Height="25" />
+            <RowDefinition Height="40" />
         </Grid.RowDefinitions>
         <DockPanel Name="MainScreen" Grid.Row="0">
             <ToolBarTray DockPanel.Dock="Top">
@@ -118,22 +118,34 @@
         <DockPanel Grid.Row="4">
             <StatusBar DockPanel.Dock="Bottom">
                 <StatusBarItem>
-                    <TextBlock Text="QSOs: "/>
+                    <TextBlock Text="QSOs: " FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="10,0,0,0"/>
+                    <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="10,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock Text="Grids: " Margin="30,0,0,0"/>
+                    <TextBlock Text="Grids: " Margin="30,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock x:Name="L_numOfGrids" Text="{Binding NumOfGrids, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="10,0,0,0"/>
+                    <TextBlock x:Name="L_numOfGrids" Text="{Binding NumOfGrids, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="10,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock Text="DXCCs: " Margin="30,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock x:Name="L_numOfDXCC" Text="{Binding NumOfDXCCs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="10,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock Text="Manual Mode: " Margin="30,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock x:Name="L_IsManual" Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
 
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Omni-Rig: "/>
-                        <TextBlock x:Name="L_OmniRig" Text="{Binding Status, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Margin="0,0,20,0"/>
+                        <TextBlock Text="Omni-Rig: " FontSize="16"/>
+                        <TextBlock x:Name="L_OmniRig" Text="{Binding Status, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Margin="0,0,20,0" FontSize="16"/>
                     </StackPanel>
                 </StatusBarItem>
             </StatusBar>
