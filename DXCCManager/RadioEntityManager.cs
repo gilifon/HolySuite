@@ -2888,7 +2888,7 @@ namespace DXCCManager
             "8R2|Guyana, Berbice|SA|4|6N|58.28W|12|09||R|=129",
             "8R3|Guyana, Essequibo|SA|4|6.64N|58.36W|12|09||R|=129",
             "VP3|British Guyana|SA|4|6.83N|58.16W|12|09||R|-1966/12/31=129",
-            "9A##|Croatia, Special Station|EU|-1|45.80N|15.94E|28|15||R|1991/06/26-=497",
+            "9A#|Croatia, Special Station|EU|-1|45.80N|15.94E|28|15||R|1991/06/26-=497",
             "9G5|Ghana, Guest Operators|AF|0|5.58N|0.20W|46|35||R|=424",
             "9H[01] 9H##|Malta, Special Station|EU|-1|35.90N|14.51E|28|15||R|=257",
             "9H3|Malta, Guest Operators|EU|-1|35.90N|14.51E|28|15||R|=257",
@@ -4751,15 +4751,15 @@ namespace DXCCManager
             "PI1 PI4 PI8 PI9|Netherlands, Club Station|EU|-1|52N|5E|27|14||R|=263",
             "PI5|Netherlands, PTT Club Station|EU|-1|52N|5E|27|14||R|=263",
             "PA[0-57-9][A-Z] PA[0-57-9][A-Z]% PA[0-57-9][A-Z]%% P[BC-EFGH]#[A-Z] P[BC-EFGH]#[A-Z]% P[BC-EFGH]#[A-Z]%%|Netherlands, Full License|EU|-1|52N|5E|27|14||R|2003/08/19-=263",
-            "PJ0 PJ1|Netherlands Antilles, Curacao, Special or Contest Station|SA|4|12.1034N|68.9342W|11|09||R|-2010/10/09=85",
-            "PJ2|Netherlands Antilles, Curacao|SA|4|12.1034N|68.9342W|11|09||R|-2010/10/09=85",
-            "PJ3|Aruba|SA|4|12.5246N|70.2675W|11|09||R|-1985/12/31=85",
-            "PJ4|Netherlands Antilles, Bonaire|SA|4|12.2287N|68.3301W|11|09||R|-2010/10/09=85",
-            "PJ9|Netherlands Antilles, Curacao, Guest Operator|SA|4|12.1034N|68.9342W|11|09||R|-2010/10/09=85",
-            "PJ5|Sint Eustatius|NA|4|17.504N|62.9805W|11|08||R|-2010/10/09=255",
-            "PJ5|Sint Eustatius|NA|4|17.504N|62.9805W|11|08||R|2010/10/10-=519",
-            "PJ6|Saba Isl.|NA|4|17.6372N|63.230661W|11|08||R|-2010/10/09=255",
-            "PJ8|Sint Maarten, Guest Operators|NA|4|12.1034N|68.9342W|11|08||R|-2010/10/09=255",
+            "PJ0 PJ1|Netherlands Antilles, Curacao, Special or Contest Station|SA|4|12.1034N|68.9342W|11|09||R|=85",
+            "PJ2|Netherlands Antilles, Curacao|SA|4|12.1034N|68.9342W|11|09||R|=85",
+            "PJ3|Aruba|SA|4|12.5246N|70.2675W|11|09||R|=85",
+            "PJ4|Netherlands Antilles, Bonaire|SA|4|12.2287N|68.3301W|11|09||R|=85",
+            "PJ9|Netherlands Antilles, Curacao, Guest Operator|SA|4|12.1034N|68.9342W|11|09||R|=85",
+            "PJ5|Sint Eustatius|NA|4|17.504N|62.9805W|11|08||R|=255",
+            "PJ5|Sint Eustatius|NA|4|17.504N|62.9805W|11|08||R|=519",
+            "PJ6|Saba Isl.|NA|4|17.6372N|63.230661W|11|08||R|=255",
+            "PJ8|Sint Maarten, Guest Operators|NA|4|12.1034N|68.9342W|11|08||R|=255",
             "Z[V-Z]#Z Z[V-Z]##|Brazil, Special or Contest Station|SA|3|23.55S|46.63W|15|11||R|=108",
             "PX[1-9]% PX#|Brazil, Special or Contest Station|SA|3|23.55S|46.63W|15|11||R|1970/01/01-=108",
             "PO[1-9]% PP[1-9]% PQ[1-9]% PR[1-9]% PS[1-9]% PT[1-9]% PU[1-9]% PV[1-9]% PW[1-79]% PY[1-9]%|Brazil, Special or Contest Station|SA|3|16.72S|49.30W|13|11||R|=108",
@@ -6198,7 +6198,7 @@ namespace DXCCManager
             "1C 1X|Tchetchenya (no DXCC credit!)|EU|-3|43.20N|45.42E|29|16||R|=0",
             "1Z|Myanmar (Burma), Province of Kawthoolei, Karen National Union (no DXCC credit!)|AS|-6.5|17N|96E|49|26||R|=0",
             "XY|Myanmar (Burma), Special or Contest Station|AS|-6.5|17N|96E|49|26||R|=309",
-            "9A11|Bosnia-Hercegovina (controlled by Croatia - no DXCC credit!)|EU|-1|43.86N|18.43E|28|15||R|1991/06/26-2007/12/31=0",
+            //"9A11|Bosnia-Hercegovina (controlled by Croatia - no DXCC credit!)|EU|-1|43.86N|18.43E|28|15||R|1991/06/26-2007/12/31=0",
             "S1 1SL|Sealand (no DXCC credit!)|EU|-0|51.88N|1.48E|27|14||R|=0",
             "T0 0S 1P#|Principality of Seborga (no DXCC credit!)|EU|-1|43.82N|7.69E|28|15||R|=0",
             "T8|Principality of Seborga (no DXCC credit!)|EU|-1|43.82N|7.69E|28|15||R|1995/01/01-1995/12/31=0",
@@ -6290,7 +6290,7 @@ namespace DXCCManager
         {
             foreach (DXCC item in FinalDXCCs)
             {
-                if (!string.IsNullOrWhiteSpace(item.prefixes) && prefixesRegexCache["^(" + item.prefixes + ".*)"].IsMatch(callsign))
+                if (!string.IsNullOrWhiteSpace(item.prefixes) && prefixesRegexCache["^(" + item.prefixes + ".*)"].IsMatch(callsign) && !string.IsNullOrWhiteSpace(item.name))
                 {
                     return item.name;
                 }

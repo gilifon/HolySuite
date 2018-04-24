@@ -139,20 +139,20 @@ namespace HolyLogger
                     {
                         QSO q = new QSO();
                         if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
-                        if (rdr["comment"] != null) q.Comment = (string)rdr["comment"];
-                        if (rdr["dx_callsign"] != null) q.DXCall = (string)rdr["dx_callsign"];
-                        if (rdr["mode"] != null) q.Mode = (string)rdr["mode"];
-                        if (rdr["exchange"] != null) q.SRX = (string)rdr["exchange"];
-                        if (rdr["frequency"] != null) q.Freq = (string)rdr["frequency"];
-                        if (rdr["band"] != null) q.Band = (string)rdr["band"];
-                        if (rdr["my_callsign"] != null) q.MyCall = (string)rdr["my_callsign"];
-                        if (rdr["my_square"] != null) q.STX = (string)rdr["my_square"];
-                        if (rdr["rst_rcvd"] != null) q.RST_RCVD = (string)rdr["rst_rcvd"];
-                        if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
-                        if (rdr["name"] != null) q.Name = (string)rdr["name"];
-                        if (rdr["country"] != null) q.Country = (string)rdr["country"];
-                        if (rdr["time"] != null) q.Time = (string)rdr["time"];
-                        if (rdr["date"] != null) q.Date = (string)rdr["date"];
+                        if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
+                        if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
+                        if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                        if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
+                        if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
+                        if (rdr["band"] != null) q.Band = rdr["band"].ToString();
+                        if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
+                        if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
+                        if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
+                        if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
+                        if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                        if (rdr["country"] != null) q.Country = rdr["country"].ToString();
+                        if (rdr["time"] != null) q.Time = rdr["time"].ToString();
+                        if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                         qso_list.Add(q);
                     }
                 }

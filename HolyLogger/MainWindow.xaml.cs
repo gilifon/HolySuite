@@ -336,8 +336,16 @@ namespace HolyLogger
                 DateTime time = TP_Time.Value.Value;
                 qso.Time = time.Hour.ToString("D2") + time.Minute.ToString("D2") + time.Second.ToString("D2");
                 //if (Properties.Settings.Default.live_log) PostQSO(qso);
-                QSO q = dal.Insert(qso);
-                Qsos.Insert(0, q);
+                try
+                {
+                    QSO q = dal.Insert(qso);
+                    Qsos.Insert(0, q);
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
+                }
+                
             }
             else if (state == State.Edit)
             {
