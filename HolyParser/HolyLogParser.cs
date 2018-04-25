@@ -519,7 +519,7 @@ th,td
             {
                 if (parsedFreq >= 0 && parsedFreq <= 2) return "160";
                 if (parsedFreq >= 2 && parsedFreq <= 5) return "80";
-                if (parsedFreq >= 5 && parsedFreq <= 10) return "40";
+                if (parsedFreq >= 5 && parsedFreq <= 9) return "40";
                 if (parsedFreq >= 10 && parsedFreq <= 11) return "30";
                 if (parsedFreq >= 12 && parsedFreq <= 16) return "20";
                 if (parsedFreq >= 18 && parsedFreq <= 19) return "17";
@@ -533,7 +533,7 @@ th,td
             {
                 if (parsedFreq >= 0 && parsedFreq <= 2000) return "160";
                 if (parsedFreq >= 2000 && parsedFreq <= 5000) return "80";
-                if (parsedFreq >= 5000 && parsedFreq <= 10000) return "40";
+                if (parsedFreq >= 5000 && parsedFreq <= 9000) return "40";
                 if (parsedFreq >= 10000 && parsedFreq <= 11000) return "30";
                 if (parsedFreq >= 12000 && parsedFreq <= 16000) return "20";
                 if (parsedFreq >= 18000 && parsedFreq <= 19000) return "17";
@@ -547,7 +547,7 @@ th,td
             {
                 if (parsedFreq >= 0 && parsedFreq <= 2000000) return "160";
                 if (parsedFreq >= 2000000 && parsedFreq <= 5000000) return "80";
-                if (parsedFreq >= 5000000 && parsedFreq <= 10000000) return "40";
+                if (parsedFreq >= 5000000 && parsedFreq <= 9000000) return "40";
                 if (parsedFreq >= 10000000 && parsedFreq <= 11000000) return "30";
                 if (parsedFreq >= 12000000 && parsedFreq <= 16000000) return "20";
                 if (parsedFreq >= 18000000 && parsedFreq <= 19000000) return "17";
