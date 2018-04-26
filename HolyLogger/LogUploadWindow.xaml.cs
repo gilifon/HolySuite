@@ -68,51 +68,7 @@ namespace HolyLogger
                 OnPropertyChanged("CategoryPower");
             }
         }
-
-        private string _Email;
-        public string Email
-        {
-            get { return _Email; }
-            set
-            {
-                _Email = value;
-                OnPropertyChanged("Email");
-            }
-        }
-
-        private string _EmailConf;
-        public string EmailConf
-        {
-            get { return _EmailConf; }
-            set
-            {
-                _EmailConf = value;
-                OnPropertyChanged("EmailConf");
-            }
-        }
-
-        private string _Handle;
-        public string Handle
-        {
-            get { return _Handle; }
-            set
-            {
-                _Handle = value;
-                OnPropertyChanged("Handle");
-            }
-        }
-
-        private string _Callsign;
-        public string Callsign
-        {
-            get { return _Callsign; }
-            set
-            {
-                _Callsign = value;
-                OnPropertyChanged("Callsign");
-            }
-        }
-
+        
         public LogUploadWindow()
         {
             InitializeComponent();
@@ -120,9 +76,9 @@ namespace HolyLogger
 
         private void SendLogBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(CategoryOperator) && !string.IsNullOrWhiteSpace(CategoryMode) && !string.IsNullOrWhiteSpace(CategoryPower) && !string.IsNullOrWhiteSpace(Email) && !string.IsNullOrWhiteSpace(Handle) && !string.IsNullOrWhiteSpace(Callsign))
+            if (!string.IsNullOrWhiteSpace(CategoryOperator) && !string.IsNullOrWhiteSpace(CategoryMode) && !string.IsNullOrWhiteSpace(CategoryPower) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoEmail) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoName) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoCallsign))
             {
-                if (Email == EmailConf)
+                if (Properties.Settings.Default.PersonalInfoEmail == Properties.Settings.Default.PersonalInfoEmailConf)
                 {
                     if (SendLog != null)
                     {

@@ -27,7 +27,7 @@ namespace HolyLogger
         public SignboardWindow(string call, string square)
         {
             InitializeComponent();
-            this.Loaded += SignboardWindow_Loaded; ;
+            this.Loaded += SignboardWindow_Loaded;
 
             signboardData = new SignboardData()
             {

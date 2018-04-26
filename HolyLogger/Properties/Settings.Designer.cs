@@ -298,5 +298,53 @@ namespace HolyLogger.Properties {
                 this["UpdateSettings"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string PersonalInfoCallsign {
+            get {
+                return ((string)(this["PersonalInfoCallsign"]));
+            }
+            set {
+                this["PersonalInfoCallsign"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string PersonalInfoName {
+            get {
+                return ((string)(this["PersonalInfoName"]));
+            }
+            set {
+                this["PersonalInfoName"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string PersonalInfoEmail {
+            get {
+                return ((string)(this["PersonalInfoEmail"]));
+            }
+            set {
+                this["PersonalInfoEmail"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string PersonalInfoEmailConf {
+            get {
+                return ((string)(this["PersonalInfoEmailConf"]));
+            }
+            set {
+                this["PersonalInfoEmailConf"] = value;
+            }
+        }
     }
 }

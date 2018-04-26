@@ -624,13 +624,13 @@ namespace HolyLogger
                 return;
             }
             LogUploadWindow w = (LogUploadWindow)sender;
-            string bareCallsign = Services.getBareCallsign(w.Callsign);
+            string bareCallsign = Services.getBareCallsign(Properties.Settings.Default.PersonalInfoCallsign);
             string country = Services.getHamQth(bareCallsign);
-            string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, w.Email, w.Handle, country);
+            string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
             string UploadLogToIARC_result = await UploadLogToIARC();
 
             StringBuilder sb = new StringBuilder(200);
-            sb.Append("Dear ").Append(w.Handle).Append(",<br><br>");
+            sb.Append("Dear ").Append(Properties.Settings.Default.PersonalInfoName).Append(",<br><br>");
             sb.Append("Thank you for participating in the 'Holyland Contest' and for sending the log.<br>");
             sb.Append("Please be patient, we will publish the result as soon as all the logs are received.<br><br>");
             sb.Append("73 and Best Regards,<br>");
@@ -638,7 +638,7 @@ namespace HolyLogger
             sb.Append("Online Log Manager.<br><br><br>");
             sb.Append("http://www.iarc.org/iarc/#HolylandResults");
 
-            string Sendemail_result = await Services.SendMail("info@iarc.org", w.Email, "Holyland Contest - your log was received", sb.ToString());
+            string Sendemail_result = await Services.SendMail("info@iarc.org", Properties.Settings.Default.PersonalInfoEmail, "Holyland Contest - your log was received", sb.ToString());
             w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
