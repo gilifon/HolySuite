@@ -191,10 +191,12 @@ namespace HolyLogger
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
-            
-
             if (TB_MyGrid.IsEnabled) Lock_Btn.Opacity = 1;
             else Lock_Btn.Opacity = 0.5;
+
+            TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
+            if (TB_Comment.IsEnabled) LockComment_Btn.Opacity = 1;
+            else LockComment_Btn.Opacity = 0.5;
 
             if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
             {
@@ -294,7 +296,7 @@ namespace HolyLogger
 
         private void EntityResolverWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            rem.GetEntity("kuku");
+            rem.GetDXCCName("kuku");
         }
 
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -317,6 +319,14 @@ namespace HolyLogger
             //TB_Frequency.IsEnabled = !(TB_Frequency.IsEnabled);
             //CB_Mode.IsEnabled = !(CB_Mode.IsEnabled);
             if (TB_MyGrid.IsEnabled) ((Image)sender).Opacity = 1;
+            else ((Image)sender).Opacity = 0.5;
+        }
+
+        private void LockComment_Btn_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            Properties.Settings.Default.isCommentLocked = !Properties.Settings.Default.isCommentLocked;
+            TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
+            if (TB_Comment.IsEnabled) ((Image)sender).Opacity = 1;
             else ((Image)sender).Opacity = 0.5;
         }
 
@@ -451,8 +461,7 @@ namespace HolyLogger
                 TB_RSTSent.Text = "599";
                 TB_RSTRcvd.Text = "599";
             }
-
-            TB_Comment.Clear();
+            if (TB_Comment.IsEnabled) TB_Comment.Clear();
             FName = string.Empty;
             Country = string.Empty;
             if (!Properties.Settings.Default.isManualMode)
@@ -1437,7 +1446,7 @@ namespace HolyLogger
 
         private async void getQrzData()
         {
-            Country = rem.GetEntity(TB_DXCallsign.Text);
+            Country = rem.GetDXCCName(TB_DXCallsign.Text);
 
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
@@ -1458,18 +1467,21 @@ namespace HolyLogger
                         //else
                         //    Country = "";
 
-                        IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
-                        if (fname.Count() > 0)
-                            FName = fname.FirstOrDefault().Value;
-                        else
-                            FName = "";
+                        if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+                        {
+                            IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
+                            if (fname.Count() > 0)
+                                FName = fname.FirstOrDefault().Value;
+                            else
+                                FName = "";
 
-                        IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
-                        if (lname.Count() > 0)
-                            FName += " " + lname.FirstOrDefault().Value;
+                            IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                            if (lname.Count() > 0)
+                                FName += " " + lname.FirstOrDefault().Value;
 
-                        string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
-                        if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
+                            string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
+                            if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
+                        }
                     }
 
                     catch (Exception)

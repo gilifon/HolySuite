@@ -200,8 +200,6 @@ th,td
                 if (match.Success)
                 {
                     qso_row.DXCall = Regex.Split(row, dxcall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                    //rem.GetEntityAsync(qso_row.Call);
-                    qso_row.DXCC = rem.GetEntity(qso_row.DXCall);
                 }
 
                 regex = new Regex(mycall_pattern, RegexOptions.IgnoreCase);
@@ -266,6 +264,7 @@ th,td
                     qso_row.Comment = "";
                 }
 
+                //if the file contains dxcc, prefer it over the RadioEntityResolver 
                 regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
                 if (match.Success)
@@ -339,7 +338,8 @@ th,td
                 }
                 else
                 {
-                    qso_row.Country = "";
+                    qso_row.Country = rem.GetDXCCName(qso_row.DXCall);
+                    //qso_row.Country = "";
                 }
 
                 qso_row.StandartizeQSO();

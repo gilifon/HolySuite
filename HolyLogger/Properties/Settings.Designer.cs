@@ -346,5 +346,17 @@ namespace HolyLogger.Properties {
                 this["PersonalInfoEmailConf"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool isCommentLocked {
+            get {
+                return ((bool)(this["isCommentLocked"]));
+            }
+            set {
+                this["isCommentLocked"] = value;
+            }
+        }
     }
 }
