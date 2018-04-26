@@ -76,33 +76,33 @@ namespace HolyLogger
             DIGI160.Source = x;
         }
 
-        public void SetMatrix(Mode mode, int band)
+        public void SetMatrix(Mode mode, string band)
         {
             switch (mode)
             {
                 case Mode.SSB:
-                    if (band == 10) SSB10.Source = v;
-                    if (band == 15) SSB15.Source = v;
-                    if (band == 20) SSB20.Source = v;
-                    if (band == 40) SSB40.Source = v;
-                    if (band == 80) SSB80.Source = v;
-                    if (band == 160) SSB160.Source = v;
+                    if (band == "10M") SSB10.Source = v;
+                    if (band == "15M") SSB15.Source = v;
+                    if (band == "20M") SSB20.Source = v;
+                    if (band == "40M") SSB40.Source = v;
+                    if (band == "80M") SSB80.Source = v;
+                    if (band == "160M") SSB160.Source = v;
                     break;
                 case Mode.CW:
-                    if (band == 10) CW10.Source = v;
-                    if (band == 15) CW15.Source = v;
-                    if (band == 20) CW20.Source = v;
-                    if (band == 40) CW40.Source = v;
-                    if (band == 80) CW80.Source = v;
-                    if (band == 160) CW160.Source = v;
+                    if (band == "10M") CW10.Source = v;
+                    if (band == "15M") CW15.Source = v;
+                    if (band == "20M") CW20.Source = v;
+                    if (band == "40M") CW40.Source = v;
+                    if (band == "80M") CW80.Source = v;
+                    if (band == "160M") CW160.Source = v;
                     break;
                 case Mode.DIGI:
-                    if (band == 10) DIGI10.Source = v;
-                    if (band == 15) DIGI15.Source = v;
-                    if (band == 20) DIGI20.Source = v;
-                    if (band == 40) DIGI40.Source = v;
-                    if (band == 80) DIGI80.Source = v;
-                    if (band == 160) DIGI160.Source = v;
+                    if (band == "10M") DIGI10.Source = v;
+                    if (band == "15M") DIGI15.Source = v;
+                    if (band == "20M") DIGI20.Source = v;
+                    if (band == "40M") DIGI40.Source = v;
+                    if (band == "80M") DIGI80.Source = v;
+                    if (band == "160M") DIGI160.Source = v;
                     break;
                 default:
                     break;

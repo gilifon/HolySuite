@@ -526,45 +526,45 @@ th,td
             if (!double.TryParse(freq.Replace(".","").Replace(",",""), NumberStyles.Number, provider, out parsedFreq)) return string.Empty;
             if (parsedFreq < 1000)
             {
-                if (parsedFreq >= 0 && parsedFreq <= 2) return "160";
-                if (parsedFreq >= 2 && parsedFreq <= 5) return "80";
-                if (parsedFreq >= 5 && parsedFreq <= 9) return "40";
-                if (parsedFreq >= 10 && parsedFreq <= 11) return "30";
-                if (parsedFreq >= 12 && parsedFreq <= 16) return "20";
-                if (parsedFreq >= 18 && parsedFreq <= 19) return "17";
-                if (parsedFreq >= 20 && parsedFreq <= 23) return "15";
-                if (parsedFreq >= 24 && parsedFreq <= 25) return "12";
-                if (parsedFreq >= 27 && parsedFreq <= 30) return "10";
-                if (parsedFreq >= 50 && parsedFreq <= 54) return "6";
-                if (parsedFreq >= 144 && parsedFreq <= 146) return "2";
+                if (parsedFreq >= 0 && parsedFreq <= 2) return "160M";
+                if (parsedFreq >= 2 && parsedFreq <= 5) return "80M";
+                if (parsedFreq >= 5 && parsedFreq <= 9) return "40M";
+                if (parsedFreq >= 10 && parsedFreq <= 11) return "30M";
+                if (parsedFreq >= 12 && parsedFreq <= 16) return "20M";
+                if (parsedFreq >= 18 && parsedFreq <= 19) return "17M";
+                if (parsedFreq >= 20 && parsedFreq <= 23) return "15M";
+                if (parsedFreq >= 24 && parsedFreq <= 25) return "12M";
+                if (parsedFreq >= 27 && parsedFreq <= 30) return "10M";
+                if (parsedFreq >= 50 && parsedFreq <= 54) return "6M";
+                if (parsedFreq >= 144 && parsedFreq <= 146) return "2M";
             }
             else if (parsedFreq < 1000000)
             {
-                if (parsedFreq >= 0 && parsedFreq <= 2000) return "160";
-                if (parsedFreq >= 2000 && parsedFreq <= 5000) return "80";
-                if (parsedFreq >= 5000 && parsedFreq <= 9000) return "40";
-                if (parsedFreq >= 10000 && parsedFreq <= 11000) return "30";
-                if (parsedFreq >= 12000 && parsedFreq <= 16000) return "20";
-                if (parsedFreq >= 18000 && parsedFreq <= 19000) return "17";
-                if (parsedFreq >= 20000 && parsedFreq <= 23000) return "15";
-                if (parsedFreq >= 24000 && parsedFreq <= 25000) return "12";
-                if (parsedFreq >= 27000 && parsedFreq <= 30000) return "10";
-                if (parsedFreq >= 50000 && parsedFreq <= 54000) return "6";
-                if (parsedFreq >= 144000 && parsedFreq <= 146000) return "2";
+                if (parsedFreq >= 0 && parsedFreq <= 2000) return "160M";
+                if (parsedFreq >= 2000 && parsedFreq <= 5000) return "80M";
+                if (parsedFreq >= 5000 && parsedFreq <= 9000) return "40M";
+                if (parsedFreq >= 10000 && parsedFreq <= 11000) return "30M";
+                if (parsedFreq >= 12000 && parsedFreq <= 16000) return "20M";
+                if (parsedFreq >= 18000 && parsedFreq <= 19000) return "17M";
+                if (parsedFreq >= 20000 && parsedFreq <= 23000) return "15M";
+                if (parsedFreq >= 24000 && parsedFreq <= 25000) return "12M";
+                if (parsedFreq >= 27000 && parsedFreq <= 30000) return "10M";
+                if (parsedFreq >= 50000 && parsedFreq <= 54000) return "6M";
+                if (parsedFreq >= 144000 && parsedFreq <= 146000) return "2M";
             }
             else if (parsedFreq < 1000000000)
             {
-                if (parsedFreq >= 0 && parsedFreq <= 2000000) return "160";
-                if (parsedFreq >= 2000000 && parsedFreq <= 5000000) return "80";
-                if (parsedFreq >= 5000000 && parsedFreq <= 9000000) return "40";
-                if (parsedFreq >= 10000000 && parsedFreq <= 11000000) return "30";
-                if (parsedFreq >= 12000000 && parsedFreq <= 16000000) return "20";
-                if (parsedFreq >= 18000000 && parsedFreq <= 19000000) return "17";
-                if (parsedFreq >= 20000000 && parsedFreq <= 23000000) return "15";
-                if (parsedFreq >= 24000000 && parsedFreq <= 25000000) return "12";
-                if (parsedFreq >= 27000000 && parsedFreq <= 30000000) return "10";
-                if (parsedFreq >= 50000000 && parsedFreq <= 54000000) return "6";
-                if (parsedFreq >= 144000000 && parsedFreq <= 146000000) return "2";
+                if (parsedFreq >= 0 && parsedFreq <= 2000000) return "160M";
+                if (parsedFreq >= 2000000 && parsedFreq <= 5000000) return "80M";
+                if (parsedFreq >= 5000000 && parsedFreq <= 9000000) return "40M";
+                if (parsedFreq >= 10000000 && parsedFreq <= 11000000) return "30M";
+                if (parsedFreq >= 12000000 && parsedFreq <= 16000000) return "20M";
+                if (parsedFreq >= 18000000 && parsedFreq <= 19000000) return "17M";
+                if (parsedFreq >= 20000000 && parsedFreq <= 23000000) return "15M";
+                if (parsedFreq >= 24000000 && parsedFreq <= 25000000) return "12M";
+                if (parsedFreq >= 27000000 && parsedFreq <= 30000000) return "10M";
+                if (parsedFreq >= 50000000 && parsedFreq <= 54000000) return "6M";
+                if (parsedFreq >= 144000000 && parsedFreq <= 146000000) return "2M";
             }
             return string.Empty;
         }

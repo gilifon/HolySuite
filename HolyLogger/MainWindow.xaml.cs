@@ -1064,7 +1064,7 @@ namespace HolyLogger
                 string band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 if (!string.IsNullOrWhiteSpace(band))
                 {
-                    TB_Band.Text = band + "M";
+                    TB_Band.Text = band;
                 }
                 else
                 {
@@ -1396,20 +1396,18 @@ namespace HolyLogger
             {
                 var qso_list = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
                 HolyLogger.Mode qsoMode;
-                int qsoBand;
 
                 foreach (var item in qso_list)
                 {
                     Enum.TryParse(item.Mode, out qsoMode);
-                    int.TryParse(item.Band, out qsoBand);
-                    matrix.SetMatrix(qsoMode, qsoBand);
+                    matrix.SetMatrix(qsoMode, item.Band);
                 }
             }
             UpdateDup();
         }
         private void UpdateDup()
         {
-            var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band + "M" == TB_Band.Text && qso.Mode == Mode select qso;
+            var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band == TB_Band.Text && qso.Mode == Mode select qso;
             if (state == State.Edit)
                 dups = dups.Where(p => p.id != QsoToUpdate.id);
 
