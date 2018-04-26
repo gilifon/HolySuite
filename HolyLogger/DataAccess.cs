@@ -130,7 +130,7 @@ namespace HolyLogger
         {
             CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
-            string stm = "SELECT * FROM qso ORDER BY date,time DESC";
+            string stm = "SELECT * FROM qso ORDER BY date DESC, time DESC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             {
                 using (SQLiteDataReader rdr = cmd.ExecuteReader())

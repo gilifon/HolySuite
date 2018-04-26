@@ -287,6 +287,10 @@ th,td
                     {
                         qso_row.SRX = Regex.Split(row, srx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                     }
+                    else
+                    {
+                        qso_row.SRX = "000";
+                    }
                 }
 
                 regex = new Regex(stx_pattern, RegexOptions.IgnoreCase);
@@ -302,6 +306,10 @@ th,td
                     if (match.Success)
                     {
                         qso_row.STX = Regex.Split(row, stx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    }
+                    else
+                    {
+                        qso_row.STX = "XXXXX";
                     }
                 }
 
@@ -337,6 +345,7 @@ th,td
                 qso_row.StandartizeQSO();
                 m_qsoList.Add(qso_row);
             }
+            m_qsoList = m_qsoList.OrderBy(p => p.Date).ThenBy(p => p.Time).ToList();
         }
 
         private void CalculateResult()
