@@ -358,5 +358,149 @@ namespace HolyLogger.Properties {
                 this["isCommentLocked"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int Date_index {
+            get {
+                return ((int)(this["Date_index"]));
+            }
+            set {
+                this["Date_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public int Time_index {
+            get {
+                return ((int)(this["Time_index"]));
+            }
+            set {
+                this["Time_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int Callsign_index {
+            get {
+                return ((int)(this["Callsign_index"]));
+            }
+            set {
+                this["Callsign_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("4")]
+        public int Name_index {
+            get {
+                return ((int)(this["Name_index"]));
+            }
+            set {
+                this["Name_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("5")]
+        public int Country_index {
+            get {
+                return ((int)(this["Country_index"]));
+            }
+            set {
+                this["Country_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("6")]
+        public int Frequency_index {
+            get {
+                return ((int)(this["Frequency_index"]));
+            }
+            set {
+                this["Frequency_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("7")]
+        public int Band_index {
+            get {
+                return ((int)(this["Band_index"]));
+            }
+            set {
+                this["Band_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("8")]
+        public int RSTrcvd_index {
+            get {
+                return ((int)(this["RSTrcvd_index"]));
+            }
+            set {
+                this["RSTrcvd_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("9")]
+        public int RSTsent_index {
+            get {
+                return ((int)(this["RSTsent_index"]));
+            }
+            set {
+                this["RSTsent_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("10")]
+        public int Mode_index {
+            get {
+                return ((int)(this["Mode_index"]));
+            }
+            set {
+                this["Mode_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("11")]
+        public int Exchange_index {
+            get {
+                return ((int)(this["Exchange_index"]));
+            }
+            set {
+                this["Exchange_index"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("12")]
+        public int Comment_index {
+            get {
+                return ((int)(this["Comment_index"]));
+            }
+            set {
+                this["Comment_index"] = value;
+            }
+        }
     }
 }

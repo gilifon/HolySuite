@@ -204,7 +204,7 @@
         <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="20" Margin="710,220,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
-        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16" MouseDoubleClick="GridRow_DoubleClick">
+        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16" MouseDoubleClick="GridRow_DoubleClick" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged">
             <!--<DataGrid.ContextMenu>
                 <ContextMenu >
                     <MenuItem Header="Delete" Click="MenuItem_Click" />
@@ -235,7 +235,7 @@
                 <DataGridTemplateColumn Header="Callsign" IsReadOnly="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5" />
+                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5" FontWeight="Bold" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

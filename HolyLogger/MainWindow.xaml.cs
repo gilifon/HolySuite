@@ -42,7 +42,7 @@ namespace HolyLogger
         #endregion
 
         DataAccess dal;
-        RadioEntityResolver rem;
+        EntityResolver rem;
 
         public ObservableCollection<QSO> Qsos;
 
@@ -161,6 +161,8 @@ namespace HolyLogger
         System.Timers.Timer UTCTimer = new System.Timers.Timer();
         private string title = "HolyLogger - 4X / 4Z Log application               ";
 
+        private const int SEND_CHUNK_SIZE = 200;
+
         public MainWindow()
         {
             InitializeComponent();
@@ -184,7 +186,8 @@ namespace HolyLogger
 
             EntityResolverWorker = new BackgroundWorker();
             EntityResolverWorker.DoWork += EntityResolverWorker_DoWork;
-            rem = new RadioEntityResolver();
+            
+            rem = new EntityResolver();
             EntityResolverWorker.RunWorkerAsync();
 
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
@@ -247,6 +250,27 @@ namespace HolyLogger
             if (Properties.Settings.Default.SignBoardWindowIsOpen)
             {
                 GenerateNewSignboardWindow();
+            }
+
+            List<KeyValuePair<string, int>> gridColumnOrder = new List<KeyValuePair<string, int>>();
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Date", Properties.Settings.Default.Date_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Time", Properties.Settings.Default.Time_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Callsign", Properties.Settings.Default.Callsign_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Name", Properties.Settings.Default.Name_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Country", Properties.Settings.Default.Country_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Frequency", Properties.Settings.Default.Frequency_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Band", Properties.Settings.Default.Band_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("RST rcvd", Properties.Settings.Default.RSTrcvd_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("RST sent", Properties.Settings.Default.RSTsent_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Mode", Properties.Settings.Default.Mode_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Exchange", Properties.Settings.Default.Exchange_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("Comment", Properties.Settings.Default.Comment_index));
+
+
+
+            foreach (var item in QSODataGrid.Columns)
+            {
+                item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
             }
         }
 
@@ -413,6 +437,9 @@ namespace HolyLogger
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
             ClearMatrix();
+
+            if (QSODataGrid.Items != null && QSODataGrid.Items[0] != null)
+                QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
         }
 
         private void LoadPreEditUserData()
@@ -520,7 +547,7 @@ namespace HolyLogger
                 string RawAdif = File.ReadAllText(openFileDialog.FileName);
                 p = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
                 p.Parse();
-                List<HolyParser.QSO> rawQSOList = p.GetRawQSO();
+                List<QSO> rawQSOList = p.GetRawQSO();
                 foreach (var rq in rawQSOList)
                 {
                     try
@@ -635,6 +662,7 @@ namespace HolyLogger
             LogUploadWindow w = (LogUploadWindow)sender;
             string bareCallsign = Services.getBareCallsign(Properties.Settings.Default.PersonalInfoCallsign);
             string country = Services.getHamQth(bareCallsign);
+
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
             string UploadLogToIARC_result = await UploadLogToIARC();
 
@@ -684,29 +712,69 @@ namespace HolyLogger
             }
         }
 
-        private async Task<string> UploadLogToIARC()
+        private void UploadLogFileToIARC()
         {
             string insert = GenerateMultipleInsert(dal.GetAllQSOs());
+            string randomFileName = Path.GetRandomFileName();
+            string myTempFile = Path.Combine(Path.GetTempPath(), randomFileName + ".log");
 
-            //************************************************** ASYNC ********************************************//
-            using (var client = new HttpClient())
+            using (StreamWriter sw = new StreamWriter(myTempFile))
             {
-                var values = new Dictionary<string, string>
+                sw.WriteLine(insert);
+            }
+            using (WebClient client = new WebClient())
+            {
+                byte[] Result = client.UploadFile(new Uri("http://www.iarc.org/Holyland/Server/holylogger_logs/temp_insert.log"), myTempFile);
+            }
+            //File.Delete(myTempFile);
+        }
+
+        private async Task<string> UploadLogToIARC()
+        {
+            List<List<QSO>> ChunkedQSOs = SplitQSOList();
+            foreach (var chunk in ChunkedQSOs)
+            {
+                string insert = GenerateMultipleInsert(chunk);
+
+                //************************************************** ASYNC ********************************************//
+                using (var client = new HttpClient())
                 {
-                    { "insertlog", insert }
-                };
-                var content = new FormUrlEncodedContent(values);
-                try
-                {
-                    var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    return responseString;
-                }
-                catch (Exception)
-                {
-                    return "Connection with server failed! Check your internet connection";
+                    var values = new Dictionary<string, string>
+                    {
+                        { "insertlog", insert }
+                    };
+                    var content = new FormUrlEncodedContent(values);
+                    try
+                    {
+                        var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
+                        var responseString = await response.Content.ReadAsStringAsync();
+                        ////return responseString;
+                    }
+                    catch (Exception)
+                    {
+                        return "Connection with server failed! Check your internet connection";
+                    }
                 }
             }
+            return "All Done, 73!";            
+        }
+
+        private List<List<QSO>> SplitQSOList()
+        {
+            var QSOList = dal.GetAllQSOs();
+            int numOfQSO = QSOList.Count;
+            int iterations = numOfQSO / SEND_CHUNK_SIZE;
+            int reminter = numOfQSO % SEND_CHUNK_SIZE;
+            if (reminter > 0) iterations++;
+
+            List<List<QSO>> SplittedQSO = new List<List<QSO>>(iterations);
+
+            for (int i = 0; i < iterations; i++)
+            {
+                SplittedQSO.Add(QSOList.Skip(i * SEND_CHUNK_SIZE).Take(SEND_CHUNK_SIZE).ToList());
+            }
+
+            return SplittedQSO;
         }
 
         private string GenerateMultipleInsert(IList<QSO> qsos)
@@ -720,7 +788,7 @@ namespace HolyLogger
                 sb.Append("'"); sb.Append(qso.STX.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Mode.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Freq.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Band.Replace("'", "\"")); sb.Append("M',");
+                sb.Append("'"); sb.Append(qso.Band.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.DXCall.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Date.Replace("'", "\"") + " " + qso.Time.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.RST_SENT.Replace("'", "\"")); sb.Append("',");
@@ -791,6 +859,37 @@ namespace HolyLogger
                 {
                     e.Handled = true;
                 }
+            }
+        }
+
+        private void QSODataGrid_ColumnDisplayIndexChanged(object sender, DataGridColumnEventArgs e)
+        {
+            foreach (var item in QSODataGrid.Columns)
+            {
+                if (item.Header.ToString() == "Date")
+                    Properties.Settings.Default.Date_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Time")
+                    Properties.Settings.Default.Time_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Callsign")
+                    Properties.Settings.Default.Callsign_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Name")
+                    Properties.Settings.Default.Name_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Country")
+                    Properties.Settings.Default.Country_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Frequency")
+                    Properties.Settings.Default.Frequency_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Band")
+                    Properties.Settings.Default.Band_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "RST rcvd")
+                    Properties.Settings.Default.RSTrcvd_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "RST sent")
+                    Properties.Settings.Default.RSTsent_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Mode")
+                    Properties.Settings.Default.Mode_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Exchange")
+                    Properties.Settings.Default.Exchange_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "Comment")
+                    Properties.Settings.Default.Comment_index = item.DisplayIndex;
             }
         }
 
@@ -1880,8 +1979,8 @@ namespace HolyLogger
 
 
 
-        #endregion
 
+        #endregion
         
     }
 }

@@ -164,7 +164,7 @@ th,td
 
         private void PopulateQSOList()
         {
-            RadioEntityResolver rem = new RadioEntityResolver();
+            EntityResolver rem = new EntityResolver();
 
             m_qsoList.Clear();
             //Remove Line breakers

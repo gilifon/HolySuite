@@ -460,7 +460,7 @@ namespace HolyContestManager
         private string GenerateMultipleInsert(IList<Participant> participants)
         {
             StringBuilder squars = new StringBuilder(10);
-            RadioEntityResolver rem = new RadioEntityResolver();
+            EntityResolver rem = new EntityResolver();
             StringBuilder sb = new StringBuilder("INSERT INTO `hlwtest` ", 500);
             sb.Append("(`active`,`year`,`call`,`uniq_timestamp`,`dxcc`,`continent`,`category`,`qso`,`points`,`mults`,`score`,`operator`,`square`) VALUES ");
             foreach (Participant p in participants)

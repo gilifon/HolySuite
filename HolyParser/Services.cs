@@ -87,7 +87,7 @@ namespace HolyParser
         public static string GenerateCSV(IEnumerable<QSO> qso_list)
         {
             StringBuilder csv = new StringBuilder(200);
-            RadioEntityResolver rem = new RadioEntityResolver();
+            EntityResolver rem = new EntityResolver();
 
             int index = 1;
 
