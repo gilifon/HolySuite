@@ -129,16 +129,15 @@ namespace HolyParser
 
         public static string getBareCallsign(string callsign)
         {
+            string[] callParts = callsign.Split('/');
+            if (callParts.Length == 1) return callsign;
+            if (callParts.Length > 2) return callParts[1];
+            if (callParts.Length == 2)
+            {
+                if (callParts[0].Length > callParts[1].Length) return callParts[0];
+                return callParts[1];
+            }
             return callsign;
-            //string[] callParts = callsign.Split('/');
-            //if (callParts.Length == 1) return callsign;
-            //if (callParts.Length > 2) return callParts[1];
-            //if (callParts.Length == 2)
-            //{
-            //    if (callParts[0].Length > callParts[1].Length) return callParts[0];
-            //    return callParts[1];
-            //}
-            //return callsign;
         }
 
         public static async Task<string> SendMail(string from, string to, string subject, string body)

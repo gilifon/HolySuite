@@ -659,7 +659,7 @@ namespace HolyLogger
                 return;
             }
             LogUploadWindow w = (LogUploadWindow)sender;
-            string bareCallsign = Services.getBareCallsign(Properties.Settings.Default.PersonalInfoCallsign);
+            string bareCallsign = Properties.Settings.Default.PersonalInfoCallsign;
             string country = Services.getHamQth(bareCallsign);
 
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
@@ -1553,7 +1553,7 @@ namespace HolyLogger
                     try
                     {
                         string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
-                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + TB_DXCallsign.Text);
+                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(TB_DXCallsign.Text));
                         var responseFromServer = await response.Content.ReadAsStringAsync();
                         XDocument xDoc = XDocument.Parse(responseFromServer);
 
