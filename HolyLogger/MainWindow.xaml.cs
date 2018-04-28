@@ -387,6 +387,8 @@ namespace HolyLogger
                 {
                     QSO q = dal.Insert(qso);
                     Qsos.Insert(0, q);
+                    if (QSODataGrid.Items != null && QSODataGrid.Items[0] != null)
+                        QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
                 }
                 catch (Exception ex)
                 {
@@ -437,9 +439,6 @@ namespace HolyLogger
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
             ClearMatrix();
-
-            if (QSODataGrid.Items != null && QSODataGrid.Items[0] != null)
-                QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
         }
 
         private void LoadPreEditUserData()
