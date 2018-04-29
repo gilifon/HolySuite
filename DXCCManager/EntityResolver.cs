@@ -394,16 +394,16 @@ namespace DXCCManager
             }
         }        
 
-        public string GetDXCCName(string callsign)
+        public DXCC GetDXCC(string callsign)
         {
             foreach (DXCC item in FinalDXCCs)
             {
                 if (!string.IsNullOrWhiteSpace(item.Prefixes) && prefixesRegexCache["^(" + item.Prefixes + ".*)"].IsMatch(callsign) && !string.IsNullOrWhiteSpace(item.Name))
                 {
-                    return item.Name;
+                    return item;
                 }
             }
-            return callsign.Length > 2 ? callsign.Substring(0, 2) : "Unkown";
+            return new DXCC() { Continent = "XX", Entity = "-1", Name = "Unknown", Prefixes = callsign.Length >= 2 ? callsign.Substring(0, 2) : callsign };
         }
 
         public string GetContinent(string callsign)
@@ -418,7 +418,7 @@ namespace DXCCManager
             return "XX";
         }
 
-        private struct DXCC
+        public struct DXCC
         {
             public string Prefixes { get; set; }
             public string Name { get; set; }

@@ -114,7 +114,7 @@ namespace HolyParser
                 csv.AppendFormat("{0},", date);
                 csv.AppendFormat("{0},", time);
                 csv.AppendFormat("{0},", qso.DXCall);
-                csv.AppendFormat("{0},", rem.GetDXCCName(qso.DXCall));
+                csv.AppendFormat("{0},", rem.GetDXCC(qso.DXCall));
                 csv.AppendFormat("{0},", qso.Name);
                 csv.AppendFormat("{0},", "");
                 csv.AppendFormat("{0},", qso.Band);

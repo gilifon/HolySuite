@@ -34,6 +34,8 @@ namespace HolyParser
 
         private string m_fileText;
         private List<QSO> m_qsoList;
+
+        DXCCManager.EntityResolver.DXCC ER_Dxcc;
         
 
         private string m_template = @"
@@ -165,6 +167,7 @@ th,td
         private void PopulateQSOList()
         {
             EntityResolver rem = new EntityResolver();
+            
 
             m_qsoList.Clear();
             //Remove Line breakers
@@ -200,6 +203,9 @@ th,td
                 if (match.Success)
                 {
                     qso_row.DXCall = Regex.Split(row, dxcall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    ER_Dxcc = rem.GetDXCC(qso_row.DXCall);
+                    qso_row.Country = ER_Dxcc.Name;
+                    qso_row.DXCC = ER_Dxcc.Entity;
                 }
 
                 regex = new Regex(mycall_pattern, RegexOptions.IgnoreCase);
@@ -264,7 +270,7 @@ th,td
                     qso_row.Comment = "";
                 }
 
-                //if the file contains dxcc, prefer it over the RadioEntityResolver 
+                //if the file contains dxcc, prefer it over the EntityResolver
                 regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
                 if (match.Success)
@@ -330,16 +336,12 @@ th,td
                     qso_row.Name = "";
                 }
 
+                //if the file contains country, prefer it over the EntityResolver
                 regex = new Regex(country_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
                 if (match.Success)
                 {
                     qso_row.Country = Regex.Split(row, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-                else
-                {
-                    qso_row.Country = rem.GetDXCCName(qso_row.DXCall);
-                    //qso_row.Country = "";
                 }
 
                 qso_row.StandartizeQSO();

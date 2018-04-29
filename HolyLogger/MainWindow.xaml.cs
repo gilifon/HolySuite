@@ -320,7 +320,7 @@ namespace HolyLogger
 
         private void EntityResolverWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            rem.GetDXCCName("kuku");
+            rem.GetDXCC("kuku");
         }
 
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -1542,7 +1542,7 @@ namespace HolyLogger
 
         private async void getQrzData()
         {
-            Country = rem.GetDXCCName(TB_DXCallsign.Text);
+            Country = rem.GetDXCC(TB_DXCallsign.Text).Name;
 
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
