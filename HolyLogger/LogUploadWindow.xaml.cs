@@ -103,5 +103,13 @@ namespace HolyLogger
         {
             this.Close();
         }
+
+        private void Window_LocationChanged(object sender, EventArgs e)
+        {
+            if (this.Left >= 0)
+                Properties.Settings.Default.LogUploadWindowLeft = this.Left;
+            if (this.Top >= 0)
+                Properties.Settings.Default.LogUploadWindowTop = this.Top;
+        }
     }
 }

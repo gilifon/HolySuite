@@ -502,5 +502,29 @@ namespace HolyLogger.Properties {
                 this["Comment_index"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("50")]
+        public double LogUploadWindowLeft {
+            get {
+                return ((double)(this["LogUploadWindowLeft"]));
+            }
+            set {
+                this["LogUploadWindowLeft"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("50")]
+        public double LogUploadWindowTop {
+            get {
+                return ((double)(this["LogUploadWindowTop"]));
+            }
+            set {
+                this["LogUploadWindowTop"] = value;
+            }
+        }
     }
 }

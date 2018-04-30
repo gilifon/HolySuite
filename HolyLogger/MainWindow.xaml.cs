@@ -145,6 +145,8 @@ namespace HolyLogger
         }
 
         HolyLogParser p;
+
+        LogUploadWindow logupload = null;
         SignboardWindow signboard = null;
         MatrixWindow matrix = null;
         AboutWindow about = null;
@@ -643,13 +645,7 @@ namespace HolyLogger
             }
 
         }
-
-        private void UploadMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            LogUploadWindow l = new LogUploadWindow();
-            l.SendLog += L_SendLog;
-            l.Show();
-        }
+        
 
         private async void L_SendLog(object sender, EventArgs e)
         {
@@ -1102,12 +1098,6 @@ namespace HolyLogger
                 matrix.ClearMatrix();
         }
 
-        private void MyScoreMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            parseAdif();
-            MessageBox.Show("Your score is: " + p.Result.ToString());
-        }
-
         private void PropertiesMenuItem_Click(object sender, RoutedEventArgs e)
         {
             PropertiesWindow PropertiesWindow = new PropertiesWindow();
@@ -1207,6 +1197,38 @@ namespace HolyLogger
                 e.Handled = true;
             }            
         }
+
+        private void UploadMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (logupload != null)
+            {
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == logupload /* return "true" if 'w' is the window your are about to open */);
+
+                if (existingWindow != null)
+                {
+                    existingWindow.Activate();
+                }
+                else
+                {
+                    GenerateNewLogUploasWindow();
+                }
+            }
+            else
+            {
+                GenerateNewLogUploasWindow();
+            }
+        }
+
+        private void GenerateNewLogUploasWindow()
+        {
+            logupload = new LogUploadWindow();
+            logupload.Left = Properties.Settings.Default.LogUploadWindowLeft < 0 ? 0 : Properties.Settings.Default.LogUploadWindowLeft;
+            logupload.Top = Properties.Settings.Default.LogUploadWindowTop < 0 ? 0 : Properties.Settings.Default.LogUploadWindowTop;
+            logupload.SendLog += L_SendLog;
+            logupload.Show();
+        }
+
+
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (signboard != null)
