@@ -783,19 +783,19 @@ namespace HolyLogger
             foreach (QSO qso in qsos)
             {
                 sb.Append("(");
-                sb.Append("'"); sb.Append(qso.MyCall.Replace("'","\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.STX.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Mode.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Freq.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Band.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.DXCall.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Date.Replace("'", "\"") + " " + qso.Time.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.RST_SENT.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.RST_RCVD.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.SRX.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Comment.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Name.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Country.Replace("'", "\"")); sb.Append("'),");
+                sb.Append("'"); sb.Append(qso.MyCall.Trim().Replace("'","\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.STX.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Mode.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Freq.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Band.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.DXCall.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Date.Trim().Replace("'", "\"") + " " + qso.Time.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.RST_SENT.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.RST_RCVD.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.SRX.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Comment.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Name.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Country.Trim().Replace("'", "\"")); sb.Append("'),");
             }
             string result = sb.ToString().TrimEnd(',');
             result += " ON DUPLICATE KEY UPDATE my_call=my_call";
