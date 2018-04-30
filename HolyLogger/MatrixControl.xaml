@@ -5,67 +5,67 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:HolyLogger"
              mc:Ignorable="d" 
-             d:DesignHeight="48" d:DesignWidth="730">
+             d:DesignHeight="48" d:DesignWidth="738">
     <Grid>
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <Label Content="10" HorizontalAlignment="Left" Margin="31,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="12" HorizontalAlignment="Left" Margin="52,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="15" HorizontalAlignment="Left" Margin="73,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="17" HorizontalAlignment="Left" Margin="94,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="20" HorizontalAlignment="Left" Margin="115,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="30" HorizontalAlignment="Left" Margin="136,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="40" HorizontalAlignment="Left" Margin="157,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="80" HorizontalAlignment="Left" Margin="178,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="160" HorizontalAlignment="Left" Margin="197,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="12" HorizontalAlignment="Left" Margin="54,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="15" HorizontalAlignment="Left" Margin="77,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="17" HorizontalAlignment="Left" Margin="100,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="20" HorizontalAlignment="Left" Margin="123,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="30" HorizontalAlignment="Left" Margin="146,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="40" HorizontalAlignment="Left" Margin="169,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="80" HorizontalAlignment="Left" Margin="192,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="160" HorizontalAlignment="Left" Margin="213,1,0,0" VerticalAlignment="Top" FontSize="14" />
         <Image x:Name="SSB10" HorizontalAlignment="Left" Height="18" Margin="35,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="SSB12" HorizontalAlignment="Left" Height="18" Margin="56,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="SSB15" HorizontalAlignment="Left" Height="18" Margin="77,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="SSB17" HorizontalAlignment="Left" Height="18" Margin="98,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="SSB20" HorizontalAlignment="Left" Height="18" Margin="119,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="SSB30" HorizontalAlignment="Left" Height="18" Margin="140,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="SSB40" HorizontalAlignment="Left" Height="18" Margin="161,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="SSB80" HorizontalAlignment="Left" Height="18" Margin="182,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="SSB160" HorizontalAlignment="Left" Height="18" Margin="203,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Label Content="10" HorizontalAlignment="Left" Margin="278,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="12" HorizontalAlignment="Left" Margin="299,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="15" HorizontalAlignment="Left" Margin="320,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Image x:Name="SSB12" HorizontalAlignment="Left" Height="18" Margin="58,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="SSB15" HorizontalAlignment="Left" Height="18" Margin="81,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="SSB17" HorizontalAlignment="Left" Height="18" Margin="104,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="SSB20" HorizontalAlignment="Left" Height="18" Margin="127,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="SSB30" HorizontalAlignment="Left" Height="18" Margin="150,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="SSB40" HorizontalAlignment="Left" Height="18" Margin="173,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="SSB80" HorizontalAlignment="Left" Height="18" Margin="196,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="SSB160" HorizontalAlignment="Left" Height="18" Margin="219,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Label Content="10" HorizontalAlignment="Left" Margin="272,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="12" HorizontalAlignment="Left" Margin="295,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="15" HorizontalAlignment="Left" Margin="318,1,0,0" VerticalAlignment="Top" FontSize="14" />
         <Label Content="17" HorizontalAlignment="Left" Margin="341,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="20" HorizontalAlignment="Left" Margin="362,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="30" HorizontalAlignment="Left" Margin="383,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="40" HorizontalAlignment="Left" Margin="404,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="80" HorizontalAlignment="Left" Margin="425,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="160" HorizontalAlignment="Left" Margin="444,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Image x:Name="CW10" HorizontalAlignment="Left" Height="18" Margin="282,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="CW12" HorizontalAlignment="Left" Height="18" Margin="303,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="CW15" HorizontalAlignment="Left" Height="18" Margin="324,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Label Content="20" HorizontalAlignment="Left" Margin="364,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="30" HorizontalAlignment="Left" Margin="387,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="40" HorizontalAlignment="Left" Margin="410,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="80" HorizontalAlignment="Left" Margin="433,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="160" HorizontalAlignment="Left" Margin="454,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Image x:Name="CW10" HorizontalAlignment="Left" Height="18" Margin="276,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="CW12" HorizontalAlignment="Left" Height="18" Margin="299,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="CW15" HorizontalAlignment="Left" Height="18" Margin="322,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
         <Image x:Name="CW17" HorizontalAlignment="Left" Height="18" Margin="345,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="CW20" HorizontalAlignment="Left" Height="18" Margin="366,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="CW30" HorizontalAlignment="Left" Height="18" Margin="387,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="CW40" HorizontalAlignment="Left" Height="18" Margin="408,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="CW80" HorizontalAlignment="Left" Height="18" Margin="429,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="CW160" HorizontalAlignment="Left" Height="18" Margin="450,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Label Content="10" HorizontalAlignment="Left" Margin="530,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="12" HorizontalAlignment="Left" Margin="551,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="15" HorizontalAlignment="Left" Margin="572,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="17" HorizontalAlignment="Left" Margin="593,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="20" HorizontalAlignment="Left" Margin="614,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Image x:Name="CW20" HorizontalAlignment="Left" Height="18" Margin="368,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="CW30" HorizontalAlignment="Left" Height="18" Margin="391,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="CW40" HorizontalAlignment="Left" Height="18" Margin="414,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="CW80" HorizontalAlignment="Left" Height="18" Margin="437,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="CW160" HorizontalAlignment="Left" Height="18" Margin="460,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Label Content="10" HorizontalAlignment="Left" Margin="520,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="12" HorizontalAlignment="Left" Margin="543,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="15" HorizontalAlignment="Left" Margin="566,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="17" HorizontalAlignment="Left" Margin="589,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="20" HorizontalAlignment="Left" Margin="612,1,0,0" VerticalAlignment="Top" FontSize="14" />
         <Label Content="30" HorizontalAlignment="Left" Margin="635,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="40" HorizontalAlignment="Left" Margin="656,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="80" HorizontalAlignment="Left" Margin="677,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Label Content="160" HorizontalAlignment="Left" Margin="696,1,0,0" VerticalAlignment="Top" FontSize="14" />
-        <Image x:Name="DIGI10" HorizontalAlignment="Left" Height="18" Margin="534,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="DIGI12" HorizontalAlignment="Left" Height="18" Margin="555,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="DIGI15" HorizontalAlignment="Left" Height="18" Margin="576,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="DIGI17" HorizontalAlignment="Left" Height="18" Margin="597,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="DIGI20" HorizontalAlignment="Left" Height="18" Margin="618,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Label Content="40" HorizontalAlignment="Left" Margin="658,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="80" HorizontalAlignment="Left" Margin="681,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Label Content="160" HorizontalAlignment="Left" Margin="702,1,0,0" VerticalAlignment="Top" FontSize="14" />
+        <Image x:Name="DIGI10" HorizontalAlignment="Left" Height="18" Margin="524,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="DIGI12" HorizontalAlignment="Left" Height="18" Margin="547,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="DIGI15" HorizontalAlignment="Left" Height="18" Margin="570,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="DIGI17" HorizontalAlignment="Left" Height="18" Margin="593,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="DIGI20" HorizontalAlignment="Left" Height="18" Margin="616,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
         <Image x:Name="DIGI30" HorizontalAlignment="Left" Height="18" Margin="639,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="DIGI40" HorizontalAlignment="Left" Height="18" Margin="660,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="DIGI80" HorizontalAlignment="Left" Height="18" Margin="681,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
-        <Image x:Name="DIGI160" HorizontalAlignment="Left" Height="18" Margin="702,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="DIGI40" HorizontalAlignment="Left" Height="18" Margin="662,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="DIGI80" HorizontalAlignment="Left" Height="18" Margin="685,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
+        <Image x:Name="DIGI160" HorizontalAlignment="Left" Height="18" Margin="708,27,0,0" VerticalAlignment="Top" Width="18" Source="Images/x_small.png"/>
         <Label x:Name="L_SSB" Content="SSB" HorizontalAlignment="Left" Height="28" Margin="1,21,0,-1" VerticalAlignment="Top" FontSize="16"/>
-        <Label x:Name="L_CW" Content="CW" HorizontalAlignment="Left" Height="28" Margin="249,21,0,-1" VerticalAlignment="Top" FontSize="16"/>
-        <Label x:Name="L_DIGI" Content="DIGI" HorizontalAlignment="Left" Height="28" Margin="493,21,0,-1" VerticalAlignment="Top" FontSize="16"/>
+        <Label x:Name="L_CW" Content="CW" HorizontalAlignment="Left" Height="28" Margin="242,21,0,-1" VerticalAlignment="Top" FontSize="16"/>
+        <Label x:Name="L_DIGI" Content="DIGI" HorizontalAlignment="Left" Height="28" Margin="483,21,0,-1" VerticalAlignment="Top" FontSize="16"/>
 
     </Grid>
 </UserControl>

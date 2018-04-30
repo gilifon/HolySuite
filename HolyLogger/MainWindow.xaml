@@ -205,7 +205,7 @@
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,248,0,0" Grid.Row="1" VerticalAlignment="Top"/>
-        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16" MouseDoubleClick="GridRow_DoubleClick" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged">
+        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16" MouseDoubleClick="GridRow_DoubleClick" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True">
             <!--<DataGrid.ContextMenu>
                 <ContextMenu >
                     <MenuItem Header="Delete" Click="MenuItem_Click" />
@@ -215,7 +215,7 @@
                 <DataGridTemplateColumn Header="Id" IsReadOnly="True" Visibility="Hidden">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding id}"  HorizontalAlignment="Center" Padding="5" />
+                            <TextBlock Text="{Binding id}"  HorizontalAlignment="Center" Padding="5"  />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

@@ -45,6 +45,7 @@ namespace HolyLogger
         EntityResolver rem;
 
         public ObservableCollection<QSO> Qsos;
+        public List<QSO> LoadedQsos; //holds temporary qsos because ObservableCollection is not thread safe
 
         private string _NumOfQSOs;
         public string NumOfQSOs
@@ -151,7 +152,7 @@ namespace HolyLogger
         MatrixWindow matrix = null;
         AboutWindow about = null;
 
-        BackgroundWorker EntityResolverWorker;
+        BackgroundWorker AdifHandlerWorker;
 
         private StickyWindow _stickyWindow;
         private State state = State.New;
@@ -168,6 +169,8 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
+            LoadedQsos = new List<QSO>();
+
             this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
             if (Properties.Settings.Default.UpdateSettings)
             {
@@ -186,11 +189,13 @@ namespace HolyLogger
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
             L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
 
-            EntityResolverWorker = new BackgroundWorker();
-            EntityResolverWorker.DoWork += EntityResolverWorker_DoWork;
-            
+            AdifHandlerWorker = new BackgroundWorker();
+            AdifHandlerWorker.WorkerReportsProgress = true;
+            AdifHandlerWorker.DoWork += AdifHandlerWorker_DoWork;
+            AdifHandlerWorker.ProgressChanged += AdifHandlerWorker_ProgressChanged;
+            AdifHandlerWorker.RunWorkerCompleted += AdifHandlerWorker_RunWorkerCompleted;
+
             rem = new EntityResolver();
-            EntityResolverWorker.RunWorkerAsync();
 
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
@@ -267,14 +272,13 @@ namespace HolyLogger
             gridColumnOrder.Add(new KeyValuePair<string, int>("Mode", Properties.Settings.Default.Mode_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Exchange", Properties.Settings.Default.Exchange_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Comment", Properties.Settings.Default.Comment_index));
-
-
-
+            
             foreach (var item in QSODataGrid.Columns)
             {
                 item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
             }
         }
+        
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
@@ -319,12 +323,7 @@ namespace HolyLogger
                     break;
             }
         }
-
-        private void EntityResolverWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            rem.GetDXCC("kuku");
-        }
-
+        
         void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.Action == NotifyCollectionChangedAction.Remove)
@@ -387,9 +386,12 @@ namespace HolyLogger
                 //if (Properties.Settings.Default.live_log) PostQSO(qso);
                 try
                 {
-                    QSO q = dal.Insert(qso);
-                    Qsos.Insert(0, q);
-                    if (QSODataGrid.Items != null && QSODataGrid.Items[0] != null)
+                    lock (this)
+                    {
+                        QSO q = dal.Insert(qso);
+                        Qsos.Insert(0, q);
+                    }                    
+                    if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
                 }
                 catch (Exception ex)
@@ -541,30 +543,78 @@ namespace HolyLogger
             CultureInfo provider = CultureInfo.InvariantCulture;
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "ADIF files (*.adi)|*.adi";
-            int faultyQSO = 0;
+            
 
             if (openFileDialog.ShowDialog() == true)
             {
-                string RawAdif = File.ReadAllText(openFileDialog.FileName);
-                p = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
+                HandleAdifFileImport(openFileDialog.FileName);
+            }
+        }
+
+        private void HandleAdifFileImport(string filename)
+        {
+            int faultyQSO = 0;
+            string RawAdif = File.ReadAllText(filename);
+            p = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
+            try
+            {
                 p.Parse();
                 List<QSO> rawQSOList = p.GetRawQSO();
-                foreach (var rq in rawQSOList)
-                {
-                    try
-                    {
-                        QSO q = dal.Insert(rq);
-                        Qsos.Insert(0, q);
-                        UpdateNumOfQSOs();
-                    }
-                    catch (Exception ex)
-                    {
-                        faultyQSO++;
-                    }
-                }
-                if (faultyQSO>0)
+
+
+                AdifHandlerWorker.RunWorkerAsync(rawQSOList);
+
+                if (faultyQSO > 0)
                 {
                     System.Windows.Forms.MessageBox.Show(faultyQSO + " QSOs failed to load, check your ADIF file.");
+                }
+            }
+            catch (Exception e)
+            {
+                System.Windows.Forms.MessageBox.Show("Failed to load! check your ADIF file format.");
+            }
+
+
+        }
+
+        private void AdifHandlerWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            UpdateNumOfQSOs();
+            foreach (var item in LoadedQsos)
+            {
+                Qsos.Insert(0, item);
+            }
+            LoadedQsos.Clear();
+            TB_Comment.Text = "";
+            UpdateNumOfQSOs();
+        }
+
+        private void AdifHandlerWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            TB_Comment.Text = e.ProgressPercentage.ToString() + "%";
+        }
+
+        private void AdifHandlerWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            List<QSO> rawQSOList = (List<QSO>)e.Argument;
+            int count = rawQSOList.Count;
+
+            int c = 0;
+            foreach (var rq in rawQSOList)
+            {
+                try
+                {
+                    lock (this)
+                    {
+                        QSO q = dal.Insert(rq);
+                        LoadedQsos.Insert(0, q);
+                    }                    
+                    float p = (float)c++ * 100 / count;
+                    AdifHandlerWorker.ReportProgress((int)p);
+                }
+                catch (Exception ex)
+                {
+                    //faultyQSO++;
                 }
             }
         }
@@ -1574,6 +1624,22 @@ namespace HolyLogger
             Properties.Settings.Default.MainWindowHeight = this.Height;
         }
 
+        private void QSODataGrid_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                // Note that you can have more than one file.
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+
+                // Assuming you have one file that you care about, pass it off to whatever
+                // handling code you have defined.
+                foreach (var file in files)
+                {
+                    HandleAdifFileImport(file);
+                }
+            }
+        }
+
         private async void getQrzData()
         {
             Country = rem.GetDXCC(TB_DXCallsign.Text).Name;
@@ -2014,6 +2080,7 @@ namespace HolyLogger
 
 
         #endregion
+
         
     }
 }
