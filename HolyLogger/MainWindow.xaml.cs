@@ -1096,6 +1096,8 @@ namespace HolyLogger
 
         private void ClearMatrix()
         {
+            MatrixC.ClearMatrix();
+
             if (matrix != null)
                 matrix.ClearMatrix();
         }
@@ -1240,7 +1242,7 @@ namespace HolyLogger
         {
             if (matrix != null)
             {
-                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix /* return "true" if 'w' is the window your are about to open */);
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix); /* return "true" if 'w' is the window your are about to open */
 
                 if (existingWindow != null)
                 {
@@ -1490,17 +1492,27 @@ namespace HolyLogger
         {
             ClearMatrix();
 
-            if (matrix != null)
-            {
-                var qso_list = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
-                HolyLogger.Mode qsoMode;
 
-                foreach (var item in qso_list)
+            var qso_list = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
+            HolyLogger.Mode qsoMode;
+
+            foreach (var item in qso_list)
+            {
+                try
                 {
                     Enum.TryParse(item.Mode, out qsoMode);
-                    matrix.SetMatrix(qsoMode, item.Band);
+                    MatrixC.SetMatrix(qsoMode, item.Band);
+                    if (matrix != null)
+                    {
+                        matrix.SetMatrix(qsoMode, item.Band);
+                    }
+                }
+                catch (Exception)
+                {
+
                 }
             }
+
             UpdateDup();
         }
         private void UpdateDup()
