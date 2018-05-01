@@ -102,6 +102,17 @@ namespace HolyLogger
             }
         }
 
+        private string _UploadProgress;
+        public string UploadProgress
+        {
+            get { return _UploadProgress; }
+            set
+            {
+                _UploadProgress = value;
+                OnPropertyChanged("UploadProgress");
+            }
+        }
+
         private string _Version;
         public string Version
         {
@@ -162,9 +173,11 @@ namespace HolyLogger
         QSO QsoPreUpdate;
 
         System.Timers.Timer UTCTimer = new System.Timers.Timer();
-        private string title = "HolyLogger - 4X / 4Z Log application               ";
+        private string title = "HolyLogger               ";
 
         private const int SEND_CHUNK_SIZE = 200;
+
+        List<string> ImportFileQ = new List<string>();
 
         public MainWindow()
         {
@@ -547,42 +560,24 @@ namespace HolyLogger
 
             if (openFileDialog.ShowDialog() == true)
             {
-                HandleAdifFileImport(openFileDialog.FileName);
+                ImportFileQ.Add(openFileDialog.FileName);
+                if (!AdifHandlerWorker.IsBusy)
+                    AdifHandlerWorker.RunWorkerAsync();
             }
         }
-
-        private void HandleAdifFileImport(string filename)
-        {
-            int faultyQSO = 0;
-            string RawAdif = File.ReadAllText(filename);
-            p = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
-            try
-            {
-                p.Parse();
-                List<QSO> rawQSOList = p.GetRawQSO();
-
-
-                AdifHandlerWorker.RunWorkerAsync(rawQSOList);
-
-                if (faultyQSO > 0)
-                {
-                    System.Windows.Forms.MessageBox.Show(faultyQSO + " QSOs failed to load, check your ADIF file.");
-                }
-            }
-            catch (Exception e)
-            {
-                System.Windows.Forms.MessageBox.Show("Failed to load! check your ADIF file format.");
-            }
-
-
-        }
-
+        
         private void AdifHandlerWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+            int faultyQso = (int)e.Result;
+            ToggleUploadProgress(Visibility.Hidden);
             UpdateNumOfQSOs();
             foreach (var item in LoadedQsos)
             {
                 Qsos.Insert(0, item);
+            }
+            if (faultyQso > 0)
+            {
+                System.Windows.Forms.MessageBox.Show(faultyQso + " Failed to load! check the files.");
             }
             LoadedQsos.Clear();
             TB_Comment.Text = "";
@@ -591,31 +586,73 @@ namespace HolyLogger
 
         private void AdifHandlerWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
-            TB_Comment.Text = e.ProgressPercentage.ToString() + "%";
+            ToggleUploadProgress(Visibility.Visible);
+            UploadProgress = e.ProgressPercentage.ToString() + "%";
+        }
+
+        private void ToggleUploadProgress(Visibility visibility)
+        {
+            UploadProgressSpinner.Visibility = visibility;
+            L_UploadProgress.Visibility = visibility;
         }
 
         private void AdifHandlerWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            List<QSO> rawQSOList = (List<QSO>)e.Argument;
-            int count = rawQSOList.Count;
-
-            int c = 0;
-            foreach (var rq in rawQSOList)
+            int faultyQSO = 0;
+            foreach (var filename in ImportFileQ) //for each file in the Q
             {
+                string RawAdif = File.ReadAllText(filename); //read it
+                p = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(Properties.Settings.Default.my_callsign)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
                 try
                 {
-                    lock (this)
+                    p.Parse(); //try to parse it
+                    List<QSO> rawQSOList = p.GetRawQSO();//get the qso list
+                    int count = rawQSOList.Count;
+
+                    int c = 1;
+                    foreach (var rq in rawQSOList)
                     {
-                        QSO q = dal.Insert(rq);
-                        LoadedQsos.Insert(0, q);
-                    }                    
-                    float p = (float)c++ * 100 / count;
-                    AdifHandlerWorker.ReportProgress((int)p);
+                        try
+                        {
+                            lock (this)
+                            {
+                                QSO q = dal.Insert(rq);
+                                LoadedQsos.Insert(0, q);
+                            }
+                            float p = (float)(c++) * 100 / count;
+                            AdifHandlerWorker.ReportProgress((int)(Math.Ceiling(p)));
+                        }
+                        catch (Exception ex)
+                        {
+                            faultyQSO++;
+                        }
+                    }
                 }
                 catch (Exception ex)
                 {
-                    //faultyQSO++;
+                    System.Windows.Forms.MessageBox.Show(filename + " Failed to load! check file format.");
                 }
+            }
+            e.Result = faultyQSO;
+            ImportFileQ.Clear();
+        }
+        
+        private void QSODataGrid_Drop(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                // Note that you can have more than one file.
+                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
+
+                //collect files in Queue
+                foreach (var file in files)
+                {
+                    ImportFileQ.Add(file);
+                    //HandleAdifFileImport(file);
+                }
+                //run async handler
+                if (!AdifHandlerWorker.IsBusy)
+                    AdifHandlerWorker.RunWorkerAsync();
             }
         }
 
@@ -1269,6 +1306,8 @@ namespace HolyLogger
             }
         }
 
+        
+
         private void GenerateNewLogUploasWindow()
         {
             logupload = new LogUploadWindow();
@@ -1622,22 +1661,6 @@ namespace HolyLogger
         {
             Properties.Settings.Default.MainWindowWidth = this.Width;
             Properties.Settings.Default.MainWindowHeight = this.Height;
-        }
-
-        private void QSODataGrid_Drop(object sender, DragEventArgs e)
-        {
-            if (e.Data.GetDataPresent(DataFormats.FileDrop))
-            {
-                // Note that you can have more than one file.
-                string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
-
-                // Assuming you have one file that you care about, pass it off to whatever
-                // handling code you have defined.
-                foreach (var file in files)
-                {
-                    HandleAdifFileImport(file);
-                }
-            }
         }
 
         private async void getQrzData()
