@@ -571,10 +571,17 @@ namespace HolyLogger
             int faultyQso = (int)e.Result;
             ToggleUploadProgress(Visibility.Hidden);
             UpdateNumOfQSOs();
-            foreach (var item in LoadedQsos)
+            //foreach (var item in LoadedQsos)
+            //{
+            //    Qsos.Insert(0, item);
+            //}
+
+            Qsos.Clear();
+            foreach (var item in dal.GetAllQSOs())
             {
-                Qsos.Insert(0, item);
+                Qsos.Add(item);
             }
+
             if (faultyQso > 0)
             {
                 System.Windows.Forms.MessageBox.Show(faultyQso + " Failed to load! check the files.");
