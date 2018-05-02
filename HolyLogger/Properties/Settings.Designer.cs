@@ -526,5 +526,17 @@ namespace HolyLogger.Properties {
                 this["LogUploadWindowTop"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool QRZ_auto_open {
+            get {
+                return ((bool)(this["QRZ_auto_open"]));
+            }
+            set {
+                this["QRZ_auto_open"] = value;
+            }
+        }
     }
 }
