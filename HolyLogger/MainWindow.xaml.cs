@@ -22,6 +22,7 @@ using System.Net.Cache;
 using System.Globalization;
 using System.Drawing.Printing;
 using Blue.Windows;
+using System.Windows.Media.Imaging;
 
 namespace HolyLogger
 {
@@ -157,6 +158,7 @@ namespace HolyLogger
         }
 
         HolyLogParser p;
+        Process QRZProcess;
 
         LogUploadWindow logupload = null;
         SignboardWindow signboard = null;
@@ -177,6 +179,9 @@ namespace HolyLogger
 
         private const int SEND_CHUNK_SIZE = 200;
 
+        BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
+        BitmapImage qrz_off_path = new BitmapImage(new Uri("Images/qrz_off.png", UriKind.Relative));
+        
         List<string> ImportFileQ = new List<string>();
 
         public MainWindow()
@@ -211,6 +216,11 @@ namespace HolyLogger
             rem = new EntityResolver();
 
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
+            if (Properties.Settings.Default.QRZ_auto_open)
+                QRZBtn.Source = qrz_path;
+            else
+                QRZBtn.Source = qrz_off_path;
+
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
@@ -220,6 +230,8 @@ namespace HolyLogger
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
             if (TB_Comment.IsEnabled) LockComment_Btn.Opacity = 1;
             else LockComment_Btn.Opacity = 0.5;
+
+            
 
             if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
             {
@@ -292,7 +304,6 @@ namespace HolyLogger
             }
         }
         
-
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             _stickyWindow = new StickyWindow(this);
@@ -474,16 +485,36 @@ namespace HolyLogger
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
         {
+            Properties.Settings.Default.QRZ_auto_open = !Properties.Settings.Default.QRZ_auto_open;
+            if (Properties.Settings.Default.QRZ_auto_open)
+                ((Image)sender).Source = qrz_path;
+            else
+                ((Image)sender).Source = qrz_off_path;
+        }
+
+        private void AutoOpenQRZPage()
+        {
             string url = "http://www.qrz.com";
             if (!string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
                 url += "/db/" + TB_DXCallsign.Text;
-
             try
             {
-                System.Diagnostics.Process.Start(url);
+                if (Properties.Settings.Default.QRZ_auto_open && QRZProcess != null && !QRZProcess.HasExited)
+                {
+                    QRZProcess.CloseMainWindow();
+                }
+                QRZProcess = new Process();
+                QRZProcess.StartInfo.FileName = "Chrome.exe";
+                QRZProcess.StartInfo.Arguments = "--user-data-dir=" + Path.GetTempPath() + "HolyLogger " + url;
+                if (QRZProcess.Start())
+                {
+                    QRZProcess.WaitForInputIdle();
+                    this.Focus();
+                }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                QRZBtn_Click(null, null);
                 MessageBox.Show("Please install 'Chrome' and try again");
             }
         }
@@ -1534,6 +1565,7 @@ namespace HolyLogger
             if (e.Key == Key.Enter)
             {
                 TB_Exchange.Focus();
+                if (Properties.Settings.Default.QRZ_auto_open) AutoOpenQRZPage();
             }
         }
 
