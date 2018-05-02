@@ -47,7 +47,7 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show("Connection Failed: " + ex.Message);
+                System.Windows.Forms.MessageBox.Show("Login to QRZ service failed: " + ex.Message);
                 SessionKey = "";
                 return false;
             }

@@ -20,9 +20,9 @@ using HolyParser;
 using System.Diagnostics;
 using System.Net.Cache;
 using System.Globalization;
-using System.Drawing.Printing;
 using Blue.Windows;
 using System.Windows.Media.Imaging;
+using System.Runtime.InteropServices;
 
 namespace HolyLogger
 {
@@ -41,6 +41,11 @@ namespace HolyLogger
             }
         }
         #endregion
+
+        [DllImport("User32")]
+        private static extern int SetForegroundWindow(IntPtr hwnd);
+        [DllImportAttribute("User32.DLL")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
         DataAccess dal;
         EntityResolver rem;
@@ -486,10 +491,7 @@ namespace HolyLogger
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
         {
             Properties.Settings.Default.QRZ_auto_open = !Properties.Settings.Default.QRZ_auto_open;
-            if (Properties.Settings.Default.QRZ_auto_open)
-                ((Image)sender).Source = qrz_path;
-            else
-                ((Image)sender).Source = qrz_off_path;
+            QRZBtn.Source = Properties.Settings.Default.QRZ_auto_open ? qrz_path : qrz_off_path;
         }
 
         private void AutoOpenQRZPage()
@@ -506,10 +508,10 @@ namespace HolyLogger
                 QRZProcess = new Process();
                 QRZProcess.StartInfo.FileName = "Chrome.exe";
                 QRZProcess.StartInfo.Arguments = "--user-data-dir=" + Path.GetTempPath() + "HolyLogger " + url;
+
                 if (QRZProcess.Start())
                 {
-                    QRZProcess.WaitForInputIdle();
-                    this.Focus();
+                    //TODO:return focus...
                 }
             }
             catch (Exception ex)
@@ -831,7 +833,7 @@ namespace HolyLogger
                 }
             }
         }
-
+        
         private void UploadLogFileToIARC()
         {
             string insert = GenerateMultipleInsert(dal.GetAllQSOs());
@@ -1532,7 +1534,7 @@ namespace HolyLogger
                 }
                 catch (Exception)
                 {
-                    System.Windows.Forms.MessageBox.Show("Server busy. Please try later.");
+                    System.Windows.Forms.MessageBox.Show("Auto checking for update Failed. Please try manualy later.");
                 }
             }
         }
