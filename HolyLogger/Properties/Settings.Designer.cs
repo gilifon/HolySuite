@@ -538,5 +538,17 @@ namespace HolyLogger.Properties {
                 this["QRZ_auto_open"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1000")]
+        public int QRZ_auto_open_delay {
+            get {
+                return ((int)(this["QRZ_auto_open_delay"]));
+            }
+            set {
+                this["QRZ_auto_open_delay"] = value;
+            }
+        }
     }
 }

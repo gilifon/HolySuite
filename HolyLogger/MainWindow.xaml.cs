@@ -41,7 +41,11 @@ namespace HolyLogger
             }
         }
         #endregion
-        
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool SetForegroundWindow(IntPtr hWnd);
+
         DataAccess dal;
         EntityResolver rem;
 
@@ -506,7 +510,9 @@ namespace HolyLogger
 
                 if (QRZProcess.Start())
                 {
-                    //TODO:return focus...
+                    QRZProcess.WaitForInputIdle();
+                    Thread.Sleep(Properties.Settings.Default.QRZ_auto_open_delay);
+                    SetForegroundWindow(Process.GetCurrentProcess().MainWindowHandle);
                 }
             }
             catch (Exception ex)
@@ -1647,7 +1653,7 @@ namespace HolyLogger
         {
             Country = rem.GetDXCC(TB_DXCallsign.Text).Name;
 
-            if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Length >=3)
             {
 
                 /*****************************/
