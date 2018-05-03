@@ -41,12 +41,7 @@ namespace HolyLogger
             }
         }
         #endregion
-
-        [DllImport("User32")]
-        private static extern int SetForegroundWindow(IntPtr hwnd);
-        [DllImportAttribute("User32.DLL")]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
+        
         DataAccess dal;
         EntityResolver rem;
 
@@ -785,8 +780,10 @@ namespace HolyLogger
             string bareCallsign = Properties.Settings.Default.PersonalInfoCallsign;
             string country = Services.getHamQth(bareCallsign);
 
+            var progressIndicator = new Progress<int>();
+
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
-            string UploadLogToIARC_result = await UploadLogToIARC();
+            string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent));
 
             StringBuilder sb = new StringBuilder(200);
             sb.Append("Dear ").Append(Properties.Settings.Default.PersonalInfoName).Append(",<br><br>");
@@ -801,7 +798,7 @@ namespace HolyLogger
             w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
-
+        
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
         {
             //string delete = "DELETE FROM `log` WHERE `my_call`= '" + callsign + "';";
@@ -833,27 +830,11 @@ namespace HolyLogger
                 }
             }
         }
-        
-        private void UploadLogFileToIARC()
-        {
-            string insert = GenerateMultipleInsert(dal.GetAllQSOs());
-            string randomFileName = Path.GetRandomFileName();
-            string myTempFile = Path.Combine(Path.GetTempPath(), randomFileName + ".log");
 
-            using (StreamWriter sw = new StreamWriter(myTempFile))
-            {
-                sw.WriteLine(insert);
-            }
-            using (WebClient client = new WebClient())
-            {
-                byte[] Result = client.UploadFile(new Uri("http://www.iarc.org/Holyland/Server/holylogger_logs/temp_insert.log"), myTempFile);
-            }
-            //File.Delete(myTempFile);
-        }
-
-        private async Task<string> UploadLogToIARC()
+        private async Task<string> UploadLogToIARC(IProgress<int> progress)
         {
             List<List<QSO>> ChunkedQSOs = SplitQSOList();
+            int c = 1;
             foreach (var chunk in ChunkedQSOs)
             {
                 string insert = GenerateMultipleInsert(chunk);
@@ -870,7 +851,8 @@ namespace HolyLogger
                     {
                         var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
                         var responseString = await response.Content.ReadAsStringAsync();
-                        ////return responseString;
+
+                        progress.Report(c++ * 100 / ChunkedQSOs.Count);
                     }
                     catch (Exception)
                     {
@@ -924,50 +906,7 @@ namespace HolyLogger
             result += " ON DUPLICATE KEY UPDATE my_call=my_call";
             return result;
         }
-
-        //public async void UploadLog()
-        //{
-        //    if (Qsos.Count == 0)
-        //    {
-        //        System.Windows.Forms.MessageBox.Show("You can not upload empty log");
-        //        return;
-        //    }
-        //    string result = await UploadLogToIARC();
-        //    //System.Windows.Forms.MessageBox.Show("Only active during the log upload period");
-        //    System.Windows.Forms.MessageBox.Show(result);
-        //}
-
-        //private void PostQSO(QSO qso)
-        //{
-        //    //************************************************** ASYNC ********************************************//
-        //    using (WebClient client = new WebClient())
-        //    {
-        //        client.UploadValuesAsync(new Uri("http://www.iarc.org/xmas/Server/AddLog.php"), new NameValueCollection()
-        //            {
-        //                { "insertlog", GenerateInsert(qso) }
-        //            });
-        //    }
-        //}
-        //private string GenerateInsert(QSO qso)
-        //{
-        //    StringBuilder sb = new StringBuilder("INSERT IGNORE INTO `log` ", 500);
-        //    sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`) VALUES ");
-        //    sb.Append("(");
-        //    sb.Append("'"); sb.Append(qso.my_call); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.my_square); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.mode); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.frequency); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.band); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.callsign); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.timestamp); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.rst_sent); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.rst_rcvd); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.exchange); sb.Append("',");
-        //    sb.Append("'"); sb.Append(qso.comment); sb.Append("')");
-        //    string result = sb.ToString();
-        //    return result;
-        //}
-
+        
         private void QSODataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Delete)

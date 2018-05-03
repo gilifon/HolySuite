@@ -173,7 +173,7 @@
         <Label Content="Score" HorizontalAlignment="Left" Margin="459,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="523,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
 
-        <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Left" Margin="648,2,0,0" VerticalAlignment="Top" Source="Images/spinner.gif" Height="80" Width="80" Grid.Row="1" Visibility="Hidden"/>
+        <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Left" Margin="648,2,0,0" VerticalAlignment="Top" Source="Images/spinner2.gif" Height="80" Width="80" Grid.Row="1" Visibility="Hidden"/>
         <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="658,18,0,0" Grid.Row="1" VerticalAlignment="Top" Width="60" Height="48" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="18" FontWeight="SemiBold" Visibility="Hidden"/>
 
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="477,54,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" />

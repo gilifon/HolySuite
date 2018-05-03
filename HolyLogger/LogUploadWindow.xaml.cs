@@ -68,7 +68,18 @@ namespace HolyLogger
                 OnPropertyChanged("CategoryPower");
             }
         }
-        
+
+        public int _UploadProgress = 0;
+        public int UploadProgress
+        {
+            get { return _UploadProgress; }
+            set
+            {
+                _UploadProgress = value;
+                OnPropertyChanged("UploadProgress");
+            }
+        }
+
         public LogUploadWindow()
         {
             InitializeComponent();
@@ -84,6 +95,7 @@ namespace HolyLogger
                     {
                         SendLog(this, e);
                         Spinner.Visibility = Visibility.Visible;
+                        L_Progress.Visibility = Visibility.Visible;
                         this.IsEnabled = false;
                     }
                 }
