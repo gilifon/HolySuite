@@ -41,11 +41,14 @@
             </ToolBarTray>
             <TextBox AcceptsReturn="True" />
         </DockPanel>
-
+        <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Grid.Row="1">
+            <Image x:Name="MapPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
+        </StackPanel>
         <DockPanel Grid.Row="2">
             <StatusBar DockPanel.Dock="Bottom">
                 
             </StatusBar>
         </DockPanel>
+        
     </Grid>
 </Window>
