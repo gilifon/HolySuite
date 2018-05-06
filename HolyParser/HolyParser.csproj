@@ -62,6 +62,10 @@
       <Project>{fa52acea-c4d5-473f-9b79-39bc5aea1390}</Project>
       <Name>DXCCManager</Name>
     </ProjectReference>
+    <ProjectReference Include="..\ModeManager\ModeManager.csproj">
+      <Project>{0f14d400-4809-44a7-93c0-a5b3cd7fa28f}</Project>
+      <Name>ModeManager</Name>
+    </ProjectReference>
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

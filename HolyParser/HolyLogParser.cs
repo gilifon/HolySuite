@@ -5,6 +5,7 @@ using System.Text.RegularExpressions;
 using MoreLinq;
 using DXCCManager;
 using System.Globalization;
+using ModeManager;
 
 namespace HolyParser
 {
@@ -35,8 +36,35 @@ namespace HolyParser
         private string m_fileText;
         private List<QSO> m_qsoList;
 
-        DXCCManager.EntityResolver.DXCC ER_Dxcc;
-        
+        private DXCC ER_Dxcc;
+        private ModeResolver mr = new ModeResolver();
+
+        private int _qso160;
+        private int _qso80;
+        private int _qso40;
+        private int _qso30;
+        private int _qso20;
+        private int _qso17;
+        private int _qso15;
+        private int _qso12;
+        private int _qso10;
+        private int _qsoCW;
+        private int _qsoSSB;
+        private int _qsoDIGI;
+
+        public int qso160 { get { return _qso160; } }
+        public int qso80 { get { return _qso80; } }
+        public int qso40 { get { return _qso40; } }
+        public int qso30 { get { return _qso30; } }
+        public int qso20 { get { return _qso20; } }
+        public int qso17 { get { return _qso17; } }
+        public int qso15 { get { return _qso15; } }
+        public int qso12 { get { return _qso12; } }
+        public int qso10 { get { return _qso10; } }
+
+        public int qsoCW { get { return _qsoCW; } }
+        public int qsoSSB { get { return _qsoSSB; } }
+        public int qsoDIGI { get { return _qsoDIGI; } }
 
         private string m_template = @"
 <style>
@@ -249,7 +277,7 @@ th,td
                 match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso_row.Mode = Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    qso_row.Mode = mr.GetalidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
                 }
 
                 regex = new Regex(time_pattern, RegexOptions.IgnoreCase);
@@ -371,6 +399,20 @@ th,td
             int double_point = validQSOs.Count(p => p.Band.Contains("40") || p.Band.Contains("80") || p.Band.Contains("160"));
             int total_points = single_point + double_point * 2;
             _points = total_points;
+
+            _qso160 = validQSOs.Count(p => p.Band.Contains("160"));
+            _qso80 = validQSOs.Count(p => p.Band.Contains("80"));
+            _qso40 = validQSOs.Count(p => p.Band.Contains("40"));
+            _qso30 = validQSOs.Count(p => p.Band.Contains("30"));
+            _qso20 = validQSOs.Count(p => p.Band.Contains("20"));
+            _qso17 = validQSOs.Count(p => p.Band.Contains("17"));
+            _qso15 = validQSOs.Count(p => p.Band.Contains("15"));
+            _qso12 = validQSOs.Count(p => p.Band.Contains("12"));
+            _qso10 = validQSOs.Count(p => p.Band.Contains("10"));
+
+            _qsoCW = validQSOs.Count(p => p.Mode.Contains("CW"));
+            _qsoSSB = validQSOs.Count(p => p.Mode.Contains("SSB"));
+
 
             log.Append("You get a score of: "); log.Append(total_points); log.Append(" points\r\n");
             log.Append("-----------------------------------------------------------------------------------------------------------\r\n");

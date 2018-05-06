@@ -417,13 +417,5 @@ namespace DXCCManager
             }
             return "XX";
         }
-
-        public struct DXCC
-        {
-            public string Prefixes { get; set; }
-            public string Name { get; set; }
-            public string Entity { get; set; }
-            public string Continent { get; set; }
-        }
     }
 }

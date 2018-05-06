@@ -64,6 +64,43 @@ namespace HolyLogger
             }
             return null;
         }
+        public bool Insert(IEnumerable<QSO> qsos)
+        {
+            if (con != null && con.State == System.Data.ConnectionState.Open)
+            {
+                SQLiteTransaction T = con.BeginTransaction();
+                foreach (var qso in qsos)
+                {
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,exchange,comment,name,country) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
+                    insertSQL.Transaction = T;
+                    insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
+                    insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
+                    insertSQL.Parameters.Add(new SQLiteParameter("frequency", qso.Freq));
+                    insertSQL.Parameters.Add(new SQLiteParameter("band", qso.Band));
+                    insertSQL.Parameters.Add(new SQLiteParameter("dx_callsign", qso.DXCall));
+                    insertSQL.Parameters.Add(new SQLiteParameter("rst_rcvd", qso.RST_RCVD));
+                    insertSQL.Parameters.Add(new SQLiteParameter("rst_sent", qso.RST_SENT));
+                    insertSQL.Parameters.Add(new SQLiteParameter("date", qso.Date));
+                    insertSQL.Parameters.Add(new SQLiteParameter("time", qso.Time));
+                    insertSQL.Parameters.Add(new SQLiteParameter("mode", qso.Mode));
+                    insertSQL.Parameters.Add(new SQLiteParameter("exchange", qso.SRX));
+                    insertSQL.Parameters.Add(new SQLiteParameter("comment", qso.Comment));
+                    insertSQL.Parameters.Add(new SQLiteParameter("name", qso.Name));
+                    insertSQL.Parameters.Add(new SQLiteParameter("country", qso.Country));
+                }
+                try
+                {
+                    T.Commit();
+                    return true;
+                }
+                catch (Exception e)
+                {
+                    T.Rollback();
+                    return false;
+                }
+            }
+            return false;
+        }
         public void Update(QSO qso)
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)

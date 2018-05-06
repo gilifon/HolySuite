@@ -177,6 +177,9 @@
     </Compile>
     <Compile Include="DataAccess.cs" />
     <Compile Include="Enums.cs" />
+    <Compile Include="LogInfoWindow.xaml.cs">
+      <DependentUpon>LogInfoWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="LogUploadWindow.xaml.cs">
       <DependentUpon>LogUploadWindow.xaml</DependentUpon>
     </Compile>
@@ -195,6 +198,10 @@
       <DependentUpon>MatrixControl.xaml</DependentUpon>
     </Compile>
     <Page Include="AboutWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="LogInfoWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
