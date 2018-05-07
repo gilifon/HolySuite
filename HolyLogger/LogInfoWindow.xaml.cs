@@ -1,18 +1,7 @@
-﻿using LiveCharts;
+﻿using System.Windows;
+using LiveCharts;
+using LiveCharts.Defaults;
 using LiveCharts.Wpf;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
-using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace HolyLogger
 {
@@ -21,20 +10,74 @@ namespace HolyLogger
     /// </summary>
     public partial class LogInfoWindow : Window
     {
+        public SeriesCollection Bands { get; set; }
+        public SeriesCollection Bands2 { get; set; }
         public LogInfoWindow()
         {
             InitializeComponent();
-            SeriesCollection seriesCollection = new SeriesCollection
+            BindCharts();
+
+            Bands = new SeriesCollection
             {
-                new LineSeries
+                new PieSeries
                 {
-                    Values = new ChartValues<double> { 3, 5, 7, 4 }
+                    Title = "10M",
+                    Values = new ChartValues<ObservableValue> { new ObservableValue(8) },
+                    DataLabels = true
                 },
-                new ColumnSeries
+                new PieSeries
                 {
-                    Values = new ChartValues<decimal> { 5, 6, 2, 7 }
+                    Title = "12M",
+                    Values = new ChartValues<ObservableValue> { new ObservableValue(6) },
+                    DataLabels = true
+                },
+                new PieSeries
+                {
+                    Title = "15M",
+                    Values = new ChartValues<ObservableValue> { new ObservableValue(10) },
+                    DataLabels = true
+                },
+                new PieSeries
+                {
+                    Title = "17M",
+                    Values = new ChartValues<ObservableValue> { new ObservableValue(4) },
+                    DataLabels = true
                 }
             };
+            Bands2 = new SeriesCollection
+            {
+                new PieSeries
+                {
+                    Title = "10M",
+                    Values = new ChartValues<ObservableValue> { new ObservableValue(48) },
+                    DataLabels = true
+                },
+                new PieSeries
+                {
+                    Title = "12M",
+                    Values = new ChartValues<ObservableValue> { new ObservableValue(16) },
+                    DataLabels = true
+                },
+                new PieSeries
+                {
+                    Title = "15M",
+                    Values = new ChartValues<ObservableValue> { new ObservableValue(10) },
+                    DataLabels = true
+                },
+                new PieSeries
+                {
+                    Title = "17M",
+                    Values = new ChartValues<ObservableValue> { new ObservableValue(14) },
+                    DataLabels = true
+                }
+            };
+
+            DataContext = this;
+        }
+
+        private void BindCharts()
+        {
+
         }
     }
 }

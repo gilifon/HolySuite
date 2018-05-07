@@ -7,7 +7,40 @@
         xmlns:local="clr-namespace:HolyLogger"
         mc:Ignorable="d"
         Title="Log Info" Height="300" Width="300">
-    <Grid>
-        <lvc:CartesianChart Series="{Binding SeriesCollection}" />
+    <Grid ShowGridLines="False" Margin="0,2,0,-2">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+        <DockPanel Name="Panel00" Grid.Row="0" Grid.Column="0">
+            <lvc:PieChart Name="Chart" Grid.Row="1" Series="{Binding Bands}" 
+                      LegendLocation="None" InnerRadius="20">
+                <lvc:PieChart.ChartLegend>
+                    <lvc:DefaultLegend BulletSize="20"></lvc:DefaultLegend>
+                </lvc:PieChart.ChartLegend>
+                <lvc:PieChart.DataTooltip>
+                    <lvc:DefaultTooltip BulletSize="20"></lvc:DefaultTooltip>
+                </lvc:PieChart.DataTooltip>
+            </lvc:PieChart>
+        </DockPanel>
+        <DockPanel Name="Panel01" Grid.Row="0" Grid.Column="1">
+            <lvc:PieChart Name="Chart2" Grid.Row="1" Series="{Binding Bands2}" 
+                      LegendLocation="None" InnerRadius="20">
+                <lvc:PieChart.ChartLegend>
+                    <lvc:DefaultLegend BulletSize="20"></lvc:DefaultLegend>
+                </lvc:PieChart.ChartLegend>
+                <lvc:PieChart.DataTooltip>
+                    <lvc:DefaultTooltip BulletSize="20"></lvc:DefaultTooltip>
+                </lvc:PieChart.DataTooltip>
+            </lvc:PieChart>
+        </DockPanel>
+        <DockPanel Name="BottomPanel" Grid.Row="2">
+
+        </DockPanel>
     </Grid>
 </Window>
