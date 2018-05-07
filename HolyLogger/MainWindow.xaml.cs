@@ -167,6 +167,7 @@ namespace HolyLogger
         LogUploadWindow logupload = null;
         SignboardWindow signboard = null;
         MatrixWindow matrix = null;
+        LogInfoWindow loginfo = null;
         AboutWindow about = null;
 
         BackgroundWorker AdifHandlerWorker;
@@ -1354,12 +1355,40 @@ namespace HolyLogger
                 GenerateNewMatrixWindow();
             }
         }
+        private void LogInfoMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (loginfo != null)
+            {
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == loginfo); /* return "true" if 'w' is the window your are about to open */
+
+                if (existingWindow != null)
+                {
+                    existingWindow.Activate();
+                }
+                else
+                {
+                    GenerateNewLogInfoWindow();
+                }
+            }
+            else
+            {
+                GenerateNewLogInfoWindow();
+            }
+        }
+        
         private void GenerateNewMatrixWindow()
         {
             matrix = new MatrixWindow();
             matrix.Left = Properties.Settings.Default.MatrixWindowLeft < 0 ? 0 : Properties.Settings.Default.MatrixWindowLeft;
             matrix.Top = Properties.Settings.Default.MatrixWindowTop < 0 ? 0 : Properties.Settings.Default.MatrixWindowTop;
             matrix.Show();
+        }
+        private void GenerateNewLogInfoWindow()
+        {
+            loginfo = new LogInfoWindow();
+            loginfo.Left = Properties.Settings.Default.LogInfoWindowLeft < 0 ? 0 : Properties.Settings.Default.LogInfoWindowLeft;
+            loginfo.Top = Properties.Settings.Default.LogInfoWindowTop < 0 ? 0 : Properties.Settings.Default.LogInfoWindowTop;
+            loginfo.Show();
         }
 
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)

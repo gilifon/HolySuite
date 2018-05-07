@@ -550,5 +550,29 @@ namespace HolyLogger.Properties {
                 this["QRZ_auto_open_delay"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public int LogInfoWindowLeft {
+            get {
+                return ((int)(this["LogInfoWindowLeft"]));
+            }
+            set {
+                this["LogInfoWindowLeft"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public int LogInfoWindowTop {
+            get {
+                return ((int)(this["LogInfoWindowTop"]));
+            }
+            set {
+                this["LogInfoWindowTop"] = value;
+            }
+        }
     }
 }

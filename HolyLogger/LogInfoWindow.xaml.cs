@@ -1,4 +1,6 @@
-﻿using System;
+﻿using LiveCharts;
+using LiveCharts.Wpf;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,6 +24,17 @@ namespace HolyLogger
         public LogInfoWindow()
         {
             InitializeComponent();
+            SeriesCollection seriesCollection = new SeriesCollection
+            {
+                new LineSeries
+                {
+                    Values = new ChartValues<double> { 3, 5, 7, 4 }
+                },
+                new ColumnSeries
+                {
+                    Values = new ChartValues<decimal> { 5, 6, 2, 7 }
+                }
+            };
         }
     }
 }
