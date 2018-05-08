@@ -1388,6 +1388,24 @@ namespace HolyLogger
             loginfo = new LogInfoWindow();
             loginfo.Left = Properties.Settings.Default.LogInfoWindowLeft < 0 ? 0 : Properties.Settings.Default.LogInfoWindowLeft;
             loginfo.Top = Properties.Settings.Default.LogInfoWindowTop < 0 ? 0 : Properties.Settings.Default.LogInfoWindowTop;
+
+            if (p != null)
+            {
+                loginfo.CW.Value = p.qsoCW;
+                loginfo.SSB.Value = p.qsoSSB;
+
+                //loginfo.Band6.Value = p.qso6;
+                loginfo.Band10.Value = p.qso10;
+                loginfo.Band12.Value = p.qso12;
+                loginfo.Band15.Value = p.qso15;
+                loginfo.Band17.Value = p.qso17;
+                loginfo.Band20.Value = p.qso20;
+                loginfo.Band30.Value = p.qso30;
+                loginfo.Band40.Value = p.qso40;
+                //loginfo.Band60.Value = p.qso60;
+                loginfo.Band80.Value = p.qso80;
+                loginfo.Band160.Value = p.qso160;
+            }
             loginfo.Show();
         }
 
