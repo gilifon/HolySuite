@@ -574,5 +574,17 @@ namespace HolyLogger.Properties {
                 this["LogInfoWindowTop"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int RecentQSOCounter {
+            get {
+                return ((int)(this["RecentQSOCounter"]));
+            }
+            set {
+                this["RecentQSOCounter"] = value;
+            }
+        }
     }
 }

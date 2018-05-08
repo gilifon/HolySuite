@@ -65,11 +65,11 @@
                                     <Image Source="Images/matrix.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem x:Name="LogInfoMenuItem" Header="Statistics" ToolTip="Show some log statistics" Click="LogInfoMenuItem_Click">
+                            <!--<MenuItem x:Name="LogInfoMenuItem" Header="Statistics" ToolTip="Show some log statistics" Click="LogInfoMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/chart.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
-                            </MenuItem>
+                            </MenuItem>-->
                         </MenuItem>
                         <MenuItem Header="Tools" FontSize="16">
                             <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
@@ -90,6 +90,11 @@
                             <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
@@ -147,7 +152,12 @@
                 <StatusBarItem>
                     <TextBlock x:Name="L_IsManual" Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
-
+                <StatusBarItem>
+                    <TextBlock Text="Recent QSOs: " Margin="30,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="10,0,0,0" FontSize="16"/>
+                </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
                         <TextBlock Text="Omni-Rig: " FontSize="16"/>

@@ -84,7 +84,7 @@ namespace HolyLogger
                 OnPropertyChanged("NumOfDXCCs");
             }
         }
-
+        
         private string _IsOmniRigEnabled;
         public string IsOmniRigEnabled
         {
@@ -419,6 +419,7 @@ namespace HolyLogger
                     {
                         QSO q = dal.Insert(qso);
                         Qsos.Insert(0, q);
+                        Properties.Settings.Default.RecentQSOCounter++;
                     }                    
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
@@ -1184,7 +1185,11 @@ namespace HolyLogger
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
             L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
         }
-        
+
+        private void ResetRecentQSOCounterMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            Properties.Settings.Default.RecentQSOCounter = 0;
+        }
 
         private void PropertiesWindow_Closed(object sender, EventArgs e)
         {
