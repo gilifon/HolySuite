@@ -26,6 +26,7 @@ namespace ClusterMap
         {
             string FILE_PATH_PDF = Path.GetTempPath() + "map.pdf";
             string FILE_PATH_TIFF = Path.GetTempPath() + "map.tif";
+            string FILE_PATH_PNG = Path.GetTempPath() + "map.png";
             const string DOWNLOADER_URI = "https://ns6t.net/azimuth/code/azimuth.fcgi?title=&location=32.0917%2C+34.885&distance=15000&paper=LETTER&bluefill=on&view=on&submit=&iplocationused=false";
 
             using (var writeStream = File.OpenWrite(FILE_PATH_PDF))
@@ -59,7 +60,20 @@ namespace ClusterMap
                 //the Bitmap stored at that position in the myImages ArrayList in the TiffImage
 
                 MapPanel.Stretch = System.Windows.Media.Stretch.Uniform;
-                MapPanel.Source = new BitmapImage(new System.Uri(FILE_PATH_TIFF));
+
+                Rectangle cropRect = new Rectangle(0,145,815,760);
+                Bitmap src = Image.FromFile(FILE_PATH_TIFF) as Bitmap;
+                Bitmap target = new Bitmap(cropRect.Width, cropRect.Height);
+
+                using (Graphics g = Graphics.FromImage(target))
+                {
+                    g.DrawImage(src, new Rectangle(0, 0, target.Width, target.Height),
+                                     cropRect,
+                                     GraphicsUnit.Pixel);
+                    target.Save(FILE_PATH_PNG, ImageFormat.Png);
+                }
+
+                MapPanel.Source = new BitmapImage(new System.Uri(FILE_PATH_PNG));
 
                 //using (Bitmap bitmap = (Bitmap)myTiff.myImages[0])
                 //{
