@@ -50,7 +50,7 @@ namespace HolyLogger
         EntityResolver rem;
 
         public ObservableCollection<QSO> Qsos;
-        public List<QSO> LoadedQsos; //holds temporary qsos because ObservableCollection is not thread safe
+        public ObservableCollection<QSO> FilteredQsos;
 
         private string _NumOfQSOs;
         public string NumOfQSOs
@@ -192,7 +192,6 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
-            LoadedQsos = new List<QSO>();
 
             this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
             if (Properties.Settings.Default.UpdateSettings)
@@ -473,6 +472,7 @@ namespace HolyLogger
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
             ClearMatrix();
+            RestoreDataContext();
         }
 
         private void LoadPreEditUserData()
@@ -554,6 +554,15 @@ namespace HolyLogger
             UpdateState(State.New);
             ShowRigStatus();
             ShowRigParams();
+            RestoreDataContext();
+        }
+
+        private void RestoreDataContext()
+        {
+            if (Properties.Settings.Default.IsFilterQSOs)
+            {
+                DataContext = Qsos;
+            }
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -607,10 +616,6 @@ namespace HolyLogger
             int faultyQso = (int)e.Result;
             ToggleUploadProgress(Visibility.Hidden);
             UpdateNumOfQSOs();
-            //foreach (var item in LoadedQsos)
-            //{
-            //    Qsos.Insert(0, item);
-            //}
 
             Qsos.Clear();
             foreach (var item in dal.GetAllQSOs())
@@ -622,7 +627,6 @@ namespace HolyLogger
             {
                 System.Windows.Forms.MessageBox.Show(faultyQso + " Failed to load! check the files.");
             }
-            LoadedQsos.Clear();
             TB_Comment.Text = "";
             UpdateNumOfQSOs();
         }
@@ -660,7 +664,6 @@ namespace HolyLogger
                             lock (this)
                             {
                                 QSO q = dal.Insert(rq);
-                                LoadedQsos.Insert(0, q);
                             }
                             float p = (float)(c++) * 100 / count;
                             AdifHandlerWorker.ReportProgress((int)(Math.Ceiling(p)));
@@ -1623,6 +1626,7 @@ namespace HolyLogger
                 TB_DX_Name.Text = "";
                 ClearMatrix();
                 L_Duplicate.Visibility = Visibility.Hidden;
+                RestoreDataContext();
             }
             else
             {
@@ -1630,6 +1634,11 @@ namespace HolyLogger
                     RefreshDateTime_Btn_MouseUp(null, null);
                 getQrzData();
                 UpdateMatrix();
+                if (Properties.Settings.Default.IsFilterQSOs)
+                {
+                    FilteredQsos = new ObservableCollection<QSO>(Qsos.Where(p => p.DXCall.Contains(TB_DXCallsign.Text)));
+                    DataContext = FilteredQsos;
+                }
             }
         }
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)

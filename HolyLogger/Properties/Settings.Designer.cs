@@ -586,5 +586,17 @@ namespace HolyLogger.Properties {
                 this["RecentQSOCounter"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool IsFilterQSOs {
+            get {
+                return ((bool)(this["IsFilterQSOs"]));
+            }
+            set {
+                this["IsFilterQSOs"] = value;
+            }
+        }
     }
 }
