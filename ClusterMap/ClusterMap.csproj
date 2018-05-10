@@ -115,6 +115,12 @@
   <ItemGroup>
     <Resource Include="ABCpdfQuickStart.txt" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\HolyParser\HolyParser.csproj">
+      <Project>{1d2e4675-0c74-41eb-919d-64be00874a10}</Project>
+      <Name>HolyParser</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\ABCpdf.11.1.0.2\build\ABCpdf.targets" Condition="Exists('..\packages\ABCpdf.11.1.0.2\build\ABCpdf.targets')" />
   <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">

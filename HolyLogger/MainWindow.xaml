@@ -11,7 +11,7 @@
     <Grid Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
-            <RowDefinition Height="305" />
+            <RowDefinition x:Name="MainForm" Height="305" />
             <RowDefinition Height="*" />
             <RowDefinition Height="40" />
         </Grid.RowDefinitions>
@@ -82,11 +82,6 @@
                                     <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem x:Name="PropertiesMenuItem" Header="QRZ Service" ToolTip="Insert your QRZ.COM credentials" Click="PropertiesMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/qrz_mini_icon.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
                             <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -95,6 +90,12 @@
                             <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
+                            <MenuItem x:Name="OptionsMenuItem" Header="Options" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </MenuItem>
@@ -224,7 +225,7 @@
         <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="20" Margin="710,220,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
-        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,248,0,0" Grid.Row="1" VerticalAlignment="Top"/>
+        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,248,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
         <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" FontSize="16" MouseDoubleClick="GridRow_DoubleClick" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True">
             <!--<DataGrid.ContextMenu>
                 <ContextMenu >

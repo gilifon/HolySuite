@@ -598,5 +598,65 @@ namespace HolyLogger.Properties {
                 this["IsFilterQSOs"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public double OptionsWindowLeft {
+            get {
+                return ((double)(this["OptionsWindowLeft"]));
+            }
+            set {
+                this["OptionsWindowLeft"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public double OptionsWindowTop {
+            get {
+                return ((double)(this["OptionsWindowTop"]));
+            }
+            set {
+                this["OptionsWindowTop"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("300")]
+        public double OptionsWindowWidth {
+            get {
+                return ((double)(this["OptionsWindowWidth"]));
+            }
+            set {
+                this["OptionsWindowWidth"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("450")]
+        public double OptionsWindowHeight {
+            get {
+                return ((double)(this["OptionsWindowHeight"]));
+            }
+            set {
+                this["OptionsWindowHeight"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool IsShowMatrixControl {
+            get {
+                return ((bool)(this["IsShowMatrixControl"]));
+            }
+            set {
+                this["IsShowMatrixControl"] = value;
+            }
+        }
     }
 }

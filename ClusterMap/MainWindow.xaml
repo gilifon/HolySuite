@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ClusterMap"
         mc:Ignorable="d"
-        Title="MainWindow" Height="350" Width="525">
+        Title="Cluster Map" Height="350" Width="525">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
@@ -41,9 +41,9 @@
             </ToolBarTray>
             <TextBox AcceptsReturn="True" />
         </DockPanel>
-        <StackPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Grid.Row="1">
+        <DockPanel HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Grid.Row="1">
             <Image x:Name="MapPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" />
-        </StackPanel>
+        </DockPanel>
         <DockPanel Grid.Row="2">
             <StatusBar DockPanel.Dock="Bottom">
                 

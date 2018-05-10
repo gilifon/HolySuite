@@ -1,0 +1,26 @@
+﻿<Window
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:HolyLogger"
+        xmlns:OptionsUserControls="clr-namespace:HolyLogger.OptionsUserControls" x:Class="HolyLogger.OptionsWindow"
+        mc:Ignorable="d"
+        Title="Properties" MinHeight="500" MinWidth="550" Height="550" Width="550" Icon="Images/properties.png" SizeChanged="Window_SizeChanged">
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="2*" />
+            <ColumnDefinition Width="5*" />
+        </Grid.ColumnDefinitions>
+
+        <DockPanel x:Name="TreeViewPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Grid.Column="0">
+            <TreeView x:Name="treeView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+                <TreeViewItem Header="General" Selected="GeneralItem_Selected" />
+                <TreeViewItem Header="User Interface" Selected="UserInterfaceItem_Selected" />
+                <TreeViewItem Header="QRZ Service" Selected="QRZServiceItem_Selected" />
+            </TreeView>
+        </DockPanel>
+        <OptionsUserControls:QRZServiceControl x:Name="QRZServiceControlInstance" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Hidden"/>
+        <OptionsUserControls:UserInterfaceControl x:Name="UserInterfaceControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10.143,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+    </Grid>
+</Window>

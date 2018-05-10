@@ -200,8 +200,14 @@
     <Compile Include="MatrixWindow.xaml.cs">
       <DependentUpon>MatrixWindow.xaml</DependentUpon>
     </Compile>
-    <Compile Include="PropertiesWindow.xaml.cs">
-      <DependentUpon>PropertiesWindow.xaml</DependentUpon>
+    <Compile Include="OptionsUserControls\QRZServiceControl.xaml.cs">
+      <DependentUpon>QRZServiceControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OptionsUserControls\UserInterfaceControl.xaml.cs">
+      <DependentUpon>UserInterfaceControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OptionsWindow.xaml.cs">
+      <DependentUpon>OptionsWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="Helper.cs" />
     <Compile Include="Settings.cs" />
@@ -239,7 +245,15 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="PropertiesWindow.xaml">
+    <Page Include="OptionsUserControls\QRZServiceControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OptionsUserControls\UserInterfaceControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OptionsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -391,6 +405,10 @@
   <ItemGroup>
     <Resource Include="Images\gauge.png" />
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\properties.png" />
+  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\System.Data.SQLite.Core.1.0.103\build\net45\System.Data.SQLite.Core.targets" Condition="Exists('..\packages\System.Data.SQLite.Core.1.0.103\build\net45\System.Data.SQLite.Core.targets')" />
   <PropertyGroup>

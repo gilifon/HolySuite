@@ -169,6 +169,7 @@ namespace HolyLogger
         MatrixWindow matrix = null;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
+        OptionsWindow options = null;
 
         BackgroundWorker AdifHandlerWorker;
 
@@ -234,9 +235,7 @@ namespace HolyLogger
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
             if (TB_Comment.IsEnabled) LockComment_Btn.Opacity = 1;
             else LockComment_Btn.Opacity = 0.5;
-
             
-
             if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
             {
                 TB_MyGrid.Clear();
@@ -305,6 +304,21 @@ namespace HolyLogger
             foreach (var item in QSODataGrid.Columns)
             {
                 item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
+            }
+            ToggleMatrixControl();
+        }
+
+        private void ToggleMatrixControl()
+        {
+            if (Properties.Settings.Default.IsShowMatrixControl)
+            {
+                MatrixC.Visibility = Visibility.Visible;
+                MainForm.Height = new GridLength(305);
+            }
+            else
+            {
+                MatrixC.Visibility = Visibility.Hidden;
+                MainForm.Height = new GridLength(260);
             }
         }
         
@@ -779,7 +793,6 @@ namespace HolyLogger
 
         }
         
-
         private async void L_SendLog(object sender, EventArgs e)
         {
             if (Qsos.Count == 0)
@@ -789,7 +802,7 @@ namespace HolyLogger
             }
             LogUploadWindow w = (LogUploadWindow)sender;
             string bareCallsign = Properties.Settings.Default.PersonalInfoCallsign;
-            string country = Services.getHamQth(bareCallsign);
+            string country = Services.getHamQth(bareCallsign).Name;
 
             var progressIndicator = new Progress<int>();
 
@@ -1175,13 +1188,6 @@ namespace HolyLogger
                 matrix.ClearMatrix();
         }
 
-        private void PropertiesMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            PropertiesWindow PropertiesWindow = new PropertiesWindow();
-            PropertiesWindow.Closed += PropertiesWindow_Closed;
-            PropertiesWindow.Show();
-        }
-
         private void ManualModeMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.isManualMode = !Properties.Settings.Default.isManualMode;
@@ -1300,8 +1306,6 @@ namespace HolyLogger
             }
         }
 
-        
-
         private void GenerateNewLogUploasWindow()
         {
             logupload = new LogUploadWindow();
@@ -1311,6 +1315,47 @@ namespace HolyLogger
             logupload.Show();
         }
 
+        private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (signboard != null)
+            {
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == options /* return "true" if 'w' is the window your are about to open */);
+
+                if (existingWindow != null)
+                {
+                    existingWindow.Activate();
+                }
+                else
+                {
+                    GenerateNewOptionsWindow();
+                }
+            }
+            else
+            {
+                GenerateNewOptionsWindow();
+            }
+        }
+
+        private void GenerateNewOptionsWindow()
+        {
+            options = new OptionsWindow();
+            options.Closed += Options_Closed;
+            options.Left = Properties.Settings.Default.OptionsWindowLeft < 0 ? 0 : Properties.Settings.Default.OptionsWindowLeft;
+            options.Top = Properties.Settings.Default.OptionsWindowTop < 0 ? 0 : Properties.Settings.Default.OptionsWindowTop;
+            options.Width = Properties.Settings.Default.OptionsWindowWidth;
+            options.Height = Properties.Settings.Default.OptionsWindowHeight;
+            options.Show();
+        }
+
+        private void Options_Closed(object sender, EventArgs e)
+        {
+            OptionsWindow ow = (OptionsWindow)sender;
+            if(ow.QRZServiceControlInstance.HasChanged)
+            {
+                Helper.LoginToQRZ(out _SessionKey);
+            }
+            ToggleMatrixControl();
+        }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -1333,6 +1378,7 @@ namespace HolyLogger
             }
 
         }
+
         private void GenerateNewSignboardWindow()
         {
             signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyGrid.Text);
@@ -1363,6 +1409,7 @@ namespace HolyLogger
                 GenerateNewMatrixWindow();
             }
         }
+
         private void LogInfoMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (loginfo != null)
@@ -1391,6 +1438,7 @@ namespace HolyLogger
             matrix.Top = Properties.Settings.Default.MatrixWindowTop < 0 ? 0 : Properties.Settings.Default.MatrixWindowTop;
             matrix.Show();
         }
+
         private void GenerateNewLogInfoWindow()
         {
             loginfo = new LogInfoWindow();
@@ -1438,11 +1486,13 @@ namespace HolyLogger
             }
 
         }
+
         private void GenerateNewAboutWindow()
         {
             about = new AboutWindow();
             about.Show();
         }
+
         private void OmnirigMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string url = "http://www.dxatlas.com/OmniRig/";
@@ -1538,6 +1588,7 @@ namespace HolyLogger
                 }
             }
         }
+
         private void wc_DownloadFileCompleted(object sender, AsyncCompletedEventArgs e)
         {
             string tempPath = Path.GetTempPath();
@@ -1560,6 +1611,14 @@ namespace HolyLogger
             var version2 = new Version(server.Trim());
             var result = version2.CompareTo(version1);
             return result > 0;
+        }
+
+        protected override void OnPreviewKeyDown(KeyEventArgs e)
+        {
+            if (e.Key == Key.Insert)
+            {
+                e.Handled = true;
+            }
         }
 
         private void TB_DXCallsign_KeyDown(object sender, KeyEventArgs e)
@@ -1589,12 +1648,7 @@ namespace HolyLogger
                 TB_MyGrid.Text = Properties.Settings.Default.my_square;
             }
         }
-
-        private void ConnectToQRZ_Click(object sender, RoutedEventArgs e)
-        {
-            Helper.LoginToQRZ(out _SessionKey);
-        }
-
+        
         private void TB_MyGrid_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (signboard != null)
@@ -1614,10 +1668,12 @@ namespace HolyLogger
         {
             UpdateDup();
         }
+
         private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             
         }
+
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
@@ -1641,6 +1697,7 @@ namespace HolyLogger
                 }
             }
         }
+
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
             TB_Exchange.Focusable = true;
@@ -1673,6 +1730,7 @@ namespace HolyLogger
 
             UpdateDup();
         }
+
         private void UpdateDup()
         {
             var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band == TB_Band.Text && qso.Mode == Mode select qso;
@@ -1704,6 +1762,7 @@ namespace HolyLogger
             if (this.Top >= 0)
                 Properties.Settings.Default.MainWindowTop = this.Top;
         }
+
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             Properties.Settings.Default.MainWindowWidth = this.Width;
@@ -1716,7 +1775,6 @@ namespace HolyLogger
 
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Length >=3)
             {
-
                 /*****************************/
                 using (var client = new HttpClient())
                 {
@@ -1749,13 +1807,11 @@ namespace HolyLogger
                             if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
                         }
                     }
-
                     catch (Exception)
                     {
                         //Country = "";
                         FName = "";
                     }
-
                 }
                 /*****************************/
             }
@@ -1766,9 +1822,7 @@ namespace HolyLogger
             }
         }
 
-
-
-
+        
         //-------------------------------------- OmniRig Section ---------------------------------------------//
         #region OmniRig
 

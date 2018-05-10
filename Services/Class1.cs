@@ -11,13 +11,12 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
-namespace HolyParser
+namespace Services
 {
     public static class Services
-    {        
-        public static HamQTH getHamQth(string callsign)
+    {
+        public static string getHamQth(string callsign)
         {
-            HamQTH hqth = new HamQTH();
             if (!string.IsNullOrWhiteSpace(callsign))
             {
                 try
@@ -30,56 +29,21 @@ namespace HolyParser
                     StreamReader reader = new StreamReader(dataStream);
                     string responseFromServer = reader.ReadToEnd();
                     XDocument xDoc = XDocument.Parse(responseFromServer);
-                    IEnumerable<XElement> property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "callsign");
-                    if (property.Count() > 0)
-                        hqth.Callsign = property.FirstOrDefault().Value;
+                    IEnumerable<XElement> country = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                    if (country.Count() > 0)
+                        return country.FirstOrDefault().Value;
+                    else
+                        return "";
 
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
-                    if (property.Count() > 0)
-                        hqth.Name = property.FirstOrDefault().Value;
-
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "details");
-                    if (property.Count() > 0)
-                        hqth.Details = property.FirstOrDefault().Value;
-
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "continent");
-                    if (property.Count() > 0)
-                        hqth.Continent = property.FirstOrDefault().Value;
-
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "utc");
-                    if (property.Count() > 0)
-                        hqth.Utc = property.FirstOrDefault().Value;
-
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "waz");
-                    if (property.Count() > 0)
-                        hqth.Waz = property.FirstOrDefault().Value;
-
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "itu");
-                    if (property.Count() > 0)
-                        hqth.Itu = property.FirstOrDefault().Value;
-
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "lat");
-                    if (property.Count() > 0)
-                        hqth.Lat = property.FirstOrDefault().Value;
-
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "lng");
-                    if (property.Count() > 0)
-                        hqth.Lng = property.FirstOrDefault().Value;
-
-                    property = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "adif");
-                    if (property.Count() > 0)
-                        hqth.Adif = property.FirstOrDefault().Value;
-
-                    return hqth;
                 }
                 catch (Exception)
                 {
-                    return hqth;
+                    return "";
                 }
             }
             else
             {
-                return hqth;
+                return "";
             }
         }
 
@@ -199,21 +163,7 @@ namespace HolyParser
             catch (Exception)
             {
                 return "Connection with server failed! Check your internet connection";
-            }            
+            }
         }
-    }
-
-    public class HamQTH
-    {
-        public string Callsign { get; set; }
-        public string Name { get; set; }
-        public string Details { get; set; }
-        public string Continent { get; set; }
-        public string Utc { get; set; }
-        public string Waz { get; set; }
-        public string Itu { get; set; }
-        public string Lat { get; set; }
-        public string Lng { get; set; }
-        public string Adif { get; set; }
     }
 }

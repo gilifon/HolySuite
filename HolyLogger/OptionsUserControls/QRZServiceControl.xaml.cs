@@ -10,42 +10,32 @@ using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
 using System.Windows.Shapes;
 
-namespace HolyLogger
+namespace HolyLogger.OptionsUserControls
 {
     /// <summary>
-    /// Interaction logic for PropertiesWindow.xaml
+    /// Interaction logic for QRZServiceControl.xaml
     /// </summary>
-    public partial class PropertiesWindow : Window
+    public partial class QRZServiceControl : UserControl
     {
         public string username { get; set; }
         public string password { get; set; }
+        public bool HasChanged{ get; set; }
 
-        public PropertiesWindow()
+        public QRZServiceControl()
         {
             InitializeComponent();
+            HasChanged = false;
+
             password = Properties.Settings.Default.qrz_password;
             username = Properties.Settings.Default.qrz_username;
 
             TB_Password.Password = Properties.Settings.Default.qrz_password;
             TB_UserName.Text = Properties.Settings.Default.qrz_username;
         }
-
-        private void CancelBtn_Click(object sender, RoutedEventArgs e)
-        {
-            Properties.Settings.Default.qrz_password = password;
-            Properties.Settings.Default.qrz_username = username;
-            this.Close();
-        }
-
-        private void SaveBtn_Click(object sender, RoutedEventArgs e)
-        {
-            Properties.Settings.Default.qrz_password = TB_Password.Password;
-            Properties.Settings.Default.qrz_username = TB_UserName.Text;
-            this.Close();
-        }
-
+        
         private void TestConnectionBtn_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.qrz_password = TB_Password.Password;
@@ -59,6 +49,18 @@ namespace HolyLogger
             {
                 System.Windows.Forms.MessageBox.Show("Connection failed!");
             }
+        }
+
+        private void TB_UserName_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            Properties.Settings.Default.qrz_username = TB_UserName.Text;
+            HasChanged = true;
+        }
+
+        private void TB_Password_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            Properties.Settings.Default.qrz_password = TB_Password.Password;
+            HasChanged = true;
         }
     }
 }
