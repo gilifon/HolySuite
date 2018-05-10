@@ -15,9 +15,9 @@
 
         <DockPanel x:Name="TreeViewPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Grid.Column="0">
             <TreeView x:Name="treeView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <TreeViewItem Header="General" Selected="GeneralItem_Selected" />
-                <TreeViewItem Header="User Interface" Selected="UserInterfaceItem_Selected" />
-                <TreeViewItem Header="QRZ Service" Selected="QRZServiceItem_Selected" />
+                <TreeViewItem x:Name="GeneralItem" Header="General" Selected="GeneralItem_Selected" />
+                <TreeViewItem x:Name="UlItem" Header="User Interface" Selected="UserInterfaceItem_Selected" />
+                <TreeViewItem x:Name="QRZItem" Header="QRZ Service" Selected="QRZServiceItem_Selected" />
             </TreeView>
         </DockPanel>
         <OptionsUserControls:QRZServiceControl x:Name="QRZServiceControlInstance" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>

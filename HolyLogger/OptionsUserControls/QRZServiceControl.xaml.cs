@@ -27,13 +27,14 @@ namespace HolyLogger.OptionsUserControls
         public QRZServiceControl()
         {
             InitializeComponent();
-            HasChanged = false;
 
             password = Properties.Settings.Default.qrz_password;
             username = Properties.Settings.Default.qrz_username;
 
             TB_Password.Password = Properties.Settings.Default.qrz_password;
             TB_UserName.Text = Properties.Settings.Default.qrz_username;
+
+            HasChanged = false;
         }
         
         private void TestConnectionBtn_Click(object sender, RoutedEventArgs e)

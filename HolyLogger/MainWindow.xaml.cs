@@ -1322,7 +1322,7 @@ namespace HolyLogger
 
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            if (signboard != null)
+            if (options != null)
             {
                 var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == options /* return "true" if 'w' is the window your are about to open */);
 

@@ -22,6 +22,7 @@ namespace HolyLogger
         public OptionsWindow()
         {
             InitializeComponent();
+            GeneralItem.IsSelected = true;
         }
         protected override void OnLocationChanged(EventArgs e)
         {
