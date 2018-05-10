@@ -200,6 +200,9 @@
     <Compile Include="MatrixWindow.xaml.cs">
       <DependentUpon>MatrixWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OptionsUserControls\GeneralSettingsControl.xaml.cs">
+      <DependentUpon>GeneralSettingsControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="OptionsUserControls\QRZServiceControl.xaml.cs">
       <DependentUpon>QRZServiceControl.xaml</DependentUpon>
     </Compile>
@@ -242,6 +245,10 @@
       <SubType>Code</SubType>
     </Compile>
     <Page Include="MatrixWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OptionsUserControls\GeneralSettingsControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

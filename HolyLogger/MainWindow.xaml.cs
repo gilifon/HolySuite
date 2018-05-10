@@ -221,10 +221,7 @@ namespace HolyLogger
             rem = new EntityResolver();
 
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
-            if (Properties.Settings.Default.QRZ_auto_open)
-                QRZBtn.Source = qrz_path;
-            else
-                QRZBtn.Source = qrz_off_path;
+            ToggleQRZAutoOpen();
 
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
@@ -306,6 +303,14 @@ namespace HolyLogger
                 item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
             }
             ToggleMatrixControl();
+        }
+
+        private void ToggleQRZAutoOpen()
+        {
+            if (Properties.Settings.Default.QRZ_auto_open)
+                QRZBtn.Source = qrz_path;
+            else
+                QRZBtn.Source = qrz_off_path;
         }
 
         private void ToggleMatrixControl()
@@ -1355,6 +1360,7 @@ namespace HolyLogger
                 Helper.LoginToQRZ(out _SessionKey);
             }
             ToggleMatrixControl();
+            ToggleQRZAutoOpen();
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)

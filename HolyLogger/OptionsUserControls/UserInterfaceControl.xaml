@@ -8,6 +8,8 @@
              d:DesignHeight="300" d:DesignWidth="380">
 
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <CheckBox x:Name="CBX_IsShowMatrix" Content="Show Matrix in main window" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowMatrixControl, Source={StaticResource Settings}, Mode=TwoWay}"/>
+        <CheckBox x:Name="CBX_IsShowMatrix" Content="Show matrix in main window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowMatrixControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
+        <CheckBox x:Name="CBX_QRZAutoOpen" Content="Auto open QRZ.com page" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.QRZ_auto_open, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,26,0,0"/>
+        
     </Grid>
 </UserControl>

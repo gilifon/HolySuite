@@ -20,7 +20,8 @@
                 <TreeViewItem Header="QRZ Service" Selected="QRZServiceItem_Selected" />
             </TreeView>
         </DockPanel>
-        <OptionsUserControls:QRZServiceControl x:Name="QRZServiceControlInstance" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Hidden"/>
-        <OptionsUserControls:UserInterfaceControl x:Name="UserInterfaceControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10.143,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+        <OptionsUserControls:QRZServiceControl x:Name="QRZServiceControlInstance" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
+        <OptionsUserControls:UserInterfaceControl x:Name="UserInterfaceControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
+        <OptionsUserControls:GeneralSettingsControl x:Name="GeneralSettingsControlControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
     </Grid>
 </Window>

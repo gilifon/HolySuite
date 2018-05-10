@@ -43,6 +43,7 @@ namespace HolyLogger
         private void GeneralItem_Selected(object sender, RoutedEventArgs e)
         {
             HideAllControls();
+            GeneralSettingsControlControlInstance.Visibility = Visibility.Visible;
         }
         private void UserInterfaceItem_Selected(object sender, RoutedEventArgs e)
         {
@@ -58,6 +59,8 @@ namespace HolyLogger
         private void HideAllControls()
         {
             QRZServiceControlInstance.Visibility = Visibility.Hidden;
+            UserInterfaceControlInstance.Visibility = Visibility.Hidden;
+            GeneralSettingsControlControlInstance.Visibility = Visibility.Hidden;
         }
     }
 }
