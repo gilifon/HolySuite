@@ -133,31 +133,31 @@
                     <TextBlock Text="QSOs: " FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="10,0,0,0" FontSize="16"/>
+                    <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock Text="Grids: " Margin="30,0,0,0" FontSize="16"/>
+                    <TextBlock Text="Grids: " Margin="20,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock x:Name="L_numOfGrids" Text="{Binding NumOfGrids, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="10,0,0,0" FontSize="16"/>
+                    <TextBlock x:Name="L_numOfGrids" Text="{Binding NumOfGrids, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock Text="DXCCs: " Margin="30,0,0,0" FontSize="16"/>
+                    <TextBlock Text="DXCCs: " Margin="20,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock x:Name="L_numOfDXCC" Text="{Binding NumOfDXCCs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="10,0,0,0" FontSize="16"/>
+                    <TextBlock x:Name="L_numOfDXCC" Text="{Binding NumOfDXCCs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock Text="Manual Mode: " Margin="30,0,0,0" FontSize="16"/>
+                    <TextBlock Text="Manual Mode: " Margin="20,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
                     <TextBlock x:Name="L_IsManual" Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock Text="Recent QSOs: " Margin="30,0,0,0" FontSize="16"/>
+                    <TextBlock Text="Recent QSOs: " Margin="20,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="10,0,0,0" FontSize="16"/>
+                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
