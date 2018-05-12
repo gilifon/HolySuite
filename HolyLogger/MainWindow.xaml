@@ -7,7 +7,7 @@
         xmlns:gif="http://wpfanimatedgif.codeplex.com"
         x:Class="HolyLogger.MainWindow"
         Title="HolyLogger" Height="660" MinHeight="560" Width="760" MinWidth="760" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
-
+    
     <Grid Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
@@ -128,7 +128,7 @@
             <TextBox AcceptsReturn="True" />
         </DockPanel>
         <DockPanel Grid.Row="4">
-            <StatusBar DockPanel.Dock="Bottom">
+            <StatusBar DockPanel.Dock="Bottom" MouseDoubleClick="StatusBar_MouseDoubleClick">
                 <StatusBarItem>
                     <TextBlock Text="QSOs: " FontSize="16"/>
                 </StatusBarItem>
@@ -161,15 +161,15 @@
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="Omni-Rig: " FontSize="16"/>
-                        <TextBlock x:Name="L_OmniRig" Text="{Binding Status, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Margin="0,0,20,0" FontSize="16"/>
+                        <!--<TextBlock Text="Omni-Rig: " FontSize="16"/>-->
+                        <Label x:Name="L_OmniRig" Content="{Binding Status, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Margin="0,0,20,0" FontSize="16" />
                     </StackPanel>
                 </StatusBarItem>
             </StatusBar>
         </DockPanel>
 
 
-        <Label Content="My Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your Callsign"/>
+        <Label Content="My Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your Callsign" />
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="102,16,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" FontSize="16"/>
         <Label Content="My Square" HorizontalAlignment="Left" Margin="216,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your current Holyland square" />
         <!--<TextBox x:Name="TB_MyGrid" HorizontalAlignment="Left" Height="23" Margin="288,21,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="100" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Source={StaticResource Settings}, Path=Default.my_square}" TextChanged="TB_MyGrid_TextChanged" />-->

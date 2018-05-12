@@ -20,9 +20,17 @@ namespace HolyLogger.OptionsUserControls
     /// </summary>
     public partial class GeneralSettingsControl : UserControl
     {
+        public bool HasChanged { get; set; }
+
         public GeneralSettingsControl()
         {
             InitializeComponent();
+            HasChanged = false;
+        }
+        
+        private void HasChanged_Click(object sender, RoutedEventArgs e)
+        {
+            HasChanged = true;
         }
     }
 }

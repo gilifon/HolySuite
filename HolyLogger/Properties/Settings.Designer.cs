@@ -265,7 +265,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool MatrixWindowIsOpen {
             get {
                 return ((bool)(this["MatrixWindowIsOpen"]));
@@ -541,7 +541,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("1000")]
+        [global::System.Configuration.DefaultSettingValueAttribute("1500")]
         public int QRZ_auto_open_delay {
             get {
                 return ((int)(this["QRZ_auto_open_delay"]));
@@ -656,6 +656,30 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["IsShowMatrixControl"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool EnableOmniRigCAT {
+            get {
+                return ((bool)(this["EnableOmniRigCAT"]));
+            }
+            set {
+                this["EnableOmniRigCAT"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowTitleClock {
+            get {
+                return ((bool)(this["ShowTitleClock"]));
+            }
+            set {
+                this["ShowTitleClock"] = value;
             }
         }
     }

@@ -23,6 +23,9 @@ using System.Globalization;
 using Blue.Windows;
 using System.Windows.Media.Imaging;
 using System.Runtime.InteropServices;
+using Microsoft.VisualBasic;
+using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace HolyLogger
 {
@@ -180,9 +183,8 @@ namespace HolyLogger
         QSO QsoToUpdate;
         QSO QsoPreUpdate;
 
-        System.Timers.Timer UTCTimer = new System.Timers.Timer();
-        private string title = "HolyLogger               ";
-
+        DispatcherTimer UTCTimer = new DispatcherTimer();
+        private string title = "HolyLogger                                                                                                                                                                ";
         private const int SEND_CHUNK_SIZE = 200;
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
@@ -190,11 +192,17 @@ namespace HolyLogger
         
         List<string> ImportFileQ = new List<string>();
 
+        DispatcherTimer BlinkingTimer = new DispatcherTimer();
+        
         public MainWindow()
         {
             InitializeComponent();
+            if (Properties.Settings.Default.ShowTitleClock)
+                this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
 
-            this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
+            BlinkingTimer.Tick += BlinkingTimer_Tick; ;
+            BlinkingTimer.Interval = new TimeSpan(0, 0, 0, 0, 500);
+
             if (Properties.Settings.Default.UpdateSettings)
             {
                 Properties.Settings.Default.Upgrade();
@@ -305,6 +313,14 @@ namespace HolyLogger
             ToggleMatrixControl();
         }
 
+        private void BlinkingTimer_Tick(object sender, EventArgs e)
+        {
+            if (L_OmniRig.Visibility == Visibility.Visible)
+                L_OmniRig.Visibility = Visibility.Hidden;
+            else
+                L_OmniRig.Visibility = Visibility.Visible;
+        }
+
         private void ToggleQRZAutoOpen()
         {
             if (Properties.Settings.Default.QRZ_auto_open)
@@ -335,16 +351,28 @@ namespace HolyLogger
             _stickyWindow.StickOnResize = true;
             _stickyWindow.StickOnMove = true;
 
-            UTCTimer.Interval = 1000;//ticks every 1 second
-            UTCTimer.Elapsed += UTCTimer_Elapsed;
-            UTCTimer.Start();
+            if (Properties.Settings.Default.ShowTitleClock)
+                StartUTCTimer();
         }
 
-        private void UTCTimer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        private void StartUTCTimer()
+        {
+            UTCTimer.Interval = new TimeSpan(0, 0, 1);
+            UTCTimer.Tick += UTCTimer_Elapsed;
+            UTCTimer.Start();
+        }
+        
+        private void StopUTCTimer()
+        {
+            if (UTCTimer.IsEnabled)
+                UTCTimer.Stop();
+        }
+
+        private void UTCTimer_Elapsed(object sender, EventArgs e)
         {
             this.Dispatcher.Invoke(() =>
             {
-                this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2");
+                this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
             });
             
         }
@@ -371,7 +399,7 @@ namespace HolyLogger
             }
         }
         
-        void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
+        public void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
             if (e.Action == NotifyCollectionChangedAction.Remove)
             {
@@ -519,6 +547,7 @@ namespace HolyLogger
             string url = "http://www.qrz.com";
             if (!string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
                 url += "/db/" + TB_DXCallsign.Text;
+            
             try
             {
                 if (Properties.Settings.Default.QRZ_auto_open && QRZProcess != null && !QRZProcess.HasExited)
@@ -571,7 +600,6 @@ namespace HolyLogger
                 LoadPreEditUserData();
             }
             UpdateState(State.New);
-            ShowRigStatus();
             ShowRigParams();
             RestoreDataContext();
         }
@@ -997,6 +1025,7 @@ namespace HolyLogger
                         HoldPreEditUserData();
                     }                    
                     LoadQsoForUpdate();
+                    ShowRigParams();
                 }
                 catch (Exception ex)
                 {
@@ -1198,6 +1227,7 @@ namespace HolyLogger
             Properties.Settings.Default.isManualMode = !Properties.Settings.Default.isManualMode;
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
             L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
+            ShowRigParams();
         }
 
         private void ResetRecentQSOCounterMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1225,7 +1255,7 @@ namespace HolyLogger
 
         private void Window_Closed(object sender, EventArgs e)
         {
-            UTCTimer.Elapsed -= UTCTimer_Elapsed;
+            UTCTimer.Tick -= UTCTimer_Elapsed;
             if (OmniRigEngine != null)
             {
                 OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
@@ -1361,6 +1391,22 @@ namespace HolyLogger
             }
             ToggleMatrixControl();
             ToggleQRZAutoOpen();
+            if (ow.GeneralSettingsControlControlInstance.HasChanged)
+            {
+                ShowRigParams();
+            }
+            if (ow.UserInterfaceControlInstance.HasChanged)
+            {
+                if (Properties.Settings.Default.ShowTitleClock)
+                {
+                    StartUTCTimer();
+                }
+                else
+                {
+                    StopUTCTimer();
+                    this.Title = title;
+                }
+            }
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1631,7 +1677,7 @@ namespace HolyLogger
         {
             if (e.Key == Key.Enter)
             {
-                TB_Exchange.Focus();
+                //TB_Exchange.Focus();
                 if (Properties.Settings.Default.QRZ_auto_open) AutoOpenQRZPage();
             }
         }
@@ -1828,7 +1874,16 @@ namespace HolyLogger
             }
         }
 
-        
+        private void StatusBar_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            if (Rig != null && Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                Properties.Settings.Default.EnableOmniRigCAT = false;
+            }
+            ShowRigParams();
+        }
+
+
         //-------------------------------------- OmniRig Section ---------------------------------------------//
         #region OmniRig
 
@@ -2086,7 +2141,6 @@ namespace HolyLogger
                     Rig = OmniRigEngine.Rig2;
                     break;
             }
-            ShowRigStatus();
             ShowRigParams();
         }
 
@@ -2109,7 +2163,8 @@ namespace HolyLogger
         {
             if (RigNumber == OurRigNo)
             {
-                thread2 = new Thread(new ThreadStart(ShowRigStatus));
+                //thread2 = new Thread(new ThreadStart(ShowRigStatus));
+                thread2 = new Thread(new ThreadStart(ShowRigParams));
                 thread2.Name = "RigStatus";
                 //Avvia il secondo thread
                 thread2.Start();
@@ -2125,14 +2180,36 @@ namespace HolyLogger
             {
                 this.Dispatcher.Invoke(() =>
                 {
+                    BlinkingTimer.Stop();
+                    L_OmniRig.Visibility = Visibility.Visible;
+                    if (Rig == null)
+                    {
+                        Status = "Omni-Rig Failed";
+                        return;
+                    }
                     Status = Rig.StatusStr;
+                    if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE && Properties.Settings.Default.EnableOmniRigCAT)
+                    {
+                        BlinkingTimer.Start();
+                    }
+                    if (!Properties.Settings.Default.EnableOmniRigCAT)
+                    {
+                        Status = "CAT Disabled";
+                        return;
+                    }
+                    if (state == State.Edit)
+                    {
+                        Status = "Edit Mode";
+                        return;
+                    }
                 });
             }
         }
 
         private void ShowRigParams()
         {
-            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || Properties.Settings.Default.isManualMode || state == State.Edit)
+            ShowRigStatus();
+            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || !Properties.Settings.Default.EnableOmniRigCAT || Properties.Settings.Default.isManualMode || state == State.Edit)
             {
                 return;
             }
@@ -2193,6 +2270,8 @@ namespace HolyLogger
             }
 
         }
+
+
 
 
 

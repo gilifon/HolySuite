@@ -20,9 +20,17 @@ namespace HolyLogger.OptionsUserControls
     /// </summary>
     public partial class UserInterfaceControl : UserControl
     {
+        public bool HasChanged { get; set; }
+
         public UserInterfaceControl()
         {
             InitializeComponent();
+            HasChanged = false;
+        }
+
+        private void HasChanged_Click(object sender, RoutedEventArgs e)
+        {
+            HasChanged = true;
         }
     }
 }

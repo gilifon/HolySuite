@@ -63,7 +63,7 @@
       <Value Profile="(Default)">330</Value>
     </Setting>
     <Setting Name="MatrixWindowIsOpen" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="SignBoardWindowIsOpen" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
@@ -132,7 +132,7 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="QRZ_auto_open_delay" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">1000</Value>
+      <Value Profile="(Default)">1500</Value>
     </Setting>
     <Setting Name="LogInfoWindowLeft" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">100</Value>
@@ -159,6 +159,12 @@
       <Value Profile="(Default)">450</Value>
     </Setting>
     <Setting Name="IsShowMatrixControl" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="EnableOmniRigCAT" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="ShowTitleClock" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
   </Settings>
