@@ -1170,7 +1170,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=2.7.9.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=2.8.0.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_0CC698D300E1900D4256378351A5C314"
@@ -2295,7 +2295,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=2.7.9.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=2.8.0.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_6A6A1E1F8232D2DA6AE0EDE76316DC1A"
@@ -3505,15 +3505,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{7EABF80D-52E7-4886-9BB3-90CE7D58292F}"
-        "PackageCode" = "8:{C5B6C9DD-6C8F-4B76-9B20-72FE97338288}"
+        "ProductCode" = "8:{D068B18F-C0AE-48DD-BA58-266109527FE4}"
+        "PackageCode" = "8:{09D5497F-BA4D-4D8C-93D9-5F90F25701C4}"
         "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:2.8.0"
+        "ProductVersion" = "8:2.8.1"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
