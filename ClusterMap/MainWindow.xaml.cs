@@ -17,16 +17,19 @@ namespace ClusterMap
     /// </summary>
     public partial class MainWindow : Window
     {
-        public const bool IS_DEBUG = false;
+        public const bool IS_DEBUG = true;
         public const double RADIUS = 353.5;
         public const double PIXLES_PER_ANGLE = 2.53;
+        public double lat { get; set; }
+        public double lng { get; set; }
 
         public MainWindow()
         {
             InitializeComponent();
+            //HamQTH country = Services.getHamQth("PP5DZ");
+            lat = 33.238086;
+            lng = 35.607119;
             LoadDefaultMap();
-            HamQTH country = Services.getHamQth("PP5DZ");
-
         }
 
         private void LoadDefaultMap()
@@ -34,8 +37,8 @@ namespace ClusterMap
             string FILE_PATH_PDF = Path.GetTempPath() + "map.pdf";
             string FILE_PATH_TIFF = Path.GetTempPath() + "map.tif";
             string FILE_PATH_PNG = Path.GetTempPath() + "map.png";
-            //const string DOWNLOADER_URI = "https://ns6t.net/azimuth/code/azimuth.fcgi?title=&location=32.0917%2C+34.885&distance=15000&paper=LETTER&bluefill=on&view=on&submit=&iplocationused=false";
-            const string DOWNLOADER_URI = "https://ns6t.net/azimuth/code/azimuth.fcgi?title=&location=0%2C+0&distance=15000&paper=LETTER&bluefill=on&view=on&submit=&iplocationused=false";
+            string DOWNLOADER_URI = "https://ns6t.net/azimuth/code/azimuth.fcgi?title=&location=" + lat + "%2C" + lng + "&distance=15000&paper=LETTER&bluefill=on&view=on&submit=&iplocationused=false";
+            //const string DOWNLOADER_URI = "https://ns6t.net/azimuth/code/azimuth.fcgi?title=&location=0%2C+0&distance=15000&paper=LETTER&bluefill=on&view=on&submit=&iplocationused=false";
             if (IS_DEBUG || !File.Exists(FILE_PATH_PNG))
             {
                 using (var writeStream = File.OpenWrite(FILE_PATH_PDF))
@@ -82,23 +85,21 @@ namespace ClusterMap
             }
             MapPanel.Source = new BitmapImage(new System.Uri(FILE_PATH_PNG));
 
-            PaintPoint(0, 0);
-            PaintPoint(33.238086, 35.607119);
-            PaintPoint(-26.731193, -53.504491);
+            PaintPoint(0 - lat, 0 - lng);
         }
 
         private void PaintPoint(double lat, double lng)
         {
-            System.Windows.Shapes.Ellipse myLine = new System.Windows.Shapes.Ellipse();
-            myLine.Stroke = System.Windows.Media.Brushes.Red;
-            myLine.Fill = System.Windows.Media.Brushes.Red;
-            myLine.StrokeThickness = 1;
-            myLine.Width = 4;
-            myLine.Height = 4;
-            System.Windows.Controls.Canvas.SetLeft(myLine, (MapPanel.Source.Width / 2) + lng2pix(lng * 0.93) - myLine.Width / 2);
-            System.Windows.Controls.Canvas.SetTop(myLine, (MapPanel.Source.Height / 2) - lat2pix(lat * 1.05) - myLine.Height / 2);
+            System.Windows.Shapes.Ellipse point = new System.Windows.Shapes.Ellipse();
+            point.Stroke = System.Windows.Media.Brushes.Red;
+            point.Fill = System.Windows.Media.Brushes.Red;
+            point.StrokeThickness = 1;
+            point.Width = 4;
+            point.Height = 4;
+            System.Windows.Controls.Canvas.SetLeft(point, (MapPanel.Source.Width / 2) + lng2pix(lng * 0.93) - point.Width / 2);
+            System.Windows.Controls.Canvas.SetTop(point, (MapPanel.Source.Height / 2) - lat2pix(lat * 1.05) - point.Height / 2);
 
-            MapContainer.Children.Add(myLine);
+            MapContainer.Children.Add(point);
         }
 
         private double lng2pix(double value)
