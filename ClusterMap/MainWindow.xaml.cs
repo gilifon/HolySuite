@@ -18,15 +18,14 @@ namespace ClusterMap
     public partial class MainWindow : Window
     {
         public const bool IS_DEBUG = false;
-        public const double RADIUS = 500;
-        public const double PIXLES_PER_DISTANCE = 0.03;// RADIUS / 15000f;
+        public const double PIXLES_PER_DISTANCE = 0.033;// RADIUS / 15000f;
         public double lat { get; set; }
         public double lng { get; set; }
 
         public MainWindow()
         {
             InitializeComponent();
-            HamQTH country = Services.getHamQth("PP5DZ");
+            //HamQTH country = Services.getHamQth("PP5DZ");
             lat = 32.270068;
             lng = 35.080606;
             LoadDefaultMap();
@@ -85,8 +84,8 @@ namespace ClusterMap
             }
             MapPanel.Source = new BitmapImage(new System.Uri(FILE_PATH_PNG));
 
-            double destination_Lat = -42.438317;
-            double destination_Lng = 147.261328;
+            double destination_Lat = 19.929857;
+            double destination_Lng = -155.738912;
 
             double distance = Utils.DistanceBetweenPlaces(lat, lng, destination_Lat, destination_Lng);
             Tuple<double,double> bearing = Utils.BearingVectors(lat, lng, destination_Lat, destination_Lng);
