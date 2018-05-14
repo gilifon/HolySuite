@@ -1,7 +1,7 @@
-﻿using ClusterMap.Utils;
-using HolyParser;
+﻿using HolyParser;
 using System;
 using System.Collections.Generic;
+using System.Device.Location;
 using System.Drawing;
 using System.Drawing.Imaging;
 using System.IO;
@@ -17,18 +17,18 @@ namespace ClusterMap
     /// </summary>
     public partial class MainWindow : Window
     {
-        public const bool IS_DEBUG = true;
-        public const double RADIUS = 353.5;
-        public const double PIXLES_PER_ANGLE = 2.53;
+        public const bool IS_DEBUG = false;
+        public const double RADIUS = 500;
+        public const double PIXLES_PER_DISTANCE = 0.03;// RADIUS / 15000f;
         public double lat { get; set; }
         public double lng { get; set; }
 
         public MainWindow()
         {
             InitializeComponent();
-            //HamQTH country = Services.getHamQth("PP5DZ");
-            lat = 33.238086;
-            lng = 35.607119;
+            HamQTH country = Services.getHamQth("PP5DZ");
+            lat = 32.270068;
+            lng = 35.080606;
             LoadDefaultMap();
         }
 
@@ -85,7 +85,14 @@ namespace ClusterMap
             }
             MapPanel.Source = new BitmapImage(new System.Uri(FILE_PATH_PNG));
 
-            PaintPoint(0 - lat, 0 - lng);
+            double destination_Lat = -42.438317;
+            double destination_Lng = 147.261328;
+
+            double distance = Utils.DistanceBetweenPlaces(lat, lng, destination_Lat, destination_Lng);
+            Tuple<double,double> bearing = Utils.BearingVectors(lat, lng, destination_Lat, destination_Lng);
+            double lat_vect = distance * bearing.Item1;
+            double lng_vect = distance * bearing.Item2;
+            PaintPoint(lat_vect, lng_vect);
         }
 
         private void PaintPoint(double lat, double lng)
@@ -96,19 +103,19 @@ namespace ClusterMap
             point.StrokeThickness = 1;
             point.Width = 4;
             point.Height = 4;
-            System.Windows.Controls.Canvas.SetLeft(point, (MapPanel.Source.Width / 2) + lng2pix(lng * 0.93) - point.Width / 2);
-            System.Windows.Controls.Canvas.SetTop(point, (MapPanel.Source.Height / 2) - lat2pix(lat * 1.05) - point.Height / 2);
+            System.Windows.Controls.Canvas.SetLeft(point, (MapPanel.Source.Width / 2) + lng2pix(lng) - point.Width / 2);
+            System.Windows.Controls.Canvas.SetTop(point, (MapPanel.Source.Height / 2) - lat2pix(lat) - point.Height / 2);
 
             MapContainer.Children.Add(point);
         }
 
         private double lng2pix(double value)
         {
-            return value * PIXLES_PER_ANGLE;
+            return value * PIXLES_PER_DISTANCE;
         }
         private double lat2pix(double value)
         {
-            return value * PIXLES_PER_ANGLE;
+            return value * PIXLES_PER_DISTANCE;
         }
     }
    
