@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ClusterMap"
         mc:Ignorable="d"
-        Title="Cluster Map" Height="960" MinHeight="960" MaxHeight="960" Width="900" MinWidth="900" MaxWidth="900" >
+        Title="Cluster Map" Height="970" MinHeight="970" MaxHeight="970" Width="910" MinWidth="910" MaxWidth="910" >
     <Grid x:Name="mainGrid">
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
