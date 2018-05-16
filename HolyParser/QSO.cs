@@ -21,10 +21,9 @@ namespace HolyParser
         [JsonProperty("callsign")]
         public string DXCall { get; set; }
 
-        [JsonProperty("date")]
+        [JsonProperty("timestamp")]
         public string Date { get; set; }
 
-        [JsonProperty("time")]
         public string Time { get; set; }
 
         [JsonProperty("band")]

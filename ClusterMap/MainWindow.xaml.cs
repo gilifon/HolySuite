@@ -22,7 +22,7 @@ namespace ClusterMap
     /// </summary>
     public partial class MainWindow : Window
     {
-        public const bool IS_DEBUG = false;
+        public const bool IS_DEBUG = true;
         public const double PIXLES_PER_DISTANCE = 0.027;// RADIUS / 15000f;
         public double lat { get; set; }
         public double lng { get; set; }
@@ -37,7 +37,7 @@ namespace ClusterMap
         public MainWindow()
         {
             InitializeComponent();
-            //HamQTH country = Services.getHamQth("PP5DZ");
+            HamQTH country = Services.getHamQth("PP5DZ");
             //lat = 32.270068;
             //lng = 35.080606;
             lat = 0;
@@ -72,13 +72,21 @@ namespace ClusterMap
             double India_Lat = 8.300320;
             double India_Lng = 77.472064;
 
-            ////BearingSea
+            ////NP
             double NP_Lat = 90;
             double NP_Lng = 0;
 
-            ////BearingSea
+            ////SP
             double SP_Lat = -90;
             double SP_Lng = 0;
+
+            //WP
+            double WP_Lat = 0;
+            double WP_Lng = -90;
+
+            //EP
+            double EP_Lat = 0;
+            double EP_Lng = 90;
 
             ////BearingSea
             double Liberia_Lat = 4.451074;
@@ -87,12 +95,17 @@ namespace ClusterMap
 
 
             PaintRelativePoint(lat,lng,Tanzania_Lat,Tanzania_Lng);
-            PaintRelativePoint(lat, lng, SA_Lat, SA_Lng);
-            PaintRelativePoint(lat, lng, BS_Lat, BS_Lng);
-            PaintRelativePoint(lat, lng, India_Lat, India_Lng);
+
+
+            //PaintRelativePoint(lat, lng, SA_Lat, SA_Lng);
+            //PaintRelativePoint(lat, lng, BS_Lat, BS_Lng);
+            //PaintRelativePoint(lat, lng, India_Lat, India_Lng);
             PaintRelativePoint(lat, lng, NP_Lat, NP_Lng);
             PaintRelativePoint(lat, lng, SP_Lat, SP_Lng);
-            PaintRelativePoint(lat, lng, Liberia_Lat, Liberia_Lng);
+            //PaintRelativePoint(lat, lng, Liberia_Lat, Liberia_Lng);
+
+            PaintRelativePoint(lat, lng, WP_Lat, WP_Lng);
+            PaintRelativePoint(lat, lng, EP_Lat, EP_Lng);
         }
 
         private void PaintRelativePoint(double slat, double slng, double dlat, double dlng)

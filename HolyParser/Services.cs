@@ -98,6 +98,13 @@ namespace HolyParser
 
             foreach (QSO qso in qso_list)
             {
+                string[] datetime = qso.Date.Split(new char[] { ' ' });
+                if (datetime.Length > 1)
+                {
+                    qso.Date = datetime[0];
+                    qso.Time = datetime[1];
+                }
+
                 if (qso.DXCall != null) adif.AppendFormat("<call:{0}>{1} ", qso.DXCall.Length, qso.DXCall);
                 if (qso.SRX != null) adif.AppendFormat("<srx_string:{0}>{1} ", qso.SRX.Length, qso.SRX);
                 if (qso.Freq != null) adif.AppendFormat("<freq:{0}>{1} ", qso.Freq.Length, qso.Freq);
