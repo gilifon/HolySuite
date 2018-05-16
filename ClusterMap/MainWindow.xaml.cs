@@ -56,9 +56,8 @@ namespace ClusterMap
 
             MapPanel.Source = new BitmapImage(new System.Uri(FILE_PATH_PNG_FINAL));
 
-            ////Tanzania
-            double Tanzania_Lat = -42.233530;
-            double Tanzania_Lng = 146.168648;
+            double Lat1 = 8.229767;
+            double Lng1 = 77.292732;
 
             ////South Argentina
             double SA_Lat = -54.601227;
@@ -72,21 +71,13 @@ namespace ClusterMap
             double India_Lat = 8.300320;
             double India_Lng = 77.472064;
 
-            ////NP
+            ////BearingSea
             double NP_Lat = 90;
             double NP_Lng = 0;
 
-            ////SP
+            ////BearingSea
             double SP_Lat = -90;
             double SP_Lng = 0;
-
-            //WP
-            double WP_Lat = 0;
-            double WP_Lng = -90;
-
-            //EP
-            double EP_Lat = 0;
-            double EP_Lng = 90;
 
             ////BearingSea
             double Liberia_Lat = 4.451074;
@@ -95,22 +86,18 @@ namespace ClusterMap
 
 
             PaintRelativePoint(lat,lng,Tanzania_Lat,Tanzania_Lng);
-
-
-            //PaintRelativePoint(lat, lng, SA_Lat, SA_Lng);
-            //PaintRelativePoint(lat, lng, BS_Lat, BS_Lng);
-            //PaintRelativePoint(lat, lng, India_Lat, India_Lng);
+            PaintRelativePoint(lat, lng, SA_Lat, SA_Lng);
+            PaintRelativePoint(lat, lng, BS_Lat, BS_Lng);
+            PaintRelativePoint(lat, lng, India_Lat, India_Lng);
             PaintRelativePoint(lat, lng, NP_Lat, NP_Lng);
             PaintRelativePoint(lat, lng, SP_Lat, SP_Lng);
-            //PaintRelativePoint(lat, lng, Liberia_Lat, Liberia_Lng);
-
-            PaintRelativePoint(lat, lng, WP_Lat, WP_Lng);
-            PaintRelativePoint(lat, lng, EP_Lat, EP_Lng);
+            PaintRelativePoint(lat, lng, Liberia_Lat, Liberia_Lng);
         }
 
         private void PaintRelativePoint(double slat, double slng, double dlat, double dlng)
         {
-            double distance = Utils.DistanceBetweenPlaces(slat, slng, dlat, dlng);
+            double distance = Utils.HaversineDistanceBetweenPlaces(slat, slng, dlat, dlng);
+            double factor = GetDistanceFactor(distance);
             Tuple<double, double> bearing = Utils.BearingVectors(slat, slng, dlat, dlng);
             double lat_vect = distance * bearing.Item1;
             double lng_vect = distance * bearing.Item2;
@@ -121,19 +108,16 @@ namespace ClusterMap
             point.StrokeThickness = 1;
             point.Width = 4;
             point.Height = 4;
-            System.Windows.Controls.Canvas.SetLeft(point, (MapPanel.Source.Width / 2) + lng2pix(lng_vect) - point.Width / 2);
-            System.Windows.Controls.Canvas.SetTop(point, (MapPanel.Source.Height / 2) - lat2pix(lat_vect) - point.Height / 2);
+            System.Windows.Controls.Canvas.SetLeft(point, (MapPanel.Source.Width / 2) + lng_vect * factor - point.Width / 2);
+            System.Windows.Controls.Canvas.SetTop(point, (MapPanel.Source.Height / 2) - lat_vect * factor - point.Height / 2);
 
             MapContainer.Children.Add(point);
         }
 
-        private double lng2pix(double value)
+        private double GetDistanceFactor(double value)
         {
-            return value * PIXLES_PER_DISTANCE;
-        }
-        private double lat2pix(double value)
-        {
-            return value * PIXLES_PER_DISTANCE;
+            double c = 0.000000000000000000000000740998 * Math.Pow(value, 6) - 0.000000000000000000042557060903 * Math.Pow(value, 5) + 0.000000000000000972213437376804 * Math.Pow(value, 4) - 0.0000000000112389058679665 * Math.Pow(value, 3) + 0.0000000694162742743402 * Math.Pow(value, 2) - (0.000221461581596741 * value) + 0.329424217146764;
+            return c;
         }
 
         private async Task<string> PostMapRequest()

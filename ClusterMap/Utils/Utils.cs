@@ -53,5 +53,12 @@ namespace ClusterMap
 
             return dist;
         }
+        public static double HaversineDistanceBetweenPlaces(double slat, double slng, double dlat, double dlng)
+        {
+            double R = 6371; // km
+            double a = Math.Pow(Math.Sin((ToRad(dlat) - ToRad(slat)) / 2), 2) + Math.Cos(ToRad(slat)) * Math.Cos(ToRad(dlat)) * Math.Pow(Math.Sin((ToRad(dlng) - ToRad(slng)) / 2), 2);
+            double c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+            return R * c;
+        }
     }
 }
