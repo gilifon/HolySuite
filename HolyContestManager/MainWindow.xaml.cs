@@ -248,15 +248,19 @@ namespace HolyContestManager
             int iteration = 0;
             int participantsCount = RawData.participants.Count();
 
-            string adif = HolyParser.Services.GenerateAdif(RawData.log);
-            System.IO.FileStream fs = File.Create(@"C:\Users\gill\Desktop\4X70.adi");
-            StreamWriter sw = new StreamWriter(fs);
-            sw.Write(adif);
-            sw.Close();
-            fs.Close();
+            //string adif = HolyParser.Services.GenerateAdif(RawData.log);
+            //System.IO.FileStream fs = File.Create(@"C:\Users\4Z1KD\Desktop\4X70.adi");
+            //StreamWriter sw = new StreamWriter(fs);
+            //sw.Write(adif);
+            //sw.Close();
+            //fs.Close();
 
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
+                if (p.callsign.ToLower() == "sp2gub")
+                {
+                    int x = 0;
+                }
                 if (p.is_manual == 0)
                 {
                     IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
@@ -308,7 +312,7 @@ namespace HolyContestManager
                 }
                 sb.Append("(");
                 sb.Append("'"); sb.Append(0); sb.Append("',");
-                sb.Append("'"); sb.Append(2017); sb.Append("',");
+                sb.Append("'"); sb.Append(2018); sb.Append("',");
                 sb.Append("'"); sb.Append(p.callsign.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append("HolyLogger:" + DateTime.Now.Ticks); sb.Append("',");
                 sb.Append("'"); sb.Append(p.country.Replace("'", "\"")); sb.Append("',");

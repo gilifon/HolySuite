@@ -83,9 +83,7 @@ namespace ClusterMap
             double Liberia_Lat = 4.451074;
             double Liberia_Lng = -7.600905;
 
-
-
-            PaintRelativePoint(lat,lng,Tanzania_Lat,Tanzania_Lng);
+            
             PaintRelativePoint(lat, lng, SA_Lat, SA_Lng);
             PaintRelativePoint(lat, lng, BS_Lat, BS_Lng);
             PaintRelativePoint(lat, lng, India_Lat, India_Lng);

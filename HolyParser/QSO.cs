@@ -103,7 +103,7 @@ namespace HolyParser
 
         private bool IsValidBand()
         {
-            if (string.IsNullOrEmpty(Band) && !string.IsNullOrEmpty(Freq.Trim()))
+            if (string.IsNullOrEmpty(Band.ToLower().Replace("m","")) && !string.IsNullOrEmpty(Freq.Trim()))
             {
                 Band = HolyLogParser.convertFreqToBand(Freq.Trim());
             }
