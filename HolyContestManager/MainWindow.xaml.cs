@@ -257,10 +257,6 @@ namespace HolyContestManager
 
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
-                if (p.callsign.ToLower() == "sp2gub")
-                {
-                    int x = 0;
-                }
                 if (p.is_manual == 0)
                 {
                     IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;

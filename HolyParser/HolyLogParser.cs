@@ -6,6 +6,7 @@ using MoreLinq;
 using DXCCManager;
 using System.Globalization;
 using ModeManager;
+using System;
 
 namespace HolyParser
 {
@@ -397,7 +398,30 @@ th,td
 
             int single_point = validQSOs.Count(p => p.Band.Contains("10") || p.Band.Contains("15") || p.Band.Contains("20"));
             int double_point = validQSOs.Count(p => p.Band.Contains("40") || p.Band.Contains("80") || p.Band.Contains("160"));
-            int total_points = single_point + double_point * 2;
+
+            int extra_points = 0;
+
+            DateTime dt;
+
+            foreach (var qso in validQSOs)
+            {
+                if (DateTime.TryParseExact(qso.Time, "HHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out dt))
+                {
+                    if (dt.TimeOfDay > new TimeSpan(17,0,0))
+                    {
+                        if (qso.Band.Contains("10") || qso.Band.Contains("15") || qso.Band.Contains("20"))
+                        {
+                            extra_points += 1;
+                        }
+                        else if (qso.Band.Contains("40") || qso.Band.Contains("85") || qso.Band.Contains("160"))
+                        {
+                            extra_points += 2;
+                        }
+                    }
+                }
+            }
+
+            int total_points = extra_points + single_point + double_point * 2;
             _points = total_points;
 
             _qso160 = validQSOs.Count(p => p.Band.Contains("160"));
