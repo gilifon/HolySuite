@@ -247,16 +247,20 @@ namespace HolyContestManager
             
             int iteration = 0;
             int participantsCount = RawData.participants.Count();
-
-            //string adif = HolyParser.Services.GenerateAdif(RawData.log);
-            //System.IO.FileStream fs = File.Create(@"C:\Users\4Z1KD\Desktop\4X70.adi");
-            //StreamWriter sw = new StreamWriter(fs);
-            //sw.Write(adif);
-            //sw.Close();
-            //fs.Close();
+            
 
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
+                //IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                //string adif = HolyParser.Services.GenerateAdif(qsosx);
+                //System.IO.FileStream fs = File.Create(@"C:\Users\4Z1KD\Desktop\" + p.callsign + ".adi");
+                //StreamWriter sw = new StreamWriter(fs);
+                //sw.Write(adif);
+                //sw.Close();
+                //fs.Close();
+                //continue;
+
+                iteration++;
                 if (p.is_manual == 0)
                 {
                     IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
