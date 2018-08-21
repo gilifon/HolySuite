@@ -367,7 +367,6 @@ namespace HolyContestManager
             }
         }
         
-
         private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             if (e.AddedItems.Count == 0) return;

@@ -92,7 +92,7 @@
                                     <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="EntireLogQrzServiseMenuItem_Click">
+                            <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Full-Log QRZ Service" ToolTip="Try to get QRZ info for the entire log" Click="EntireLogQrzServiseMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>

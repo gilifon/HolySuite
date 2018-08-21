@@ -166,6 +166,8 @@ namespace HolyLogger
             }
         }
 
+        public bool isNetworkAvailable { get; set; }
+
         HolyLogParser p;
         Process QRZProcess;
 
@@ -200,6 +202,9 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
+
+            isNetworkAvailable = Helper.CheckForInternetConnection();
+
             if (Properties.Settings.Default.ShowTitleClock)
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
 
@@ -214,7 +219,7 @@ namespace HolyLogger
                 Properties.Settings.Default.UpdateSettings = false;
                 Properties.Settings.Default.Save();
             }
-            if (Properties.Settings.Default.isAutoCheckUpdates)
+            if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
             {
                 NotifyVersionUpToDate = false;
                 UpdatesMenuItem_Click(null, null);
@@ -230,14 +235,7 @@ namespace HolyLogger
             AdifHandlerWorker.DoWork += AdifHandlerWorker_DoWork;
             AdifHandlerWorker.ProgressChanged += AdifHandlerWorker_ProgressChanged;
             AdifHandlerWorker.RunWorkerCompleted += AdifHandlerWorker_RunWorkerCompleted;
-
-            EntireLogQrzWorker = new BackgroundWorker();
-            EntireLogQrzWorker.WorkerReportsProgress = true;
-            EntireLogQrzWorker.DoWork += EntireLogQrzWorker_DoWork;
-            EntireLogQrzWorker.ProgressChanged += EntireLogQrzWorker_ProgressChanged;
-            EntireLogQrzWorker.RunWorkerCompleted += EntireLogQrzWorker_RunWorkerCompleted;
             
-
             rem = new EntityResolver();
 
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
@@ -323,15 +321,16 @@ namespace HolyLogger
                 item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
             }
             ToggleMatrixControl();
-            NetworkFlag.Fill = Helper.CheckForInternetConnection() ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
+            NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
         
         private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
         {
+            isNetworkAvailable = e.IsAvailable;
             this.Dispatcher.Invoke(() =>
             {
-                NetworkFlag.Fill = e.IsAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
+                NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             });
         }
 
@@ -1701,7 +1700,7 @@ namespace HolyLogger
             if (e.Key == Key.Enter)
             {
                 //TB_Exchange.Focus();
-                if (Properties.Settings.Default.QRZ_auto_open) AutoOpenQRZPage();
+                if (Properties.Settings.Default.QRZ_auto_open && isNetworkAvailable) AutoOpenQRZPage();
             }
         }
 
@@ -1911,31 +1910,31 @@ namespace HolyLogger
             }
         }
 
-        private void EntireLogQrzWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        private async void EntireLogQrzServiseMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            
-        }
-
-        private void EntireLogQrzWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
-        {
-            
-        }
-
-        private void EntireLogQrzServiseMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            EntireLogQrzWorker.RunWorkerAsync();
-        }
-
-        private async void EntireLogQrzWorker_DoWork(object sender, DoWorkEventArgs e)
-        {
-            int c = 0;
-            foreach (var qso in Qsos)
+            for (int i = 0; i < Qsos.Count; i++)
             {
-                qso.Name = await GetQrzForCall(qso.DXCall);
-                dal.Update(qso);
+                try
+                {
+                    QSO qso = Qsos[i];
+                    if (string.IsNullOrWhiteSpace(qso.Name) && isNetworkAvailable)
+                    {
+                        qso.Name = await GetQrzForCall(qso.DXCall);
+                        dal.Update(qso);
+                        this.Dispatcher.Invoke(() =>
+                        {
+                            QSODataGrid.Items.Refresh();
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to execute QRZ Service: " + ex.Message);
+                    break;
+                }                
             }
         }
-
+        
         private async Task<string> GetQrzForCall(string callsign)
         {
             using (var client = new HttpClient())
@@ -1953,12 +1952,10 @@ namespace HolyLogger
 
                         if (call.Count() > 0)
                         {
-                            string name;
+                            string name = "";
                             IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
                             if (fname.Count() > 0)
                                 name = fname.FirstOrDefault().Value;
-                            else
-                                return "";
 
                             IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
                             if (lname.Count() > 0)
