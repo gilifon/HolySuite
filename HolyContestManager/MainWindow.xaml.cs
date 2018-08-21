@@ -251,14 +251,7 @@ namespace HolyContestManager
 
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
-                //IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
-                //string adif = HolyParser.Services.GenerateAdif(qsosx);
-                //System.IO.FileStream fs = File.Create(@"C:\Users\4Z1KD\Desktop\" + p.callsign + ".adi");
-                //StreamWriter sw = new StreamWriter(fs);
-                //sw.Write(adif);
-                //sw.Close();
-                //fs.Close();
-                //continue;
+                GenerateLogFile(p);
 
                 iteration++;
                 if (p.is_manual == 0)
@@ -295,6 +288,17 @@ namespace HolyContestManager
             Report = Report.OrderByDescending(p => p.score).ToList();
             FilteredReport = new List<Participant>(Report);
             string insert_hlwtest = GenerateMultipleInsert(FilteredReport);
+        }
+
+        private void GenerateLogFile(Participant p)
+        {
+            IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+            string adif = HolyParser.Services.GenerateAdif(qsosx);
+            System.IO.FileStream fs = File.Create(@"C:\Users\4Z1KD\Desktop\" + Helper.getBareCallsign(p.callsign) + ".adi");
+            StreamWriter sw = new StreamWriter(fs);
+            sw.Write(adif);
+            sw.Close();
+            fs.Close();
         }
 
         private string GenerateMultipleInsert(IList<Participant> participants)

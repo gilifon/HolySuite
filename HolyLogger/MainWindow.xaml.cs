@@ -1836,28 +1836,33 @@ namespace HolyLogger
                         var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(TB_DXCallsign.Text));
                         var responseFromServer = await response.Content.ReadAsStringAsync();
                         XDocument xDoc = XDocument.Parse(responseFromServer);
-
-                        //IEnumerable<XElement> country = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "country");
-                        //if (country.Count() > 0)
-                        //    Country = country.FirstOrDefault().Value;
-                        //else
-                        //    Country = "";
-
+                        
                         if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
                         {
-                            IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
-                            if (fname.Count() > 0)
-                                FName = fname.FirstOrDefault().Value;
+                            IEnumerable<XElement> xref = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "xref");
+                            IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
+
+                            if ((call.Count() > 0 && call.FirstOrDefault().Value == TB_DXCallsign.Text) || (xref.Count() > 0 && xref.FirstOrDefault().Value == TB_DXCallsign.Text))
+                            {
+
+                                IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
+                                if (fname.Count() > 0)
+                                    FName = fname.FirstOrDefault().Value;
+                                else
+                                    FName = "";
+
+                                IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                                if (lname.Count() > 0)
+                                    FName += " " + lname.FirstOrDefault().Value;
+
+                                string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
+                                if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
+                            }
                             else
+                            {
                                 FName = "";
-
-                            IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
-                            if (lname.Count() > 0)
-                                FName += " " + lname.FirstOrDefault().Value;
-
-                            string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
-                            if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
-                        }
+                            }
+                        }                        
                     }
                     catch (Exception)
                     {
