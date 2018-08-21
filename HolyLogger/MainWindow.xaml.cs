@@ -26,6 +26,8 @@ using System.Runtime.InteropServices;
 using Microsoft.VisualBasic;
 using System.Windows.Media.Animation;
 using System.Windows.Threading;
+using System.Net.NetworkInformation;
+using System.Windows.Media;
 
 namespace HolyLogger
 {
@@ -200,6 +202,8 @@ namespace HolyLogger
             if (Properties.Settings.Default.ShowTitleClock)
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
 
+            NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
+
             BlinkingTimer.Tick += BlinkingTimer_Tick; ;
             BlinkingTimer.Interval = new TimeSpan(0, 0, 0, 0, 500);
 
@@ -311,6 +315,16 @@ namespace HolyLogger
                 item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
             }
             ToggleMatrixControl();
+            NetworkFlag.Fill = Helper.CheckForInternetConnection() ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
+            NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
+        }
+
+        private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
+        {
+            this.Dispatcher.Invoke(() =>
+            {
+                NetworkFlag.Fill = e.IsAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
+            });
         }
 
         private void BlinkingTimer_Tick(object sender, EventArgs e)
@@ -334,12 +348,12 @@ namespace HolyLogger
             if (Properties.Settings.Default.IsShowMatrixControl)
             {
                 MatrixC.Visibility = Visibility.Visible;
-                MainForm.Height = new GridLength(305);
+                MainForm.Height = new GridLength(325);
             }
             else
             {
                 MatrixC.Visibility = Visibility.Hidden;
-                MainForm.Height = new GridLength(260);
+                MainForm.Height = new GridLength(270);
             }
         }
         
@@ -1384,18 +1398,18 @@ namespace HolyLogger
 
         private void Options_Closed(object sender, EventArgs e)
         {
-            OptionsWindow ow = (OptionsWindow)sender;
-            if(ow.QRZServiceControlInstance.HasChanged)
+            OptionsWindow optionWindow = (OptionsWindow)sender;
+            if(optionWindow.QRZServiceControlInstance.HasChanged)
             {
                 Helper.LoginToQRZ(out _SessionKey);
             }
             ToggleMatrixControl();
             ToggleQRZAutoOpen();
-            if (ow.GeneralSettingsControlControlInstance.HasChanged)
+            if (optionWindow.GeneralSettingsControlControlInstance.HasChanged)
             {
                 ShowRigParams();
             }
-            if (ow.UserInterfaceControlInstance.HasChanged)
+            if (optionWindow.UserInterfaceControlInstance.HasChanged)
             {
                 if (Properties.Settings.Default.ShowTitleClock)
                 {
@@ -1405,8 +1419,9 @@ namespace HolyLogger
                 {
                     StopUTCTimer();
                     this.Title = title;
-                }
+                }                
             }
+            NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1734,6 +1749,7 @@ namespace HolyLogger
                 TB_DX_Name.Text = "";
                 ClearMatrix();
                 L_Duplicate.Visibility = Visibility.Hidden;
+                L_Legal.Visibility = Visibility.Hidden;
                 RestoreDataContext();
             }
             else
@@ -1786,12 +1802,15 @@ namespace HolyLogger
         private void UpdateDup()
         {
             var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band == TB_Band.Text && qso.Mode == Mode select qso;
+            var legal = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
+
             if (state == State.Edit)
                 dups = dups.Where(p => p.id != QsoToUpdate.id);
 
             if (dups.Count() > 0)
             {
                 L_Duplicate.Visibility = Visibility.Visible;
+                L_Legal.Visibility = Visibility.Hidden;
                 if (matrix != null)
                 {
                     matrix.SetDup();
@@ -1800,6 +1819,11 @@ namespace HolyLogger
             else
             {
                 L_Duplicate.Visibility = Visibility.Hidden;
+                L_Legal.Visibility = Visibility.Hidden;
+                if (legal.Count() > 0)
+                {
+                    L_Legal.Visibility = Visibility.Visible;
+                }
                 if (matrix != null)
                 {
                     matrix.ClearDup();

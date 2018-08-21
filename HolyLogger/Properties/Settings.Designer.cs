@@ -682,5 +682,17 @@ namespace HolyLogger.Properties {
                 this["ShowTitleClock"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowNetworkFlag {
+            get {
+                return ((bool)(this["ShowNetworkFlag"]));
+            }
+            set {
+                this["ShowNetworkFlag"] = value;
+            }
+        }
     }
 }
