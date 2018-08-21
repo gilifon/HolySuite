@@ -177,6 +177,7 @@ namespace HolyLogger
         OptionsWindow options = null;
 
         BackgroundWorker AdifHandlerWorker;
+        BackgroundWorker EntireLogQrzWorker;
 
         private StickyWindow _stickyWindow;
         private State state = State.New;
@@ -229,6 +230,13 @@ namespace HolyLogger
             AdifHandlerWorker.DoWork += AdifHandlerWorker_DoWork;
             AdifHandlerWorker.ProgressChanged += AdifHandlerWorker_ProgressChanged;
             AdifHandlerWorker.RunWorkerCompleted += AdifHandlerWorker_RunWorkerCompleted;
+
+            EntireLogQrzWorker = new BackgroundWorker();
+            EntireLogQrzWorker.WorkerReportsProgress = true;
+            EntireLogQrzWorker.DoWork += EntireLogQrzWorker_DoWork;
+            EntireLogQrzWorker.ProgressChanged += EntireLogQrzWorker_ProgressChanged;
+            EntireLogQrzWorker.RunWorkerCompleted += EntireLogQrzWorker_RunWorkerCompleted;
+            
 
             rem = new EntityResolver();
 
@@ -318,7 +326,7 @@ namespace HolyLogger
             NetworkFlag.Fill = Helper.CheckForInternetConnection() ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
-
+        
         private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
         {
             this.Dispatcher.Invoke(() =>
@@ -1247,7 +1255,7 @@ namespace HolyLogger
         private void ResetRecentQSOCounterMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.RecentQSOCounter = 0;
-        }
+        }        
 
         private void PropertiesWindow_Closed(object sender, EventArgs e)
         {
@@ -1756,7 +1764,7 @@ namespace HolyLogger
             {
                 if (!Properties.Settings.Default.isManualMode && state == State.New)
                     RefreshDateTime_Btn_MouseUp(null, null);
-                getQrzData();
+                GetQrzData();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
                 {
@@ -1845,7 +1853,7 @@ namespace HolyLogger
             Properties.Settings.Default.MainWindowHeight = this.Height;
         }
 
-        private async void getQrzData()
+        private async void GetQrzData()
         {
             Country = rem.GetDXCC(TB_DXCallsign.Text).Name;
 
@@ -1900,6 +1908,78 @@ namespace HolyLogger
             {
                 //Country = "";
                 FName = "";
+            }
+        }
+
+        private void EntireLogQrzWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
+        {
+            
+        }
+
+        private void EntireLogQrzWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
+        {
+            
+        }
+
+        private void EntireLogQrzServiseMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            EntireLogQrzWorker.RunWorkerAsync();
+        }
+
+        private async void EntireLogQrzWorker_DoWork(object sender, DoWorkEventArgs e)
+        {
+            int c = 0;
+            foreach (var qso in Qsos)
+            {
+                qso.Name = await GetQrzForCall(qso.DXCall);
+                dal.Update(qso);
+            }
+        }
+
+        private async Task<string> GetQrzForCall(string callsign)
+        {
+            using (var client = new HttpClient())
+            {
+                try
+                {
+                    string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
+                    var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(callsign));
+                    var responseFromServer = await response.Content.ReadAsStringAsync();
+                    XDocument xDoc = XDocument.Parse(responseFromServer);
+
+                    if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(callsign))
+                    {
+                        IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
+
+                        if (call.Count() > 0)
+                        {
+                            string name;
+                            IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
+                            if (fname.Count() > 0)
+                                name = fname.FirstOrDefault().Value;
+                            else
+                                return "";
+
+                            IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                            if (lname.Count() > 0)
+                                name += " " + lname.FirstOrDefault().Value;
+
+                            string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
+                            if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
+
+                            return name;
+                        }
+                        else
+                        {
+                            return "";
+                        }
+                    }
+                }
+                catch (Exception)
+                {
+                    return "";
+                }
+                return "";
             }
         }
 

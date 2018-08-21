@@ -92,6 +92,11 @@
                                     <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="EntireLogQrzServiseMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <Separator />
                             <MenuItem x:Name="OptionsMenuItem" Header="Options" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
                                 <MenuItem.Icon>
