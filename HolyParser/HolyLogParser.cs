@@ -216,7 +216,7 @@ th,td
             foreach (string row in rows)
             {
                 //skip empty rows
-                if (string.IsNullOrEmpty(row)) continue;
+                if (string.IsNullOrWhiteSpace(row)) continue;
 
                 QSO qso_row = new QSO();
 
@@ -637,9 +637,26 @@ th,td
             return string.Empty;
         }
 
+        public static string convertBandToFreq(string band)
+        {
+
+            if (band.ToLower() == "160m") return "1.800000";
+            if (band.ToLower() == "80m") return "3.600000";
+            if (band.ToLower() == "40m") return "7.100000";
+            if (band.ToLower() == "30m") return "10.000000";
+            if (band.ToLower() == "20m") return "14.200000";
+            if (band.ToLower() == "17m") return "18.100000";
+            if (band.ToLower() == "15m") return "21.300000";
+            if (band.ToLower() == "12m") return "24.950000";
+            if (band.ToLower() == "10m") return "28.400000";
+            if (band.ToLower() == "6m") return "50.000000";
+            if (band.ToLower() == "2m") return "145.000000";
+            return string.Empty;
+        }
+
         public static bool IsIsraeliStation(string callsign)
         {
-            return !string.IsNullOrEmpty(callsign) && (callsign.StartsWith("4X", true, System.Globalization.CultureInfo.CurrentCulture) || callsign.StartsWith("4Z", true, System.Globalization.CultureInfo.CurrentCulture));
+            return !string.IsNullOrWhiteSpace(callsign) && (callsign.StartsWith("4X", true, System.Globalization.CultureInfo.CurrentCulture) || callsign.StartsWith("4Z", true, System.Globalization.CultureInfo.CurrentCulture));
         }
 
         

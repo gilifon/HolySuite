@@ -67,7 +67,7 @@ namespace HolyParser
             IsIsraeli = HolyLogParser.IsIsraeliStation(DXCall);
             string pattern = @"([a-zA-Z]{1})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
             Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
-            if (!string.IsNullOrEmpty(SRX))//srx not empty -> good, try match
+            if (!string.IsNullOrWhiteSpace(SRX))//srx not empty -> good, try match
             {
                 Match match = regex.Match(SRX);
                 if (match.Success) //srx matches grid
@@ -103,44 +103,50 @@ namespace HolyParser
 
         private bool IsValidBand()
         {
-            if (string.IsNullOrEmpty(Band.ToLower().Replace("m","")) && !string.IsNullOrEmpty(Freq.Trim()))
+            if ((string.IsNullOrWhiteSpace(Band) || string.IsNullOrWhiteSpace(Band.ToLower().Replace("m",""))) && !string.IsNullOrWhiteSpace(Freq))
             {
                 Band = HolyLogParser.convertFreqToBand(Freq.Trim());
             }
-            bool isValid = !string.IsNullOrEmpty(Band) && (Band.Contains("10M") || Band.Contains("15M") || Band.Contains("20M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
-            if (!isValid) this.ERROR += "Band is not valid: " + Band + " - ";
+            if (!string.IsNullOrWhiteSpace(Band) && string.IsNullOrWhiteSpace(Freq))
+            {
+                Freq = HolyLogParser.convertBandToFreq(Band);
+            }
+            bool isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("10M") || Band.Contains("15M") || Band.Contains("20M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
+            if (!isValid)
+            {
+                this.ERROR += "Band is not valid: " + Band + " - ";
+            }
             return isValid;
-
         }
         private bool IsValidMode()
         {
             return true;
-            //bool isValid = !string.IsNullOrEmpty(Mode) && (Mode.ToLower().Contains("ph") || Mode.ToLower().Contains("fm") || Mode.ToLower().Contains("ry") || Mode.ToLower().Contains("ssb") || Mode.ToLower().Contains("lsb") || Mode.ToLower().Contains("usb") || Mode.ToLower().Contains("cw") || Mode.ToLower().Contains("rtty") || Mode.ToLower().Contains("psk") || Mode.ToLower().Contains("digi") || Mode.ToLower().Contains("ps") || Mode.ToLower().Contains("pk"));
+            //bool isValid = !string.IsNullOrWhiteSpace(Mode) && (Mode.ToLower().Contains("ph") || Mode.ToLower().Contains("fm") || Mode.ToLower().Contains("ry") || Mode.ToLower().Contains("ssb") || Mode.ToLower().Contains("lsb") || Mode.ToLower().Contains("usb") || Mode.ToLower().Contains("cw") || Mode.ToLower().Contains("rtty") || Mode.ToLower().Contains("psk") || Mode.ToLower().Contains("digi") || Mode.ToLower().Contains("ps") || Mode.ToLower().Contains("pk"));
             //if (!isValid) this.ERROR += "Mode is not valid: " + Mode + " - ";
             //return isValid;
         }
         private bool IsValidCall()
         {
-            bool isValid = !string.IsNullOrEmpty(DXCall);
+            bool isValid = !string.IsNullOrWhiteSpace(DXCall);
             if (!isValid) this.ERROR += "Call is empty -";
             return isValid;
         }
         private bool IsValidComment()
         {
-            bool isValid = !string.IsNullOrEmpty(Comment);
+            bool isValid = !string.IsNullOrWhiteSpace(Comment);
             if (!isValid) this.ERROR += "Comment is empty -";
             return isValid;
         }
         private bool IsValidSRX()
         {
-            bool isValid = !string.IsNullOrEmpty(SRX);
+            bool isValid = !string.IsNullOrWhiteSpace(SRX);
             if (!isValid) this.ERROR += "SRX is empty -";
             return isValid;
         }
         private bool IsValidDXCC()
         {
             //return true;
-            bool isValid = !string.IsNullOrEmpty(DXCC);
+            bool isValid = !string.IsNullOrWhiteSpace(DXCC);
             if (!isValid) this.ERROR += "DXCC is empty -";
             return isValid;
         }
