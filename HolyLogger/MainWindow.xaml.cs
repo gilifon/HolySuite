@@ -1702,6 +1702,10 @@ namespace HolyLogger
                 //TB_Exchange.Focus();
                 if (Properties.Settings.Default.QRZ_auto_open && isNetworkAvailable) AutoOpenQRZPage();
             }
+            else if (e.Key == Key.Space)
+            {
+                e.Handled = true;
+            }
         }
 
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
@@ -1855,25 +1859,28 @@ namespace HolyLogger
         private async void GetQrzData()
         {
             Country = rem.GetDXCC(TB_DXCallsign.Text).Name;
+            
 
-            if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Length >=3)
+            if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Trim().Length >=3)
             {
+                string dxcall = TB_DXCallsign.Text.Trim();
+
                 /*****************************/
                 using (var client = new HttpClient())
                 {
                     try
                     {
                         string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
-                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(TB_DXCallsign.Text));
+                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(dxcall));
                         var responseFromServer = await response.Content.ReadAsStringAsync();
                         XDocument xDoc = XDocument.Parse(responseFromServer);
                         
-                        if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+                        if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(dxcall))
                         {
                             IEnumerable<XElement> xref = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "xref");
                             IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
 
-                            if ((call.Count() > 0 && call.FirstOrDefault().Value == TB_DXCallsign.Text) || (xref.Count() > 0 && xref.FirstOrDefault().Value == TB_DXCallsign.Text))
+                            if ((call.Count() > 0 && call.FirstOrDefault().Value == dxcall) || (xref.Count() > 0 && xref.FirstOrDefault().Value == dxcall))
                             {
 
                                 IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
@@ -1889,10 +1896,14 @@ namespace HolyLogger
                                 string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
                                 if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
                             }
-                            else
+                            else if (call.Count() == 0 && xref.Count() == 0)
                             {
                                 FName = "";
                             }
+                            //else
+                            //{
+                            //    FName = "";
+                            //}
                         }                        
                     }
                     catch (Exception)
@@ -2293,7 +2304,8 @@ namespace HolyLogger
                         Status = "Omni-Rig Failed";
                         return;
                     }
-                    Status = Rig.StatusStr;
+                    //Status = Rig.StatusStr;
+                    Status = "CAT Enabled";
                     if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE && Properties.Settings.Default.EnableOmniRigCAT)
                     {
                         BlinkingTimer.Start();
@@ -2394,8 +2406,15 @@ namespace HolyLogger
 
 
 
+
         #endregion
 
-        
+        private void TB_DXCallsign_PreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Space)
+            {
+                e.Handled = true;
+            }
+        }
     }
 }

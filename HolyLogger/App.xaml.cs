@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Media;
 
 namespace HolyLogger
 {
@@ -22,6 +23,7 @@ namespace HolyLogger
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            
             bool aIsNewInstance = false;
             myMutex = new Mutex(true, "HolyLoggerApplication", out aIsNewInstance);
             if (!aIsNewInstance)

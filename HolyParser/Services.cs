@@ -172,13 +172,13 @@ namespace HolyParser
 
         public static string getBareCallsign(string callsign)
         {
-            string[] callParts = callsign.Split('/');
+            string[] callParts = callsign.Trim().Split('/');
             if (callParts.Length == 1) return callsign;
             if (callParts.Length > 2) return callParts[1];
             if (callParts.Length == 2)
             {
                 if (callParts[0].Length > callParts[1].Length) return callParts[0];
-                return callParts[1];
+                return callParts[1].Trim();
             }
             return callsign;
         }
