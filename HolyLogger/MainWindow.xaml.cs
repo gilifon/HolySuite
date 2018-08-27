@@ -1879,10 +1879,10 @@ namespace HolyLogger
                         {
                             IEnumerable<XElement> xref = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "xref");
                             IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
+                            IEnumerable<XElement> error = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Error");
 
                             if ((call.Count() > 0 && call.FirstOrDefault().Value == dxcall) || (xref.Count() > 0 && xref.FirstOrDefault().Value == dxcall))
                             {
-
                                 IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
                                 if (fname.Count() > 0)
                                     FName = fname.FirstOrDefault().Value;
@@ -1896,9 +1896,11 @@ namespace HolyLogger
                                 string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
                                 if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
                             }
-                            else if (call.Count() == 0 && xref.Count() == 0)
+                            else if (error.Count() > 0)
                             {
-                                FName = "";
+                                string errorCall = error.FirstOrDefault().Value.Split(':')[1].Trim();
+                                if (errorCall == dxcall)
+                                    FName = "";
                             }
                             //else
                             //{
@@ -1923,8 +1925,16 @@ namespace HolyLogger
 
         private async void EntireLogQrzServiseMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            ToggleUploadProgress(Visibility.Visible);
+            await GetQrzForEntireLogAsync(new Progress<int>(percent => UploadProgress = percent.ToString()));
+            ToggleUploadProgress(Visibility.Hidden);
+        }
+
+        private async Task<bool> GetQrzForEntireLogAsync(IProgress<int> progress)
+        {
             for (int i = 0; i < Qsos.Count; i++)
             {
+                progress.Report((i+1) * 100 / Qsos.Count);
                 try
                 {
                     QSO qso = Qsos[i];
@@ -1942,8 +1952,9 @@ namespace HolyLogger
                 {
                     System.Windows.Forms.MessageBox.Show("Failed to execute QRZ Service: " + ex.Message);
                     break;
-                }                
+                }
             }
+            return true;
         }
         
         private async Task<string> GetQrzForCall(string callsign)
