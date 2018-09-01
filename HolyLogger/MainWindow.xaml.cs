@@ -2319,6 +2319,7 @@ namespace HolyLogger
                     Status = "CAT Enabled";
                     if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE && Properties.Settings.Default.EnableOmniRigCAT)
                     {
+                        Status = Rig.StatusStr;
                         BlinkingTimer.Start();
                     }
                     if (!Properties.Settings.Default.EnableOmniRigCAT)
