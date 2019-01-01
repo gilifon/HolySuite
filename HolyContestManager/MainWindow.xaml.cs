@@ -217,7 +217,7 @@ namespace HolyContestManager
 
         private void GetData()
         {
-            WebRequest request = WebRequest.Create("http://www.iarc.org/ws/get_holyland_data.php");
+            WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;
             Stream dataStream = response.GetResponseStream();

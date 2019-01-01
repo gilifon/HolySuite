@@ -8,7 +8,7 @@ namespace ModeManager
 {
     public class ModeResolver
     {
-        private List<Mode> Modes = new List<Mode>()
+        public List<Mode> Modes = new List<Mode>()
         {
             new Mode {Name="AM"},
             new Mode {Name="ARDOP"},
@@ -170,7 +170,7 @@ namespace ModeManager
 
         }
 
-        public string GetalidMode(string mode)
+        public string GetValidMode(string mode)
         {
             //Mode fromsubmode = Modes.Where(p => p.Submodes.Where(s => s.Name == mode.ToUpper().Trim()).FirstOrDefault() != null).FirstOrDefault();
             Mode fromsubmode = Modes.Where(d => d.Submodes != null && d.Submodes.Any(s => s.Name == mode.ToUpper().Trim())).FirstOrDefault();
@@ -192,10 +192,14 @@ namespace ModeManager
             }
         }
 
-        private class Mode
+        public class Mode
         {
             public string Name{ get; set; }
             public IEnumerable<Mode> Submodes { get; set; }
+            public override string ToString()
+            {
+                return Name;
+            }
         }
     }
     

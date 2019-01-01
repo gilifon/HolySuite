@@ -278,7 +278,7 @@ th,td
                 match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso_row.Mode = mr.GetalidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+                    qso_row.Mode = mr.GetValidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
                 }
 
                 regex = new Regex(time_pattern, RegexOptions.IgnoreCase);
