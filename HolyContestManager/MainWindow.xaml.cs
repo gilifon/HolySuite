@@ -294,7 +294,7 @@ namespace HolyContestManager
         {
             IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
             string adif = HolyParser.Services.GenerateAdif(qsosx);
-            System.IO.FileStream fs = File.Create(@"C:\Users\4Z1KD\Desktop\" + Helper.getBareCallsign(p.callsign) + ".adi");
+            System.IO.FileStream fs = File.Create(@"C:\Users\gill\Desktop\" + Helper.getBareCallsign(p.callsign) + ".adi");
             StreamWriter sw = new StreamWriter(fs);
             sw.Write(adif);
             sw.Close();
@@ -443,7 +443,7 @@ namespace HolyContestManager
 
     public struct HolylandData
     {
-        public bool success { get; set; }
+        //public bool success { get; set; }
         public List<Participant> participants { get; set; }
         public List<QSO> log { get; set; }
     }
@@ -471,19 +471,19 @@ namespace HolyContestManager
         }
     }
 
-    public struct Member
-    {
-        public Member(string call, string email, string name, string link)
-        {
-            Call = call;
-            Email = email;
-            Name = name;
-            Link = link;
-        }
-        public string Call { get; set; }
-        public string Email { get; set; }
-        public string Name { get; set; }
-        public string Link { get; set; }
-    }
+    //public struct Member
+    //{
+    //    public Member(string call, string email, string name, string link)
+    //    {
+    //        Call = call;
+    //        Email = email;
+    //        Name = name;
+    //        Link = link;
+    //    }
+    //    public string Call { get; set; }
+    //    public string Email { get; set; }
+    //    public string Name { get; set; }
+    //    public string Link { get; set; }
+    //}
     
 }

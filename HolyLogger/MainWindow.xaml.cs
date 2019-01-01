@@ -899,7 +899,7 @@ namespace HolyLogger
                 
                 try
                 {
-                    var response = await client.PostAsync("http://www.iarc.org/livelog/Server/GetLogForCall.php", content);
+                    var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     return responseString;
                 }
