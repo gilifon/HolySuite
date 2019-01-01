@@ -898,7 +898,7 @@ namespace HolyLogger
                 var content = new FormUrlEncodedContent(values);
                 try
                 {
-                    var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
+                    var response = await client.PostAsync("http://www.iarc.org/livelog/Server/AddLog.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     return responseString;
                 }
@@ -927,7 +927,7 @@ namespace HolyLogger
                     var content = new FormUrlEncodedContent(values);
                     try
                     {
-                        var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
+                        var response = await client.PostAsync("http://www.iarc.org/livelog/Server/AddLog.php", content);
                         var responseString = await response.Content.ReadAsStringAsync();
 
                         progress.Report(c++ * 100 / ChunkedQSOs.Count);

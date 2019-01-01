@@ -190,9 +190,9 @@ namespace HolyParser
             client.Port = 25;
             client.DeliveryMethod = SmtpDeliveryMethod.Network;
             client.UseDefaultCredentials = false;
-            client.Host = "host406.hostmonster.com";
+            client.Host = "iarc.org";
             client.UseDefaultCredentials = false;
-            client.Credentials = new System.Net.NetworkCredential("iarcorg", "Rw6Ach!@");
+            client.Credentials = new System.Net.NetworkCredential("info", "info1234%%");
 
             mail.IsBodyHtml = true;
             mail.Subject = subject;
