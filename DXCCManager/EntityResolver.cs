@@ -398,19 +398,19 @@ namespace DXCCManager
         {
             foreach (DXCC item in FinalDXCCs)
             {
-                if (!string.IsNullOrWhiteSpace(item.Prefixes) && prefixesRegexCache["^(" + item.Prefixes + ".*)"].IsMatch(callsign) && !string.IsNullOrWhiteSpace(item.Name))
+                if (!string.IsNullOrWhiteSpace(item.Prefixes) && prefixesRegexCache["^(" + item.Prefixes + ".*)"].IsMatch(callsign.ToUpper()) && !string.IsNullOrWhiteSpace(item.Name))
                 {
                     return item;
                 }
             }
-            return new DXCC() { Continent = "XX", Entity = "-1", Name = "Unknown", Prefixes = callsign.Length >= 2 ? callsign.Substring(0, 2) : callsign };
+            return new DXCC() { Continent = "XX", Entity = "-1", Name = "Unknown", Prefixes = callsign.Length >= 2 ? callsign.ToUpper().Substring(0, 2) : callsign.ToUpper() };
         }
 
         public string GetContinent(string callsign)
         {
             foreach (DXCC item in FinalDXCCs)
             {
-                if (!string.IsNullOrWhiteSpace(item.Prefixes) && prefixesRegexCache["^(" + item.Prefixes + ".*)"].IsMatch(callsign))
+                if (!string.IsNullOrWhiteSpace(item.Prefixes) && prefixesRegexCache["^(" + item.Prefixes + ".*)"].IsMatch(callsign.ToUpper()))
                 {
                     return item.Continent;
                 }

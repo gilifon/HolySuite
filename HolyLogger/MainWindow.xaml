@@ -99,7 +99,7 @@
                             </MenuItem>
                             <MenuItem x:Name="RemoveDuplicatesMenuItem" Header="Remove Duplicates" ToolTip="Remove duplicates from the log" Click="RemoveDuplicatesMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />

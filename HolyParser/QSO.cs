@@ -72,6 +72,7 @@ namespace HolyParser
         {
             IsValid = false;
             IsIsraeli = HolyLogParser.IsIsraeliStation(DXCall);
+            Hash();
             string pattern = @"([a-zA-Z]{1})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
             Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
             if (!string.IsNullOrWhiteSpace(SRX))//srx not empty -> good, try match
@@ -81,8 +82,6 @@ namespace HolyParser
                 {
                     this.SRX = match.Groups[1].Value + match.Groups[2].Value + match.Groups[3].Value;
                     IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && IsIsraeli;
-                    if (IsValid && IsIsraeli)
-                        HASH = MyCall + DXCall + Band + Mode;
                 }
                 else //srx does NOT matche grid
                 {
@@ -93,8 +92,6 @@ namespace HolyParser
                     {
                         this.SRX = match.Groups[1].Value;
                         IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && !IsIsraeli;
-                        if (IsValid && !IsIsraeli)
-                            HASH = MyCall + DXCall + Band + Mode;
                     }
                     else
                     {
@@ -164,6 +161,15 @@ namespace HolyParser
             bool isValid = !string.IsNullOrWhiteSpace(DXCC);
             if (!isValid) this.ERROR += "DXCC is empty -";
             return isValid;
+        }
+        private void Hash()
+        {
+            string mycall = string.IsNullOrWhiteSpace(MyCall) ? MyCall : "MyCall";
+            string dxcall = IsValidCall() ? DXCall : "DXCall";
+            string band = IsValidBand() ? Band : "Band";
+            string mode = IsValidMode() ? Mode : "Mode";
+
+            HASH = mycall + dxcall + band + mode;
         }
 
         public bool Equals(QSO other)

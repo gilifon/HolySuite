@@ -241,7 +241,7 @@ th,td
                 match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso_row.DXCall = Regex.Split(row, dxcall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    qso_row.DXCall = Regex.Split(row, dxcall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
                     ER_Dxcc = rem.GetDXCC(qso_row.DXCall);
                     qso_row.Country = ER_Dxcc.Name;
                     qso_row.DXCC = ER_Dxcc.Entity;
@@ -251,7 +251,7 @@ th,td
                 match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso_row.MyCall = Regex.Split(row, mycall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    qso_row.MyCall = Regex.Split(row, mycall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
                 }
                 else
                 {
@@ -259,7 +259,7 @@ th,td
                     match = regex.Match(row);
                     if (match.Success)
                     {
-                        qso_row.MyCall = Regex.Split(row, operator_call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                        qso_row.MyCall = Regex.Split(row, operator_call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
                     }
                 }
 
@@ -322,6 +322,7 @@ th,td
                 if (match.Success)
                 {
                     qso_row.SRX = Regex.Split(row, srx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "000";
                 }
                 else
                 {
@@ -330,6 +331,7 @@ th,td
                     if (match.Success)
                     {
                         qso_row.SRX = Regex.Split(row, srx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                        if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "000";
                     }
                     else
                     {
