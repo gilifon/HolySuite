@@ -1932,6 +1932,40 @@ namespace HolyLogger
             ToggleUploadProgress(Visibility.Hidden);
         }
 
+        private void RemoveDuplicatesMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string adif = Services.GenerateAdif(dal.GetAllQSOs());
+            _holyLogParser = new HolyLogParser(adif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, false, true);
+            _holyLogParser.Parse();
+
+            Qsos.Clear();
+            dal.DeleteAll();
+            
+            List<QSO> rawQSOList = _holyLogParser.GetRawQSO();//get the qso list
+            int count = rawQSOList.Count;
+
+            int faultyQSO = 0;
+            foreach (var rq in rawQSOList)
+            {
+                try
+                {
+                    lock (this)
+                    {
+                        QSO q = dal.Insert(rq);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    faultyQSO++;
+                }
+            }
+            foreach (var item in dal.GetAllQSOs())
+            {
+                Qsos.Add(item);
+            }
+            
+        }
+
         private async Task<bool> GetQrzForEntireLogAsync(IProgress<int> progress)
         {
             for (int i = 0; i < Qsos.Count; i++)
