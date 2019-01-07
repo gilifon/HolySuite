@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace HolyParser
 {
-    public class QSO
+    public class QSO : IEquatable<QSO>
     {
         [JsonProperty("id")]
         public int id { get; set; }
@@ -60,6 +60,13 @@ namespace HolyParser
         [JsonProperty("rst_sent")]
         public string RST_SENT { get; set; }
 
+        public bool IsAllowWARC { get; set; }
+
+
+        public QSO()
+        {
+            IsAllowWARC = false;
+        }
 
         public void StandartizeQSO()
         {
@@ -111,7 +118,15 @@ namespace HolyParser
             {
                 Freq = HolyLogParser.convertBandToFreq(Band);
             }
-            bool isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("10M") || Band.Contains("15M") || Band.Contains("20M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
+            bool isValid = false;
+            if (IsAllowWARC)
+            {
+                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("2M") || Band.Contains("6M") || Band.Contains("10M") || Band.Contains("12M") || Band.Contains("15M") || Band.Contains("17M") || Band.Contains("20M") || Band.Contains("30M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
+            }
+            else
+            {
+                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("10M") || Band.Contains("15M") || Band.Contains("20M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
+            }
             if (!isValid)
             {
                 this.ERROR += "Band is not valid: " + Band + " - ";
@@ -149,6 +164,11 @@ namespace HolyParser
             bool isValid = !string.IsNullOrWhiteSpace(DXCC);
             if (!isValid) this.ERROR += "DXCC is empty -";
             return isValid;
+        }
+
+        public bool Equals(QSO other)
+        {
+            return (this.HASH == other.HASH);
         }
     }
 }

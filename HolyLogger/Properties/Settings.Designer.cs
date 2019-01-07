@@ -694,5 +694,29 @@ namespace HolyLogger.Properties {
                 this["ShowNetworkFlag"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool IsParseWARC {
+            get {
+                return ((bool)(this["IsParseWARC"]));
+            }
+            set {
+                this["IsParseWARC"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool IsParseDuplicates {
+            get {
+                return ((bool)(this["IsParseDuplicates"]));
+            }
+            set {
+                this["IsParseDuplicates"] = value;
+            }
+        }
     }
 }

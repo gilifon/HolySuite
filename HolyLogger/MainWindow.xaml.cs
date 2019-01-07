@@ -168,7 +168,7 @@ namespace HolyLogger
 
         public bool isNetworkAvailable { get; set; }
 
-        HolyLogParser p;
+        HolyLogParser _holyLogParser;
         Process QRZProcess;
 
         LogUploadWindow logupload = null;
@@ -656,7 +656,7 @@ namespace HolyLogger
             NumOfQSOs = dal.GetQsoCount().ToString();
             NumOfGrids = dal.GetGridCount().ToString();
             NumOfDXCCs = dal.GetDXCCCount().ToString();
-            Score = p.Result.ToString();
+            Score = _holyLogParser.Result.ToString();
         }
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -717,11 +717,11 @@ namespace HolyLogger
             foreach (var filename in ImportFileQ) //for each file in the Q
             {
                 string RawAdif = File.ReadAllText(filename); //read it
-                p = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(Properties.Settings.Default.my_callsign)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
+                _holyLogParser = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(Properties.Settings.Default.my_callsign)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
                 try
                 {
-                    p.Parse(); //try to parse it
-                    List<QSO> rawQSOList = p.GetRawQSO();//get the qso list
+                    _holyLogParser.Parse(); //try to parse it
+                    List<QSO> rawQSOList = _holyLogParser.GetRawQSO();//get the qso list
                     int count = rawQSOList.Count;
 
                     int c = 1;
@@ -1090,6 +1090,7 @@ namespace HolyLogger
             {
                 string date = QsoToUpdate.Date.Insert(4, "/").Insert(7, "/");
                 string time = QsoToUpdate.Time.Insert(2, ":").Insert(5, ":");
+                if (time.Length < 7) time = time.Insert(time.Length, "00");
 
                 TP_Date.Value = DateTime.Parse(date);
                 TP_Time.Value = DateTime.Parse(time);
@@ -1266,8 +1267,8 @@ namespace HolyLogger
         private void parseAdif()
         {
             string adif = Services.GenerateAdif(dal.GetAllQSOs());
-            p = new HolyLogParser(adif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
-            p.Parse();
+            _holyLogParser = new HolyLogParser(adif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
+            _holyLogParser.Parse();
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
@@ -1520,22 +1521,22 @@ namespace HolyLogger
             loginfo.Left = Properties.Settings.Default.LogInfoWindowLeft < 0 ? 0 : Properties.Settings.Default.LogInfoWindowLeft;
             loginfo.Top = Properties.Settings.Default.LogInfoWindowTop < 0 ? 0 : Properties.Settings.Default.LogInfoWindowTop;
 
-            if (p != null)
+            if (_holyLogParser != null)
             {
-                loginfo.CW.Value = p.qsoCW;
-                loginfo.SSB.Value = p.qsoSSB;
+                loginfo.CW.Value = _holyLogParser.qsoCW;
+                loginfo.SSB.Value = _holyLogParser.qsoSSB;
 
                 //loginfo.Band6.Value = p.qso6;
-                loginfo.Band10.Value = p.qso10;
-                loginfo.Band12.Value = p.qso12;
-                loginfo.Band15.Value = p.qso15;
-                loginfo.Band17.Value = p.qso17;
-                loginfo.Band20.Value = p.qso20;
-                loginfo.Band30.Value = p.qso30;
-                loginfo.Band40.Value = p.qso40;
+                loginfo.Band10.Value = _holyLogParser.qso10;
+                loginfo.Band12.Value = _holyLogParser.qso12;
+                loginfo.Band15.Value = _holyLogParser.qso15;
+                loginfo.Band17.Value = _holyLogParser.qso17;
+                loginfo.Band20.Value = _holyLogParser.qso20;
+                loginfo.Band30.Value = _holyLogParser.qso30;
+                loginfo.Band40.Value = _holyLogParser.qso40;
                 //loginfo.Band60.Value = p.qso60;
-                loginfo.Band80.Value = p.qso80;
-                loginfo.Band160.Value = p.qso160;
+                loginfo.Band80.Value = _holyLogParser.qso80;
+                loginfo.Band160.Value = _holyLogParser.qso160;
             }
             loginfo.Show();
         }

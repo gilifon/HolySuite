@@ -9,5 +9,7 @@
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsFilterGrid" Content="Filter QSO grid" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsFilterQSOs, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
         <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,26,0,0" Click="HasChanged_Click"/>
+        <CheckBox x:Name="CBX_IsParseWarc" Content="Parse WARC Frequencies" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsParseWARC, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,52,0,0"/>
+        <CheckBox x:Name="CBX_IsParseDuplicates" Content="Parse Duplicates" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsParseDuplicates, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,78,0,0"/>
     </Grid>
 </UserControl>
