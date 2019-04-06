@@ -56,12 +56,20 @@ namespace HolyLogger
             HideAllControls();
             QRZServiceControlInstance.Visibility = Visibility.Visible;
         }
+        private void ImportItem_Selected(object sender, RoutedEventArgs e)
+        {
+            HideAllControls();
+            ImportControlInstance.Visibility = Visibility.Visible;
+        }
+
+        //ImportItem_Selected
 
         private void HideAllControls()
         {
             QRZServiceControlInstance.Visibility = Visibility.Hidden;
             UserInterfaceControlInstance.Visibility = Visibility.Hidden;
             GeneralSettingsControlControlInstance.Visibility = Visibility.Hidden;
+            ImportControlInstance.Visibility = Visibility.Hidden;
         }
     }
 }

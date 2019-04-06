@@ -20,18 +20,18 @@
                 <ToolBar>
                     <Menu>
                         <MenuItem Header="File" FontSize="16">
-                            <MenuItem x:Name="ImportMenuItem" Header="Import From ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
+                            <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
                                 <MenuItem.Icon>
                                     <Image Source="Images/import.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />
-                            <MenuItem x:Name="ExpotMenuItem" Header="Export To ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExpotMenuItem_Click" >
+                            <MenuItem x:Name="ExpotMenuItem" Header="Export ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExpotMenuItem_Click" >
                                 <MenuItem.Icon>
                                     <Image Source="Images/exportA.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
-                            <MenuItem x:Name="ExpotExlMenuItem" Header="Export To CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >
+                            <MenuItem x:Name="ExpotExlMenuItem" Header="Export CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >
                                 <MenuItem.Icon>
                                     <Image Source="Images/exportX.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>

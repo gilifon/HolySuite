@@ -864,15 +864,11 @@ namespace HolyLogger
             string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent));
 
             StringBuilder sb = new StringBuilder(200);
-            sb.Append("Dear ").Append(Properties.Settings.Default.PersonalInfoName).Append(",<br><br>");
-            sb.Append("Thank you for participating in the 'Holyland Contest' and for sending the log.<br>");
-            sb.Append("Please be patient, we will publish the result as soon as all the logs are received.<br><br>");
-            sb.Append("73 and Best Regards,<br>");
-            sb.Append("Gil, 4Z1KD.<br>");
-            sb.Append("Online Log Manager.<br><br><br>");
-            sb.Append("http://www.iarc.org/iarc/#HolylandResults");
+            sb.Append("Dear ").Append(Properties.Settings.Default.PersonalInfoName).Append(",<br>");
+            sb.Append("Thank you for sending the log.<br>");
+            sb.Append("73 and Best Regards.");
 
-            string Sendemail_result = await Services.SendMail("info@iarc.org", Properties.Settings.Default.PersonalInfoEmail, "Holyland Contest - your log was received", sb.ToString());
+            string Sendemail_result = await Services.SendMail("info@iarc.org", Properties.Settings.Default.PersonalInfoEmail, "Your log was received", sb.ToString());
             w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
@@ -899,7 +895,7 @@ namespace HolyLogger
                 
                 try
                 {
-                    var response = await client.PostAsync("http://www.iarc.org/Holyland/Server/AddLog.php", content);
+                    var response = await client.PostAsync("https://www.iarc.org/Holyland/Server/AddLog.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     return responseString;
                 }
@@ -928,7 +924,7 @@ namespace HolyLogger
                     var content = new FormUrlEncodedContent(values);
                     try
                     {
-                        var response = await client.PostAsync("http://www.iarc.org/livelog/Server/AddLog.php", content);
+                        var response = await client.PostAsync("https://www.iarc.org/Holyland/Server/AddLog.php", content);
                         var responseString = await response.Content.ReadAsStringAsync();
 
                         progress.Report(c++ * 100 / ChunkedQSOs.Count);

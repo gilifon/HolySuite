@@ -4,16 +4,16 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
-             mc:Ignorable="d" Height="110" Width="380">
+             mc:Ignorable="d" Height="110" Width="360">
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
         <Label x:Name="label1" Content="User Name" HorizontalAlignment="Left" Margin="0,0,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_UserName" HorizontalAlignment="Left" Height="23" Margin="93,4,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="279" FontSize="16" TextChanged="TB_UserName_TextChanged" />
-        <PasswordBox x:Name="TB_Password" HorizontalAlignment="Left" Margin="92,34,0,0" VerticalAlignment="Top" Width="279" FontSize="16" PasswordChanged="TB_Password_PasswordChanged"/>
+        <TextBox x:Name="TB_UserName" HorizontalAlignment="Left" Height="23" Margin="93,4,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="259" FontSize="16" TextChanged="TB_UserName_TextChanged" />
+        <PasswordBox x:Name="TB_Password" HorizontalAlignment="Left" Margin="92,34,0,0" VerticalAlignment="Top" Width="260" FontSize="16" PasswordChanged="TB_Password_PasswordChanged"/>
         <Label x:Name="label1_Copy" Content="Password" HorizontalAlignment="Left" Margin="0,31,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <Button x:Name="TestConnectionBtn" Content="Test Connection" HorizontalAlignment="Left" Margin="217,76,0,0" VerticalAlignment="Top" Width="155" FontSize="16" Click="TestConnectionBtn_Click"/>
+        <Button x:Name="TestConnectionBtn" Content="Test Connection" HorizontalAlignment="Left" Margin="217,76,0,0" VerticalAlignment="Top" Width="135" FontSize="16" Click="TestConnectionBtn_Click"/>
     </Grid>
 </UserControl>

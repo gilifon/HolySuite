@@ -1,0 +1,13 @@
+﻿<UserControl x:Class="HolyLogger.OptionsUserControls.ImportControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
+             mc:Ignorable="d" 
+             d:DesignHeight="300" d:DesignWidth="380">
+    <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <CheckBox x:Name="CBX_IsParseWarc" Content="Allow WARC Bands" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsParseWARC, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" />
+        <CheckBox x:Name="CBX_IsParseDuplicates" Content="Import Duplicates" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsParseDuplicates, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,26,0,0"/>
+    </Grid>
+</UserControl>

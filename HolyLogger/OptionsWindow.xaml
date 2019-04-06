@@ -18,10 +18,12 @@
                 <TreeViewItem x:Name="GeneralItem" Header="General" Selected="GeneralItem_Selected" />
                 <TreeViewItem x:Name="UlItem" Header="User Interface" Selected="UserInterfaceItem_Selected" />
                 <TreeViewItem x:Name="QRZItem" Header="QRZ Service" Selected="QRZServiceItem_Selected" />
+                <TreeViewItem x:Name="ImportItem" Header="Import Settings" Selected="ImportItem_Selected"/>
             </TreeView>
         </DockPanel>
         <OptionsUserControls:QRZServiceControl x:Name="QRZServiceControlInstance" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
         <OptionsUserControls:UserInterfaceControl x:Name="UserInterfaceControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
         <OptionsUserControls:GeneralSettingsControl x:Name="GeneralSettingsControlControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+        <OptionsUserControls:ImportControl x:Name="ImportControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
     </Grid>
 </Window>
