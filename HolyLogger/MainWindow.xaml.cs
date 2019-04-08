@@ -1262,9 +1262,16 @@ namespace HolyLogger
 
         private void parseAdif()
         {
-            string adif = Services.GenerateAdif(dal.GetAllQSOs());
-            _holyLogParser = new HolyLogParser(adif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
-            _holyLogParser.Parse();
+            try
+            {
+                string adif = Services.GenerateAdif(dal.GetAllQSOs());
+                _holyLogParser = new HolyLogParser(adif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
+                _holyLogParser.Parse();
+            }
+            catch (Exception e)
+            {
+                System.Windows.Forms.MessageBox.Show("Parsing failed.");
+            }
         }
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
