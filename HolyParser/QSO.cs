@@ -143,12 +143,6 @@ namespace HolyParser
             if (!isValid) this.ERROR += "Call is empty -";
             return isValid;
         }
-        private bool IsValidComment()
-        {
-            bool isValid = !string.IsNullOrWhiteSpace(Comment);
-            if (!isValid) this.ERROR += "Comment is empty -";
-            return isValid;
-        }
         private bool IsValidSRX()
         {
             bool isValid = !string.IsNullOrWhiteSpace(SRX);

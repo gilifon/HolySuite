@@ -5,6 +5,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -288,6 +289,18 @@ namespace HolyContestManager
             Report = Report.OrderByDescending(p => p.score).ToList();
             FilteredReport = new List<Participant>(Report);
             string insert_hlwtest = GenerateMultipleInsert(FilteredReport);
+        }
+
+        private bool IsValidDate(QSO q)
+        {
+            DateTime dateValue;
+            bool result = DateTime.TryParseExact(q.Date, "yyyyMMdd HHmmss", new CultureInfo("en-US"), DateTimeStyles.AllowWhiteSpaces, out dateValue);
+            if (result)
+            {
+                bool isValid = dateValue >= new DateTime(2019, 04, 19, 21, 00, 00) && dateValue < new DateTime(2019, 04, 20, 21, 00, 00);
+                return isValid;
+            }
+            return false;
         }
 
         private void GenerateLogFile(Participant p)

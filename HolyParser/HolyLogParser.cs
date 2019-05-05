@@ -404,7 +404,7 @@ th,td
             IEnumerable<QSO> validQSOs = null;
             if (LogType == Operator.Foreign)
             {
-                validQSOs = m_qsoList.Where(p => p.IsValid && p.IsIsraeli).DistinctBy(p => p.HASH);
+                validQSOs = m_qsoList.Where(p => p.IsValid && p.IsIsraeli ).DistinctBy(p => p.HASH);
             }
             else if (LogType == Operator.Israeli)
             {
@@ -426,13 +426,13 @@ th,td
             {
                 if (DateTime.TryParseExact(qso.Time, "HHmmss", CultureInfo.CurrentCulture, DateTimeStyles.None, out dt))
                 {
-                    if (dt.TimeOfDay > new TimeSpan(17,0,0))
+                    if (dt.TimeOfDay > new TimeSpan(17, 0, 0) && dt.TimeOfDay < new TimeSpan(21, 0, 0))
                     {
                         if (qso.Band.Contains("10") || qso.Band.Contains("15") || qso.Band.Contains("20"))
                         {
                             extra_points += 1;
                         }
-                        else if (qso.Band.Contains("40") || qso.Band.Contains("85") || qso.Band.Contains("160"))
+                        else if (qso.Band.Contains("40") || qso.Band.Contains("80") || qso.Band.Contains("160"))
                         {
                             extra_points += 2;
                         }
@@ -582,6 +582,8 @@ th,td
             //}
             m_templateRes = FinalTemplate.ToString();
         }
+
+        
 
         public List<QSO> GetRawQSO()
         {
