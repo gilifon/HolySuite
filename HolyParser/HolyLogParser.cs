@@ -626,6 +626,7 @@ th,td
                 if (parsedFreq >= 27 && parsedFreq <= 30) return "10M";
                 if (parsedFreq >= 50 && parsedFreq <= 54) return "6M";
                 if (parsedFreq >= 144 && parsedFreq <= 146) return "2M";
+                if (parsedFreq >= 430 && parsedFreq <= 440) return "70CM";
             }
             else if (parsedFreq < 1000000)
             {
@@ -640,6 +641,7 @@ th,td
                 if (parsedFreq >= 27000 && parsedFreq <= 30000) return "10M";
                 if (parsedFreq >= 50000 && parsedFreq <= 54000) return "6M";
                 if (parsedFreq >= 144000 && parsedFreq <= 146000) return "2M";
+                if (parsedFreq >= 430000 && parsedFreq <= 440000) return "70CM";
             }
             else if (parsedFreq < 1000000000)
             {
@@ -654,6 +656,7 @@ th,td
                 if (parsedFreq >= 27000000 && parsedFreq <= 30000000) return "10M";
                 if (parsedFreq >= 50000000 && parsedFreq <= 54000000) return "6M";
                 if (parsedFreq >= 144000000 && parsedFreq <= 146000000) return "2M";
+                if (parsedFreq >= 430000000 && parsedFreq <= 440000000) return "70CM";
             }
             return string.Empty;
         }
@@ -672,6 +675,7 @@ th,td
             if (band.ToLower() == "10m") return "28.400000";
             if (band.ToLower() == "6m") return "50.000000";
             if (band.ToLower() == "2m") return "145.000000";
+            if (band.ToLower() == "70cm") return "433.000000";
             return string.Empty;
         }
 

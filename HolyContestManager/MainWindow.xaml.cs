@@ -252,12 +252,12 @@ namespace HolyContestManager
 
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
-                GenerateLogFile(p);
+                //GenerateLogFile(p);
 
                 iteration++;
                 if (p.is_manual == 0)
                 {
-                    IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                    IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) && IsValidDate(q) select q;
              
                     int numOfSquers = qsos.DistinctBy(q => q.STX).Count();
 
@@ -300,6 +300,12 @@ namespace HolyContestManager
                 bool isValid = dateValue >= new DateTime(2019, 04, 19, 21, 00, 00) && dateValue < new DateTime(2019, 04, 20, 21, 00, 00);
                 return isValid;
             }
+            result = DateTime.TryParseExact(q.Date, "yyyyMMdd HHmm", new CultureInfo("en-US"), DateTimeStyles.AllowWhiteSpaces, out dateValue);
+            if (result)
+            {
+                bool isValid = dateValue >= new DateTime(2019, 04, 19, 21, 00, 00) && dateValue < new DateTime(2019, 04, 20, 21, 00, 00);
+                return isValid;
+            }
             return false;
         }
 
@@ -322,14 +328,14 @@ namespace HolyContestManager
             sb.Append("(`active`,`year`,`call`,`uniq_timestamp`,`dxcc`,`continent`,`category`,`qso`,`points`,`mults`,`score`,`operator`,`square`) VALUES ");
             foreach (Participant p in participants)
             {
-                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) && IsValidDate(q) select q;
                 foreach (var item in qsos.Where(xp => xp.MyCall.StartsWith("4X") || xp.MyCall.StartsWith("4Z")).Select(t => t.STX).Distinct())
                 {
                     squars.AppendFormat("{0},", item);
                 }
                 sb.Append("(");
                 sb.Append("'"); sb.Append(0); sb.Append("',");
-                sb.Append("'"); sb.Append(2018); sb.Append("',");
+                sb.Append("'"); sb.Append(DateTime.Now.Year); sb.Append("',");
                 sb.Append("'"); sb.Append(p.callsign.Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append("HolyLogger:" + DateTime.Now.Ticks); sb.Append("',");
                 sb.Append("'"); sb.Append(p.country.Replace("'", "\"")); sb.Append("',");

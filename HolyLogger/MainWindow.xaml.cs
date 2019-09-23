@@ -2131,7 +2131,7 @@ namespace HolyLogger
         /// <summary>
         /// Frequency
         /// </summary>
-        private string mFrequency = "14220000";
+        private string mFrequency = "014220000";
 
         /// <summary>
         /// Frequency
@@ -2404,6 +2404,8 @@ namespace HolyLogger
                     TX = Rig.GetTxFrequency().ToString();
                     //Frequency = Rig.Freq.ToString();
                     if (Rig.GetRxFrequency() < 10000000)
+                        Frequency = RX.Insert(0, "00");
+                    else if (Rig.GetRxFrequency() < 100000000)
                         Frequency = RX.Insert(0, "0");
                     else
                         Frequency = RX; ;
