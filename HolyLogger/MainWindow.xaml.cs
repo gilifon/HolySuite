@@ -467,8 +467,8 @@ namespace HolyLogger
                 qso.DXCall = TB_DXCallsign.Text;
                 qso.Mode = Mode;
                 qso.SRX = TB_Exchange.Text;
-                qso.Freq = TB_Frequency.Text.Replace(",", "");
-                qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+                qso.Freq = Frequency.Replace(",", "");
+                qso.Band = HolyLogParser.convertFreqToBand(Frequency.Replace(",", ""));
                 qso.Country = Country;
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
@@ -503,8 +503,8 @@ namespace HolyLogger
                 QsoToUpdate.DXCall = TB_DXCallsign.Text;
                 QsoToUpdate.Mode = Mode;
                 QsoToUpdate.SRX = TB_Exchange.Text;
-                QsoToUpdate.Freq = TB_Frequency.Text.Replace(",", "");
-                QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text.Replace(",", ""));
+                QsoToUpdate.Freq = Frequency.Replace(",", "");
+                QsoToUpdate.Band = HolyLogParser.convertFreqToBand(Frequency.Replace(",", ""));
                 QsoToUpdate.Country = Country;
                 QsoToUpdate.Name = FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
@@ -2403,9 +2403,9 @@ namespace HolyLogger
                     RX = Rig.GetRxFrequency().ToString();
                     TX = Rig.GetTxFrequency().ToString();
                     //Frequency = Rig.Freq.ToString();
-                    if (Rig.GetRxFrequency() < 10000000)
-                        Frequency = RX.Insert(0, "00");
-                    else if (Rig.GetRxFrequency() < 100000000)
+                    //if (Rig.GetRxFrequency() < 10000000)
+                    //    Frequency = RX.Insert(0, "00");
+                    if (Rig.GetRxFrequency() < 100000000)
                         Frequency = RX.Insert(0, "0");
                     else
                         Frequency = RX; ;
