@@ -217,9 +217,9 @@
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The Exchange sent by the DX station" />
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="102,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="189" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="7" />
         <Label Content="RST Sent" HorizontalAlignment="Left" Margin="302,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="399,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
+        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="399,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="3" />
         <Label Content="RST Rcvd" HorizontalAlignment="Left" Margin="453,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="537,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" />
+        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="537,145,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="40" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="3"/>
 
         <Label Content="Date" HorizontalAlignment="Left" Margin="302,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
         <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="350,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="109" FontSize="16" Height="28" />

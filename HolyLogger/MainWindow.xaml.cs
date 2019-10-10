@@ -403,7 +403,7 @@ namespace HolyLogger
             switch (e.PropertyName)
             {
                 case FLD_Mode:
-                    if (mMode == "SSB")
+                    if (mMode == "SSB" || mMode == "FM")
                     {
                         TB_RSTSent.Text = "59";
                         TB_RSTRcvd.Text = "59";
