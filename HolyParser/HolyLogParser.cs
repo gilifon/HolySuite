@@ -607,56 +607,56 @@ th,td
             double parsedFreq;
             CultureInfo provider = CultureInfo.InvariantCulture;
 
-            if (freq.IndexOf(".") > 0)
-                freq = freq.Substring(0, freq.IndexOf("."));
-            if (freq.IndexOf(",") > 0)
-                freq = freq.Substring(0, freq.IndexOf(","));
+            //if (freq.IndexOf(".") > 0)
+            //    freq = freq.Substring(0, freq.IndexOf("."));
+            //if (freq.IndexOf(",") > 0)
+            //    freq = freq.Substring(0, freq.IndexOf(","));
 
-            if (!double.TryParse(freq.Replace(".","").Replace(",",""), NumberStyles.Number, provider, out parsedFreq)) return string.Empty;
+            if (!double.TryParse(freq, NumberStyles.Number, provider, out parsedFreq)) return string.Empty;
             if (parsedFreq < 1000)
             {
-                if (parsedFreq >= 0 && parsedFreq <= 2) return "160M";
-                if (parsedFreq >= 2 && parsedFreq <= 5) return "80M";
-                if (parsedFreq >= 5 && parsedFreq <= 9) return "40M";
-                if (parsedFreq >= 10 && parsedFreq <= 11) return "30M";
-                if (parsedFreq >= 12 && parsedFreq <= 16) return "20M";
-                if (parsedFreq >= 18 && parsedFreq <= 19) return "17M";
-                if (parsedFreq >= 20 && parsedFreq <= 23) return "15M";
-                if (parsedFreq >= 24 && parsedFreq <= 25) return "12M";
-                if (parsedFreq >= 27 && parsedFreq <= 30) return "10M";
+                if (parsedFreq >= 1.8 && parsedFreq <= 2) return "160M";
+                if (parsedFreq >= 3.5 && parsedFreq <= 4) return "80M";
+                if (parsedFreq >= 7 && parsedFreq <= 7.3) return "40M";
+                if (parsedFreq >= 10 && parsedFreq <= 10.15) return "30M";
+                if (parsedFreq >= 14 && parsedFreq <= 14.35) return "20M";
+                if (parsedFreq >= 18 && parsedFreq <= 18.168) return "17M";
+                if (parsedFreq >= 21 && parsedFreq <= 21.45) return "15M";
+                if (parsedFreq >= 24.89 && parsedFreq <= 24.99) return "12M";
+                if (parsedFreq >= 28 && parsedFreq <= 29.7) return "10M";
                 if (parsedFreq >= 50 && parsedFreq <= 54) return "6M";
-                if (parsedFreq >= 144 && parsedFreq <= 146) return "2M";
-                if (parsedFreq >= 430 && parsedFreq <= 440) return "70CM";
+                if (parsedFreq >= 144 && parsedFreq <= 148) return "2M";
+                if (parsedFreq >= 420 && parsedFreq <= 450) return "70CM";
             }
             else if (parsedFreq < 1000000)
             {
-                if (parsedFreq >= 0 && parsedFreq <= 2000) return "160M";
-                if (parsedFreq >= 2000 && parsedFreq <= 5000) return "80M";
-                if (parsedFreq >= 5000 && parsedFreq <= 9000) return "40M";
-                if (parsedFreq >= 10000 && parsedFreq <= 11000) return "30M";
-                if (parsedFreq >= 12000 && parsedFreq <= 16000) return "20M";
-                if (parsedFreq >= 18000 && parsedFreq <= 19000) return "17M";
-                if (parsedFreq >= 20000 && parsedFreq <= 23000) return "15M";
-                if (parsedFreq >= 24000 && parsedFreq <= 25000) return "12M";
-                if (parsedFreq >= 27000 && parsedFreq <= 30000) return "10M";
+                if (parsedFreq >= 1800 && parsedFreq <= 2000) return "160M";
+                if (parsedFreq >= 3500 && parsedFreq <= 4000) return "80M";
+                if (parsedFreq >= 7000 && parsedFreq <= 7300) return "40M";
+                if (parsedFreq >= 10000 && parsedFreq <= 10150) return "30M";
+                if (parsedFreq >= 14000 && parsedFreq <= 14350) return "20M";
+                if (parsedFreq >= 18000 && parsedFreq <= 18168) return "17M";
+                if (parsedFreq >= 21000 && parsedFreq <= 21450) return "15M";
+                if (parsedFreq >= 24890 && parsedFreq <= 24990) return "12M";
+                if (parsedFreq >= 28000 && parsedFreq <= 29700) return "10M";
                 if (parsedFreq >= 50000 && parsedFreq <= 54000) return "6M";
-                if (parsedFreq >= 144000 && parsedFreq <= 146000) return "2M";
-                if (parsedFreq >= 430000 && parsedFreq <= 440000) return "70CM";
+                if (parsedFreq >= 144000 && parsedFreq <= 148000) return "2M";
+                if (parsedFreq >= 420000 && parsedFreq <= 450000) return "70CM";
             }
             else if (parsedFreq < 1000000000)
             {
-                if (parsedFreq >= 0 && parsedFreq <= 2000000) return "160M";
-                if (parsedFreq >= 2000000 && parsedFreq <= 5000000) return "80M";
-                if (parsedFreq >= 5000000 && parsedFreq <= 9000000) return "40M";
-                if (parsedFreq >= 10000000 && parsedFreq <= 11000000) return "30M";
-                if (parsedFreq >= 12000000 && parsedFreq <= 16000000) return "20M";
-                if (parsedFreq >= 18000000 && parsedFreq <= 19000000) return "17M";
-                if (parsedFreq >= 20000000 && parsedFreq <= 23000000) return "15M";
-                if (parsedFreq >= 24000000 && parsedFreq <= 25000000) return "12M";
-                if (parsedFreq >= 27000000 && parsedFreq <= 30000000) return "10M";
+                if (parsedFreq >= 1800000 && parsedFreq <= 2000000) return "160M";
+                if (parsedFreq >= 3500000 && parsedFreq <= 4000000) return "80M";
+                if (parsedFreq >= 7000000 && parsedFreq <= 7300000) return "40M";
+                if (parsedFreq >= 10000000 && parsedFreq <= 10150000) return "30M";
+                if (parsedFreq >= 14000000 && parsedFreq <= 14350000) return "20M";
+                if (parsedFreq >= 18000000 && parsedFreq <= 18168000) return "17M";
+                if (parsedFreq >= 21000000 && parsedFreq <= 21450000) return "15M";
+                if (parsedFreq >= 24890000 && parsedFreq <= 24990000) return "12M";
+                if (parsedFreq >= 28000000 && parsedFreq <= 29700000) return "10M";
                 if (parsedFreq >= 50000000 && parsedFreq <= 54000000) return "6M";
-                if (parsedFreq >= 144000000 && parsedFreq <= 146000000) return "2M";
-                if (parsedFreq >= 430000000 && parsedFreq <= 440000000) return "70CM";
+                if (parsedFreq >= 144000000 && parsedFreq <= 148000000) return "2M";
+                if (parsedFreq >= 420000000 && parsedFreq <= 450000000) return "70CM";
             }
             return string.Empty;
         }

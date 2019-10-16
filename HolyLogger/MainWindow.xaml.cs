@@ -2131,7 +2131,7 @@ namespace HolyLogger
         /// <summary>
         /// Frequency
         /// </summary>
-        private string mFrequency = "014220000";
+        private string mFrequency = "14220";
 
         /// <summary>
         /// Frequency
