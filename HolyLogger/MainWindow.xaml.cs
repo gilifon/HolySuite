@@ -2469,7 +2469,7 @@ namespace HolyLogger
 
         #endregion
 
-        private void TB_DXCallsign_PreviewKeyDown(object sender, KeyEventArgs e)
+        private void PreventSpaceInCallsign(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Space)
             {
