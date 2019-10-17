@@ -107,6 +107,7 @@ namespace HolyParser
 
                 if (qso.DXCall != null) adif.AppendFormat("<call:{0}>{1} ", qso.DXCall.Length, qso.DXCall);
                 if (qso.SRX != null) adif.AppendFormat("<srx_string:{0}>{1} ", qso.SRX.Length, qso.SRX);
+                if (qso.SRX != null) adif.AppendFormat("<sig:{0}>{1} ", qso.SRX.Length, qso.SRX);
                 if (qso.Freq != null) adif.AppendFormat("<freq:{0}>{1} ", qso.Freq.Length, qso.Freq);
                 if (qso.Mode != null) adif.AppendFormat("<mode:{0}>{1} ", qso.Mode.Length, qso.Mode);
                 if (qso.Band != null) adif.AppendFormat("<band:{0}>{1} ", qso.Band.Length + 1, qso.Band);
@@ -115,6 +116,7 @@ namespace HolyParser
                 if (qso.Name != null) adif.AppendFormat("<name:{0}>{1} ", qso.Name.Length, qso.Name);
                 if (qso.Country != null) adif.AppendFormat("<country:{0}>{1} ", qso.Country.Length, qso.Country);
                 if (qso.STX != null) adif.AppendFormat("<stx_string:{0}>{1} ", qso.STX.Length, qso.STX);
+                if (qso.STX != null) adif.AppendFormat("<my_sig:{0}>{1} ", qso.STX.Length, qso.STX);
                 if (qso.RST_RCVD != null) adif.AppendFormat("<rst_rcvd:{0}>{1} ", qso.RST_RCVD.Length, qso.RST_RCVD);
                 if (qso.RST_SENT != null) adif.AppendFormat("<rst_sent:{0}>{1} ", qso.RST_SENT.Length, qso.RST_SENT);
                 if (qso.Date != null) adif.AppendFormat("<qso_date:{0}>{1} ", qso.Date.Length, qso.Date);
