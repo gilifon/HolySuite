@@ -599,7 +599,7 @@ namespace HolyLogger
             TB_DXCallsign.Clear();
             TB_Exchange.Clear();
 
-            if (mMode == "SSB")
+            if (mMode == "SSB" || mMode == "FM")
             {
                 TB_RSTSent.Text = "59";
                 TB_RSTRcvd.Text = "59";
