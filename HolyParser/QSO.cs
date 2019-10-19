@@ -68,13 +68,18 @@ namespace HolyParser
             IsAllowWARC = false;
         }
 
-        public void StandartizeQSO()
+        public void StandartizeQSO(bool isApplyValidation)
         {
             IsValid = false;
             IsIsraeli = HolyLogParser.IsIsraeliStation(DXCall);
             Hash();
             string pattern = @"([a-zA-Z]{1})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
             Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
+            if (!isApplyValidation)
+            {
+                IsValid = true;
+                return;
+            }
             if (!string.IsNullOrWhiteSpace(SRX))//srx not empty -> good, try match
             {
                 Match match = regex.Match(SRX);
