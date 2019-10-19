@@ -190,6 +190,7 @@ namespace HolyLogger
                         if (rdr["country"] != null) q.Country = rdr["country"].ToString();
                         if (rdr["time"] != null) q.Time = rdr["time"].ToString();
                         if (rdr["date"] != null) q.Date = rdr["date"].ToString();
+                        q.StandartizeQSO();
                         qso_list.Add(q);
                     }
                 }
@@ -223,6 +224,7 @@ namespace HolyLogger
                         if (rdr["country"] != null) q.Country = (string)rdr["country"];
                         if (rdr["time"] != null) q.Time = (string)rdr["time"];
                         if (rdr["date"] != null) q.Date = (string)rdr["date"];
+                        q.StandartizeQSO();
                         qso_list.Add(q);
                     }
                 }

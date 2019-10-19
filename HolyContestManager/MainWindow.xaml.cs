@@ -261,7 +261,7 @@ namespace HolyContestManager
              
                     int numOfSquers = qsos.DistinctBy(q => q.STX).Count();
 
-                    HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, false, false, true);
+                    HolyLogParser lop = new HolyLogParser(Services.GenerateAdif(qsos), HolyLogParser.IsIsraeliStation(p.callsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign);
                     lop.Parse();
 
                     Participant n = p;

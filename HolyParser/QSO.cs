@@ -68,18 +68,13 @@ namespace HolyParser
             IsAllowWARC = false;
         }
 
-        public void StandartizeQSO(bool isApplyValidation)
+        public void StandartizeQSO()
         {
             IsValid = false;
             IsIsraeli = HolyLogParser.IsIsraeliStation(DXCall);
             Hash();
-            string pattern = @"([a-zA-Z]{1})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
+            string pattern = @"([a-zA-Z]{1,2})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
             Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
-            if (!isApplyValidation)
-            {
-                IsValid = true;
-                return;
-            }
             if (!string.IsNullOrWhiteSpace(SRX))//srx not empty -> good, try match
             {
                 Match match = regex.Match(SRX);
@@ -123,11 +118,11 @@ namespace HolyParser
             bool isValid = false;
             if (IsAllowWARC)
             {
-                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("2M") || Band.Contains("6M") || Band.Contains("10M") || Band.Contains("12M") || Band.Contains("15M") || Band.Contains("17M") || Band.Contains("20M") || Band.Contains("30M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
+                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("70CM") || Band.Contains("2M") || Band.Contains("6M") || Band.Contains("10M") || Band.Contains("12M") || Band.Contains("15M") || Band.Contains("17M") || Band.Contains("20M") || Band.Contains("30M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
             }
             else
             {
-                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("10M") || Band.Contains("15M") || Band.Contains("20M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
+                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("70CM") || Band.Contains("2M") || Band.Contains("10M") || Band.Contains("15M") || Band.Contains("20M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
             }
             if (!isValid)
             {
@@ -163,7 +158,7 @@ namespace HolyParser
         }
         private void Hash()
         {
-            string mycall = string.IsNullOrWhiteSpace(MyCall) ? MyCall : "MyCall";
+            string mycall = !string.IsNullOrWhiteSpace(MyCall) ? MyCall : "MyCall";
             string dxcall = IsValidCall() ? DXCall : "DXCall";
             string band = IsValidBand() ? Band : "Band";
             string mode = IsValidMode() ? Mode : "Mode";
