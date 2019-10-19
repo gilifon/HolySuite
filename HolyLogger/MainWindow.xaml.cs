@@ -1729,6 +1729,7 @@ namespace HolyLogger
                 TB_MyGrid.IsEnabled = true;
                 TB_MyGrid.Text = Properties.Settings.Default.my_square;
             }
+            UpdateMatrix();
         }
         
         private void TB_MyGrid_TextChanged(object sender, TextChangedEventArgs e)
