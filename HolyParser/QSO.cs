@@ -163,7 +163,7 @@ namespace HolyParser
             string band = IsValidBand() ? Band : "Band";
             string mode = IsValidMode() ? Mode : "Mode";
 
-            HASH = mycall + dxcall + band + mode;
+            HASH = mycall + dxcall + band + mode + SRX + STX;
         }
 
         public bool Equals(QSO other)

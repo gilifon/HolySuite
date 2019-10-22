@@ -60,6 +60,7 @@
       <Link>VersionInfo.cs</Link>
     </Compile>
     <Compile Include="HolyLogParser.cs" />
+    <Compile Include="MaidenheadLocator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="QSO.cs" />
     <Compile Include="Services.cs" />

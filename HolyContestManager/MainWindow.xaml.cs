@@ -214,6 +214,55 @@ namespace HolyContestManager
         private void GetDataWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             GetData();
+            foreach (var qso in RawData.log)
+            {
+                if (qso.STX == qso.SRX)
+                {
+                    qso.Comment = "1";
+                }
+                else
+                {
+                    try
+                    {
+                        qso.Comment = Math.Round(HolyParser.MaidenheadLocator.Distance(qso.STX, qso.SRX)).ToString();
+                    }
+                    catch (Exception)
+                    {
+                        qso.Comment = "0";
+                    }
+                }
+            }
+
+            StringBuilder sb = new StringBuilder();
+
+            foreach (Participant p in RawData.participants)
+            {
+                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                Participant n = p;
+                n.qsos = qsos.Count();// qsos.Count();
+                n.score = qsos.Sum(x => int.Parse(x.Comment));
+                n.squers = qsos.DistinctBy(x=>x.STX).Count();
+                n.mults = 1;
+                n.points = 0;
+                sb.AppendFormat("{0},", p.callsign);
+                sb.AppendFormat("{0},", p.name);
+                sb.AppendFormat("{0},", n.qsos);
+                sb.AppendFormat("{0},", n.squers);
+                sb.AppendFormat("{0}\n", n.score);
+                Report.Add(n);
+            }
+
+            System.IO.FileStream fs = File.Create(@"C:\Users\4z1kd\Documents\result.csv");
+            StreamWriter sw = new StreamWriter(fs);
+            sw.Write(sb.ToString());
+            sw.Close();
+            fs.Close();
+
+            System.IO.FileStream fs2 = File.Create(@"C:\Users\4z1kd\Documents\log.adi");
+            StreamWriter sw2 = new StreamWriter(fs2);
+            sw2.Write(Services.GenerateAdif(RawData.log));
+            sw2.Close();
+            fs2.Close();
         }
 
         private void GetData()
