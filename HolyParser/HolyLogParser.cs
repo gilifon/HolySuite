@@ -616,6 +616,7 @@ th,td
             if (parsedFreq < 1000)
             {
                 if (parsedFreq >= 1.8 && parsedFreq <= 2) return "160M";
+                if (parsedFreq >= 2.4 && parsedFreq <= 2.5) return "13CM";
                 if (parsedFreq >= 3.5 && parsedFreq <= 4) return "80M";
                 if (parsedFreq >= 7 && parsedFreq <= 7.3) return "40M";
                 if (parsedFreq >= 10 && parsedFreq <= 10.15) return "30M";
@@ -631,6 +632,7 @@ th,td
             else if (parsedFreq < 1000000)
             {
                 if (parsedFreq >= 1800 && parsedFreq <= 2000) return "160M";
+                if (parsedFreq >= 2400 && parsedFreq <= 2500) return "13CM";
                 if (parsedFreq >= 3500 && parsedFreq <= 4000) return "80M";
                 if (parsedFreq >= 7000 && parsedFreq <= 7300) return "40M";
                 if (parsedFreq >= 10000 && parsedFreq <= 10150) return "30M";
@@ -646,6 +648,7 @@ th,td
             else if (parsedFreq < 1000000000)
             {
                 if (parsedFreq >= 1800000 && parsedFreq <= 2000000) return "160M";
+                if (parsedFreq >= 2400000 && parsedFreq <= 2500000) return "13CM";
                 if (parsedFreq >= 3500000 && parsedFreq <= 4000000) return "80M";
                 if (parsedFreq >= 7000000 && parsedFreq <= 7300000) return "40M";
                 if (parsedFreq >= 10000000 && parsedFreq <= 10150000) return "30M";

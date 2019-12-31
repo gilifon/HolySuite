@@ -251,16 +251,16 @@ namespace HolyLogger
             if (TB_Comment.IsEnabled) LockComment_Btn.Opacity = 1;
             else LockComment_Btn.Opacity = 0.5;
             
-            if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
-            {
-                TB_MyGrid.Clear();
-                TB_MyGrid.IsEnabled = false;
-            }
-            else
-            {
-                TB_MyGrid.IsEnabled = true;
-                TB_MyGrid.Text = Properties.Settings.Default.my_square;
-            }
+            //if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
+            //{
+            //    TB_MyGrid.Clear();
+            //    TB_MyGrid.IsEnabled = false;
+            //}
+            //else
+            //{
+            //    TB_MyGrid.IsEnabled = true;
+            //    TB_MyGrid.Text = Properties.Settings.Default.my_square;
+            //}
             TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
 
             try
@@ -1719,16 +1719,16 @@ namespace HolyLogger
                 signboard.signboardData.Callsign = TB_MyCallsign.Text;
             }
             if (TB_MyGrid == null) return;
-            if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
-            {
-                TB_MyGrid.Clear();
-                TB_MyGrid.IsEnabled = false;
-            }
-            else
-            {
-                TB_MyGrid.IsEnabled = true;
-                TB_MyGrid.Text = Properties.Settings.Default.my_square;
-            }
+            //if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
+            //{
+            //    TB_MyGrid.Clear();
+            //    TB_MyGrid.IsEnabled = false;
+            //}
+            //else
+            //{
+            //    TB_MyGrid.IsEnabled = true;
+            //    TB_MyGrid.Text = Properties.Settings.Default.my_square;
+            //}
             UpdateMatrix();
         }
         

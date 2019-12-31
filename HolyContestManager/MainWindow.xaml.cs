@@ -101,6 +101,7 @@ namespace HolyContestManager
             }
         }
         
+        private const string files_path = @"C:\Users\4z1kd\Documents\";
 
         private BackgroundWorker CalculateWorker;
         private BackgroundWorker GetDataWorker;
@@ -223,8 +224,7 @@ namespace HolyContestManager
             sb2.AppendFormat("{0},", "Freq");
             sb2.AppendFormat("{0},", "Band");
             sb2.AppendFormat("{0},", "Mode");
-            sb2.AppendFormat("{0},", "Date");
-            sb2.AppendFormat("{0}\n", "Time");
+            sb2.AppendFormat("{0}\n", "Datetime");
 
             foreach (var qso in RawData.log)
             {
@@ -251,8 +251,7 @@ namespace HolyContestManager
                 sb2.AppendFormat("{0},", qso.Freq);
                 sb2.AppendFormat("{0},", qso.Band);
                 sb2.AppendFormat("{0},", qso.Mode);
-                sb2.AppendFormat("{0},", qso.Date);
-                sb2.AppendFormat("{0}\n", qso.Time);
+                sb2.AppendFormat("{0}\n", qso.Date);
             }
 
             StringBuilder sb = new StringBuilder();
@@ -281,42 +280,24 @@ namespace HolyContestManager
                 Report.Add(n);
             }
 
+
+            System.IO.FileStream fs = File.Create(files_path + @"result.csv");
+            StreamWriter sw = new StreamWriter(fs);
+            sw.Write(sb.ToString());
+            sw.Close();
+            fs.Close();
             
-            foreach (Participant p in RawData.participants)
-            {
-                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
-                Participant n = p;
-                n.qsos = qsos.Count();// qsos.Count();
-                n.score = qsos.Sum(x => int.Parse(x.Comment));
-                n.squers = qsos.DistinctBy(x => x.STX).Count();
-                n.mults = 1;
-                n.points = 0;
-
-                sb.AppendFormat("{0},", p.callsign);
-                sb.AppendFormat("{0},", p.name);
-                sb.AppendFormat("{0},", n.qsos);
-                sb.AppendFormat("{0},", n.squers);
-                sb.AppendFormat("{0}\n", n.score);
-                Report.Add(n);
-            }
-
-            //System.IO.FileStream fs = File.Create(@"C:\Users\4z1kd\Documents\result.csv");
-            //StreamWriter sw = new StreamWriter(fs);
-            //sw.Write(sb.ToString());
-            //sw.Close();
-            //fs.Close();
-
-            System.IO.FileStream fs3 = File.Create(@"C:\Users\4z1kd\Documents\log_info.csv");
-            StreamWriter sw3 = new StreamWriter(fs3);
-            sw3.Write(sb2.ToString());
-            sw3.Close();
-            fs3.Close();
-
-            System.IO.FileStream fs2 = File.Create(@"C:\Users\4z1kd\Documents\log.adi");
+            System.IO.FileStream fs2 = File.Create(files_path + @"log.adi");
             StreamWriter sw2 = new StreamWriter(fs2);
             sw2.Write(Services.GenerateAdif(RawData.log));
             sw2.Close();
             fs2.Close();
+
+            System.IO.FileStream fs3 = File.Create(files_path + @"log_info.csv");
+            StreamWriter sw3 = new StreamWriter(fs3);
+            sw3.Write(sb2.ToString());
+            sw3.Close();
+            fs3.Close();
         }
 
         private void GetData()
@@ -355,7 +336,7 @@ namespace HolyContestManager
 
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
-                //GenerateLogFile(p);
+                GenerateLogFile(p);
 
                 iteration++;
                 if (p.is_manual == 0)
@@ -416,7 +397,7 @@ namespace HolyContestManager
         {
             IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
             string adif = HolyParser.Services.GenerateAdif(qsosx);
-            System.IO.FileStream fs = File.Create(@"C:\Users\gill\Desktop\" + Helper.getBareCallsign(p.callsign) + ".adi");
+            System.IO.FileStream fs = File.Create(files_path + Helper.getBareCallsign(p.callsign) + ".adi");
             StreamWriter sw = new StreamWriter(fs);
             sw.Write(adif);
             sw.Close();
