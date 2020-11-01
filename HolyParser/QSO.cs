@@ -62,6 +62,12 @@ namespace HolyParser
 
         public bool IsAllowWARC { get; set; }
 
+        [JsonProperty("prop_mode")]
+        public string PROP_MODE { get; set; }
+
+        [JsonProperty("sat_name")]
+        public string SAT_NAME { get; set; }
+
 
         public QSO()
         {

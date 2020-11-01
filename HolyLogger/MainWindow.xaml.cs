@@ -479,6 +479,11 @@ namespace HolyLogger
                 qso.Date = date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
                 DateTime time = TP_Time.Value.Value;
                 qso.Time = time.Hour.ToString("D2") + time.Minute.ToString("D2") + time.Second.ToString("D2");
+                qso.PROP_MODE = Properties.Settings.Default.IsSatelliteMode ? "SAT" : "";                
+                if (Properties.Settings.Default.IsSatelliteMode && !string.IsNullOrWhiteSpace(Properties.Settings.Default.SatelliteName))
+                {
+                    qso.SAT_NAME = Properties.Settings.Default.SatelliteName;
+                }
                 //if (Properties.Settings.Default.live_log) PostQSO(qso);
                 try
                 {
@@ -1431,6 +1436,10 @@ namespace HolyLogger
                     StopUTCTimer();
                     this.Title = title;
                 }                
+            }
+            if (optionWindow.SatelliteControlInstance.HasChanged)
+            {
+                ShowRigParams();
             }
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -2400,8 +2409,12 @@ namespace HolyLogger
             {
                 this.Dispatcher.Invoke(() =>
                 {
-                    RX = Rig.GetRxFrequency().ToString();
-                    TX = Rig.GetTxFrequency().ToString();
+                    double radioRX = (double)Rig.GetRxFrequency() / 1000000;
+                    double radioTX = (double)Rig.GetTxFrequency() / 1000000;
+                    if (Properties.Settings.Default.IsSatelliteMode)
+                        radioRX += Properties.Settings.Default.SatelliteShift;
+                    RX = radioRX.ToString("###0.000000");
+                    TX = radioTX.ToString("###0.000000");                    
                     Frequency = RX;
                     switch (Rig.Mode)
                     {
@@ -2449,24 +2462,6 @@ namespace HolyLogger
             }
 
         }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
         #endregion
 

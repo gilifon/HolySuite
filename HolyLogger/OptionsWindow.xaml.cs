@@ -61,6 +61,11 @@ namespace HolyLogger
             HideAllControls();
             ImportControlInstance.Visibility = Visibility.Visible;
         }
+        private void SatelliteItem_Selected(object sender, RoutedEventArgs e)
+        {
+            HideAllControls();
+            SatelliteControlInstance.Visibility = Visibility.Visible;
+        }
 
         //ImportItem_Selected
 
@@ -70,6 +75,7 @@ namespace HolyLogger
             UserInterfaceControlInstance.Visibility = Visibility.Hidden;
             GeneralSettingsControlControlInstance.Visibility = Visibility.Hidden;
             ImportControlInstance.Visibility = Visibility.Hidden;
+            SatelliteControlInstance.Visibility = Visibility.Hidden;
         }
     }
 }

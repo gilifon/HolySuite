@@ -1,0 +1,19 @@
+﻿<UserControl x:Class="HolyLogger.OptionsUserControls.SatelliteControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
+             mc:Ignorable="d" Height="110" Width="360">
+    <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <CheckBox x:Name="CBX_IsSatelliteMode" Content="Satellite Mode" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsSatelliteMode, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Click="HasChanged_Click" />
+        <TextBox x:Name="TB_SatelliteName" HorizontalAlignment="Left" Margin="126,36,0,0" VerticalAlignment="Top" Width="226" FontSize="16" IsEnabled="{Binding Default.IsSatelliteMode, Source={StaticResource Settings}, Mode=OneWay}" Text="{Binding Default.SatelliteName, Source={StaticResource Settings}, Mode=TwoWay}" />
+        <Label x:Name="SatName_lbl" Content="Satellite Name" HorizontalAlignment="Left" Margin="0,31,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <Label x:Name="Shift_lbl" Content="Satellite Tx Shift" HorizontalAlignment="Left" Margin="0,67,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="TB_SatelliteShift" HorizontalAlignment="Left" Margin="126,72,0,0" VerticalAlignment="Top" Width="226" FontSize="16" IsEnabled="{Binding Default.IsSatelliteMode, Source={StaticResource Settings}, Mode=OneWay}" Text="{Binding Default.SatelliteShift, Mode=TwoWay, Source={StaticResource Settings}}" />
+    </Grid>
+</UserControl>

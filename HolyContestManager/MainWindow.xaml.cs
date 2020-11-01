@@ -339,7 +339,7 @@ namespace HolyContestManager
                 //GenerateLogFile(p);
 
                 iteration++;
-                if (p.is_manual == 0)
+                if (p.is_manual == 0 && p.callsign.ToLower() == "4x6fr")
                 {
                     IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) && IsValidDate(q) select q;
              

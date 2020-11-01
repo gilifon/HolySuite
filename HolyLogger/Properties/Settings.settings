@@ -176,5 +176,14 @@
     <Setting Name="IsParseDuplicates" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="IsSatelliteMode" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="SatelliteName" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="SatelliteShift" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">1968</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
