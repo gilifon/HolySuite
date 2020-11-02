@@ -130,6 +130,12 @@
         "Entry"
         {
         "MsmKey" = "8:_2014D6B3CC35978AF17B6090296911EB"
+        "OwnerKey" = "8:_901E7A4571053B4F3D912BC17CEA6C76"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_2014D6B3CC35978AF17B6090296911EB"
         "OwnerKey" = "8:_6BDDD7F7728ECA03B261527DC0A1AAEC"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -143,6 +149,12 @@
         {
         "MsmKey" = "8:_215396E899846E4441C8C691F72501B3"
         "OwnerKey" = "8:_1B9A9F2A996B4703A098C708A1AB7AC7"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_215396E899846E4441C8C691F72501B3"
+        "OwnerKey" = "8:_901E7A4571053B4F3D912BC17CEA6C76"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -244,6 +256,12 @@
         "Entry"
         {
         "MsmKey" = "8:_3E32CDCB45353A8C56DE4B41F2C37EB3"
+        "OwnerKey" = "8:_901E7A4571053B4F3D912BC17CEA6C76"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_3E32CDCB45353A8C56DE4B41F2C37EB3"
         "OwnerKey" = "8:_07F5B46248842184EC8C025CFBCA3BC7"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -310,13 +328,13 @@
         "Entry"
         {
         "MsmKey" = "8:_53214E9A004ACC1BB5E6800837066676"
-        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
+        "OwnerKey" = "8:_1B9A9F2A996B4703A098C708A1AB7AC7"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_53214E9A004ACC1BB5E6800837066676"
-        "OwnerKey" = "8:_1B9A9F2A996B4703A098C708A1AB7AC7"
+        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -394,13 +412,13 @@
         "Entry"
         {
         "MsmKey" = "8:_6BDDD7F7728ECA03B261527DC0A1AAEC"
-        "OwnerKey" = "8:_53214E9A004ACC1BB5E6800837066676"
+        "OwnerKey" = "8:_1B9A9F2A996B4703A098C708A1AB7AC7"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
         {
         "MsmKey" = "8:_6BDDD7F7728ECA03B261527DC0A1AAEC"
-        "OwnerKey" = "8:_1B9A9F2A996B4703A098C708A1AB7AC7"
+        "OwnerKey" = "8:_53214E9A004ACC1BB5E6800837066676"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -491,6 +509,12 @@
         {
         "MsmKey" = "8:_8F2E209E412890DE53B4F8B06147AA9C"
         "OwnerKey" = "8:_1B9A9F2A996B4703A098C708A1AB7AC7"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_901E7A4571053B4F3D912BC17CEA6C76"
+        "OwnerKey" = "8:_UNDEFINED"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -598,12 +622,6 @@
         "Entry"
         {
         "MsmKey" = "8:_E63B3740B6CDB8AAE074D970A6C9E9B3"
-        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_E63B3740B6CDB8AAE074D970A6C9E9B3"
         "OwnerKey" = "8:_1B9A9F2A996B4703A098C708A1AB7AC7"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -611,6 +629,12 @@
         {
         "MsmKey" = "8:_E63B3740B6CDB8AAE074D970A6C9E9B3"
         "OwnerKey" = "8:_A34E0A7058ACCFEC600794103136454B"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_E63B3740B6CDB8AAE074D970A6C9E9B3"
+        "OwnerKey" = "8:_2450D84030FEC7DAF4EDE26FE4F0ACBD"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -1651,7 +1675,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=4.0.10.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=5.0.1.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_2450D84030FEC7DAF4EDE26FE4F0ACBD"
@@ -2854,6 +2878,37 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_901E7A4571053B4F3D912BC17CEA6C76"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_901E7A4571053B4F3D912BC17CEA6C76"
+                    {
+                    "Name" = "8:System.ValueTuple.DLL"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:System.ValueTuple.DLL"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_998C3D3465F99D878ADFC9ABFA347AB8"
             {
             "AssemblyRegister" = "3:1"
@@ -3044,7 +3099,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=4.0.10.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=5.0.1.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_B07CB5883DE086A56C1A603F3D9D56DF"
@@ -3614,15 +3669,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{E8781118-89FE-469C-B5EF-00620EBDCE6B}"
-        "PackageCode" = "8:{DA44E3D6-6D08-4891-A9E1-12BD2BDDD287}"
+        "ProductCode" = "8:{AC8846E3-9EDE-46B9-81BC-F1E84C8B9681}"
+        "PackageCode" = "8:{8255C818-0E8E-4345-89C2-F8E64C0D8E0D}"
         "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:5.0.0"
+        "ProductVersion" = "8:5.0.2"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:"
@@ -4164,7 +4219,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_1B9A9F2A996B4703A098C708A1AB7AC7"
             {
-            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Debug\\HolyLogger.exe"
+            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Release\\HolyLogger.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"

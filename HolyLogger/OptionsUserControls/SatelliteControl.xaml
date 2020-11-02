@@ -11,9 +11,9 @@
         </Grid.RowDefinitions>
 
         <CheckBox x:Name="CBX_IsSatelliteMode" Content="Satellite Mode" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsSatelliteMode, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Click="HasChanged_Click" />
-        <TextBox x:Name="TB_SatelliteName" HorizontalAlignment="Left" Margin="126,36,0,0" VerticalAlignment="Top" Width="226" FontSize="16" IsEnabled="{Binding Default.IsSatelliteMode, Source={StaticResource Settings}, Mode=OneWay}" Text="{Binding Default.SatelliteName, Source={StaticResource Settings}, Mode=TwoWay}" />
+        <TextBox x:Name="TB_SatelliteName" HorizontalAlignment="Left" Margin="171,36,0,0" VerticalAlignment="Top" Width="181" FontSize="16" IsEnabled="{Binding Default.IsSatelliteMode, Source={StaticResource Settings}, Mode=OneWay}" Text="{Binding Default.SatelliteName, Source={StaticResource Settings}, Mode=TwoWay}" />
         <Label x:Name="SatName_lbl" Content="Satellite Name" HorizontalAlignment="Left" Margin="0,31,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <Label x:Name="Shift_lbl" Content="Satellite Tx Shift" HorizontalAlignment="Left" Margin="0,67,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_SatelliteShift" HorizontalAlignment="Left" Margin="126,72,0,0" VerticalAlignment="Top" Width="226" FontSize="16" IsEnabled="{Binding Default.IsSatelliteMode, Source={StaticResource Settings}, Mode=OneWay}" Text="{Binding Default.SatelliteShift, Mode=TwoWay, Source={StaticResource Settings}}" />
+        <Label x:Name="Shift_lbl" Content="Satellite Tx Shift (MHz)" HorizontalAlignment="Left" Margin="0,67,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="TB_SatelliteShift" HorizontalAlignment="Left" Margin="171,72,0,0" VerticalAlignment="Top" Width="181" FontSize="16" IsEnabled="{Binding Default.IsSatelliteMode, Source={StaticResource Settings}, Mode=OneWay}" Text="{Binding Default.SatelliteShift, Mode=TwoWay, Source={StaticResource Settings}}" />
     </Grid>
 </UserControl>

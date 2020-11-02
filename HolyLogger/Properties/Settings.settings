@@ -180,7 +180,7 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="SatelliteName" Type="System.String" Scope="User">
-      <Value Profile="(Default)" />
+      <Value Profile="(Default)">QO-100</Value>
     </Setting>
     <Setting Name="SatelliteShift" Type="System.Double" Scope="User">
       <Value Profile="(Default)">1968</Value>
