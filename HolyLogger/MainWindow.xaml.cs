@@ -189,7 +189,7 @@ namespace HolyLogger
         QSO QsoPreUpdate;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
-        private string title = "HolyLogger                                                                                                                                                                ";
+        private string title = "HolyLogger   ";
         private const int SEND_CHUNK_SIZE = 200;
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
@@ -744,10 +744,11 @@ namespace HolyLogger
                         catch (Exception ex)
                         {
                             faultyQSO++;
+                            System.Windows.Forms.MessageBox.Show(ex.Message);
                         }
                     }
                 }
-                catch (Exception ex)
+                catch (Exception exc)
                 {
                     System.Windows.Forms.MessageBox.Show(filename + " Failed to load! check file format.");
                 }

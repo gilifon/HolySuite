@@ -113,7 +113,7 @@ namespace HolyParser
 
         private bool IsValidBand()
         {
-            if ((string.IsNullOrWhiteSpace(Band) || string.IsNullOrWhiteSpace(Band.ToLower().Replace("m",""))) && !string.IsNullOrWhiteSpace(Freq))
+            if ((string.IsNullOrWhiteSpace(Band) || string.IsNullOrWhiteSpace(Band.ToLower().Replace("m", "")) || string.IsNullOrWhiteSpace(Band.ToLower().Replace("cm", ""))) && !string.IsNullOrWhiteSpace(Freq))
             {
                 Band = HolyLogParser.convertFreqToBand(Freq.Trim());
             }
@@ -124,11 +124,11 @@ namespace HolyParser
             bool isValid = false;
             if (IsAllowWARC)
             {
-                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("70CM") || Band.Contains("2M") || Band.Contains("6M") || Band.Contains("10M") || Band.Contains("12M") || Band.Contains("15M") || Band.Contains("17M") || Band.Contains("20M") || Band.Contains("30M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
+                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("13CM") || Band.Contains("70CM") || Band.Contains("2M") || Band.Contains("6M") || Band.Contains("10M") || Band.Contains("12M") || Band.Contains("15M") || Band.Contains("17M") || Band.Contains("20M") || Band.Contains("30M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
             }
             else
             {
-                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("70CM") || Band.Contains("2M") || Band.Contains("10M") || Band.Contains("15M") || Band.Contains("20M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
+                isValid = !string.IsNullOrWhiteSpace(Band) && (Band.Contains("13CM") || Band.Contains("70CM") || Band.Contains("2M") || Band.Contains("10M") || Band.Contains("15M") || Band.Contains("20M") || Band.Contains("40M") || Band.Contains("80M") || Band.Contains("160M"));
             }
             if (!isValid)
             {

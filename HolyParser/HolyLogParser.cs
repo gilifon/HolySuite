@@ -234,7 +234,7 @@ th,td
                 Match match = regex.Match(row);
                 if (match.Success)
                 {
-                    qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim().ToLower().Replace("m","") + "M";
+                    qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim().ToUpper();
                 }
 
                 regex = new Regex(dxcall_pattern, RegexOptions.IgnoreCase);
@@ -276,6 +276,9 @@ th,td
                 {
                     qso_row.RST_SENT = Regex.Split(row, rst_sent_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                 }
+                if (string.IsNullOrWhiteSpace(qso_row.RST_RCVD) && !string.IsNullOrWhiteSpace(qso_row.RST_SENT)) qso_row.RST_RCVD = qso_row.RST_SENT;
+                if (string.IsNullOrWhiteSpace(qso_row.RST_SENT) && !string.IsNullOrWhiteSpace(qso_row.RST_RCVD)) qso_row.RST_SENT = qso_row.RST_RCVD;
+
 
                 regex = new Regex(date_pattern, RegexOptions.IgnoreCase);
                 match = regex.Match(row);
