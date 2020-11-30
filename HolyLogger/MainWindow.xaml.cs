@@ -1386,6 +1386,7 @@ namespace HolyLogger
             if (options != null)
             {
                 var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == options /* return "true" if 'w' is the window your are about to open */);
+                GetRigTypes();
 
                 if (existingWindow != null)
                 {
@@ -1400,6 +1401,8 @@ namespace HolyLogger
             {
                 GenerateNewOptionsWindow();
             }
+            options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
+            options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
         }
 
         private void GenerateNewOptionsWindow()
@@ -1424,6 +1427,7 @@ namespace HolyLogger
             ToggleQRZAutoOpen();
             if (optionWindow.GeneralSettingsControlControlInstance.HasChanged)
             {
+                SelectRig();
                 ShowRigParams();
             }
             if (optionWindow.UserInterfaceControlInstance.HasChanged)
@@ -2212,6 +2216,9 @@ namespace HolyLogger
             }
         }
 
+        public string Rig1 { get; set; }
+        public string Rig2 { get; set; }
+
         #endregion
         #region Constants
         // Constants for enum RigParamX
@@ -2265,10 +2272,6 @@ namespace HolyLogger
         /// </summary>
         OmniRig.RigX Rig;
         /// <summary>
-        /// Our rig no
-        /// </summary>
-        int OurRigNo;
-        /// <summary>
         /// The events subscribed
         /// </summary>
         private bool EventsSubscribed = false;
@@ -2294,8 +2297,10 @@ namespace HolyLogger
                         OmniRigEngine = null;
                         MessageBox.Show("OmniRig Is Not installed Or has a wrong version number");
                     }
+                    GetRigTypes();
                     SubscribeToEvents();
-                    SelectRig(1);
+                    SelectRig();
+                    ShowRigParams();
                 }
             }
             catch (Exception)
@@ -2307,6 +2312,11 @@ namespace HolyLogger
             }
         }
 
+        private void GetRigTypes()
+        {
+            Rig1 = OmniRigEngine.Rig1.RigType;
+            Rig2 = OmniRigEngine.Rig2.RigType;
+        }
         private void SubscribeToEvents()
         {
             if (!EventsSubscribed)
@@ -2316,55 +2326,33 @@ namespace HolyLogger
                 OmniRigEngine.ParamsChange += OmniRigEngine_ParamsChange;
             }
         }
-        private void SelectRig(int NewRigNo)
+        private void SelectRig()
         {
-            if (OmniRigEngine == null)
-            {
-                return;
-            }
-            OurRigNo = NewRigNo;
-            switch (NewRigNo)
-            {
-                case 1:
-                    Rig = OmniRigEngine.Rig1;
-                    break;
-                case 2:
-                    Rig = OmniRigEngine.Rig2;
-                    break;
-            }
-            ShowRigParams();
+            if (Properties.Settings.Default.SelectedOmniRig1)
+                Rig = OmniRigEngine.Rig1;
+            else if (Properties.Settings.Default.SelectedOmniRig2)
+                Rig = OmniRigEngine.Rig2;
         }
 
         //OmniRig ParamsChange events
         private void OmniRigEngine_ParamsChange(int RigNumber, int Params)
         {
-            if (RigNumber == OurRigNo)
-            {
-                thread1 = new Thread(new ThreadStart(ShowRigParams));
-                thread1.Name = "RigParams";
-                //Avvia il primo thread
-                thread1.Start();
-            }
-
+            thread1 = new Thread(new ThreadStart(ShowRigParams));
+            thread1.Name = "RigParams";
+            thread1.Start();
         }
-
 
         //OmniRig StatusChange events
         private void OmniRigEngine_StatusChange(int RigNumber)
         {
-            if (RigNumber == OurRigNo)
-            {
-                //thread2 = new Thread(new ThreadStart(ShowRigStatus));
-                thread2 = new Thread(new ThreadStart(ShowRigParams));
-                thread2.Name = "RigStatus";
-                //Avvia il secondo thread
-                thread2.Start();
-            }
+            thread2 = new Thread(new ThreadStart(ShowRigParams));
+            thread2.Name = "RigStatus";
+            thread2.Start();
         }
 
         private void ShowRigStatus()
         {
-            if (Rig == null)
+            if (OmniRigEngine == null || Rig == null)
             {
             }
             else
@@ -2402,7 +2390,7 @@ namespace HolyLogger
         private void ShowRigParams()
         {
             ShowRigStatus();
-            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || !Properties.Settings.Default.EnableOmniRigCAT || Properties.Settings.Default.isManualMode || state == State.Edit)
+            if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || !Properties.Settings.Default.EnableOmniRigCAT || Properties.Settings.Default.isManualMode || state == State.Edit)
             {
                 return;
             }

@@ -9,5 +9,11 @@
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsFilterGrid" Content="Filter QSO grid" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsFilterQSOs, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
         <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,26,0,0" Click="HasChanged_Click"/>
+        <RadioButton x:Name="Rig1_RB" HorizontalAlignment="Left" Margin="10,63,0,0" VerticalAlignment="Top"  Click="HasChanged_Click" IsChecked="{Binding Default.SelectedOmniRig1, Mode=TwoWay, Source={StaticResource Settings}}"/>
+        <RadioButton x:Name="Rig2_RB" HorizontalAlignment="Left" Margin="10,83,0,0" VerticalAlignment="Top"  Click="HasChanged_Click" IsChecked="{Binding Default.SelectedOmniRig2, Mode=TwoWay, Source={StaticResource Settings}}"/>
+
+
+
+
     </Grid>
 </UserControl>

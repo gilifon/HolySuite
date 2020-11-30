@@ -139,17 +139,17 @@ namespace HolyParser
             int index = 1;
 
             csv.AppendFormat("{0},", "No");
-            csv.AppendFormat("{0},", "Date");
-            csv.AppendFormat("{0},", "UTC Start");
+            csv.AppendFormat("{0},", "Station Callsign");
             csv.AppendFormat("{0},", "Callsign");
+            csv.AppendFormat("{0},", "Band");
+            csv.AppendFormat("{0},", "Mode");
+            csv.AppendFormat("{0},", "Date");
+            csv.AppendFormat("{0},", "UTC");                        
+            csv.AppendFormat("{0},", "RST Rcvd");
+            csv.AppendFormat("{0},", "RST Sent");
             csv.AppendFormat("{0},", "Country");
             csv.AppendFormat("{0},", "Name");
             csv.AppendFormat("{0},", "QTH");
-            csv.AppendFormat("{0},", "Band");
-            csv.AppendFormat("{0},", "Mode");
-            csv.AppendFormat("{0},", "Rcvd");
-            csv.AppendFormat("{0},", "Sent");
-            csv.AppendFormat("{0},", "UTC End");
             csv.AppendFormat("{0}\r\n", "Exchange");
 
             foreach (QSO qso in qso_list)
@@ -158,17 +158,17 @@ namespace HolyParser
                 string time = qso.Time;
 
                 csv.AppendFormat("{0},", index++);
-                csv.AppendFormat("{0},", date);
-                csv.AppendFormat("{0},", time);
+                csv.AppendFormat("{0},", qso.MyCall);
                 csv.AppendFormat("{0},", qso.DXCall);
-                csv.AppendFormat("{0},", rem.GetDXCC(qso.DXCall));
-                csv.AppendFormat("{0},", qso.Name);
-                csv.AppendFormat("{0},", "");
                 csv.AppendFormat("{0},", qso.Band);
                 csv.AppendFormat("{0},", qso.Mode);
+                csv.AppendFormat("{0},", date);
+                csv.AppendFormat("{0},", time);
                 csv.AppendFormat("{0},", qso.RST_RCVD);
                 csv.AppendFormat("{0},", qso.RST_SENT);
-                csv.AppendFormat("{0},", time);
+                csv.AppendFormat("{0},", rem.GetDXCC(qso.DXCall).Name);
+                csv.AppendFormat("{0},", qso.Name);
+                csv.AppendFormat("{0},", "");
                 csv.AppendFormat("{0}\r\n", qso.SRX);
             }
             return csv.ToString();

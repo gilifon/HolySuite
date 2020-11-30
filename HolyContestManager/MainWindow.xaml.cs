@@ -336,7 +336,7 @@ namespace HolyContestManager
 
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
-                //GenerateLogFile(p);
+                GenerateLogFile(p);
 
                 iteration++;
                 if (p.is_manual == 0 && p.callsign.ToLower() == "4x6fr")

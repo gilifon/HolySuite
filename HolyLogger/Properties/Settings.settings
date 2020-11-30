@@ -185,5 +185,11 @@
     <Setting Name="SatelliteShift" Type="System.Double" Scope="User">
       <Value Profile="(Default)">1968</Value>
     </Setting>
+    <Setting Name="SelectedOmniRig1" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="SelectedOmniRig2" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

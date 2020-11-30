@@ -1,14 +1,15 @@
 ﻿<Window x:Name="Window_About" x:Class="HolyLogger.AboutWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="About" Height="180" Width="390" MinHeight="180" MaxHeight="180" MinWidth="390" MaxWidth="390" Icon="Images/about.png">
+        Title="About" Height="200" Width="390" MinHeight="200" MaxHeight="200" MinWidth="390" MaxWidth="390" Icon="Images/about.png">
     <Grid Background="#FFCBCBCB">
 
         <Image HorizontalAlignment="Left" Height="113" Margin="10,10,0,0" VerticalAlignment="Top" Width="111" Source="Images/crown100.png"/>
-        <StackPanel HorizontalAlignment="Left" Height="134" Margin="138,10,0,0" VerticalAlignment="Top" Width="234">
+        <StackPanel HorizontalAlignment="Left" Height="149" Margin="138,10,0,0" VerticalAlignment="Top" Width="234">
             <TextBlock HorizontalAlignment="Left" Margin="0,0,0,0" TextWrapping="Wrap" Text="Holyland Contest Logger" VerticalAlignment="Top"/>
-            <TextBlock x:Name="L_Version" HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Version 1.0.0.1" VerticalAlignment="Top"/>
+            <TextBlock x:Name="L_Version" HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Version x.x.x.x" VerticalAlignment="Top"/>
             <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Design &amp; Development - Gil 4Z1KD" VerticalAlignment="Top" />
+            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Code Contribution - Zeev 4X5ZS" VerticalAlignment="Top" />
             <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Good Advice:" VerticalAlignment="Top" />
             <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Dan 4Z5SL, Chanan 4Z1DZ, Avraham 4Z1IZ" VerticalAlignment="Top" />            
             <TextBlock x:Name="L_LastUpdate" Margin="0,5,0,0" TextWrapping="Wrap" Text="Last update: April 2018" VerticalAlignment="Top" HorizontalAlignment="Left" Width="184" />

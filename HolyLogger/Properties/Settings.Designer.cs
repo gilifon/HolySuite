@@ -754,5 +754,29 @@ namespace HolyLogger.Properties {
                 this["SatelliteShift"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool SelectedOmniRig1 {
+            get {
+                return ((bool)(this["SelectedOmniRig1"]));
+            }
+            set {
+                this["SelectedOmniRig1"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool SelectedOmniRig2 {
+            get {
+                return ((bool)(this["SelectedOmniRig2"]));
+            }
+            set {
+                this["SelectedOmniRig2"] = value;
+            }
+        }
     }
 }
