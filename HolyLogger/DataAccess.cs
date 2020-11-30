@@ -23,13 +23,15 @@ namespace HolyLogger
                 //string path = (System.IO.Path.GetDirectoryName(executable));
                 //AppDomain.CurrentDomain.SetData("DataDirectory", path);
 
-                con = new SQLiteConnection(@"Data Source = Data\logDB.db;Version=3");
+                con = new SQLiteConnection(@"DataSource = Data\logDB.db;Version=3");
                 con.Open();
             }
             catch (Exception e)
             {
                 throw new Exception("Failed to connect to DB: " + e.Message);
             }
+            AddQsoColIfNeeded("prop_mode", "nvarchar(100) NULL");
+            AddQsoColIfNeeded("sat_name", "nvarchar(100) NULL");
         }
 
         public QSO Insert(QSO qso)
@@ -266,6 +268,35 @@ namespace HolyLogger
             {
                 cmd.CommandType = CommandType.Text;
                 return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        private void AddQsoColIfNeeded(string name, string definition)
+        {
+
+            string stm = "SELECT count(*) FROM pragma_table_info(\"qso\") WHERE name = \"" + name + "\"";
+            SQLiteCommand cmd = new SQLiteCommand(stm, con);
+            try
+            {
+                int colCount = Convert.ToInt32(cmd.ExecuteScalar());
+                if (colCount > 0)
+                {
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
+            }
+            stm = "ALTER TABLE qso ADD COLUMN [" + name + "] " + definition;
+            cmd = new SQLiteCommand(stm, con);
+            try
+            {
+                cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex)
+            {
+                throw new Exception(ex.Message);
             }
         }
     }
