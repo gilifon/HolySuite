@@ -25,24 +25,24 @@ namespace HolyLogger.OptionsUserControls
         
         public bool HasChanged { get; set; }
 
-        public string _Rig1;
+        public string _Rig1 = "Not Connected";
         public string Rig1
         {
             get { return _Rig1; }
             set
             {
                 _Rig1 = value;
-                Rig1_RB.Content = _Rig1;
+                Rig1_RB.Content = "1:  " + _Rig1;
             }
         }
-        public string _Rig2;
+        public string _Rig2 = "Not Connected";
         public string Rig2
         {
             get { return _Rig2; }
             set
             {
                 _Rig2 = value;
-                Rig2_RB.Content = _Rig2;
+                Rig2_RB.Content = "2:  " + _Rig2;
             }
         }
 
