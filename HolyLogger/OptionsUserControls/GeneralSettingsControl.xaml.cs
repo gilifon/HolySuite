@@ -1,9 +1,14 @@
-﻿using System;
+﻿using Microsoft.Win32;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Runtime.CompilerServices;
+using System.Runtime.InteropServices;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -13,7 +18,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
-using System.Windows.Shapes;
+
 
 namespace HolyLogger.OptionsUserControls
 {
@@ -22,7 +27,10 @@ namespace HolyLogger.OptionsUserControls
     /// </summary>
     public partial class GeneralSettingsControl : UserControl
     {
-        
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        static extern bool SetForegroundWindow(IntPtr hWnd);
+
         public bool HasChanged { get; set; }
 
         public string _Rig1 = "Not Connected";
@@ -50,11 +58,6 @@ namespace HolyLogger.OptionsUserControls
         {
             InitializeComponent();
             HasChanged = false;
-        }
-
-        private void GeneralSettingsControl_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)
