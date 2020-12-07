@@ -45,6 +45,7 @@ namespace HolyParser
 
         private DXCC ER_Dxcc;
         private ModeResolver mr = new ModeResolver();
+        private EntityResolver rem;
 
         private int _qso160;
         private int _qso80;
@@ -186,6 +187,11 @@ th,td
         private string name_pattern = @"<name:(\d{1,2})(?::[a-z]{1})?>";
         private string country_pattern = @"<country:(\d{1,2})(?::[a-z]{1})?>";
 
+        public HolyLogParser() : this("", Operator.Israeli)
+        {
+            
+        }
+
         public HolyLogParser(string rawData, Operator logType, bool isParseDuplicates = true, bool isParseWarc = true)
         {
             m_fileText = rawData;
@@ -193,6 +199,7 @@ th,td
             IsParseDuplicates = isParseDuplicates;
             IsParseWARC = isParseWarc;
 
+            rem = new EntityResolver();
             m_qsoList = new List<QSO>();
         }
 
@@ -204,9 +211,6 @@ th,td
 
         private void PopulateQSOList()
         {
-            EntityResolver rem = new EntityResolver();
-            
-
             m_qsoList.Clear();
             //Remove Line breakers
             string oneLiner = Regex.Replace(m_fileText, "\r\n", "");
@@ -227,168 +231,7 @@ th,td
                 //skip empty rows
                 if (string.IsNullOrWhiteSpace(row)) continue;
 
-                QSO qso_row = new QSO();
-                qso_row.IsAllowWARC = IsParseWARC;
-
-                Regex regex = new Regex(band_pattern, RegexOptions.IgnoreCase);
-                Match match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim().ToUpper();
-                }
-
-                regex = new Regex(dxcall_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.DXCall = Regex.Split(row, dxcall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
-                    ER_Dxcc = rem.GetDXCC(qso_row.DXCall);
-                    qso_row.Country = ER_Dxcc.Name;
-                    qso_row.DXCC = ER_Dxcc.Entity;
-                }
-
-                regex = new Regex(mycall_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.MyCall = Regex.Split(row, mycall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
-                }
-                else
-                {
-                    regex = new Regex(operator_call_pattern, RegexOptions.IgnoreCase);
-                    match = regex.Match(row);
-                    if (match.Success)
-                    {
-                        qso_row.MyCall = Regex.Split(row, operator_call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
-                    }
-                }
-
-                regex = new Regex(rst_rcvd_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.RST_RCVD = Regex.Split(row, rst_rcvd_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-
-                regex = new Regex(rst_sent_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.RST_SENT = Regex.Split(row, rst_sent_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-                if (string.IsNullOrWhiteSpace(qso_row.RST_RCVD) && !string.IsNullOrWhiteSpace(qso_row.RST_SENT)) qso_row.RST_RCVD = qso_row.RST_SENT;
-                if (string.IsNullOrWhiteSpace(qso_row.RST_SENT) && !string.IsNullOrWhiteSpace(qso_row.RST_RCVD)) qso_row.RST_SENT = qso_row.RST_RCVD;
-
-
-                regex = new Regex(date_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.Date = Regex.Split(row, date_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-
-                regex = new Regex(mode_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.Mode = mr.GetValidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
-                }
-
-                regex = new Regex(time_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.Time = Regex.Split(row, time_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-
-                regex = new Regex(commant_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.Comment = Regex.Split(row, commant_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-                else
-                {
-                    qso_row.Comment = "";
-                }
-
-                //if the file contains dxcc, prefer it over the EntityResolver
-                regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.DXCC = Regex.Split(row, dxcc_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-
-                regex = new Regex(srx_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.SRX = Regex.Split(row, srx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                    if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "000";
-                }
-                else
-                {
-                    regex = new Regex(srx_short_pattern, RegexOptions.IgnoreCase);
-                    match = regex.Match(row);
-                    if (match.Success)
-                    {
-                        qso_row.SRX = Regex.Split(row, srx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                        if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "000";
-                    }
-                    else
-                    {
-                        qso_row.SRX = "000";
-                    }
-                }
-
-                regex = new Regex(stx_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.STX = Regex.Split(row, stx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-                else
-                {
-                    regex = new Regex(stx_short_pattern, RegexOptions.IgnoreCase);
-                    match = regex.Match(row);
-                    if (match.Success)
-                    {
-                        qso_row.STX = Regex.Split(row, stx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                    }
-                    else
-                    {
-                        qso_row.STX = "XXXXX";
-                    }
-                }
-
-                regex = new Regex(freq_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.Freq = Regex.Split(row, freq_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-
-                regex = new Regex(name_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.Name = Regex.Split(row, name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-                else
-                {
-                    qso_row.Name = "";
-                }
-
-                //if the file contains country, prefer it over the EntityResolver
-                regex = new Regex(country_pattern, RegexOptions.IgnoreCase);
-                match = regex.Match(row);
-                if (match.Success)
-                {
-                    qso_row.Country = Regex.Split(row, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-
-                qso_row.StandartizeQSO();
+                QSO qso_row = ParseRawQSO(row);
                 if (IsParseDuplicates)
                 {
                     m_qsoList.Add(qso_row);
@@ -399,6 +242,173 @@ th,td
                 }
             }
             m_qsoList = m_qsoList.OrderBy(p => p.Date).ThenBy(p => p.Time).ToList();
+        }
+
+        public QSO ParseRawQSO(string row)
+        {
+            if (string.IsNullOrWhiteSpace(row)) return null;
+            QSO qso_row = new QSO();
+            qso_row.IsAllowWARC = IsParseWARC;
+
+            Regex regex = new Regex(band_pattern, RegexOptions.IgnoreCase);
+            Match match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim().ToUpper();
+            }
+
+            regex = new Regex(dxcall_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.DXCall = Regex.Split(row, dxcall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
+                ER_Dxcc = rem.GetDXCC(qso_row.DXCall);
+                qso_row.Country = ER_Dxcc.Name;
+                qso_row.DXCC = ER_Dxcc.Entity;
+            }
+
+            regex = new Regex(mycall_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.MyCall = Regex.Split(row, mycall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
+            }
+            else
+            {
+                regex = new Regex(operator_call_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.MyCall = Regex.Split(row, operator_call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
+                }
+            }
+
+            regex = new Regex(rst_rcvd_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.RST_RCVD = Regex.Split(row, rst_rcvd_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+
+            regex = new Regex(rst_sent_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.RST_SENT = Regex.Split(row, rst_sent_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            if (string.IsNullOrWhiteSpace(qso_row.RST_RCVD) && !string.IsNullOrWhiteSpace(qso_row.RST_SENT)) qso_row.RST_RCVD = qso_row.RST_SENT;
+            if (string.IsNullOrWhiteSpace(qso_row.RST_SENT) && !string.IsNullOrWhiteSpace(qso_row.RST_RCVD)) qso_row.RST_SENT = qso_row.RST_RCVD;
+
+
+            regex = new Regex(date_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Date = Regex.Split(row, date_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+
+            regex = new Regex(mode_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Mode = mr.GetValidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+            }
+
+            regex = new Regex(time_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Time = Regex.Split(row, time_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+
+            regex = new Regex(commant_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Comment = Regex.Split(row, commant_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            else
+            {
+                qso_row.Comment = "";
+            }
+
+            //if the file contains dxcc, prefer it over the EntityResolver
+            regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.DXCC = Regex.Split(row, dxcc_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+
+            regex = new Regex(srx_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.SRX = Regex.Split(row, srx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "000";
+            }
+            else
+            {
+                regex = new Regex(srx_short_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.SRX = Regex.Split(row, srx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                    if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "000";
+                }
+                else
+                {
+                    qso_row.SRX = "000";
+                }
+            }
+
+            regex = new Regex(stx_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.STX = Regex.Split(row, stx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            else
+            {
+                regex = new Regex(stx_short_pattern, RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.STX = Regex.Split(row, stx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+                else
+                {
+                    qso_row.STX = "XXXXX";
+                }
+            }
+
+            regex = new Regex(freq_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Freq = Regex.Split(row, freq_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+
+            regex = new Regex(name_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Name = Regex.Split(row, name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            else
+            {
+                qso_row.Name = "";
+            }
+
+            //if the file contains country, prefer it over the EntityResolver
+            regex = new Regex(country_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Country = Regex.Split(row, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            qso_row.StandartizeQSO();
+            return qso_row;
         }
 
         private void CalculateResult()
@@ -585,9 +595,7 @@ th,td
             //}
             m_templateRes = FinalTemplate.ToString();
         }
-
         
-
         public List<QSO> GetRawQSO()
         {
             return m_qsoList;

@@ -198,13 +198,13 @@ namespace HolyLogger
 
         DispatcherTimer BlinkingTimer = new DispatcherTimer();
 
-        //public static UdpClient Client = new UdpClient(2237);//2333
+        public static UdpClient Client = new UdpClient(2333);//2237
 
         public MainWindow()
         {
             InitializeComponent();
 
-            //Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
+            Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
 
             isNetworkAvailable = Helper.CheckForInternetConnection();
 
@@ -328,16 +328,32 @@ namespace HolyLogger
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
 
-        //private void StartUDPClient(IAsyncResult res)
-        //{
-        //    IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
-        //    byte[] received = Client.EndReceive(res, ref RemoteIpEndPoint);
+        private void StartUDPClient(IAsyncResult res)
+        {
+            IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            byte[] received = Client.EndReceive(res, ref RemoteIpEndPoint);
+            string data = Encoding.UTF8.GetString(received);
 
-        //    _holyLogParser = new HolyLogParser(Encoding.UTF8.GetString(received), HolyLogParser.Operator.Israeli);
-        //    _holyLogParser.Parse();
+            _holyLogParser = new HolyLogParser();
+            QSO qso = _holyLogParser.ParseRawQSO(data);
+            try
+            {
+                lock (this)
+                {
+                    QSO q = dal.Insert(qso);
+                    Qsos.Insert(0, q);
+                    Properties.Settings.Default.RecentQSOCounter++;
+                }
+                if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
+                    QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
+            }
 
-        //    Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
-        //}
+            Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
+        }
 
         private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
         {
@@ -514,7 +530,10 @@ namespace HolyLogger
                 {
                     System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
                 }
-                
+                UpdateNumOfQSOs();
+                ClearMatrix();
+                RestoreDataContext();
+
             }
             else if (state == State.Edit)
             {
