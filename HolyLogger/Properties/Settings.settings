@@ -191,5 +191,11 @@
     <Setting Name="SelectedOmniRig2" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="EnableUDPClient" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="UDPPort" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">2333</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

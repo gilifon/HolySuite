@@ -778,5 +778,29 @@ namespace HolyLogger.Properties {
                 this["SelectedOmniRig2"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableUDPClient {
+            get {
+                return ((bool)(this["EnableUDPClient"]));
+            }
+            set {
+                this["EnableUDPClient"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2333")]
+        public int UDPPort {
+            get {
+                return ((int)(this["UDPPort"]));
+            }
+            set {
+                this["UDPPort"] = value;
+            }
+        }
     }
 }

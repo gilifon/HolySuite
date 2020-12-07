@@ -198,7 +198,7 @@ namespace HolyLogger
 
         DispatcherTimer BlinkingTimer = new DispatcherTimer();
 
-        public static UdpClient Client = new UdpClient(2333);//2237
+        public static UdpClient Client = new UdpClient(Properties.Settings.Default.UDPPort);//2333 / 2237
 
         public MainWindow()
         {
@@ -330,27 +330,36 @@ namespace HolyLogger
 
         private void StartUDPClient(IAsyncResult res)
         {
+            if (!Properties.Settings.Default.EnableUDPClient)
+            {
+                Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
+                return;
+            }
             IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
             byte[] received = Client.EndReceive(res, ref RemoteIpEndPoint);
             string data = Encoding.UTF8.GetString(received);
 
             _holyLogParser = new HolyLogParser();
             QSO qso = _holyLogParser.ParseRawQSO(data);
-            try
+            this.Dispatcher.Invoke(() =>
             {
-                lock (this)
+                try
                 {
-                    QSO q = dal.Insert(qso);
-                    Qsos.Insert(0, q);
-                    Properties.Settings.Default.RecentQSOCounter++;
+                    lock (this)
+                    {
+                        QSO q = dal.Insert(qso);
+                        Qsos.Insert(0, q);
+                        Properties.Settings.Default.RecentQSOCounter++;
+                    }
+                    if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
+                        QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
                 }
-                if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
-                    QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
-            }
-            catch (Exception ex)
-            {
-                System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
-            }
+                catch (Exception ex)
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
+                }
+            });
+
 
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
         }
@@ -2178,7 +2187,7 @@ namespace HolyLogger
         /// <summary>
         /// Frequency
         /// </summary>
-        private string mFrequency = "14220000";
+        private string mFrequency = "14.220000";
 
         /// <summary>
         /// Frequency

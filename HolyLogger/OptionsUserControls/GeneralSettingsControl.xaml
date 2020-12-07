@@ -17,7 +17,9 @@
             </StackPanel>
         </GroupBox>
 
-
+        <CheckBox x:Name="CBX_EnableUDPClient" Content="Enable UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,150,0,0" Click="HasChanged_Click"/>
+        <Label x:Name="label" Content="Port" HorizontalAlignment="Left" Margin="199,144,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="textBox" HorizontalAlignment="Left" Height="23" Margin="243,148,0,0" TextWrapping="Wrap" Text="{Binding Default.UDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
 
 
 

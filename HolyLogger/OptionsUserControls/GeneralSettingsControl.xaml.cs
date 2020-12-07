@@ -64,6 +64,28 @@ namespace HolyLogger.OptionsUserControls
         {
             HasChanged = true;
         }
+
+        private static bool IsValidPort(string text)
+        {
+            int x;
+            return int.TryParse(text, out x);
+        }
+
+        private void PreviewTextInputHandler(Object sender, TextCompositionEventArgs e)
+        {
+            e.Handled = !IsValidPort(e.Text);
+        }
+
+        // Use the DataObject.Pasting Handler  
+        private void PastingHandler(object sender, DataObjectPastingEventArgs e)
+        {
+            if (e.DataObject.GetDataPresent(typeof(string)))
+            {
+                string text = (string)e.DataObject.GetData(typeof(string));
+                if (!IsValidPort(text)) e.CancelCommand();
+            }
+            else e.CancelCommand();
+        }
     }
     
 }
