@@ -215,6 +215,7 @@
     <Compile Include="MatrixControl.xaml.cs">
       <DependentUpon>MatrixControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="UDPSocket.cs" />
     <Page Include="AboutWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

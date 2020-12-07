@@ -23,11 +23,10 @@ using System.Globalization;
 using Blue.Windows;
 using System.Windows.Media.Imaging;
 using System.Runtime.InteropServices;
-using Microsoft.VisualBasic;
-using System.Windows.Media.Animation;
 using System.Windows.Threading;
 using System.Net.NetworkInformation;
 using System.Windows.Media;
+using System.Net.Sockets;
 
 namespace HolyLogger
 {
@@ -198,10 +197,14 @@ namespace HolyLogger
         List<string> ImportFileQ = new List<string>();
 
         DispatcherTimer BlinkingTimer = new DispatcherTimer();
-        
+
+        //public static UdpClient Client = new UdpClient(2237);//2333
+
         public MainWindow()
         {
             InitializeComponent();
+
+            //Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
 
             isNetworkAvailable = Helper.CheckForInternetConnection();
 
@@ -324,7 +327,18 @@ namespace HolyLogger
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
-        
+
+        //private void StartUDPClient(IAsyncResult res)
+        //{
+        //    IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
+        //    byte[] received = Client.EndReceive(res, ref RemoteIpEndPoint);
+
+        //    _holyLogParser = new HolyLogParser(Encoding.UTF8.GetString(received), HolyLogParser.Operator.Israeli);
+        //    _holyLogParser.Parse();
+
+        //    Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
+        //}
+
         private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
         {
             isNetworkAvailable = e.IsAvailable;
