@@ -802,5 +802,17 @@ namespace HolyLogger.Properties {
                 this["UDPPort"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string my_locator {
+            get {
+                return ((string)(this["my_locator"]));
+            }
+            set {
+                this["my_locator"] = value;
+            }
+        }
     }
 }

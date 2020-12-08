@@ -12,5 +12,6 @@
         <CheckBox x:Name="CBX_QRZAutoOpen" Content="Auto open QRZ.com page" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.QRZ_auto_open, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,26,0,0"/>
         <CheckBox x:Name="CBX_ShowTitleClock" Content="Show UTC clock in the title" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowTitleClock, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,52,0,0" Click="HasChanged_Click"/>
         <CheckBox x:Name="CBX_ShowNetworkFlag" Content="Show the Network connectivity icon" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowNetworkFlag, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,78,0,0"/>
+        <CheckBox x:Name="CBX_Lock" Content="Lock My Callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isLocked, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,104,0,0"/>
     </Grid>
 </UserControl>

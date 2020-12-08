@@ -247,24 +247,10 @@ namespace HolyLogger
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
-            if (TB_MyGrid.IsEnabled) Lock_Btn.Opacity = 1;
-            else Lock_Btn.Opacity = 0.5;
 
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
             if (TB_Comment.IsEnabled) LockComment_Btn.Opacity = 1;
-            else LockComment_Btn.Opacity = 0.5;
-            
-            //if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
-            //{
-            //    TB_MyGrid.Clear();
-            //    TB_MyGrid.IsEnabled = false;
-            //}
-            //else
-            //{
-            //    TB_MyGrid.IsEnabled = true;
-            //    TB_MyGrid.Text = Properties.Settings.Default.my_square;
-            //}
-            TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
+            else LockComment_Btn.Opacity = 0.5;            
 
             try
             {
@@ -471,17 +457,6 @@ namespace HolyLogger
             }
         }
 
-        private void Lock_Btn_MouseUp(object sender, MouseButtonEventArgs e)
-        {
-            Properties.Settings.Default.isLocked = !Properties.Settings.Default.isLocked;
-            TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
-            TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
-            //TB_Frequency.IsEnabled = !(TB_Frequency.IsEnabled);
-            //CB_Mode.IsEnabled = !(CB_Mode.IsEnabled);
-            if (TB_MyGrid.IsEnabled) ((Image)sender).Opacity = 1;
-            else ((Image)sender).Opacity = 0.5;
-        }
-
         private void LockComment_Btn_MouseUp(object sender, MouseButtonEventArgs e)
         {
             Properties.Settings.Default.isCommentLocked = !Properties.Settings.Default.isCommentLocked;
@@ -511,7 +486,8 @@ namespace HolyLogger
                 qso.Country = Country;
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
-                qso.STX = TB_MyGrid.Text;//.Replace("-", "");
+                qso.STX = TB_MyHolyland.Text;//.Replace("-", "");
+                qso.MyLocator = TB_MyLocator.Text;//.Replace("-", "");
                 qso.RST_RCVD = TB_RSTRcvd.Text;
                 qso.RST_SENT = TB_RSTSent.Text;
                 DateTime date = TP_Date.Value.Value;
@@ -555,7 +531,8 @@ namespace HolyLogger
                 QsoToUpdate.Country = Country;
                 QsoToUpdate.Name = FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
-                QsoToUpdate.STX = TB_MyGrid.Text;//.Replace("-", "");
+                QsoToUpdate.STX = TB_MyHolyland.Text;//.Replace("-", "");
+                QsoToUpdate.MyLocator = TB_MyLocator.Text;//.Replace("-", "");
                 QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
                 QsoToUpdate.RST_SENT = TB_RSTSent.Text;
                 DateTime date = TP_Date.Value.Value;
@@ -597,7 +574,8 @@ namespace HolyLogger
             //TB_Exchange.Text = QsoPreUpdate.SRX;
             Frequency = QsoPreUpdate.Freq;
             TB_MyCallsign.Text = QsoPreUpdate.MyCall;
-            TB_MyGrid.Text = QsoPreUpdate.STX;
+            TB_MyHolyland.Text = QsoPreUpdate.STX;
+            TB_MyLocator.Text = QsoPreUpdate.MyLocator;
             //TB_RSTRcvd.Text = QsoPreUpdate.RST_RCVD;
             //TB_RSTSent.Text = QsoPreUpdate.RST_SENT;
             //TB_DX_Name.Text = QsoPreUpdate.Name;
@@ -786,13 +764,13 @@ namespace HolyLogger
                         catch (Exception ex)
                         {
                             faultyQSO++;
-                            System.Windows.Forms.MessageBox.Show(ex.Message);
+                            //System.Windows.Forms.MessageBox.Show(ex.Message);
                         }
                     }
                 }
                 catch (Exception exc)
                 {
-                    System.Windows.Forms.MessageBox.Show(filename + " Failed to load! check file format.");
+                    System.Windows.Forms.MessageBox.Show(filename + " Failed to load! check the file.");
                 }
             }
             e.Result = faultyQSO;
@@ -1108,7 +1086,8 @@ namespace HolyLogger
             QsoPreUpdate.SRX = TB_Exchange.Text;
             QsoPreUpdate.Freq = Frequency;
             QsoPreUpdate.MyCall = TB_MyCallsign.Text;
-            QsoPreUpdate.STX = TB_MyGrid.Text;
+            QsoPreUpdate.STX = TB_MyHolyland.Text;
+            QsoPreUpdate.MyLocator = TB_MyLocator.Text;
             QsoPreUpdate.RST_RCVD = TB_RSTRcvd.Text;
             QsoPreUpdate.RST_SENT = TB_RSTSent.Text;
             QsoPreUpdate.Name = TB_DX_Name.Text;
@@ -1124,7 +1103,8 @@ namespace HolyLogger
             TB_Exchange.Text = QsoToUpdate.SRX;
             Frequency = QsoToUpdate.Freq;
             TB_MyCallsign.Text = QsoToUpdate.MyCall;
-            TB_MyGrid.Text = QsoToUpdate.STX;
+            TB_MyHolyland.Text = QsoToUpdate.STX;
+            TB_MyLocator.Text = QsoToUpdate.MyLocator;
             TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
             TB_RSTSent.Text = QsoToUpdate.RST_SENT;
             TB_DX_Name.Text = QsoToUpdate.Name;
@@ -1226,18 +1206,18 @@ namespace HolyLogger
                     TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
                 }
 
-                if (TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z"))
-                {
-                    if (string.IsNullOrWhiteSpace(TB_MyGrid.Text))// || !HolyLogParser.validSquares.Contains(TB_MyGrid.Text))
-                    {
-                        allOK = false;
-                        TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.Red;
-                    }
-                    else
-                    {
-                        TB_MyGrid.BorderBrush = System.Windows.Media.Brushes.LightGray;
-                    }
-                }
+                //if (TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z"))
+                //{
+                //    if (string.IsNullOrWhiteSpace(TB_MyHolyland.Text))// || !HolyLogParser.validSquares.Contains(TB_MyHolyland.Text))
+                //    {
+                //        allOK = false;
+                //        TB_MyHolyland.BorderBrush = System.Windows.Media.Brushes.Red;
+                //    }
+                //    else
+                //    {
+                //        TB_MyHolyland.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                //    }
+                //}
 
                 if (string.IsNullOrWhiteSpace(TB_RSTRcvd.Text))
                 {
@@ -1369,7 +1349,7 @@ namespace HolyLogger
                 try
                 {
                     // Saves the Image via a FileStream created by the OpenFile method.
-                    using (System.IO.StreamWriter file = new System.IO.StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "\\" + DateTime.Now.Ticks.ToString() + ".adif"))
+                    using (System.IO.StreamWriter file = new System.IO.StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "\\" + DateTime.Now.Ticks.ToString() + ".adi"))
                     {
                         file.Write(adif);
                         file.Close();
@@ -1381,6 +1361,7 @@ namespace HolyLogger
                 }
                 finally
                 {
+                    Properties.Settings.Default.RecentQSOCounter = 0;
                     Qsos.Clear();
                     dal.DeleteAll();
                     ClearBtn_Click(null, null);
@@ -1482,13 +1463,14 @@ namespace HolyLogger
                 {
                     StopUTCTimer();
                     this.Title = title;
-                }                
+                }
             }
             if (optionWindow.SatelliteControlInstance.HasChanged)
             {
                 ShowRigParams();
             }
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
+            TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1515,7 +1497,7 @@ namespace HolyLogger
 
         private void GenerateNewSignboardWindow()
         {
-            signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyGrid.Text);
+            signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyHolyland.Text);
             signboard.Left = Properties.Settings.Default.SignBoardWindowLeft < 0 ? 0 : Properties.Settings.Default.SignBoardWindowLeft;
             signboard.Top = Properties.Settings.Default.SignBoardWindowTop < 0 ? 0 : Properties.Settings.Default.SignBoardWindowTop;
             signboard.Width = Properties.Settings.Default.SignBoardWindowWidth;
@@ -1597,6 +1579,28 @@ namespace HolyLogger
                 loginfo.Band160.Value = _holyLogParser.qso160;
             }
             loginfo.Show();
+        }
+       
+        private void TutorialMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string url = "https://www.youtube.com/watch?v=NCUu65E7V6c";
+
+            try
+            {
+                Process p = new Process();
+                p.StartInfo.FileName = "Chrome.exe";
+                p.StartInfo.Arguments = "--user-data-dir=" + Path.GetTempPath() + "HolyLogger " + url;
+
+                if (p.Start())
+                {
+                    p.WaitForInputIdle();
+                    SetForegroundWindow(Process.GetCurrentProcess().MainWindowHandle);
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Please install 'Chrome' and try again");
+            }
         }
 
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1774,25 +1778,15 @@ namespace HolyLogger
             {
                 signboard.signboardData.Callsign = TB_MyCallsign.Text;
             }
-            if (TB_MyGrid == null) return;
-            //if (!(TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z")))
-            //{
-            //    TB_MyGrid.Clear();
-            //    TB_MyGrid.IsEnabled = false;
-            //}
-            //else
-            //{
-            //    TB_MyGrid.IsEnabled = true;
-            //    TB_MyGrid.Text = Properties.Settings.Default.my_square;
-            //}
+            if (TB_MyHolyland == null) return;
             UpdateMatrix();
         }
         
-        private void TB_MyGrid_TextChanged(object sender, TextChangedEventArgs e)
+        private void TB_MyHolyland_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (signboard != null)
             {
-                signboard.signboardData.Square = TB_MyGrid.Text;
+                signboard.signboardData.Square = TB_MyHolyland.Text;
             }
             
         }

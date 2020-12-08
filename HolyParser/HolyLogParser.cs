@@ -177,6 +177,7 @@ th,td
         private string time_pattern = @"<time_on:(\d{1,2})(?::[a-z]{1})?>";
         private string band_pattern = @"<band:(\d{1,2})(?::[a-z]{1})?>";
         private string mode_pattern = @"<mode:(\d{1,2})(?::[a-z]{1})?>";
+        private string submode_pattern = @"<submode:(\d{1,2})(?::[a-z]{1})?>";
         private string commant_pattern = @"<comment:(\d{1,2})(?::[a-z]{1})?>";
         private string dxcc_pattern = @"<dxcc:(\d{1,2})(?::[a-z]{1})?>";
         private string freq_pattern = @"<freq:(\d{1,2})(?::[a-z]{1})?>";
@@ -186,6 +187,8 @@ th,td
         private string stx_short_pattern = @"<stx:(\d{1,2})(?::[a-z]{1})?>";
         private string name_pattern = @"<name:(\d{1,2})(?::[a-z]{1})?>";
         private string country_pattern = @"<country:(\d{1,2})(?::[a-z]{1})?>";
+        private string dxlocator_pattern = @"<gridsquare:(\d{1,2})(?::[a-z]{1})?>";
+        private string mylocator_pattern = @"<my_gridsquare:(\d{1,2})(?::[a-z]{1})?>";
 
         public HolyLogParser() : this("", Operator.Israeli)
         {
@@ -314,6 +317,14 @@ th,td
                 qso_row.Mode = mr.GetValidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
             }
 
+            regex = new Regex(submode_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.SUBMode = mr.GetValidMode(Regex.Split(row, submode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+            }
+            
+
             regex = new Regex(time_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
             if (match.Success)
@@ -330,6 +341,28 @@ th,td
             else
             {
                 qso_row.Comment = "";
+            }
+
+            regex = new Regex(dxlocator_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.DXLocator = Regex.Split(row, dxlocator_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            else
+            {
+                qso_row.DXLocator = "";
+            }
+
+            regex = new Regex(mylocator_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.MyLocator = Regex.Split(row, mylocator_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            else
+            {
+                qso_row.MyLocator = "";
             }
 
             //if the file contains dxcc, prefer it over the EntityResolver

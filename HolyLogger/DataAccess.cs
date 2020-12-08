@@ -15,6 +15,8 @@ namespace HolyLogger
     {
         private SQLiteConnection con = null;
 
+        public bool SchemaHasChanged { get; set; }
+
         public DataAccess()
         {
             try
@@ -22,7 +24,7 @@ namespace HolyLogger
                 //string executable = System.Reflection.Assembly.GetExecutingAssembly().Location;
                 //string path = (System.IO.Path.GetDirectoryName(executable));
                 //AppDomain.CurrentDomain.SetData("DataDirectory", path);
-
+                SchemaHasChanged = false;
                 con = new SQLiteConnection(@"DataSource = Data\logDB.db;Version=3");
                 con.Open();
             }
@@ -32,15 +34,26 @@ namespace HolyLogger
             }
             AddQsoColIfNeeded("prop_mode", "nvarchar(100) NULL");
             AddQsoColIfNeeded("sat_name", "nvarchar(100) NULL");
+            AddQsoColIfNeeded("my_locator", "nvarchar(100) NULL");
+            AddQsoColIfNeeded("dx_locator", "nvarchar(100) NULL");
+            AddQsoColIfNeeded("submode", "nvarchar(100) NULL");
+
+            if (SchemaHasChanged)
+            {
+                con.Close();
+                con.Open();
+            }
         }
 
         public QSO Insert(QSO qso)
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,exchange,comment,name,country,prop_mode,sat_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,prop_mode,sat_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
+                insertSQL.Parameters.Add(new SQLiteParameter("my_locator", qso.MyLocator));
+                insertSQL.Parameters.Add(new SQLiteParameter("dx_locator", qso.DXLocator));
                 insertSQL.Parameters.Add(new SQLiteParameter("frequency", qso.Freq));
                 insertSQL.Parameters.Add(new SQLiteParameter("band", qso.Band));
                 insertSQL.Parameters.Add(new SQLiteParameter("dx_callsign", qso.DXCall));
@@ -49,6 +62,7 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("date", qso.Date));
                 insertSQL.Parameters.Add(new SQLiteParameter("time", qso.Time));
                 insertSQL.Parameters.Add(new SQLiteParameter("mode", qso.Mode));
+                insertSQL.Parameters.Add(new SQLiteParameter("submode", qso.SUBMode));
                 insertSQL.Parameters.Add(new SQLiteParameter("exchange", qso.SRX));
                 insertSQL.Parameters.Add(new SQLiteParameter("comment", qso.Comment));
                 insertSQL.Parameters.Add(new SQLiteParameter("name", qso.Name));
@@ -75,10 +89,12 @@ namespace HolyLogger
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,exchange,comment,name,country,prop_mode,sat_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,prop_mode,sat_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
+                    insertSQL.Parameters.Add(new SQLiteParameter("my_locator", qso.MyLocator));
+                    insertSQL.Parameters.Add(new SQLiteParameter("dx_locator", qso.DXLocator));
                     insertSQL.Parameters.Add(new SQLiteParameter("frequency", qso.Freq));
                     insertSQL.Parameters.Add(new SQLiteParameter("band", qso.Band));
                     insertSQL.Parameters.Add(new SQLiteParameter("dx_callsign", qso.DXCall));
@@ -87,6 +103,7 @@ namespace HolyLogger
                     insertSQL.Parameters.Add(new SQLiteParameter("date", qso.Date));
                     insertSQL.Parameters.Add(new SQLiteParameter("time", qso.Time));
                     insertSQL.Parameters.Add(new SQLiteParameter("mode", qso.Mode));
+                    insertSQL.Parameters.Add(new SQLiteParameter("submode", qso.SUBMode));
                     insertSQL.Parameters.Add(new SQLiteParameter("exchange", qso.SRX));
                     insertSQL.Parameters.Add(new SQLiteParameter("comment", qso.Comment));
                     insertSQL.Parameters.Add(new SQLiteParameter("name", qso.Name));
@@ -111,9 +128,11 @@ namespace HolyLogger
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("UPDATE qso SET my_callsign = @my_callsign ,my_square = @my_square,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,exchange = @exchange,comment = @comment,name = @name,country = @country,prop_mode = @prop_mode,sat_name = @sat_name WHERE id = @id", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("UPDATE qso SET my_callsign = @my_callsign ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,prop_mode = @prop_mode,sat_name = @sat_name WHERE id = @id", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("@my_square", qso.STX));
+                insertSQL.Parameters.Add(new SQLiteParameter("@my_locator", qso.MyLocator));
+                insertSQL.Parameters.Add(new SQLiteParameter("@dx_locator", qso.DXLocator));
                 insertSQL.Parameters.Add(new SQLiteParameter("@frequency", qso.Freq));
                 insertSQL.Parameters.Add(new SQLiteParameter("@band", qso.Band));
                 insertSQL.Parameters.Add(new SQLiteParameter("@dx_callsign", qso.DXCall));
@@ -122,6 +141,7 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("@date", qso.Date));
                 insertSQL.Parameters.Add(new SQLiteParameter("@time", qso.Time));
                 insertSQL.Parameters.Add(new SQLiteParameter("@mode", qso.Mode));
+                insertSQL.Parameters.Add(new SQLiteParameter("@submode", qso.SUBMode));
                 insertSQL.Parameters.Add(new SQLiteParameter("@exchange", qso.SRX));
                 insertSQL.Parameters.Add(new SQLiteParameter("@comment", qso.Comment));
                 insertSQL.Parameters.Add(new SQLiteParameter("@name", qso.Name));
@@ -187,11 +207,14 @@ namespace HolyLogger
                         if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
                         if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
                         if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                        if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
                         if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
                         if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
                         if (rdr["band"] != null) q.Band = rdr["band"].ToString();
                         if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
                         if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
+                        if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
+                        if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
                         if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
                         if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
                         if (rdr["name"] != null) q.Name = rdr["name"].ToString();
@@ -223,11 +246,14 @@ namespace HolyLogger
                         if (rdr["comment"] != null) q.Comment = (string)rdr["comment"];
                         if (rdr["dx_callsign"] != null) q.DXCall = (string)rdr["dx_callsign"];
                         if (rdr["mode"] != null) q.Mode = (string)rdr["mode"];
+                        if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
                         if (rdr["exchange"] != null) q.SRX = (string)rdr["exchange"];
                         if (rdr["frequency"] != null) q.Freq = (string)rdr["frequency"];
                         if (rdr["band"] != null) q.Band = (string)rdr["band"];
                         if (rdr["my_callsign"] != null) q.MyCall = (string)rdr["my_callsign"];
                         if (rdr["my_square"] != null) q.STX = (string)rdr["my_square"];
+                        if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
+                        if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
                         if (rdr["rst_rcvd"] != null) q.RST_RCVD = (string)rdr["rst_rcvd"];
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
@@ -293,6 +319,7 @@ namespace HolyLogger
             try
             {
                 cmd.ExecuteNonQuery();
+                SchemaHasChanged = true;
             }
             catch (Exception ex)
             {

@@ -32,6 +32,9 @@ namespace HolyParser
         [JsonProperty("mode")]
         public string Mode { get; set; }
 
+        [JsonProperty("submode")]
+        public string SUBMode { get; set; }
+
         [JsonProperty("name")]
         public string Name { get; set; }
 
@@ -51,6 +54,13 @@ namespace HolyParser
 
         [JsonProperty("my_square")]
         public string STX { get; set; }
+
+        [JsonProperty("my_locator")]
+        public string MyLocator { get; set; }
+
+        [JsonProperty("dx_locator")]
+        public string DXLocator { get; set; }
+
         public string HASH { get; set; }
         public string ERROR { get; set; }
 
