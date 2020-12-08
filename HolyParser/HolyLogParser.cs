@@ -229,20 +229,29 @@ th,td
             //Splite body to lines
             string[] rows = Regex.Split(body, "<EOR>", RegexOptions.IgnoreCase);
 
+            int debugCounter = 0;
+
             foreach (string row in rows)
             {
                 //skip empty rows
                 if (string.IsNullOrWhiteSpace(row)) continue;
-
-                QSO qso_row = ParseRawQSO(row);
-                if (IsParseDuplicates)
+                try
                 {
-                    m_qsoList.Add(qso_row);
+                    QSO qso_row = ParseRawQSO(row);
+                    if (IsParseDuplicates)
+                    {
+                        m_qsoList.Add(qso_row);
+                    }
+                    else if (!IsParseDuplicates && !m_qsoList.Contains(qso_row))
+                    {
+                        m_qsoList.Add(qso_row);
+                    }
                 }
-                else if (!IsParseDuplicates && !m_qsoList.Contains(qso_row))
+                catch (Exception)
                 {
-                    m_qsoList.Add(qso_row);
+                    debugCounter++;
                 }
+                
             }
             m_qsoList = m_qsoList.OrderBy(p => p.Date).ThenBy(p => p.Time).ToList();
         }
@@ -250,6 +259,7 @@ th,td
         public QSO ParseRawQSO(string row)
         {
             if (string.IsNullOrWhiteSpace(row)) return null;
+
             QSO qso_row = new QSO();
             qso_row.IsAllowWARC = IsParseWARC;
 
@@ -321,7 +331,14 @@ th,td
             match = regex.Match(row);
             if (match.Success)
             {
-                qso_row.SUBMode = mr.GetValidMode(Regex.Split(row, submode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+                try
+                {
+                    qso_row.SUBMode = mr.GetValidMode(Regex.Split(row, submode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+                }
+                catch
+                {
+                    
+                }                
             }
             
 
@@ -336,7 +353,14 @@ th,td
             match = regex.Match(row);
             if (match.Success)
             {
-                qso_row.Comment = Regex.Split(row, commant_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                try
+                {
+                    qso_row.Comment = Regex.Split(row, commant_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+                catch
+                {
+                    qso_row.Comment = "";
+                }                
             }
             else
             {
@@ -426,7 +450,14 @@ th,td
             match = regex.Match(row);
             if (match.Success)
             {
-                qso_row.Name = Regex.Split(row, name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                try
+                {
+                    qso_row.Name = Regex.Split(row, name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                }
+                catch
+                {
+                    qso_row.Name = "";
+                }
             }
             else
             {

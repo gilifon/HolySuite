@@ -741,7 +741,7 @@ namespace HolyLogger
             int faultyQSO = 0;
             foreach (var filename in ImportFileQ) //for each file in the Q
             {
-                string RawAdif = File.ReadAllText(filename); //read it
+                string RawAdif = File.ReadAllText(filename, Encoding.UTF8); //read it
                 _holyLogParser = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(Properties.Settings.Default.my_callsign)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
                 try
                 {
