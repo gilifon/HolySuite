@@ -41,6 +41,8 @@ namespace HolyLogger
             if (SchemaHasChanged)
             {
                 con.Close();
+                con.Dispose();
+                con = new SQLiteConnection(@"DataSource = Data\logDB.db;Version=3");
                 con.Open();
             }
         }
