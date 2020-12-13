@@ -508,6 +508,7 @@ namespace HolyLogger
                 qso.MyCall = TB_MyCallsign.Text;
                 qso.STX = TB_MyHolyland.Text;//.Replace("-", "");
                 qso.MyLocator = TB_MyLocator.Text;//.Replace("-", "");
+                qso.DXLocator = TB_DXLocator.Text;//.Replace("-", "");
                 qso.RST_RCVD = TB_RSTRcvd.Text;
                 qso.RST_SENT = TB_RSTSent.Text;
                 DateTime date = TP_Date.Value.Value;
@@ -556,6 +557,7 @@ namespace HolyLogger
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.STX = TB_MyHolyland.Text;//.Replace("-", "");
                 QsoToUpdate.MyLocator = TB_MyLocator.Text;//.Replace("-", "");
+                QsoToUpdate.DXLocator = TB_DXLocator.Text;//.Replace("-", "");
                 QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
                 QsoToUpdate.RST_SENT = TB_RSTSent.Text;
                 DateTime date = TP_Date.Value.Value;
@@ -599,6 +601,7 @@ namespace HolyLogger
             TB_MyCallsign.Text = QsoPreUpdate.MyCall;
             TB_MyHolyland.Text = QsoPreUpdate.STX;
             TB_MyLocator.Text = QsoPreUpdate.MyLocator;
+            //TB_DXLocator.Text = QsoPreUpdate.DXLocator;
             //TB_RSTRcvd.Text = QsoPreUpdate.RST_RCVD;
             //TB_RSTSent.Text = QsoPreUpdate.RST_SENT;
             //TB_DX_Name.Text = QsoPreUpdate.Name;
@@ -1123,6 +1126,7 @@ namespace HolyLogger
             QsoPreUpdate.MyCall = TB_MyCallsign.Text;
             QsoPreUpdate.STX = TB_MyHolyland.Text;
             QsoPreUpdate.MyLocator = TB_MyLocator.Text;
+            QsoPreUpdate.DXLocator = TB_DXLocator.Text;
             QsoPreUpdate.RST_RCVD = TB_RSTRcvd.Text;
             QsoPreUpdate.RST_SENT = TB_RSTSent.Text;
             QsoPreUpdate.Name = TB_DX_Name.Text;
@@ -1140,6 +1144,7 @@ namespace HolyLogger
             TB_MyCallsign.Text = QsoToUpdate.MyCall;
             TB_MyHolyland.Text = QsoToUpdate.STX;
             TB_MyLocator.Text = QsoToUpdate.MyLocator;
+            TB_DXLocator.Text = QsoToUpdate.DXLocator;
             TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
             TB_RSTSent.Text = QsoToUpdate.RST_SENT;
             TB_DX_Name.Text = QsoToUpdate.Name;
