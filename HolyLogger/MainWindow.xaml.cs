@@ -165,6 +165,8 @@ namespace HolyLogger
             }
         }
 
+        private bool isLiveLog = false;
+
         public bool isNetworkAvailable { get; set; }
 
         HolyLogParser _holyLogParser;
@@ -207,6 +209,7 @@ namespace HolyLogger
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
 
             isNetworkAvailable = Helper.CheckForInternetConnection();
+            checkForAutoUpload();
 
             if (Properties.Settings.Default.ShowTitleClock)
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
@@ -247,6 +250,7 @@ namespace HolyLogger
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
+            setLockBtnState();
 
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
             if (TB_Comment.IsEnabled) LockComment_Btn.Opacity = 1;
@@ -457,6 +461,20 @@ namespace HolyLogger
             }
         }
 
+        private void Lock_Btn_MouseUp(object sender, MouseButtonEventArgs e)
+        {
+            Properties.Settings.Default.isLocked = !Properties.Settings.Default.isLocked;
+            TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
+            //TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
+            setLockBtnState();
+        }
+
+        private void setLockBtnState()
+        {
+            if (!Properties.Settings.Default.isLocked) Lock_Btn.Opacity = 1;
+            else Lock_Btn.Opacity = 0.5;
+        }
+
         private void LockComment_Btn_MouseUp(object sender, MouseButtonEventArgs e)
         {
             Properties.Settings.Default.isCommentLocked = !Properties.Settings.Default.isCommentLocked;
@@ -499,7 +517,10 @@ namespace HolyLogger
                 {
                     qso.SAT_NAME = Properties.Settings.Default.SatelliteName;
                 }
-                //if (Properties.Settings.Default.live_log) PostQSO(qso);
+                if (isLiveLog)
+                {
+                    UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
+                }
                 try
                 {
                     lock (this)
@@ -887,7 +908,7 @@ namespace HolyLogger
             var progressIndicator = new Progress<int>();
 
             string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
-            string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent));
+            string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
 
             StringBuilder sb = new StringBuilder(200);
             sb.Append("Dear ").Append(Properties.Settings.Default.PersonalInfoName).Append(",<br>");
@@ -932,9 +953,9 @@ namespace HolyLogger
             }
         }
 
-        private async Task<string> UploadLogToIARC(IProgress<int> progress)
+        private async Task<string> UploadLogToIARC(IProgress<int> progress, ObservableCollection<QSO> QSOList)
         {
-            List<List<QSO>> ChunkedQSOs = SplitQSOList();
+            List<List<QSO>> ChunkedQSOs = SplitQSOList(QSOList);
             int c = 1;
             foreach (var chunk in ChunkedQSOs)
             {
@@ -964,9 +985,9 @@ namespace HolyLogger
             return "All Done, 73!";            
         }
 
-        private List<List<QSO>> SplitQSOList()
+        private List<List<QSO>> SplitQSOList(ObservableCollection<QSO> QSOList)
         {
-            var QSOList = dal.GetAllQSOs();
+            //var QSOList = dal.GetAllQSOs();
             int numOfQSO = QSOList.Count;
             int iterations = numOfQSO / SEND_CHUNK_SIZE;
             int reminter = numOfQSO % SEND_CHUNK_SIZE;
@@ -982,6 +1003,18 @@ namespace HolyLogger
             return SplittedQSO;
         }
 
+        private void PostQSO(QSO qso)
+        {
+            //************************************************** ASYNC ********************************************//
+            using (WebClient client = new WebClient())
+            {
+                client.UploadValuesAsync(new Uri("http://www.iarc.org/Holyland/Server/AddLog.php"), new NameValueCollection()
+                    {
+                        { "insertlog", GenerateMultipleInsert(new List<QSO>{qso}) }
+                    });
+            }
+        }
+       
         private string GenerateMultipleInsert(IList<QSO> qsos)
         {
             StringBuilder sb = new StringBuilder("INSERT INTO `log` ", 500);
@@ -1471,6 +1504,7 @@ namespace HolyLogger
             }
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
+            setLockBtnState();
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
@@ -2114,7 +2148,25 @@ namespace HolyLogger
             ShowRigParams();
         }
 
-
+        private async void checkForAutoUpload()
+        {
+            if (!isNetworkAvailable) return;
+            WebRequestHandler _webRequestHandler = new WebRequestHandler() { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.BypassCache) };
+            using (var client = new HttpClient(_webRequestHandler))
+            {
+                try
+                {
+                    string baseRequest = "http://raw.githubusercontent.com/4Z1KD/HolyLogger/master/LiveLog?v=" + DateTime.Now.Ticks;
+                    var response = await client.GetAsync(baseRequest);
+                    var responseFromServer = await response.Content.ReadAsStringAsync();
+                    isLiveLog = responseFromServer.ToLower().Trim() == "true";
+                }
+                catch
+                {
+                    isLiveLog = false;
+                }
+            }
+        }
         //-------------------------------------- OmniRig Section ---------------------------------------------//
         #region OmniRig
 
