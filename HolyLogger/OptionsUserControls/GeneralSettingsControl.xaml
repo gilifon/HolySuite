@@ -8,18 +8,19 @@
              d:DesignHeight="300" d:DesignWidth="380">
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsFilterGrid" Content="Filter QSO grid" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsFilterQSOs, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
-        <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,26,0,0" Click="HasChanged_Click"/>
+        <CheckBox x:Name="CBX_IsAllowLiveLog" Content="Allow automatic upload during spaciel events" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isAllowLiveLog, Source={StaticResource Settings}, Mode=TwoWay}" Margin="0,26,0,0" FontSize="16"/>
+        <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,51,0,0" Click="HasChanged_Click"/>
 
-        <GroupBox x:Name="groupBox" Header="Select Rig" Height="90" Margin="10,51,10,0" VerticalAlignment="Top" Width="360" FontSize="16">
+        <GroupBox x:Name="groupBox" Header="Select Rig" Height="90" Margin="10,76,10,0" VerticalAlignment="Top" Width="360" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="Rig1_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="1: Rig Number 1"  Click="HasChanged_Click" IsChecked="{Binding Default.SelectedOmniRig1, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="Rig2_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="2: Rig Number 2" Click="HasChanged_Click" IsChecked="{Binding Default.SelectedOmniRig2, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
 
-        <CheckBox x:Name="CBX_EnableUDPClient" Content="Enable UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,150,0,0" Click="HasChanged_Click"/>
-        <Label x:Name="label" Content="Port" HorizontalAlignment="Left" Margin="199,144,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="textBox" HorizontalAlignment="Left" Height="23" Margin="243,148,0,0" TextWrapping="Wrap" Text="{Binding Default.UDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
+        <CheckBox x:Name="CBX_EnableUDPClient" Content="Enable UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,180,0,0" Click="HasChanged_Click"/>
+        <Label x:Name="label" Content="Port" HorizontalAlignment="Left" Margin="199,174,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="textBox" HorizontalAlignment="Left" Height="23" Margin="243,178,0,0" TextWrapping="Wrap" Text="{Binding Default.UDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
 
 
 

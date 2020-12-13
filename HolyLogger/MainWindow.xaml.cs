@@ -165,7 +165,8 @@ namespace HolyLogger
             }
         }
 
-        private bool isLiveLog = false;
+        private bool isRemoteServerLiveLog = false;
+        private bool isInitializeComponentsComplete = false;
 
         public bool isNetworkAvailable { get; set; }
 
@@ -205,6 +206,7 @@ namespace HolyLogger
         public MainWindow()
         {
             InitializeComponent();
+            isInitializeComponentsComplete = true;
 
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
 
@@ -517,7 +519,7 @@ namespace HolyLogger
                 {
                     qso.SAT_NAME = Properties.Settings.Default.SatelliteName;
                 }
-                if (isLiveLog)
+                if (Properties.Settings.Default.isAllowLiveLog && isRemoteServerLiveLog)
                 {
                     UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
                 }
@@ -1873,8 +1875,8 @@ namespace HolyLogger
 
         private void UpdateMatrix()
         {
+            if (!isInitializeComponentsComplete) return;
             ClearMatrix();
-
 
             var qso_list = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
             HolyLogger.Mode qsoMode;
@@ -2159,11 +2161,11 @@ namespace HolyLogger
                     string baseRequest = "http://raw.githubusercontent.com/4Z1KD/HolyLogger/master/LiveLog?v=" + DateTime.Now.Ticks;
                     var response = await client.GetAsync(baseRequest);
                     var responseFromServer = await response.Content.ReadAsStringAsync();
-                    isLiveLog = responseFromServer.ToLower().Trim() == "true";
+                    isRemoteServerLiveLog = responseFromServer.ToLower().Trim() == "true";
                 }
                 catch
                 {
-                    isLiveLog = false;
+                    isRemoteServerLiveLog = false;
                 }
             }
         }

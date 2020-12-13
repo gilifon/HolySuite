@@ -11,7 +11,7 @@
     <Setting Name="validation_enabled" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
-    <Setting Name="live_log" Type="System.Boolean" Scope="User">
+    <Setting Name="isAllowLiveLog" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="qrz_username" Type="System.String" Scope="User">

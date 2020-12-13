@@ -62,12 +62,12 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool live_log {
+        public bool isAllowLiveLog {
             get {
-                return ((bool)(this["live_log"]));
+                return ((bool)(this["isAllowLiveLog"]));
             }
             set {
-                this["live_log"] = value;
+                this["isAllowLiveLog"] = value;
             }
         }
         
