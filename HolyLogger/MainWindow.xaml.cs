@@ -522,6 +522,8 @@ namespace HolyLogger
                 }
                 if (Properties.Settings.Default.isAllowLiveLog && isRemoteServerLiveLog)
                 {
+                    UploadProgress = "100%";
+                    ToggleUploadProgress(Visibility.Visible);
                     UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
                 }
                 try
@@ -649,6 +651,7 @@ namespace HolyLogger
             //TB_Frequency.Text = string.Empty;
             TB_DXCallsign.Clear();
             TB_Exchange.Clear();
+            TB_DXLocator.Clear();
 
             if (mMode == "SSB" || mMode == "FM")
             {
@@ -987,6 +990,7 @@ namespace HolyLogger
                     }
                 }
             }
+            ToggleUploadProgress(Visibility.Hidden);
             return "All Done, 73!";            
         }
 
@@ -1622,10 +1626,10 @@ namespace HolyLogger
             loginfo.Show();
         }
        
-        private void TutorialMenuItem_Click(object sender, RoutedEventArgs e)
+        private void GridSquareMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string url = "https://www.youtube.com/watch?v=NCUu65E7V6c";
-
+            //string url = "https://www.youtube.com/watch?v=NCUu65E7V6c";
+            string url = "https://www.iarc.org/holysquare/";
             try
             {
                 Process p = new Process();

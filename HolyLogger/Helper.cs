@@ -1,15 +1,9 @@
-﻿using DXCCManager;
-using HolyParser;
-using System;
-using System.Collections.Generic;
+﻿using System;
 using System.IO;
 using System.Linq;
 using System.Net;
-using System.Net.Mail;
-using System.Reflection;
-using System.Text;
-using System.Threading.Tasks;
 using System.Xml.Linq;
+using System.Device.Location;
 
 namespace HolyLogger
 {
@@ -68,5 +62,6 @@ namespace HolyLogger
                 return false;
             }
         }
+
     }
 }
