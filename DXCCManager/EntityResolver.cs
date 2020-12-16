@@ -38,7 +38,7 @@ namespace DXCCManager
             "4W6~East Timor~511~OC",
             "4[X-Z]~Israel~336~AS",
             "5A~Libya~436~AF",
-            "5B~Cyprus~215~AS",
+            "5B|H2|C4~Cyprus~215~AS",
             "5[H-I]~Tanzania~470~AF",
             "5[N-O]~Nigeria~450~AF",
             "5[R-S]~Madagascar~438~AF",

@@ -189,6 +189,8 @@ th,td
         private string country_pattern = @"<country:(\d{1,2})(?::[a-z]{1})?>";
         private string dxlocator_pattern = @"<gridsquare:(\d{1,2})(?::[a-z]{1})?>";
         private string mylocator_pattern = @"<my_gridsquare:(\d{1,2})(?::[a-z]{1})?>";
+        private string prop_mode_pattern = @"<prop_mode:(\d{1,2})(?::[a-z]{1})?>";
+        private string sat_name_pattern = @"<sat_name:(\d{1,2})(?::[a-z]{1})?>";
 
         public HolyLogParser() : this("", Operator.Israeli)
         {
@@ -389,6 +391,30 @@ th,td
                 qso_row.MyLocator = "";
             }
 
+            regex = new Regex(prop_mode_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.MyLocator = Regex.Split(row, prop_mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            else
+            {
+                qso_row.PROP_MODE = "";
+            }
+
+            regex = new Regex(sat_name_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.MyLocator = Regex.Split(row, sat_name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+            else
+            {
+                qso_row.SAT_NAME = "";
+            }
+
+
+
             //if the file contains dxcc, prefer it over the EntityResolver
             regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
@@ -402,7 +428,7 @@ th,td
             if (match.Success)
             {
                 qso_row.SRX = Regex.Split(row, srx_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "000";
+                if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "";
             }
             else
             {
@@ -411,11 +437,11 @@ th,td
                 if (match.Success)
                 {
                     qso_row.SRX = Regex.Split(row, srx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                    if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "000";
+                    if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "";
                 }
                 else
                 {
-                    qso_row.SRX = "000";
+                    qso_row.SRX = "";
                 }
             }
 

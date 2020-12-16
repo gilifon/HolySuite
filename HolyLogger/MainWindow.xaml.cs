@@ -181,7 +181,7 @@ namespace HolyLogger
         OptionsWindow options = null;
 
         BackgroundWorker AdifHandlerWorker;
-        BackgroundWorker EntireLogQrzWorker;
+        //BackgroundWorker EntireLogQrzWorker;
 
         private StickyWindow _stickyWindow;
         private State state = State.New;
@@ -201,15 +201,27 @@ namespace HolyLogger
 
         DispatcherTimer BlinkingTimer = new DispatcherTimer();
 
-        public static UdpClient Client = new UdpClient(Properties.Settings.Default.UDPPort);//2333 / 2237
+        public static UdpClient Client;
 
         public MainWindow()
         {
+            Qsos = new ObservableCollection<QSO>();
             InitializeComponent();
             isInitializeComponentsComplete = true;
 
-            Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
-
+            if (Properties.Settings.Default.EnableUDPClient)
+            {
+                try
+                {
+                    Client = new UdpClient(Properties.Settings.Default.UDPPort);//2333 / 2237
+                    Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
+                }
+                catch
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to open UDP port");
+                    Properties.Settings.Default.EnableUDPClient = false;
+                }
+            }
             isNetworkAvailable = Helper.CheckForInternetConnection();
             checkForAutoUpload();
 
@@ -279,7 +291,7 @@ namespace HolyLogger
 
             TP_Date.Value = DateTime.UtcNow;
             TP_Time.Value = DateTime.UtcNow;
-            Qsos = new ObservableCollection<QSO>();
+            
             Qsos = dal.GetAllQSOs();
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
@@ -320,11 +332,10 @@ namespace HolyLogger
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
 
-        private void StartUDPClient(IAsyncResult res)
+        private async void StartUDPClient(IAsyncResult res)
         {
             if (!Properties.Settings.Default.EnableUDPClient)
             {
-                Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
                 return;
             }
             IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
@@ -333,6 +344,11 @@ namespace HolyLogger
 
             _holyLogParser = new HolyLogParser();
             QSO qso = _holyLogParser.ParseRawQSO(data);
+            if (string.IsNullOrWhiteSpace(qso.Name) && isNetworkAvailable)
+            {
+                qso.Name = await GetQrzForCall(qso.DXCall);
+            }
+
             this.Dispatcher.Invoke(() =>
             {
                 try
@@ -345,14 +361,21 @@ namespace HolyLogger
                     }
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
+
+                    if (Properties.Settings.Default.isAllowLiveLog && isRemoteServerLiveLog)
+                    {
+                        UploadProgress = "100%";
+                        ToggleUploadProgress(Visibility.Visible);
+                        Task<string> response = UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
+                    }
+                    UpdateNumOfQSOs();
+                    RestoreDataContext();
                 }
                 catch (Exception ex)
                 {
                     System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
                 }
             });
-
-
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
         }
 
@@ -434,15 +457,18 @@ namespace HolyLogger
             switch (e.PropertyName)
             {
                 case FLD_Mode:
-                    if (mMode == "SSB" || mMode == "FM")
+                    if (state == State.New)
                     {
-                        TB_RSTSent.Text = "59";
-                        TB_RSTRcvd.Text = "59";
-                    }
-                    else
-                    {
-                        TB_RSTSent.Text = "599";
-                        TB_RSTRcvd.Text = "599";
+                        if (mMode == "SSB" || mMode == "FM")
+                        {
+                            TB_RSTSent.Text = "59";
+                            TB_RSTRcvd.Text = "59";
+                        }
+                        else
+                        {
+                            TB_RSTSent.Text = "599";
+                            TB_RSTRcvd.Text = "599";
+                        }
                     }
                     UpdateDup();
                     break;
@@ -501,14 +527,14 @@ namespace HolyLogger
                 qso.DXCall = TB_DXCallsign.Text;
                 qso.Mode = Mode;
                 qso.SRX = TB_Exchange.Text;
-                qso.Freq = TB_Frequency.Text;//.Replace(",", "");
+                qso.Freq = TB_Frequency.Text;
                 qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 qso.Country = Country;
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
-                qso.STX = TB_MyHolyland.Text;//.Replace("-", "");
-                qso.MyLocator = TB_MyLocator.Text;//.Replace("-", "");
-                qso.DXLocator = TB_DXLocator.Text;//.Replace("-", "");
+                qso.STX = TB_MyHolyland.Text;
+                qso.MyLocator = TB_MyLocator.Text;
+                qso.DXLocator = TB_DXLocator.Text;
                 qso.RST_RCVD = TB_RSTRcvd.Text;
                 qso.RST_SENT = TB_RSTSent.Text;
                 DateTime date = TP_Date.Value.Value;
@@ -524,7 +550,7 @@ namespace HolyLogger
                 {
                     UploadProgress = "100%";
                     ToggleUploadProgress(Visibility.Visible);
-                    UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
+                    Task<string> response = UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
                 }
                 try
                 {
@@ -541,10 +567,6 @@ namespace HolyLogger
                 {
                     System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
                 }
-                UpdateNumOfQSOs();
-                ClearMatrix();
-                RestoreDataContext();
-
             }
             else if (state == State.Edit)
             {
@@ -552,20 +574,25 @@ namespace HolyLogger
                 QsoToUpdate.DXCall = TB_DXCallsign.Text;
                 QsoToUpdate.Mode = Mode;
                 QsoToUpdate.SRX = TB_Exchange.Text;
-                QsoToUpdate.Freq = TB_Frequency.Text;//.Replace(",", "");
+                QsoToUpdate.Freq = TB_Frequency.Text;
                 QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 QsoToUpdate.Country = Country;
                 QsoToUpdate.Name = FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
-                QsoToUpdate.STX = TB_MyHolyland.Text;//.Replace("-", "");
-                QsoToUpdate.MyLocator = TB_MyLocator.Text;//.Replace("-", "");
-                QsoToUpdate.DXLocator = TB_DXLocator.Text;//.Replace("-", "");
+                QsoToUpdate.STX = TB_MyHolyland.Text;
+                QsoToUpdate.MyLocator = TB_MyLocator.Text;
+                QsoToUpdate.DXLocator = TB_DXLocator.Text;
                 QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
                 QsoToUpdate.RST_SENT = TB_RSTSent.Text;
                 DateTime date = TP_Date.Value.Value;
                 QsoToUpdate.Date = date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
                 DateTime time = TP_Time.Value.Value;
                 QsoToUpdate.Time = time.Hour.ToString("D2") + time.Minute.ToString("D2") + time.Second.ToString("D2");
+                QsoToUpdate.PROP_MODE = Properties.Settings.Default.IsSatelliteMode ? "SAT" : "";
+                if (Properties.Settings.Default.IsSatelliteMode && !string.IsNullOrWhiteSpace(Properties.Settings.Default.SatelliteName))
+                {
+                    QsoToUpdate.SAT_NAME = Properties.Settings.Default.SatelliteName;
+                }
                 dal.Update(QsoToUpdate);
                 QSO q = Qsos.FirstOrDefault(p => p.id == QsoToUpdate.id);
                 if (q != null)
@@ -584,6 +611,8 @@ namespace HolyLogger
                     q.RST_SENT = QsoToUpdate.RST_SENT;
                     q.Date = QsoToUpdate.Date;
                     q.Time = QsoToUpdate.Time;
+                    q.PROP_MODE = QsoToUpdate.PROP_MODE;
+                    q.SAT_NAME = QsoToUpdate.SAT_NAME;
                     QSODataGrid.Items.Refresh();
                 }
                 LoadPreEditUserData();
@@ -1513,6 +1542,30 @@ namespace HolyLogger
             {
                 ShowRigParams();
             }
+            if (Properties.Settings.Default.EnableUDPClient)
+            {
+                try
+                {
+                    if (Client == null)
+                    {
+                        Client = new UdpClient(Properties.Settings.Default.UDPPort);//2333 / 2237
+                        Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
+                    }
+                }
+                catch
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to open UDP port");
+                    Properties.Settings.Default.EnableUDPClient = false;
+                }
+            }
+            else
+            {
+                if (Client != null)
+                {
+                    Client.Close();
+                    Client = null;
+                }                
+            }
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
             setLockBtnState();
@@ -1887,6 +1940,7 @@ namespace HolyLogger
             if (!isInitializeComponentsComplete) return;
             ClearMatrix();
 
+            if (Qsos == null) return;
             var qso_list = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
             HolyLogger.Mode qsoMode;
 
