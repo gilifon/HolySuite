@@ -33,11 +33,12 @@ namespace HolyLogger
 
 
             timer = new CountDownTimer();
+            timer.SetTime(60);
+            timerlbl.Content = timer.TimeLeftStr;
             //update label text
             timer.TimeChanged += TimeChanged;
             timer.CountDownFinished += () => MessageBox.Show("Timer finished the work!");
             timer.StepMs = 77; // for nice milliseconds time switch
-
         }
 
         private void TimeChanged()
@@ -80,21 +81,28 @@ namespace HolyLogger
                 Properties.Settings.Default.TimerWindowHeight = this.Height;
         }
 
-        private void StartBtn_Click(object sender, RoutedEventArgs e)
+        private void ResetBtn_Click(object sender, RoutedEventArgs e)
         {
-            //set to 30 mins
-            timer.SetTime(60, 0);
-
-            timer.Start();
-
-            
+            timer.Stop();
+            timer.Reset();
+            StartStopBtn.Content = "Start";
+            timerlbl.Content = timer.TimeLeftStr;
         }
 
-        private void StopBtn_Click(object sender, RoutedEventArgs e)
+        private void StartStopBtn_Click(object sender, RoutedEventArgs e)
         {
             if (timer!= null)
             {
-                timer.Stop();
+                if (timer.IsRunnign)
+                {
+                    timer.Pause();
+                    StartStopBtn.Content = "Start";
+                }
+                else
+                {
+                    timer.Start();
+                    StartStopBtn.Content = "Stop";
+                }
             }
         }
     }

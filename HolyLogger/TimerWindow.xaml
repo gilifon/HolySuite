@@ -9,8 +9,8 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
         <DockPanel Grid.Row="0">
-            <Button x:Name="StratBtn" Content="Start" HorizontalAlignment="Left" Margin="5,2,0,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="StartBtn_Click" FontSize="16" ToolTip="Clear the current QSO data"/>
-            <Button x:Name="StopBtn" Content="Stop" HorizontalAlignment="right" Margin="5,2,5,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="StopBtn_Click" FontSize="16" ToolTip="Clear the current QSO data"/>
+            <Button x:Name="ResetBtn" Content="Reset" HorizontalAlignment="Left" Margin="5,2,0,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="ResetBtn_Click" FontSize="16" ToolTip="Reset the timer"/>
+            <Button x:Name="StartStopBtn" Content="Start" HorizontalAlignment="right" Margin="5,2,5,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="StartStopBtn_Click" FontSize="16" ToolTip="Start / Stop the timer"/>
 
         </DockPanel>
         <Viewbox Grid.Row="1">
