@@ -814,5 +814,53 @@ namespace HolyLogger.Properties {
                 this["my_locator"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public double TimerWindowLeft {
+            get {
+                return ((double)(this["TimerWindowLeft"]));
+            }
+            set {
+                this["TimerWindowLeft"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public double TimerWindowTop {
+            get {
+                return ((double)(this["TimerWindowTop"]));
+            }
+            set {
+                this["TimerWindowTop"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public double TimerWindowWidth {
+            get {
+                return ((double)(this["TimerWindowWidth"]));
+            }
+            set {
+                this["TimerWindowWidth"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public double TimerWindowHeight {
+            get {
+                return ((double)(this["TimerWindowHeight"]));
+            }
+            set {
+                this["TimerWindowHeight"] = value;
+            }
+        }
     }
 }

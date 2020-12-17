@@ -175,6 +175,7 @@ namespace HolyLogger
 
         LogUploadWindow logupload = null;
         SignboardWindow signboard = null;
+        TimerWindow timerscreen = null;
         MatrixWindow matrix = null;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
@@ -1593,6 +1594,28 @@ namespace HolyLogger
 
         }
 
+        private void TimerMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (timerscreen != null)
+            {
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen /* return "true" if 'w' is the window your are about to open */);
+
+                if (existingWindow != null)
+                {
+                    existingWindow.Activate();
+                }
+                else
+                {
+                    GenerateNewTimerWindow();
+                }
+            }
+            else
+            {
+                GenerateNewTimerWindow();
+            }
+
+        }
+
         private void GenerateNewSignboardWindow()
         {
             signboard = new SignboardWindow(TB_MyCallsign.Text, TB_MyHolyland.Text);
@@ -1601,6 +1624,16 @@ namespace HolyLogger
             signboard.Width = Properties.Settings.Default.SignBoardWindowWidth;
             signboard.Height = Properties.Settings.Default.SignBoardWindowHeight;
             signboard.Show();
+        }
+
+        private void GenerateNewTimerWindow()
+        {
+            timerscreen = new TimerWindow("kuku");
+            timerscreen.Left = Properties.Settings.Default.TimerWindowLeft < 0 ? 0 : Properties.Settings.Default.TimerWindowLeft;
+            timerscreen.Top = Properties.Settings.Default.TimerWindowTop < 0 ? 0 : Properties.Settings.Default.TimerWindowTop;
+            timerscreen.Width = Properties.Settings.Default.TimerWindowWidth;
+            timerscreen.Height = Properties.Settings.Default.TimerWindowHeight;
+            timerscreen.Show();
         }
 
         private void MatrixMenuItem_Click(object sender, RoutedEventArgs e)

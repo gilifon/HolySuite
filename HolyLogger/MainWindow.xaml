@@ -60,6 +60,11 @@
                                     <Image Source="Images/sign.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <MenuItem x:Name="TimerItem" Header="Timer" ToolTip="Open a 1 hour countdown timer" Click="TimerMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
                             <MenuItem x:Name="MatrixMenuItem" Header="Matrix" ToolTip="Open a matrix presentation for the DX station" Click="MatrixMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/matrix.png" Stretch="UniformToFill" Width="16" Height="16"/>

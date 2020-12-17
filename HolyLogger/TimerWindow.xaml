@@ -1,0 +1,20 @@
+﻿<Window x:Name="TimerWindow1" x:Class="HolyLogger.TimerWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Countdown Timer" Height="330" Width="280" Icon="Images/timer.png" LocationChanged="TimerWindow1_LocationChanged" SizeChanged="TimerWindow1_SizeChanged">
+    <Grid x:Name="LayoutGrid">
+        <!-- Define Columns -->
+        <Grid.RowDefinitions>
+            <RowDefinition Height="30px"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <DockPanel Grid.Row="0">
+            <Button x:Name="StratBtn" Content="Start" HorizontalAlignment="Left" Margin="5,2,0,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="StartBtn_Click" FontSize="16" ToolTip="Clear the current QSO data"/>
+            <Button x:Name="StopBtn" Content="Stop" HorizontalAlignment="right" Margin="5,2,5,0" VerticalAlignment="Top" Width="82" Grid.Row="1" Click="StopBtn_Click" FontSize="16" ToolTip="Clear the current QSO data"/>
+
+        </DockPanel>
+        <Viewbox Grid.Row="1">
+            <Label x:Name="timerlbl" Content="00:00:00" FontFamily="Arial Black" FontWeight="Bold" />
+        </Viewbox>
+    </Grid>
+</Window>
