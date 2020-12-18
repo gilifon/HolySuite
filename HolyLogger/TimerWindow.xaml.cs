@@ -13,6 +13,7 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 
 namespace HolyLogger
 {
@@ -21,8 +22,10 @@ namespace HolyLogger
     /// </summary>
     public partial class TimerWindow : Window
     {
+        private DispatcherTimer BlinkingTimer = new DispatcherTimer();
         private StickyWindow _stickyWindow;
-        CountDownTimer timer;
+        private CountDownTimer timer;
+        private bool isWhiteBG = true;
 
         public TimerWindow(string call)
         {
@@ -31,14 +34,31 @@ namespace HolyLogger
             this.Closed += TimerWindow_Closed;
             LayoutGrid.DataContext = this;
 
-
+            //Set the time
             timer = new CountDownTimer();
-            timer.SetTime(60);
+            timer.SetTime(0,5);
             timerlbl.Content = timer.TimeLeftStr;
-            //update label text
             timer.TimeChanged += TimeChanged;
-            timer.CountDownFinished += () => MessageBox.Show("Timer finished the work!");
+            timer.CountDownFinished += CountDownFinished;
             timer.StepMs = 77; // for nice milliseconds time switch
+
+            BlinkingTimer.Tick += BlinkingTimer_Tick; ;
+            BlinkingTimer.Interval = new TimeSpan(0, 0, 0, 0, 500);
+        }
+
+        private void CountDownFinished()
+        {
+            BlinkingTimer.Start();
+        }
+
+        private void BlinkingTimer_Tick(object sender, EventArgs e)
+        {
+            if (isWhiteBG)
+                timerPanel.Background = new SolidColorBrush(Color.FromRgb(150, 0, 0));
+            else
+                timerPanel.Background = null;
+
+            isWhiteBG = !isWhiteBG;
         }
 
         private void TimeChanged()
@@ -83,6 +103,8 @@ namespace HolyLogger
 
         private void ResetBtn_Click(object sender, RoutedEventArgs e)
         {
+            BlinkingTimer.Stop();
+            timerPanel.Background = null;
             timer.Stop();
             timer.Reset();
             StartStopBtn.Content = "Start";

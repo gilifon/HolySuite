@@ -1413,6 +1413,22 @@ namespace HolyLogger
 
         }
 
+        private void TB_Frequency_KeyDown(object sender, KeyEventArgs e)
+        {
+
+            if ((e.Key >= Key.D0 && e.Key <= Key.D9) || (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad9) || e.Key == Key.OemPeriod || e.Key == Key.Decimal)
+            {
+                if ((e.Key == Key.OemPeriod || e.Key == Key.Decimal) && ((sender as TextBox).Text.IndexOf('.') > -1))
+                {
+                    e.Handled = true;
+                }
+            }
+            else
+            {
+                e.Handled = true;
+            }
+        }
+
         private void ClearLogMenuItem_Click(object sender, RoutedEventArgs e)
         {
             MessageBoxResult messageBoxResult = System.Windows.MessageBox.Show("Are you sure?", "Delete Confirmation", System.Windows.MessageBoxButton.YesNo);
@@ -2647,5 +2663,7 @@ namespace HolyLogger
                 e.Handled = true;
             }
         }
+
+        
     }
 }

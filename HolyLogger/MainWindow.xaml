@@ -178,6 +178,15 @@
                 </StatusBarItem>
                 <StatusBarItem>
                     <TextBlock Text="Recent QSOs: " Margin="20,0,0,0" FontSize="16"/>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
                 </StatusBarItem>
                 <StatusBarItem>
                     <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="0,0,0,0" FontSize="16"/>
@@ -210,7 +219,7 @@
         <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
         <Label Content="Frequency" HorizontalAlignment="Left" Margin="275,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
         <!--<xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="348,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="9" />-->
-        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="390,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="112" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="10"/>
+        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="390,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="112" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10"/>
         <Label Content="Band" HorizontalAlignment="Left" Margin="507,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->

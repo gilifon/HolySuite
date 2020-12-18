@@ -27,6 +27,8 @@ namespace HolyLogger
 
         private bool _mustStop => (_max.TotalMilliseconds - _stpWatch.ElapsedMilliseconds) < 0;
 
+        public bool TimeOver { get { return _mustStop; } }
+
         public string TimeLeftStr => TimeLeft.ToString(@"hh\:mm\:ss");
 
         public string TimeLeftMsStr => TimeLeft.ToString(@"hh\:mm\:ss\.fff");

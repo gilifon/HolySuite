@@ -14,7 +14,9 @@
 
         </DockPanel>
         <Viewbox Grid.Row="1">
-            <Label x:Name="timerlbl" Content="00:00:00" FontFamily="Arial Black" FontWeight="Bold" />
+            <DockPanel x:Name="timerPanel" LastChildFill="False">
+                <Label x:Name="timerlbl" Content="00:00:00" FontFamily="Arial Black" FontWeight="Bold" />
+            </DockPanel>
         </Viewbox>
     </Grid>
 </Window>
