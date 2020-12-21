@@ -36,7 +36,7 @@ namespace HolyLogger
 
             //Set the time
             timer = new CountDownTimer();
-            timer.SetTime(0,5);
+            timer.SetTime(60);
             timerlbl.Content = timer.TimeLeftStr;
             timer.TimeChanged += TimeChanged;
             timer.CountDownFinished += CountDownFinished;

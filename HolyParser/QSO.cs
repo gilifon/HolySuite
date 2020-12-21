@@ -78,7 +78,6 @@ namespace HolyParser
         [JsonProperty("sat_name")]
         public string SAT_NAME { get; set; }
 
-
         public QSO()
         {
             IsAllowWARC = false;

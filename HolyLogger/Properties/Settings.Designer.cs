@@ -841,7 +841,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        [global::System.Configuration.DefaultSettingValueAttribute("350")]
         public double TimerWindowWidth {
             get {
                 return ((double)(this["TimerWindowWidth"]));
@@ -853,13 +853,37 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        [global::System.Configuration.DefaultSettingValueAttribute("200")]
         public double TimerWindowHeight {
             get {
                 return ((double)(this["TimerWindowHeight"]));
             }
             set {
                 this["TimerWindowHeight"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool TimerWindowIsOpen {
+            get {
+                return ((bool)(this["TimerWindowIsOpen"]));
+            }
+            set {
+                this["TimerWindowIsOpen"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool DisplayLastQSOinGrid {
+            get {
+                return ((bool)(this["DisplayLastQSOinGrid"]));
+            }
+            set {
+                this["DisplayLastQSOinGrid"] = value;
             }
         }
     }

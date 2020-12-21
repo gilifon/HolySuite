@@ -207,10 +207,16 @@
       <Value Profile="(Default)">0</Value>
     </Setting>
     <Setting Name="TimerWindowWidth" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">100</Value>
+      <Value Profile="(Default)">350</Value>
     </Setting>
     <Setting Name="TimerWindowHeight" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">100</Value>
+      <Value Profile="(Default)">200</Value>
+    </Setting>
+    <Setting Name="TimerWindowIsOpen" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="DisplayLastQSOinGrid" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
     </Setting>
   </Settings>
 </SettingsFile>

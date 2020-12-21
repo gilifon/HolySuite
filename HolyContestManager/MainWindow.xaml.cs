@@ -215,6 +215,8 @@ namespace HolyContestManager
         private void GetDataWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             GetData();
+
+            ///////////////////////////////////////////////////////// SUKOT ///////////////////////////////////////////////
             //StringBuilder sb2 = new StringBuilder();
             //sb2.AppendFormat("{0},", "My Call");
             //sb2.AppendFormat("{0},", "My Square");
@@ -253,51 +255,56 @@ namespace HolyContestManager
             //    sb2.AppendFormat("{0},", qso.Mode);
             //    sb2.AppendFormat("{0}\n", qso.Date);
             //}
-
-            //StringBuilder sb = new StringBuilder();
-
-            //sb.AppendFormat("{0},", "Callsign");
-            //sb.AppendFormat("{0},", "Name");
-            //sb.AppendFormat("{0},", "QSOs");
-            //sb.AppendFormat("{0},", "Squares");
-            //sb.AppendFormat("{0}\n", "Score");
-
-            //foreach (Participant p in RawData.participants)
-            //{
-            //    IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
-            //    Participant n = p;
-            //    n.qsos = qsos.Count();// qsos.Count();
-            //    n.score = qsos.Sum(x => int.Parse(x.Comment));
-            //    n.squers = qsos.DistinctBy(x=>x.STX).Count();
-            //    n.mults = 1;
-            //    n.points = 0;
-                
-            //    sb.AppendFormat("{0},", p.callsign);
-            //    sb.AppendFormat("{0},", p.name);
-            //    sb.AppendFormat("{0},", n.qsos);
-            //    sb.AppendFormat("{0},", n.squers);
-            //    sb.AppendFormat("{0}\n", n.score);
-            //    Report.Add(n);
-            //}
-
-
-            //System.IO.FileStream fs = File.Create(files_path + @"result.csv");
-            //StreamWriter sw = new StreamWriter(fs);
-            //sw.Write(sb.ToString());
-            //sw.Close();
-            //fs.Close();
-            
-            //System.IO.FileStream fs2 = File.Create(files_path + @"log.adi");
-            //StreamWriter sw2 = new StreamWriter(fs2);
-            //sw2.Write(Services.GenerateAdif(RawData.log));
-            //sw2.Close();
-            //fs2.Close();
-
             //System.IO.FileStream fs3 = File.Create(files_path + @"log_info.csv");
             //StreamWriter sw3 = new StreamWriter(fs3);
             //sw3.Write(sb2.ToString());
             //sw3.Close();
             //fs3.Close();
+            ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+            StringBuilder sb = new StringBuilder();
+
+            sb.AppendFormat("{0},", "Callsign");
+            sb.AppendFormat("{0},", "Name");
+            sb.AppendFormat("{0},", "QSOs");
+            sb.AppendFormat("{0},", "Squares");
+            sb.AppendFormat("{0}\n", "Score");
+
+            foreach (Participant p in RawData.participants)
+            {
+                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                System.IO.FileStream fs2 = File.Create(files_path + p.callsign + @".adi");
+                StreamWriter sw2 = new StreamWriter(fs2);
+                sw2.Write(Services.GenerateAdif(qsos));
+                sw2.Close();
+                fs2.Close();
+                //Participant n = p;
+                //n.qsos = qsos.Count();// qsos.Count();
+                //n.score = qsos.Sum(x => int.Parse(x.Comment));
+                //n.squers = qsos.DistinctBy(x => x.STX).Count();
+                //n.mults = 1;
+                //n.points = 0;
+
+                //sb.AppendFormat("{0},", p.callsign);
+                //sb.AppendFormat("{0},", p.name);
+                //sb.AppendFormat("{0},", n.qsos);
+                //sb.AppendFormat("{0},", n.squers);
+                //sb.AppendFormat("{0}\n", n.score);
+                //Report.Add(n);
+            }
+
+
+            System.IO.FileStream fs = File.Create(files_path + @"result.csv");
+            StreamWriter sw = new StreamWriter(fs);
+            sw.Write(sb.ToString());
+            sw.Close();
+            fs.Close();
+
+            //System.IO.FileStream fs2 = File.Create(files_path + @"log.adi");
+            //StreamWriter sw2 = new StreamWriter(fs2);
+            //sw2.Write(Services.GenerateAdif(RawData.log));
+            //sw2.Close();
+            //fs2.Close();            
         }
 
         private void GetData()

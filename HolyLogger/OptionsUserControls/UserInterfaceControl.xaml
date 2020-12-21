@@ -13,5 +13,6 @@
         <CheckBox x:Name="CBX_ShowTitleClock" Content="Show UTC clock in the title" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowTitleClock, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,52,0,0" Click="HasChanged_Click"/>
         <CheckBox x:Name="CBX_ShowNetworkFlag" Content="Show the Network connectivity icon" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowNetworkFlag, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,78,0,0"/>
         <CheckBox x:Name="CBX_Lock" Content="Lock My Callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isLocked, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,104,0,0"/>
+        <CheckBox x:Name="CBX_DisplayLastQSOinGrid" Content="Highlight last QSO" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.DisplayLastQSOinGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,130,0,0"/>
     </Grid>
 </UserControl>

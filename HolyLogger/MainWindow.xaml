@@ -172,9 +172,27 @@
                 </StatusBarItem>
                 <StatusBarItem>
                     <TextBlock Text="Manual Mode: " Margin="20,0,0,0" FontSize="16"/>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Change mode" Click="ManualModeMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
                 </StatusBarItem>
                 <StatusBarItem>
                     <TextBlock x:Name="L_IsManual" Margin="0,0,0,0" FontSize="16"/>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Change mode" Click="ManualModeMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
                 </StatusBarItem>
                 <StatusBarItem>
                     <TextBlock Text="Recent QSOs: " Margin="20,0,0,0" FontSize="16"/>
@@ -189,7 +207,16 @@
                     </StatusBarItem.ContextMenu>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="0,0,0,0" FontSize="16"/>
+                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="0,0,0,0" FontSize="16" />
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">

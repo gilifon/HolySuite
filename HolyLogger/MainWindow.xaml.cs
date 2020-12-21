@@ -27,6 +27,7 @@ using System.Windows.Threading;
 using System.Net.NetworkInformation;
 using System.Windows.Media;
 using System.Net.Sockets;
+using System.Windows.Controls.Primitives;
 
 namespace HolyLogger
 {
@@ -190,6 +191,7 @@ namespace HolyLogger
 
         QSO QsoToUpdate;
         QSO QsoPreUpdate;
+        QSO LastQSO;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         private string title = "HolyLogger   ";
@@ -296,6 +298,7 @@ namespace HolyLogger
             Qsos = dal.GetAllQSOs();
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
+            LastQSO = Qsos.FirstOrDefault();
 
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
@@ -308,6 +311,10 @@ namespace HolyLogger
             if (Properties.Settings.Default.SignBoardWindowIsOpen)
             {
                 GenerateNewSignboardWindow();
+            }
+            if (Properties.Settings.Default.TimerWindowIsOpen)
+            {
+                GenerateNewTimerWindow();
             }
 
             List<KeyValuePair<string, int>> gridColumnOrder = new List<KeyValuePair<string, int>>();
@@ -557,8 +564,8 @@ namespace HolyLogger
                 {
                     lock (this)
                     {
-                        QSO q = dal.Insert(qso);
-                        Qsos.Insert(0, q);
+                        LastQSO = dal.Insert(qso);
+                        Qsos.Insert(0, LastQSO);
                         Properties.Settings.Default.RecentQSOCounter++;
                     }                    
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
@@ -736,11 +743,11 @@ namespace HolyLogger
 
         private void UpdateNumOfQSOs()
         {
-            parseAdif();
+            //parseAdif();
             NumOfQSOs = dal.GetQsoCount().ToString();
             NumOfGrids = dal.GetGridCount().ToString();
             NumOfDXCCs = dal.GetDXCCCount().ToString();
-            Score = _holyLogParser.Result.ToString();
+            //Score = _holyLogParser.Result.ToString();
         }
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -1393,6 +1400,7 @@ namespace HolyLogger
             }
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
+            Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
             Properties.Settings.Default.Save();
         }
 
@@ -1974,11 +1982,12 @@ namespace HolyLogger
                 if (Properties.Settings.Default.IsFilterQSOs)
                 {
                     FilteredQsos = new ObservableCollection<QSO>(Qsos.Where(p => p.DXCall.Contains(TB_DXCallsign.Text)));
+                    if (LastQSO != null && Properties.Settings.Default.DisplayLastQSOinGrid) FilteredQsos.Insert(0, LastQSO);
                     DataContext = FilteredQsos;
                 }
             }
         }
-
+        
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
             TB_Exchange.Focusable = true;
