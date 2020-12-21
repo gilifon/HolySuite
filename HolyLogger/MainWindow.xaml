@@ -5,17 +5,18 @@
         xmlns:xcdg="http://schemas.xceed.com/wpf/xaml/datagrid"
         xmlns:local="clr-namespace:HolyLogger"
         xmlns:gif="http://wpfanimatedgif.codeplex.com"
+        xmlns:ToolsUserControls="clr-namespace:HolyLogger.ToolsUserControls"
         x:Class="HolyLogger.MainWindow"
-        Title="HolyLogger" Height="660" MinHeight="560" Width="800" MinWidth="800" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
+        Title="HolyLogger" Height="660" MinHeight="560" Width="1050" MinWidth="800" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
 
-    <Grid Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
+    <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
             <RowDefinition x:Name="MainForm" Height="325" />
             <RowDefinition Height="*" />
             <RowDefinition Height="40" />
         </Grid.RowDefinitions>
-        <DockPanel Name="MainScreen" Grid.Row="0">
+        <DockPanel x:Name="MainScreen" Grid.Row="0">
             <ToolBarTray DockPanel.Dock="Top">
                 <ToolBar>
                     <Menu>
@@ -171,7 +172,18 @@
                     <TextBlock x:Name="L_numOfDXCC" Text="{Binding NumOfDXCCs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Change mode" Click="ManualModeMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
                     <TextBlock Text="Manual Mode: " Margin="20,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
                     <StatusBarItem.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Change mode" Click="ManualModeMenuItem_Click">
@@ -181,33 +193,21 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                </StatusBarItem>
-                <StatusBarItem>
                     <TextBlock x:Name="L_IsManual" Margin="0,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
                     <StatusBarItem.ContextMenu>
                         <ContextMenu>
-                            <MenuItem Header="Change mode" Click="ManualModeMenuItem_Click">
+                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
                                 <MenuItem.Icon>
-                                    <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                </StatusBarItem>
-                <StatusBarItem>
                     <TextBlock Text="Recent QSOs: " Margin="20,0,0,0" FontSize="16"/>
-                    <StatusBarItem.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </ContextMenu>
-                    </StatusBarItem.ContextMenu>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="0,0,0,0" FontSize="16" />
                     <StatusBarItem.ContextMenu>
                         <ContextMenu>
                             <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
@@ -217,6 +217,7 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
+                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="0,0,0,0" FontSize="16" />
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
@@ -236,8 +237,7 @@
         <Label Content="My Locator" HorizontalAlignment="Left" Margin="507,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
         <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="602,16,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="90" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="8"/>
         <Label Content="Mode" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="101,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="146
-                  " FontSize="16" Height="28">
+        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="101,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="146                   " FontSize="16" Height="28">
             <ComboBoxItem x:Name="op_cw" Content="CW"/>
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
             <ComboBoxItem x:Name="op_ssb" IsSelected="True" Content="SSB"/>
@@ -396,6 +396,8 @@
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
+
+        <ToolsUserControls:AzimuthUserControl x:Name="AzimuthControl" HorizontalAlignment="Left" Height="200" Margin="785,12,0,0" Grid.Row="1" VerticalAlignment="Top" Width="200"/>
 
     </Grid>
 </Window>

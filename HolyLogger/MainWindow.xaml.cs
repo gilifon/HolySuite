@@ -156,6 +156,11 @@ namespace HolyLogger
             }
         }
 
+        public string QRZLat { get; set; }
+        public string QRZLon { get; set; }
+        public string QRZGrid { get; set; }
+        public double Azimuth { get; set; }
+
         private string _SessionKey;
         public string SessionKey
         {
@@ -1968,6 +1973,7 @@ namespace HolyLogger
             {
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
+                ClearAzimuth();
                 ClearMatrix();
                 L_Duplicate.Visibility = Visibility.Hidden;
                 L_Legal.Visibility = Visibility.Hidden;
@@ -2068,10 +2074,37 @@ namespace HolyLogger
             Properties.Settings.Default.MainWindowHeight = this.Height;
         }
 
+        private void SetAzimuth()
+        {
+            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text) && !string.IsNullOrWhiteSpace(QRZGrid))
+            {
+                try
+                {
+                    Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, QRZGrid);
+                    AzimuthControl.azimuthData.Azimuth = Azimuth;
+                }
+                catch (Exception e)
+                {
+                    ClearAzimuth();
+                }
+            }
+            else
+            {
+                ClearAzimuth();
+            }
+        }
+
+        private void ClearAzimuth()
+        {
+            Azimuth = 0;
+            AzimuthControl.azimuthData.Azimuth = Azimuth;
+        }
+
         private async void GetQrzData()
         {
             Country = rem.GetDXCC(TB_DXCallsign.Text).Name;
-            
+            QRZGrid = rem.GetLocator(TB_DXCallsign.Text);
+            SetAzimuth();
 
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Trim().Length >=3)
             {
@@ -2087,7 +2120,7 @@ namespace HolyLogger
                         var responseFromServer = await response.Content.ReadAsStringAsync();
                         XDocument xDoc = XDocument.Parse(responseFromServer);
                         
-                        if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(dxcall))
+                        if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && (dxcall == TB_DXCallsign.Text.Trim()))
                         {
                             IEnumerable<XElement> xref = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "xref");
                             IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
@@ -2105,6 +2138,22 @@ namespace HolyLogger
                                 if (lname.Count() > 0)
                                     FName += " " + lname.FirstOrDefault().Value;
 
+                                //****************** AZIMUTH *****************//
+                                IEnumerable<XElement> lat = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "lat");
+                                if (lat.Count() > 0)
+                                    QRZLat = lat.FirstOrDefault().Value;
+
+                                IEnumerable<XElement> lon = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "lon");
+                                if (lon.Count() > 0)
+                                    QRZLon = lon.FirstOrDefault().Value;
+
+                                IEnumerable<XElement> grid = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "grid");
+                                if (grid.Count() > 0)
+                                    QRZGrid = grid.FirstOrDefault().Value;
+
+                                SetAzimuth();
+                                //*************************************************//
+
                                 string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
                                 if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
                             }
@@ -2112,17 +2161,15 @@ namespace HolyLogger
                             {
                                 string errorCall = error.FirstOrDefault().Value.Split(':')[1].Trim();
                                 if (errorCall == dxcall)
+                                {
                                     FName = "";
+                                    ClearAzimuth();
+                                }
                             }
-                            //else
-                            //{
-                            //    FName = "";
-                            //}
                         }                        
                     }
                     catch (Exception)
                     {
-                        //Country = "";
                         FName = "";
                     }
                 }
@@ -2130,7 +2177,6 @@ namespace HolyLogger
             }
             else
             {
-                //Country = "";
                 FName = "";
             }
         }
