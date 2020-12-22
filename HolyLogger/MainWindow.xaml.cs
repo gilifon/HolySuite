@@ -341,6 +341,7 @@ namespace HolyLogger
                 item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
             }
             ToggleMatrixControl();
+            ToggleAzimuthControl();
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
@@ -430,7 +431,21 @@ namespace HolyLogger
                 MainForm.Height = new GridLength(270);
             }
         }
-        
+
+        private void ToggleAzimuthControl()
+        {
+            if (Properties.Settings.Default.IsShowAzimuthControl)
+            {
+                AzimuthControl.Visibility = Visibility.Visible;
+                this.MinWidth = 1020;
+            }
+            else
+            {
+                AzimuthControl.Visibility = Visibility.Hidden;
+                this.MinWidth = 800;
+            }
+        }
+
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             _stickyWindow = new StickyWindow(this);
@@ -1550,6 +1565,7 @@ namespace HolyLogger
                 Helper.LoginToQRZ(out _SessionKey);
             }
             ToggleMatrixControl();
+            ToggleAzimuthControl();
             ToggleQRZAutoOpen();
             if (optionWindow.GeneralSettingsControlControlInstance.HasChanged)
             {
@@ -2082,6 +2098,7 @@ namespace HolyLogger
                 {
                     Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, QRZGrid);
                     AzimuthControl.azimuthData.Azimuth = Azimuth;
+                    TB_DXLocator.Text = QRZGrid;
                 }
                 catch (Exception e)
                 {
@@ -2098,6 +2115,7 @@ namespace HolyLogger
         {
             Azimuth = 0;
             AzimuthControl.azimuthData.Azimuth = Azimuth;
+            TB_DXLocator.Text = "";
         }
 
         private async void GetQrzData()
@@ -2163,7 +2181,6 @@ namespace HolyLogger
                                 if (errorCall == dxcall)
                                 {
                                     FName = "";
-                                    ClearAzimuth();
                                 }
                             }
                         }                        

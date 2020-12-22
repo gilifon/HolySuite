@@ -886,5 +886,17 @@ namespace HolyLogger.Properties {
                 this["DisplayLastQSOinGrid"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool IsShowAzimuthControl {
+            get {
+                return ((bool)(this["IsShowAzimuthControl"]));
+            }
+            set {
+                this["IsShowAzimuthControl"] = value;
+            }
+        }
     }
 }

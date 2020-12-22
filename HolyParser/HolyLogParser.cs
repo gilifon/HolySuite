@@ -302,7 +302,7 @@ namespace HolyParser
             match = regex.Match(row);
             if (match.Success)
             {
-                qso_row.MyLocator = Regex.Split(row, prop_mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                qso_row.PROP_MODE = Regex.Split(row, prop_mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
             }
             else
             {
@@ -313,7 +313,7 @@ namespace HolyParser
             match = regex.Match(row);
             if (match.Success)
             {
-                qso_row.MyLocator = Regex.Split(row, sat_name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                qso_row.SAT_NAME = Regex.Split(row, sat_name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
             }
             else
             {
