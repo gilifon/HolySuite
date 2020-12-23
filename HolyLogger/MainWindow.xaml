@@ -281,7 +281,7 @@
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="101,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="338" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="5" />
         <Label Content="Country" HorizontalAlignment="Left" Margin="453,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="522,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="248" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="False" FontSize="16" />
+        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="522,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="248" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" IsReadOnly="True" FontSize="16" />
 
         <Label Content="DX Locator" HorizontalAlignment="Left" Margin="6,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
         <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="101,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="6"/>
@@ -397,7 +397,7 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <ToolsUserControls:AzimuthUserControl x:Name="AzimuthControl" HorizontalAlignment="Left" Height="200" Margin="785,10,0,0" Grid.Row="1" VerticalAlignment="Top" Width="200"/>
+        <ToolsUserControls:AzimuthUserControl x:Name="AzimuthControl" HorizontalAlignment="Left" Height="220" Width="220" Margin="785,10,0,0" Grid.Row="1" VerticalAlignment="Top"/>
 
     </Grid>
 </Window>

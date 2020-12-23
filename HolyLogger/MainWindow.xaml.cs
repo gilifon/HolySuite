@@ -145,6 +145,17 @@ namespace HolyLogger
             }
         }
 
+        private string _Prefix;
+        public string Prefix
+        {
+            get { return _Prefix; }
+            set
+            {
+                _Prefix = value;
+                OnPropertyChanged("Prefix");
+            }
+        }
+
         private string _FName;
         public string FName
         {
@@ -437,7 +448,7 @@ namespace HolyLogger
             if (Properties.Settings.Default.IsShowAzimuthControl)
             {
                 AzimuthControl.Visibility = Visibility.Visible;
-                this.MinWidth = 1020;
+                this.MinWidth = 1040;
             }
             else
             {
@@ -2097,7 +2108,9 @@ namespace HolyLogger
                 try
                 {
                     Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, QRZGrid);
+                    var distance = MaidenheadLocator.Distance(TB_MyLocator.Text, QRZGrid);
                     AzimuthControl.azimuthData.Azimuth = Azimuth;
+                    AzimuthControl.azimuthData.Distance = distance;
                     TB_DXLocator.Text = QRZGrid;
                 }
                 catch (Exception e)
@@ -2115,13 +2128,16 @@ namespace HolyLogger
         {
             Azimuth = 0;
             AzimuthControl.azimuthData.Azimuth = Azimuth;
+            AzimuthControl.azimuthData.Distance = 0;
             TB_DXLocator.Text = "";
         }
 
         private async void GetQrzData()
         {
-            Country = rem.GetDXCC(TB_DXCallsign.Text).Name;
-            QRZGrid = rem.GetLocator(TB_DXCallsign.Text);
+            DXCC dXCC = rem.GetDXCC(TB_DXCallsign.Text);
+            Country = dXCC.Name;
+            QRZGrid = dXCC.Locator;
+            Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
             SetAzimuth();
 
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Trim().Length >=3)

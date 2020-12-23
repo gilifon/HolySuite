@@ -26,6 +26,8 @@ namespace HolyLogger.ToolsUserControls
             {
                 Azimuth = 0
             };
+            Lbl_Info.Margin = new Thickness(-Math.Sin(azimuthData.Azimuth/180*Math.PI) * 30, Math.Cos(azimuthData.Azimuth / 180 * Math.PI) * 30, 0, 0);
+            LayoutGrid.DataContext = azimuthData;
             azimuthData.PropertyChanged += AzimuthData_PropertyChanged;
         }
 
@@ -33,7 +35,7 @@ namespace HolyLogger.ToolsUserControls
         {
             RotateTransform rotateTransform = new RotateTransform(azimuthData.Azimuth, Needle.Width/2,Needle.Height/2);
             Needle.RenderTransform = rotateTransform;
-            Lbl_Azimuth.Content = Math.Round(azimuthData.Azimuth,0);
+            Lbl_Info.Margin = new Thickness(-Math.Sin(azimuthData.Azimuth / 180 * Math.PI) * 30, Math.Cos(azimuthData.Azimuth / 180 * Math.PI) * 30, 0, 0);
         }
 
         public class AzimuthData : INotifyPropertyChanged
@@ -43,7 +45,7 @@ namespace HolyLogger.ToolsUserControls
             {
                 get
                 {
-                    return _azimuth;
+                    return Math.Round(_azimuth, 0);
                 }
                 set
                 {
@@ -51,7 +53,43 @@ namespace HolyLogger.ToolsUserControls
 
                     if (PropertyChanged != null)
                     {
-                        PropertyChanged(this, new PropertyChangedEventArgs("Azimuth"));
+                        PropertyChanged(this, new PropertyChangedEventArgs("Value"));
+                    }
+                }
+            }
+
+            private double _distance;
+            public double Distance
+            {
+                get
+                {
+                    return Math.Round(_distance, 0);
+                }
+                set
+                {
+                    _distance = value;
+
+                    if (PropertyChanged != null)
+                    {
+                        PropertyChanged(this, new PropertyChangedEventArgs("Value"));
+                    }
+                }
+            }
+
+            private string _value;
+            public string Value
+            {
+                get
+                {
+                    return Azimuth + "°" + Environment.NewLine + Distance + "km";
+                }
+                set
+                {
+                    _value = value;
+
+                    if (PropertyChanged != null)
+                    {
+                        PropertyChanged(this, new PropertyChangedEventArgs("Value"));
                     }
                 }
             }
