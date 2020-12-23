@@ -101,7 +101,7 @@ namespace HolyContestManager
             }
         }
         
-        private const string files_path = @"C:\Users\4z1kd\Documents\";
+        private const string files_path = @"C:\Users\gill\Desktop\logs\";
 
         private BackgroundWorker CalculateWorker;
         private BackgroundWorker GetDataWorker;
@@ -458,7 +458,6 @@ namespace HolyContestManager
             if (p.category_mode.ToLower() == "mixed") return "MIX";
             return "XX";
         }
-
 
         private void CalculateBtn_Click(object sender, RoutedEventArgs e)
         {

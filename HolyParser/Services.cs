@@ -127,7 +127,9 @@ namespace HolyParser
                 if (qso.SRX != null) adif.AppendFormat("<sig:{0}>{1} ", qso.SRX.Length, qso.SRX);
                 if (qso.STX != null) adif.AppendFormat("<my_sig:{0}>{1} ", qso.STX.Length, qso.STX);
                 if (qso.PROP_MODE != null) adif.AppendFormat("<prop_mode:{0}>{1} ", qso.PROP_MODE.Length, qso.PROP_MODE);
+                else if (qso.Band == "13CM") adif.AppendFormat("<prop_mode:{0}>{1} ", 3, "SAT");
                 if (qso.SAT_NAME != null) adif.AppendFormat("<sat_name:{0}>{1} ", qso.SAT_NAME.Length, qso.SAT_NAME);
+                else if (qso.Band == "13CM") adif.AppendFormat("<sat_name:{0}>{1} ", 6, "QO-100");
                 adif.AppendLine("<EOR>");
             }
 
