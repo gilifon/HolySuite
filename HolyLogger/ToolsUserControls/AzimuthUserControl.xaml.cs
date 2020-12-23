@@ -19,6 +19,7 @@ namespace HolyLogger.ToolsUserControls
     public partial class AzimuthUserControl : UserControl
     {
         public AzimuthData azimuthData { get; set; }
+        private int labelMargin = 35;
         public AzimuthUserControl()
         {
             InitializeComponent();
@@ -26,7 +27,7 @@ namespace HolyLogger.ToolsUserControls
             {
                 Azimuth = 0
             };
-            Lbl_Info.Margin = new Thickness(-Math.Sin(azimuthData.Azimuth/180*Math.PI) * 30, Math.Cos(azimuthData.Azimuth / 180 * Math.PI) * 30, 0, 0);
+            Lbl_Info.Margin = new Thickness(-Math.Sin(azimuthData.Azimuth/180*Math.PI) * labelMargin, Math.Cos(azimuthData.Azimuth / 180 * Math.PI) * labelMargin, 0, 0);
             LayoutGrid.DataContext = azimuthData;
             azimuthData.PropertyChanged += AzimuthData_PropertyChanged;
         }
@@ -35,7 +36,7 @@ namespace HolyLogger.ToolsUserControls
         {
             RotateTransform rotateTransform = new RotateTransform(azimuthData.Azimuth, Needle.Width/2,Needle.Height/2);
             Needle.RenderTransform = rotateTransform;
-            Lbl_Info.Margin = new Thickness(-Math.Sin(azimuthData.Azimuth / 180 * Math.PI) * 30, Math.Cos(azimuthData.Azimuth / 180 * Math.PI) * 30, 0, 0);
+            Lbl_Info.Margin = new Thickness(-Math.Sin(azimuthData.Azimuth / 180 * Math.PI) * labelMargin, Math.Cos(azimuthData.Azimuth / 180 * Math.PI) * labelMargin, 0, 0);
         }
 
         public class AzimuthData : INotifyPropertyChanged
