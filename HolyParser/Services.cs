@@ -88,7 +88,7 @@ namespace HolyParser
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             StringBuilder adif = new StringBuilder(200);
-            adif.AppendLine("<ADIF_VERS:3>2.2 ");
+            adif.AppendLine("<ADIF_VERS:3>3.1 ");
             adif.AppendLine("<PROGRAMID:10>HolyLogger ");
             //adif.AppendLine("<PROGRAMVERSION:15>Version 1.0.0.0 ");
             adif.AppendFormat("<PROGRAMVERSION:{0}>{1} ", version.Length, version);

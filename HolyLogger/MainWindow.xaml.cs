@@ -145,6 +145,17 @@ namespace HolyLogger
             }
         }
 
+        private string _Continent;
+        public string Continent
+        {
+            get { return _Continent; }
+            set
+            {
+                _Continent = value;
+                OnPropertyChanged("Continent");
+            }
+        }
+
         private string _Prefix;
         public string Prefix
         {
@@ -225,6 +236,7 @@ namespace HolyLogger
         public MainWindow()
         {
             Qsos = new ObservableCollection<QSO>();
+            rem = new EntityResolver();
             InitializeComponent();
             isInitializeComponentsComplete = true;
 
@@ -275,7 +287,7 @@ namespace HolyLogger
             AdifHandlerWorker.ProgressChanged += AdifHandlerWorker_ProgressChanged;
             AdifHandlerWorker.RunWorkerCompleted += AdifHandlerWorker_RunWorkerCompleted;
             
-            rem = new EntityResolver();
+            
 
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             ToggleQRZAutoOpen();
@@ -569,6 +581,7 @@ namespace HolyLogger
                 qso.Freq = TB_Frequency.Text;
                 qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 qso.Country = Country;
+                qso.Continent = Continent;
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
                 qso.STX = TB_MyHolyland.Text;
@@ -616,6 +629,7 @@ namespace HolyLogger
                 QsoToUpdate.Freq = TB_Frequency.Text;
                 QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 QsoToUpdate.Country = Country;
+                QsoToUpdate.Continent = Continent;
                 QsoToUpdate.Name = FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.STX = TB_MyHolyland.Text;
@@ -643,6 +657,7 @@ namespace HolyLogger
                     q.Freq = QsoToUpdate.Freq;
                     q.Band = QsoToUpdate.Band;
                     q.Country = QsoToUpdate.Country;
+                    q.Continent = QsoToUpdate.Continent;
                     q.Name = QsoToUpdate.Name;
                     q.MyCall = QsoToUpdate.MyCall;
                     q.STX = QsoToUpdate.STX;
@@ -734,6 +749,7 @@ namespace HolyLogger
             if (TB_Comment.IsEnabled) TB_Comment.Clear();
             FName = string.Empty;
             Country = string.Empty;
+            Continent = string.Empty;
             if (!Properties.Settings.Default.isManualMode)
                 RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
@@ -778,7 +794,7 @@ namespace HolyLogger
             NumOfQSOs = dal.GetQsoCount().ToString();
             NumOfGrids = dal.GetGridCount().ToString();
             NumOfDXCCs = dal.GetDXCCCount().ToString();
-            //Score = _holyLogParser.Result.ToString();
+            Score = "0";// _holyLogParser.Result.ToString();
         }
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
@@ -991,7 +1007,7 @@ namespace HolyLogger
             sb.Append("Thank you for sending the log.<br>");
             sb.Append("73 and Best Regards.");
 
-            string Sendemail_result = await Services.SendMail("info@iarc.org", Properties.Settings.Default.PersonalInfoEmail, "Your log was received", sb.ToString());
+            string Sendemail_result = await Services.SendMail("holyland@iarc.org", Properties.Settings.Default.PersonalInfoEmail, "Your log was received", sb.ToString());
             w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
@@ -1095,26 +1111,32 @@ namespace HolyLogger
         private string GenerateMultipleInsert(IList<QSO> qsos)
         {
             StringBuilder sb = new StringBuilder("INSERT INTO `log` ", 500);
-            sb.Append("(`my_call`, `my_square`, `mode`, `frequency`, `band`, `callsign`, `timestamp`, `rst_sent`, `rst_rcvd`, `exchange`, `comment`, `name`, `country`) VALUES ");
+            sb.Append("(`my_callsign`, `operator`, `my_square`, `my_locator`, `dx_locator`, `frequency`, `band`, `dx_callsign`, `rst_rcvd`, `rst_sent`, `timestamp`, `mode`, `exchange`, `comment`, `name`, `country`, `continent`, `prop_mode`, `sat_name` ) VALUES ");
             foreach (QSO qso in qsos)
             {
                 sb.Append("(");
-                sb.Append("'"); sb.Append(qso.MyCall.Trim().Replace("'","\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.MyCall.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Operator.Trim().Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.STX.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Mode.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.MyLocator.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.DXLocator.Trim().Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Freq.Trim().Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Band.Trim().Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.DXCall.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Date.Trim().Replace("'", "\"") + " " + qso.Time.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.RST_SENT.Trim().Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.RST_RCVD.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.RST_SENT.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Date.Trim().Replace("'", "\"") + " " + qso.Time.Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Mode.Trim().Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.SRX.Trim().Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Comment.Trim().Replace("'", "\"")); sb.Append("',");
                 sb.Append("'"); sb.Append(qso.Name.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Country.Trim().Replace("'", "\"")); sb.Append("'),");
+                sb.Append("'"); sb.Append(qso.Country.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.Continent.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.PROP_MODE.Trim().Replace("'", "\"")); sb.Append("',");
+                sb.Append("'"); sb.Append(qso.SAT_NAME.Trim().Replace("'", "\"")); sb.Append("'),");
             }
             string result = sb.ToString().TrimEnd(',');
-            result += " ON DUPLICATE KEY UPDATE my_call=my_call";
+            result += " ON DUPLICATE KEY UPDATE my_callsign=my_callsign";
             return result;
         }
         
@@ -1961,6 +1983,8 @@ namespace HolyLogger
 
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (TB_MyLocator == null || TB_MyCallsign == null) return;
+            TB_MyLocator.Text = rem.GetDXCC(TB_MyCallsign.Text).Locator;
             if (signboard != null)
             {
                 signboard.signboardData.Callsign = TB_MyCallsign.Text;
@@ -2010,6 +2034,12 @@ namespace HolyLogger
             {
                 if (!Properties.Settings.Default.isManualMode && state == State.New)
                     RefreshDateTime_Btn_MouseUp(null, null);
+                DXCC dXCC = rem.GetDXCC(TB_DXCallsign.Text);
+                Country = dXCC.Name;
+                Continent = dXCC.Continent;
+                QRZGrid = dXCC.Locator;
+                Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
+                SetAzimuth();
                 GetQrzData();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
@@ -2134,12 +2164,6 @@ namespace HolyLogger
 
         private async void GetQrzData()
         {
-            DXCC dXCC = rem.GetDXCC(TB_DXCallsign.Text);
-            Country = dXCC.Name;
-            QRZGrid = dXCC.Locator;
-            Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
-            SetAzimuth();
-
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Trim().Length >=3)
             {
                 string dxcall = TB_DXCallsign.Text.Trim();
@@ -2183,7 +2207,7 @@ namespace HolyLogger
 
                                 IEnumerable<XElement> grid = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "grid");
                                 if (grid.Count() > 0)
-                                    QRZGrid = grid.FirstOrDefault().Value;
+                                    QRZGrid = grid.FirstOrDefault().Value.ToUpper();
 
                                 SetAzimuth();
                                 //*************************************************//

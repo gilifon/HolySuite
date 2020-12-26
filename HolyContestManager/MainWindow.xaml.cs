@@ -101,7 +101,7 @@ namespace HolyContestManager
             }
         }
         
-        private const string files_path = @"C:\Users\gill\Desktop\logs\";
+        private const string files_path = @"C:\Users\HolyLoggerLogs\";
 
         private BackgroundWorker CalculateWorker;
         private BackgroundWorker GetDataWorker;

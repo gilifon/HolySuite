@@ -15,10 +15,10 @@ namespace HolyParser
         public bool IsIsraeli { get; set; }
         public bool IsValid { get; set; }
 
-        [JsonProperty("my_call")]
+        [JsonProperty("my_callsign")]
         public string MyCall { get; set; }
 
-        [JsonProperty("callsign")]
+        [JsonProperty("dx_callsign")]
         public string DXCall { get; set; }
 
         [JsonProperty("timestamp")]
@@ -77,6 +77,12 @@ namespace HolyParser
 
         [JsonProperty("sat_name")]
         public string SAT_NAME { get; set; }
+
+        [JsonProperty("continent")]
+        public string Continent { get; set; }
+
+        [JsonProperty("operator")]
+        public string Operator { get; set; }
 
         public QSO()
         {
