@@ -20,9 +20,9 @@ namespace HolyContestManager
             if (callParts.Length == 2)
             {
                 if (callParts[0].Length > callParts[1].Length) return callParts[0];
-                return callParts[1];
+                return callParts[1].ToUpper();
             }
-            return callsign;
+            return callsign.ToUpper();
         }
     }
 }

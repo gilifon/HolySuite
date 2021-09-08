@@ -116,6 +116,7 @@
             <ComboBoxItem Name="op_cw">CW</ComboBoxItem>
             <ComboBoxItem Name="op_digi">DIGI</ComboBoxItem>
             <ComboBoxItem Name="op_mix">MIXED</ComboBoxItem>
+            <ComboBoxItem Name="op_ft8">FT8</ComboBoxItem>
         </ComboBox>
 
         <Label x:Name="L_Operator" Content="Operator" HorizontalAlignment="Left" Margin="171,8,0,0" VerticalAlignment="Top" FontSize="16"/>

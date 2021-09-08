@@ -101,7 +101,7 @@ namespace HolyContestManager
             }
         }
         
-        private const string files_path = @"C:\Users\HolyLoggerLogs\";
+        private const string files_path = @"C:\tmp\";
 
         private BackgroundWorker CalculateWorker;
         private BackgroundWorker GetDataWorker;
@@ -272,12 +272,13 @@ namespace HolyContestManager
 
             foreach (Participant p in RawData.participants)
             {
-                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
-                System.IO.FileStream fs2 = File.Create(files_path + p.callsign + @".adi");
-                StreamWriter sw2 = new StreamWriter(fs2);
-                sw2.Write(Services.GenerateAdif(qsos));
-                sw2.Close();
-                fs2.Close();
+                //IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                //System.IO.FileStream fs2 = File.Create(files_path + Helper.getBareCallsign(p.callsign) + @".adi");
+                //StreamWriter sw2 = new StreamWriter(fs2);
+                //sw2.Write(Services.GenerateAdif(qsos));
+                //sw2.Close();
+                //fs2.Close();
+
                 //Participant n = p;
                 //n.qsos = qsos.Count();// qsos.Count();
                 //n.score = qsos.Sum(x => int.Parse(x.Comment));
@@ -343,12 +344,14 @@ namespace HolyContestManager
 
             foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
             {
-                GenerateLogFile(p);
+                //GenerateLogFile(p);
 
                 iteration++;
-                if (p.is_manual == 0 && p.callsign.ToLower() == "4x6fr")
+                if (p.is_manual == 0)// && Helper.getBareCallsign(p.callsign).ToUpper() == "4Z5PN")
                 {
-                    IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) && IsValidDate(q) select q;
+                    IEnumerable<QSO> _qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;//  && IsValidDate(q) select q;
+
+                    List<QSO> qsos = _qsos.ToList();
              
                     int numOfSquers = qsos.DistinctBy(q => q.STX).Count();
 
@@ -379,7 +382,7 @@ namespace HolyContestManager
             }
             Report = Report.OrderByDescending(p => p.score).ToList();
             FilteredReport = new List<Participant>(Report);
-            string insert_hlwtest = GenerateMultipleInsert(FilteredReport);
+            //string insert_hlwtest = GenerateMultipleInsert(FilteredReport);
         }
 
         private bool IsValidDate(QSO q)
@@ -388,13 +391,13 @@ namespace HolyContestManager
             bool result = DateTime.TryParseExact(q.Date, "yyyyMMdd HHmmss", new CultureInfo("en-US"), DateTimeStyles.AllowWhiteSpaces, out dateValue);
             if (result)
             {
-                bool isValid = dateValue >= new DateTime(2020, 04, 17, 21, 00, 00) && dateValue < new DateTime(2020, 04, 18, 21, 00, 00);
+                bool isValid = dateValue >= new DateTime(2021, 04, 16, 21, 00, 00) && dateValue < new DateTime(2021, 04, 17, 21, 00, 00);
                 return isValid;
             }
             result = DateTime.TryParseExact(q.Date, "yyyyMMdd HHmm", new CultureInfo("en-US"), DateTimeStyles.AllowWhiteSpaces, out dateValue);
             if (result)
             {
-                bool isValid = dateValue >= new DateTime(2020, 04, 17, 21, 00, 00) && dateValue < new DateTime(2020, 04, 18, 21, 00, 00);
+                bool isValid = dateValue >= new DateTime(2021, 04, 16, 21, 00, 00) && dateValue < new DateTime(2021, 04, 17, 21, 00, 00);
                 return isValid;
             }
             return false;
