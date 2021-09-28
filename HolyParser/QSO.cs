@@ -102,7 +102,7 @@ namespace HolyParser
                 if (match.Success) //srx matches grid
                 {
                     this.SRX = match.Groups[1].Value + match.Groups[2].Value + match.Groups[3].Value;
-                    IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && IsIsraeli;
+                    IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC();// && IsIsraeli;
                 }
                 else //srx does NOT matche grid
                 {

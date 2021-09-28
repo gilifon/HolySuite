@@ -215,97 +215,96 @@ namespace HolyContestManager
         private void GetDataWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             GetData();
+            bool is_sukot = true;
 
             ///////////////////////////////////////////////////////// SUKOT ///////////////////////////////////////////////
-            //StringBuilder sb2 = new StringBuilder();
-            //sb2.AppendFormat("{0},", "My Call");
-            //sb2.AppendFormat("{0},", "My Square");
-            //sb2.AppendFormat("{0},", "DX Call");
-            //sb2.AppendFormat("{0},", "DX Square");
-            //sb2.AppendFormat("{0},", "Distance");
-            //sb2.AppendFormat("{0},", "Freq");
-            //sb2.AppendFormat("{0},", "Band");
-            //sb2.AppendFormat("{0},", "Mode");
-            //sb2.AppendFormat("{0}\n", "Datetime");
-
-            //foreach (var qso in RawData.log)
-            //{
-            //    if (qso.STX == qso.SRX)
-            //    {
-            //        qso.Comment = "1";
-            //    }
-            //    else
-            //    {
-            //        try
-            //        {
-            //            qso.Comment = Math.Round(HolyParser.MaidenheadLocator.Distance(qso.STX, qso.SRX)).ToString();
-            //        }
-            //        catch (Exception)
-            //        {
-            //            qso.Comment = "0";
-            //        }
-            //    }
-            //    sb2.AppendFormat("{0},", qso.MyCall);
-            //    sb2.AppendFormat("{0},", qso.STX);
-            //    sb2.AppendFormat("{0},", qso.DXCall);
-            //    sb2.AppendFormat("{0},", qso.SRX);
-            //    sb2.AppendFormat("{0},", qso.Comment);
-            //    sb2.AppendFormat("{0},", qso.Freq);
-            //    sb2.AppendFormat("{0},", qso.Band);
-            //    sb2.AppendFormat("{0},", qso.Mode);
-            //    sb2.AppendFormat("{0}\n", qso.Date);
-            //}
-            //System.IO.FileStream fs3 = File.Create(files_path + @"log_info.csv");
-            //StreamWriter sw3 = new StreamWriter(fs3);
-            //sw3.Write(sb2.ToString());
-            //sw3.Close();
-            //fs3.Close();
-            ///////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-            StringBuilder sb = new StringBuilder();
-
-            sb.AppendFormat("{0},", "Callsign");
-            sb.AppendFormat("{0},", "Name");
-            sb.AppendFormat("{0},", "QSOs");
-            sb.AppendFormat("{0},", "Squares");
-            sb.AppendFormat("{0}\n", "Score");
-
-            foreach (Participant p in RawData.participants)
+            if (is_sukot)
             {
-                //IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
-                //System.IO.FileStream fs2 = File.Create(files_path + Helper.getBareCallsign(p.callsign) + @".adi");
-                //StreamWriter sw2 = new StreamWriter(fs2);
-                //sw2.Write(Services.GenerateAdif(qsos));
-                //sw2.Close();
-                //fs2.Close();
+                StringBuilder sb2 = new StringBuilder();
+                sb2.AppendFormat("{0},", "My Call");
+                sb2.AppendFormat("{0},", "My Square");
+                sb2.AppendFormat("{0},", "DX Call");
+                sb2.AppendFormat("{0},", "DX Square");
+                sb2.AppendFormat("{0},", "Distance");
+                sb2.AppendFormat("{0},", "Freq");
+                sb2.AppendFormat("{0},", "Band");
+                sb2.AppendFormat("{0},", "Mode");
+                sb2.AppendFormat("{0}\n", "Datetime");
 
-                //Participant n = p;
-                //n.qsos = qsos.Count();// qsos.Count();
-                //n.score = qsos.Sum(x => int.Parse(x.Comment));
-                //n.squers = qsos.DistinctBy(x => x.STX).Count();
-                //n.mults = 1;
-                //n.points = 0;
+                foreach (var qso in RawData.log)
+                {
+                    if (qso.MyLocator.ToUpper() == qso.SRX.ToUpper())
+                    {
+                        qso.Comment = "1";
+                    }
+                    else
+                    {
+                        try
+                        {
+                            qso.Comment = Math.Round(HolyParser.MaidenheadLocator.Distance(qso.MyLocator, qso.SRX)).ToString();
+                        }
+                        catch (Exception)
+                        {
+                            qso.Comment = "0";
+                        }
+                    }
+                    sb2.AppendFormat("{0},", qso.MyCall.ToUpper());
+                    sb2.AppendFormat("{0},", qso.MyLocator);
+                    sb2.AppendFormat("{0},", qso.DXCall);
+                    sb2.AppendFormat("{0},", qso.SRX);
+                    sb2.AppendFormat("{0},", qso.Comment);
+                    sb2.AppendFormat("{0},", qso.Freq);
+                    sb2.AppendFormat("{0},", qso.Band);
+                    sb2.AppendFormat("{0},", qso.Mode);
+                    sb2.AppendFormat("{0}\n", qso.Date);
+                }
+                System.IO.FileStream fs3 = File.Create(files_path + @"log_info.csv");
+                StreamWriter sw3 = new StreamWriter(fs3);
+                sw3.Write(sb2.ToString());
+                sw3.Close();
+                fs3.Close();
 
-                //sb.AppendFormat("{0},", p.callsign);
-                //sb.AppendFormat("{0},", p.name);
-                //sb.AppendFormat("{0},", n.qsos);
-                //sb.AppendFormat("{0},", n.squers);
-                //sb.AppendFormat("{0}\n", n.score);
-                //Report.Add(n);
+                StringBuilder sb = new StringBuilder();
+
+                sb.AppendFormat("{0},", "Callsign");
+                sb.AppendFormat("{0},", "Name");
+                sb.AppendFormat("{0},", "QSOs");
+                sb.AppendFormat("{0},", "Squares");
+                sb.AppendFormat("{0}\n", "Score");
+
+                foreach (Participant p in RawData.participants)
+                {
+                    IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                    System.IO.FileStream fs2 = File.Create(files_path + Helper.getBareCallsign(p.callsign) + @".adi");
+                    StreamWriter sw2 = new StreamWriter(fs2);
+                    sw2.Write(Services.GenerateAdif(qsos));
+                    sw2.Close();
+                    fs2.Close();
+
+                    Participant n = p;
+                    n.qsos = qsos.Count();// qsos.Count();
+                    n.score = qsos.Sum(x => int.Parse(x.Comment));
+                    n.squers = qsos.DistinctBy(x => x.MyLocator.ToLower()).Count();
+                    n.mults = 1;
+                    n.points = 0;
+
+                    sb.AppendFormat("{0},", p.callsign.ToUpper());
+                    sb.AppendFormat("{0},", p.name);
+                    sb.AppendFormat("{0},", n.qsos);
+                    sb.AppendFormat("{0},", n.squers);
+                    sb.AppendFormat("{0}\n", n.score);
+                    Report.Add(n);
+                }
+
+
+                System.IO.FileStream fs = File.Create(files_path + @"result.csv");
+                StreamWriter sw = new StreamWriter(fs);
+                sw.Write(sb.ToString());
+                sw.Close();
+                fs.Close();
+
+                ///////////////////////////////////////////////////////// END SUKOT ///////////////////////////////////////////////
             }
-
-
-            System.IO.FileStream fs = File.Create(files_path + @"result.csv");
-            StreamWriter sw = new StreamWriter(fs);
-            sw.Write(sb.ToString());
-            sw.Close();
-            fs.Close();
-
-            //System.IO.FileStream fs2 = File.Create(files_path + @"log.adi");
-            //StreamWriter sw2 = new StreamWriter(fs2);
-            //sw2.Write(Services.GenerateAdif(RawData.log));
-            //sw2.Close();
-            //fs2.Close();            
         }
 
         private void GetData()
@@ -340,14 +339,15 @@ namespace HolyContestManager
             
             int iteration = 0;
             int participantsCount = RawData.participants.Count();
-            
 
-            foreach (Participant p in RawData.participants.OrderByDescending(t=>t.qsos))
+            List<Participant> participants = RawData.participants.Where(q => !q.callsign.StartsWith("4X") && !q.callsign.StartsWith("4Z")).OrderByDescending(t => t.qsos).ToList();
+
+            foreach (Participant p in participants)
             {
                 //GenerateLogFile(p);
 
                 iteration++;
-                if (p.is_manual == 0)// && Helper.getBareCallsign(p.callsign).ToUpper() == "4Z5PN")
+                if (p.is_manual == 0)// && Helper.getBareCallsign(p.callsign).ToUpper() == "4X1KP")
                 {
                     IEnumerable<QSO> _qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;//  && IsValidDate(q) select q;
 
@@ -382,7 +382,7 @@ namespace HolyContestManager
             }
             Report = Report.OrderByDescending(p => p.score).ToList();
             FilteredReport = new List<Participant>(Report);
-            //string insert_hlwtest = GenerateMultipleInsert(FilteredReport);
+            string insert_hlwtest = GenerateMultipleInsert(FilteredReport);
         }
 
         private bool IsValidDate(QSO q)
@@ -419,7 +419,7 @@ namespace HolyContestManager
             StringBuilder squars = new StringBuilder(10);
             EntityResolver rem = new EntityResolver();
             StringBuilder sb = new StringBuilder("INSERT INTO `hlwtest` ", 500);
-            sb.Append("(`active`,`year`,`call`,`uniq_timestamp`,`dxcc`,`continent`,`category`,`qso`,`points`,`mults`,`score`,`operator`,`square`) VALUES ");
+            sb.Append("(`active`,`year`,`callsign`,`uniq_timestamp`,`dxcc`,`continent`,`category`,`qso`,`points`,`mults`,`score`,`operator`,`square`) VALUES ");
             foreach (Participant p in participants)
             {
                 IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) && IsValidDate(q) select q;
@@ -444,21 +444,49 @@ namespace HolyContestManager
                 squars.Clear();
             }
             string result = sb.ToString().TrimEnd(',');
-            result += " ON DUPLICATE KEY UPDATE `call`=`call`";
+            result += " ON DUPLICATE KEY UPDATE `callsign`=`callsign`";
             return result;
         }
 
         private string getCategory(Participant p)
         {
-            if (p.category_op.ToLower() == "checklog") return "CHECKLOG";
-            if (p.category_power.ToLower() == "qrp") return "QRP";
-            if (p.category_op.ToLower() == "mobile") return "MOBILE";
-            if (p.callsign.ToLower().Contains(@"/p")) return "PORTABLE";
-            if (p.category_op.ToLower() == "multi-op") return "MULTIOP";
-            if (p.category_mode.ToLower() == "ssb") return "SSB";
-            if (p.category_mode.ToLower() == "cw") return "CW";
-            if (p.category_mode.ToLower() == "digi") return "DIGI";
-            if (p.category_mode.ToLower() == "mixed") return "MIX";
+            //if (p.category_op.ToLower() == "checklog") return "CHECKLOG";
+            //if (p.category_power.ToLower() == "qrp") return "QRP";
+            //if (p.category_op.ToLower() == "mobile") return "MOBILE";
+            //if (p.callsign.ToLower().Contains(@"/p")) return "PORTABLE";
+            //if (p.category_op.ToLower() == "multi-op") return "MULTIOP";
+            //if (p.category_mode.ToLower() == "ssb") return "SSB";
+            //if (p.category_mode.ToLower() == "cw") return "CW";
+            //if (p.category_mode.ToLower() == "digi") return "DIGI";
+            //if (p.category_mode.ToLower() == "mixed") return "MIX";
+            //if (p.category_mode.ToLower() == "mix") return "MIX";
+
+            if (p.category_mode.ToUpper() == "CHECKLOG") return "CHECKLOG";
+            if (p.category_mode.ToUpper() == "MIXED") return "MIX";
+            if (p.category_mode.ToUpper() == "MIX") return "MIX";
+            if (p.category_mode.ToUpper() == "CW") return "CW";
+            if (p.category_mode.ToUpper() == "SSB") return "SSB";
+            if (p.category_mode.ToUpper() == "FT8") return "FT8";
+            if (p.category_mode.ToUpper() == "DIGI") return "DIGI";
+            if (p.category_mode.ToUpper() == "QRP") return "QRP";
+            if (p.category_mode.ToUpper() == "SOB 10") return "SOB 10";
+            if (p.category_mode.ToUpper() == "SOB 15") return "SOB 15";
+            if (p.category_mode.ToUpper() == "SOB 20") return "SOB 20";
+            if (p.category_mode.ToUpper() == "SOB 40") return "SOB 40";
+            if (p.category_mode.ToUpper() == "SOB 80") return "SOB 80";
+            if (p.category_mode.ToUpper() == "SOB 160") return "SOB 160";
+            if (p.category_mode.ToUpper() == "M5") return "M5";
+            if (p.category_mode.ToUpper() == "M10") return "M10";
+            if (p.category_mode.ToUpper() == "POR") return "POR";
+            if (p.category_mode.ToUpper() == "MOP") return "MOP";
+            if (p.category_mode.ToUpper() == "MM") return "MM";
+            if (p.category_mode.ToUpper() == "MMP") return "MMP";
+            if (p.category_mode.ToUpper() == "4Z9") return "4Z9";
+            if (p.category_mode.ToUpper() == "SHA") return "SHA";
+            if (p.category_mode.ToUpper() == "SWL") return "SWL";
+            if (p.category_mode.ToUpper() == "NEW") return "NEW";
+
+
             return "XX";
         }
 

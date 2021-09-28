@@ -91,11 +91,6 @@
     <CodeAnalysisRuleSet>MinimumRecommendedRules.ruleset</CodeAnalysisRuleSet>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Interop.OmniRig, Version=1.0.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
-      <EmbedInteropTypes>True</EmbedInteropTypes>
-      <HintPath>lib\Interop.OmniRig.dll</HintPath>
-    </Reference>
     <Reference Include="LiveCharts, Version=0.9.7.0, Culture=neutral, PublicKeyToken=0bc1f845d1ebb8df, processorArchitecture=MSIL">
       <HintPath>..\packages\LiveCharts.0.9.7\lib\net45\LiveCharts.dll</HintPath>
       <Private>True</Private>
@@ -391,7 +386,6 @@
     <Resource Include="Images\HolyLogger icon.png" />
     <Resource Include="Images\upload_log.png" />
     <Resource Include="Images\qrz_mini_icon.png" />
-    <None Include="lib\Interop.OmniRig.dll" />
     <Resource Include="Images\sign.png" />
     <Resource Include="Images\empty20.png" />
   </ItemGroup>
@@ -445,6 +439,17 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Images\needle.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <COMReference Include="OmniRig">
+      <Guid>{4FE359C5-A58F-459D-BE95-CA559FB4F270}</Guid>
+      <VersionMajor>1</VersionMajor>
+      <VersionMinor>0</VersionMinor>
+      <Lcid>0</Lcid>
+      <WrapperTool>tlbimp</WrapperTool>
+      <Isolated>False</Isolated>
+      <EmbedInteropTypes>True</EmbedInteropTypes>
+    </COMReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\System.Data.SQLite.Core.1.0.103\build\net45\System.Data.SQLite.Core.targets" Condition="Exists('..\packages\System.Data.SQLite.Core.1.0.103\build\net45\System.Data.SQLite.Core.targets')" />
