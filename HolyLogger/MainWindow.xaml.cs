@@ -428,9 +428,19 @@ namespace HolyLogger
         private void BlinkingTimer_Tick(object sender, EventArgs e)
         {
             if (L_OmniRig.Visibility == Visibility.Visible)
+            {
                 L_OmniRig.Visibility = Visibility.Hidden;
+                L_FrequencyValidation.Visibility = Visibility.Hidden;
+                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
+            }
             else
+            {
                 L_OmniRig.Visibility = Visibility.Visible;
+                L_FrequencyValidation.Visibility = Visibility.Visible;
+                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
+            }
+
+            
         }
 
         private void ToggleQRZAutoOpen()
@@ -1327,7 +1337,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
                 }
 
                 if (string.IsNullOrWhiteSpace(TB_MyCallsign.Text))
@@ -2686,6 +2696,8 @@ namespace HolyLogger
                 {
                     BlinkingTimer.Stop();
                     L_OmniRig.Visibility = Visibility.Visible;
+                    L_FrequencyValidation.Visibility = Visibility.Hidden;
+                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
                     if (Rig == null)
                     {
                         Status = "Omni-Rig Failed";
@@ -2728,7 +2740,7 @@ namespace HolyLogger
                     if (Properties.Settings.Default.IsSatelliteMode)
                         radioRX += Properties.Settings.Default.SatelliteShift;
                     RX = radioRX.ToString("###0.000000");
-                    TX = radioTX.ToString("###0.000000");                    
+                    TX = radioTX.ToString("###0.000000");
                     Frequency = RX;
                     switch (Rig.Mode)
                     {
@@ -2765,7 +2777,7 @@ namespace HolyLogger
                             Mode = "DIGI";
                             break;
                         default:
-                            Mode = "Other";
+                            Mode = "DIGI";
                             break;
                     }
                 });

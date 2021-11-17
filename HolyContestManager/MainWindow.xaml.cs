@@ -101,7 +101,7 @@ namespace HolyContestManager
             }
         }
         
-        private const string files_path = @"C:\tmp\";
+        private const string files_path = @"C:\TEMP\";
 
         private BackgroundWorker CalculateWorker;
         private BackgroundWorker GetDataWorker;

@@ -582,6 +582,7 @@ namespace HolyParser
                 if (parsedFreq >= 1.8 && parsedFreq <= 2) return "160M";
                 if (parsedFreq >= 2.4 && parsedFreq <= 2.5) return "13CM";
                 if (parsedFreq >= 3.5 && parsedFreq <= 4) return "80M";
+                if (parsedFreq >= 5 && parsedFreq <= 5.4) return "60M";
                 if (parsedFreq >= 7 && parsedFreq <= 7.3) return "40M";
                 if (parsedFreq >= 10 && parsedFreq <= 10.15) return "30M";
                 if (parsedFreq >= 14 && parsedFreq <= 14.35) return "20M";
@@ -598,6 +599,7 @@ namespace HolyParser
                 if (parsedFreq >= 1800 && parsedFreq <= 2000) return "160M";
                 if (parsedFreq >= 2400 && parsedFreq <= 2500) return "13CM";
                 if (parsedFreq >= 3500 && parsedFreq <= 4000) return "80M";
+                if (parsedFreq >= 5000 && parsedFreq <= 5400) return "60M";
                 if (parsedFreq >= 7000 && parsedFreq <= 7300) return "40M";
                 if (parsedFreq >= 10000 && parsedFreq <= 10150) return "30M";
                 if (parsedFreq >= 14000 && parsedFreq <= 14350) return "20M";
@@ -612,6 +614,7 @@ namespace HolyParser
                 if (parsedFreq >= 18000 && parsedFreq <= 20000) return "160M";
                 if (parsedFreq >= 24000 && parsedFreq <= 25000) return "13CM";
                 if (parsedFreq >= 35000 && parsedFreq <= 40000) return "80M";
+                if (parsedFreq >= 50000 && parsedFreq <= 54000) return "60M";
                 if (parsedFreq >= 70000 && parsedFreq <= 73000) return "40M";
                 if (parsedFreq >= 100000 && parsedFreq <= 101500) return "30M";
                 if (parsedFreq >= 140000 && parsedFreq <= 143500) return "20M";
@@ -626,6 +629,7 @@ namespace HolyParser
                 if (parsedFreq >= 18000 && parsedFreq <= 20000) return "160M";
                 if (parsedFreq >= 24000 && parsedFreq <= 25000) return "13CM";
                 if (parsedFreq >= 35000 && parsedFreq <= 40000) return "80M";
+                if (parsedFreq >= 50000 && parsedFreq <= 54000) return "60M";
                 if (parsedFreq >= 70000 && parsedFreq <= 73000) return "40M";
                 if (parsedFreq >= 100000 && parsedFreq <= 101500) return "30M";
                 if (parsedFreq >= 140000 && parsedFreq <= 143500) return "20M";
@@ -642,6 +646,7 @@ namespace HolyParser
                 if (parsedFreq >= 1800000 && parsedFreq <= 2000000) return "160M";
                 if (parsedFreq >= 2400000 && parsedFreq <= 2500000) return "13CM";
                 if (parsedFreq >= 3500000 && parsedFreq <= 4000000) return "80M";
+                if (parsedFreq >= 5000000 && parsedFreq <= 5400000) return "60M";
                 if (parsedFreq >= 7000000 && parsedFreq <= 7300000) return "40M";
                 if (parsedFreq >= 10000000 && parsedFreq <= 10150000) return "30M";
                 if (parsedFreq >= 14000000 && parsedFreq <= 14350000) return "20M";
@@ -661,6 +666,7 @@ namespace HolyParser
 
             if (band.ToLower() == "160m") return "1800";
             if (band.ToLower() == "80m") return "3600";
+            if (band.ToLower() == "60m") return "5360";
             if (band.ToLower() == "40m") return "7100";
             if (band.ToLower() == "30m") return "10000";
             if (band.ToLower() == "20m") return "14200";

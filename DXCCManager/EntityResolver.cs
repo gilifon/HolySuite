@@ -223,7 +223,7 @@ namespace DXCCManager
             "O[N-T]~Belgium~209~EU~JN29",
             "OX~Greenland~237~EU~FQ37",
             "OY~Faroe Is.~222~NA~IP61",
-            "(OZ|OV|5[P,Q])~Denmark~221~EU~JO44",
+            "(OZ|OV|OU|5[P,Q])~Denmark~221~EU~JO44",
             "P2~Papua New Guinea~163~OC~QH49",
             "P4~Aruba~91~SA~FK42",
             "P5~North Korea~344~AS~PM27",
