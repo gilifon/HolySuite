@@ -229,8 +229,6 @@ namespace HolyLogger
         
         List<string> ImportFileQ = new List<string>();
 
-        DispatcherTimer BlinkingTimer = new DispatcherTimer();
-
         public static UdpClient Client;
 
         public MainWindow()
@@ -260,9 +258,6 @@ namespace HolyLogger
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
 
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
-
-            BlinkingTimer.Tick += BlinkingTimer_Tick; ;
-            BlinkingTimer.Interval = new TimeSpan(0, 0, 0, 0, 500);
 
             if (Properties.Settings.Default.UpdateSettings)
             {
@@ -423,24 +418,6 @@ namespace HolyLogger
             {
                 NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             });
-        }
-
-        private void BlinkingTimer_Tick(object sender, EventArgs e)
-        {
-            if (L_OmniRig.Visibility == Visibility.Visible)
-            {
-                L_OmniRig.Visibility = Visibility.Hidden;
-                L_FrequencyValidation.Visibility = Visibility.Hidden;
-                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
-            }
-            else
-            {
-                L_OmniRig.Visibility = Visibility.Visible;
-                L_FrequencyValidation.Visibility = Visibility.Visible;
-                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
-            }
-
-            
         }
 
         private void ToggleQRZAutoOpen()
@@ -1334,10 +1311,12 @@ namespace HolyLogger
                 {
                     allOK = false;
                     TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
+                    TB_Frequency.BorderThickness = new Thickness(2);
                 }
                 else
                 {
-                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
+                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TB_Frequency.BorderThickness = new Thickness(1);
                 }
 
                 if (string.IsNullOrWhiteSpace(TB_MyCallsign.Text))
@@ -2661,6 +2640,15 @@ namespace HolyLogger
                 OmniRigEngine.ParamsChange += OmniRigEngine_ParamsChange;
             }
         }
+        private void UnsubscribeFromEvents()
+        {
+            if (EventsSubscribed)
+            {
+                EventsSubscribed = false;
+                OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
+                OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
+            }
+        }
         private void SelectRig()
         {
             if (Properties.Settings.Default.SelectedOmniRig1)
@@ -2694,9 +2682,6 @@ namespace HolyLogger
             {
                 this.Dispatcher.Invoke(() =>
                 {
-                    BlinkingTimer.Stop();
-                    L_OmniRig.Visibility = Visibility.Visible;
-                    L_FrequencyValidation.Visibility = Visibility.Hidden;
                     TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
                     if (Rig == null)
                     {
@@ -2707,13 +2692,33 @@ namespace HolyLogger
                     Status = "CAT Enabled";
                     if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE && Properties.Settings.Default.EnableOmniRigCAT)
                     {
+                        var response = System.Windows.Forms.MessageBox.Show("Try to recover?", "CAT connection failed", System.Windows.Forms.MessageBoxButtons.YesNo);
+                        if (response == System.Windows.Forms.DialogResult.Yes)
+                        {
+                            foreach (var process in Process.GetProcessesByName("OmniRig"))
+                            {
+                                process.Kill();
+                            }
+                            UnsubscribeFromEvents();
+                            OmniRigEngine = null;
+                            StartOmniRig();
+                        }
+                        else {
+                            Properties.Settings.Default.EnableOmniRigCAT = false;
+                        }
                         Status = Rig.StatusStr;
-                        BlinkingTimer.Start();
                     }
                     if (!Properties.Settings.Default.EnableOmniRigCAT)
                     {
                         Status = "CAT Disabled";
+                        TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
+                        TB_Frequency.BorderThickness = new Thickness(2);
                         return;
+                    }
+                    else
+                    {
+                        TB_Frequency.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                        TB_Frequency.BorderThickness = new Thickness(1);
                     }
                     if (state == State.Edit)
                     {

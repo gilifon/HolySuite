@@ -285,12 +285,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_5F1F58B2B8CBD524B492CA93DC4C73EE"
-        "OwnerKey" = "8:_6CC766DA267E491F8C23D5235C6F0130"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_60A5DEE625578CA022EF370C864F1B16"
         "OwnerKey" = "8:_6CC766DA267E491F8C23D5235C6F0130"
         "MsmSig" = "8:_UNDEFINED"
@@ -579,6 +573,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_EFAD0EA364FC852BAC2472E96C9FE1EF"
+        "OwnerKey" = "8:_6CC766DA267E491F8C23D5235C6F0130"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_F0885335D76751CB4616D2D2AA17A2CF"
         "OwnerKey" = "8:_6CC766DA267E491F8C23D5235C6F0130"
         "MsmSig" = "8:_UNDEFINED"
@@ -640,7 +640,7 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_5F1F58B2B8CBD524B492CA93DC4C73EE"
+        "OwnerKey" = "8:_EFAD0EA364FC852BAC2472E96C9FE1EF"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -1535,7 +1535,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=5.4.0.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=5.4.1.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_2450D84030FEC7DAF4EDE26FE4F0ACBD"
@@ -2081,37 +2081,6 @@
                     }
                 }
             "SourcePath" = "8:Xceed.Wpf.AvalonDock.Themes.VS2010.dll"
-            "TargetName" = "8:"
-            "Tag" = "8:"
-            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:TRUE"
-            "IsolateTo" = "8:"
-            }
-            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_5F1F58B2B8CBD524B492CA93DC4C73EE"
-            {
-            "AssemblyRegister" = "3:1"
-            "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:WpfAnimatedGif, Version=2.0.0.0, Culture=neutral, PublicKeyToken=9e7cd3b544a090dc, processorArchitecture=MSIL"
-                "ScatterAssemblies"
-                {
-                    "_5F1F58B2B8CBD524B492CA93DC4C73EE"
-                    {
-                    "Name" = "8:WpfAnimatedGif.dll"
-                    "Attributes" = "3:512"
-                    }
-                }
-            "SourcePath" = "8:WpfAnimatedGif.dll"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
@@ -2990,7 +2959,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=5.4.0.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=5.4.1.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_B07CB5883DE086A56C1A603F3D9D56DF"
@@ -3265,6 +3234,37 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_EFAD0EA364FC852BAC2472E96C9FE1EF"
+            {
+            "AssemblyRegister" = "3:1"
+            "AssemblyIsInGAC" = "11:FALSE"
+            "AssemblyAsmDisplayName" = "8:WpfAnimatedGif, Version=2.0.0.0, Culture=neutral, PublicKeyToken=9e7cd3b544a090dc, processorArchitecture=MSIL"
+                "ScatterAssemblies"
+                {
+                    "_EFAD0EA364FC852BAC2472E96C9FE1EF"
+                    {
+                    "Name" = "8:WpfAnimatedGif.dll"
+                    "Attributes" = "3:512"
+                    }
+                }
+            "SourcePath" = "8:WpfAnimatedGif.dll"
+            "TargetName" = "8:"
+            "Tag" = "8:"
+            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_F0885335D76751CB4616D2D2AA17A2CF"
             {
             "AssemblyRegister" = "3:1"
@@ -3467,15 +3467,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{CFC24C14-72F5-405E-9E03-7304F004C5D3}"
-        "PackageCode" = "8:{B0F7840C-4AE5-4E00-ABBF-FA07BF09E995}"
+        "ProductCode" = "8:{DAF139C6-26CB-4F4D-AE7E-78315D908BB3}"
+        "PackageCode" = "8:{D47AC878-935C-48D0-B5D9-DDCA526D5C4E}"
         "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:5.4.0"
+        "ProductVersion" = "8:5.4.2"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:https://4z1kd.github.io/HolyLogger/"
