@@ -986,7 +986,9 @@ namespace HolyLogger
 
             var progressIndicator = new Progress<int>();
 
-            string AddParticipant_result = await AddParticipant(bareCallsign, w.CategoryOperator, w.CategoryMode, w.CategoryPower, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
+            ContestCategory cc = new ContestCategory(w.Category);
+
+            string AddParticipant_result = await AddParticipant(bareCallsign, cc.Operator, cc.Mode, cc.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
             string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
 
             StringBuilder sb = new StringBuilder(200);
@@ -1002,7 +1004,7 @@ namespace HolyLogger
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
         {
             //string delete = "DELETE FROM `log` WHERE `my_call`= '" + callsign + "';";
-            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.UtcNow.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "', `category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.UtcNow.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
+            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.UtcNow.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "',`category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.UtcNow.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
             //************************************************** ASYNC ********************************************//
             //string deleteResponse = await ExecuteQuery(delete);
             string insertResponse = await ExecuteQuery(insert);

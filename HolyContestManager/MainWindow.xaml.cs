@@ -553,10 +553,6 @@ namespace HolyContestManager
             FilteredReport = new List<Participant>(Report);
             if (CategoryMode != "No Filter")
                 FilteredReport.RemoveAll(p => p.category_mode.ToLower() != CategoryMode.ToLower());
-            if (CategoryOperator != "No Filter")
-                FilteredReport.RemoveAll(p => p.category_op.ToLower() != CategoryOperator.ToLower());
-            if (CategoryPower != "No Filter")
-                FilteredReport.RemoveAll(p => p.category_power.ToLower() != CategoryPower.ToLower());
             if (CategoryOrigin == "Israeli")
                 FilteredReport.RemoveAll(p => !HolyLogParser.IsIsraeliStation(p.callsign));
             else if (CategoryOrigin == "Foreign")
@@ -592,9 +588,7 @@ namespace HolyContestManager
     {
         public int id { get; set; }
         public string callsign { get; set; }
-        public string category_op { get; set; }
         public string category_mode { get; set; }
-        public string category_power { get; set; }
         public string email { get; set; }
         public string name { get; set; }
         public string country { get; set; }

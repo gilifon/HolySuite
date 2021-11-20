@@ -36,36 +36,14 @@ namespace HolyLogger
 
         public event SendLogEventHandler SendLog;
 
-        private string _CategoryOperator = "SINGLE-OP";
-        public string CategoryOperator
+        private string _Category = "SSB (Single OP, SSB Only)";
+        public string Category
         {
-            get { return _CategoryOperator; }
+            get { return _Category; }
             set
             {
-                _CategoryOperator = value;
-                OnPropertyChanged("CategoryOperator");
-            }
-        }
-
-        private string _CategoryMode = "SSB";
-        public string CategoryMode
-        {
-            get { return _CategoryMode; }
-            set
-            {
-                _CategoryMode = value;
-                OnPropertyChanged("CategoryMode");
-            }
-        }
-
-        private string _CategoryPower = "HIGH";
-        public string CategoryPower
-        {
-            get { return _CategoryPower; }
-            set
-            {
-                _CategoryPower = value;
-                OnPropertyChanged("CategoryPower");
+                _Category = value;
+                OnPropertyChanged("Category");
             }
         }
 
@@ -87,7 +65,7 @@ namespace HolyLogger
 
         private void SendLogBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(CategoryOperator) && !string.IsNullOrWhiteSpace(CategoryMode) && !string.IsNullOrWhiteSpace(CategoryPower) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoEmail) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoName) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoCallsign))
+            if (!string.IsNullOrWhiteSpace(Category) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoEmail) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoName) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoCallsign))
             {
                 if (Properties.Settings.Default.PersonalInfoEmail == Properties.Settings.Default.PersonalInfoEmailConf)
                 {
