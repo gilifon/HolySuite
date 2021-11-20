@@ -229,32 +229,32 @@
         </DockPanel>
 
 
-        <Label Content="My Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your Callsign" />
-        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="101,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="145" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="12"/>
+        <Label Content="Station Call" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Callsign used on the air" />
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="101,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="145" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="12" BorderBrush="#FFABADB3"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="20" Margin="252,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="My Holyland Square" HorizontalAlignment="Left" Margin="275,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your Holyland square" />
         <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="433,16,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="69" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="5"/>
         <Label Content="My Locator" HorizontalAlignment="Left" Margin="507,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
         <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="602,16,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="90" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="8"/>
-        <Label Content="Mode" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="101,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="146                   " FontSize="16" Height="28">
+        <Label Content="Mode" HorizontalAlignment="Left" Margin="544,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
+        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="603,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="89" FontSize="16" Height="28">
             <ComboBoxItem x:Name="op_cw" Content="CW"/>
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
             <ComboBoxItem x:Name="op_ssb" IsSelected="True" Content="SSB"/>
             <ComboBoxItem x:Name="op_fm" Content="FM"/>
         </ComboBox>
         <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
-        <Label Content="Frequency" HorizontalAlignment="Left" Margin="275,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
+        <Label Content="Frequency" HorizontalAlignment="Left" Margin="248,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
         <!--<xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="348,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="9" />-->
-        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="390,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="112" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10"/>
-        <Label Content="Band" HorizontalAlignment="Left" Margin="507,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="333,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="96" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10"/>
+        <Label Content="Band" HorizontalAlignment="Left" Margin="435,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
         <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Left" Margin="700,2,0,0" VerticalAlignment="Top" Source="Images/spinner2.gif" Height="80" Width="80" Grid.Row="1" Visibility="Hidden"/>
         <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="712,18,0,0" Grid.Row="1" VerticalAlignment="Top" Width="60" Height="48" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="18" FontWeight="SemiBold" Visibility="Hidden"/>
 
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="602,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="90" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" />
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="483,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="The DX Station Callsign"/>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="189" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" KeyDown="TB_DXCallsign_KeyDown" FontSize="16" PreviewKeyDown="PreventSpaceInCallsign" MaxLength="15" TabIndex="1"/>
         <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="7,121,0,0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
@@ -398,6 +398,8 @@
         </DataGrid>
 
         <ToolsUserControls:AzimuthUserControl x:Name="AzimuthControl" HorizontalAlignment="Left" Height="220" Width="220" Margin="785,10,0,0" Grid.Row="1" VerticalAlignment="Top"/>
+        <Label Content="Operator" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your Personal Callsign" />
+        <TextBox x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="101,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="145" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Operator, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="12"/>
 
     </Grid>
 </Window>

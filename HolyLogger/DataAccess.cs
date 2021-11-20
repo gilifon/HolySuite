@@ -55,7 +55,7 @@ namespace HolyLogger
             {
                 SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
-                insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.MyCall));
+                insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_locator", qso.MyLocator));
                 insertSQL.Parameters.Add(new SQLiteParameter("dx_locator", qso.DXLocator));
@@ -98,7 +98,7 @@ namespace HolyLogger
                     SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
-                    insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.MyCall));
+                    insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                     insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
                     insertSQL.Parameters.Add(new SQLiteParameter("my_locator", qso.MyLocator));
                     insertSQL.Parameters.Add(new SQLiteParameter("dx_locator", qso.DXLocator));

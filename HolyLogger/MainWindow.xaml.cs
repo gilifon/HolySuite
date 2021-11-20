@@ -290,6 +290,7 @@ namespace HolyLogger
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
+            TB_Operator.IsEnabled = !Properties.Settings.Default.isLocked;
             setLockBtnState();
 
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
@@ -531,6 +532,7 @@ namespace HolyLogger
         {
             Properties.Settings.Default.isLocked = !Properties.Settings.Default.isLocked;
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
+            TB_Operator.IsEnabled = !Properties.Settings.Default.isLocked;
             //TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
             setLockBtnState();
         }
@@ -571,6 +573,7 @@ namespace HolyLogger
                 qso.Continent = Continent;
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
+                qso.Operator = TB_Operator.Text;
                 qso.STX = TB_MyHolyland.Text;
                 qso.MyLocator = TB_MyLocator.Text;
                 qso.DXLocator = TB_DXLocator.Text;
@@ -619,6 +622,7 @@ namespace HolyLogger
                 QsoToUpdate.Continent = Continent;
                 QsoToUpdate.Name = FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
+                QsoToUpdate.Operator = TB_Operator.Text;
                 QsoToUpdate.STX = TB_MyHolyland.Text;
                 QsoToUpdate.MyLocator = TB_MyLocator.Text;
                 QsoToUpdate.DXLocator = TB_DXLocator.Text;
@@ -671,6 +675,7 @@ namespace HolyLogger
             //TB_Exchange.Text = QsoPreUpdate.SRX;
             Frequency = QsoPreUpdate.Freq;
             TB_MyCallsign.Text = QsoPreUpdate.MyCall;
+            TB_Operator.Text = QsoPreUpdate.Operator;
             TB_MyHolyland.Text = QsoPreUpdate.STX;
             TB_MyLocator.Text = QsoPreUpdate.MyLocator;
             //TB_DXLocator.Text = QsoPreUpdate.DXLocator;
@@ -1207,6 +1212,7 @@ namespace HolyLogger
             QsoPreUpdate.SRX = TB_Exchange.Text;
             QsoPreUpdate.Freq = Frequency;
             QsoPreUpdate.MyCall = TB_MyCallsign.Text;
+            QsoPreUpdate.Operator = TB_Operator.Text;
             QsoPreUpdate.STX = TB_MyHolyland.Text;
             QsoPreUpdate.MyLocator = TB_MyLocator.Text;
             QsoPreUpdate.DXLocator = TB_DXLocator.Text;
@@ -1225,6 +1231,7 @@ namespace HolyLogger
             TB_Exchange.Text = QsoToUpdate.SRX;
             Frequency = QsoToUpdate.Freq;
             TB_MyCallsign.Text = QsoToUpdate.MyCall;
+            TB_Operator.Text = QsoToUpdate.Operator;
             TB_MyHolyland.Text = QsoToUpdate.STX;
             TB_MyLocator.Text = QsoToUpdate.MyLocator;
             TB_DXLocator.Text = QsoToUpdate.DXLocator;
@@ -1279,7 +1286,7 @@ namespace HolyLogger
             }
             else
             {
-                TB_DXCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                TB_DXCallsign.BorderBrush = System.Windows.Media.Brushes.Gray;
             }
             
             if (Properties.Settings.Default.validation_enabled)
@@ -1291,7 +1298,7 @@ namespace HolyLogger
                 //}
                 //else
                 //{
-                //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                //    TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Gray;
                 //}
 
                 //if (!(TB_DXCallsign.Text.StartsWith("4X") || TB_DXCallsign.Text.StartsWith("4Z")))
@@ -1299,7 +1306,7 @@ namespace HolyLogger
                 //    int n;
                 //    if (!string.IsNullOrWhiteSpace(TB_Exchange.Text) && int.TryParse(TB_Exchange.Text, out n))
                 //    {
-                //        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                //        TB_Exchange.BorderBrush = System.Windows.Media.Brushes.Gray;
                 //    }
                 //    else
                 //    {
@@ -1317,7 +1324,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
                     TB_Frequency.BorderThickness = new Thickness(1);
                 }
 
@@ -1328,7 +1335,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TB_MyCallsign.BorderBrush = System.Windows.Media.Brushes.Gray;
                 }
 
                 //if (TB_MyCallsign.Text.StartsWith("4X") || TB_MyCallsign.Text.StartsWith("4Z"))
@@ -1340,7 +1347,7 @@ namespace HolyLogger
                 //    }
                 //    else
                 //    {
-                //        TB_MyHolyland.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                //        TB_MyHolyland.BorderBrush = System.Windows.Media.Brushes.Gray;
                 //    }
                 //}
 
@@ -1351,7 +1358,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    TB_RSTRcvd.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TB_RSTRcvd.BorderBrush = System.Windows.Media.Brushes.Gray;
                 }
 
                 if (string.IsNullOrWhiteSpace(TB_RSTSent.Text))
@@ -1361,7 +1368,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TB_RSTSent.BorderBrush = System.Windows.Media.Brushes.Gray;
                 }
 
                 if (string.IsNullOrWhiteSpace(TP_Date.Text))
@@ -1371,7 +1378,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    TP_Date.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TP_Date.BorderBrush = System.Windows.Media.Brushes.Gray;
                 }
                 if (string.IsNullOrWhiteSpace(TP_Time.Text))
                 {
@@ -1380,7 +1387,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    TP_Time.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                    TP_Time.BorderBrush = System.Windows.Media.Brushes.Gray;
                 }
             }
             return allOK;
@@ -1638,6 +1645,7 @@ namespace HolyLogger
             }
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
+            TB_Operator.IsEnabled = !Properties.Settings.Default.isLocked;
             setLockBtnState();
         }
 
@@ -2719,7 +2727,7 @@ namespace HolyLogger
                     }
                     else
                     {
-                        TB_Frequency.BorderBrush = System.Windows.Media.Brushes.LightGray;
+                        TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
                         TB_Frequency.BorderThickness = new Thickness(1);
                     }
                     if (state == State.Edit)
