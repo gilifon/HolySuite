@@ -386,11 +386,19 @@ namespace HolyLogger
             {
                 try
                 {
+                    qso.MyCall = (qso.MyCall == null) ? TB_MyCallsign.Text : qso.MyCall;
+                    qso.Operator = (qso.MyCall == null) ? TB_Operator.Text : qso.Operator;
+                    qso.Comment = (qso.MyCall == null) ? TB_Comment.Text : qso.Comment;
+                    qso.STX = (qso.MyCall == null) ? TB_MyHolyland.Text : qso.STX;
+
                     lock (this)
                     {
-                        QSO q = dal.Insert(qso);
-                        Qsos.Insert(0, q);
-                        Properties.Settings.Default.RecentQSOCounter++;
+                        if (!String.IsNullOrWhiteSpace(qso.MyCall) && !String.IsNullOrWhiteSpace(qso.Band) && !String.IsNullOrWhiteSpace(qso.Mode) && !String.IsNullOrWhiteSpace(qso.DXCall))
+                        {
+                            QSO q = dal.Insert(qso);
+                            Qsos.Insert(0, q);
+                            Properties.Settings.Default.RecentQSOCounter++;
+                        }
                     }
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
@@ -1983,7 +1991,7 @@ namespace HolyLogger
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (TB_MyLocator == null || TB_MyCallsign == null) return;
-            TB_MyLocator.Text = rem.GetDXCC(TB_MyCallsign.Text).Locator;
+            //TB_MyLocator.Text = rem.GetDXCC(TB_MyCallsign.Text).Locator;
             if (signboard != null)
             {
                 signboard.signboardData.Callsign = TB_MyCallsign.Text;
@@ -2606,7 +2614,8 @@ namespace HolyLogger
                 }
                 else
                 {
-                    OmniRigEngine = (OmniRig.OmniRigX)Activator.CreateInstance(Type.GetTypeFromProgID("OmniRig.OmniRigX"));
+                    OmniRigEngine = new OmniRig.OmniRigX();
+                    //OmniRigEngine = (OmniRig.OmniRigX)Activator.CreateInstance(Type.GetTypeFromProgID("OmniRig.OmniRigX"));
                     // we want OmniRig interface V.1.1 to 1.99
                     // as V2.0 will likely be incompatible  with 1.x
                     if (OmniRigEngine.InterfaceVersion < 0x101 && OmniRigEngine.InterfaceVersion > 0x299)
@@ -2620,7 +2629,7 @@ namespace HolyLogger
                     ShowRigParams();
                 }
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 //Mouse.OverrideCursor = null;
                 //MessageBox.Show(ex.Message);
