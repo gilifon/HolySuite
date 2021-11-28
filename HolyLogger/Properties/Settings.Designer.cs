@@ -910,5 +910,29 @@ namespace HolyLogger.Properties {
                 this["Operator"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool AddQSOWithEnter {
+            get {
+                return ((bool)(this["AddQSOWithEnter"]));
+            }
+            set {
+                this["AddQSOWithEnter"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool DoNothing {
+            get {
+                return ((bool)(this["DoNothing"]));
+            }
+            set {
+                this["DoNothing"] = value;
+            }
+        }
     }
 }

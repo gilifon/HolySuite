@@ -696,6 +696,7 @@ namespace HolyLogger
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
         {
             Properties.Settings.Default.QRZ_auto_open = !Properties.Settings.Default.QRZ_auto_open;
+            Properties.Settings.Default.DoNothing = !Properties.Settings.Default.QRZ_auto_open;
             QRZBtn.Source = Properties.Settings.Default.QRZ_auto_open ? qrz_path : qrz_off_path;
         }
 
@@ -773,7 +774,7 @@ namespace HolyLogger
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.F1)
+            if ((e.Key == Key.F1) || (e.Key == Key.Enter && Properties.Settings.Default.AddQSOWithEnter))
             {
                 AddBtn_Click(null, null);
             }
