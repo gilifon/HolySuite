@@ -311,6 +311,76 @@ namespace HolyLogger
             }
         }
 
+        public ObservableCollection<RadioEvent> GetRadioEvents()
+        {
+            CultureInfo enUS = new CultureInfo("en-US");
+            ObservableCollection<RadioEvent> radioEvent_list = new ObservableCollection<RadioEvent>();
+            string stm = "SELECT * FROM radio_events ORDER BY Id ASC";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            {
+                using (SQLiteDataReader rdr = cmd.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        RadioEvent q = new RadioEvent();
+                        if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                        if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                        if (rdr["description"] != null) q.Description = rdr["description"].ToString();
+                        if (rdr["is_categories"] != null) q.IsCategories = int.Parse(rdr["is_categories"].ToString()) == 1;
+                        radioEvent_list.Add(q);
+                    }
+                }
+            }
+            return radioEvent_list;
+        }
+
+        public ObservableCollection<Category> GetCategories()
+        {
+            CultureInfo enUS = new CultureInfo("en-US");
+            ObservableCollection<Category> category_list = new ObservableCollection<Category>();
+            string stm = "SELECT * FROM categories ORDER BY Id ASC";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            {
+                using (SQLiteDataReader rdr = cmd.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        Category q = new Category();
+                        if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                        if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                        if (rdr["description"] != null) q.Description = rdr["description"].ToString();
+                        if (rdr["event_id"] != null) q.EventId = int.Parse(rdr["event_id"].ToString());
+                        category_list.Add(q);
+                    }
+                }
+            }
+            return category_list;
+        }
+
+        public ObservableCollection<Category> GetCategories(int eventId)
+        {
+            CultureInfo enUS = new CultureInfo("en-US");
+            ObservableCollection<Category> category_list = new ObservableCollection<Category>();
+            string stm = "SELECT * FROM categories WHERE event_id = @eventId ORDER BY Id ASC";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@eventId", eventId));
+                using (SQLiteDataReader rdr = cmd.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        Category q = new Category();
+                        if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                        if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                        if (rdr["description"] != null) q.Description = rdr["description"].ToString();
+                        if (rdr["event_id"] != null) q.EventId = int.Parse(rdr["event_id"].ToString());
+                        category_list.Add(q);
+                    }
+                }
+            }
+            return category_list;
+        }
+
         private void AddQsoColIfNeeded(string name, string definition)
         {
 

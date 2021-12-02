@@ -1,5 +1,7 @@
-﻿using System;
+﻿using HolyParser;
+using System;
 using System.Collections.Generic;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
 using System.Text;
@@ -36,17 +38,6 @@ namespace HolyLogger
 
         public event SendLogEventHandler SendLog;
 
-        private string _Category = "SSB (Single OP, SSB Only)";
-        public string Category
-        {
-            get { return _Category; }
-            set
-            {
-                _Category = value;
-                OnPropertyChanged("Category");
-            }
-        }
-
         public int _UploadProgress = 0;
         public int UploadProgress
         {
@@ -58,14 +49,51 @@ namespace HolyLogger
             }
         }
 
+        DataAccess dal;
+        public ObservableCollection<RadioEvent> RadioEvents { get; set; }
+        public ObservableCollection<Category> Categories { get; set; }
+
+        public Category selectedCategory { get; set; }
+
         public LogUploadWindow()
         {
             InitializeComponent();
+            try
+            {
+                dal = new DataAccess();
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Failed to connect to DB: " + e.Message);
+                throw;
+            }
+
+            RadioEvents = dal.GetRadioEvents();
+            CB_Events.SelectionChanged += CB_Events_SelectionChanged;
+            CB_Events.DisplayMemberPath = "Description";
+            CB_Events.SelectedValuePath = "id";
+            CB_Events.ItemsSource = RadioEvents;
+            CB_Events.SelectedIndex = 0;
+        }
+
+        private void CB_Events_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            Categories = dal.GetCategories((int)CB_Events.SelectedValue);
+            CB_Category.SelectionChanged += CB_Category_SelectionChanged;
+            CB_Category.DisplayMemberPath = "Description";
+            CB_Category.SelectedValuePath = "id";
+            CB_Category.ItemsSource = Categories;
+            CB_Category.SelectedIndex = 0;
+        }
+
+        private void CB_Category_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            selectedCategory = (Category)CB_Category.SelectedItem;
         }
 
         private void SendLogBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(Category) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoEmail) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoName) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoCallsign))
+            if (!string.IsNullOrWhiteSpace(((Category)CB_Category.SelectedItem).Description) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoEmail) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoName) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoCallsign))
             {
                 if (Properties.Settings.Default.PersonalInfoEmail == Properties.Settings.Default.PersonalInfoEmailConf)
                 {

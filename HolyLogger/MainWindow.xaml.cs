@@ -1000,7 +1000,7 @@ namespace HolyLogger
 
             var progressIndicator = new Progress<int>();
 
-            ContestCategory cc = new ContestCategory(w.Category);
+            ContestCategory cc = new ContestCategory(w.selectedCategory.Name);
 
             string AddParticipant_result = await AddParticipant(bareCallsign, cc.Operator, cc.Mode, cc.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
             string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
