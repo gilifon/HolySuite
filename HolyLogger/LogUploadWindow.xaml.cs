@@ -54,6 +54,8 @@ namespace HolyLogger
         public ObservableCollection<Category> Categories { get; set; }
 
         public Category selectedCategory { get; set; }
+        public RadioEvent selectedRadioEvent { get; set; }
+        
 
         public LogUploadWindow()
         {
@@ -73,17 +75,31 @@ namespace HolyLogger
             CB_Events.DisplayMemberPath = "Description";
             CB_Events.SelectedValuePath = "id";
             CB_Events.ItemsSource = RadioEvents;
-            CB_Events.SelectedIndex = 0;
+            RadioEvent re = RadioEvents.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedEvent);
+            if (re != null)
+                CB_Events.SelectedItem = re;
+            else
+                CB_Events.SelectedIndex = 0;
         }
 
         private void CB_Events_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            Categories = dal.GetCategories((int)CB_Events.SelectedValue);
+            selectedRadioEvent = (RadioEvent)CB_Events.SelectedItem;
+            int eid = selectedRadioEvent.id;
+            Categories = dal.GetCategories(eid);
+            if (Categories.Count() == 0)
+            {
+                Categories.Add(new Category() { id = 0, Description = "None", EventId = eid, Name = "None" });
+            }
             CB_Category.SelectionChanged += CB_Category_SelectionChanged;
             CB_Category.DisplayMemberPath = "Description";
             CB_Category.SelectedValuePath = "id";
             CB_Category.ItemsSource = Categories;
-            CB_Category.SelectedIndex = 0;
+            Category c = Categories.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedCategory);
+            if (c != null)
+                CB_Category.SelectedItem = c;
+            else
+                CB_Category.SelectedIndex = 0;
         }
 
         private void CB_Category_SelectionChanged(object sender, SelectionChangedEventArgs e)

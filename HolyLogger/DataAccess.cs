@@ -349,6 +349,9 @@ namespace HolyLogger
                         if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
                         if (rdr["name"] != null) q.Name = rdr["name"].ToString();
                         if (rdr["description"] != null) q.Description = rdr["description"].ToString();
+                        if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                        if (rdr["operator"] != null) q.Operator= rdr["operator"].ToString();
+                        if (rdr["power"] != null) q.Power = rdr["power"].ToString();
                         if (rdr["event_id"] != null) q.EventId = int.Parse(rdr["event_id"].ToString());
                         category_list.Add(q);
                     }
@@ -373,6 +376,9 @@ namespace HolyLogger
                         if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
                         if (rdr["name"] != null) q.Name = rdr["name"].ToString();
                         if (rdr["description"] != null) q.Description = rdr["description"].ToString();
+                        if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                        if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
+                        if (rdr["power"] != null) q.Power = rdr["power"].ToString();
                         if (rdr["event_id"] != null) q.EventId = int.Parse(rdr["event_id"].ToString());
                         category_list.Add(q);
                     }

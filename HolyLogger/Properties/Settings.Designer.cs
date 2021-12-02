@@ -934,5 +934,29 @@ namespace HolyLogger.Properties {
                 this["DoNothing"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string selectedEvent {
+            get {
+                return ((string)(this["selectedEvent"]));
+            }
+            set {
+                this["selectedEvent"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string selectedCategory {
+            get {
+                return ((string)(this["selectedCategory"]));
+            }
+            set {
+                this["selectedCategory"] = value;
+            }
+        }
     }
 }

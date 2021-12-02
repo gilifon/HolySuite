@@ -19,6 +19,15 @@ namespace HolyParser
         [JsonProperty("description")]
         public string Description { get; set; }
 
+        [JsonProperty("mode")]
+        public string Mode { get; set; }
+
+        [JsonProperty("operator")]
+        public string Operator { get; set; }
+
+        [JsonProperty("power")]
+        public string Power { get; set; }
+
         [JsonProperty("event_id")]
         public int EventId { get; set; }
 

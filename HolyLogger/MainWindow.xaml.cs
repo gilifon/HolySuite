@@ -998,11 +998,9 @@ namespace HolyLogger
             string bareCallsign = Properties.Settings.Default.PersonalInfoCallsign;
             string country = Services.getHamQth(bareCallsign).Name;
 
-            var progressIndicator = new Progress<int>();
+            var progressIndicator = new Progress<int>();           
 
-            ContestCategory cc = new ContestCategory(w.selectedCategory.Name);
-
-            string AddParticipant_result = await AddParticipant(bareCallsign, cc.Operator, cc.Mode, cc.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
+            string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedCategory.Operator, w.selectedCategory.Mode, w.selectedCategory.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
             string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
 
             StringBuilder sb = new StringBuilder(200);

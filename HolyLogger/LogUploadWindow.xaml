@@ -12,11 +12,11 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
         <Label x:Name="L_Event" Content="Event" HorizontalAlignment="Left" Margin="10,87,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <ComboBox x:Name="CB_Events" HorizontalAlignment="Left" Margin="107,92,0,0" VerticalAlignment="Top" Width="281" FontSize="16">
+        <ComboBox x:Name="CB_Events" Text="{Binding Default.selectedEvent, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="107,92,0,0" VerticalAlignment="Top" Width="281" FontSize="16">
             
         </ComboBox>
         <Label x:Name="L_Category" Content="Category" HorizontalAlignment="Left" Margin="10,122,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <ComboBox x:Name="CB_Category" HorizontalAlignment="Left" Margin="107,127,0,0" VerticalAlignment="Top" Width="281" FontSize="16">
+        <ComboBox x:Name="CB_Category" Text="{Binding Default.selectedCategory, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="107,127,0,0" VerticalAlignment="Top" Width="281" FontSize="16">
             
         </ComboBox>
 
