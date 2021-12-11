@@ -5,6 +5,7 @@ using System.Collections.ObjectModel;
 using System.Data;
 using System.Data.SQLite;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,6 +15,7 @@ namespace HolyLogger
     public class DataAccess
     {
         private SQLiteConnection con = null;
+        string dbPath = "";
 
         public bool SchemaHasChanged { get; set; }
 
@@ -21,32 +23,43 @@ namespace HolyLogger
         {
             try
             {
+
                 //string executable = System.Reflection.Assembly.GetExecutingAssembly().Location;
                 //string path = (System.IO.Path.GetDirectoryName(executable));
                 //AppDomain.CurrentDomain.SetData("DataDirectory", path);
+
+                System.Reflection.Assembly assembly = System.Reflection.Assembly.GetExecutingAssembly();
+                System.Diagnostics.FileVersionInfo fvi = System.Diagnostics.FileVersionInfo.GetVersionInfo(assembly.Location);
+                string company = fvi.CompanyName;
+                string product = fvi.ProductName;
+                string ApplicationData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+
+                dbPath = Path.Combine(ApplicationData, company, product, "logDB.db");
+
                 SchemaHasChanged = false;
-                con = new SQLiteConnection(@"DataSource = Data\logDB.db;Version=3");
+
+                con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
                 con.Open();
             }
             catch (Exception e)
             {
                 throw new Exception("Failed to connect to DB: " + e.Message);
             }
-            AddQsoColIfNeeded("prop_mode", "nvarchar(100) NULL");
-            AddQsoColIfNeeded("sat_name", "nvarchar(100) NULL");
-            AddQsoColIfNeeded("my_locator", "nvarchar(100) NULL");
-            AddQsoColIfNeeded("dx_locator", "nvarchar(100) NULL");
-            AddQsoColIfNeeded("submode", "nvarchar(100) NULL");
-            AddQsoColIfNeeded("operator", "nvarchar(100) NULL");
-            AddQsoColIfNeeded("continent", "nvarchar(100) NULL");
+            
+            //AddQsoColIfNeeded("submode", "nvarchar(100) NULL");
+            //if (SchemaHasChanged)
+            //{
+            //    con.Close();
+            //    con.Dispose();
+            //    con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
+            //    con.Open();
+            //}
+        }
 
-            if (SchemaHasChanged)
-            {
-                con.Close();
-                con.Dispose();
-                con = new SQLiteConnection(@"DataSource = Data\logDB.db;Version=3");
-                con.Open();
-            }
+        public void Close()
+        {
+            con.Close();
+            con.Dispose();
         }
 
         public QSO Insert(QSO qso)

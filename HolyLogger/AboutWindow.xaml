@@ -10,9 +10,9 @@
             <TextBlock x:Name="L_Version" HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Version x.x.x.x" VerticalAlignment="Top"/>
             <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Design &amp; Development - Gil 4Z1KD" VerticalAlignment="Top" />
             <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Good Advice:" VerticalAlignment="Top" />
-            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Dan 4Z5SL, Chanan 4Z1DZ" VerticalAlignment="Top" />
-            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Avraham 4Z1IZ, Zvika 4Z1ZV" VerticalAlignment="Top" />
-            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Code Contribution: Zeev 4X5ZS" VerticalAlignment="Top" />
+            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Dan 4Z5SL, Chanan 4Z1DZ," VerticalAlignment="Top" />
+            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="Avraham 4Z1IZ, Zvika 4Z1ZV, Zeev 4X5ZS" VerticalAlignment="Top" />
+            <TextBlock HorizontalAlignment="Left" Margin="0,5,0,0" TextWrapping="Wrap" Text="QA: Elad 4Z1ED" VerticalAlignment="Top" />
             <TextBlock x:Name="L_LastUpdate" Margin="0,5,0,0" TextWrapping="Wrap" Text="Last update: April 2018" VerticalAlignment="Top" HorizontalAlignment="Left" Width="184" />
 
         </StackPanel>

@@ -1,5 +1,5 @@
 ﻿-- Script Date: 08/12/2020 22:03  - ErikEJ.SqlCeScripting version 3.5.2.86
-DROP TABLE [qso];
+DROP TABLE IF EXISTS[qso];
 CREATE TABLE [qso] (
   [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
 , [my_callsign] nvarchar(100) NOT NULL COLLATE NOCASE
@@ -7,14 +7,15 @@ CREATE TABLE [qso] (
 , [my_square] nvarchar(100) NULL COLLATE NOCASE
 , [my_locator] nvarchar(100) NULL COLLATE NOCASE
 , [dx_locator] nvarchar(100) NULL COLLATE NOCASE
-, [frequency] nvarchar(100) NOT NULL COLLATE NOCASE
+, [frequency] nvarchar(100) NULL COLLATE NOCASE
 , [band] nvarchar(100) NOT NULL COLLATE NOCASE
 , [dx_callsign] nvarchar(100) NOT NULL COLLATE NOCASE
-, [rst_rcvd] nvarchar(100) NOT NULL COLLATE NOCASE
-, [rst_sent] nvarchar(100) NOT NULL COLLATE NOCASE
+, [rst_rcvd] nvarchar(100) NULL COLLATE NOCASE
+, [rst_sent] nvarchar(100) NULL COLLATE NOCASE
 , [date] nvarchar(100) NOT NULL COLLATE NOCASE
 , [time] nvarchar(100) NOT NULL COLLATE NOCASE
 , [mode] nvarchar(100) NOT NULL COLLATE NOCASE
+, [submode] nvarchar(100) NULL COLLATE NOCASE
 , [exchange] nvarchar(100) NULL COLLATE NOCASE
 , [comment] nvarchar(500) NULL COLLATE NOCASE
 , [name] nvarchar(500) NULL COLLATE NOCASE
@@ -24,7 +25,7 @@ CREATE TABLE [qso] (
 , [sat_name] nvarchar(100) NULL COLLATE NOCASE
 );
 
-DROP TABLE [categories];
+DROP TABLE IF EXISTS[categories];
 CREATE TABLE [categories] (
   [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
 , [name] nvarchar(100) NOT NULL COLLATE NOCASE
@@ -35,7 +36,7 @@ CREATE TABLE [categories] (
 , [event_id] INTEGER NOT NULL COLLATE NOCASE
 );
 
-DROP TABLE [radio_events];
+DROP TABLE IF EXISTS[radio_events];
 CREATE TABLE [radio_events] (
   [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
 , [name] nvarchar(100) NOT NULL COLLATE NOCASE

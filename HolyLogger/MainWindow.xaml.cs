@@ -303,8 +303,9 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
-                MessageBox.Show("Failed to connect to DB: " + e.Message);
-                throw;
+                MessageBox.Show(e.Message);
+                System.Windows.Application.Current.Shutdown();
+                return;
             }
             
             TB_MyCallsign.Focus();
@@ -714,7 +715,8 @@ namespace HolyLogger
                 }
                 QRZProcess = new Process();
                 QRZProcess.StartInfo.FileName = "Chrome.exe";
-                QRZProcess.StartInfo.Arguments = "--user-data-dir=" + Path.GetTempPath() + "HolyLogger " + url;
+                //QRZProcess.StartInfo.Arguments = "--user-data-dir=" + Path.GetTempPath() + "HolyLogger " + url;
+                QRZProcess.StartInfo.Arguments = url;
 
                 if (QRZProcess.Start())
                 {
@@ -778,6 +780,11 @@ namespace HolyLogger
             {
                 AddBtn_Click(null, null);
             }
+            else if ((e.Key == Key.F2))
+            {
+                OptionsMenuItemMenuItem_Click(null, null);
+            }
+            
         }
 
         private void RST_GotFocus(object sender, RoutedEventArgs e)
@@ -1460,6 +1467,7 @@ namespace HolyLogger
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
             Properties.Settings.Default.Save();
+            if (dal != null) dal.Close();
         }
 
         private void TB_Frequency_TextChanged(object sender, TextChangedEventArgs e)
@@ -2639,15 +2647,26 @@ namespace HolyLogger
 
         private void GetRigTypes()
         {
-            Rig1 = OmniRigEngine.Rig1.RigType;
-            Rig2 = OmniRigEngine.Rig2.RigType;
-
+            if (OmniRigEngine == null) return;
+            try
+            {
+                Rig1 = OmniRigEngine.Rig1.RigType;
+                Rig2 = OmniRigEngine.Rig2.RigType;
+            }
+            catch
+            {
+                Rig1 = "";
+                Rig2 = "";
+            }
             try
             {
                 Rig3 = OmniRigEngine.Rig3.RigType;
                 Rig4 = OmniRigEngine.Rig4.RigType;
             }
-            catch { }
+            catch {
+                Rig3 = "";
+                Rig4 = "";
+            }
         }
         private void SubscribeToEvents()
         {
@@ -2669,6 +2688,7 @@ namespace HolyLogger
         }
         private void SelectRig()
         {
+            if (OmniRigEngine == null) return;
             if (Properties.Settings.Default.SelectedOmniRig1)
                 Rig = OmniRigEngine.Rig1;
             else if (Properties.Settings.Default.SelectedOmniRig2)
