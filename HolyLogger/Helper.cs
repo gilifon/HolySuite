@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net;
 using System.Xml.Linq;
 using System.Device.Location;
+using HolyParser;
 
 namespace HolyLogger
 {
@@ -41,10 +42,20 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show("Login to QRZ service failed: " + ex.Message);
+                //System.Windows.Forms.MessageBox.Show("Login to QRZ service failed: " + ex.Message);
                 SessionKey = "";
                 return false;
             }
+        }
+
+        public static void SendHeartbeat(string callsign, string op_callsign, string frequency, string mode)
+        {
+            WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/heartbeat.php?callsign=" + callsign + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode);
+            WebResponse response = request.GetResponse();
+            string status = ((HttpWebResponse)response).StatusDescription;
+            Stream dataStream = response.GetResponseStream();
+            StreamReader reader = new StreamReader(dataStream);
+            string responseFromServer = reader.ReadToEnd();
         }
 
         public static bool CheckForInternetConnection()

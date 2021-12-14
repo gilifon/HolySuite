@@ -221,6 +221,8 @@ namespace HolyLogger
         QSO LastQSO;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
+        DispatcherTimer HeartbeatTimer = new DispatcherTimer();
+
         private string title = "HolyLogger   ";
         private const int SEND_CHUNK_SIZE = 200;
 
@@ -253,6 +255,7 @@ namespace HolyLogger
             }
             isNetworkAvailable = Helper.CheckForInternetConnection();
             checkForAutoUpload();
+            HeartbeatTimer_Tick(null, null);
 
             if (Properties.Settings.Default.ShowTitleClock)
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
@@ -327,7 +330,7 @@ namespace HolyLogger
 
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
-            Helper.LoginToQRZ(out _SessionKey);
+            if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
 
             if (Properties.Settings.Default.MatrixWindowIsOpen)
             {
@@ -424,6 +427,7 @@ namespace HolyLogger
         private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
         {
             isNetworkAvailable = e.IsAvailable;
+            if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
             this.Dispatcher.Invoke(() =>
             {
                 NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
@@ -474,6 +478,8 @@ namespace HolyLogger
             _stickyWindow.StickOnResize = true;
             _stickyWindow.StickOnMove = true;
 
+            StartHeartbeatTimer();
+
             if (Properties.Settings.Default.ShowTitleClock)
                 StartUTCTimer();
         }
@@ -498,6 +504,17 @@ namespace HolyLogger
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
             });
             
+        }
+        private void StartHeartbeatTimer()
+        {
+            HeartbeatTimer.Interval = new TimeSpan(0, 12, 0);
+            HeartbeatTimer.Tick += HeartbeatTimer_Tick;
+            HeartbeatTimer.Start();
+        }
+
+        private void HeartbeatTimer_Tick(object sender, EventArgs e)
+        {
+            if (isNetworkAvailable) Helper.SendHeartbeat(TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), TB_Frequency.Text.Trim(), CB_Mode.Text);
         }
 
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -1431,7 +1448,7 @@ namespace HolyLogger
         private void PropertiesWindow_Closed(object sender, EventArgs e)
         {
             if (String.IsNullOrWhiteSpace(SessionKey))
-                Helper.LoginToQRZ(out _SessionKey);
+                if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
         }
 
         private void parseAdif()
@@ -1608,7 +1625,7 @@ namespace HolyLogger
             OptionsWindow optionWindow = (OptionsWindow)sender;
             if(optionWindow.QRZServiceControlInstance.HasChanged)
             {
-                Helper.LoginToQRZ(out _SessionKey);
+                if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
@@ -2227,7 +2244,8 @@ namespace HolyLogger
                                 //*************************************************//
 
                                 string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
-                                if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
+                                if (SessionKey != key)
+                                    if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
                             }
                             else if (error.Count() > 0)
                             {
