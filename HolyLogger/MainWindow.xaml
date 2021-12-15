@@ -401,5 +401,7 @@
         <Label Content="Operator Callsign" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your Personal Callsign" />
         <TextBox x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="139,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="107" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Operator, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="10"/>
 
+
     </Grid>
+
 </Window>

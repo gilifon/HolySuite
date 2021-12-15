@@ -255,7 +255,7 @@ namespace HolyLogger
             }
             isNetworkAvailable = Helper.CheckForInternetConnection();
             checkForAutoUpload();
-            HeartbeatTimer_Tick(null, null);
+            
 
             if (Properties.Settings.Default.ShowTitleClock)
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
@@ -365,6 +365,7 @@ namespace HolyLogger
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
+            HeartbeatTimer_Tick(null, null);
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
@@ -507,14 +508,14 @@ namespace HolyLogger
         }
         private void StartHeartbeatTimer()
         {
-            HeartbeatTimer.Interval = new TimeSpan(0, 12, 0);
+            HeartbeatTimer.Interval = new TimeSpan(0, 1, 0);
             HeartbeatTimer.Tick += HeartbeatTimer_Tick;
             HeartbeatTimer.Start();
         }
 
         private void HeartbeatTimer_Tick(object sender, EventArgs e)
         {
-            if (isNetworkAvailable) Helper.SendHeartbeat(TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), TB_Frequency.Text.Trim(), CB_Mode.Text);
+            if (isNetworkAvailable) Helper.SendHeartbeat(TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), Frequency.Trim(), Mode.Trim());
         }
 
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
@@ -2414,12 +2415,14 @@ namespace HolyLogger
             {
                 try
                 {
-                    string baseRequest = "http://raw.githubusercontent.com/4Z1KD/HolyLogger/master/LiveLog?v=" + DateTime.Now.Ticks;
+                    ServicePointManager.Expect100Continue = true;
+                    ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
+                    string baseRequest = "https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/LiveLog?v=" + DateTime.Now.Ticks;
                     var response = await client.GetAsync(baseRequest);
                     var responseFromServer = await response.Content.ReadAsStringAsync();
                     isRemoteServerLiveLog = responseFromServer.ToLower().Trim() == "true";
                 }
-                catch
+                catch(Exception e)
                 {
                     isRemoteServerLiveLog = false;
                 }
@@ -2639,6 +2642,7 @@ namespace HolyLogger
                 }
                 else
                 {
+
                     OmniRigEngine = new OmniRig.OmniRigX();
                     //OmniRigEngine = (OmniRig.OmniRigX)Activator.CreateInstance(Type.GetTypeFromProgID("OmniRig.OmniRigX"));
                     // we want OmniRig interface V.1.1 to 1.99
