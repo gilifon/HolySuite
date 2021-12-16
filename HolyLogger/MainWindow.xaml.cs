@@ -365,7 +365,7 @@ namespace HolyLogger
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
-            HeartbeatTimer_Tick(null, null);
+            //HeartbeatTimer_Tick(null, null);
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
@@ -1495,6 +1495,8 @@ namespace HolyLogger
                 string band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 if (!string.IsNullOrWhiteSpace(band))
                 {
+                    HeartbeatTimer.Stop();
+                    HeartbeatTimer.Start();
                     TB_Band.Text = band;
                 }
                 else
@@ -1821,24 +1823,28 @@ namespace HolyLogger
             }
             loginfo.Show();
         }
-       
+
         private void GridSquareMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            //string url = "https://www.youtube.com/watch?v=NCUu65E7V6c";
             string url = "https://www.iarc.org/holysquare/";
             try
             {
-                Process p = new Process();
-                p.StartInfo.FileName = "Chrome.exe";
-                p.StartInfo.Arguments = "--user-data-dir=" + Path.GetTempPath() + "HolyLogger " + url;
-
-                if (p.Start())
-                {
-                    p.WaitForInputIdle();
-                    SetForegroundWindow(Process.GetCurrentProcess().MainWindowHandle);
-                }
+                System.Diagnostics.Process.Start(url);
             }
-            catch (Exception ex)
+            catch (Exception)
+            {
+                MessageBox.Show("Please install 'Chrome' and try again");
+            }
+        }
+
+        private void OnTheAirMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string url = "https://www.iarc.org/ontheair/";
+            try
+            {
+                System.Diagnostics.Process.Start(url);
+            }
+            catch (Exception)
             {
                 MessageBox.Show("Please install 'Chrome' and try again");
             }
@@ -1889,7 +1895,6 @@ namespace HolyLogger
         private void HolyLoggerMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string url = "https://4z1kd.github.io/HolyLogger/";
-
             try
             {
                 System.Diagnostics.Process.Start(url);

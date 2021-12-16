@@ -121,6 +121,7 @@
                                     <Image Source="Images/update.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <Separator />
                             <MenuItem x:Name="HolyLogWebsiteMenuItem" Header="HolyLogger web page" ToolTip="Go to HolyLogger website" Click="HolyLoggerMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/crown.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -136,6 +137,12 @@
                                     <Image Source="Images/pin.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
+                            <MenuItem x:Name="OnTheAir" Header="HolyLogger On The Air" ToolTip="A cluster of HolyLogger user that are currently on the air" Click="OnTheAirMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <Separator />
                             <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>
