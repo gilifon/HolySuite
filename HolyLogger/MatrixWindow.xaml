@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:HolyLogger"
         mc:Ignorable="d"
-        Title="Matrix" Height="330" Width="250" MinWidth="50" MinHeight="330" MaxWidth="250" MaxHeight="300" LocationChanged="MatrixWindow1_LocationChanged" Icon="Images/matrix.png">
+        Title="Matrix" Height="380" Width="250" MinWidth="50" MinHeight="380" MaxWidth="250" MaxHeight="300" LocationChanged="MatrixWindow1_LocationChanged" Icon="Images/matrix.png">
     <Grid>
         <Label x:Name="L10" Content="10M" HorizontalAlignment="Left" Margin="8,82,0,0" VerticalAlignment="Top"/>
         <Label x:Name="L15" Content="15M" HorizontalAlignment="Left" Margin="8,117,0,0" VerticalAlignment="Top"/>
@@ -35,6 +35,11 @@
         <Image x:Name="DIGI160" HorizontalAlignment="Left" Height="24" Margin="181,258,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
         <Image x:Name="CW160" HorizontalAlignment="Left" Height="24" Margin="119,258,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
         <Image x:Name="SSB160" HorizontalAlignment="Left" Height="24" Margin="60,258,0,0" VerticalAlignment="Top" Width="24" Source="Images\x.PNG"/>
+        
+        <Image x:Name="DIGISAT" HorizontalAlignment="Left" Height="32" Margin="177,295,0,0" VerticalAlignment="Top" Width="32" Source="Images\satx.PNG"/>
+        <Image x:Name="CWSAT" HorizontalAlignment="Left" Height="32" Margin="115,295,0,0" VerticalAlignment="Top" Width="32" Source="Images\satx.PNG"/>
+        <Image x:Name="SSBSAT" HorizontalAlignment="Left" Height="32" Margin="56,295,0,0" VerticalAlignment="Top" Width="32" Source="Images\satx.PNG"/>
+        
         <Label x:Name="L_dup" Content="DUP!" HorizontalAlignment="Center"  VerticalAlignment="Top" Background="White" Foreground="Red" FontSize="22" FontWeight="Bold" Visibility="Visible" HorizontalContentAlignment="Center"/>
     </Grid>
 </Window>

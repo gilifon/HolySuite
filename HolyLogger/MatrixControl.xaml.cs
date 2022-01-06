@@ -23,15 +23,21 @@ namespace HolyLogger
 
         string x_path = "Images/x.PNG";
         string v_path = "Images/v.PNG";
+        string satx_path = "Images/satX.PNG";
+        string satv_path = "Images/satV.PNG";
 
         BitmapImage x;
         BitmapImage v;
+        BitmapImage satx;
+        BitmapImage satv;
 
         public MatrixControl()
         {
             InitializeComponent();
             x = new BitmapImage(new Uri(x_path, UriKind.Relative));
             v = new BitmapImage(new Uri(v_path, UriKind.Relative));
+            satx = new BitmapImage(new Uri(satx_path, UriKind.Relative));
+            satv = new BitmapImage(new Uri(satv_path, UriKind.Relative));
             Clear();
         }
 
@@ -50,6 +56,7 @@ namespace HolyLogger
             SSB40.Source = x;
             SSB80.Source = x;
             SSB160.Source = x;
+            SSBSAT.Source = satx;
 
             CW10.Source = x;
             CW12.Source = x;
@@ -60,6 +67,7 @@ namespace HolyLogger
             CW40.Source = x;
             CW80.Source = x;
             CW160.Source = x;
+            CWSAT.Source = satx;
 
             DIGI10.Source = x;
             DIGI12.Source = x;
@@ -70,6 +78,7 @@ namespace HolyLogger
             DIGI40.Source = x;
             DIGI80.Source = x;
             DIGI160.Source = x;
+            DIGISAT.Source = satx;
         }
         public void SetMatrix(Mode mode, string band)
         {
@@ -85,6 +94,8 @@ namespace HolyLogger
                     if (band == "40M") SSB40.Source = v;
                     if (band == "80M") SSB80.Source = v;
                     if (band == "160M") SSB160.Source = v;
+                    if (band == "13CM") SSBSAT.Source = satv;
+                    
                     break;
                 case Mode.CW:
                     if (band == "10M") CW10.Source = v;
@@ -96,6 +107,7 @@ namespace HolyLogger
                     if (band == "40M") CW40.Source = v;
                     if (band == "80M") CW80.Source = v;
                     if (band == "160M") CW160.Source = v;
+                    if (band == "13CM") CWSAT.Source = satv;
                     break;
                 case Mode.DIGI:
                     if (band == "10M") DIGI10.Source = v;
@@ -107,6 +119,7 @@ namespace HolyLogger
                     if (band == "40M") DIGI40.Source = v;
                     if (band == "80M") DIGI80.Source = v;
                     if (band == "160M") DIGI160.Source = v;
+                    if (band == "13CM") DIGISAT.Source = satv;
                     break;
                 default:
                     break;
