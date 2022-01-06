@@ -254,6 +254,7 @@ namespace HolyLogger
                 }
             }
             isNetworkAvailable = Helper.CheckForInternetConnection();
+            HeartbeatTimer.Tick += HeartbeatTimer_Tick;
             checkForAutoUpload();
             
 
@@ -365,7 +366,6 @@ namespace HolyLogger
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
-            //HeartbeatTimer_Tick(null, null);
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
         }
@@ -479,7 +479,7 @@ namespace HolyLogger
             _stickyWindow.StickOnResize = true;
             _stickyWindow.StickOnMove = true;
 
-            StartHeartbeatTimer();
+            RestartHeartbeatTimer();
 
             if (Properties.Settings.Default.ShowTitleClock)
                 StartUTCTimer();
@@ -506,11 +506,16 @@ namespace HolyLogger
             });
             
         }
-        private void StartHeartbeatTimer()
+        
+        private void RestartHeartbeatTimer()
         {
-            HeartbeatTimer.Interval = new TimeSpan(0, 1, 0);
-            HeartbeatTimer.Tick += HeartbeatTimer_Tick;
-            HeartbeatTimer.Start();
+            if (HeartbeatTimer != null)
+            {
+                if (HeartbeatTimer.IsEnabled) 
+                    HeartbeatTimer.Stop();
+                HeartbeatTimer.Interval = new TimeSpan(0, 1, 0);
+                HeartbeatTimer.Start();
+            }
         }
 
         private void HeartbeatTimer_Tick(object sender, EventArgs e)
@@ -1495,8 +1500,7 @@ namespace HolyLogger
                 string band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 if (!string.IsNullOrWhiteSpace(band))
                 {
-                    HeartbeatTimer.Stop();
-                    HeartbeatTimer.Start();
+                    RestartHeartbeatTimer();
                     TB_Band.Text = band;
                 }
                 else
@@ -2021,6 +2025,7 @@ namespace HolyLogger
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (TB_MyLocator == null || TB_MyCallsign == null) return;
+            RestartHeartbeatTimer();
             //TB_MyLocator.Text = rem.GetDXCC(TB_MyCallsign.Text).Locator;
             if (signboard != null)
             {
