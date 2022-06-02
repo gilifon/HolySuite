@@ -121,7 +121,7 @@ namespace HolyParser
                 if (qso.Comment != null) adif.AppendFormat("<comment:{0}>{1} ", qso.Comment.Length, qso.Comment);
                 if (qso.MyLocator != null) adif.AppendFormat("<my_gridsquare:{0}>{1} ", qso.MyLocator.Length, qso.MyLocator);
                 if (qso.DXLocator != null) adif.AppendFormat("<gridsquare:{0}>{1} ", qso.DXLocator.Length, qso.DXLocator);
-                if (qso.MyCall != null) adif.AppendFormat("<operator:{0}>{1} ", qso.MyCall.Length, qso.MyCall);
+                if (qso.Operator != null) adif.AppendFormat("<operator:{0}>{1} ", qso.Operator.Length, qso.Operator);
                 if (qso.SRX != null) adif.AppendFormat("<srx_string:{0}>{1} ", qso.SRX.Length, qso.SRX);
                 if (qso.STX != null) adif.AppendFormat("<stx_string:{0}>{1} ", qso.STX.Length, qso.STX);
                 if (qso.SRX != null) adif.AppendFormat("<sig:{0}>{1} ", qso.SRX.Length, qso.SRX);

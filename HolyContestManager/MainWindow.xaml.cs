@@ -215,7 +215,7 @@ namespace HolyContestManager
         private void GetDataWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             GetData();
-            bool is_sukot = true;
+            bool is_sukot = false;
 
             ///////////////////////////////////////////////////////// SUKOT ///////////////////////////////////////////////
             if (is_sukot)
@@ -340,14 +340,15 @@ namespace HolyContestManager
             int iteration = 0;
             int participantsCount = RawData.participants.Count();
 
-            List<Participant> participants = RawData.participants.Where(q => !q.callsign.StartsWith("4X") && !q.callsign.StartsWith("4Z")).OrderByDescending(t => t.qsos).ToList();
+            //List<Participant> participants = RawData.participants.Where(q => !q.callsign.StartsWith("4X") && !q.callsign.StartsWith("4Z")).OrderByDescending(t => t.qsos).ToList();
+            List<Participant> participants = RawData.participants.Where(q => q.callsign.StartsWith("4X") || q.callsign.StartsWith("4Z")).OrderByDescending(t => t.qsos).ToList();
 
             foreach (Participant p in participants)
             {
                 //GenerateLogFile(p);
 
                 iteration++;
-                if (p.is_manual == 0)// && Helper.getBareCallsign(p.callsign).ToUpper() == "4X1KP")
+                if (p.is_manual == 0) // && Helper.getBareCallsign(p.callsign).ToUpper() == "VU3XIO")
                 {
                     IEnumerable<QSO> _qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;//  && IsValidDate(q) select q;
 
