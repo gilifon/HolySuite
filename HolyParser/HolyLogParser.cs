@@ -194,6 +194,7 @@ namespace HolyParser
             if (match.Success)
             {
                 qso_row.MyCall = Regex.Split(row, mycall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
+                qso_row.Operator = qso_row.MyCall;
             }
             else
             {
@@ -203,6 +204,13 @@ namespace HolyParser
                 {
                     qso_row.MyCall = Regex.Split(row, operator_call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
                 }
+            }
+
+            regex = new Regex(operator_call_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Operator = Regex.Split(row, operator_call_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
             }
 
             regex = new Regex(rst_rcvd_pattern, RegexOptions.IgnoreCase);

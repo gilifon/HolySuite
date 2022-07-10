@@ -1256,7 +1256,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=5.6.5.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=5.6.6.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_0CC698D300E1900D4256378351A5C314"
@@ -2237,7 +2237,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=5.6.5.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=5.6.6.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_6A6A1E1F8232D2DA6AE0EDE76316DC1A"
@@ -3490,15 +3490,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{4D2F3864-432A-471E-9F6D-17C569B7C603}"
-        "PackageCode" = "8:{4EC62BCD-74E6-4E9A-8032-20AF6D62C346}"
+        "ProductCode" = "8:{50FDD77D-4FE6-482E-856B-A4634320707A}"
+        "PackageCode" = "8:{B505DA34-BC56-4588-96DA-B01D192A397D}"
         "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:5.6.6"
+        "ProductVersion" = "8:5.7.0"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:"
         "ARPHELPLINK" = "8:https://4z1kd.github.io/HolyLogger/"
@@ -4040,7 +4040,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_6CC766DA267E491F8C23D5235C6F0130"
             {
-            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Release\\HolyLogger.exe"
+            "SourcePath" = "8:"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 15
-VisualStudioVersion = 15.0.28307.271
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.32106.194
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HolyLogger", "HolyLogger\HolyLogger.csproj", "{944C4B28-6479-4A51-A6A2-BEC8FDE2748C}"
 EndProject
@@ -21,6 +21,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ModeManager", "ModeManager\ModeManager.csproj", "{0F14D400-4809-44A7-93C0-A5B3CD7FA28F}"
 EndProject
 Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "HolyLogger_x86", "HolyLogger_x86\HolyLogger_x86.vdproj", "{84EB106D-8620-4AAE-A7EB-7A81347FFAC0}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HolyServer", "HolyServer\HolyServer.csproj", "{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -249,6 +251,36 @@ Global
 		{84EB106D-8620-4AAE-A7EB-7A81347FFAC0}.SingleImage|x64.Build.0 = Release
 		{84EB106D-8620-4AAE-A7EB-7A81347FFAC0}.SingleImage|x86.ActiveCfg = Release
 		{84EB106D-8620-4AAE-A7EB-7A81347FFAC0}.SingleImage|x86.Build.0 = Release
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.CD_ROM|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.CD_ROM|Any CPU.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.CD_ROM|x64.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.CD_ROM|x64.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.CD_ROM|x86.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.CD_ROM|x86.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Debug|x64.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Debug|x86.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.DVD-5|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.DVD-5|Any CPU.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.DVD-5|x64.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.DVD-5|x64.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.DVD-5|x86.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.DVD-5|x86.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Release|x64.ActiveCfg = Release|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Release|x64.Build.0 = Release|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Release|x86.ActiveCfg = Release|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.Release|x86.Build.0 = Release|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.SingleImage|Any CPU.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.SingleImage|Any CPU.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.SingleImage|x64.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.SingleImage|x64.Build.0 = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.SingleImage|x86.ActiveCfg = Debug|Any CPU
+		{1F0DF5AC-48EA-4D54-8F62-3B5A7BF980B0}.SingleImage|x86.Build.0 = Debug|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
