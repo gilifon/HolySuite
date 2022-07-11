@@ -615,7 +615,8 @@ namespace HolyLogger
                 qso.Date = date.Year.ToString("D4") + date.Month.ToString("D2") + date.Day.ToString("D2");
                 DateTime time = TP_Time.Value.Value;
                 qso.Time = time.Hour.ToString("D2") + time.Minute.ToString("D2") + time.Second.ToString("D2");
-                qso.PROP_MODE = Properties.Settings.Default.IsSatelliteMode ? "SAT" : "";                
+                qso.PROP_MODE = Properties.Settings.Default.IsSatelliteMode ? "SAT" : "";
+                qso.SAT_NAME = "";
                 if (Properties.Settings.Default.IsSatelliteMode && !string.IsNullOrWhiteSpace(Properties.Settings.Default.SatelliteName))
                 {
                     qso.SAT_NAME = Properties.Settings.Default.SatelliteName;
