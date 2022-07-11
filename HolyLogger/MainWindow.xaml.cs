@@ -623,9 +623,17 @@ namespace HolyLogger
                 }
                 if (Properties.Settings.Default.isAllowLiveLog && isRemoteServerLiveLog)
                 {
-                    UploadProgress = "100%";
-                    ToggleUploadProgress(Visibility.Visible);
-                    Task<string> response = UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
+                    try
+                    {
+                        UploadProgress = "100%";
+                        ToggleUploadProgress(Visibility.Visible);
+                        Task<string> response = UploadLogToIARC(new Progress<int>(percent => UploadProgress = percent.ToString() + "%"), new ObservableCollection<QSO> { qso });
+                    }
+                    catch (Exception ex)
+                    {
+                        ToggleUploadProgress(Visibility.Hidden);
+                    }
+                    
                 }
                 try
                 {
