@@ -391,14 +391,14 @@ namespace HolyLogger
             {
                 try
                 {
-                    qso.MyCall = (qso.MyCall == null) ? TB_MyCallsign.Text : qso.MyCall;
-                    qso.Operator = (qso.MyCall == null) ? TB_Operator.Text : qso.Operator;
-                    qso.Comment = (qso.MyCall == null) ? TB_Comment.Text : qso.Comment;
-                    qso.STX = (qso.MyCall == null) ? TB_MyHolyland.Text : qso.STX;
+                    qso.MyCall = string.IsNullOrWhiteSpace(qso.MyCall) ? TB_MyCallsign.Text : qso.MyCall;
+                    qso.Operator = string.IsNullOrWhiteSpace(qso.Operator) ? TB_Operator.Text : qso.Operator;
+                    qso.Comment = string.IsNullOrWhiteSpace(qso.Comment) ? TB_Comment.Text : qso.Comment;
+                    qso.STX = string.IsNullOrWhiteSpace(qso.STX) ? TB_MyHolyland.Text : qso.STX;
 
                     lock (this)
                     {
-                        if (!String.IsNullOrWhiteSpace(qso.MyCall) && !String.IsNullOrWhiteSpace(qso.Band) && !String.IsNullOrWhiteSpace(qso.Mode) && !String.IsNullOrWhiteSpace(qso.DXCall))
+                        if (!string.IsNullOrWhiteSpace(qso.MyCall) && !string.IsNullOrWhiteSpace(qso.Band) && !string.IsNullOrWhiteSpace(qso.Mode) && !string.IsNullOrWhiteSpace(qso.DXCall))
                         {
                             QSO q = dal.Insert(qso);
                             Qsos.Insert(0, q);
