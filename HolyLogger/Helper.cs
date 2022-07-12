@@ -5,11 +5,18 @@ using System.Net;
 using System.Xml.Linq;
 using System.Device.Location;
 using HolyParser;
+using System.Runtime.InteropServices;
 
 namespace HolyLogger
 {
     public static class Helper
     {
+        [DllImport("user32.dll")]
+        private static extern bool GetLastInputInfo(ref LASTINPUTINFO plii);
+
+        [DllImport("Kernel32.dll")]
+        private static extern uint GetLastError();
+
         public static bool LoginToQRZ(out string SessionKey)
         {
             if (string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_username) || string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_password))
@@ -78,6 +85,26 @@ namespace HolyLogger
             {
                 return false;
             }
+        }
+
+        public static uint GetIdleTime()
+        {
+            LASTINPUTINFO lastInPut = new LASTINPUTINFO();
+            lastInPut.cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf(lastInPut);
+            GetLastInputInfo(ref lastInPut);
+
+            return (uint)Environment.TickCount - lastInPut.dwTime;
+        }
+
+        public static long GetLastInputTime()
+        {
+            LASTINPUTINFO lastInPut = new LASTINPUTINFO();
+            lastInPut.cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf(lastInPut);
+            if (!GetLastInputInfo(ref lastInPut))
+            {
+                throw new Exception(GetLastError().ToString());
+            }
+            return lastInPut.dwTime;
         }
 
     }

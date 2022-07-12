@@ -31,6 +31,12 @@ using System.Windows.Controls.Primitives;
 
 namespace HolyLogger
 {
+    internal struct LASTINPUTINFO
+    {
+        public uint cbSize;
+
+        public uint dwTime;
+    }
     /// <summary>
     /// Interaction logic for MainWindow.xaml
     /// </summary>
@@ -508,7 +514,7 @@ namespace HolyLogger
             });
             
         }
-        
+
         private void RestartHeartbeatTimer()
         {
             if (HeartbeatTimer != null)
@@ -522,7 +528,11 @@ namespace HolyLogger
 
         private void HeartbeatTimer_Tick(object sender, EventArgs e)
         {
-            if (isNetworkAvailable) Helper.SendHeartbeat(TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), Frequency.Trim(), Mode.Trim());
+            uint idle_t = Helper.GetIdleTime();
+            if (isNetworkAvailable && idle_t < 1000 * 60 * 5)
+            {
+                Helper.SendHeartbeat(TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), Frequency.Trim(), Mode.Trim()); //1000->seconds 60->minute 5->minutes
+            }
         }
 
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
