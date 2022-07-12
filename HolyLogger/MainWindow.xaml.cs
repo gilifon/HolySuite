@@ -391,6 +391,7 @@ namespace HolyLogger
             {
                 try
                 {
+                    bool isValid = false;
                     qso.MyCall = string.IsNullOrWhiteSpace(qso.MyCall) ? TB_MyCallsign.Text : qso.MyCall;
                     qso.Operator = string.IsNullOrWhiteSpace(qso.Operator) ? TB_Operator.Text : qso.Operator;
                     qso.Comment = string.IsNullOrWhiteSpace(qso.Comment) ? TB_Comment.Text : qso.Comment;
@@ -403,12 +404,13 @@ namespace HolyLogger
                             QSO q = dal.Insert(qso);
                             Qsos.Insert(0, q);
                             Properties.Settings.Default.RecentQSOCounter++;
+                            isValid = true;
                         }
                     }
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
 
-                    if (Properties.Settings.Default.isAllowLiveLog && isRemoteServerLiveLog)
+                    if (isValid && Properties.Settings.Default.isAllowLiveLog && isRemoteServerLiveLog)
                     {
                         UploadProgress = "100%";
                         ToggleUploadProgress(Visibility.Visible);
