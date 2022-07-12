@@ -171,6 +171,8 @@ namespace HolyParser
 
             QSO qso_row = new QSO();
             qso_row.IsAllowWARC = IsParseWARC;
+            qso_row.Continent = "";
+            qso_row.Operator = "";
 
             Regex regex = new Regex(band_pattern, RegexOptions.IgnoreCase);
             Match match = regex.Match(row);
@@ -187,6 +189,7 @@ namespace HolyParser
                 ER_Dxcc = rem.GetDXCC(qso_row.DXCall);
                 qso_row.Country = ER_Dxcc.Name;
                 qso_row.DXCC = ER_Dxcc.Entity;
+                qso_row.Continent = ER_Dxcc.Continent;
             }
 
             regex = new Regex(mycall_pattern, RegexOptions.IgnoreCase);
@@ -194,7 +197,6 @@ namespace HolyParser
             if (match.Success)
             {
                 qso_row.MyCall = Regex.Split(row, mycall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
-                qso_row.Operator = qso_row.MyCall;
             }
             else
             {
