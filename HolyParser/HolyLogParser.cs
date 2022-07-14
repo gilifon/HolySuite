@@ -173,6 +173,13 @@ namespace HolyParser
             qso_row.IsAllowWARC = IsParseWARC;
             qso_row.Continent = "";
             qso_row.Operator = "";
+            qso_row.Comment = "";
+            qso_row.MyLocator = "";
+            qso_row.PROP_MODE = "";
+            qso_row.SAT_NAME = "";
+            qso_row.SRX = "";
+            qso_row.STX = "";
+            qso_row.Name = "";
 
             Regex regex = new Regex(band_pattern, RegexOptions.IgnoreCase);
             Match match = regex.Match(row);
@@ -243,7 +250,14 @@ namespace HolyParser
             match = regex.Match(row);
             if (match.Success)
             {
-                qso_row.Mode = mr.GetValidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+                try
+                {
+                    qso_row.Mode = mr.GetValidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+                }
+                catch
+                {
+
+                }
             }
 
             regex = new Regex(submode_pattern, RegexOptions.IgnoreCase);
@@ -278,12 +292,8 @@ namespace HolyParser
                 }
                 catch
                 {
-                    qso_row.Comment = "";
-                }                
-            }
-            else
-            {
-                qso_row.Comment = "";
+
+                }
             }
 
             regex = new Regex(dxlocator_pattern, RegexOptions.IgnoreCase);
@@ -292,20 +302,12 @@ namespace HolyParser
             {
                 qso_row.DXLocator = Regex.Split(row, dxlocator_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
             }
-            else
-            {
-                qso_row.DXLocator = "";
-            }
 
             regex = new Regex(mylocator_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
             if (match.Success)
             {
                 qso_row.MyLocator = Regex.Split(row, mylocator_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-            }
-            else
-            {
-                qso_row.MyLocator = "";
             }
 
             regex = new Regex(prop_mode_pattern, RegexOptions.IgnoreCase);
@@ -314,10 +316,6 @@ namespace HolyParser
             {
                 qso_row.PROP_MODE = Regex.Split(row, prop_mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
             }
-            else
-            {
-                qso_row.PROP_MODE = "";
-            }
 
             regex = new Regex(sat_name_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
@@ -325,12 +323,6 @@ namespace HolyParser
             {
                 qso_row.SAT_NAME = Regex.Split(row, sat_name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
             }
-            else
-            {
-                qso_row.SAT_NAME = "";
-            }
-
-
 
             //if the file contains dxcc, prefer it over the EntityResolver
             regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
@@ -356,10 +348,6 @@ namespace HolyParser
                     qso_row.SRX = Regex.Split(row, srx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
                     if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "";
                 }
-                else
-                {
-                    qso_row.SRX = "";
-                }
             }
 
             regex = new Regex(stx_pattern, RegexOptions.IgnoreCase);
@@ -375,10 +363,6 @@ namespace HolyParser
                 if (match.Success)
                 {
                     qso_row.STX = Regex.Split(row, stx_short_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-                }
-                else
-                {
-                    qso_row.STX = "XXXXX";
                 }
             }
 
@@ -399,12 +383,8 @@ namespace HolyParser
                 }
                 catch
                 {
-                    qso_row.Name = "";
+                    
                 }
-            }
-            else
-            {
-                qso_row.Name = "";
             }
 
             //if the file contains country, prefer it over the EntityResolver
@@ -601,6 +581,7 @@ namespace HolyParser
                 if (parsedFreq >= 24.89 && parsedFreq <= 24.99) return "12M";
                 if (parsedFreq >= 28 && parsedFreq <= 29.7) return "10M";
                 if (parsedFreq >= 50 && parsedFreq <= 54) return "6M";
+                if (parsedFreq >= 70 && parsedFreq <= 71) return "4M";
                 if (parsedFreq >= 144 && parsedFreq <= 148) return "2M";
                 if (parsedFreq >= 420 && parsedFreq <= 450) return "70CM";
             }
@@ -618,6 +599,7 @@ namespace HolyParser
                 if (parsedFreq >= 24890 && parsedFreq <= 24990) return "12M";
                 if (parsedFreq >= 28000 && parsedFreq <= 29700) return "10M";
                 if (parsedFreq >= 50000 && parsedFreq <= 54000) return "6M";
+                if (parsedFreq >= 70000 && parsedFreq <= 71000) return "4M";
                 if (parsedFreq >= 144000 && parsedFreq <= 148000) return "2M";
                 if (parsedFreq >= 420000 && parsedFreq <= 450000) return "70CM";
 
@@ -633,6 +615,7 @@ namespace HolyParser
                 if (parsedFreq >= 248900 && parsedFreq <= 249900) return "12M";
                 if (parsedFreq >= 280000 && parsedFreq <= 297000) return "10M";
                 if (parsedFreq >= 500000 && parsedFreq <= 540000) return "6M";
+                if (parsedFreq >= 700000 && parsedFreq <= 710000) return "4M";
             }
             else if (parsedFreq < 10000000)
             {
@@ -648,6 +631,7 @@ namespace HolyParser
                 if (parsedFreq >= 248900 && parsedFreq <= 249900) return "12M";
                 if (parsedFreq >= 280000 && parsedFreq <= 297000) return "10M";
                 if (parsedFreq >= 500000 && parsedFreq <= 540000) return "6M";
+                if (parsedFreq >= 700000 && parsedFreq <= 710000) return "4M";
                 if (parsedFreq >= 1440000 && parsedFreq <= 1480000) return "2M";
                 if (parsedFreq >= 4200000 && parsedFreq <= 4500000) return "70CM";
             }
@@ -665,6 +649,7 @@ namespace HolyParser
                 if (parsedFreq >= 24890000 && parsedFreq <= 24990000) return "12M";
                 if (parsedFreq >= 28000000 && parsedFreq <= 29700000) return "10M";
                 if (parsedFreq >= 50000000 && parsedFreq <= 54000000) return "6M";
+                if (parsedFreq >= 70000000 && parsedFreq <= 71000000) return "4M";
                 if (parsedFreq >= 144000000 && parsedFreq <= 148000000) return "2M";
                 if (parsedFreq >= 420000000 && parsedFreq <= 450000000) return "70CM";
             }
@@ -685,6 +670,7 @@ namespace HolyParser
             if (band.ToLower() == "12m") return "24900";
             if (band.ToLower() == "10m") return "28400";
             if (band.ToLower() == "6m") return "50000";
+            if (band.ToLower() == "7m") return "70000";
             if (band.ToLower() == "2m") return "145000";
             if (band.ToLower() == "70cm") return "433000";
             return string.Empty;

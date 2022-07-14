@@ -244,7 +244,7 @@
         <Label Content="My Locator" HorizontalAlignment="Left" Margin="507,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
         <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="602,16,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="90" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="8" TabIndex="3"/>
         <Label Content="Mode" HorizontalAlignment="Left" Margin="544,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="603,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="89" FontSize="16" Height="28" TabIndex="7">
+        <ComboBox x:Name="CB_Mode" Text="{Binding Mode, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="603,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="89" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged">
             <ComboBoxItem x:Name="op_cw" Content="CW"/>
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
             <ComboBoxItem x:Name="op_ssb" IsSelected="True" Content="SSB"/>

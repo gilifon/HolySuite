@@ -239,8 +239,12 @@ namespace HolyLogger
 
         public static UdpClient Client;
 
+        string MachineName = "Default";
+
         public MainWindow()
         {
+            MachineName = Environment.MachineName;
+
             Qsos = new ObservableCollection<QSO>();
             rem = new EntityResolver();
             InitializeComponent();
@@ -536,33 +540,33 @@ namespace HolyLogger
             uint idle_t = Helper.GetIdleTime();
             if (isNetworkAvailable && idle_t < 1000 * 60 * 5)
             {
-                Helper.SendHeartbeat(TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), Frequency.Trim(), Mode.Trim()); //1000->seconds 60->minute 5->minutes
+                Helper.SendHeartbeat(MachineName, TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), Frequency.Trim(), Mode.Trim()); //1000->seconds 60->minute 5->minutes
             }
         }
 
         private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
-            switch (e.PropertyName)
-            {
-                case FLD_Mode:
-                    if (state == State.New)
-                    {
-                        if (mMode == "SSB" || mMode == "FM")
-                        {
-                            TB_RSTSent.Text = "59";
-                            TB_RSTRcvd.Text = "59";
-                        }
-                        else
-                        {
-                            TB_RSTSent.Text = "599";
-                            TB_RSTRcvd.Text = "599";
-                        }
-                    }
-                    UpdateDup();
-                    break;
-                default:
-                    break;
-            }
+            //switch (e.PropertyName)
+            //{
+            //    case FLD_Mode:
+            //        if (state == State.New)
+            //        {
+            //            if (mMode == "SSB" || mMode == "FM")
+            //            {
+            //                TB_RSTSent.Text = "59";
+            //                TB_RSTRcvd.Text = "59";
+            //            }
+            //            else
+            //            {
+            //                TB_RSTSent.Text = "599";
+            //                TB_RSTRcvd.Text = "599";
+            //            }
+            //        }
+            //        UpdateDup();
+            //        break;
+            //    default:
+            //        break;
+            //}
         }
         
         public void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
@@ -2083,6 +2087,26 @@ namespace HolyLogger
 
         private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            try
+            {
+                string val = CB_Mode.Text;
+                if (val == "SSB" || val == "FM")
+                {
+                    TB_RSTSent.Text = "59";
+                    TB_RSTRcvd.Text = "59";
+                }
+                else
+                {
+                    TB_RSTSent.Text = "599";
+                    TB_RSTRcvd.Text = "599";
+                }
+                UpdateDup();
+            }
+            catch (Exception)
+            {
+
+                //throw;
+            }
             
         }
 

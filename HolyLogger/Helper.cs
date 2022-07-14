@@ -55,12 +55,12 @@ namespace HolyLogger
             }
         }
 
-        public static void SendHeartbeat(string callsign, string op_callsign, string frequency, string mode)
+        public static void SendHeartbeat(string machineName, string callsign, string op_callsign, string frequency, string mode)
         {
             ServicePointManager.Expect100Continue = true;
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             if (string.IsNullOrEmpty(callsign) || string.IsNullOrEmpty(frequency) || string.IsNullOrEmpty(mode)) return;
-            WebRequest request = WebRequest.Create("https://www.iarc.org/Holyland/Server/heartbeat.php?callsign=" + callsign + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode);
+            WebRequest request = WebRequest.Create("https://www.iarc.org/Holyland/Server/heartbeat.php?callsign=" + callsign + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode + "&machine=" + machineName);
             try
             {
                 var response = request.GetResponseAsync();
