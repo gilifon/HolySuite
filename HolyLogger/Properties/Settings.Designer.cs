@@ -958,5 +958,17 @@ namespace HolyLogger.Properties {
                 this["selectedCategory"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool IsOverrideOperator {
+            get {
+                return ((bool)(this["IsOverrideOperator"]));
+            }
+            set {
+                this["IsOverrideOperator"] = value;
+            }
+        }
     }
 }

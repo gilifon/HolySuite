@@ -9,5 +9,6 @@
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsParseWarc" Content="Allow WARC Bands" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsParseWARC, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" />
         <CheckBox x:Name="CBX_IsParseDuplicates" Content="Import Duplicates" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsParseDuplicates, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,26,0,0"/>
+        <CheckBox x:Name="CBX_IsOverrideOperator" Content="Override 'Operator' with local value" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsOverrideOperator, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,52,0,0"/>
     </Grid>
 </UserControl>

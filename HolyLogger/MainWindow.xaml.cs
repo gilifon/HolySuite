@@ -400,6 +400,11 @@ namespace HolyLogger
                     bool isValid = false;
                     qso.MyCall = string.IsNullOrWhiteSpace(qso.MyCall) ? TB_MyCallsign.Text : qso.MyCall;
                     qso.Operator = string.IsNullOrWhiteSpace(qso.Operator) ? TB_Operator.Text : qso.Operator;
+                    if (Properties.Settings.Default.IsOverrideOperator)
+                    {
+                        qso.Operator = TB_Operator.Text;
+                    }
+
                     qso.Comment = string.IsNullOrWhiteSpace(qso.Comment) ? TB_Comment.Text : qso.Comment;
                     qso.STX = string.IsNullOrWhiteSpace(qso.STX) ? TB_MyHolyland.Text : qso.STX;
 
