@@ -296,7 +296,6 @@ namespace HolyLogger
             AdifHandlerWorker.ProgressChanged += AdifHandlerWorker_ProgressChanged;
             AdifHandlerWorker.RunWorkerCompleted += AdifHandlerWorker_RunWorkerCompleted;
             
-            
 
             QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
             ToggleQRZAutoOpen();
@@ -321,6 +320,22 @@ namespace HolyLogger
                 System.Windows.Application.Current.Shutdown();
                 return;
             }
+
+            bool item_found = false;
+            foreach (ComboBoxItem item in CB_Mode.Items)
+            {
+                if ((string)item.Content == Properties.Settings.Default.Mode)
+                {
+                    CB_Mode.SelectedItem = item;
+                    item_found = true;
+                    break;
+                }
+            }
+            if (!item_found)
+            {
+                CB_Mode.SelectedIndex = 0;
+            }
+            CB_Mode.Text = Properties.Settings.Default.Mode;
             
             TB_MyCallsign.Focus();
 
@@ -540,7 +555,7 @@ namespace HolyLogger
             uint idle_t = Helper.GetIdleTime();
             if (isNetworkAvailable && idle_t < 1000 * 60 * 5)
             {
-                Helper.SendHeartbeat(MachineName, TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), Frequency.Trim(), Mode.Trim()); //1000->seconds 60->minute 5->minutes
+                Helper.SendHeartbeat(MachineName, TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), TB_Frequency.Text.Trim(), CB_Mode.Text.Trim()); //1000->seconds 60->minute 5->minutes
             }
         }
 
@@ -618,7 +633,7 @@ namespace HolyLogger
                 QSO qso = new QSO();
                 qso.Comment = TB_Comment.Text;
                 qso.DXCall = TB_DXCallsign.Text;
-                qso.Mode = Mode;
+                qso.Mode = CB_Mode.Text;
                 qso.SRX = TB_Exchange.Text;
                 qso.Freq = TB_Frequency.Text;
                 qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
@@ -676,7 +691,7 @@ namespace HolyLogger
             {
                 QsoToUpdate.Comment = TB_Comment.Text;
                 QsoToUpdate.DXCall = TB_DXCallsign.Text;
-                QsoToUpdate.Mode = Mode;
+                QsoToUpdate.Mode = CB_Mode.Text;
                 QsoToUpdate.SRX = TB_Exchange.Text;
                 QsoToUpdate.Freq = TB_Frequency.Text;
                 QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
@@ -735,7 +750,7 @@ namespace HolyLogger
             //TB_Comment.Text = QsoPreUpdate.Comment;
             //TB_DXCallsign.Text = QsoPreUpdate.DXCall;
             //TB_Exchange.Text = QsoPreUpdate.SRX;
-            Frequency = QsoPreUpdate.Freq;
+            TB_Frequency.Text = QsoPreUpdate.Freq;
             TB_MyCallsign.Text = QsoPreUpdate.MyCall;
             TB_Operator.Text = QsoPreUpdate.Operator;
             TB_MyHolyland.Text = QsoPreUpdate.STX;
@@ -744,7 +759,7 @@ namespace HolyLogger
             //TB_RSTRcvd.Text = QsoPreUpdate.RST_RCVD;
             //TB_RSTSent.Text = QsoPreUpdate.RST_SENT;
             //TB_DX_Name.Text = QsoPreUpdate.Name;
-            Mode = QsoPreUpdate.Mode;
+            CB_Mode.Text = QsoPreUpdate.Mode;
         }
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
@@ -792,7 +807,7 @@ namespace HolyLogger
             TB_Exchange.Clear();
             TB_DXLocator.Clear();
 
-            if (mMode == "SSB" || mMode == "FM")
+            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
             {
                 TB_RSTSent.Text = "59";
                 TB_RSTRcvd.Text = "59";
@@ -1277,7 +1292,7 @@ namespace HolyLogger
             QsoPreUpdate.Comment = TB_Comment.Text;
             QsoPreUpdate.DXCall = TB_DXCallsign.Text;
             QsoPreUpdate.SRX = TB_Exchange.Text;
-            QsoPreUpdate.Freq = Frequency;
+            QsoPreUpdate.Freq = TB_Frequency.Text;
             QsoPreUpdate.MyCall = TB_MyCallsign.Text;
             QsoPreUpdate.Operator = TB_Operator.Text;
             QsoPreUpdate.STX = TB_MyHolyland.Text;
@@ -1286,7 +1301,7 @@ namespace HolyLogger
             QsoPreUpdate.RST_RCVD = TB_RSTRcvd.Text;
             QsoPreUpdate.RST_SENT = TB_RSTSent.Text;
             QsoPreUpdate.Name = TB_DX_Name.Text;
-            QsoPreUpdate.Mode = Mode;
+            QsoPreUpdate.Mode = CB_Mode.Text;
         }
 
         private void LoadQsoForUpdate()
@@ -1296,7 +1311,7 @@ namespace HolyLogger
             TB_Comment.Text = QsoToUpdate.Comment;
             TB_DXCallsign.Text = QsoToUpdate.DXCall;
             TB_Exchange.Text = QsoToUpdate.SRX;
-            Frequency = QsoToUpdate.Freq;
+            TB_Frequency.Text = QsoToUpdate.Freq;
             TB_MyCallsign.Text = QsoToUpdate.MyCall;
             TB_Operator.Text = QsoToUpdate.Operator;
             TB_MyHolyland.Text = QsoToUpdate.STX;
@@ -1305,7 +1320,7 @@ namespace HolyLogger
             TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
             TB_RSTSent.Text = QsoToUpdate.RST_SENT;
             TB_DX_Name.Text = QsoToUpdate.Name;
-            Mode = QsoToUpdate.Mode;
+            CB_Mode.Text = QsoToUpdate.Mode;
 
             try
             {
@@ -2179,7 +2194,7 @@ namespace HolyLogger
 
         private void UpdateDup()
         {
-            var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band == TB_Band.Text && qso.Mode == Mode select qso;
+            var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band == TB_Band.Text && qso.Mode == CB_Mode.Text select qso;
             var legal = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
 
             if (state == State.Edit)
@@ -2599,32 +2614,6 @@ namespace HolyLogger
         }
 
 
-        /// <summary>
-        /// Mode
-        /// </summary>
-        public const string FLD_Mode = "Mode";
-
-        /// <summary>
-        /// Mode
-        /// </summary>
-        private string mMode = "SSB";
-
-        /// <summary>
-        /// Mode
-        /// </summary>
-        public string Mode
-        {
-            get
-            {
-                return mMode;
-            }
-            set
-            {
-                mMode = value;
-                OnPropertyChanged(FLD_Mode);
-            }
-        }
-
         public string Rig1 { get; set; }
         public string Rig2 { get; set; }
 
@@ -2866,43 +2855,43 @@ namespace HolyLogger
                         radioRX += Properties.Settings.Default.SatelliteShift;
                     RX = radioRX.ToString("###0.000000");
                     TX = radioTX.ToString("###0.000000");
-                    Frequency = RX;
+                    TB_Frequency.Text = RX;
                     switch (Rig.Mode)
                     {
                         case (OmniRig.RigParamX)PM_CW_L:
                             //cmbMode.Text = cmbMode.Items[1].ToString();
-                            Mode = "CW";
+                            CB_Mode.Text = "CW";
                             break;
                         case (OmniRig.RigParamX)PM_CW_U:
                             //cmbMode.Text = cmbMode.Items[0].ToString();
-                            Mode = "CW";
+                            CB_Mode.Text = "CW";
                             break;
                         case (OmniRig.RigParamX)PM_SSB_L:
                             //cmbMode.Text = cmbMode.Items[3].ToString();
-                            Mode = "SSB";
+                            CB_Mode.Text = "SSB";
                             break;
                         case (OmniRig.RigParamX)PM_SSB_U:
                             // cmbMode.Text = cmbMode.Items[2].ToString();
-                            Mode = "SSB";
+                            CB_Mode.Text = "SSB";
                             break;
                         case (OmniRig.RigParamX)PM_FM:
                             // cmbMode.Text = cmbMode.Items[7].ToString();
-                            Mode = "FM";
+                            CB_Mode.Text = "FM";
                             break;
                         case (OmniRig.RigParamX)PM_AM:
                             // cmbMode.Text = cmbMode.Items[7].ToString();
-                            Mode = "AM";
+                            CB_Mode.Text = "AM";
                             break;
                         case (OmniRig.RigParamX)PM_DIG_L:
                             // cmbMode.Text = cmbMode.Items[7].ToString();
-                            Mode = "DIGI";
+                            CB_Mode.Text = "DIGI";
                             break;
                         case (OmniRig.RigParamX)PM_DIG_U:
                             // cmbMode.Text = cmbMode.Items[7].ToString();
-                            Mode = "DIGI";
+                            CB_Mode.Text = "DIGI";
                             break;
                         default:
-                            Mode = "DIGI";
+                            CB_Mode.Text = "DIGI";
                             break;
                     }
                 });

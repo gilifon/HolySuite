@@ -239,5 +239,14 @@
     <Setting Name="IsOverrideOperator" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="Frequency" Type="System.String" Scope="User">
+      <Value Profile="(Default)">7.130</Value>
+    </Setting>
+    <Setting Name="Comment" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="Mode" Type="System.String" Scope="User">
+      <Value Profile="(Default)">SSB</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
