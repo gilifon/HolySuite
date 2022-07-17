@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="300" d:DesignWidth="380">
+             d:DesignHeight="340" d:DesignWidth="380">
 
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsShowMatrix" Content="Show matrix in main window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowMatrixControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
@@ -14,7 +14,8 @@
         <CheckBox x:Name="CBX_ShowNetworkFlag" Content="Show the Network connectivity icon" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowNetworkFlag, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,78,0,0"/>
         <CheckBox x:Name="CBX_Lock" Content="Lock My Callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isLocked, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,104,0,0"/>
         <CheckBox x:Name="CBX_DisplayLastQSOinGrid" Content="Highlight last QSO" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.DisplayLastQSOinGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,130,0,0"/>
-        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,156,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
+        <CheckBox x:Name="CBX_UseDXCCDefaultGrid" Content="Use default grid for DXCC" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.UseDXCCDefaultGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,156,0,0"/>
+        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,182,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AutoQRZ_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Open QRZ.com page"  Click="HasChanged_Click" IsChecked="{Binding Default.QRZ_auto_open, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>

@@ -1006,5 +1006,17 @@ namespace HolyLogger.Properties {
                 this["Mode"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool UseDXCCDefaultGrid {
+            get {
+                return ((bool)(this["UseDXCCDefaultGrid"]));
+            }
+            set {
+                this["UseDXCCDefaultGrid"] = value;
+            }
+        }
     }
 }

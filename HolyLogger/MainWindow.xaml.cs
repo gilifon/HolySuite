@@ -2127,6 +2127,7 @@ namespace HolyLogger
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
+            ClearDXLocator();
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 TB_DXCC.Text = "";
@@ -2147,6 +2148,8 @@ namespace HolyLogger
                 QRZGrid = dXCC.Locator;
                 Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
                 SetAzimuth();
+                if (Properties.Settings.Default.UseDXCCDefaultGrid)
+                    SetDXLocator(QRZGrid);
                 GetQrzData();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
@@ -2248,7 +2251,6 @@ namespace HolyLogger
                     var distance = MaidenheadLocator.Distance(TB_MyLocator.Text, QRZGrid);
                     AzimuthControl.azimuthData.Azimuth = Azimuth;
                     AzimuthControl.azimuthData.Distance = distance;
-                    TB_DXLocator.Text = QRZGrid;
                 }
                 catch (Exception e)
                 {
@@ -2260,13 +2262,25 @@ namespace HolyLogger
                 ClearAzimuth();
             }
         }
+        private void SetDXLocator(string locator)
+        {
+            if (!string.IsNullOrWhiteSpace(locator))
+            {
+                TB_DXLocator.Text = locator;
+            }
+        }
+        private void ClearDXLocator()
+        {
+            TB_DXLocator.Clear();            
+        }
+
+
 
         private void ClearAzimuth()
         {
             Azimuth = 0;
             AzimuthControl.azimuthData.Azimuth = Azimuth;
             AzimuthControl.azimuthData.Distance = 0;
-            TB_DXLocator.Text = "";
         }
 
         private async void GetQrzData()
@@ -2317,6 +2331,7 @@ namespace HolyLogger
                                     QRZGrid = grid.FirstOrDefault().Value.ToUpper();
 
                                 SetAzimuth();
+                                SetDXLocator(QRZGrid);
                                 //*************************************************//
 
                                 string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
