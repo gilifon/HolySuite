@@ -2632,10 +2632,6 @@ namespace HolyLogger
         public string Rig1 { get; set; }
         public string Rig2 { get; set; }
 
-        public string Rig3 { get; set; }
-
-        public string Rig4 { get; set; }
-
         #endregion
         #region Constants
         // Constants for enum RigParamX
@@ -2743,15 +2739,6 @@ namespace HolyLogger
             {
                 Rig1 = "";
                 Rig2 = "";
-            }
-            try
-            {
-                Rig3 = OmniRigEngine.Rig3.RigType;
-                Rig4 = OmniRigEngine.Rig4.RigType;
-            }
-            catch {
-                Rig3 = "";
-                Rig4 = "";
             }
         }
         private void SubscribeToEvents()
