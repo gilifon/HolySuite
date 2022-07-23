@@ -309,7 +309,8 @@ namespace HolyContestManager
 
         private void GetData()
         {
-            WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
+            //WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
+            WebRequest request = WebRequest.Create("https://www.iarc.org/maccabiah/Server/GetLogForADIF.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;
             Stream dataStream = response.GetResponseStream();
@@ -335,6 +336,9 @@ namespace HolyContestManager
 
         private void CalculateWorker_DoWork(object sender, DoWorkEventArgs e)
         {
+            GenerateLogFile("4Z21MG");
+            GenerateLogFile("4X21MG");
+
             Report.Clear();
             
             int iteration = 0;
@@ -342,11 +346,12 @@ namespace HolyContestManager
 
             //List<Participant> participants = RawData.participants.Where(q => !q.callsign.StartsWith("4X") && !q.callsign.StartsWith("4Z")).OrderByDescending(t => t.qsos).ToList();
             List<Participant> participants = RawData.participants.Where(q => q.callsign.StartsWith("4X") || q.callsign.StartsWith("4Z")).OrderByDescending(t => t.qsos).ToList();
+            
 
             foreach (Participant p in participants)
             {
-                //GenerateLogFile(p);
-
+                GenerateLogFile(p);
+                return;
                 iteration++;
                 if (p.is_manual == 0) // && Helper.getBareCallsign(p.callsign).ToUpper() == "VU3XIO")
                 {
@@ -406,9 +411,14 @@ namespace HolyContestManager
 
         private void GenerateLogFile(Participant p)
         {
-            IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+            GenerateLogFile(p.callsign);
+        }
+
+        private void GenerateLogFile(string callsign)
+        {
+            IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(callsign) select q;
             string adif = HolyParser.Services.GenerateAdif(qsosx);
-            System.IO.FileStream fs = File.Create(files_path + Helper.getBareCallsign(p.callsign) + ".adi");
+            System.IO.FileStream fs = File.Create(files_path + Helper.getBareCallsign(callsign) + ".adi");
             StreamWriter sw = new StreamWriter(fs);
             sw.Write(adif);
             sw.Close();

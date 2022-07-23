@@ -2575,33 +2575,7 @@ namespace HolyLogger
                 OnPropertyChanged(FLD_TX);
             }
         }
-
-        /// <summary>
-        /// Frequency
-        /// </summary>
-        public const string FLD_Frequency = "Frequency";
-
-        /// <summary>
-        /// Frequency
-        /// </summary>
-        private string mFrequency = "14.220000";
-
-        /// <summary>
-        /// Frequency
-        /// </summary>
-        public string Frequency
-        {
-            get
-            {
-                return mFrequency;
-            }
-            set
-            {
-                mFrequency = value;
-                OnPropertyChanged(FLD_Frequency);
-            }
-        }
-
+                
         /// <summary>
         /// Status
         /// </summary>

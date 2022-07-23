@@ -188,16 +188,42 @@ namespace HolyParser
                 qso_row.Band = Regex.Split(row, band_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim().ToUpper();
             }
 
+            //if the file contains country, let it be the default
+            regex = new Regex(country_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Country = Regex.Split(row, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+
             regex = new Regex(dxcall_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
             if (match.Success)
             {
                 qso_row.DXCall = Regex.Split(row, dxcall_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).ToUpper();
+
+                //use the callsign to resolve the entity info
                 ER_Dxcc = rem.GetDXCC(qso_row.DXCall);
-                qso_row.Country = ER_Dxcc.Name;
+
+                qso_row.Country = ER_Dxcc.Name != "Unknown" ? ER_Dxcc.Name : qso_row.Country;
                 qso_row.DXCC = ER_Dxcc.Entity;
                 qso_row.Continent = ER_Dxcc.Continent;
+
             }
+
+            //if the file contains dxcc, prefer it over the EntityResolver
+            regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.DXCC = Regex.Split(row, dxcc_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+
+                ER_Dxcc = rem.GetDXCC(qso_row.DXCall);
+                qso_row.Country = ER_Dxcc.Name != "Unknown" ? ER_Dxcc.Name : qso_row.Country;
+                qso_row.Continent = ER_Dxcc.Continent;
+            }
+
+            
 
             regex = new Regex(mycall_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
@@ -324,14 +350,6 @@ namespace HolyParser
                 qso_row.SAT_NAME = Regex.Split(row, sat_name_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
             }
 
-            //if the file contains dxcc, prefer it over the EntityResolver
-            regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
-            match = regex.Match(row);
-            if (match.Success)
-            {
-                qso_row.DXCC = Regex.Split(row, dxcc_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
-            }
-
             regex = new Regex(srx_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
             if (match.Success)
@@ -385,14 +403,6 @@ namespace HolyParser
                 {
                     
                 }
-            }
-
-            //if the file contains country, prefer it over the EntityResolver
-            regex = new Regex(country_pattern, RegexOptions.IgnoreCase);
-            match = regex.Match(row);
-            if (match.Success)
-            {
-                qso_row.Country = Regex.Split(row, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
             }
             qso_row.StandartizeQSO();
             return qso_row;

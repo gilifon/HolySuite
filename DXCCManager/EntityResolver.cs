@@ -393,7 +393,7 @@ namespace DXCCManager
                     prefixesRegexCache.Add("^(" + item.Prefixes + ".*)", compiledRegex);
                 }
             }
-        }        
+        }
 
         public DXCC GetDXCC(string callsign)
         {
@@ -405,6 +405,17 @@ namespace DXCCManager
                 }
             }
             return new DXCC() { Continent = "XX", Entity = "-1", Name = "Unknown", Prefixes = callsign.Length >= 2 ? callsign.ToUpper().Substring(0, 2) : callsign.ToUpper() };
+        }
+        public DXCC GetDXCCbyEntityCode(string entityCode)
+        {
+            foreach (DXCC item in FinalDXCCs)
+            {
+                if (!string.IsNullOrWhiteSpace(item.Entity) && prefixesRegexCache["^(" + item.Entity + ".*)"].IsMatch(entityCode.ToUpper()) && !string.IsNullOrWhiteSpace(item.Name))
+                {
+                    return item;
+                }
+            }
+            return new DXCC() { Continent = "XX", Entity = "-1", Name = "Unknown", Prefixes = "" };
         }
 
         public string GetContinent(string callsign)
