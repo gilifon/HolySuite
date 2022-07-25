@@ -233,7 +233,6 @@ namespace HolyLogger
         private const int SEND_CHUNK_SIZE = 200;
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
-        BitmapImage qrz_off_path = new BitmapImage(new Uri("Images/qrz_off.png", UriKind.Relative));
         
         List<string> ImportFileQ = new List<string>();
 
@@ -296,10 +295,6 @@ namespace HolyLogger
             AdifHandlerWorker.ProgressChanged += AdifHandlerWorker_ProgressChanged;
             AdifHandlerWorker.RunWorkerCompleted += AdifHandlerWorker_RunWorkerCompleted;
             
-
-            QRZBtn.Visibility = Properties.Settings.Default.show_qrz ? System.Windows.Visibility.Visible : System.Windows.Visibility.Hidden;
-            ToggleQRZAutoOpen();
-
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
@@ -465,14 +460,6 @@ namespace HolyLogger
             {
                 NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             });
-        }
-
-        private void ToggleQRZAutoOpen()
-        {
-            if (Properties.Settings.Default.QRZ_auto_open)
-                QRZBtn.Source = qrz_path;
-            else
-                QRZBtn.Source = qrz_off_path;
         }
 
         private void ToggleMatrixControl()
@@ -764,39 +751,9 @@ namespace HolyLogger
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
         {
-            Properties.Settings.Default.QRZ_auto_open = !Properties.Settings.Default.QRZ_auto_open;
-            Properties.Settings.Default.DoNothing = !Properties.Settings.Default.QRZ_auto_open;
-            QRZBtn.Source = Properties.Settings.Default.QRZ_auto_open ? qrz_path : qrz_off_path;
-        }
-
-        private void AutoOpenQRZPage()
-        {
-            string url = "http://www.qrz.com";
             if (!string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
-                url += "/db/" + TB_DXCallsign.Text;
-            
-            try
             {
-                if (Properties.Settings.Default.QRZ_auto_open && QRZProcess != null && !QRZProcess.HasExited)
-                {
-                    QRZProcess.CloseMainWindow();
-                }
-                QRZProcess = new Process();
-                QRZProcess.StartInfo.FileName = "Chrome.exe";
-                //QRZProcess.StartInfo.Arguments = "--user-data-dir=" + Path.GetTempPath() + "HolyLogger " + url;
-                QRZProcess.StartInfo.Arguments = url;
-
-                if (QRZProcess.Start())
-                {
-                    QRZProcess.WaitForInputIdle();
-                    Thread.Sleep(Properties.Settings.Default.QRZ_auto_open_delay);
-                    SetForegroundWindow(Process.GetCurrentProcess().MainWindowHandle);
-                }
-            }
-            catch (Exception ex)
-            {
-                QRZBtn_Click(null, null);
-                MessageBox.Show("Please install 'Chrome' and try again");
+                GetQrzData();
             }
         }
 
@@ -924,7 +881,7 @@ namespace HolyLogger
             UploadProgressSpinner.Visibility = visibility;
             L_UploadProgress.Visibility = visibility;
         }
-
+         
         private void AdifHandlerWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             int faultyQSO = 0;
@@ -1681,7 +1638,6 @@ namespace HolyLogger
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
-            ToggleQRZAutoOpen();
             if (optionWindow.GeneralSettingsControlControlInstance.HasChanged)
             {
                 SelectRig();
@@ -2058,8 +2014,7 @@ namespace HolyLogger
         {
             if (e.Key == Key.Enter)
             {
-                //TB_Exchange.Focus();
-                if (Properties.Settings.Default.QRZ_auto_open && isNetworkAvailable) AutoOpenQRZPage();
+
             }
             else if (e.Key == Key.Space)
             {
@@ -2150,7 +2105,8 @@ namespace HolyLogger
                 SetAzimuth();
                 if (Properties.Settings.Default.UseDXCCDefaultGrid)
                     SetDXLocator(QRZGrid);
-                GetQrzData();
+                if (state == State.New)
+                    GetQrzData();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
                 {

@@ -5,9 +5,6 @@
     <Setting Name="my_callsign" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
-    <Setting Name="show_qrz" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
-    </Setting>
     <Setting Name="validation_enabled" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
@@ -127,12 +124,6 @@
     </Setting>
     <Setting Name="LogUploadWindowTop" Type="System.Double" Scope="User">
       <Value Profile="(Default)">50</Value>
-    </Setting>
-    <Setting Name="QRZ_auto_open" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
-    </Setting>
-    <Setting Name="QRZ_auto_open_delay" Type="System.Int32" Scope="User">
-      <Value Profile="(Default)">1500</Value>
     </Setting>
     <Setting Name="LogInfoWindowLeft" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">100</Value>

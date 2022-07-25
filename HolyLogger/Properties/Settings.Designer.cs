@@ -38,18 +38,6 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool show_qrz {
-            get {
-                return ((bool)(this["show_qrz"]));
-            }
-            set {
-                this["show_qrz"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool validation_enabled {
             get {
                 return ((bool)(this["validation_enabled"]));
@@ -524,30 +512,6 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["LogUploadWindowTop"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("True")]
-        public bool QRZ_auto_open {
-            get {
-                return ((bool)(this["QRZ_auto_open"]));
-            }
-            set {
-                this["QRZ_auto_open"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("1500")]
-        public int QRZ_auto_open_delay {
-            get {
-                return ((int)(this["QRZ_auto_open_delay"]));
-            }
-            set {
-                this["QRZ_auto_open_delay"] = value;
             }
         }
         
