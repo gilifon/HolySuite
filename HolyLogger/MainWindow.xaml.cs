@@ -28,6 +28,7 @@ using System.Net.NetworkInformation;
 using System.Windows.Media;
 using System.Net.Sockets;
 using System.Windows.Controls.Primitives;
+using Newtonsoft.Json;
 
 namespace HolyLogger
 {
@@ -1084,6 +1085,7 @@ namespace HolyLogger
             int c = 1;
             foreach (var chunk in ChunkedQSOs)
             {
+                //string insert = JsonConvert.SerializeObject(chunk);
                 string insert = GenerateMultipleInsert(chunk);
 
                 //************************************************** ASYNC ********************************************//
