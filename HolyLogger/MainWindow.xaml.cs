@@ -1048,27 +1048,31 @@ namespace HolyLogger
         
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
         {
-            //string delete = "DELETE FROM `log` WHERE `my_call`= '" + callsign + "';";
-            string insert = "INSERT  INTO  `participants` (`callsign`,`category_op`,`category_mode`,`category_power`,`email`,`name`,`country`,`year`,`qsos`,`points`) VALUES ('" + callsign + "','" + category_op + "','" + category_mode + "','" + category_power + "','" + email + "','" + name + "','" + country + "','" + DateTime.UtcNow.Year + "','" + Qsos.Count + "','" + Score + "') ON DUPLICATE KEY UPDATE `category_op`= '" + category_op + "',`category_mode`= '" + category_mode + "',`category_power`= '" + category_power + "',`email`= '" + email + "',`name`= '" + name + "',`year`= '" + DateTime.UtcNow.Year + "',`qsos`= '" + Qsos.Count + "',`points`= '" + Score + "'";
-            //************************************************** ASYNC ********************************************//
-            //string deleteResponse = await ExecuteQuery(delete);
-            string insertResponse = await ExecuteQuery(insert);
-            return insertResponse;
-        }
+            Participant participant = new Participant();
+            participant.Callsign = callsign;
+            participant.CategoryOp = category_op;
+            participant.CategoryMode = category_mode;
+            participant.CategoryPower = category_power;
+            participant.Email = email;
+            participant.Name = name;
+            participant.Country = country;
+            participant.Year = DateTime.UtcNow.Year;
+            participant.QSOs = Qsos.Count;
+            participant.Points = Score;
 
-        private async Task<string> ExecuteQuery(string query)
-        {
+           string participantJSON = JsonConvert.SerializeObject(participant);
+
+            //************************************************** ASYNC ********************************************//
             using (var client = new HttpClient())
             {
                 var values = new Dictionary<string, string>
-                {
-                    { "insertlog", query }
-                };
+                    {
+                        { "data", participantJSON }
+                    };
                 var content = new FormUrlEncodedContent(values);
-                
                 try
                 {
-                    var response = await client.PostAsync(Properties.Settings.Default.baseURL+"/Holyland/Server/AddLog.php", content);
+                    var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddParticipant.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     return responseString;
                 }
@@ -1085,7 +1089,7 @@ namespace HolyLogger
             int c = 1;
             foreach (var chunk in ChunkedQSOs)
             {
-                string insert = JsonConvert.SerializeObject(chunk);
+                string chunkJSON = JsonConvert.SerializeObject(chunk);
                 //string insert = GenerateMultipleInsert(chunk);
 
                 //************************************************** ASYNC ********************************************//
@@ -1093,7 +1097,7 @@ namespace HolyLogger
                 {
                     var values = new Dictionary<string, string>
                     {
-                        { "insertlog", insert }
+                        { "data", chunkJSON }
                     };
                     var content = new FormUrlEncodedContent(values);
                     try
