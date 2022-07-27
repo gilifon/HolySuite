@@ -60,7 +60,7 @@ namespace HolyLogger
             ServicePointManager.Expect100Continue = true;
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             if (string.IsNullOrEmpty(callsign) || string.IsNullOrEmpty(frequency) || string.IsNullOrEmpty(mode)) return;
-            WebRequest request = WebRequest.Create("https://www.iarc.org/Holyland/Server/heartbeat.php?callsign=" + callsign + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode + "&machine=" + machineName);
+            WebRequest request = WebRequest.Create(Properties.Settings.Default.baseURL + "/Holyland/Server/heartbeat.php?callsign=" + callsign + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode + "&machine=" + machineName);
             try
             {
                 var response = request.GetResponseAsync();

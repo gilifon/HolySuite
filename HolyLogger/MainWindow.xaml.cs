@@ -1068,7 +1068,7 @@ namespace HolyLogger
                 
                 try
                 {
-                    var response = await client.PostAsync("https://www.iarc.org/Holyland/Server/AddLog.php", content);
+                    var response = await client.PostAsync(Properties.Settings.Default.baseURL+"/Holyland/Server/AddLog.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     return responseString;
                 }
@@ -1085,8 +1085,8 @@ namespace HolyLogger
             int c = 1;
             foreach (var chunk in ChunkedQSOs)
             {
-                //string insert = JsonConvert.SerializeObject(chunk);
-                string insert = GenerateMultipleInsert(chunk);
+                string insert = JsonConvert.SerializeObject(chunk);
+                //string insert = GenerateMultipleInsert(chunk);
 
                 //************************************************** ASYNC ********************************************//
                 using (var client = new HttpClient())
@@ -1098,7 +1098,8 @@ namespace HolyLogger
                     var content = new FormUrlEncodedContent(values);
                     try
                     {
-                        var response = await client.PostAsync("https://www.iarc.org/Holyland/Server/AddLog.php", content);
+                        var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddQSO.php", content);
+                        //var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php", content);
                         var responseString = await response.Content.ReadAsStringAsync();
 
                         progress.Report(c++ * 100 / ChunkedQSOs.Count);
@@ -1136,7 +1137,7 @@ namespace HolyLogger
             //************************************************** ASYNC ********************************************//
             using (WebClient client = new WebClient())
             {
-                client.UploadValuesAsync(new Uri("http://www.iarc.org/Holyland/Server/AddLog.php"), new NameValueCollection()
+                client.UploadValuesAsync(new Uri(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php"), new NameValueCollection()
                     {
                         { "insertlog", GenerateMultipleInsert(new List<QSO>{qso}) }
                     });
