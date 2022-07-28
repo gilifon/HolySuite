@@ -1272,6 +1272,7 @@ namespace HolyLogger
         {
             ClearBtn_Click(null, null);
             UpdateState(State.Edit);
+            CB_Mode.Text = QsoToUpdate.Mode;
             TB_Comment.Text = QsoToUpdate.Comment;
             TB_DXCallsign.Text = QsoToUpdate.DXCall;
             TB_Exchange.Text = QsoToUpdate.SRX;
@@ -1284,7 +1285,7 @@ namespace HolyLogger
             TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
             TB_RSTSent.Text = QsoToUpdate.RST_SENT;
             TB_DX_Name.Text = QsoToUpdate.Name;
-            CB_Mode.Text = QsoToUpdate.Mode;
+            
 
             try
             {
