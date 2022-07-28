@@ -685,7 +685,7 @@ namespace HolyLogger
                 QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 QsoToUpdate.Country = Country;
                 QsoToUpdate.Continent = Continent;
-                QsoToUpdate.Name = FName.Length > 25 ? FName.Substring(0, 25) : FName;
+                QsoToUpdate.Name = TB_DX_Name.Text.Length > 25 ? TB_DX_Name.Text.Substring(0, 25) : TB_DX_Name.Text; //FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.Operator = TB_Operator.Text;
                 QsoToUpdate.STX = TB_MyHolyland.Text;
@@ -2738,40 +2738,47 @@ namespace HolyLogger
                     }
                     //Status = Rig.StatusStr;
                     Status = "CAT Enabled";
-                    if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE && Properties.Settings.Default.EnableOmniRigCAT)
+                    //if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE && Properties.Settings.Default.EnableOmniRigCAT)
+                    //{
+                    //    var response = System.Windows.Forms.MessageBox.Show("Try to recover?", "CAT connection failed", System.Windows.Forms.MessageBoxButtons.YesNo);
+                    //    if (response == System.Windows.Forms.DialogResult.Yes)
+                    //    {
+                    //        foreach (var process in Process.GetProcessesByName("OmniRig"))
+                    //        {
+                    //            process.Kill();
+                    //        }
+                    //        UnsubscribeFromEvents();
+                    //        OmniRigEngine = null;
+                    //        StartOmniRig();
+                    //    }
+                    //    else
+                    //    {
+                    //        Properties.Settings.Default.EnableOmniRigCAT = false;
+                    //    }
+                    //    Status = Rig.StatusStr;
+                    //}
+                    if (!Properties.Settings.Default.EnableOmniRigCAT || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)//disabled or offline -> red border
                     {
-                        var response = System.Windows.Forms.MessageBox.Show("Try to recover?", "CAT connection failed", System.Windows.Forms.MessageBoxButtons.YesNo);
-                        if (response == System.Windows.Forms.DialogResult.Yes)
-                        {
-                            foreach (var process in Process.GetProcessesByName("OmniRig"))
-                            {
-                                process.Kill();
-                            }
-                            UnsubscribeFromEvents();
-                            OmniRigEngine = null;
-                            StartOmniRig();
-                        }
-                        else {
-                            Properties.Settings.Default.EnableOmniRigCAT = false;
-                        }
-                        Status = Rig.StatusStr;
-                    }
-                    if (!Properties.Settings.Default.EnableOmniRigCAT)
-                    {
-                        Status = "CAT Disabled";
                         TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
                         TB_Frequency.BorderThickness = new Thickness(2);
-                        return;
                     }
-                    else
+                    else // -> normal border
                     {
                         TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
                         TB_Frequency.BorderThickness = new Thickness(1);
                     }
+                    Status = Rig.StatusStr;
+                    if (Rig.Status == OmniRig.RigStatusX.ST_ONLINE)//online
+                    {
+                        Status = "Cat Enabled";
+                    }
+                    if (!Properties.Settings.Default.EnableOmniRigCAT)//disabled
+                    {
+                        Status = "CAT Disabled";
+                    }
                     if (state == State.Edit)
                     {
                         Status = "Edit Mode";
-                        return;
                     }
                 });
             }
