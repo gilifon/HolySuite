@@ -45,15 +45,15 @@ namespace HolyLogger
             {
                 throw new Exception("Failed to connect to DB: " + e.Message);
             }
-            
-            //AddQsoColIfNeeded("submode", "nvarchar(100) NULL");
-            //if (SchemaHasChanged)
-            //{
-            //    con.Close();
-            //    con.Dispose();
-            //    con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
-            //    con.Open();
-            //}
+
+            AddQsoColIfNeeded("soapbox", "nvarchar(100) NULL");
+            if (SchemaHasChanged)
+            {
+                con.Close();
+                con.Dispose();
+                con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
+                con.Open();
+            }
         }
 
         public void Close()
@@ -66,7 +66,7 @@ namespace HolyLogger
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
@@ -88,6 +88,7 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("continent", qso.Continent));
                 insertSQL.Parameters.Add(new SQLiteParameter("prop_mode", qso.PROP_MODE));
                 insertSQL.Parameters.Add(new SQLiteParameter("sat_name", qso.SAT_NAME));
+                insertSQL.Parameters.Add(new SQLiteParameter("soapbox", qso.SOAPBOX));
                 try
                 {
                     insertSQL.ExecuteNonQuery();
@@ -108,7 +109,7 @@ namespace HolyLogger
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
@@ -131,6 +132,7 @@ namespace HolyLogger
                     insertSQL.Parameters.Add(new SQLiteParameter("continent", qso.Continent));
                     insertSQL.Parameters.Add(new SQLiteParameter("prop_mode", qso.PROP_MODE));
                     insertSQL.Parameters.Add(new SQLiteParameter("sat_name", qso.SAT_NAME));
+                    insertSQL.Parameters.Add(new SQLiteParameter("soapbox", qso.SOAPBOX));
                 }
                 try
                 {
@@ -149,7 +151,7 @@ namespace HolyLogger
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,prop_mode = @prop_mode,sat_name = @sat_name WHERE id = @id", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox WHERE id = @id", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("@my_square", qso.STX));
@@ -171,6 +173,7 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("@continent", qso.Continent));
                 insertSQL.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                 insertSQL.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
+                insertSQL.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
                 insertSQL.Parameters.Add(new SQLiteParameter("@id", qso.id));
 
                 try
@@ -248,6 +251,7 @@ namespace HolyLogger
                         if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                         if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                         if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
+                        if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         q.StandartizeQSO();
                         qso_list.Add(q);
                     }
@@ -289,6 +293,7 @@ namespace HolyLogger
                         if (rdr["date"] != null) q.Date = (string)rdr["date"];
                         if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                         if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
+                        if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         q.StandartizeQSO();
                         qso_list.Add(q);
                     }

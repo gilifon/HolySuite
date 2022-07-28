@@ -130,6 +130,7 @@ namespace HolyParser
                 else if (qso.Band == "13CM") adif.AppendFormat("<prop_mode:{0}>{1} ", 3, "SAT");
                 if (qso.SAT_NAME != null) adif.AppendFormat("<sat_name:{0}>{1} ", qso.SAT_NAME.Length, qso.SAT_NAME);
                 else if (qso.Band == "13CM") adif.AppendFormat("<sat_name:{0}>{1} ", 6, "QO-100");
+                if (qso.SOAPBOX != null) adif.AppendFormat("<soapbox:{0}>{1} ", qso.SOAPBOX.Length, qso.SOAPBOX);
                 adif.AppendLine("<EOR>");
             }
 

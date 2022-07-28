@@ -19,10 +19,11 @@ CREATE TABLE [qso] (
 , [exchange] nvarchar(100) NULL COLLATE NOCASE
 , [comment] nvarchar(500) NULL COLLATE NOCASE
 , [name] nvarchar(500) NULL COLLATE NOCASE
-, [country] nvarchar(500) NULL COLLATE NOCASE
-, [continent] nvarchar(500) NULL COLLATE NOCASE
+, [country] nvarchar(100) NULL COLLATE NOCASE
+, [continent] nvarchar(100) NULL COLLATE NOCASE
 , [prop_mode] nvarchar(100) NULL COLLATE NOCASE
 , [sat_name] nvarchar(100) NULL COLLATE NOCASE
+, [soapbox] nvarchar(100) NULL COLLATE NOCASE
 );
 
 DROP TABLE IF EXISTS[categories];

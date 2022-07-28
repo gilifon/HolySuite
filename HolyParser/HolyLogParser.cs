@@ -98,6 +98,7 @@ namespace HolyParser
         private string mylocator_pattern = @"<my_gridsquare:(\d{1,2})(?::[a-z]{1})?>";
         private string prop_mode_pattern = @"<prop_mode:(\d{1,2})(?::[a-z]{1})?>";
         private string sat_name_pattern = @"<sat_name:(\d{1,2})(?::[a-z]{1})?>";
+        private string soapbox_pattern = @"<soapbox:(\d{1,2})(?::[a-z]{1})?>";
 
         public HolyLogParser() : this("", Operator.Israeli)
         {
@@ -180,6 +181,7 @@ namespace HolyParser
             qso_row.SRX = "";
             qso_row.STX = "";
             qso_row.Name = "";
+            qso_row.GenerateSoapBox();
 
             Regex regex = new Regex(band_pattern, RegexOptions.IgnoreCase);
             Match match = regex.Match(row);
@@ -389,6 +391,14 @@ namespace HolyParser
             if (match.Success)
             {
                 qso_row.Freq = Regex.Split(row, freq_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+            }
+
+            regex = new Regex(soapbox_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                string sb = Regex.Split(row, soapbox_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                qso_row.SOAPBOX = string.IsNullOrWhiteSpace(sb) ? qso_row.SOAPBOX : sb;
             }
 
             regex = new Regex(name_pattern, RegexOptions.IgnoreCase);

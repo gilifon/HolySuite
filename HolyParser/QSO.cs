@@ -85,6 +85,9 @@ namespace HolyParser
         [JsonProperty("operator")]
         public string Operator { get; set; }
 
+        [JsonProperty("soapbox")]
+        public string SOAPBOX { get; set; }
+
         public QSO()
         {
             IsAllowWARC = false;
@@ -187,7 +190,10 @@ namespace HolyParser
 
             HASH = mycall + dxcall + band + mode + SRX + STX;
         }
-
+        public void GenerateSoapBox()
+        {
+            SOAPBOX = Guid.NewGuid().ToString() + " " + DateTime.UtcNow.Ticks.ToString();
+        }
         public bool Equals(QSO other)
         {
             return (this.HASH == other.HASH);
