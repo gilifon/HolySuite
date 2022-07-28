@@ -1092,7 +1092,7 @@ namespace HolyLogger
             int c = 1;
             foreach (var chunk in ChunkedQSOs)
             {
-                string chunkJSON = JsonConvert.SerializeObject(chunk);
+                string chunkJSON = JsonConvert.SerializeObject(chunk).Replace("'", "");
                 //string insert = GenerateMultipleInsert(chunk);
 
                 //************************************************** ASYNC ********************************************//
