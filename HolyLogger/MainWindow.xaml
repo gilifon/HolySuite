@@ -49,11 +49,11 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />
-                            <MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
+                            <!--<MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
                                 <MenuItem.Icon>
                                     <Image Source="Images/folder.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
-                            </MenuItem>
+                            </MenuItem>-->
                             <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
                                 <MenuItem.Icon>
                                     <Image Source="Images/exit.png" Stretch="UniformToFill" Width="16" Height="16"/>
