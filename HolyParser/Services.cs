@@ -146,7 +146,8 @@ namespace HolyParser
 
             csv.AppendFormat("{0},", "No");
             csv.AppendFormat("{0},", "Station Callsign");
-            csv.AppendFormat("{0},", "Callsign");
+            csv.AppendFormat("{0},", "Operator");
+            csv.AppendFormat("{0},", "DX Callsign");
             csv.AppendFormat("{0},", "Band");
             csv.AppendFormat("{0},", "Mode");
             csv.AppendFormat("{0},", "Date");
@@ -165,6 +166,7 @@ namespace HolyParser
 
                 csv.AppendFormat("{0},", index++);
                 csv.AppendFormat("{0},", qso.MyCall);
+                csv.AppendFormat("{0},", qso.Operator);
                 csv.AppendFormat("{0},", qso.DXCall);
                 csv.AppendFormat("{0},", qso.Band);
                 csv.AppendFormat("{0},", qso.Mode);

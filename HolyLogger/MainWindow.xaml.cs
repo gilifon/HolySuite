@@ -2252,6 +2252,10 @@ namespace HolyLogger
 
         private async void GetQrzData()
         {
+            if (string.IsNullOrWhiteSpace(SessionKey) && isNetworkAvailable)
+            {
+                Helper.LoginToQRZ(out _SessionKey);
+            }
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Trim().Length >=3)
             {
                 string dxcall = TB_DXCallsign.Text.Trim();
