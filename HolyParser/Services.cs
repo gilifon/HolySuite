@@ -204,7 +204,7 @@ namespace HolyParser
             client.UseDefaultCredentials = false;
             client.Host = "iarc.org";
             client.UseDefaultCredentials = false;
-            client.Credentials = new System.Net.NetworkCredential("info", "info1234%%");
+            client.Credentials = new System.Net.NetworkCredential("Administrator", "Tango1234%%");
 
             mail.IsBodyHtml = true;
             mail.Subject = subject;
@@ -215,7 +215,7 @@ namespace HolyParser
                 await client.SendMailAsync(mail);
                 return "email successfully sent";
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 return "Connection with server failed! Check your internet connection";
             }            

@@ -458,6 +458,17 @@
       <EmbedInteropTypes>True</EmbedInteropTypes>
     </COMReference>
   </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\folder.png" />
+    <Content Include="Server\AddLog.php" />
+    <Content Include="Server\addParticipant.php" />
+    <Content Include="Server\addQSO.php" />
+    <Content Include="Server\db_holylanddb.inc" />
+    <Content Include="Server\error.inc" />
+    <Content Include="Server\get_events.php" />
+    <Content Include="Server\get_holyland_data.php" />
+    <Content Include="Server\heartbeat.php" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\System.Data.SQLite.Core.1.0.103\build\net45\System.Data.SQLite.Core.targets" Condition="Exists('..\packages\System.Data.SQLite.Core.1.0.103\build\net45\System.Data.SQLite.Core.targets')" />
   <PropertyGroup>

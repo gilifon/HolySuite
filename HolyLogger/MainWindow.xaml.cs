@@ -838,6 +838,11 @@ namespace HolyLogger
         {
             Application.Current.Shutdown();
         }
+        private void OpenFolderItem_Click(object sender, RoutedEventArgs e)
+        {
+            Process.Start(AppDomain.CurrentDomain.BaseDirectory);
+        }
+        
 
         private void ImportAdifMenuItem_Click(object sender, RoutedEventArgs e)
         {
@@ -1088,6 +1093,8 @@ namespace HolyLogger
 
         private async Task<string> UploadLogToIARC(IProgress<int> progress, ObservableCollection<QSO> QSOList)
         {
+            bool allSuccessfullyDone = true;
+            StringBuilder errorLog = new StringBuilder();
             List<List<QSO>> ChunkedQSOs = SplitQSOList(QSOList);
             int c = 1;
             foreach (var chunk in ChunkedQSOs)
@@ -1095,7 +1102,6 @@ namespace HolyLogger
                 string chunkJSON = JsonConvert.SerializeObject(chunk).Replace("'", "");
                 //string insert = GenerateMultipleInsert(chunk);
 
-                //************************************************** ASYNC ********************************************//
                 using (var client = new HttpClient())
                 {
                     var values = new Dictionary<string, string>
@@ -1108,7 +1114,9 @@ namespace HolyLogger
                         var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddQSO.php", content);
                         //var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php", content);
                         var responseString = await response.Content.ReadAsStringAsync();
-
+                        errorLog.AppendLine("Chunk #" + c + ":");
+                        errorLog.AppendLine(responseString);
+                        if (responseString != "Done!") allSuccessfullyDone = false;
                         progress.Report(c++ * 100 / ChunkedQSOs.Count);
                     }
                     catch (Exception)
@@ -1118,7 +1126,15 @@ namespace HolyLogger
                 }
             }
             ToggleUploadProgress(Visibility.Hidden);
-            return "All Done, 73!";            
+            if (!allSuccessfullyDone)
+            {
+                using (System.IO.StreamWriter file = new System.IO.StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "\\UploadReport_" + DateTime.Now.Ticks.ToString() + ".txt"))
+                {
+                    file.Write(errorLog.ToString());
+                    file.Close();
+                }
+            }
+            return allSuccessfullyDone ? "All Done, 73!" : "Done with some errors.\r\nPlease contact support.";// "Some of the QSOs had error";
         }
 
         private List<List<QSO>> SplitQSOList(ObservableCollection<QSO> QSOList)
@@ -2809,7 +2825,8 @@ namespace HolyLogger
                         radioRX += Properties.Settings.Default.SatelliteShift;
                     RX = radioRX.ToString("###0.000000");
                     TX = radioTX.ToString("###0.000000");
-                    TB_Frequency.Text = RX;
+                    //TB_Frequency.Text = RX;
+                    Properties.Settings.Default.Frequency = RX;
                     switch (Rig.Mode)
                     {
                         case (OmniRig.RigParamX)PM_CW_L:
