@@ -616,12 +616,6 @@
         "Entry"
         {
         "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_E75420564B689FF8C222EE5AE02F0B79"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
         }
@@ -1031,6 +1025,12 @@
         {
         "MsmKey" = "8:_UNDEFINED"
         "OwnerKey" = "8:_2014D6B3CC35978AF17B6090296911EB"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_E75420564B689FF8C222EE5AE02F0B79"
         "MsmSig" = "8:_UNDEFINED"
         }
     }
@@ -1535,7 +1535,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=6.0.1.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=6.0.4.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_2450D84030FEC7DAF4EDE26FE4F0ACBD"
@@ -2959,7 +2959,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=6.0.1.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=6.0.4.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_B07CB5883DE086A56C1A603F3D9D56DF"
@@ -3490,15 +3490,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{F7785A64-A08F-41CE-A71B-DF84420FBAF6}"
-        "PackageCode" = "8:{2BAAAE2C-CFEE-4089-930F-B24F8389054E}"
+        "ProductCode" = "8:{925095AD-38FA-4980-B47A-349DD609B457}"
+        "PackageCode" = "8:{1ADCFFC2-7A0C-4430-9189-2C8D081AB713}"
         "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:6.0.2"
+        "ProductVersion" = "8:6.0.5"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:+972547828077"
         "ARPHELPLINK" = "8:https://4z1kd.github.io/HolyLogger/"
@@ -3622,7 +3622,7 @@
             "Target" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
             "Folder" = "8:_287D9384F73E417AB6A790242779BAE5"
             "WorkingFolder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Icon" = "8:"
+            "Icon" = "8:_8D1366CFBA87444ABD31721AFA2CFBC5"
             "Feature" = "8:"
             }
             "{970C0BB2-C7D0-45D7-ABFA-7EC378858BC0}:_F179AFCF0EB549C7B9417D4D5CF31F1B"
@@ -3636,7 +3636,7 @@
             "Target" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
             "Folder" = "8:_E164CAA6F4E84C46A80A656C418D9FA8"
             "WorkingFolder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Icon" = "8:"
+            "Icon" = "8:_8D1366CFBA87444ABD31721AFA2CFBC5"
             "Feature" = "8:"
             }
         }
@@ -4040,7 +4040,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_B3AC16EEFCCB4135994F46A7F9226169"
             {
-            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Release\\HolyLogger.exe"
+            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Debug\\HolyLogger.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"

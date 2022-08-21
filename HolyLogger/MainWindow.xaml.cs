@@ -231,7 +231,7 @@ namespace HolyLogger
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
 
         private string title = "HolyLogger   ";
-        private const int SEND_CHUNK_SIZE = 200;
+        private const int SEND_CHUNK_SIZE = 50;
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
         
@@ -2275,6 +2275,7 @@ namespace HolyLogger
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Trim().Length >=3)
             {
                 string dxcall = TB_DXCallsign.Text.Trim();
+                string bare_dxcall = Services.getBareCallsign(dxcall);
 
                 /*****************************/
                 using (var client = new HttpClient())
@@ -2282,7 +2283,7 @@ namespace HolyLogger
                     try
                     {
                         string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
-                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(dxcall));
+                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + bare_dxcall);
                         var responseFromServer = await response.Content.ReadAsStringAsync();
                         XDocument xDoc = XDocument.Parse(responseFromServer);
                         
@@ -2292,7 +2293,7 @@ namespace HolyLogger
                             IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
                             IEnumerable<XElement> error = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Error");
 
-                            if ((call.Count() > 0 && call.FirstOrDefault().Value == dxcall) || (xref.Count() > 0 && xref.FirstOrDefault().Value == dxcall))
+                            if ((call.Count() > 0 && call.FirstOrDefault().Value == bare_dxcall) || (xref.Count() > 0 && xref.FirstOrDefault().Value == bare_dxcall))
                             {
                                 IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
                                 if (fname.Count() > 0)
@@ -2328,7 +2329,7 @@ namespace HolyLogger
                             else if (error.Count() > 0)
                             {
                                 string errorCall = error.FirstOrDefault().Value.Split(':')[1].Trim();
-                                if (errorCall == dxcall)
+                                if (errorCall == dxcall || errorCall == bare_dxcall)
                                 {
                                     FName = "";
                                 }
