@@ -1724,8 +1724,24 @@ namespace HolyLogger
             {
                 GenerateNewOptionsWindow();
             }
+            options.GeneralSettingsControlControlInstance.OmniRigEngine_Changed += GeneralSettingsControlControlInstance_OmniRigEngine_Changed;
             options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
             options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
+        }
+
+        private void GeneralSettingsControlControlInstance_OmniRigEngine_Changed()
+        {
+            if (Properties.Settings.Default.EnableOmniRigCAT)
+            {
+                StartOmniRig();
+                options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
+                options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
+            }
+            else
+                StopOmniRig();
+
+            SelectRig();
+            ShowRigParams();
         }
 
         private void GenerateNewOptionsWindow()
@@ -1748,18 +1764,7 @@ namespace HolyLogger
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
-            if (optionWindow.GeneralSettingsControlControlInstance.HasChanged)
-            {
-                if (Properties.Settings.Default.EnableOmniRigCAT)
-                {
-                    StartOmniRig();
-                }
-                else
-                    StopOmniRig();
 
-                SelectRig();
-                ShowRigParams();
-            }
             if (optionWindow.UserInterfaceControlInstance.HasChanged)
             {
                 if (Properties.Settings.Default.ShowTitleClock)
@@ -2595,6 +2600,7 @@ namespace HolyLogger
             if (Rig != null && Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
                 Properties.Settings.Default.EnableOmniRigCAT = false;
+                StopOmniRig();
             }
             ShowRigParams();
         }
