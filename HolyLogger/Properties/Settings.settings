@@ -245,5 +245,11 @@
     <Setting Name="baseURL" Type="System.String" Scope="User">
       <Value Profile="(Default)">https://www.iarc.org</Value>
     </Setting>
+    <Setting Name="EnableN1MMUDPClient" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="N1MMUDPPort" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">12060</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

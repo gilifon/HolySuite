@@ -107,6 +107,5 @@ namespace HolyLogger
             return lastInPut.dwTime;
         }
 
-        
     }
 }

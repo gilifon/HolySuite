@@ -994,5 +994,29 @@ namespace HolyLogger.Properties {
                 this["baseURL"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableN1MMUDPClient {
+            get {
+                return ((bool)(this["EnableN1MMUDPClient"]));
+            }
+            set {
+                this["EnableN1MMUDPClient"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("12060")]
+        public int N1MMUDPPort {
+            get {
+                return ((int)(this["N1MMUDPPort"]));
+            }
+            set {
+                this["N1MMUDPPort"] = value;
+            }
+        }
     }
 }
