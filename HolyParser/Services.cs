@@ -98,7 +98,7 @@ namespace HolyParser
 
             foreach (QSO qso in qso_list)
             {
-                string[] datetime = qso.Date.Split(new char[] { ' ' });
+                string[] datetime = string.IsNullOrWhiteSpace(qso.Date) ? new string[] { "", "" } : qso.Date.Split(new char[] { ' ' });
                 if (datetime.Length > 1)
                 {
                     qso.Date = datetime[0];
