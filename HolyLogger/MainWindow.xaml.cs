@@ -1764,7 +1764,11 @@ namespace HolyLogger
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
-
+            if (optionWindow.GeneralSettingsControlControlInstance.HasChanged)
+            {
+                SelectRig();
+                ShowRigParams();
+            }
             if (optionWindow.UserInterfaceControlInstance.HasChanged)
             {
                 if (Properties.Settings.Default.ShowTitleClock)
