@@ -1125,12 +1125,6 @@ namespace HolyLogger
             string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedCategory.Operator, w.selectedCategory.Mode, w.selectedCategory.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
             string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
 
-            StringBuilder sb = new StringBuilder(200);
-            sb.Append("Dear ").Append(Properties.Settings.Default.PersonalInfoName).Append(",<br>");
-            sb.Append("Thank you for sending the log.<br>");
-            sb.Append("73 and Best Regards.");
-
-            string Sendemail_result = await Services.SendMail("holyland@iarc.org", Properties.Settings.Default.PersonalInfoEmail, "Your log was received", sb.ToString());
             w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
