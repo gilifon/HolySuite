@@ -29,6 +29,7 @@ using System.Windows.Media;
 using System.Net.Sockets;
 using System.Windows.Controls.Primitives;
 using Newtonsoft.Json;
+using System.Text.RegularExpressions;
 
 namespace HolyLogger
 {
@@ -231,13 +232,16 @@ namespace HolyLogger
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
 
         private string title = "HolyLogger   ";
-        private const int SEND_CHUNK_SIZE = 200;
+        private const int SEND_CHUNK_SIZE = 50;
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
-        
+        BitmapImage lock_path = new BitmapImage(new Uri("Images/lock.png", UriKind.Relative));
+        BitmapImage unlock_path = new BitmapImage(new Uri("Images/unlock.png", UriKind.Relative));
+
         List<string> ImportFileQ = new List<string>();
 
         public static UdpClient Client;
+        public static UdpClient N1MMClient;
 
         string MachineName = "Default";
 
@@ -263,6 +267,21 @@ namespace HolyLogger
                     Properties.Settings.Default.EnableUDPClient = false;
                 }
             }
+
+            if (Properties.Settings.Default.EnableN1MMUDPClient)
+            {
+                try
+                {
+                    N1MMClient = new UdpClient(Properties.Settings.Default.N1MMUDPPort);//12060
+                    N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
+                }
+                catch
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to open N1MM+ UDP port");
+                    Properties.Settings.Default.EnableN1MMUDPClient = false;
+                }
+            }
+
             isNetworkAvailable = Helper.CheckForInternetConnection();
             HeartbeatTimer.Tick += HeartbeatTimer_Tick;
             checkForAutoUpload();
@@ -303,8 +322,7 @@ namespace HolyLogger
             setLockBtnState();
 
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
-            if (TB_Comment.IsEnabled) LockComment_Btn.Opacity = 1;
-            else LockComment_Btn.Opacity = 0.5;            
+            setLockCommentBtnState();
 
             try
             {
@@ -455,6 +473,64 @@ namespace HolyLogger
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
         }
 
+        private void StartN1MMUDPClient(IAsyncResult res)
+        {
+            if (!Properties.Settings.Default.EnableN1MMUDPClient)
+            {
+                return;
+            }
+            IPEndPoint RemoteIpEndPoint = new IPEndPoint(IPAddress.Any, 0);
+            byte[] received = N1MMClient.EndReceive(res, ref RemoteIpEndPoint);
+            string data = Encoding.UTF8.GetString(received);
+
+            this.Dispatcher.Invoke(() =>
+            {
+                try
+                {
+                    Regex regex = new Regex(@"<TXFreq>(.*)?<", RegexOptions.IgnoreCase);
+                    Match match = regex.Match(data);
+                    if (match.Success)
+                    {
+                        string freq_str = Regex.Split(data, @"<TXFreq>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+                        double freq = 0;
+                        if (double.TryParse(freq_str,out freq))
+                        {
+                            TB_Frequency.Text = (freq / 100).ToString("F2");
+                        }
+                    }
+
+                    regex = new Regex(@"<Mode>(.*)?<", RegexOptions.IgnoreCase);
+                    match = regex.Match(data);
+                    if (match.Success)
+                    {
+                        string mode = Regex.Split(data, @"<Mode>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+                        if (mode == "SSB" || mode == "LSB" || mode == "USB") mode = "SSB";
+                        if (mode == "RTTY" || mode == "RTTY-R" || mode == "RTTY-L" || mode == "AFSK" || mode == "AFSK-R" || mode == "AFSK-L") mode = "DIGI";
+                        bool item_found = false;
+                        foreach (ComboBoxItem item in CB_Mode.Items)
+                        {
+                            if ((string)item.Content == mode)
+                            {
+                                CB_Mode.Text = (string)item.Content;
+                                CB_Mode.SelectedItem = item;                                
+                                item_found = true;
+                                break;
+                            }
+                        }
+                        if (!item_found)
+                        {
+                            CB_Mode.SelectedIndex = 0;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
+                }
+            });
+            N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
+        }
+
         private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
         {
             isNetworkAvailable = e.IsAvailable;
@@ -597,16 +673,21 @@ namespace HolyLogger
 
         private void setLockBtnState()
         {
-            if (!Properties.Settings.Default.isLocked) Lock_Btn.Opacity = 1;
-            else Lock_Btn.Opacity = 0.5;
+            if (!Properties.Settings.Default.isLocked) Lock_Btn.Source = unlock_path;
+            else Lock_Btn.Source = lock_path;
         }
 
         private void LockComment_Btn_MouseUp(object sender, MouseButtonEventArgs e)
         {
             Properties.Settings.Default.isCommentLocked = !Properties.Settings.Default.isCommentLocked;
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
-            if (TB_Comment.IsEnabled) ((Image)sender).Opacity = 1;
-            else ((Image)sender).Opacity = 0.5;
+            setLockCommentBtnState();
+        }
+
+        private void setLockCommentBtnState()
+        {
+            if (!Properties.Settings.Default.isCommentLocked) LockComment_Btn.Source = unlock_path;
+            else LockComment_Btn.Source = lock_path;
         }
 
         private void RefreshDateTime_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -1044,12 +1125,6 @@ namespace HolyLogger
             string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedCategory.Operator, w.selectedCategory.Mode, w.selectedCategory.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
             string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
 
-            StringBuilder sb = new StringBuilder(200);
-            sb.Append("Dear ").Append(Properties.Settings.Default.PersonalInfoName).Append(",<br>");
-            sb.Append("Thank you for sending the log.<br>");
-            sb.Append("73 and Best Regards.");
-
-            string Sendemail_result = await Services.SendMail("holyland@iarc.org", Properties.Settings.Default.PersonalInfoEmail, "Your log was received", sb.ToString());
             w.Close();
             System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
@@ -1502,7 +1577,9 @@ namespace HolyLogger
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            StartOmniRig();
+            if (Properties.Settings.Default.EnableOmniRigCAT)
+                StartOmniRig();
+            UpdateStatus();
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -1641,8 +1718,24 @@ namespace HolyLogger
             {
                 GenerateNewOptionsWindow();
             }
+            options.GeneralSettingsControlControlInstance.OmniRigEngine_Changed += GeneralSettingsControlControlInstance_OmniRigEngine_Changed;
             options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
             options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
+        }
+
+        private void GeneralSettingsControlControlInstance_OmniRigEngine_Changed()
+        {
+            if (Properties.Settings.Default.EnableOmniRigCAT)
+            {
+                StartOmniRig();
+                options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
+                options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
+            }
+            else
+                StopOmniRig();
+
+            SelectRig();
+            ShowRigParams();
         }
 
         private void GenerateNewOptionsWindow()
@@ -1708,7 +1801,31 @@ namespace HolyLogger
                 {
                     Client.Close();
                     Client = null;
-                }                
+                }
+            }
+            if (Properties.Settings.Default.EnableN1MMUDPClient)
+            {
+                try
+                {
+                    if (N1MMClient == null)
+                    {
+                        N1MMClient = new UdpClient(Properties.Settings.Default.N1MMUDPPort);//2333 / 2237
+                        N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
+                    }
+                }
+                catch
+                {
+                    System.Windows.Forms.MessageBox.Show("Failed to open N1MM+ UDP port");
+                    Properties.Settings.Default.EnableN1MMUDPClient = false;
+                }
+            }
+            else
+            {
+                if (N1MMClient != null)
+                {
+                    N1MMClient.Close();
+                    N1MMClient = null;
+                }
             }
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
@@ -2275,6 +2392,7 @@ namespace HolyLogger
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Trim().Length >=3)
             {
                 string dxcall = TB_DXCallsign.Text.Trim();
+                string bare_dxcall = Services.getBareCallsign(dxcall);
 
                 /*****************************/
                 using (var client = new HttpClient())
@@ -2282,7 +2400,7 @@ namespace HolyLogger
                     try
                     {
                         string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
-                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(dxcall));
+                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + bare_dxcall);
                         var responseFromServer = await response.Content.ReadAsStringAsync();
                         XDocument xDoc = XDocument.Parse(responseFromServer);
                         
@@ -2292,7 +2410,7 @@ namespace HolyLogger
                             IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
                             IEnumerable<XElement> error = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Error");
 
-                            if ((call.Count() > 0 && call.FirstOrDefault().Value == dxcall) || (xref.Count() > 0 && xref.FirstOrDefault().Value == dxcall))
+                            if ((call.Count() > 0 && call.FirstOrDefault().Value == bare_dxcall) || (xref.Count() > 0 && xref.FirstOrDefault().Value == bare_dxcall))
                             {
                                 IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
                                 if (fname.Count() > 0)
@@ -2328,7 +2446,7 @@ namespace HolyLogger
                             else if (error.Count() > 0)
                             {
                                 string errorCall = error.FirstOrDefault().Value.Split(':')[1].Trim();
-                                if (errorCall == dxcall)
+                                if (errorCall == dxcall || errorCall == bare_dxcall)
                                 {
                                     FName = "";
                                 }
@@ -2480,6 +2598,7 @@ namespace HolyLogger
             if (Rig != null && Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
                 Properties.Settings.Default.EnableOmniRigCAT = false;
+                StopOmniRig();
             }
             ShowRigParams();
         }
@@ -2659,7 +2778,7 @@ namespace HolyLogger
             {
                 if (OmniRigEngine != null)
                 {
-                    MessageBox.Show("OmniRig Is running");
+                    //MessageBox.Show("OmniRig Is running");
                 }
                 else
                 {
@@ -2686,6 +2805,20 @@ namespace HolyLogger
                 //throw;
                 Status = "Not installed";
             }
+        }
+        private void StopOmniRig()
+        {
+            UnsubscribeFromEvents();
+            Process[] workers = Process.GetProcessesByName("OmniRig");
+            foreach (Process worker in workers)
+            {
+                worker.Kill();
+                worker.WaitForExit();
+                worker.Dispose();
+            }
+            OmniRigEngine = null;
+            Rig = null;
+            UpdateStatus();
         }
 
         private void GetRigTypes()
@@ -2754,57 +2887,44 @@ namespace HolyLogger
             {
                 this.Dispatcher.Invoke(() =>
                 {
-                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
-                    if (Rig == null)
-                    {
-                        Status = "Omni-Rig Failed";
-                        return;
-                    }
-                    //Status = Rig.StatusStr;
-                    Status = "CAT Enabled";
-                    //if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE && Properties.Settings.Default.EnableOmniRigCAT)
-                    //{
-                    //    var response = System.Windows.Forms.MessageBox.Show("Try to recover?", "CAT connection failed", System.Windows.Forms.MessageBoxButtons.YesNo);
-                    //    if (response == System.Windows.Forms.DialogResult.Yes)
-                    //    {
-                    //        foreach (var process in Process.GetProcessesByName("OmniRig"))
-                    //        {
-                    //            process.Kill();
-                    //        }
-                    //        UnsubscribeFromEvents();
-                    //        OmniRigEngine = null;
-                    //        StartOmniRig();
-                    //    }
-                    //    else
-                    //    {
-                    //        Properties.Settings.Default.EnableOmniRigCAT = false;
-                    //    }
-                    //    Status = Rig.StatusStr;
-                    //}
-                    if (!Properties.Settings.Default.EnableOmniRigCAT || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)//disabled or offline -> red border
-                    {
-                        TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
-                        TB_Frequency.BorderThickness = new Thickness(2);
-                    }
-                    else // -> normal border
-                    {
-                        TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
-                        TB_Frequency.BorderThickness = new Thickness(1);
-                    }
-                    Status = Rig.StatusStr;
-                    if (Rig.Status == OmniRig.RigStatusX.ST_ONLINE)//online
-                    {
-                        Status = "Cat Enabled";
-                    }
-                    if (!Properties.Settings.Default.EnableOmniRigCAT)//disabled
-                    {
-                        Status = "CAT Disabled";
-                    }
-                    if (state == State.Edit)
-                    {
-                        Status = "Edit Mode";
-                    }
+                    UpdateStatus();
                 });
+            }
+        }
+
+        private void UpdateStatus()
+        {
+            TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
+            
+            Status = "CAT Enabled";
+            if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)//disabled or offline -> red border
+            {
+                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
+                TB_Frequency.BorderThickness = new Thickness(2);
+            }
+            else // -> normal border
+            {
+                TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
+                TB_Frequency.BorderThickness = new Thickness(1);
+            }
+            
+            if (Rig == null)
+            {
+                Status = "CAT Disabled";
+                return;
+            }
+            Status = Rig.StatusStr;
+            if (Rig.Status == OmniRig.RigStatusX.ST_ONLINE)//online
+            {
+                Status = "Cat Enabled";
+            }
+            if (!Properties.Settings.Default.EnableOmniRigCAT)//disabled
+            {
+                Status = "CAT Disabled";
+            }
+            if (state == State.Edit)
+            {
+                Status = "Edit Mode";
             }
         }
 

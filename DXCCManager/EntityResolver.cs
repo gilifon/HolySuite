@@ -149,7 +149,7 @@ namespace DXCCManager
             "FT8Z~Amsterdam & St. Paul Is.~10~AF~MF81",
             "FW~Wallis & Futuna Is.~298~OC~AH16",
             "FY~French Guiana~63~SA~Gj22",
-            "(F[0-9]|F[B,D,E,F,U,V]|T[H,M,Q,V,W,X]|H[W,X,Y])~France~227~EU~IN77",
+            "(F|F[0-9]|F[B,D,E,F,U,V]|T[H,M,Q,V,W,X]|H[W,X,Y])~France~227~EU~IN77",
             "(G[0-9,A,B,F,X]|M|2E)~England~223~EU~IO70",
             "(2D|G[D,T]|M[D,T])~Isle of Man~114~EU~IO74",
             "G[I,N]~Northern Ireland~265~EU~IO54",

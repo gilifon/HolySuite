@@ -174,6 +174,9 @@ namespace HolyParser
         {
             if (string.IsNullOrWhiteSpace(row)) return null;
 
+            if (isN1MM(row))
+                return ParseN1MMRawQSO(row);
+
             QSO qso_row = new QSO();
             qso_row.IsAllowWARC = IsParseWARC;
             qso_row.Continent = "";
@@ -420,6 +423,193 @@ namespace HolyParser
             }
             qso_row.StandartizeQSO();
             return qso_row;
+        }
+
+        public QSO ParseN1MMRawQSO(string row)
+        {
+            if (string.IsNullOrWhiteSpace(row)) return null;
+
+            QSO qso_row = new QSO();
+            qso_row.IsAllowWARC = IsParseWARC;
+            qso_row.Continent = "";
+            qso_row.Operator = "";
+            qso_row.Comment = "";
+            qso_row.MyLocator = "";
+            qso_row.PROP_MODE = "";
+            qso_row.SAT_NAME = "";
+            qso_row.SRX = "";
+            qso_row.STX = "";
+            qso_row.Name = "";
+            qso_row.GenerateSoapBox();
+
+            Regex regex = new Regex(@"<band>(.*)?<", RegexOptions.IgnoreCase);
+            Match match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Band = Regex.Split(row, @"<band>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+            }
+
+            regex = new Regex(@"<call>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.DXCall = Regex.Split(row, @"<call>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+
+                //use the callsign to resolve the entity info
+                ER_Dxcc = rem.GetDXCC(qso_row.DXCall);
+
+                qso_row.Country = ER_Dxcc.Name != "Unknown" ? ER_Dxcc.Name : qso_row.Country;
+                qso_row.DXCC = ER_Dxcc.Entity;
+                qso_row.Continent = ER_Dxcc.Continent;
+
+            }
+
+            regex = new Regex(@"<mycall>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.MyCall = Regex.Split(row, @"<mycall>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+            }
+            else
+            {
+                regex = new Regex(@"<operator>(.*)?<", RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.MyCall = Regex.Split(row, @"<operator>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+                }
+            }
+
+            regex = new Regex(@"<operator>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Operator = Regex.Split(row, @"<operator>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+            }
+
+            regex = new Regex(@"<rcv>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.RST_RCVD = Regex.Split(row, @"<rcv>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+            }
+
+            regex = new Regex(@"<snt>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.RST_SENT = Regex.Split(row, @"<snt>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+            }
+            if (string.IsNullOrWhiteSpace(qso_row.RST_RCVD) && !string.IsNullOrWhiteSpace(qso_row.RST_SENT)) qso_row.RST_RCVD = qso_row.RST_SENT;
+            if (string.IsNullOrWhiteSpace(qso_row.RST_SENT) && !string.IsNullOrWhiteSpace(qso_row.RST_RCVD)) qso_row.RST_SENT = qso_row.RST_RCVD;
+
+
+            regex = new Regex(@"<timestamp>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Date = Regex.Split(Regex.Split(row, @"<timestamp>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper(), " ")[0].Replace("-","");
+            }
+
+            regex = new Regex(@"<mode>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                try
+                {
+                    qso_row.Mode = mr.GetValidMode(Regex.Split(row, @"<mode>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper());
+                }
+                catch
+                {
+
+                }
+            }
+
+            regex = new Regex(@"<timestamp>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Time = Regex.Split(Regex.Split(row, @"<timestamp>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper(), " ")[1].Replace(":", "");
+            }
+
+            regex = new Regex(@"<comment>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                try
+                {
+                    qso_row.Comment = Regex.Split(row, @"<comment>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+                }
+                catch
+                {
+
+                }
+            }
+
+            regex = new Regex(@"<gridsquare>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.DXLocator = Regex.Split(row, @"<gridsquare>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+            }
+
+            regex = new Regex(@"<rcvnr>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.SRX = Regex.Split(row, @"<rcvnr>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+                if (string.IsNullOrWhiteSpace(qso_row.SRX)) qso_row.SRX = "";
+            }
+            
+            regex = new Regex(@"<exchangel>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.STX = Regex.Split(row, @"<exchangel>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+            }
+            else
+            {
+                regex = new Regex(@"<sntnr>(.*)?<", RegexOptions.IgnoreCase);
+                match = regex.Match(row);
+                if (match.Success)
+                {
+                    qso_row.STX = Regex.Split(row, @"<sntnr>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+                }
+            }
+
+            regex = new Regex(@"<txfreq>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                qso_row.Freq = Regex.Split(row, @"<txfreq>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+            }
+
+            regex = new Regex(@"<name>(.*)?<", RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                try
+                {
+                    qso_row.Name = Regex.Split(row, @"<name>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
+                }
+                catch
+                {
+
+                }
+            }
+            qso_row.StandartizeQSO();
+            return qso_row;
+        }
+
+        private bool isN1MM(string row)
+        {
+            Regex regex = new Regex(@"<app>(.*)?<", RegexOptions.IgnoreCase);
+            Match match = regex.Match(row);
+            if (match.Success)
+            {
+                return Regex.Split(row, @"<app>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper() == "N1MM";
+            }
+            return false;
         }
 
         private void CalculateResult()

@@ -25,11 +25,14 @@ namespace HolyLogger.OptionsUserControls
     /// <summary>
     /// Interaction logic for GeneralSettingsControl.xaml
     /// </summary>
+    public delegate void OmniRigEngine();
     public partial class GeneralSettingsControl : UserControl
     {
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        public event OmniRigEngine OmniRigEngine_Changed;
 
         public bool HasChanged { get; set; }
 
@@ -58,6 +61,18 @@ namespace HolyLogger.OptionsUserControls
         {
             InitializeComponent();
             HasChanged = false;
+        }
+
+        private void CBX_EnableOmniRigCAT_Changed(object sender, RoutedEventArgs e)
+        {
+            HasChanged = true;
+            if (OmniRigEngine_Changed != null)
+            {
+                this.Dispatcher.Invoke(() =>
+                {
+                    OmniRigEngine_Changed.Invoke();
+                });
+            }
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)

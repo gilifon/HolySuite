@@ -98,7 +98,7 @@ namespace HolyParser
 
             foreach (QSO qso in qso_list)
             {
-                string[] datetime = qso.Date.Split(new char[] { ' ' });
+                string[] datetime = string.IsNullOrWhiteSpace(qso.Date) ? new string[] { "", "" } : qso.Date.Split(new char[] { ' ' });
                 if (datetime.Length > 1)
                 {
                     qso.Date = datetime[0];
@@ -195,31 +195,6 @@ namespace HolyParser
             return callsign;
         }
 
-        public static async Task<string> SendMail(string from, string to, string subject, string body)
-        {
-            MailMessage mail = new MailMessage(from, to);
-            SmtpClient client = new SmtpClient();
-            client.Port = 25;
-            client.DeliveryMethod = SmtpDeliveryMethod.Network;
-            client.UseDefaultCredentials = false;
-            client.Host = "iarc.org";
-            client.UseDefaultCredentials = false;
-            client.Credentials = new System.Net.NetworkCredential("Administrator", "Tango1234%%");
-
-            mail.IsBodyHtml = true;
-            mail.Subject = subject;
-            mail.Body = body;
-
-            try
-            {
-                await client.SendMailAsync(mail);
-                return "email successfully sent";
-            }
-            catch (Exception e)
-            {
-                return "Connection with server failed! Check your internet connection";
-            }            
-        }
     }
 
     public class HamQTH

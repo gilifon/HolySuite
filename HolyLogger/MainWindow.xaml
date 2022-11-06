@@ -49,11 +49,11 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />
-                            <MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
+                            <!--<MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
                                 <MenuItem.Icon>
                                     <Image Source="Images/folder.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
-                            </MenuItem>
+                            </MenuItem>-->
                             <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
                                 <MenuItem.Icon>
                                     <Image Source="Images/exit.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -243,7 +243,7 @@
 
         <Label Content="Station Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Callsign used on the air" />
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="125,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="121" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="12" BorderBrush="#FFABADB3" TabIndex="1"/>
-        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="20" Margin="252,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="252,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Label Content="My Holyland Square" HorizontalAlignment="Left" Margin="275,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your Holyland square" />
         <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="433,16,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="69" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="5" TabIndex="2"/>
         <Label Content="My Locator" HorizontalAlignment="Left" Margin="507,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
@@ -299,7 +299,7 @@
         <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="101,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="17"/>
         <Label Content="Comment" HorizontalAlignment="Left" Margin="210,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
         <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="295,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="446" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="18"/>
-        <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="20" Margin="750,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="750,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,265,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>

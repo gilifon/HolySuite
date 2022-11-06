@@ -9,7 +9,7 @@
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsFilterGrid" Content="Filter QSOs table by DX callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsFilterQSOs, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
         <CheckBox x:Name="CBX_IsAllowLiveLog" Content="Allow automatic upload during special events" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isAllowLiveLog, Source={StaticResource Settings}, Mode=TwoWay}" Margin="0,26,0,0" FontSize="16"/>
-        <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,51,0,0" Click="HasChanged_Click"/>
+        <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,51,0,0" Click="CBX_EnableOmniRigCAT_Changed"/>
 
         <GroupBox x:Name="groupBox" Header="Select Rig" Height="90" Margin="10,76,10,0" VerticalAlignment="Top" Width="360" FontSize="16">
             <StackPanel>
@@ -21,6 +21,10 @@
         <CheckBox x:Name="CBX_EnableUDPClient" Content="Enable UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,180,0,0" Click="HasChanged_Click"/>
         <Label x:Name="label" Content="Port" HorizontalAlignment="Left" Margin="199,174,0,0" VerticalAlignment="Top" FontSize="16"/>
         <TextBox x:Name="textBox" HorizontalAlignment="Left" Height="23" Margin="243,178,0,0" TextWrapping="Wrap" Text="{Binding Default.UDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
+
+        <CheckBox x:Name="CBX_EnableN1MMUDPClient" Content="N1MM+ UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableN1MMUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,205,0,0" Click="HasChanged_Click"/>
+        <Label x:Name="label2" Content="Port" HorizontalAlignment="Left" Margin="199,199,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="textBox2" HorizontalAlignment="Left" Height="23" Margin="243,204,0,0" TextWrapping="Wrap" Text="{Binding Default.N1MMUDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
 
 
 
