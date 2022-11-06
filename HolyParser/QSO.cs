@@ -188,7 +188,7 @@ namespace HolyParser
             string band = IsValidBand() ? Band : "Band";
             string mode = IsValidMode() ? Mode : "Mode";
 
-            HASH = mycall + dxcall + band + mode + SRX + STX;
+            HASH = mycall + dxcall + band + mode + Date;// + SRX + STX;
         }
         public void GenerateSoapBox()
         {

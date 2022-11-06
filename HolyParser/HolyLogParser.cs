@@ -148,20 +148,24 @@ namespace HolyParser
                 try
                 {
                     QSO qso_row = ParseRawQSO(row);
-                    if (IsParseDuplicates)
-                    {
-                        m_qsoList.Add(qso_row);
-                    }
-                    else if (!IsParseDuplicates && !m_qsoList.Contains(qso_row))
-                    {
-                        m_qsoList.Add(qso_row);
-                    }
+                    m_qsoList.Add(qso_row);
+                    //if (IsParseDuplicates)
+                    //{
+                    //    m_qsoList.Add(qso_row);
+                    //}
+                    //else if (!IsParseDuplicates && !m_qsoList.Contains(qso_row))
+                    //{
+                    //    m_qsoList.Add(qso_row);
+                    //}
                 }
                 catch (Exception)
                 {
                     debugCounter++;
                 }
-                
+            }
+            if (!IsParseDuplicates)
+            {
+                m_qsoList= m_qsoList.DistinctBy(p => p.HASH).ToList();
             }
             m_qsoList = m_qsoList.OrderBy(p => p.Date).ThenBy(p => p.Time).ToList();
         }
