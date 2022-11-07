@@ -310,7 +310,7 @@ namespace HolyContestManager
         private void GetData()
         {
             //WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
-            WebRequest request = WebRequest.Create("https://www.iarc.org/lighthouse/Server/GetLogForADIF.php");
+            WebRequest request = WebRequest.Create("https://www.iarc.org/railway/Server/GetLogForADIF.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;
             Stream dataStream = response.GetResponseStream();
@@ -336,11 +336,9 @@ namespace HolyContestManager
 
         private void CalculateWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            GenerateLogFile("4X01LH");
-            GenerateLogFile("4X02LH");
-            GenerateLogFile("4X03LH");
-            GenerateLogFile("4X04LH");
-            GenerateLogFile("4X05LH");
+            GenerateLogFile("4X0VK");
+            GenerateLogFile("4X01R");
+            GenerateLogFile("4X02R");
 
             Report.Clear();
             
