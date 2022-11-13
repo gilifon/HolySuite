@@ -461,6 +461,7 @@
   <ItemGroup>
     <Resource Include="Images\folder.png" />
     <Resource Include="Images\unlock.png" />
+    <Resource Include="Images\newdxcc.gif" />
     <Content Include="Server\AddLog.php" />
     <Content Include="Server\addParticipant.php" />
     <Content Include="Server\addQSO.php" />

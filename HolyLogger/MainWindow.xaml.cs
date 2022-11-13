@@ -230,6 +230,7 @@ namespace HolyLogger
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
+        System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
         private string title = "HolyLogger   ";
         private const int SEND_CHUNK_SIZE = 50;
@@ -407,6 +408,9 @@ namespace HolyLogger
             ToggleAzimuthControl();
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
+
+            NewDXCCTimer.Interval = 2500;    // or whatever you need it to be
+            NewDXCCTimer.Tick += NewDXCCTimer_Tick;
         }
 
         private async void StartUDPClient(IAsyncResult res)
@@ -811,10 +815,27 @@ namespace HolyLogger
                 }
                 LoadPreEditUserData();
             }
+            ShowNewDXCC();
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
             ClearMatrix();
             RestoreDataContext();
+            
+        }
+
+        private void ShowNewDXCC()
+        {
+            var dups = from qso in Qsos where qso.Country == TB_DXCC.Text select qso;
+            if (dups.Count() == 1) //if there is only one -> it is the one we just added -> it was a new one!
+            {
+                NewDXCC.Visibility = Visibility.Visible;
+                NewDXCCTimer.Start();
+            }
+        }
+        private void NewDXCCTimer_Tick(object sender, EventArgs e)
+        {
+            NewDXCCTimer.Stop();
+            NewDXCC.Visibility = Visibility.Hidden;
         }
 
         private void LoadPreEditUserData()
