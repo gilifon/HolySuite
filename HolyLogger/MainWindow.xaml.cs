@@ -915,7 +915,11 @@ namespace HolyLogger
             {
                 OptionsMenuItemMenuItem_Click(null, null);
             }
-            
+            else if ((e.Key == Key.Escape))
+            {
+                ClearBtn_Click(null, null);
+            }
+
         }
 
         private void RST_GotFocus(object sender, RoutedEventArgs e)
@@ -948,7 +952,7 @@ namespace HolyLogger
 
         private void ImportAdifMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            CultureInfo provider = CultureInfo.InvariantCulture;
+            //CultureInfo provider = CultureInfo.InvariantCulture;
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "ADIF files (*.adi)|*.adi";
             

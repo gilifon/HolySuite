@@ -49,15 +49,9 @@ CREATE TABLE [radio_events] (
 INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
 1,'holyland','Holyland Contest',1);
 INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
-2,'lighthouse','Lighthouse',0);
+2,'sukot','Sukot',1);
 INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
-3,'eurovision','Eurovision',0);
-INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
-4,'craters','Craters',0);
-INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
-5,'chanukah','Chanukah',0);
-INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
-6,'sukot','Sukot',1);
+3,'iarc','IARC Event',1);
 
 -- Script Date: 12/1/2021 9:48 PM  - ErikEJ.SqlCeScripting version 3.5.2.90
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
@@ -65,36 +59,38 @@ INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[e
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
 2,'SSB','SSB (Single OP, SSB Only)','SSB','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-3,'FT8','FT8 (Single OP, FT8 Only)','FT8','SINGLE-OP','LOW',1);
+3,'MIX','MIX(Single OP, Mix Modes)','MIX','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-4,'DIGI','DIGI (Single OP, RTTY/PSK Only)','DIGI','SINGLE-OP','LOW',1);
+4,'FT8','FT8 (Single OP, FT8 Only)','FT8','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-5,'QRP','QRP (Single OP, 10W Max)','QRP','SINGLE-OP','QRP',1);
+5,'DIGI','DIGI (Single OP, RTTY/PSK Only)','DIGI','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-6,'SOB','SOB (Single OP, Single Band)','SOB','SINGLE-OP','LOW',1);
+6,'QRP','QRP (Single OP, 10W Max)','QRP','SINGLE-OP','QRP',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-7,'POR','POR (Single OP, Portable 1 Square)','POR','SINGLE-OP','LOW',1);
+7,'SOB','SOB (Single OP, Single Band)','SOB','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-8,'M5','M5 (Single OP, Portable 5 Squares)','M5','SINGLE-OP','LOW',1);
+8,'POR','POR (Single OP, Portable 1 Square)','POR','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-9,'M10','M10 (Single OP, Portable 10 Squares)','M10','SINGLE-OP','LOW',1);
+9,'M5','M5 (Single OP, Portable 5 Squares)','M5','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-10,'MOP','MOP (Multi OP, Single TX)','MOP','MULTI-OP','LOW',1);
+10,'M10','M10 (Single OP, Portable 10 Squares)','M10','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-11,'MM','MM (Multi OP, Multi TX)','MM','MULTI-OP','LOW',1);
+11,'MOP','MOP (Multi OP, Single TX)','MOP','MULTI-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-12,'MMP','MMP (Multi OP, Single TX, Portable)','MMP','MULTI-OP','LOW',1);
+12,'MM','MM (Multi OP, Multi TX)','MM','MULTI-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-13,'4Z9','4Z9 (4Z9 callsign)','4Z9','SINGLE-OP','LOW',1);
+13,'MMP','MMP (Multi OP, Single TX, Portable)','MMP','MULTI-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-14,'SHA','SHA (Saturday Night)','SHA','SINGLE-OP','LOW',1);
+14,'4Z9','4Z9 (4Z9 callsign)','4Z9','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-15,'SWL','SWL (Short Wave Listener)','SWL','SINGLE-OP','LOW',1);
+15,'SHA','SHA (Saturday Night)','SHA','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-16,'NEW','NEW (License less than 2 years)','NEW','SINGLE-OP','LOW',1);
+16,'SWL','SWL (Short Wave Listener)','SWL','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-17,'VHF/UHF','VHF/UHF','VHF/UHF','SINGLE-OP','LOW',6);
+17,'NEW','NEW (License less than 2 years)','NEW','SINGLE-OP','LOW',1);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-18,'VHF','VHF','VHF','SINGLE-OP','LOW',6);
+18,'VHF/UHF','VHF/UHF','VHF/UHF','SINGLE-OP','LOW',2);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-19,'UHF','UHF','UHF','SINGLE-OP','LOW',6);
+19,'VHF','VHF','VHF','SINGLE-OP','LOW',2);
+INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+20,'UHF','UHF','UHF','SINGLE-OP','LOW',2);
