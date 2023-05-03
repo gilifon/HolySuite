@@ -1059,7 +1059,19 @@ namespace HolyLogger
 
         private void ExpotMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            //Contester c = new Contester();
+            //c.Callsign = TB_MyCallsign.Text.Trim();
+            //c.Category_Mode = "SSB";
+            //c.Category_Operator = "SINGLE-OP";
+            //c.Category_Power = "LOW";
+            //c.Contest = "HOLYLAND";
+            //c.Email = "4z1kd@iarc.org";
+            //c.Grid = TB_MyLocator.Text.Trim();
+            //c.Name = "Gil";
+            //c.Soapbox = "HolyLogger";
+
             string adif = Services.GenerateAdif(dal.GetAllQSOs());
+            //string cabrillo = Services.GenerateCabrillo(dal.GetAllQSOs(), c);
             // Displays a SaveFileDialog so the user can save the Image
             // assigned to Button2.
             SaveFileDialog saveFileDialog1 = new SaveFileDialog();

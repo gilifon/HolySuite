@@ -137,6 +137,56 @@ namespace HolyParser
             return adif.ToString();
         }
 
+        public static string GenerateCabrillo(IEnumerable<QSO> qso_list, Contester participant)
+        {
+            string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+
+            StringBuilder adif = new StringBuilder(200);
+            adif.AppendLine("START-OF-LOG: 3.0");
+            if (!string.IsNullOrEmpty(participant.Contest)) { adif.AppendFormat("CONTEST: {0}", participant.Contest); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Callsign)) {adif.AppendFormat("CALLSIGN: {0}", participant.Callsign); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Location)) {adif.AppendFormat("LOCATION: {0}", participant.Location); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Operator)) {adif.AppendFormat("CATEGORY-OPERATOR: {0}", participant.Category_Operator); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Assisted)) {adif.AppendFormat("CATEGORY-ASSISTED: {0}", participant.Category_Assisted); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Band)) {adif.AppendFormat("CATEGORY-BAND: {0}", participant.Category_Band); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Power)) {adif.AppendFormat("CATEGORY-POWER: {0}", participant.Category_Power); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Mode)) {adif.AppendFormat("CATEGORY-MODE: {0}", participant.Category_Mode); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Transmitter)) {adif.AppendFormat("CATEGORY-TRANSMITTER: {0}", participant.Category_Transmitter); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Grid)) {adif.AppendFormat("GRID-LOCATOR: {0}", participant.Grid); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Score)) {adif.AppendFormat("CLAIMED-SCORE: {0}", participant.Score); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Club)) {adif.AppendFormat("CLUB: {0}", participant.Club); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Name)) {adif.AppendFormat("NAME: {0}", participant.Name); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Address)) {adif.AppendFormat("ADDRESS: {0}", participant.Address); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.City)) {adif.AppendFormat("ADDRESS-CITY: {0}", participant.City); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Country)) {adif.AppendFormat("ADDRESS-COUNTRY: {0}", participant.Country); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Operators)) {adif.AppendFormat("OPERATORS: {0}", participant.Operators); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Soapbox)) {adif.AppendFormat("SOAPBOX: {0}", participant.Soapbox); adif.AppendLine(); }
+
+            foreach (QSO qso in qso_list)
+            {
+                string[] datetime = string.IsNullOrWhiteSpace(qso.Date) ? new string[] { "", "" } : qso.Date.Split(new char[] { ' ' });
+                if (datetime.Length > 1)
+                {
+                    qso.Date = datetime[0];
+                    qso.Time = datetime[1];
+                }
+
+                adif.Append("QSO: ");
+                if (qso.Freq != null) adif.AppendFormat("{0} ", qso.Freq);
+                if (qso.Mode != null) adif.AppendFormat("{0} ", qso.Mode);
+                if (qso.Date != null) adif.AppendFormat("{0} ", qso.Date);
+                if (qso.Time != null) adif.AppendFormat("{0} ", qso.Time);
+                if (qso.MyCall != null) adif.AppendFormat("{0} ", qso.MyCall);
+                if (qso.RST_SENT != null) adif.AppendFormat("{0} ", qso.RST_SENT);
+                if (qso.STX != null) adif.AppendFormat("{0} ", qso.STX);
+                if (qso.DXCall != null) adif.AppendFormat("{0} ", qso.DXCall);
+                if (qso.RST_RCVD != null) adif.AppendFormat("{0} ", qso.RST_RCVD);
+                if (qso.SRX != null) adif.AppendFormat("{0} ", qso.SRX);
+                adif.AppendLine();
+            }
+            adif.AppendLine("END-OF-LOG:");
+            return adif.ToString();
+        }
         public static string GenerateCSV(IEnumerable<QSO> qso_list)
         {
             StringBuilder csv = new StringBuilder(200);
@@ -209,5 +259,28 @@ namespace HolyParser
         public string Lat { get; set; }
         public string Lng { get; set; }
         public string Adif { get; set; }
+    }
+
+    public class Contester
+    {
+        public string Contest { get; set; }
+        public string Callsign { get; set; }
+        public string Name { get; set; }
+        public string Email { get; set; }
+        public string Category_Operator { get; set; }
+        public string Category_Band { get; set; }
+        public string Category_Mode { get; set; }
+        public string Category_Power { get; set; }
+        public string Location { get; set; }
+        public string Category_Assisted { get; set; }
+        public string Category_Transmitter { get; set; }
+        public string Grid { get; set; }
+        public string Score { get; set; }
+        public string Club { get; set; }
+        public string Address { get; set; }
+        public string City { get; set; }
+        public string Country { get; set; }
+        public string Operators { get; set; }
+        public string Soapbox { get; set; }
     }
 }
