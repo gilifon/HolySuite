@@ -309,8 +309,8 @@ namespace HolyContestManager
 
         private void GetData()
         {
-            //WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
-            WebRequest request = WebRequest.Create("https://www.iarc.org/iarc75/Server/GetLogForADIF.php");
+            WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
+            //WebRequest request = WebRequest.Create("https://www.iarc.org/iarc75/Server/GetLogForADIF.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;
             Stream dataStream = response.GetResponseStream();
@@ -336,25 +336,27 @@ namespace HolyContestManager
 
         private void CalculateWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            GenerateLogFile("4X75UT");
-            GenerateLogFile("4X75BQ");
+            //Participant par = new Participant();
+            //par.callsign = "EA3WX";
+            //par.category_op = "SINGLE-OP";
+            //par.category_mode = "SSB";
+            //par.category_power = "LOW";
+            //par.email = "@iarc.org";
+            //par.name = "-----";
+            //GenerateLogFile(par);
             
-
             Report.Clear();
             
             int iteration = 0;
             int participantsCount = RawData.participants.Count();
 
-            //List<Participant> participants = RawData.participants.Where(q => !q.callsign.StartsWith("4X") && !q.callsign.StartsWith("4Z")).OrderByDescending(t => t.qsos).ToList();
-            List<Participant> participants = RawData.participants.Where(q => q.callsign.StartsWith("4X") || q.callsign.StartsWith("4Z")).OrderByDescending(t => t.qsos).ToList();
-            
+            List<Participant> participants = RawData.participants;
 
             foreach (Participant p in participants)
             {
                 GenerateLogFile(p);
-                return;
                 iteration++;
-                if (p.is_manual == 0) // && Helper.getBareCallsign(p.callsign).ToUpper() == "VU3XIO")
+                if (p.is_manual == 0)
                 {
                     IEnumerable<QSO> _qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;//  && IsValidDate(q) select q;
 
@@ -412,19 +414,37 @@ namespace HolyContestManager
 
         private void GenerateLogFile(Participant p)
         {
-            GenerateLogFile(p.callsign);
-        }
-
-        private void GenerateLogFile(string callsign)
-        {
-            IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(callsign) select q;
-            string adif = HolyParser.Services.GenerateAdif(qsosx);
-            System.IO.FileStream fs = File.Create(files_path + Helper.getBareCallsign(callsign) + ".adi");
+            bool isAdif = false;
+            IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+            if (qsosx.Count() == 0) return;
+            string log = "";
+            string ext = "";
+            if (isAdif)
+            {
+                log = HolyParser.Services.GenerateAdif(qsosx);
+                ext = "adi";
+            }
+            else if (!string.IsNullOrEmpty(p.category_op) && !string.IsNullOrEmpty(p.category_mode) && !string.IsNullOrEmpty(p.category_power) && !string.IsNullOrEmpty(p.name) && !string.IsNullOrEmpty(p.email))
+            {
+                Contester c = new Contester();
+                c.Callsign = p.callsign;
+                c.Category_Mode = p.category_mode;
+                c.Category_Operator = p.category_op;
+                c.Category_Power = p.category_power;
+                c.Contest = "HOLYLAND";
+                c.Email = p.email;
+                c.Name = p.name;
+                c.Soapbox = "HolyLogger";
+                log = HolyParser.Services.GenerateCabrillo(qsosx, c);
+                ext = "txt";
+            }
+            System.IO.FileStream fs = File.Create(files_path + Helper.getBareCallsign(p.callsign) + "." + ext);
             StreamWriter sw = new StreamWriter(fs);
-            sw.Write(adif);
+            sw.Write(log);
             sw.Close();
             fs.Close();
         }
+
 
         private string GenerateMultipleInsert(IList<Participant> participants)
         {
@@ -601,6 +621,8 @@ namespace HolyContestManager
         public int id { get; set; }
         public string callsign { get; set; }
         public string category_mode { get; set; }
+        public string category_power { get; set; }
+        public string category_op { get; set; }
         public string email { get; set; }
         public string name { get; set; }
         public string country { get; set; }

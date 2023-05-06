@@ -145,6 +145,7 @@ namespace HolyParser
             adif.AppendLine("START-OF-LOG: 3.0");
             if (!string.IsNullOrEmpty(participant.Contest)) { adif.AppendFormat("CONTEST: {0}", participant.Contest); adif.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Callsign)) {adif.AppendFormat("CALLSIGN: {0}", participant.Callsign); adif.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Email)) { adif.AppendFormat("EMAIL: {0}", participant.Email); adif.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Location)) {adif.AppendFormat("LOCATION: {0}", participant.Location); adif.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Category_Operator)) {adif.AppendFormat("CATEGORY-OPERATOR: {0}", participant.Category_Operator); adif.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Category_Assisted)) {adif.AppendFormat("CATEGORY-ASSISTED: {0}", participant.Category_Assisted); adif.AppendLine(); }
