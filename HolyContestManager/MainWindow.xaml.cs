@@ -215,7 +215,7 @@ namespace HolyContestManager
         private void GetDataWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             GetData();
-            bool is_sukot = false;
+            bool is_sukot = true;
 
             ///////////////////////////////////////////////////////// SUKOT ///////////////////////////////////////////////
             if (is_sukot)
@@ -310,7 +310,7 @@ namespace HolyContestManager
         private void GetData()
         {
             WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
-            //WebRequest request = WebRequest.Create("https://www.iarc.org/iarc75/Server/GetLogForADIF.php");
+            //WebRequest request = WebRequest.Create("https://www.iarc.org/golan/Server/GetLogForADIF.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;
             Stream dataStream = response.GetResponseStream();
@@ -336,14 +336,14 @@ namespace HolyContestManager
 
         private void CalculateWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            //Participant par = new Participant();
-            //par.callsign = "EA3WX";
-            //par.category_op = "SINGLE-OP";
-            //par.category_mode = "SSB";
-            //par.category_power = "LOW";
-            //par.email = "@iarc.org";
-            //par.name = "-----";
-            //GenerateLogFile(par);
+            Participant par = new Participant();
+            par.callsign = "4X01G";
+            par.category_op = "SINGLE-OP";
+            par.category_mode = "SSB";
+            par.category_power = "LOW";
+            par.email = "@iarc.org";
+            par.name = "-----";
+            GenerateLogFile(par);
             
             Report.Clear();
             
@@ -414,7 +414,7 @@ namespace HolyContestManager
 
         private void GenerateLogFile(Participant p)
         {
-            bool isAdif = false;
+            bool isAdif = true;
             IEnumerable<QSO> qsosx = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
             if (qsosx.Count() == 0) return;
             string log = "";
