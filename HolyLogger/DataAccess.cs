@@ -287,7 +287,7 @@ namespace HolyLogger
                         if (rdr["rst_rcvd"] != null) q.RST_RCVD = (string)rdr["rst_rcvd"];
                         if (rdr["rst_sent"] != null) q.RST_SENT = (string)rdr["rst_sent"];
                         if (rdr["name"] != null) q.Name = (string)rdr["name"];
-                        if (rdr["country"] != null) q.Country = (string)rdr["country"];
+                        if (rdr["country"] != null) q.Country = rdr["country"].ToString();
                         if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                         if (rdr["time"] != null) q.Time = (string)rdr["time"];
                         if (rdr["date"] != null) q.Date = (string)rdr["date"];

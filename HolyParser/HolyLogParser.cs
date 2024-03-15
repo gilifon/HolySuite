@@ -618,7 +618,8 @@ namespace HolyParser
             IEnumerable<QSO> validQSOs = null;
             if (LogType == Operator.Foreign)
             {
-                validQSOs = m_qsoList.Where(p => p.IsValid && p.IsIsraeli ).DistinctBy(p => p.HASH);
+                //validQSOs = m_qsoList.Where(p => p.IsValid && p.IsIsraeli).DistinctBy(p => p.HASH);
+                validQSOs = m_qsoList.Where(p => p.IsValid).DistinctBy(p => p.HASH);
             }
             else if (LogType == Operator.Israeli)
             {
@@ -736,8 +737,9 @@ namespace HolyParser
                 log.Append(AllBandSquares); log.Append(" squares in all bands\r\n");
                 log.Append("You have contacted Israeli stations on "); log.Append(AllBandIsraeliStations); log.Append(" bands\r\n");
                 log.Append("-----------------------------------------------------------------------------------------------------------\r\n");
-                _result = total_points * (AllBandSquares);// + AllBandIsraeliStations);
-                _mults = AllBandSquares;// + AllBandIsraeliStations;
+                _result = total_points * (AllBandSquares + AllBandDXCC);// + AllBandIsraeliStations);
+                //_mults = AllBandSquares;// + AllBandIsraeliStations;
+                _mults = AllBandSquares + AllBandDXCC;// + AllBandIsraeliStations;
             }
             else if (LogType == Operator.Israeli)
             {

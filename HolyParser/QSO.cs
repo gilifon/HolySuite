@@ -116,7 +116,7 @@ namespace HolyParser
                     if (match.Success)
                     {
                         this.SRX = match.Groups[1].Value;
-                        IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC() && !IsIsraeli;
+                        IsValid = IsValidCall() && IsValidBand() && IsValidMode() && IsValidSRX() && IsValidDXCC();// && !IsIsraeli;
                     }
                     else
                     {
