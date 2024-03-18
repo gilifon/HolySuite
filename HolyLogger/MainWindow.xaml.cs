@@ -1057,7 +1057,7 @@ namespace HolyLogger
             }
         }
 
-        private void ExpotMenuItem_Click(object sender, RoutedEventArgs e)
+        private void ExportMenuItem_Click(object sender, RoutedEventArgs e)
         {
             //Contester c = new Contester();
             //c.Callsign = TB_MyCallsign.Text.Trim();
@@ -1114,6 +1114,49 @@ namespace HolyLogger
             }
         }
 
+        private void ExportCabrilloMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            Contester c = new Contester();
+            c.Callsign = Properties.Settings.Default.PersonalInfoCallsign;
+            c.Category_Mode = Properties.Settings.Default.selectedCategory;
+            c.Category_Operator = Properties.Settings.Default.selectedOperator;
+            c.Category_Power = Properties.Settings.Default.selectedPower;
+            c.Contest = Properties.Settings.Default.selectedEvent;
+            c.Email = Properties.Settings.Default.PersonalInfoEmail;
+            c.Grid = Properties.Settings.Default.my_locator;
+            c.Name = Properties.Settings.Default.PersonalInfoName;
+            c.Soapbox = "HolyLogger";
+
+            string cabrillo = Services.GenerateCabrillo(dal.GetAllQSOs(), c);
+            // Displays a SaveFileDialog so the user can save the Image
+            // assigned to Button2.
+            SaveFileDialog saveFileDialog1 = new SaveFileDialog();
+            saveFileDialog1.Filter = "Cabrillo File|*.cbr|Text File|*.txt|Log File|*.log";
+            saveFileDialog1.Title = "Export Cabrillo";
+            saveFileDialog1.ShowDialog();
+
+            // If the file name is not an empty string open it for saving.
+            try
+            {
+                if (saveFileDialog1.FileName != "")
+                {
+                    // Saves the Image via a FileStream created by the OpenFile method.
+                    System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
+                    StreamWriter sw = new StreamWriter(fs);
+                    sw.Write(cabrillo);
+                    sw.Close();
+                    fs.Close();
+                    MessageBox.Show("File created successfully!");
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Export failed: " + ex.Message);
+            }
+        }
+
+        
+
         private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string adif = Services.GenerateCSV(dal.GetAllQSOs());
@@ -1148,22 +1191,25 @@ namespace HolyLogger
         
         private async void L_SendLog(object sender, EventArgs e)
         {
+            LogUploadWindow w = (LogUploadWindow)sender;
             if (Qsos.Count == 0)
             {
                 System.Windows.Forms.MessageBox.Show("You can not upload empty log");
+                w.Close();
                 return;
             }
-            LogUploadWindow w = (LogUploadWindow)sender;
+            
             string bareCallsign = Properties.Settings.Default.PersonalInfoCallsign;
             string country = Services.getHamQth(bareCallsign).Name;
 
             var progressIndicator = new Progress<int>();           
 
-            string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedCategory.Operator, w.selectedCategory.Mode, w.selectedCategory.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
-            string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
+            //string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedCategory.Operator, w.selectedCategory.Mode, w.selectedCategory.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
+            //string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
+            string UploadCabrilloToIARC_result = await UploadCabrilloToIARC(bareCallsign, w.selectedOperator.Name, w.selectedCategory.Name, w.selectedBand.Name, w.selectedPower.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country, dal.GetAllQSOs());
 
             w.Close();
-            System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
+            System.Windows.Forms.MessageBox.Show(UploadCabrilloToIARC_result);
         }
         
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
@@ -1247,6 +1293,75 @@ namespace HolyLogger
                 }
             }
             return allSuccessfullyDone ? "All Done, 73!" : "Done with some errors.\r\nPlease contact support.";// "Some of the QSOs had error";
+        }
+
+        private async Task<string> UploadCabrilloToIARC(string callsign, string op, string category, string band, string power, string email, string name, string country, ObservableCollection<QSO> QSOList)
+        {
+            using (var client = new HttpClient())
+            {
+                //prepare the header data
+                Contester c = new Contester();
+                c.Callsign = callsign.Trim();
+                c.Category_Band = band.Trim();
+                c.Category_Operator = op.Trim();
+                c.Category_Mode = category.Trim();                
+                c.Category_Power = power.Trim();
+                c.Contest = "HOLYLAND";
+                c.Email = email;
+                c.Grid = TB_MyLocator.Text.Trim();
+                c.Name = name.Trim();
+                c.Country = country.Trim();
+                c.Soapbox = "HolyLogger";
+
+                //generate cabrillo
+                string cabrillo = Services.GenerateCabrillo(dal.GetAllQSOs(), c);
+
+                //set multipart
+                var formData = new MultipartFormDataContent();
+                var filename = callsign + "_" + DateTime.UtcNow.ToString("yyyyMMdd") + ".txt";
+                formData.Add(new StringContent(cabrillo), "file", filename);
+
+                c.filename = filename;
+                c.timestamp = DateTime.UtcNow.Ticks.ToString();
+                
+                //post file
+                var response = await client.PostAsync("https://iarc.org/iarc/Server/ftp.php", formData);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    string jsonData = "{\"info\": " + JsonConvert.SerializeObject(c).Replace("'", "") + "}";
+
+                    // Create a StringContent object with your JSON data
+                    StringContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+
+                    try
+                    {
+                        // Send a POST request to the URL with the JSON data
+                        //upload_log.php
+                        response = await client.PostAsync("https://iarc.org/iarc/Server/upload_log.php", content);
+
+                        // Check if the request was successful
+                        if (response.IsSuccessStatusCode)
+                        {
+                            // Read and display the response from the PHP file
+                            string responseContent = await response.Content.ReadAsStringAsync();
+                            return "File uploaded successfully.";
+                        }
+                        else
+                        {
+                            return $"Error uploading file. Status code: {response.StatusCode}";
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        return $"Error uploading file";
+                    }
+                }
+                else
+                {
+                    return $"Error uploading file. Status code: {response.StatusCode}";
+                }
+            }
         }
 
         private List<List<QSO>> SplitQSOList(ObservableCollection<QSO> QSOList)

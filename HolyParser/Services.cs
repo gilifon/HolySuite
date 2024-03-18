@@ -262,26 +262,5 @@ namespace HolyParser
         public string Adif { get; set; }
     }
 
-    public class Contester
-    {
-        public string Contest { get; set; }
-        public string Callsign { get; set; }
-        public string Name { get; set; }
-        public string Email { get; set; }
-        public string Category_Operator { get; set; }
-        public string Category_Band { get; set; }
-        public string Category_Mode { get; set; }
-        public string Category_Power { get; set; }
-        public string Location { get; set; }
-        public string Category_Assisted { get; set; }
-        public string Category_Transmitter { get; set; }
-        public string Grid { get; set; }
-        public string Score { get; set; }
-        public string Club { get; set; }
-        public string Address { get; set; }
-        public string City { get; set; }
-        public string Country { get; set; }
-        public string Operators { get; set; }
-        public string Soapbox { get; set; }
-    }
+    
 }

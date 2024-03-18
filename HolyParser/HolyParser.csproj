@@ -59,8 +59,10 @@
     <Compile Include="..\VersionInfo.cs">
       <Link>VersionInfo.cs</Link>
     </Compile>
+    <Compile Include="GenericItem.cs" />
     <Compile Include="HolyLogParser.cs" />
     <Compile Include="MaidenheadLocator.cs" />
+    <Compile Include="Contester.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Category.cs" />
     <Compile Include="Participant.cs" />

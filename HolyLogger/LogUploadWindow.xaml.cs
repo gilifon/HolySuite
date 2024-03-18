@@ -52,10 +52,16 @@ namespace HolyLogger
         DataAccess dal;
         public ObservableCollection<RadioEvent> RadioEvents { get; set; }
         public ObservableCollection<Category> Categories { get; set; }
+        public ObservableCollection<GenericItem> Operators { get; set; }
+        public ObservableCollection<GenericItem> Bands { get; set; }
+        public ObservableCollection<GenericItem> Power { get; set; }
 
         public Category selectedCategory { get; set; }
         public RadioEvent selectedRadioEvent { get; set; }
-        
+        public GenericItem selectedOperator{ get; set; }
+        public GenericItem selectedBand { get; set; }
+        public GenericItem selectedPower { get; set; }
+
 
         public LogUploadWindow()
         {
@@ -80,12 +86,51 @@ namespace HolyLogger
                 CB_Events.SelectedItem = re;
             else
                 CB_Events.SelectedIndex = 0;
+
+            Operators = dal.GetTableData("operators");
+            CB_Operator.SelectionChanged += CB_Operator_SelectionChanged;
+            CB_Operator.DisplayMemberPath = "Description";
+            CB_Operator.SelectedValuePath = "id";
+            CB_Operator.ItemsSource = Operators;
+            GenericItem gi = Operators.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedOperator);
+            if (gi != null)
+                CB_Operator.SelectedItem = gi;
+            else
+                CB_Operator.SelectedIndex = 0;
+
+            Bands = dal.GetTableData("bands");
+            CB_Band.SelectionChanged += CB_Band_SelectionChanged;
+            CB_Band.DisplayMemberPath = "Description";
+            CB_Band.SelectedValuePath = "id";
+            CB_Band.ItemsSource = Bands;
+            gi = Bands.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedBand);
+            if (gi != null)
+                CB_Band.SelectedItem = gi;
+            else
+                CB_Band.SelectedIndex = 0;
+
+            Power = dal.GetTableData("power");
+            CB_Power.SelectionChanged += CB_Power_SelectionChanged;
+            CB_Power.DisplayMemberPath = "Description";
+            CB_Power.SelectedValuePath = "id";
+            CB_Power.ItemsSource = Power;
+            gi = Power.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedPower);
+            if (gi != null)
+                CB_Power.SelectedItem = gi;
+            else
+                CB_Power.SelectedIndex = 0;
         }
 
         private void CB_Events_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             selectedRadioEvent = (RadioEvent)CB_Events.SelectedItem;
             int eid = selectedRadioEvent.id;
+
+            init_category_list(eid);
+        }
+
+        private void init_category_list(int eid)
+        {
             Categories = dal.GetCategories(eid);
             if (Categories.Count() == 0)
             {
@@ -105,6 +150,18 @@ namespace HolyLogger
         private void CB_Category_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             selectedCategory = (Category)CB_Category.SelectedItem;
+        }
+        private void CB_Operator_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            selectedOperator = (GenericItem)CB_Operator.SelectedItem;
+        }
+        private void CB_Band_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            selectedBand = (GenericItem)CB_Band.SelectedItem;
+        }
+        private void CB_Power_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            selectedPower = (GenericItem)CB_Power.SelectedItem;
         }
 
         private void SendLogBtn_Click(object sender, RoutedEventArgs e)

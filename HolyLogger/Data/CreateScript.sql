@@ -45,6 +45,30 @@ CREATE TABLE [radio_events] (
 , [is_categories] INTEGER NOT NULL COLLATE NOCASE
 );
 
+DROP TABLE [bands];
+CREATE TABLE [bands] (
+  [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+, [name] nvarchar(100) NOT NULL COLLATE NOCASE
+, [description] nvarchar(100) NOT NULL COLLATE NOCASE
+, [event_id] bigint NOT NULL
+);
+
+DROP TABLE [operators];
+CREATE TABLE [operators] (
+  [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+, [name] nvarchar(100) NOT NULL COLLATE NOCASE
+, [description] nvarchar(100) NOT NULL COLLATE NOCASE
+, [event_id] bigint NOT NULL
+);
+
+DROP TABLE [power];
+CREATE TABLE [power] (
+  [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+, [name] nvarchar(100) NOT NULL COLLATE NOCASE
+, [description] nvarchar(100) NOT NULL COLLATE NOCASE
+, [event_id] bigint NOT NULL
+);
+
 -- Script Date: 12/1/2021 9:47 PM  - ErikEJ.SqlCeScripting version 3.5.2.90
 INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
 1,'holyland','Holyland Contest',1);
@@ -94,3 +118,32 @@ INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[e
 19,'VHF','VHF','VHF','SINGLE-OP','LOW',2);
 INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
 20,'UHF','UHF','UHF','SINGLE-OP','LOW',2);
+
+INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+1,'All-Bands','All-Bands',1);
+INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+2,'10M','10M',1);
+INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+3,'15M','15M',1);
+INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+4,'20M','20M',1);
+INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+5,'40M','40M',1);
+INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+6,'80M','80M',1);
+
+INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
+1,'SINGLE-OP','SINGLE-OP',1);
+INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
+2,'MULTI-OP','MULTI-OP',1);
+INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
+3,'CHECKLOG','CHECKLOG',1);
+INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
+4,'SWL','SWL',1);
+
+INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
+1,'High','High (>100W)',1);
+INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
+2,'Low','Low (<100W)',1);
+INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
+3,'QRP','QRP(<10W)',1);

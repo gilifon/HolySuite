@@ -27,9 +27,14 @@
                                 </MenuItem.Icon>
                             </MenuItem>
                             <Separator />
-                            <MenuItem x:Name="ExpotMenuItem" Header="Export ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExpotMenuItem_Click" >
+                            <MenuItem x:Name="ExportMenuItem" Header="Export ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExportMenuItem_Click" >
                                 <MenuItem.Icon>
                                     <Image Source="Images/exportA.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                            <MenuItem x:Name="ExportCabrilloMenuItem" Header="Export Cabrillo" ToolTip="Generates Cabrillo file from the QSO list" Click="ExportCabrilloMenuItem_Click" >
+                                <MenuItem.Icon>
+                                    <Image Source="Images/exportC.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>
                             <MenuItem x:Name="ExpotExlMenuItem" Header="Export CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >

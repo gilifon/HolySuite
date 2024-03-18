@@ -462,6 +462,7 @@
     <Resource Include="Images\folder.png" />
     <Resource Include="Images\unlock.png" />
     <Resource Include="Images\newdxcc.gif" />
+    <Resource Include="Images\exportC.png" />
     <Content Include="Server\AddLog.php" />
     <Content Include="Server\addParticipant.php" />
     <Content Include="Server\addQSO.php" />

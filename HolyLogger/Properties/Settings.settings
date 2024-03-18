@@ -251,5 +251,14 @@
     <Setting Name="N1MMUDPPort" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">12060</Value>
     </Setting>
+    <Setting Name="selectedBand" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="selectedOperator" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="selectedPower" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
   </Settings>
 </SettingsFile>

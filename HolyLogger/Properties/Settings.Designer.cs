@@ -1018,5 +1018,41 @@ namespace HolyLogger.Properties {
                 this["N1MMUDPPort"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string selectedBand {
+            get {
+                return ((string)(this["selectedBand"]));
+            }
+            set {
+                this["selectedBand"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string selectedOperator {
+            get {
+                return ((string)(this["selectedOperator"]));
+            }
+            set {
+                this["selectedOperator"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string selectedPower {
+            get {
+                return ((string)(this["selectedPower"]));
+            }
+            set {
+                this["selectedPower"] = value;
+            }
+        }
     }
 }

@@ -405,6 +405,29 @@ namespace HolyLogger
             return category_list;
         }
 
+        public ObservableCollection<GenericItem> GetTableData(string tableName)
+        {
+            CultureInfo enUS = new CultureInfo("en-US");
+            ObservableCollection<GenericItem> category_list = new ObservableCollection<GenericItem>();
+            string stm = "SELECT * FROM " + tableName + " ORDER BY Id ASC";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            {
+                using (SQLiteDataReader rdr = cmd.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        GenericItem q = new GenericItem();
+                        if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                        if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                        if (rdr["description"] != null) q.Description = rdr["description"].ToString();
+                        if (rdr["event_id"] != null) q.EventId = int.Parse(rdr["event_id"].ToString());
+                        category_list.Add(q);
+                    }
+                }
+            }
+            return category_list;
+        }
+
         private void AddQsoColIfNeeded(string name, string definition)
         {
 
