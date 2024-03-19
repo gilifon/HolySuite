@@ -15,12 +15,6 @@
     {
         "Entry"
         {
-        "MsmKey" = "8:_04A8F712C3C042DBB8D95EAFA88014B0"
-        "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_05CC3092C01B991A4F9100EE87FABD6F"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
@@ -375,12 +369,6 @@
         }
         "Entry"
         {
-        "MsmKey" = "8:_81A561630A604B49864EDF277C6CE041"
-        "OwnerKey" = "8:_UNDEFINED"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
         "MsmKey" = "8:_8351A14A7751C7A48E4572728B40806D"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
@@ -537,6 +525,12 @@
         }
         "Entry"
         {
+        "MsmKey" = "8:_C5FEDAB4525A4493B632960F6E4A8DE0"
+        "OwnerKey" = "8:_UNDEFINED"
+        "MsmSig" = "8:_UNDEFINED"
+        }
+        "Entry"
+        {
         "MsmKey" = "8:_DFB8BBD0E6D54832F8DB1BBDDDC3E62C"
         "OwnerKey" = "8:_B3AC16EEFCCB4135994F46A7F9226169"
         "MsmSig" = "8:_UNDEFINED"
@@ -617,12 +611,6 @@
         {
         "MsmKey" = "8:_FC286FCB97D1E39AC5342D20D2E43880"
         "OwnerKey" = "8:_A34E0A7058ACCFEC600794103136454B"
-        "MsmSig" = "8:_UNDEFINED"
-        }
-        "Entry"
-        {
-        "MsmKey" = "8:_UNDEFINED"
-        "OwnerKey" = "8:_E75420564B689FF8C222EE5AE02F0B79"
         "MsmSig" = "8:_UNDEFINED"
         }
         "Entry"
@@ -1039,6 +1027,12 @@
         "OwnerKey" = "8:_2014D6B3CC35978AF17B6090296911EB"
         "MsmSig" = "8:_UNDEFINED"
         }
+        "Entry"
+        {
+        "MsmKey" = "8:_UNDEFINED"
+        "OwnerKey" = "8:_E75420564B689FF8C222EE5AE02F0B79"
+        "MsmSig" = "8:_UNDEFINED"
+        }
     }
     "Configurations"
     {
@@ -1134,26 +1128,6 @@
         }
         "File"
         {
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_04A8F712C3C042DBB8D95EAFA88014B0"
-            {
-            "SourcePath" = "8:..\\HolyLogger\\Data\\logDB.db"
-            "TargetName" = "8:logDB.db"
-            "Tag" = "8:"
-            "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
-            "IsolateTo" = "8:"
-            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_05CC3092C01B991A4F9100EE87FABD6F"
             {
             "AssemblyRegister" = "3:1"
@@ -1561,7 +1535,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:HolyParser, Version=6.1.1.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:HolyParser, Version=7.1.1.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_2450D84030FEC7DAF4EDE26FE4F0ACBD"
@@ -2487,26 +2461,6 @@
             "IsDependency" = "11:TRUE"
             "IsolateTo" = "8:"
             }
-            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_81A561630A604B49864EDF277C6CE041"
-            {
-            "SourcePath" = "8:..\\HolyLogger\\Data\\logDB.db"
-            "TargetName" = "8:logDB.db"
-            "Tag" = "8:"
-            "Folder" = "8:_69DC518C1C884B8E917724CF53907456"
-            "Condition" = "8:"
-            "Transitive" = "11:FALSE"
-            "Vital" = "11:TRUE"
-            "ReadOnly" = "11:FALSE"
-            "Hidden" = "11:FALSE"
-            "System" = "11:FALSE"
-            "Permanent" = "11:FALSE"
-            "SharedLegacy" = "11:FALSE"
-            "PackageAs" = "3:1"
-            "Register" = "3:1"
-            "Exclude" = "11:FALSE"
-            "IsDependency" = "11:FALSE"
-            "IsolateTo" = "8:"
-            }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_8351A14A7751C7A48E4572728B40806D"
             {
             "AssemblyRegister" = "3:1"
@@ -2985,7 +2939,7 @@
             {
             "AssemblyRegister" = "3:1"
             "AssemblyIsInGAC" = "11:FALSE"
-            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=6.1.1.0, Culture=neutral, processorArchitecture=MSIL"
+            "AssemblyAsmDisplayName" = "8:DXCCManager, Version=7.1.1.0, Culture=neutral, processorArchitecture=MSIL"
                 "ScatterAssemblies"
                 {
                     "_B07CB5883DE086A56C1A603F3D9D56DF"
@@ -3072,6 +3026,26 @@
             "Register" = "3:1"
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:TRUE"
+            "IsolateTo" = "8:"
+            }
+            "{1FB2D0AE-D3B9-43D4-B9DD-F88EC61E35DE}:_C5FEDAB4525A4493B632960F6E4A8DE0"
+            {
+            "SourcePath" = "8:..\\HolyLogger\\Data\\logDB.db"
+            "TargetName" = "8:logDB.db"
+            "Tag" = "8:"
+            "Folder" = "8:_69DC518C1C884B8E917724CF53907456"
+            "Condition" = "8:"
+            "Transitive" = "11:TRUE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
             }
             "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_DFB8BBD0E6D54832F8DB1BBDDDC3E62C"
@@ -3516,15 +3490,15 @@
         {
         "Name" = "8:Microsoft Visual Studio"
         "ProductName" = "8:HolyLogger"
-        "ProductCode" = "8:{3EA7E19E-AAC7-4F8C-B22D-32051AB77B55}"
-        "PackageCode" = "8:{5EF242F6-066A-4A1E-88BF-81DF2FA58D53}"
+        "ProductCode" = "8:{142A9702-62D8-488D-AC0A-6A659D29B2CC}"
+        "PackageCode" = "8:{DF7CF31A-3227-481C-9B90-54BE6D909B40}"
         "UpgradeCode" = "8:{60EADFD8-DD20-4992-B05E-81FB7BE707D4}"
         "AspNetVersion" = "8:4.0.30319.0"
         "RestartWWWService" = "11:FALSE"
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:7.0.1"
+        "ProductVersion" = "8:7.1.2"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:+972547828077"
         "ARPHELPLINK" = "8:https://4z1kd.github.io/HolyLogger/"
@@ -4066,7 +4040,7 @@
         {
             "{5259A561-127C-4D43-A0A1-72F10C7B3BF8}:_B3AC16EEFCCB4135994F46A7F9226169"
             {
-            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Release\\HolyLogger.exe"
+            "SourcePath" = "8:..\\HolyLogger\\obj\\x86\\Debug\\HolyLogger.exe"
             "TargetName" = "8:"
             "Tag" = "8:"
             "Folder" = "8:_447F70E0652E4B60AFA2BC3C93B00245"

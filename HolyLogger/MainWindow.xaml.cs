@@ -1059,40 +1059,11 @@ namespace HolyLogger
 
         private void ExportMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            //Contester c = new Contester();
-            //c.Callsign = TB_MyCallsign.Text.Trim();
-            //c.Category_Mode = "SSB";
-            //c.Category_Operator = "SINGLE-OP";
-            //c.Category_Power = "LOW";
-            //c.Contest = "HOLYLAND";
-            //c.Email = "4z1kd@iarc.org";
-            //c.Grid = TB_MyLocator.Text.Trim();
-            //c.Name = "Gil";
-            //c.Soapbox = "HolyLogger";
-
             string adif = Services.GenerateAdif(dal.GetAllQSOs());
-            //string cabrillo = Services.GenerateCabrillo(dal.GetAllQSOs(), c);
-            // Displays a SaveFileDialog so the user can save the Image
-            // assigned to Button2.
             SaveFileDialog saveFileDialog1 = new SaveFileDialog();
             saveFileDialog1.Filter = "ADIF File|*.adi";
             saveFileDialog1.Title = "Export ADIF";
             saveFileDialog1.ShowDialog();
-
-            //PrintDocument p = new PrintDocument();
-            //p.PrintPage += delegate (object sender1, PrintPageEventArgs e1)
-            //{
-            //    e1.Graphics.DrawString(adif, new System.Drawing.Font("Times New Roman", 12), new System.Drawing.SolidBrush(System.Drawing.Color.Black), new System.Drawing.RectangleF(0, 0, p.DefaultPageSettings.PrintableArea.Width, p.DefaultPageSettings.PrintableArea.Height));
-            //};
-            //try
-            //{
-            //    p.Print();
-            //}
-            //catch (Exception ex)
-            //{
-            //    throw new Exception("Exception Occured While Printing", ex);
-            //}
-
 
             // If the file name is not an empty string open it for saving.
             try
@@ -1155,8 +1126,6 @@ namespace HolyLogger
             }
         }
 
-        
-
         private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string adif = Services.GenerateCSV(dal.GetAllQSOs());
@@ -1204,12 +1173,14 @@ namespace HolyLogger
 
             var progressIndicator = new Progress<int>();           
 
-            //string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedCategory.Operator, w.selectedCategory.Mode, w.selectedCategory.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
-            //string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
-            string UploadCabrilloToIARC_result = await UploadCabrilloToIARC(bareCallsign, w.selectedOperator.Name, w.selectedCategory.Name, w.selectedBand.Name, w.selectedPower.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country, dal.GetAllQSOs());
-
+            string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedCategory.Operator, w.selectedCategory.Mode, w.selectedCategory.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
+            string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
+            if (w.selectedRadioEvent.Name.ToLower() == "holyland")
+            {
+                string UploadCabrilloToIARC_result = await UploadCabrilloToIARC(bareCallsign, w.selectedOperator.Name, w.selectedCategory.Name, w.selectedBand.Name, w.selectedPower.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country, dal.GetAllQSOs());
+            }
             w.Close();
-            System.Windows.Forms.MessageBox.Show(UploadCabrilloToIARC_result);
+            System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
         }
         
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
@@ -1292,7 +1263,7 @@ namespace HolyLogger
                     file.Close();
                 }
             }
-            return allSuccessfullyDone ? "All Done, 73!" : "Done with some errors.\r\nPlease contact support.";// "Some of the QSOs had error";
+            return allSuccessfullyDone ? "Log sent successfully, 73!" : "Done with some errors.\r\nPlease contact support.";// "Some of the QSOs had error";
         }
 
         private async Task<string> UploadCabrilloToIARC(string callsign, string op, string category, string band, string power, string email, string name, string country, ObservableCollection<QSO> QSOList)
@@ -1329,16 +1300,16 @@ namespace HolyLogger
 
                 if (response.IsSuccessStatusCode)
                 {
-                    string jsonData = "{\"info\": " + JsonConvert.SerializeObject(c).Replace("'", "") + "}";
-
                     // Create a StringContent object with your JSON data
-                    StringContent content = new StringContent(jsonData, Encoding.UTF8, "application/json");
+                    //set multipart
+                    formData = new MultipartFormDataContent();
+                    formData.Add(new StringContent(JsonConvert.SerializeObject(c).Replace("'", "")), "info");
 
                     try
                     {
                         // Send a POST request to the URL with the JSON data
                         //upload_log.php
-                        response = await client.PostAsync("https://iarc.org/iarc/Server/upload_log.php", content);
+                        response = await client.PostAsync("https://iarc.org/iarc/Server/upload_log.php", formData);
 
                         // Check if the request was successful
                         if (response.IsSuccessStatusCode)

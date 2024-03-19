@@ -47,6 +47,7 @@ namespace HolyLogger
             }
 
             AddQsoColIfNeeded("soapbox", "nvarchar(100) NULL");
+            UpdateSchema();
             if (SchemaHasChanged)
             {
                 con.Close();
@@ -368,7 +369,7 @@ namespace HolyLogger
                         if (rdr["name"] != null) q.Name = rdr["name"].ToString();
                         if (rdr["description"] != null) q.Description = rdr["description"].ToString();
                         if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
-                        if (rdr["operator"] != null) q.Operator= rdr["operator"].ToString();
+                        if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
                         if (rdr["power"] != null) q.Power = rdr["power"].ToString();
                         if (rdr["event_id"] != null) q.EventId = int.Parse(rdr["event_id"].ToString());
                         category_list.Add(q);
@@ -436,25 +437,234 @@ namespace HolyLogger
             try
             {
                 int colCount = Convert.ToInt32(cmd.ExecuteScalar());
-                if (colCount > 0)
+                if (colCount == 0)
                 {
-                    return;
+                    stm = "ALTER TABLE qso ADD COLUMN [" + name + "] " + definition;
+                    cmd = new SQLiteCommand(stm, con);
+                    try
+                    {
+                        cmd.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new Exception(ex.Message);
+                    }
                 }
             }
             catch (Exception ex)
             {
                 throw new Exception(ex.Message);
             }
-            stm = "ALTER TABLE qso ADD COLUMN [" + name + "] " + definition;
-            cmd = new SQLiteCommand(stm, con);
-            try
+
+        }
+
+        // Function to check if a table exists in the database
+        bool TableExists(string tableName)
+        {
+            using (var command = new SQLiteCommand($"SELECT name FROM sqlite_master WHERE type='table' AND name='{tableName}'", con))
             {
-                cmd.ExecuteNonQuery();
-                SchemaHasChanged = true;
+                using (var reader = command.ExecuteReader())
+                {
+                    return reader.HasRows;
+                }
             }
-            catch (Exception ex)
+        }
+
+        private void UpdateSchema()
+        {
+            string createTable_qso = @"
+            DROP TABLE IF EXISTS[qso];
+            CREATE TABLE [qso] (
+                [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            , [my_callsign] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [operator] nvarchar(100) NULL COLLATE NOCASE
+            , [my_square] nvarchar(100) NULL COLLATE NOCASE
+            , [my_locator] nvarchar(100) NULL COLLATE NOCASE
+            , [dx_locator] nvarchar(100) NULL COLLATE NOCASE
+            , [frequency] nvarchar(100) NULL COLLATE NOCASE
+            , [band] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [dx_callsign] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [rst_rcvd] nvarchar(100) NULL COLLATE NOCASE
+            , [rst_sent] nvarchar(100) NULL COLLATE NOCASE
+            , [date] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [time] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [mode] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [submode] nvarchar(100) NULL COLLATE NOCASE
+            , [exchange] nvarchar(100) NULL COLLATE NOCASE
+            , [comment] nvarchar(500) NULL COLLATE NOCASE
+            , [name] nvarchar(500) NULL COLLATE NOCASE
+            , [country] nvarchar(100) NULL COLLATE NOCASE
+            , [continent] nvarchar(100) NULL COLLATE NOCASE
+            , [prop_mode] nvarchar(100) NULL COLLATE NOCASE
+            , [sat_name] nvarchar(100) NULL COLLATE NOCASE
+            , [soapbox] nvarchar(100) NULL COLLATE NOCASE
+            );";
+
+            string createTable_categories = @"
+            DROP TABLE IF EXISTS[categories];
+            CREATE TABLE [categories] (
+                [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            , [name] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [description] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [mode] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [operator] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [power] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [event_id] INTEGER NOT NULL COLLATE NOCASE
+            );
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            1,'CW','CW (Single OP, CW Only)','CW','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            2,'SSB','SSB (Single OP, SSB Only)','SSB','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            3,'MIX','MIX(Single OP, Mix Modes)','MIX','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            4,'FT8','FT8 (Single OP, FT8 Only)','FT8','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            5,'DIGI','DIGI (Single OP, RTTY/PSK Only)','DIGI','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            6,'QRP','QRP (Single OP, 10W Max)','QRP','SINGLE-OP','QRP',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            7,'SOB','SOB (Single OP, Single Band)','SOB','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            8,'POR','POR (Single OP, Portable 1 Square)','POR','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            9,'M5','M5 (Single OP, Portable 5 Squares)','M5','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            10,'M10','M10 (Single OP, Portable 10 Squares)','M10','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            11,'MOP','MOP (Multi OP, Single TX)','MOP','MULTI-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            12,'MM','MM (Multi OP, Multi TX)','MM','MULTI-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            13,'MMP','MMP (Multi OP, Single TX, Portable)','MMP','MULTI-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            14,'4Z9','4Z9 (4Z9 callsign)','4Z9','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            15,'SHA','SHA (Saturday Night)','SHA','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            16,'SWL','SWL (Short Wave Listener)','SWL','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            17,'NEW','NEW (License less than 2 years)','NEW','SINGLE-OP','LOW',1);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            18,'VHF/UHF','VHF/UHF','VHF/UHF','SINGLE-OP','LOW',2);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            19,'VHF','VHF','VHF','SINGLE-OP','LOW',2);
+            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
+            20,'UHF','UHF','UHF','SINGLE-OP','LOW',2);";
+
+            string createTable_radio_events = @"
+            DROP TABLE IF EXISTS[radio_events];
+            CREATE TABLE [radio_events] (
+                [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            , [name] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [description] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [is_categories] INTEGER NOT NULL COLLATE NOCASE
+            );
+            INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
+            1,'holyland','Holyland Contest',1);
+            INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
+            2,'sukot','Sukot',1);
+            INSERT INTO [radio_events] ([Id],[name],[description],[is_categories]) VALUES (
+            3,'iarc','IARC Event',1);";
+
+            string createTable_bands = @"DROP TABLE IF EXISTS[bands];
+            CREATE TABLE [bands] (
+                [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            , [name] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [description] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [event_id] bigint NOT NULL
+            );
+            INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+            1,'All-Bands','All-Bands',1);
+            INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+            2,'10','10M',1);
+            INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+            3,'15','15M',1);
+            INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+            4,'20','20M',1);
+            INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+            5,'40','40M',1);
+            INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
+            6,'80','80M',1);";
+
+            string createTable_operators = @"DROP TABLE IF EXISTS[operators];
+            CREATE TABLE [operators] (
+                [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            , [name] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [description] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [event_id] bigint NOT NULL
+            );
+            INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
+            1,'SINGLE-OP','SINGLE-OP',1);
+            INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
+            2,'MULTI-OP','MULTI-OP',1);
+            INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
+            3,'CHECKLOG','CHECKLOG',1);
+            INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
+            4,'SWL','SWL',1);";
+
+            string createTable_power = @"DROP TABLE IF EXISTS[power];
+            CREATE TABLE [power] (
+                [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            , [name] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [description] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [event_id] bigint NOT NULL
+            );
+            INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
+            1,'HIGH','High (>100W)',1);
+            INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
+            2,'LOW','Low (<100W)',1);
+            INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
+            3,'QRP','QRP(<10W)',1);";
+
+            if (!TableExists("qso"))
             {
-                throw new Exception(ex.Message);
+                using (var command = new SQLiteCommand(createTable_qso, con))
+                {
+                    command.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+            if (!TableExists("categories"))
+            {
+                using (var command = new SQLiteCommand(createTable_categories, con))
+                {
+                    command.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+            if (!TableExists("radio_events"))
+            {
+                using (var command = new SQLiteCommand(createTable_radio_events, con))
+                {
+                    command.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+            if (!TableExists("bands"))
+            {
+                using (var command = new SQLiteCommand(createTable_bands, con))
+                {
+                    command.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+            if (!TableExists("operators"))
+            {
+                using (var command = new SQLiteCommand(createTable_operators, con))
+                {
+                    command.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+            if (!TableExists("power"))
+            {
+                using (var command = new SQLiteCommand(createTable_power, con))
+                {
+                    command.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
             }
         }
     }

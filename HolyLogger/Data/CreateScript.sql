@@ -122,15 +122,15 @@ INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[e
 INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
 1,'All-Bands','All-Bands',1);
 INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
-2,'10M','10M',1);
+2,'10','10M',1);
 INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
-3,'15M','15M',1);
+3,'15','15M',1);
 INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
-4,'20M','20M',1);
+4,'20','20M',1);
 INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
-5,'40M','40M',1);
+5,'40','40M',1);
 INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
-6,'80M','80M',1);
+6,'80','80M',1);
 
 INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
 1,'SINGLE-OP','SINGLE-OP',1);
@@ -142,8 +142,8 @@ INSERT INTO [operators] ([Id],[name],[description],[event_id]) VALUES (
 4,'SWL','SWL',1);
 
 INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
-1,'High','High (>100W)',1);
+1,'HIGH','High (>100W)',1);
 INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
-2,'Low','Low (<100W)',1);
+2,'LOW','Low (<100W)',1);
 INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
 3,'QRP','QRP(<10W)',1);
