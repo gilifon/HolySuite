@@ -14,12 +14,14 @@ namespace HolyLogger
 {
     public class DataAccess
     {
+        // Private static instance variable to hold the single instance of the class.
+        private static DataAccess instance;
         private SQLiteConnection con = null;
         string dbPath = "";
 
         public bool SchemaHasChanged { get; set; }
 
-        public DataAccess()
+        private DataAccess()
         {
             try
             {
@@ -40,21 +42,32 @@ namespace HolyLogger
 
                 con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
                 con.Open();
+
+                UpdateSchema();
+                
+                con.Close();
+                con.Dispose();
+                
+                con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
+                con.Open();
+
             }
             catch (Exception e)
             {
                 throw new Exception("Failed to connect to DB: " + e.Message);
             }
+            
+        }
 
-            AddQsoColIfNeeded("soapbox", "nvarchar(100) NULL");
-            UpdateSchema();
-            if (SchemaHasChanged)
+        // Public static method to get the single instance of the class.
+        public static DataAccess GetInstance()
+        {
+            // If instance is null, create a new instance.
+            if (instance == null)
             {
-                con.Close();
-                con.Dispose();
-                con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
-                con.Open();
+                instance = new DataAccess();
             }
+            return instance;
         }
 
         public void Close()
@@ -429,17 +442,17 @@ namespace HolyLogger
             return category_list;
         }
 
-        private void AddQsoColIfNeeded(string name, string definition)
+        private void AddColToTable(string tableName, string colName, string definition)
         {
 
-            string stm = "SELECT count(*) FROM pragma_table_info(\"qso\") WHERE name = \"" + name + "\"";
+            string stm = $"SELECT count(*) FROM pragma_table_info('{tableName}') WHERE name = '{colName}'";
             SQLiteCommand cmd = new SQLiteCommand(stm, con);
             try
             {
                 int colCount = Convert.ToInt32(cmd.ExecuteScalar());
                 if (colCount == 0)
                 {
-                    stm = "ALTER TABLE qso ADD COLUMN [" + name + "] " + definition;
+                    stm = $"ALTER TABLE {tableName} ADD COLUMN [" + colName + "] " + definition;
                     cmd = new SQLiteCommand(stm, con);
                     try
                     {
@@ -474,7 +487,6 @@ namespace HolyLogger
         private void UpdateSchema()
         {
             string createTable_qso = @"
-            DROP TABLE IF EXISTS[qso];
             CREATE TABLE [qso] (
                 [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
             , [my_callsign] nvarchar(100) NOT NULL COLLATE NOCASE
@@ -623,48 +635,39 @@ namespace HolyLogger
                 using (var command = new SQLiteCommand(createTable_qso, con))
                 {
                     command.ExecuteNonQuery();
-                    SchemaHasChanged = true;
                 }
             }
-            if (!TableExists("categories"))
+            else
             {
-                using (var command = new SQLiteCommand(createTable_categories, con))
-                {
-                    command.ExecuteNonQuery();
-                    SchemaHasChanged = true;
-                }
+                AddColToTable("qso", "my_callsign", "nvarchar(100) NOT NULL");
+                AddColToTable("qso", "operator", "nvarchar(100) NULL");
+                AddColToTable("qso", "my_square", "nvarchar(100) NULL");
+                AddColToTable("qso", "my_locator", "nvarchar(100) NULL");
+                AddColToTable("qso", "dx_locator", "nvarchar(100) NULL");
+                AddColToTable("qso", "dx_callsign", "nvarchar(100) NOT NULL");
+                AddColToTable("qso", "prop_mode", "nvarchar(100) NULL");
+                AddColToTable("qso", "sat_name", "nvarchar(100) NULL");
+                AddColToTable("qso", "soapbox", "nvarchar(100) NULL");
             }
-            if (!TableExists("radio_events"))
+            using (var command = new SQLiteCommand(createTable_categories, con))
             {
-                using (var command = new SQLiteCommand(createTable_radio_events, con))
-                {
-                    command.ExecuteNonQuery();
-                    SchemaHasChanged = true;
-                }
+                command.ExecuteNonQuery();
             }
-            if (!TableExists("bands"))
+            using (var command = new SQLiteCommand(createTable_radio_events, con))
             {
-                using (var command = new SQLiteCommand(createTable_bands, con))
-                {
-                    command.ExecuteNonQuery();
-                    SchemaHasChanged = true;
-                }
+                command.ExecuteNonQuery();
             }
-            if (!TableExists("operators"))
+            using (var command = new SQLiteCommand(createTable_bands, con))
             {
-                using (var command = new SQLiteCommand(createTable_operators, con))
-                {
-                    command.ExecuteNonQuery();
-                    SchemaHasChanged = true;
-                }
+                command.ExecuteNonQuery();
             }
-            if (!TableExists("power"))
+            using (var command = new SQLiteCommand(createTable_operators, con))
             {
-                using (var command = new SQLiteCommand(createTable_power, con))
-                {
-                    command.ExecuteNonQuery();
-                    SchemaHasChanged = true;
-                }
+                command.ExecuteNonQuery();
+            }
+            using (var command = new SQLiteCommand(createTable_power, con))
+            {
+                command.ExecuteNonQuery();
             }
         }
     }

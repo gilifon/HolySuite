@@ -327,7 +327,7 @@ namespace HolyLogger
 
             try
             {
-                dal = new DataAccess();
+                dal = DataAccess.GetInstance();
             }
             catch (Exception e)
             {
