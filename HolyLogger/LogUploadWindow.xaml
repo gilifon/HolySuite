@@ -6,8 +6,8 @@
         xmlns:gif="http://wpfanimatedgif.codeplex.com"
         xmlns:local="clr-namespace:HolyLogger"
         mc:Ignorable="d"
-        Title="Send Log" Height="480" MaxHeight="480" Width="433" MaxWidth="433" Icon="Images/crown.png" LocationChanged="Window_LocationChanged" MinWidth="433" MinHeight="480">
-    <Grid Margin="10,10,0,0" Height="460" MinWidth="1">
+        Title="Send Log" Height="505" MaxHeight="505" Width="433" MaxWidth="433" Icon="Images/crown.png" LocationChanged="Window_LocationChanged" MinWidth="433" MinHeight="505">
+    <Grid Margin="10,10,0,0" Height="480" MinWidth="1">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
@@ -18,7 +18,7 @@
         <ComboBox x:Name="CB_Operator" Text="{Binding Default.selectedOperator, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="107,50,0,0" VerticalAlignment="Top" Width="281" FontSize="16"></ComboBox>
 
         <Label x:Name="L_Mode" Content="Mode" HorizontalAlignment="Left" Margin="10,80,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <ComboBox x:Name="CB_Category" Text="{Binding Default.selectedCategory, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="107,85,0,0" VerticalAlignment="Top" Width="281" FontSize="16"></ComboBox>
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.selectedMode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="107,85,0,0" VerticalAlignment="Top" Width="281" FontSize="16"></ComboBox>
 
         <Label x:Name="L_Band" Content="Band" HorizontalAlignment="Left" Margin="10,115,0,0" VerticalAlignment="Top" FontSize="16"/>
         <ComboBox x:Name="CB_Band" Text="{Binding Default.selectedBand, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="107,120,0,0" VerticalAlignment="Top" Width="281" FontSize="16"></ComboBox>
@@ -26,22 +26,25 @@
         <Label x:Name="L_Power" Content="Power" HorizontalAlignment="Left" Margin="10,150,0,0" VerticalAlignment="Top" FontSize="16"/>
         <ComboBox x:Name="CB_Power" Text="{Binding Default.selectedPower, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="107,155,0,0" VerticalAlignment="Top" Width="281" FontSize="16"></ComboBox>
 
+        <Label x:Name="L_Overlay" Content="Overlay" HorizontalAlignment="Left" Margin="10,185,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <ComboBox x:Name="CB_Overlay" Text="{Binding Default.selectedOverlay, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="107,190,0,0" VerticalAlignment="Top" Width="281" FontSize="16"></ComboBox>
 
-        <Label x:Name="title_info" Content="Personal Info" HorizontalAlignment="Left" Margin="10,206,0,0" VerticalAlignment="Top" FontSize="16" FontWeight="Bold"/>
 
-        <Label x:Name="LCallsign" Content="Operator Callsign" HorizontalAlignment="Left" Margin="12,242,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_Callsign" HorizontalAlignment="Left" Height="30" Margin="146,242,0,0" TextWrapping="Wrap" CharacterCasing="Upper" VerticalAlignment="Top" Width="242" Text="{Binding Default.PersonalInfoCallsign, Source={StaticResource Settings}}" FontSize="16"  />
+        <Label x:Name="title_info" Content="Personal Info" HorizontalAlignment="Left" Margin="10,233,0,0" VerticalAlignment="Top" FontSize="16" FontWeight="Bold"/>
 
-        <Label x:Name="LHandle" Content="Name" HorizontalAlignment="Left" Margin="12,277,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_Handle" HorizontalAlignment="Left" Height="30" Margin="146,277,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="242" Text="{Binding Default.PersonalInfoName, Source={StaticResource Settings}}" FontSize="16"  />
+        <Label x:Name="LCallsign" Content="Operator Callsign" HorizontalAlignment="Left" Margin="12,266,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="TB_Callsign" HorizontalAlignment="Left" Height="30" Margin="146,266,0,0" TextWrapping="Wrap" CharacterCasing="Upper" VerticalAlignment="Top" Width="242" Text="{Binding Default.PersonalInfoCallsign, Source={StaticResource Settings}}" FontSize="16"  />
 
-        <Label x:Name="LEmail" Content="Email" HorizontalAlignment="Left" Margin="10,313,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="30" Margin="146,313,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="242" Text="{Binding Default.PersonalInfoEmail, Source={StaticResource Settings}}" FontSize="16"  />
-        <Label x:Name="LEmail_Copy" Content="Confirm Email" HorizontalAlignment="Left" Margin="10,350,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_MyCallsign_Copy" HorizontalAlignment="Left" Height="30" Margin="146,350,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="242" Text="{Binding Default.PersonalInfoEmailConf, Source={StaticResource Settings}}" FontSize="16"  />
+        <Label x:Name="LHandle" Content="Name" HorizontalAlignment="Left" Margin="12,301,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="TB_Handle" HorizontalAlignment="Left" Height="30" Margin="146,301,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="242" Text="{Binding Default.PersonalInfoName, Source={StaticResource Settings}}" FontSize="16"  />
 
-        <Button x:Name="SendLogBtn" Content="Send" HorizontalAlignment="Left" Margin="313,397,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="SendLogBtn_Click"/>
-        <Button x:Name="CancelBtn" Content="Cancel" HorizontalAlignment="Left" Margin="228,397,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="CancelBtn_Click"/>
+        <Label x:Name="LEmail" Content="Email" HorizontalAlignment="Left" Margin="10,337,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="30" Margin="146,337,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="242" Text="{Binding Default.PersonalInfoEmail, Source={StaticResource Settings}}" FontSize="16"  />
+        <Label x:Name="LEmail_Copy" Content="Confirm Email" HorizontalAlignment="Left" Margin="10,374,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="TB_MyCallsign_Copy" HorizontalAlignment="Left" Height="30" Margin="146,374,0,0" TextWrapping="Wrap" VerticalAlignment="Top" Width="242" Text="{Binding Default.PersonalInfoEmailConf, Source={StaticResource Settings}}" FontSize="16"  />
+
+        <Button x:Name="SendLogBtn" Content="Send" HorizontalAlignment="Left" Margin="313,421,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="SendLogBtn_Click"/>
+        <Button x:Name="CancelBtn" Content="Cancel" HorizontalAlignment="Left" Margin="228,421,0,0" VerticalAlignment="Top" Width="75" FontSize="16" Click="CancelBtn_Click"/>
         <Image x:Name="Spinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Left" Margin="297,-6,0,0" VerticalAlignment="Top" Source="Images/spinner2.gif" Height="90" Width="90" Visibility="Hidden"/>
         <Label x:Name="L_Progress"  Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="297,10,0,0" VerticalAlignment="Top" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="20" FontWeight="DemiBold" Height="59" Width="91" Visibility="Hidden"/>
 

@@ -68,6 +68,7 @@
     <Compile Include="Participant.cs" />
     <Compile Include="RadioEvent.cs" />
     <Compile Include="QSO.cs" />
+    <Compile Include="ServerResponse.cs" />
     <Compile Include="Services.cs" />
   </ItemGroup>
   <ItemGroup>

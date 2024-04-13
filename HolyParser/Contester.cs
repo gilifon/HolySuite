@@ -34,6 +34,9 @@ namespace HolyParser
         [JsonProperty("power")]
         public string Category_Power { get; set; }
 
+        [JsonProperty("overlay")]
+        public string Category_Overlay { get; set; }
+
         [JsonProperty("location")]
         public string Location { get; set; }
 

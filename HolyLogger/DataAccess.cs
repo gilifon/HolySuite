@@ -366,66 +366,14 @@ namespace HolyLogger
             return radioEvent_list;
         }
 
-        public ObservableCollection<Category> GetCategories()
-        {
-            CultureInfo enUS = new CultureInfo("en-US");
-            ObservableCollection<Category> category_list = new ObservableCollection<Category>();
-            string stm = "SELECT * FROM categories ORDER BY Id ASC";
-            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
-            {
-                using (SQLiteDataReader rdr = cmd.ExecuteReader())
-                {
-                    while (rdr.Read())
-                    {
-                        Category q = new Category();
-                        if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
-                        if (rdr["name"] != null) q.Name = rdr["name"].ToString();
-                        if (rdr["description"] != null) q.Description = rdr["description"].ToString();
-                        if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
-                        if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
-                        if (rdr["power"] != null) q.Power = rdr["power"].ToString();
-                        if (rdr["event_id"] != null) q.EventId = int.Parse(rdr["event_id"].ToString());
-                        category_list.Add(q);
-                    }
-                }
-            }
-            return category_list;
-        }
-
-        public ObservableCollection<Category> GetCategories(int eventId)
-        {
-            CultureInfo enUS = new CultureInfo("en-US");
-            ObservableCollection<Category> category_list = new ObservableCollection<Category>();
-            string stm = "SELECT * FROM categories WHERE event_id = @eventId ORDER BY Id ASC";
-            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
-            {
-                cmd.Parameters.Add(new SQLiteParameter("@eventId", eventId));
-                using (SQLiteDataReader rdr = cmd.ExecuteReader())
-                {
-                    while (rdr.Read())
-                    {
-                        Category q = new Category();
-                        if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
-                        if (rdr["name"] != null) q.Name = rdr["name"].ToString();
-                        if (rdr["description"] != null) q.Description = rdr["description"].ToString();
-                        if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
-                        if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
-                        if (rdr["power"] != null) q.Power = rdr["power"].ToString();
-                        if (rdr["event_id"] != null) q.EventId = int.Parse(rdr["event_id"].ToString());
-                        category_list.Add(q);
-                    }
-                }
-            }
-            return category_list;
-        }
-
-        public ObservableCollection<GenericItem> GetTableData(string tableName)
+        public ObservableCollection<GenericItem> GetTableData(string tableName, int eventId=1)
         {
             CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<GenericItem> category_list = new ObservableCollection<GenericItem>();
-            string stm = "SELECT * FROM " + tableName + " ORDER BY Id ASC";
+            string stm = "SELECT * FROM " + tableName + " WHERE event_id = @eventId ORDER BY Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             {
+                cmd.Parameters.Add(new SQLiteParameter("@eventId", eventId));
                 using (SQLiteDataReader rdr = cmd.ExecuteReader())
                 {
                     while (rdr.Read())
@@ -519,51 +467,18 @@ namespace HolyLogger
                 [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
             , [name] nvarchar(100) NOT NULL COLLATE NOCASE
             , [description] nvarchar(100) NOT NULL COLLATE NOCASE
-            , [mode] nvarchar(100) NOT NULL COLLATE NOCASE
-            , [operator] nvarchar(100) NOT NULL COLLATE NOCASE
-            , [power] nvarchar(100) NOT NULL COLLATE NOCASE
-            , [event_id] INTEGER NOT NULL COLLATE NOCASE
+            , [event_id] bigint NOT NULL
             );
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            1,'CW','CW (Single OP, CW Only)','CW','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            2,'SSB','SSB (Single OP, SSB Only)','SSB','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            3,'MIX','MIX(Single OP, Mix Modes)','MIX','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            4,'FT8','FT8 (Single OP, FT8 Only)','FT8','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            5,'DIGI','DIGI (Single OP, RTTY/PSK Only)','DIGI','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            6,'QRP','QRP (Single OP, 10W Max)','QRP','SINGLE-OP','QRP',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            7,'SOB','SOB (Single OP, Single Band)','SOB','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            8,'POR','POR (Single OP, Portable 1 Square)','POR','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            9,'M5','M5 (Single OP, Portable 5 Squares)','M5','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            10,'M10','M10 (Single OP, Portable 10 Squares)','M10','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            11,'MOP','MOP (Multi OP, Single TX)','MOP','MULTI-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            12,'MM','MM (Multi OP, Multi TX)','MM','MULTI-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            13,'MMP','MMP (Multi OP, Single TX, Portable)','MMP','MULTI-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            14,'4Z9','4Z9 (4Z9 callsign)','4Z9','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            15,'SHA','SHA (Saturday Night)','SHA','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            16,'SWL','SWL (Short Wave Listener)','SWL','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            17,'NEW','NEW (License less than 2 years)','NEW','SINGLE-OP','LOW',1);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            18,'VHF/UHF','VHF/UHF','VHF/UHF','SINGLE-OP','LOW',2);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            19,'VHF','VHF','VHF','SINGLE-OP','LOW',2);
-            INSERT INTO [categories] ([Id],[name],[description],[mode],[operator],[power],[event_id]) VALUES (
-            20,'UHF','UHF','UHF','SINGLE-OP','LOW',2);";
+            INSERT INTO [categories] ([Id],[name],[description],[event_id]) VALUES (
+            1,'','NONE',1);
+            INSERT INTO [categories] ([Id],[name],[description],[event_id]) VALUES (
+            2,'POR','Portable (1 Square)',1);
+            INSERT INTO [categories] ([Id],[name],[description],[event_id]) VALUES (
+            3,'M5','Mobile 5 (5 Squares)',1);
+            INSERT INTO [categories] ([Id],[name],[description],[event_id]) VALUES (
+            4,'M10','Mobile 10 (10 Squares)',1);
+            INSERT INTO [categories] ([Id],[name],[description],[event_id]) VALUES (
+            5,'YN','YN (Under 20 / License < 3 Years)',1);";
 
             string createTable_radio_events = @"
             DROP TABLE IF EXISTS[radio_events];
@@ -588,7 +503,7 @@ namespace HolyLogger
             , [event_id] bigint NOT NULL
             );
             INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
-            1,'All-Bands','All-Bands',1);
+            1,'ALL','ALL',1);
             INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
             2,'10','10M',1);
             INSERT INTO [bands] ([Id],[name],[description],[event_id]) VALUES (
@@ -630,6 +545,26 @@ namespace HolyLogger
             INSERT INTO [power] ([Id],[name],[description],[event_id]) VALUES (
             3,'QRP','QRP(<10W)',1);";
 
+            string createTable_modes = @"DROP TABLE IF EXISTS[modes];
+            CREATE TABLE [modes] (
+                [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            , [name] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [description] nvarchar(100) NOT NULL COLLATE NOCASE
+            , [event_id] bigint NOT NULL
+            );
+            INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
+            1,'MIX','MIX',1);
+            INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
+            2,'SSB','SSB',1);
+            INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
+            3,'CW','CW',1);
+            INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
+            4,'VHF/UHF','VHF/UHF',2);
+            INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
+            5,'VHF','VHF',2);
+            INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
+            6,'UHF','UHF',2);";
+
             if (!TableExists("qso"))
             {
                 using (var command = new SQLiteCommand(createTable_qso, con))
@@ -666,6 +601,10 @@ namespace HolyLogger
                 command.ExecuteNonQuery();
             }
             using (var command = new SQLiteCommand(createTable_power, con))
+            {
+                command.ExecuteNonQuery();
+            }
+            using (var command = new SQLiteCommand(createTable_modes, con))
             {
                 command.ExecuteNonQuery();
             }

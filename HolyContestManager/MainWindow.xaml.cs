@@ -309,8 +309,8 @@ namespace HolyContestManager
 
         private void GetData()
         {
-            //WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
-            WebRequest request = WebRequest.Create("https://www.iarc.org/incense/Server/GetLogForAdif.php");
+            WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
+            //WebRequest request = WebRequest.Create("https://www.iarc.org/incense/Server/GetLogForAdif.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;
             Stream dataStream = response.GetResponseStream();
@@ -431,6 +431,7 @@ namespace HolyContestManager
                 c.Category_Mode = p.category_mode;
                 c.Category_Operator = p.category_op;
                 c.Category_Power = p.category_power;
+                c.Category_Overlay = p.category_overlay;
                 c.Contest = "HOLYLAND";
                 c.Email = p.email;
                 c.Name = p.name;
@@ -622,6 +623,7 @@ namespace HolyContestManager
         public string category_mode { get; set; }
         public string category_power { get; set; }
         public string category_op { get; set; }
+        public string category_overlay { get; set; }
         public string email { get; set; }
         public string name { get; set; }
         public string country { get; set; }

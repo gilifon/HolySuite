@@ -914,12 +914,12 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
-        public string selectedCategory {
+        public string selectedMode {
             get {
-                return ((string)(this["selectedCategory"]));
+                return ((string)(this["selectedMode"]));
             }
             set {
-                this["selectedCategory"] = value;
+                this["selectedMode"] = value;
             }
         }
         
@@ -1052,6 +1052,18 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["selectedPower"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string selectedOverlay {
+            get {
+                return ((string)(this["selectedOverlay"]));
+            }
+            set {
+                this["selectedOverlay"] = value;
             }
         }
     }

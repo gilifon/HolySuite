@@ -224,7 +224,7 @@
     <Setting Name="selectedEvent" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
-    <Setting Name="selectedCategory" Type="System.String" Scope="User">
+    <Setting Name="selectedMode" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="IsOverrideOperator" Type="System.Boolean" Scope="User">
@@ -258,6 +258,9 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="selectedPower" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="selectedOverlay" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
   </Settings>

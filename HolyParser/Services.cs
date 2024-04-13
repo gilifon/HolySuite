@@ -141,27 +141,28 @@ namespace HolyParser
         {
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
-            StringBuilder adif = new StringBuilder(200);
-            adif.AppendLine("START-OF-LOG: 3.0");
-            if (!string.IsNullOrEmpty(participant.Contest)) { adif.AppendFormat("CONTEST: {0}", participant.Contest); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Callsign)) {adif.AppendFormat("CALLSIGN: {0}", participant.Callsign); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Email)) { adif.AppendFormat("EMAIL: {0}", participant.Email); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Location)) {adif.AppendFormat("LOCATION: {0}", participant.Location); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Category_Operator)) {adif.AppendFormat("CATEGORY-OPERATOR: {0}", participant.Category_Operator); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Category_Assisted)) {adif.AppendFormat("CATEGORY-ASSISTED: {0}", participant.Category_Assisted); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Category_Band)) {adif.AppendFormat("CATEGORY-BAND: {0}", participant.Category_Band); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Category_Power)) {adif.AppendFormat("CATEGORY-POWER: {0}", participant.Category_Power); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Category_Mode)) {adif.AppendFormat("CATEGORY-MODE: {0}", participant.Category_Mode); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Category_Transmitter)) {adif.AppendFormat("CATEGORY-TRANSMITTER: {0}", participant.Category_Transmitter); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Grid)) {adif.AppendFormat("GRID-LOCATOR: {0}", participant.Grid); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Score)) {adif.AppendFormat("CLAIMED-SCORE: {0}", participant.Score); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Club)) {adif.AppendFormat("CLUB: {0}", participant.Club); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Name)) {adif.AppendFormat("NAME: {0}", participant.Name); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Address)) {adif.AppendFormat("ADDRESS: {0}", participant.Address); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.City)) {adif.AppendFormat("ADDRESS-CITY: {0}", participant.City); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Country)) {adif.AppendFormat("ADDRESS-COUNTRY: {0}", participant.Country); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Operators)) {adif.AppendFormat("OPERATORS: {0}", participant.Operators); adif.AppendLine(); }
-            if (!string.IsNullOrEmpty(participant.Soapbox)) {adif.AppendFormat("SOAPBOX: {0}", participant.Soapbox); adif.AppendLine(); }
+            StringBuilder cbr = new StringBuilder(200);
+            cbr.AppendLine("START-OF-LOG: 3.0");
+            if (!string.IsNullOrEmpty(participant.Contest)) { cbr.AppendFormat("CONTEST: {0}", participant.Contest); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Callsign)) {cbr.AppendFormat("CALLSIGN: {0}", participant.Callsign); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Email)) { cbr.AppendFormat("EMAIL: {0}", participant.Email); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Location)) {cbr.AppendFormat("LOCATION: {0}", participant.Location); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Operator)) {cbr.AppendFormat("CATEGORY-OPERATOR: {0}", participant.Category_Operator); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Assisted)) {cbr.AppendFormat("CATEGORY-ASSISTED: {0}", participant.Category_Assisted); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Band)) {cbr.AppendFormat("CATEGORY-BAND: {0}", participant.Category_Band); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Power)) {cbr.AppendFormat("CATEGORY-POWER: {0}", participant.Category_Power); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Mode)) {cbr.AppendFormat("CATEGORY-MODE: {0}", participant.Category_Mode); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Transmitter)) { cbr.AppendFormat("CATEGORY-TRANSMITTER: {0}", participant.Category_Transmitter); cbr.AppendLine(); }
+            //if (!string.IsNullOrEmpty(participant.Category_Overlay)) { cbr.AppendFormat("CATEGORY-OVERLAY: {0}", participant.Category_Overlay); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Grid)) {cbr.AppendFormat("GRID-LOCATOR: {0}", participant.Grid); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Score)) {cbr.AppendFormat("CLAIMED-SCORE: {0}", participant.Score); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Club)) {cbr.AppendFormat("CLUB: {0}", participant.Club); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Name)) {cbr.AppendFormat("NAME: {0}", participant.Name); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Address)) {cbr.AppendFormat("ADDRESS: {0}", participant.Address); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.City)) {cbr.AppendFormat("ADDRESS-CITY: {0}", participant.City); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Country)) {cbr.AppendFormat("ADDRESS-COUNTRY: {0}", participant.Country); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Operators)) {cbr.AppendFormat("OPERATORS: {0}", participant.Operators); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Soapbox)) {cbr.AppendFormat("SOAPBOX: {0}", participant.Soapbox); cbr.AppendLine(); }
 
             foreach (QSO qso in qso_list)
             {
@@ -172,21 +173,21 @@ namespace HolyParser
                     qso.Time = datetime[1];
                 }
 
-                adif.Append("QSO: ");
-                if (qso.Freq != null) adif.AppendFormat("{0} ", qso.Freq);
-                if (qso.Mode != null) adif.AppendFormat("{0} ", qso.Mode);
-                if (qso.Date != null) adif.AppendFormat("{0} ", qso.Date);
-                if (qso.Time != null) adif.AppendFormat("{0} ", qso.Time);
-                if (qso.MyCall != null) adif.AppendFormat("{0} ", qso.MyCall);
-                if (qso.RST_SENT != null) adif.AppendFormat("{0} ", qso.RST_SENT);
-                if (qso.STX != null) adif.AppendFormat("{0} ", qso.STX);
-                if (qso.DXCall != null) adif.AppendFormat("{0} ", qso.DXCall);
-                if (qso.RST_RCVD != null) adif.AppendFormat("{0} ", qso.RST_RCVD);
-                if (qso.SRX != null) adif.AppendFormat("{0} ", qso.SRX);
-                adif.AppendLine();
+                cbr.Append("QSO: ");
+                if (qso.Freq != null) cbr.AppendFormat("{0} ", qso.Freq);
+                if (qso.Mode != null) cbr.AppendFormat("{0} ", qso.Mode);
+                if (qso.Date != null) cbr.AppendFormat("{0} ", qso.Date);
+                if (qso.Time != null) cbr.AppendFormat("{0} ", qso.Time);
+                if (qso.MyCall != null) cbr.AppendFormat("{0} ", qso.MyCall);
+                if (qso.RST_SENT != null) cbr.AppendFormat("{0} ", qso.RST_SENT);
+                if (qso.STX != null) cbr.AppendFormat("{0} ", qso.STX);
+                if (qso.DXCall != null) cbr.AppendFormat("{0} ", qso.DXCall);
+                if (qso.RST_RCVD != null) cbr.AppendFormat("{0} ", qso.RST_RCVD);
+                if (qso.SRX != null) cbr.AppendFormat("{0} ", qso.SRX);
+                cbr.AppendLine();
             }
-            adif.AppendLine("END-OF-LOG:");
-            return adif.ToString();
+            cbr.AppendLine("END-OF-LOG:");
+            return cbr.ToString();
         }
         public static string GenerateCSV(IEnumerable<QSO> qso_list)
         {

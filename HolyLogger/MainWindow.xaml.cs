@@ -1089,9 +1089,11 @@ namespace HolyLogger
         {
             Contester c = new Contester();
             c.Callsign = Properties.Settings.Default.PersonalInfoCallsign;
-            c.Category_Mode = Properties.Settings.Default.selectedCategory;
+            c.Category_Mode = Properties.Settings.Default.selectedMode;
             c.Category_Operator = Properties.Settings.Default.selectedOperator;
             c.Category_Power = Properties.Settings.Default.selectedPower;
+            c.Category_Band = Properties.Settings.Default.selectedBand;
+            c.Category_Overlay = Properties.Settings.Default.selectedOverlay;
             c.Contest = Properties.Settings.Default.selectedEvent;
             c.Email = Properties.Settings.Default.PersonalInfoEmail;
             c.Grid = Properties.Settings.Default.my_locator;
@@ -1102,7 +1104,7 @@ namespace HolyLogger
             // Displays a SaveFileDialog so the user can save the Image
             // assigned to Button2.
             SaveFileDialog saveFileDialog1 = new SaveFileDialog();
-            saveFileDialog1.Filter = "Cabrillo File|*.cbr|Text File|*.txt|Log File|*.log";
+            saveFileDialog1.Filter = "Text File|*.txt|Cabrillo File|*.cbr|Log File|*.log";
             saveFileDialog1.Title = "Export Cabrillo";
             saveFileDialog1.ShowDialog();
 
@@ -1173,14 +1175,20 @@ namespace HolyLogger
 
             var progressIndicator = new Progress<int>();           
 
-            string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedCategory.Operator, w.selectedCategory.Mode, w.selectedCategory.Power, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
-            string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
             if (w.selectedRadioEvent.Name.ToLower() == "holyland")
             {
-                string UploadCabrilloToIARC_result = await UploadCabrilloToIARC(bareCallsign, w.selectedOperator.Name, w.selectedCategory.Name, w.selectedBand.Name, w.selectedPower.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country, dal.GetAllQSOs());
+                string UploadCabrilloToIARC_result = await UploadCabrilloToIARC(bareCallsign, w.selectedOperator.Name, w.selectedMode.Name, w.selectedBand.Name, w.selectedPower.Name, w.selectedOverlay.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country, dal.GetAllQSOs());
+                w.Close();
+                System.Windows.Forms.MessageBox.Show(UploadCabrilloToIARC_result);
             }
-            w.Close();
-            System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
+            else
+            {
+                string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedOperator.Name, w.selectedMode.Name, w.selectedPower.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
+                string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
+                w.Close();
+                System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
+            }
+            
         }
         
         private async Task<string> AddParticipant(string callsign, string category_op, string category_mode, string category_power, string email, string name, string country)
@@ -1266,7 +1274,7 @@ namespace HolyLogger
             return allSuccessfullyDone ? "Log sent successfully, 73!" : "Done with some errors.\r\nPlease contact support.";// "Some of the QSOs had error";
         }
 
-        private async Task<string> UploadCabrilloToIARC(string callsign, string op, string category, string band, string power, string email, string name, string country, ObservableCollection<QSO> QSOList)
+        private async Task<string> UploadCabrilloToIARC(string callsign, string op, string mode, string band, string power, string overlay, string email, string name, string country, ObservableCollection<QSO> QSOList)
         {
             using (var client = new HttpClient())
             {
@@ -1275,8 +1283,9 @@ namespace HolyLogger
                 c.Callsign = callsign.Trim();
                 c.Category_Band = band.Trim();
                 c.Category_Operator = op.Trim();
-                c.Category_Mode = category.Trim();                
+                c.Category_Mode = mode.Trim();
                 c.Category_Power = power.Trim();
+                c.Category_Overlay = overlay.Trim();
                 c.Contest = "HOLYLAND";
                 c.Email = email;
                 c.Grid = TB_MyLocator.Text.Trim();
@@ -1294,7 +1303,7 @@ namespace HolyLogger
 
                 c.filename = filename;
                 c.timestamp = DateTime.UtcNow.Ticks.ToString();
-                
+
                 //post file
                 var response = await client.PostAsync("https://iarc.org/iarc/Server/ftp.php", formData);
 
@@ -1316,7 +1325,22 @@ namespace HolyLogger
                         {
                             // Read and display the response from the PHP file
                             string responseContent = await response.Content.ReadAsStringAsync();
-                            return "File uploaded successfully.";
+                            try
+                            {
+                                ServerResponse serverResponse = JsonConvert.DeserializeObject<ServerResponse>(responseContent);
+                                if (serverResponse.Success)
+                                {
+                                    return "File uploaded successfully.";
+                                }
+                                else
+                                {
+                                    return serverResponse.Msg;
+                                }
+                            }
+                            catch
+                            {
+                                return "Failed to send log. Please export cabrillo and send via the website";
+                            }
                         }
                         else
                         {

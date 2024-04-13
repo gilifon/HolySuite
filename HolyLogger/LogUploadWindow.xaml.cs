@@ -51,16 +51,18 @@ namespace HolyLogger
 
         DataAccess dal;
         public ObservableCollection<RadioEvent> RadioEvents { get; set; }
-        public ObservableCollection<Category> Categories { get; set; }
+        public ObservableCollection<GenericItem> Modes { get; set; }
         public ObservableCollection<GenericItem> Operators { get; set; }
         public ObservableCollection<GenericItem> Bands { get; set; }
         public ObservableCollection<GenericItem> Power { get; set; }
+        public ObservableCollection<GenericItem> Overlay { get; set; }
 
-        public Category selectedCategory { get; set; }
+        public GenericItem selectedMode{ get; set; }
         public RadioEvent selectedRadioEvent { get; set; }
         public GenericItem selectedOperator{ get; set; }
         public GenericItem selectedBand { get; set; }
         public GenericItem selectedPower { get; set; }
+        public GenericItem selectedOverlay{ get; set; }
 
 
         public LogUploadWindow()
@@ -119,6 +121,17 @@ namespace HolyLogger
                 CB_Power.SelectedItem = gi;
             else
                 CB_Power.SelectedIndex = 0;
+
+            Overlay = dal.GetTableData("categories");
+            CB_Overlay.SelectionChanged += CB_Overlay_SelectionChanged;
+            CB_Overlay.DisplayMemberPath = "Description";
+            CB_Overlay.SelectedValuePath = "id";
+            CB_Overlay.ItemsSource = Overlay;
+            gi = Overlay.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedOverlay);
+            if (gi != null)
+                CB_Overlay.SelectedItem = gi;
+            else
+                CB_Overlay.SelectedIndex = 0;
         }
 
         private void CB_Events_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -126,30 +139,26 @@ namespace HolyLogger
             selectedRadioEvent = (RadioEvent)CB_Events.SelectedItem;
             int eid = selectedRadioEvent.id;
 
-            init_category_list(eid);
+            init_mode_list(eid);
         }
 
-        private void init_category_list(int eid)
+        private void init_mode_list(int eid)
         {
-            Categories = dal.GetCategories(eid);
-            if (Categories.Count() == 0)
-            {
-                Categories.Add(new Category() { id = 0, Description = "None", EventId = eid, Name = "None" });
-            }
-            CB_Category.SelectionChanged += CB_Category_SelectionChanged;
-            CB_Category.DisplayMemberPath = "Description";
-            CB_Category.SelectedValuePath = "id";
-            CB_Category.ItemsSource = Categories;
-            Category c = Categories.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedCategory);
-            if (c != null)
-                CB_Category.SelectedItem = c;
+            Modes = dal.GetTableData("modes", eid);
+            CB_Mode.SelectionChanged += CB_Mode_SelectionChanged;
+            CB_Mode.DisplayMemberPath = "Description";
+            CB_Mode.SelectedValuePath = "id";
+            CB_Mode.ItemsSource = Modes;
+            GenericItem gi = Modes.FirstOrDefault(t => t.Description == Properties.Settings.Default.selectedMode);
+            if (gi != null)
+                CB_Mode.SelectedItem = gi;
             else
-                CB_Category.SelectedIndex = 0;
+                CB_Mode.SelectedIndex = 0;
         }
 
-        private void CB_Category_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
-            selectedCategory = (Category)CB_Category.SelectedItem;
+            selectedMode = (GenericItem)CB_Mode.SelectedItem;
         }
         private void CB_Operator_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
@@ -163,10 +172,21 @@ namespace HolyLogger
         {
             selectedPower = (GenericItem)CB_Power.SelectedItem;
         }
+        private void CB_Overlay_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            selectedOverlay = (GenericItem)CB_Overlay.SelectedItem;
+        }
 
         private void SendLogBtn_Click(object sender, RoutedEventArgs e)
         {
-            if (!string.IsNullOrWhiteSpace(((Category)CB_Category.SelectedItem).Description) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoEmail) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoName) && !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoCallsign))
+            if (!string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedEvent) &&
+                !string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedMode) &&
+                !string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedBand) &&
+                !string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedOperator) &&
+                !string.IsNullOrWhiteSpace(Properties.Settings.Default.selectedOverlay) &&
+                !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoEmail) &&
+                !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoName) && 
+                !string.IsNullOrWhiteSpace(Properties.Settings.Default.PersonalInfoCallsign))
             {
                 if (Properties.Settings.Default.PersonalInfoEmail == Properties.Settings.Default.PersonalInfoEmailConf)
                 {
