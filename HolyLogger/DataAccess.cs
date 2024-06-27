@@ -563,7 +563,9 @@ namespace HolyLogger
             INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
             5,'VHF','VHF',2);
             INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
-            6,'UHF','UHF',2);";
+            6,'UHF','UHF',2);
+            INSERT INTO [modes] ([Id],[name],[description],[event_id]) VALUES (
+            7,'MIX','MIX',3);";
 
             if (!TableExists("qso"))
             {
