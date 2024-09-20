@@ -5,5 +5,8 @@
     <Setting Name="Port" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">65301</Value>
     </Setting>
+    <Setting Name="baseURL" Type="System.String" Scope="User">
+      <Value Profile="(Default)">https://xyz.iarc.org</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

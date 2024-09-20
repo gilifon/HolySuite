@@ -1305,7 +1305,7 @@ namespace HolyLogger
                 c.timestamp = DateTime.UtcNow.Ticks.ToString();
 
                 //post file
-                var response = await client.PostAsync("https://iarc.org/iarc/Server/ftp.php", formData);
+                var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/iarc/Server/ftp.php", formData);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -1318,7 +1318,7 @@ namespace HolyLogger
                     {
                         // Send a POST request to the URL with the JSON data
                         //upload_log.php
-                        response = await client.PostAsync("https://iarc.org/iarc/Server/upload_log.php", formData);
+                        response = await client.PostAsync(Properties.Settings.Default.baseURL + "/iarc/Server/upload_log.php", formData);
 
                         // Check if the request was successful
                         if (response.IsSuccessStatusCode)
@@ -2122,7 +2122,7 @@ namespace HolyLogger
 
         private void GridSquareMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string url = "https://www.iarc.org/holysquare/";
+            string url = Properties.Settings.Default.baseURL + "/holysquare/";
             try
             {
                 System.Diagnostics.Process.Start(url);
@@ -2135,7 +2135,7 @@ namespace HolyLogger
 
         private void OnTheAirMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string url = "https://www.iarc.org/ontheair/";
+            string url = Properties.Settings.Default.baseURL + "/ontheair/";
             try
             {
                 System.Diagnostics.Process.Start(url);

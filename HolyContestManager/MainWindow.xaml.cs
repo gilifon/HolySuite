@@ -309,7 +309,7 @@ namespace HolyContestManager
 
         private void GetData()
         {
-            WebRequest request = WebRequest.Create("http://www.iarc.org/Holyland/Server/get_holyland_data.php");
+            WebRequest request = WebRequest.Create("http://xyz.iarc.org/Holyland/Server/get_holyland_data.php");
             //WebRequest request = WebRequest.Create("https://www.iarc.org/incense/Server/GetLogForAdif.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;

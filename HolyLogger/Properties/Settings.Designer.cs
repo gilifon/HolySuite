@@ -985,7 +985,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("https://www.iarc.org")]
+        [global::System.Configuration.DefaultSettingValueAttribute("https://xyz.iarc.org")]
         public string baseURL {
             get {
                 return ((string)(this["baseURL"]));
