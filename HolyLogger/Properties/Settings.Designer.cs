@@ -985,18 +985,6 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("https://xyz.iarc.org")]
-        public string baseURL {
-            get {
-                return ((string)(this["baseURL"]));
-            }
-            set {
-                this["baseURL"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool EnableN1MMUDPClient {
             get {

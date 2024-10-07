@@ -74,7 +74,7 @@ namespace HolyServer
                 var content = new FormUrlEncodedContent(values);
                 try
                 {
-                    var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php", content);
+                    var response = await client.PostAsync("https://tools.iarc.org/Holyland/Server/AddLog.php", content);
                     return await response.Content.ReadAsStringAsync();
                 }
                 catch (Exception)

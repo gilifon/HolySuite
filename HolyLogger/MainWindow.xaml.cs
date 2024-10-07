@@ -1217,13 +1217,13 @@ namespace HolyLogger
                 var content = new FormUrlEncodedContent(values);
                 try
                 {
-                    var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddParticipant.php", content);
+                    var response = await client.PostAsync("https://tools.iarc.org/Holyland/Server/AddParticipant.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     return responseString;
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
-                    return "Connection with server failed! Check your internet connection";
+                    return ex.Message + " Connection with server failed! Check your internet connection";
                 }
             }
         }
@@ -1248,7 +1248,7 @@ namespace HolyLogger
                     var content = new FormUrlEncodedContent(values);
                     try
                     {
-                        var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddQSO.php", content);
+                        var response = await client.PostAsync("https://tools.iarc.org/Holyland/Server/AddQSO.php", content);
                         //var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php", content);
                         var responseString = await response.Content.ReadAsStringAsync();
                         errorLog.AppendLine("Chunk #" + c + ":");
@@ -1305,7 +1305,7 @@ namespace HolyLogger
                 c.timestamp = DateTime.UtcNow.Ticks.ToString();
 
                 //post file
-                var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/iarc/Server/ftp.php", formData);
+                var response = await client.PostAsync("https://tools.iarc.org/iarc/Server/ftp.php", formData);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -1318,7 +1318,7 @@ namespace HolyLogger
                     {
                         // Send a POST request to the URL with the JSON data
                         //upload_log.php
-                        response = await client.PostAsync(Properties.Settings.Default.baseURL + "/iarc/Server/upload_log.php", formData);
+                        response = await client.PostAsync("https://tools.iarc.org/iarc/Server/upload_log.php", formData);
 
                         // Check if the request was successful
                         if (response.IsSuccessStatusCode)
@@ -1382,7 +1382,7 @@ namespace HolyLogger
             //************************************************** ASYNC ********************************************//
             using (WebClient client = new WebClient())
             {
-                client.UploadValuesAsync(new Uri(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php"), new NameValueCollection()
+                client.UploadValuesAsync(new Uri("https://tools.iarc.org/Holyland/Server/AddLog.php"), new NameValueCollection()
                     {
                         { "insertlog", GenerateMultipleInsert(new List<QSO>{qso}) }
                     });
@@ -2122,7 +2122,7 @@ namespace HolyLogger
 
         private void GridSquareMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string url = Properties.Settings.Default.baseURL + "/holysquare/";
+            string url = "https://tools.iarc.org/holysquare/";
             try
             {
                 System.Diagnostics.Process.Start(url);
@@ -2135,7 +2135,7 @@ namespace HolyLogger
 
         private void OnTheAirMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string url = Properties.Settings.Default.baseURL + "/ontheair/";
+            string url = "https://tools.iarc.org/ontheair/";
             try
             {
                 System.Diagnostics.Process.Start(url);
