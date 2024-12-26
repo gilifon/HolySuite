@@ -999,43 +999,50 @@ namespace HolyLogger
          
         private void AdifHandlerWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            int faultyQSO = 0;
-            foreach (var filename in ImportFileQ) //for each file in the Q
+            this.Dispatcher.Invoke(() =>
             {
-                string RawAdif = File.ReadAllText(filename, Encoding.UTF8); //read it
-                _holyLogParser = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(Properties.Settings.Default.my_callsign)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
-                try
+                int faultyQSO = 0;
+                foreach (var filename in ImportFileQ) //for each file in the Q
                 {
-                    _holyLogParser.Parse(); //try to parse it
-                    List<QSO> rawQSOList = _holyLogParser.GetRawQSO();//get the qso list
-                    int count = rawQSOList.Count;
-
-                    int c = 1;
-                    foreach (var rq in rawQSOList)
+                    string RawAdif = File.ReadAllText(filename, Encoding.UTF8); //read it
+                    _holyLogParser = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(Properties.Settings.Default.my_callsign)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
+                    try
                     {
-                        try
+                        _holyLogParser.Parse(); //try to parse it
+                        List<QSO> rawQSOList = _holyLogParser.GetRawQSO();//get the qso list
+                        int count = rawQSOList.Count;
+
+                        int c = 1;
+                        foreach (var rq in rawQSOList)
                         {
-                            lock (this)
+                            if (Properties.Settings.Default.IsOverrideOperatorFromFile)
                             {
-                                QSO q = dal.Insert(rq);
+                                rq.Operator = TB_Operator.Text;
                             }
-                            float p = (float)(c++) * 100 / count;
-                            AdifHandlerWorker.ReportProgress((int)(Math.Ceiling(p)));
-                        }
-                        catch (Exception ex)
-                        {
-                            faultyQSO++;
-                            //System.Windows.Forms.MessageBox.Show(ex.Message);
+                            try
+                            {
+                                lock (this)
+                                {
+                                    QSO q = dal.Insert(rq);
+                                }
+                                float p = (float)(c++) * 100 / count;
+                                AdifHandlerWorker.ReportProgress((int)(Math.Ceiling(p)));
+                            }
+                            catch (Exception ex)
+                            {
+                                faultyQSO++;
+                                //System.Windows.Forms.MessageBox.Show(ex.Message);
+                            }
                         }
                     }
+                    catch (Exception exc)
+                    {
+                        System.Windows.Forms.MessageBox.Show(filename + " Failed to load! check the file.");
+                    }
                 }
-                catch (Exception exc)
-                {
-                    System.Windows.Forms.MessageBox.Show(filename + " Failed to load! check the file.");
-                }
-            }
-            e.Result = faultyQSO;
-            ImportFileQ.Clear();
+                e.Result = faultyQSO;
+                ImportFileQ.Clear();
+            });
         }
         
         private void QSODataGrid_Drop(object sender, DragEventArgs e)

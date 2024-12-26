@@ -215,7 +215,7 @@ namespace HolyContestManager
         private void GetDataWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             GetData();
-            bool is_sukot = false;
+            bool is_sukot = true;
 
             ///////////////////////////////////////////////////////// SUKOT ///////////////////////////////////////////////
             if (is_sukot)
@@ -267,10 +267,12 @@ namespace HolyContestManager
                 StringBuilder sb = new StringBuilder();
 
                 sb.AppendFormat("{0},", "Callsign");
+                sb.AppendFormat("{0},", "Mode");
                 sb.AppendFormat("{0},", "Name");
                 sb.AppendFormat("{0},", "QSOs");
                 sb.AppendFormat("{0},", "Squares");
                 sb.AppendFormat("{0}\n", "Score");
+
 
                 foreach (Participant p in RawData.participants)
                 {
@@ -289,6 +291,7 @@ namespace HolyContestManager
                     n.points = 0;
 
                     sb.AppendFormat("{0},", p.callsign.ToUpper());
+                    sb.AppendFormat("{0},", p.category_mode);
                     sb.AppendFormat("{0},", p.name);
                     sb.AppendFormat("{0},", n.qsos);
                     sb.AppendFormat("{0},", n.squers);
@@ -309,8 +312,8 @@ namespace HolyContestManager
 
         private void GetData()
         {
-            WebRequest request = WebRequest.Create("https://tools.iarc.org/Holyland/Server/get_holyland_data.php");
-            //WebRequest request = WebRequest.Create("https://tools.iarc.org/incense/Server/GetLogForAdif.php");
+            //WebRequest request = WebRequest.Create("https://tools.iarc.org/Holyland/Server/get_holyland_data.php");
+            WebRequest request = WebRequest.Create("https://tools.iarc.org/xmas2024/Server/GetLogForAdif.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;
             Stream dataStream = response.GetResponseStream();
