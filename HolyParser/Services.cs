@@ -139,6 +139,13 @@ namespace HolyParser
 
         public static string GenerateCabrillo(IEnumerable<QSO> qso_list, Contester participant)
         {
+            string _convert_mode(string mode)
+            {
+                if (mode.Trim().ToLower() == "ssb")
+                    return "ph";
+                return mode;
+            }
+            
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             StringBuilder cbr = new StringBuilder(200);
@@ -175,7 +182,7 @@ namespace HolyParser
 
                 cbr.Append("QSO: ");
                 if (qso.Freq != null) cbr.AppendFormat("{0} ", qso.Freq);
-                if (qso.Mode != null) cbr.AppendFormat("{0} ", qso.Mode);
+                if (qso.Mode != null) cbr.AppendFormat("{0} ", _convert_mode(qso.Mode));
                 if (qso.Date != null) cbr.AppendFormat("{0} ", qso.Date);
                 if (qso.Time != null) cbr.AppendFormat("{0} ", qso.Time);
                 if (qso.MyCall != null) cbr.AppendFormat("{0} ", qso.MyCall);
