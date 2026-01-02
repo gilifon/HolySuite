@@ -215,7 +215,17 @@ namespace HolyContestManager
         private void GetDataWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             GetData();
-            bool is_sukot = true;
+
+            foreach (Participant p in RawData.participants)
+            {
+                IEnumerable<QSO> qsos = from q in RawData.log where Helper.getBareCallsign(q.MyCall) == Helper.getBareCallsign(p.callsign) select q;
+                System.IO.FileStream fs2 = File.Create(files_path + Helper.getBareCallsign(p.callsign) + @".adi");
+                StreamWriter sw2 = new StreamWriter(fs2);
+                sw2.Write(Services.GenerateAdif(qsos));
+                sw2.Close();
+                fs2.Close();
+            }
+            bool is_sukot = false;
 
             ///////////////////////////////////////////////////////// SUKOT ///////////////////////////////////////////////
             if (is_sukot)
@@ -313,7 +323,7 @@ namespace HolyContestManager
         private void GetData()
         {
             //WebRequest request = WebRequest.Create("https://tools.iarc.org/Holyland/Server/get_holyland_data.php");
-            WebRequest request = WebRequest.Create("https://tools.iarc.org/xmas2024/Server/GetLogForAdif.php");
+            WebRequest request = WebRequest.Create("https://tools.iarc.org/xmas2025/Server/GetLogForAdif.php");
             WebResponse response = request.GetResponse();
             string status = ((HttpWebResponse)response).StatusDescription;
             Stream dataStream = response.GetResponseStream();

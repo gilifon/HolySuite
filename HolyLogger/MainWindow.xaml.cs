@@ -449,6 +449,10 @@ namespace HolyLogger
 
                     lock (this)
                     {
+                        if (!string.IsNullOrWhiteSpace(qso.Freq))
+                        {
+                            qso.Band = HolyLogParser.convertFreqToBand(qso.Freq);
+                        }
                         if (!string.IsNullOrWhiteSpace(qso.MyCall) && !string.IsNullOrWhiteSpace(qso.Band) && !string.IsNullOrWhiteSpace(qso.Mode) && !string.IsNullOrWhiteSpace(qso.DXCall))
                         {
                             QSO q = dal.Insert(qso);

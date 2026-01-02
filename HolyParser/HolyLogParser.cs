@@ -869,6 +869,24 @@ namespace HolyParser
                 if (parsedFreq >= 144000000 && parsedFreq <= 148000000) return "2M";
                 if (parsedFreq >= 420000000 && parsedFreq <= 450000000) return "70CM";
             }
+            if (parsedFreq < 100000000) //n1mm
+            {
+                if (parsedFreq >= 180000 && parsedFreq <= 200000) return "160M";
+                if (parsedFreq >= 240000 && parsedFreq <= 250000) return "13CM";
+                if (parsedFreq >= 350000 && parsedFreq <= 400000) return "80M";
+                if (parsedFreq >= 500000 && parsedFreq <= 540000) return "60M";
+                if (parsedFreq >= 700000 && parsedFreq <= 730000) return "40M";
+                if (parsedFreq >= 1000000 && parsedFreq <= 1015000) return "30M";
+                if (parsedFreq >= 1400000 && parsedFreq <= 1435000) return "20M";
+                if (parsedFreq >= 1800000 && parsedFreq <= 1816800) return "17M";
+                if (parsedFreq >= 2100000 && parsedFreq <= 2145000) return "15M";
+                if (parsedFreq >= 2489000 && parsedFreq <= 2499000) return "12M";
+                if (parsedFreq >= 2800000 && parsedFreq <= 2970000) return "10M";
+                if (parsedFreq >= 5000000 && parsedFreq <= 5400000) return "6M";
+                if (parsedFreq >= 7000000 && parsedFreq <= 7100000) return "4M";
+                if (parsedFreq >= 14400000 && parsedFreq <= 14800000) return "2M";
+                if (parsedFreq >= 42000000 && parsedFreq <= 45000000) return "70CM";
+            }
             return string.Empty;
         }
 
