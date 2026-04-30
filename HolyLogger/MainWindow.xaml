@@ -282,10 +282,10 @@
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The Exchange sent by the DX station" />
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="160" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
-        <Label Content="RST Sent" HorizontalAlignment="Left" Margin="273,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="350,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="60" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="6" TabIndex="10" />
-        <Label Content="RST Rcvd" HorizontalAlignment="Left" Margin="424,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="503,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="60" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="6" TabIndex="11"/>
+        <Label Content="RST-S" HorizontalAlignment="Left" Margin="263,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="315,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="3" TabIndex="10" />
+        <Label Content="RST-R" HorizontalAlignment="Left" Margin="512,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="564,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="3" TabIndex="11"/>
         <Label Content="Date" HorizontalAlignment="Left" Margin="300,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
         <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="345,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" />
         <Label Content="Time" HorizontalAlignment="Left" Margin="465,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
@@ -293,7 +293,7 @@
 
 
         <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,89,0,0" VerticalAlignment="Top" Width="682" Grid.Row="1" />
-        <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="582,144,0,0" VerticalAlignment="Top" Width="110" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" />
+        <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="608,144,0,0" VerticalAlignment="Top" Width="84" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" />
         <Button x:Name="ClearBtn" HorizontalAlignment="Left" Margin="608,100,0,0" VerticalAlignment="Top" Width="84" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Left" Padding="6,0,0,0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <Image Source="Images/broom.png" Width="18" Height="24" Margin="0,0,16,0" Stretch="Uniform" ToolTip="Set to current time" Cursor="Hand" PreviewMouseLeftButtonUp="RefreshIcon_PreviewMouseUp"/>
