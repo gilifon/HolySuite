@@ -232,7 +232,7 @@ namespace HolyLogger
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
-        private string title = "HolyLogger   ";
+        private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
         private const int SEND_CHUNK_SIZE = 50;
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
@@ -299,11 +299,12 @@ namespace HolyLogger
                 Properties.Settings.Default.UpdateSettings = false;
                 Properties.Settings.Default.Save();
             }
-            if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
-            {
-                NotifyVersionUpToDate = false;
-                UpdatesMenuItem_Click(null, null);
-            }
+            // temporarily disabled - re-enable when done with local development
+            //if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
+            //{
+            //    NotifyVersionUpToDate = false;
+            //    UpdatesMenuItem_Click(null, null);
+            //}
             this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
 
@@ -702,6 +703,13 @@ namespace HolyLogger
         {
             TP_Date.Value = DateTime.UtcNow;
             TP_Time.Value = DateTime.UtcNow;
+        }
+
+        private void RefreshIcon_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            TP_Date.Value = DateTime.UtcNow;
+            TP_Time.Value = DateTime.UtcNow;
+            e.Handled = true;
         }
 
         private void AddBtn_Click(object sender, RoutedEventArgs e)

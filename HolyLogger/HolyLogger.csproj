@@ -376,6 +376,7 @@
     <Resource Include="Images\x.png" />
     <Resource Include="Images\matrix.png" />
     <Resource Include="Images\manual.png" />
+    <Resource Include="Images\broom.png" />
     <Resource Include="Images\eraser.png" />
     <Resource Include="Images\import.png" />
     <Resource Include="Images\spinner.gif" />
