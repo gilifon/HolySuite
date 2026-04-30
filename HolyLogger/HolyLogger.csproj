@@ -208,6 +208,9 @@
     <Compile Include="MatrixControl.xaml.cs">
       <DependentUpon>MatrixControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SMeterControl.xaml.cs">
+      <DependentUpon>SMeterControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ToolsUserControls\AzimuthUserControl.xaml.cs">
       <DependentUpon>AzimuthUserControl.xaml</DependentUpon>
     </Compile>
@@ -273,6 +276,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MatrixControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="SMeterControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

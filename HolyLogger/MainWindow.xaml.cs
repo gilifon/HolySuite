@@ -395,8 +395,8 @@ namespace HolyLogger
             gridColumnOrder.Add(new KeyValuePair<string, int>("Country", Properties.Settings.Default.Country_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Frequency", Properties.Settings.Default.Frequency_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Band", Properties.Settings.Default.Band_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("RST rcvd", Properties.Settings.Default.RSTrcvd_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("RST sent", Properties.Settings.Default.RSTsent_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("RST-R", Properties.Settings.Default.RSTrcvd_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("RST-S", Properties.Settings.Default.RSTsent_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Mode", Properties.Settings.Default.Mode_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Exchange", Properties.Settings.Default.Exchange_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Comment", Properties.Settings.Default.Comment_index));
@@ -943,6 +943,15 @@ namespace HolyLogger
             }
         }
 
+        private void TB_RSTSent_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (SMeter == null) return;
+            if (TB_RSTSent.Text.Length >= 2 && int.TryParse(TB_RSTSent.Text[1].ToString(), out int s))
+                SMeter.SetSValue(s);
+            else
+                SMeter.SetSValue(0);
+        }
+
         private void UpdateNumOfQSOs()
         {
             //parseAdif();
@@ -1474,9 +1483,9 @@ namespace HolyLogger
                     Properties.Settings.Default.Frequency_index = item.DisplayIndex;
                 else if (item.Header.ToString() == "Band")
                     Properties.Settings.Default.Band_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "RST rcvd")
+                else if (item.Header.ToString() == "RST-R")
                     Properties.Settings.Default.RSTrcvd_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "RST sent")
+                else if (item.Header.ToString() == "RST-S")
                     Properties.Settings.Default.RSTsent_index = item.DisplayIndex;
                 else if (item.Header.ToString() == "Mode")
                     Properties.Settings.Default.Mode_index = item.DisplayIndex;
