@@ -15,32 +15,32 @@
         <Rectangle x:Name="IndicatorFill" Canvas.Left="10" Canvas.Top="14" Width="0" Height="10" Fill="#22CC22"/>
 
         <!-- "S" prefix label -->
-        <TextBlock Canvas.Left="0" Canvas.Top="3" Text="S" FontSize="9" FontWeight="Bold" Foreground="#333333"/>
+        <TextBlock Canvas.Left="0" Canvas.Top="1" Text="S" FontSize="10" FontWeight="Bold" Foreground="#333333"/>
 
         <!-- Tick marks and labels -->
         <!-- S1 at x=10 -->
         <Line X1="10" Y1="11" X2="10" Y2="14" Stroke="#666666" StrokeThickness="0.5"/>
-        <TextBlock Canvas.Left="8" Canvas.Top="3" Text="1" FontSize="8" Foreground="#333333"/>
+        <TextBlock Canvas.Left="8" Canvas.Top="1" Text="1" FontSize="10" Foreground="#333333"/>
         <!-- S3 at x=35 -->
         <Line X1="35" Y1="11" X2="35" Y2="14" Stroke="#666666" StrokeThickness="0.5"/>
-        <TextBlock Canvas.Left="33" Canvas.Top="3" Text="3" FontSize="8" Foreground="#333333"/>
+        <TextBlock Canvas.Left="33" Canvas.Top="1" Text="3" FontSize="10" Foreground="#333333"/>
         <!-- S5 at x=60 -->
         <Line X1="60" Y1="11" X2="60" Y2="14" Stroke="#666666" StrokeThickness="0.5"/>
-        <TextBlock Canvas.Left="58" Canvas.Top="3" Text="5" FontSize="8" Foreground="#333333"/>
+        <TextBlock Canvas.Left="58" Canvas.Top="1" Text="5" FontSize="10" Foreground="#333333"/>
         <!-- S7 at x=84 -->
         <Line X1="84" Y1="11" X2="84" Y2="14" Stroke="#666666" StrokeThickness="0.5"/>
-        <TextBlock Canvas.Left="82" Canvas.Top="3" Text="7" FontSize="8" Foreground="#333333"/>
+        <TextBlock Canvas.Left="82" Canvas.Top="1" Text="7" FontSize="10" Foreground="#333333"/>
         <!-- S9 at x=109 -->
         <Line X1="109" Y1="11" X2="109" Y2="14" Stroke="#666666" StrokeThickness="0.5"/>
-        <TextBlock Canvas.Left="106" Canvas.Top="3" Text="9" FontSize="8" Foreground="#333333"/>
+        <TextBlock Canvas.Left="106" Canvas.Top="1" Text="9" FontSize="10" Foreground="#333333"/>
         <!-- +20 at x=131 -->
         <Line X1="131" Y1="11" X2="131" Y2="14" Stroke="#666666" StrokeThickness="0.5"/>
-        <TextBlock Canvas.Left="122" Canvas.Top="3" Text="+20" FontSize="8" Foreground="#333333"/>
+        <TextBlock Canvas.Left="122" Canvas.Top="1" Text="+20" FontSize="10" Foreground="#333333"/>
         <!-- +40 at x=153 -->
         <Line X1="153" Y1="11" X2="153" Y2="14" Stroke="#666666" StrokeThickness="0.5"/>
-        <TextBlock Canvas.Left="144" Canvas.Top="3" Text="+40" FontSize="8" Foreground="#333333"/>
+        <TextBlock Canvas.Left="144" Canvas.Top="1" Text="+40" FontSize="10" Foreground="#333333"/>
         <!-- +60 at x=175 -->
         <Line X1="175" Y1="11" X2="175" Y2="14" Stroke="#666666" StrokeThickness="0.5"/>
-        <TextBlock Canvas.Left="164" Canvas.Top="3" Text="+60" FontSize="8" Foreground="#333333"/>
+        <TextBlock Canvas.Left="164" Canvas.Top="1" Text="+60" FontSize="10" Foreground="#333333"/>
     </Canvas>
 </UserControl>
