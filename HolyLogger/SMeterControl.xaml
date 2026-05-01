@@ -11,8 +11,8 @@
         <Rectangle Canvas.Left="10" Canvas.Top="14" Width="99" Height="10" Fill="#D0D0D0" Stroke="#888888" StrokeThickness="0.5"/>
         <!-- +dB zone background: amber -->
         <Rectangle Canvas.Left="109" Canvas.Top="14" Width="66" Height="10" Fill="#FFB830" Stroke="#888888" StrokeThickness="0.5"/>
-        <!-- Signal fill indicator -->
-        <Rectangle x:Name="IndicatorFill" Canvas.Left="10" Canvas.Top="14" Width="0" Height="10" Fill="#22CC22"/>
+        <!-- Signal strength indicator line -->
+        <Line x:Name="IndicatorLine" X1="60" Y1="14" X2="60" Y2="24" Stroke="Red" StrokeThickness="3"/>
 
         <!-- "S" prefix label -->
         <TextBlock Canvas.Left="0" Canvas.Top="1" Text="S" FontSize="10" FontWeight="Bold" Foreground="#333333"/>

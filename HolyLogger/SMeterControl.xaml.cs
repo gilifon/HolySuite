@@ -16,11 +16,14 @@ namespace HolyLogger
         {
             if (s <= 0)
             {
-                IndicatorFill.Width = 0;
+                IndicatorLine.Visibility = System.Windows.Visibility.Hidden;
                 return;
             }
+            IndicatorLine.Visibility = System.Windows.Visibility.Visible;
             if (s > 9) s = 9;
-            IndicatorFill.Width = (s - 1) * (SZoneWidth / SIntervals);
+            double x = 10 + (s - 1) * (SZoneWidth / SIntervals);
+            IndicatorLine.X1 = x;
+            IndicatorLine.X2 = x;
         }
     }
 }
