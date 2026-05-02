@@ -2348,12 +2348,14 @@ namespace HolyLogger
             {
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
+                ApplyHighlightedCallsignSuggestionToTextBox();
                 e.Handled = true;
             }
             else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
+                ApplyHighlightedCallsignSuggestionToTextBox();
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
@@ -2376,6 +2378,17 @@ namespace HolyLogger
             {
                 e.Handled = true;
             }
+        }
+
+        private void ApplyHighlightedCallsignSuggestionToTextBox()
+        {
+            string highlighted = LB_DXCallsignSuggestions.SelectedItem as string;
+            if (string.IsNullOrWhiteSpace(highlighted)) return;
+
+            isApplyingSuggestion = true;
+            TB_DXCallsign.Text = highlighted;
+            TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
+            isApplyingSuggestion = false;
         }
 
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
@@ -2617,6 +2630,13 @@ namespace HolyLogger
                 if (!call.StartsWith(prefix, StringComparison.Ordinal)) break;
                 matches.Add(call);
             }
+
+            // Show suggestions at the same vertical level as DX callsign and slightly to its right.
+            Point dxCallPosition = TB_DXCallsign.TranslatePoint(new Point(0, 0), this);
+            CallsignSuggestionsPopup.PlacementTarget = this;
+            CallsignSuggestionsPopup.Placement = PlacementMode.Relative;
+            CallsignSuggestionsPopup.HorizontalOffset = dxCallPosition.X + TB_DXCallsign.ActualWidth + 6;
+            CallsignSuggestionsPopup.VerticalOffset = dxCallPosition.Y;
 
             LB_DXCallsignSuggestions.ItemsSource = matches;
             LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
