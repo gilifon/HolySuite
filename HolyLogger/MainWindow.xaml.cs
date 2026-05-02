@@ -2375,6 +2375,29 @@ namespace HolyLogger
             UpdateDup();
         }
 
+        private void TB_DX_Name_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            const double rightEdge = 371;
+            const double minLeft = 57;
+            const double defaultLeft = 101;
+
+            var ft = new System.Windows.Media.FormattedText(
+                TB_DX_Name.Text,
+                System.Globalization.CultureInfo.CurrentCulture,
+                System.Windows.FlowDirection.LeftToRight,
+                new System.Windows.Media.Typeface(TB_DX_Name.FontFamily, TB_DX_Name.FontStyle, TB_DX_Name.FontWeight, TB_DX_Name.FontStretch),
+                TB_DX_Name.FontSize,
+                System.Windows.Media.Brushes.Black);
+
+            double neededWidth = ft.Width + 16; // padding
+            double newLeft = rightEdge - neededWidth;
+            if (newLeft > defaultLeft) newLeft = defaultLeft;
+            if (newLeft < minLeft) newLeft = minLeft;
+
+            TB_DX_Name.Margin = new Thickness(newLeft, TB_DX_Name.Margin.Top, 0, 0);
+            TB_DX_Name.Width = rightEdge - newLeft;
+        }
+
         private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
