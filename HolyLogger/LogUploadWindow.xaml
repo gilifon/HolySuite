@@ -6,7 +6,7 @@
         xmlns:gif="http://wpfanimatedgif.codeplex.com"
         xmlns:local="clr-namespace:HolyLogger"
         mc:Ignorable="d"
-        Title="Send Log" Height="505" MaxHeight="505" Width="433" MaxWidth="433" Icon="Images/crown.png" LocationChanged="Window_LocationChanged" MinWidth="433" MinHeight="505">
+        Title="Send Log" Height="505" MaxHeight="505" Width="433" MaxWidth="433" Icon="Images/crown.png" LocationChanged="Window_LocationChanged" MinWidth="433" MinHeight="505" KeyDown="Window_KeyDown">
     <Grid Margin="10,10,0,0" Height="480" MinWidth="1">
         <Grid.RowDefinitions>
             <RowDefinition Height="*" />

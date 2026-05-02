@@ -30,6 +30,7 @@ using System.Net.Sockets;
 using System.Windows.Controls.Primitives;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
+using System.Data.SQLite;
 
 namespace HolyLogger
 {
@@ -228,11 +229,19 @@ namespace HolyLogger
         QSO QsoPreUpdate;
         QSO LastQSO;
 
+        private List<string> callsignIndex = new List<string>();
+        private bool isApplyingSuggestion = false;
+        private const int DefaultCallsignSuggestionRows = 20;
+        private const int MinCallsignSuggestionRows = 10;
+        private const int MaxCallsignSuggestionRows = 30;
+        private const double CallsignSuggestionRowHeight = 22;
+        private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
+
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
-        private string title = "HolyLogger   ";
+        private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
         private const int SEND_CHUNK_SIZE = 50;
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
@@ -254,6 +263,8 @@ namespace HolyLogger
             rem = new EntityResolver();
             InitializeComponent();
             isInitializeComponentsComplete = true;
+            ApplyCallsignSuggestionRowsSetting();
+            LoadCallsignIndex();
 
             if (Properties.Settings.Default.EnableUDPClient)
             {
@@ -299,11 +310,12 @@ namespace HolyLogger
                 Properties.Settings.Default.UpdateSettings = false;
                 Properties.Settings.Default.Save();
             }
-            if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
-            {
-                NotifyVersionUpToDate = false;
-                UpdatesMenuItem_Click(null, null);
-            }
+            // temporarily disabled - re-enable when done with local development
+            //if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
+            //{
+            //    NotifyVersionUpToDate = false;
+            //    UpdatesMenuItem_Click(null, null);
+            //}
             this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
 
@@ -394,8 +406,8 @@ namespace HolyLogger
             gridColumnOrder.Add(new KeyValuePair<string, int>("Country", Properties.Settings.Default.Country_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Frequency", Properties.Settings.Default.Frequency_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Band", Properties.Settings.Default.Band_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("RST rcvd", Properties.Settings.Default.RSTrcvd_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("RST sent", Properties.Settings.Default.RSTsent_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("RST-R", Properties.Settings.Default.RSTrcvd_index));
+            gridColumnOrder.Add(new KeyValuePair<string, int>("RST-S", Properties.Settings.Default.RSTsent_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Mode", Properties.Settings.Default.Mode_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Exchange", Properties.Settings.Default.Exchange_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Comment", Properties.Settings.Default.Comment_index));
@@ -704,6 +716,13 @@ namespace HolyLogger
             TP_Time.Value = DateTime.UtcNow;
         }
 
+        private void RefreshIcon_PreviewMouseUp(object sender, MouseButtonEventArgs e)
+        {
+            TP_Date.Value = DateTime.UtcNow;
+            TP_Time.Value = DateTime.UtcNow;
+            e.Handled = true;
+        }
+
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
             if (!Validate()) return;
@@ -885,6 +904,7 @@ namespace HolyLogger
                 TB_RSTRcvd.Text = "599";
             }
             if (TB_Comment.IsEnabled) TB_Comment.Clear();
+            TB_State.Text = string.Empty;
             FName = string.Empty;
             Country = string.Empty;
             Continent = string.Empty;
@@ -933,6 +953,15 @@ namespace HolyLogger
                 ((TextBox)sender).CaretIndex = 1;
                 ((TextBox)sender).SelectionLength = 1;
             }
+        }
+
+        private void TB_RSTSent_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (SMeter == null) return;
+            if (TB_RSTSent.Text.Length >= 2 && int.TryParse(TB_RSTSent.Text[1].ToString(), out int s))
+                SMeter.SetSValue(s);
+            else
+                SMeter.SetSValue(0);
         }
 
         private void UpdateNumOfQSOs()
@@ -1466,9 +1495,9 @@ namespace HolyLogger
                     Properties.Settings.Default.Frequency_index = item.DisplayIndex;
                 else if (item.Header.ToString() == "Band")
                     Properties.Settings.Default.Band_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "RST rcvd")
+                else if (item.Header.ToString() == "RST-R")
                     Properties.Settings.Default.RSTrcvd_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "RST sent")
+                else if (item.Header.ToString() == "RST-S")
                     Properties.Settings.Default.RSTsent_index = item.DisplayIndex;
                 else if (item.Header.ToString() == "Mode")
                     Properties.Settings.Default.Mode_index = item.DisplayIndex;
@@ -1932,6 +1961,8 @@ namespace HolyLogger
                     StopUTCTimer();
                     this.Title = title;
                 }
+
+                ApplyCallsignSuggestionRowsSetting();
             }
             if (optionWindow.SatelliteControlInstance.HasChanged)
             {
@@ -2314,9 +2345,33 @@ namespace HolyLogger
 
         private void TB_DXCallsign_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter)
+            if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
-
+                LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
+                LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
+            {
+                LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
+                LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                if (CallsignSuggestionsPopup.IsOpen)
+                {
+                    ApplySelectedCallsignSuggestion();
+                    e.Handled = true;
+                }
+            }
+            else if (e.Key == Key.Escape)
+            {
+                if (CallsignSuggestionsPopup.IsOpen)
+                {
+                    CallsignSuggestionsPopup.IsOpen = false;
+                    e.Handled = true;
+                }
             }
             else if (e.Key == Key.Space)
             {
@@ -2357,6 +2412,36 @@ namespace HolyLogger
             UpdateDup();
         }
 
+        private void TB_DX_Name_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            const double rightEdge = 371;
+            const double minLeft = 57;
+            const double defaultLeft = 101;
+
+            var ft = new System.Windows.Media.FormattedText(
+                TB_DX_Name.Text,
+                System.Globalization.CultureInfo.CurrentCulture,
+                System.Windows.FlowDirection.LeftToRight,
+                new System.Windows.Media.Typeface(TB_DX_Name.FontFamily, TB_DX_Name.FontStyle, TB_DX_Name.FontWeight, TB_DX_Name.FontStretch),
+                TB_DX_Name.FontSize,
+                System.Windows.Media.Brushes.Black);
+
+            double neededWidth = ft.Width + 16; // padding
+            double newLeft = rightEdge - neededWidth;
+            if (newLeft > defaultLeft) newLeft = defaultLeft;
+            if (newLeft < minLeft) newLeft = minLeft;
+
+            TB_DX_Name.Margin = new Thickness(newLeft, TB_DX_Name.Margin.Top, 0, 0);
+            TB_DX_Name.Width = rightEdge - newLeft;
+        }
+
+        private void TB_State_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            TB_State.TextAlignment = TB_State.Text.Length <= 2
+                ? TextAlignment.Center
+                : TextAlignment.Left;
+        }
+
         private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
@@ -2384,11 +2469,17 @@ namespace HolyLogger
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (!isApplyingSuggestion)
+            {
+                UpdateCallsignSuggestions();
+            }
+
             ClearDXLocator();
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
+                TB_State.Text = "";
                 ClearAzimuth();
                 ClearMatrix();
                 L_Duplicate.Visibility = Visibility.Hidden;
@@ -2421,7 +2512,152 @@ namespace HolyLogger
         
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
+            CallsignSuggestionsPopup.IsOpen = false;
             TB_Exchange.Focusable = true;
+        }
+
+        private void LoadCallsignIndex()
+        {
+            try
+            {
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string[] bigTextCandidatePaths = new[]
+                {
+                    Path.Combine(baseDir, "callsigns_merged_big.txt"),
+                    Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\callsigns_merged_big.txt")),
+                    Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\..\callsigns_merged_big.txt"))
+                };
+
+                string bigTextPath = bigTextCandidatePaths.FirstOrDefault(File.Exists);
+                if (string.IsNullOrWhiteSpace(bigTextPath))
+                {
+                    callsignIndex = new List<string>();
+                    return;
+                }
+
+                LoadCallsignIndexFromText(bigTextPath);
+            }
+            catch
+            {
+                callsignIndex = new List<string>();
+            }
+        }
+
+        private bool LoadCallsignIndexFromText(string filePath)
+        {
+            try
+            {
+                var set = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var rawLine in File.ReadLines(filePath))
+                {
+                    string line = rawLine.Trim().ToUpperInvariant();
+                    if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";")) continue;
+
+                    string token = line.Split(new[] { ' ', '\t', ',' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                    if (string.IsNullOrWhiteSpace(token) || token.Length > 15) continue;
+
+                    set.Add(token);
+                }
+
+                callsignIndex = set.ToList();
+                callsignIndex.Sort(StringComparer.Ordinal);
+                return callsignIndex.Count > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool LoadCallsignIndexFromSqlite(string sqlitePath)
+        {
+            try
+            {
+                var set = new HashSet<string>(StringComparer.Ordinal);
+                using (var con = new SQLiteConnection(@"Data Source = " + sqlitePath + @";Version=3"))
+                {
+                    con.Open();
+                    using (var cmd = new SQLiteCommand("SELECT callsign FROM callsigns ORDER BY callsign", con))
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string call = reader["callsign"].ToString().Trim().ToUpperInvariant();
+                            if (string.IsNullOrWhiteSpace(call) || call.Length > 15) continue;
+                            set.Add(call);
+                        }
+                    }
+                }
+
+                callsignIndex = set.ToList();
+                callsignIndex.Sort(StringComparer.Ordinal);
+                return callsignIndex.Count > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void UpdateCallsignSuggestions()
+        {
+            string prefix = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
+            if (prefix.Length < 2)
+            {
+                CallsignSuggestionsPopup.IsOpen = false;
+                return;
+            }
+
+            int index = callsignIndex.BinarySearch(prefix, StringComparer.Ordinal);
+            if (index < 0) index = ~index;
+
+            var matches = new List<string>(maxCallsignSuggestions);
+            for (int i = index; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
+            {
+                string call = callsignIndex[i];
+                if (!call.StartsWith(prefix, StringComparison.Ordinal)) break;
+                matches.Add(call);
+            }
+
+            LB_DXCallsignSuggestions.ItemsSource = matches;
+            LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
+            CallsignSuggestionsPopup.IsOpen = matches.Count > 0;
+        }
+
+        private void ApplySelectedCallsignSuggestion()
+        {
+            string selected = LB_DXCallsignSuggestions.SelectedItem as string;
+            if (string.IsNullOrWhiteSpace(selected)) return;
+
+            isApplyingSuggestion = true;
+            TB_DXCallsign.Text = selected;
+            TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
+            isApplyingSuggestion = false;
+            CallsignSuggestionsPopup.IsOpen = false;
+        }
+
+        private void LB_DXCallsignSuggestions_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            ApplySelectedCallsignSuggestion();
+        }
+
+        private void LB_DXCallsignSuggestions_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            ApplySelectedCallsignSuggestion();
+        }
+
+        private int NormalizeCallsignSuggestionRows(int rows)
+        {
+            if (rows <= 0) return DefaultCallsignSuggestionRows;
+            return Math.Max(MinCallsignSuggestionRows, Math.Min(MaxCallsignSuggestionRows, rows));
+        }
+
+        private void ApplyCallsignSuggestionRowsSetting()
+        {
+            int rows = NormalizeCallsignSuggestionRows(Properties.Settings.Default.CallsignSuggestionRows);
+
+            maxCallsignSuggestions = rows;
+            LB_DXCallsignSuggestions.MaxHeight = rows * CallsignSuggestionRowHeight;
         }
 
         private void UpdateMatrix()
@@ -2593,6 +2829,9 @@ namespace HolyLogger
                                 if (grid.Count() > 0)
                                     QRZGrid = grid.FirstOrDefault().Value.ToUpper();
 
+                                IEnumerable<XElement> stateEl = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "state");
+                                TB_State.Text = stateEl.Count() > 0 ? stateEl.FirstOrDefault().Value.Trim() : string.Empty;
+
                                 SetAzimuth();
                                 SetDXLocator(QRZGrid);
                                 //*************************************************//
@@ -2607,6 +2846,7 @@ namespace HolyLogger
                                 if (errorCall == dxcall || errorCall == bare_dxcall)
                                 {
                                     FName = "";
+                                    TB_State.Text = "";
                                 }
                             }
                         }                        
@@ -2614,6 +2854,7 @@ namespace HolyLogger
                     catch (Exception)
                     {
                         FName = "";
+                        TB_State.Text = "";
                     }
                 }
                 /*****************************/
@@ -2621,6 +2862,7 @@ namespace HolyLogger
             else
             {
                 FName = "";
+                TB_State.Text = "";
             }
         }
 

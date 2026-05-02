@@ -15,7 +15,15 @@
         <CheckBox x:Name="CBX_Lock" Content="Lock My Callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isLocked, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,104,0,0"/>
         <CheckBox x:Name="CBX_DisplayLastQSOinGrid" Content="Highlight last QSO" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.DisplayLastQSOinGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,130,0,0"/>
         <CheckBox x:Name="CBX_UseDXCCDefaultGrid" Content="Use default grid for DXCC" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.UseDXCCDefaultGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,156,0,0"/>
-        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,182,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
+        <Label Content="Callsign suggestion lines" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,188,0,0" FontSize="16"/>
+        <ComboBox x:Name="CB_CallsignSuggestionRows" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="210,184,0,0" SelectionChanged="CB_CallsignSuggestionRows_SelectionChanged" FontSize="16">
+            <ComboBoxItem Content="10"/>
+            <ComboBoxItem Content="15"/>
+            <ComboBoxItem Content="20"/>
+            <ComboBoxItem Content="25"/>
+            <ComboBoxItem Content="30"/>
+        </ComboBox>
+        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,220,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>

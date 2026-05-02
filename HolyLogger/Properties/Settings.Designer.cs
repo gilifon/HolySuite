@@ -1054,6 +1054,18 @@ namespace HolyLogger.Properties {
                 this["selectedOverlay"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("20")]
+        public int CallsignSuggestionRows {
+            get {
+                return ((int)(this["CallsignSuggestionRows"]));
+            }
+            set {
+                this["CallsignSuggestionRows"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

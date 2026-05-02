@@ -28,7 +28,7 @@
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>1</ApplicationRevision>
-    <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <ApplicationVersion>1.0.3.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
@@ -208,6 +208,9 @@
     <Compile Include="MatrixControl.xaml.cs">
       <DependentUpon>MatrixControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SMeterControl.xaml.cs">
+      <DependentUpon>SMeterControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ToolsUserControls\AzimuthUserControl.xaml.cs">
       <DependentUpon>AzimuthUserControl.xaml</DependentUpon>
     </Compile>
@@ -273,6 +276,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="MatrixControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="SMeterControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -376,6 +383,7 @@
     <Resource Include="Images\x.png" />
     <Resource Include="Images\matrix.png" />
     <Resource Include="Images\manual.png" />
+    <Resource Include="Images\broom.png" />
     <Resource Include="Images\eraser.png" />
     <Resource Include="Images\import.png" />
     <Resource Include="Images\spinner.gif" />

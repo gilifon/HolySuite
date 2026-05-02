@@ -7,6 +7,9 @@
              mc:Ignorable="d" 
              d:DesignHeight="48" d:DesignWidth="780">
     <Grid Width="780">
+        <Grid.LayoutTransform>
+            <ScaleTransform ScaleX="0.9436" ScaleY="1"/>
+        </Grid.LayoutTransform>
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <Label Content="10" HorizontalAlignment="Left" Margin="27,1,0,0" VerticalAlignment="Top" FontSize="13" />
