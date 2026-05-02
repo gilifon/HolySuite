@@ -2493,6 +2493,7 @@ namespace HolyLogger
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
                 TB_State.Text = "";
+                UpdateCountryFlag(null);
                 ClearAzimuth();
                 ClearMatrix();
                 L_Duplicate.Visibility = Visibility.Hidden;

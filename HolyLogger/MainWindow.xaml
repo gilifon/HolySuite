@@ -275,6 +275,32 @@
         <Popup x:Name="CallsignSuggestionsPopup" PlacementTarget="{Binding ElementName=TB_DXCallsign}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
             <Border BorderBrush="Gray" BorderThickness="1" Background="White">
                 <ListBox x:Name="LB_DXCallsignSuggestions" Width="160" MaxHeight="440" FontSize="14" PreviewMouseLeftButtonUp="LB_DXCallsignSuggestions_PreviewMouseLeftButtonUp" MouseDoubleClick="LB_DXCallsignSuggestions_MouseDoubleClick">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="White" Padding="3,2">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#CCE8FF"/>
+                                                <Setter Property="Foreground" Value="Black"/>
+                                            </Trigger>
+                                            <MultiTrigger>
+                                                <MultiTrigger.Conditions>
+                                                    <Condition Property="IsMouseOver" Value="True"/>
+                                                    <Condition Property="IsSelected" Value="False"/>
+                                                </MultiTrigger.Conditions>
+                                                <Setter TargetName="Bd" Property="Background" Value="#CCE8FF"/>
+                                            </MultiTrigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <TextBlock>
