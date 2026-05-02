@@ -893,6 +893,7 @@ namespace HolyLogger
                 TB_RSTRcvd.Text = "599";
             }
             if (TB_Comment.IsEnabled) TB_Comment.Clear();
+            TB_State.Text = string.Empty;
             FName = string.Empty;
             Country = string.Empty;
             Continent = string.Empty;
@@ -2406,6 +2407,7 @@ namespace HolyLogger
             {
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
+                TB_State.Text = "";
                 ClearAzimuth();
                 ClearMatrix();
                 L_Duplicate.Visibility = Visibility.Hidden;
@@ -2610,6 +2612,9 @@ namespace HolyLogger
                                 if (grid.Count() > 0)
                                     QRZGrid = grid.FirstOrDefault().Value.ToUpper();
 
+                                IEnumerable<XElement> stateEl = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "state");
+                                TB_State.Text = stateEl.Count() > 0 ? stateEl.FirstOrDefault().Value.Trim() : string.Empty;
+
                                 SetAzimuth();
                                 SetDXLocator(QRZGrid);
                                 //*************************************************//
@@ -2624,6 +2629,7 @@ namespace HolyLogger
                                 if (errorCall == dxcall || errorCall == bare_dxcall)
                                 {
                                     FName = "";
+                                    TB_State.Text = "";
                                 }
                             }
                         }                        
@@ -2631,6 +2637,7 @@ namespace HolyLogger
                     catch (Exception)
                     {
                         FName = "";
+                        TB_State.Text = "";
                     }
                 }
                 /*****************************/
@@ -2638,6 +2645,7 @@ namespace HolyLogger
             else
             {
                 FName = "";
+                TB_State.Text = "";
             }
         }
 
