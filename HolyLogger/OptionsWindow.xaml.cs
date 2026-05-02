@@ -33,6 +33,11 @@ namespace HolyLogger
             base.OnLocationChanged(e);
         }
 
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape) this.Close();
+        }
+
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (this.Width >= 0)
