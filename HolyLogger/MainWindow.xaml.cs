@@ -310,12 +310,11 @@ namespace HolyLogger
                 Properties.Settings.Default.UpdateSettings = false;
                 Properties.Settings.Default.Save();
             }
-            // temporarily disabled - re-enable when done with local development
-            //if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
-            //{
-            //    NotifyVersionUpToDate = false;
-            //    UpdatesMenuItem_Click(null, null);
-            //}
+            if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
+            {
+                NotifyVersionUpToDate = false;
+                UpdatesMenuItem_Click(null, null);
+            }
             this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
 
