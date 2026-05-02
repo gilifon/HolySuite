@@ -1,4 +1,4 @@
-﻿"DeployProject"
+"DeployProject"
 {
 "VSVersion" = "3:800"
 "ProjectType" = "8:{978C614F-708E-4E1A-B201-565925725DBA}"
@@ -3928,7 +3928,26 @@
             "SourcePath" = "8:<VsdDialogDir>\\VsdUserInterface.wim"
             }
         }
-        "MergeModule"
+            "{9F6F8455-1EF1-4B85-886A-4223BCC8E7F7}:_2FB247F321864906B84F84530F0FA0C0"
+            {
+            "SourcePath" = "8:..\\HolyLogger\\callsigns_merged_big.txt"
+            "TargetName" = "8:callsigns_merged_big.txt"
+            "Tag" = "8:"
+            "Folder" = "8:_A3201F3469A34EB19E5A76041089256B"
+            "Condition" = "8:"
+            "Transitive" = "11:FALSE"
+            "Vital" = "11:TRUE"
+            "ReadOnly" = "11:FALSE"
+            "Hidden" = "11:FALSE"
+            "System" = "11:FALSE"
+            "Permanent" = "11:FALSE"
+            "SharedLegacy" = "11:FALSE"
+            "PackageAs" = "3:1"
+            "Register" = "3:1"
+            "Exclude" = "11:FALSE"
+            "IsDependency" = "11:FALSE"
+            "IsolateTo" = "8:"
+            }        "MergeModule"
         {
         }
         "ProjectOutput"
