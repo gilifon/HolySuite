@@ -2398,6 +2398,13 @@ namespace HolyLogger
             TB_DX_Name.Width = rightEdge - newLeft;
         }
 
+        private void TB_State_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            TB_State.TextAlignment = TB_State.Text.Length <= 2
+                ? TextAlignment.Center
+                : TextAlignment.Left;
+        }
+
         private void CB_Mode_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             try
