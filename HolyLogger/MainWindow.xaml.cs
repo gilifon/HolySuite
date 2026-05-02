@@ -30,6 +30,7 @@ using System.Net.Sockets;
 using System.Windows.Controls.Primitives;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
+using System.Data.SQLite;
 
 namespace HolyLogger
 {
@@ -228,6 +229,14 @@ namespace HolyLogger
         QSO QsoPreUpdate;
         QSO LastQSO;
 
+        private List<string> callsignIndex = new List<string>();
+        private bool isApplyingSuggestion = false;
+        private const int DefaultCallsignSuggestionRows = 20;
+        private const int MinCallsignSuggestionRows = 10;
+        private const int MaxCallsignSuggestionRows = 30;
+        private const double CallsignSuggestionRowHeight = 22;
+        private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
+
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
@@ -254,6 +263,8 @@ namespace HolyLogger
             rem = new EntityResolver();
             InitializeComponent();
             isInitializeComponentsComplete = true;
+            ApplyCallsignSuggestionRowsSetting();
+            LoadCallsignIndex();
 
             if (Properties.Settings.Default.EnableUDPClient)
             {
@@ -1950,6 +1961,8 @@ namespace HolyLogger
                     StopUTCTimer();
                     this.Title = title;
                 }
+
+                ApplyCallsignSuggestionRowsSetting();
             }
             if (optionWindow.SatelliteControlInstance.HasChanged)
             {
@@ -2332,9 +2345,33 @@ namespace HolyLogger
 
         private void TB_DXCallsign_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Enter)
+            if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
-
+                LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
+                LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
+            {
+                LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
+                LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Enter)
+            {
+                if (CallsignSuggestionsPopup.IsOpen)
+                {
+                    ApplySelectedCallsignSuggestion();
+                    e.Handled = true;
+                }
+            }
+            else if (e.Key == Key.Escape)
+            {
+                if (CallsignSuggestionsPopup.IsOpen)
+                {
+                    CallsignSuggestionsPopup.IsOpen = false;
+                    e.Handled = true;
+                }
             }
             else if (e.Key == Key.Space)
             {
@@ -2432,6 +2469,11 @@ namespace HolyLogger
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
+            if (!isApplyingSuggestion)
+            {
+                UpdateCallsignSuggestions();
+            }
+
             ClearDXLocator();
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
@@ -2470,7 +2512,152 @@ namespace HolyLogger
         
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
+            CallsignSuggestionsPopup.IsOpen = false;
             TB_Exchange.Focusable = true;
+        }
+
+        private void LoadCallsignIndex()
+        {
+            try
+            {
+                string baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                string[] bigTextCandidatePaths = new[]
+                {
+                    Path.Combine(baseDir, "callsigns_merged_big.txt"),
+                    Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\callsigns_merged_big.txt")),
+                    Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\..\callsigns_merged_big.txt"))
+                };
+
+                string bigTextPath = bigTextCandidatePaths.FirstOrDefault(File.Exists);
+                if (string.IsNullOrWhiteSpace(bigTextPath))
+                {
+                    callsignIndex = new List<string>();
+                    return;
+                }
+
+                LoadCallsignIndexFromText(bigTextPath);
+            }
+            catch
+            {
+                callsignIndex = new List<string>();
+            }
+        }
+
+        private bool LoadCallsignIndexFromText(string filePath)
+        {
+            try
+            {
+                var set = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var rawLine in File.ReadLines(filePath))
+                {
+                    string line = rawLine.Trim().ToUpperInvariant();
+                    if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";")) continue;
+
+                    string token = line.Split(new[] { ' ', '\t', ',' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                    if (string.IsNullOrWhiteSpace(token) || token.Length > 15) continue;
+
+                    set.Add(token);
+                }
+
+                callsignIndex = set.ToList();
+                callsignIndex.Sort(StringComparer.Ordinal);
+                return callsignIndex.Count > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private bool LoadCallsignIndexFromSqlite(string sqlitePath)
+        {
+            try
+            {
+                var set = new HashSet<string>(StringComparer.Ordinal);
+                using (var con = new SQLiteConnection(@"Data Source = " + sqlitePath + @";Version=3"))
+                {
+                    con.Open();
+                    using (var cmd = new SQLiteCommand("SELECT callsign FROM callsigns ORDER BY callsign", con))
+                    using (var reader = cmd.ExecuteReader())
+                    {
+                        while (reader.Read())
+                        {
+                            string call = reader["callsign"].ToString().Trim().ToUpperInvariant();
+                            if (string.IsNullOrWhiteSpace(call) || call.Length > 15) continue;
+                            set.Add(call);
+                        }
+                    }
+                }
+
+                callsignIndex = set.ToList();
+                callsignIndex.Sort(StringComparer.Ordinal);
+                return callsignIndex.Count > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void UpdateCallsignSuggestions()
+        {
+            string prefix = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
+            if (prefix.Length < 2)
+            {
+                CallsignSuggestionsPopup.IsOpen = false;
+                return;
+            }
+
+            int index = callsignIndex.BinarySearch(prefix, StringComparer.Ordinal);
+            if (index < 0) index = ~index;
+
+            var matches = new List<string>(maxCallsignSuggestions);
+            for (int i = index; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
+            {
+                string call = callsignIndex[i];
+                if (!call.StartsWith(prefix, StringComparison.Ordinal)) break;
+                matches.Add(call);
+            }
+
+            LB_DXCallsignSuggestions.ItemsSource = matches;
+            LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
+            CallsignSuggestionsPopup.IsOpen = matches.Count > 0;
+        }
+
+        private void ApplySelectedCallsignSuggestion()
+        {
+            string selected = LB_DXCallsignSuggestions.SelectedItem as string;
+            if (string.IsNullOrWhiteSpace(selected)) return;
+
+            isApplyingSuggestion = true;
+            TB_DXCallsign.Text = selected;
+            TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
+            isApplyingSuggestion = false;
+            CallsignSuggestionsPopup.IsOpen = false;
+        }
+
+        private void LB_DXCallsignSuggestions_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            ApplySelectedCallsignSuggestion();
+        }
+
+        private void LB_DXCallsignSuggestions_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            ApplySelectedCallsignSuggestion();
+        }
+
+        private int NormalizeCallsignSuggestionRows(int rows)
+        {
+            if (rows <= 0) return DefaultCallsignSuggestionRows;
+            return Math.Max(MinCallsignSuggestionRows, Math.Min(MaxCallsignSuggestionRows, rows));
+        }
+
+        private void ApplyCallsignSuggestionRowsSetting()
+        {
+            int rows = NormalizeCallsignSuggestionRows(Properties.Settings.Default.CallsignSuggestionRows);
+
+            maxCallsignSuggestions = rows;
+            LB_DXCallsignSuggestions.MaxHeight = rows * CallsignSuggestionRowHeight;
         }
 
         private void UpdateMatrix()
