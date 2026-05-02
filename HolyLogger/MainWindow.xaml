@@ -279,9 +279,9 @@
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="160" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
         <Label Content="RST-S" HorizontalAlignment="Left" Margin="263,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="315,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="3" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
-        <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="360,143,0,0" Grid.Row="1" VerticalAlignment="Top"/>
-        <Label Content="RST-R" HorizontalAlignment="Left" Margin="544,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="596,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="3" TabIndex="11"/>
+        <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="360,143,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
+        <Label Content="RST-R" HorizontalAlignment="Left" Margin="360,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="412,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="3" TabIndex="11"/>
         <Label Content="Date" HorizontalAlignment="Left" Margin="317,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
         <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="362,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" />
         <Label Content="Time" HorizontalAlignment="Left" Margin="497,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
@@ -297,15 +297,17 @@
             </StackPanel>
         </Button>
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="101,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="270" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" />
-        <Label Content="Country" HorizontalAlignment="Left" Margin="392,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="462,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="230" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" IsReadOnly="True" FontSize="16" TabIndex="16" />
+        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="101,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="220" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" />
+        <Label Content="Country" HorizontalAlignment="Left" Margin="330,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="400,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="222" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" IsReadOnly="True" FontSize="16" TabIndex="16" />
+        <Label Content="State" HorizontalAlignment="Left" Margin="630,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="679,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="45" CharacterCasing="Upper" MaxLength="4" Grid.Row="1" FontSize="16" TabIndex="17" />
 
         <Label Content="DX Locator" HorizontalAlignment="Left" Margin="6,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
-        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="101,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="17"/>
+        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="101,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
         <Label Content="Comment" HorizontalAlignment="Left" Margin="210,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
-        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="295,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="368" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="18"/>
-        <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="672,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="295,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="400" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
+        <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="704,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <Rectangle Grid.Row="1" Fill="Gainsboro" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="53" Margin="0,272,0,0" />
