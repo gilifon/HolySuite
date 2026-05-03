@@ -310,12 +310,11 @@ namespace HolyLogger
                 Properties.Settings.Default.UpdateSettings = false;
                 Properties.Settings.Default.Save();
             }
-            // temporarily disabled - re-enable when done with local development
-            //if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
-            //{
-            //    NotifyVersionUpToDate = false;
-            //    UpdatesMenuItem_Click(null, null);
-            //}
+            if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
+            {
+                NotifyVersionUpToDate = false;
+                UpdatesMenuItem_Click(null, null);
+            }
             this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
 
@@ -907,6 +906,7 @@ namespace HolyLogger
             TB_State.Text = string.Empty;
             FName = string.Empty;
             Country = string.Empty;
+            UpdateCountryFlag(null);
             Continent = string.Empty;
             if (!Properties.Settings.Default.isManualMode)
                 RefreshDateTime_Btn_MouseUp(null, null);
@@ -2349,12 +2349,14 @@ namespace HolyLogger
             {
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
+                ApplyHighlightedCallsignSuggestionToTextBox();
                 e.Handled = true;
             }
             else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
+                ApplyHighlightedCallsignSuggestionToTextBox();
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
@@ -2377,6 +2379,17 @@ namespace HolyLogger
             {
                 e.Handled = true;
             }
+        }
+
+        private void ApplyHighlightedCallsignSuggestionToTextBox()
+        {
+            string highlighted = (LB_DXCallsignSuggestions.SelectedItem as CallsignSuggestionItem)?.FullCallsign;
+            if (string.IsNullOrWhiteSpace(highlighted)) return;
+
+            isApplyingSuggestion = true;
+            TB_DXCallsign.Text = highlighted;
+            TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
+            isApplyingSuggestion = false;
         }
 
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
@@ -2480,6 +2493,7 @@ namespace HolyLogger
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
                 TB_State.Text = "";
+                UpdateCountryFlag(null);
                 ClearAzimuth();
                 ClearMatrix();
                 L_Duplicate.Visibility = Visibility.Hidden;
@@ -2492,6 +2506,7 @@ namespace HolyLogger
                     RefreshDateTime_Btn_MouseUp(null, null);
                 DXCC dXCC = rem.GetDXCC(TB_DXCallsign.Text);
                 Country = dXCC.Name;
+                UpdateCountryFlag(dXCC.Name);
                 Continent = dXCC.Continent;
                 QRZGrid = dXCC.Locator;
                 Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
@@ -2602,31 +2617,196 @@ namespace HolyLogger
         private void UpdateCallsignSuggestions()
         {
             string prefix = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
-            if (prefix.Length < 2)
+            var matches = new List<CallsignSuggestionItem>(maxCallsignSuggestions);
+
+            // Wildcard modes:
+            // *ABC   -> callsigns ending with ABC
+            // *ABC*  -> callsigns containing ABC
+            if (prefix.StartsWith("*", StringComparison.Ordinal))
             {
-                CallsignSuggestionsPopup.IsOpen = false;
-                return;
+                if (prefix.EndsWith("*", StringComparison.Ordinal) && prefix.Length > 2)
+                {
+                    string containsTerm = prefix.Substring(1, prefix.Length - 2);
+                    for (int i = 0; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
+                    {
+                        string call = callsignIndex[i];
+                        int pos = call.IndexOf(containsTerm, StringComparison.Ordinal);
+                        if (pos >= 0)
+                            matches.Add(BuildSuggestionItem(call, containsTerm, pos));
+                    }
+                }
+                else if (prefix.Length > 1)
+                {
+                    string suffixTerm = prefix.Substring(1);
+                    for (int i = 0; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
+                    {
+                        string call = callsignIndex[i];
+                        if (call.EndsWith(suffixTerm, StringComparison.Ordinal))
+                            matches.Add(BuildSuggestionItem(call, suffixTerm, call.Length - suffixTerm.Length));
+                    }
+                }
+            }
+            else
+            {
+                if (prefix.Length < 2)
+                {
+                    CallsignSuggestionsPopup.IsOpen = false;
+                    return;
+                }
+
+                int index = callsignIndex.BinarySearch(prefix, StringComparer.Ordinal);
+                if (index < 0) index = ~index;
+
+                for (int i = index; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
+                {
+                    string call = callsignIndex[i];
+                    if (!call.StartsWith(prefix, StringComparison.Ordinal)) break;
+                    matches.Add(BuildSuggestionItem(call, prefix, 0));
+                }
             }
 
-            int index = callsignIndex.BinarySearch(prefix, StringComparer.Ordinal);
-            if (index < 0) index = ~index;
-
-            var matches = new List<string>(maxCallsignSuggestions);
-            for (int i = index; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
-            {
-                string call = callsignIndex[i];
-                if (!call.StartsWith(prefix, StringComparison.Ordinal)) break;
-                matches.Add(call);
-            }
+            // Show suggestions to the right of the DX callsign textbox, same vertical level.
+            Point dxCallPosition = TB_DXCallsign.TranslatePoint(new Point(0, 0), this);
+            CallsignSuggestionsPopup.PlacementTarget = this;
+            CallsignSuggestionsPopup.Placement = PlacementMode.Relative;
+            CallsignSuggestionsPopup.HorizontalOffset = dxCallPosition.X + TB_DXCallsign.ActualWidth - 8;
+            CallsignSuggestionsPopup.VerticalOffset = dxCallPosition.Y;
 
             LB_DXCallsignSuggestions.ItemsSource = matches;
             LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
-            CallsignSuggestionsPopup.IsOpen = matches.Count > 0;
+            CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown;
+
+            if (!Properties.Settings.Default.ShowCallsignDropdown && prefix.StartsWith("*", StringComparison.Ordinal))
+            {
+                var tt = new ToolTip
+                {
+                    Content = "Autocomplete dropdown is disabled.\nEnable it in Tools → Options → User Interface\n→ \"Show callsign autocomplete dropdown\"",
+                    PlacementTarget = TB_DXCallsign,
+                    Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+                    IsOpen = true,
+                    StaysOpen = false
+                };
+                TB_DXCallsign.ToolTip = tt;
+            }
+            else
+            {
+                TB_DXCallsign.ToolTip = null;
+            }
+        }
+
+        private static readonly Dictionary<string, string> DxccNameToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            {"Afghanistan","af"},{"Agalega & St. Brandon","mu"},{"Aland Is.","fi"},{"Alaska","us"},
+            {"Albania","al"},{"Algeria","dz"},{"Amsterdam & St. Paul Is.","tf"},{"Andaman & Nicobar Is.","in"},
+            {"Andorra","ad"},{"Angola","ao"},{"Anguilla","ai"},{"Antarctica","aq"},
+            {"Antigua & Barbuda","ag"},{"Argentina","ar"},{"Armenia","am"},{"Aruba","aw"},
+            {"Ascension I.","sh"},{"Australia","au"},{"Austria","at"},{"Aves I.","ve"},
+            {"Azores","pt"},{"Azerbaijan","az"},{"Bahamas","bs"},{"Bahrain","bh"},
+            {"Bangladesh","bd"},{"Barbados","bb"},{"Belarus","by"},{"Belgium","be"},
+            {"Belize","bz"},{"Benin","bj"},{"Bermuda","bm"},{"Bhutan","bt"},
+            {"Bolivia","bo"},{"Bonaire","bq"},{"Bosnia-Herzegovina","ba"},{"Botswana","bw"},
+            {"Bouvet","bv"},{"Brazil","br"},{"British Virgin Is.","vg"},{"Brunei Darussalam","bn"},
+            {"Bulgaria","bg"},{"Burkina Faso","bf"},{"Burundi","bi"},{"Cambodia","kh"},
+            {"Cameroon","cm"},{"Canada","ca"},{"Canary Is.","es"},{"Cape Verde","cv"},
+            {"Cayman Is.","ky"},{"Central Africa","cf"},{"Ceuta & Melilla","es"},{"Chad","td"},
+            {"Chagos Is.","io"},{"Chatham Is.","nz"},{"Chesterfield Is.","nc"},{"Chile","cl"},
+            {"China","cn"},{"Cocos (Keeling) Is.","cc"},{"Cocos I.","cr"},{"Colombia","co"},
+            {"Comoros","km"},{"Congo","cg"},{"Conway Reef","fj"},{"Corsica","fr"},
+            {"Costa Rica","cr"},{"Cote d'Ivoire","ci"},{"Crete","gr"},{"Croatia","hr"},
+            {"Crozet I.","tf"},{"Cuba","cu"},{"Curacao","cw"},{"Cyprus","cy"},
+            {"Czech Republic","cz"},{"Dem. Rep. Of Congo","cd"},{"Denmark","dk"},{"Desecheo I.","pr"},
+            {"Djibouti","dj"},{"Dodecanese","gr"},{"Dominica","dm"},{"Dominican Republic","do"},
+            {"Ducie I.","pn"},{"East Malaysia","my"},{"East Timor","tl"},{"Easter I.","cl"},
+            {"Ecuador","ec"},{"Egypt","eg"},{"El Salvador","sv"},{"England","gb"},
+            {"Equatorial Guinea","gq"},{"Eritrea","er"},{"Estonia","ee"},{"Ethiopia","et"},
+            {"European Russia","ru"},{"Falkland Is.","fk"},{"Faroe Is.","fo"},{"Fed. Rep. of Germany","de"},
+            {"Fernando de Noronha","br"},{"Fiji","fj"},{"Finland","fi"},{"France","fr"},
+            {"Franz Josef Land","ru"},{"French Guiana","gf"},{"French Polynesia","pf"},{"Gabon","ga"},
+            {"Galapagos Is.","ec"},{"Georgia","ge"},{"Ghana","gh"},{"Gibraltar","gi"},
+            {"Glorioso Is.","tf"},{"Greece","gr"},{"Greenland","gl"},{"Grenada","gd"},
+            {"Guadeloupe","gp"},{"Guam","gu"},{"Guantanamo Bay","cu"},{"Guatemala","gt"},
+            {"Guernsey","gg"},{"Guinea","gn"},{"Guinea-Bissau","gw"},{"Guyana","gy"},
+            {"Haiti","ht"},{"Hawaii","us"},{"Heard I.","hm"},{"Honduras","hn"},
+            {"Hong Kong","hk"},{"Hungary","hu"},{"Iceland","is"},{"India","in"},
+            {"Indonesia","id"},{"Iran","ir"},{"Iraq","iq"},{"Ireland","ie"},
+            {"Isle of Man","im"},{"Israel","il"},{"Italy","it"},{"ITU HQ","ch"},
+            {"Jamaica","jm"},{"Jan Mayen","no"},{"Japan","jp"},{"Jersey","je"},
+            {"Jordan","jo"},{"Juan de Nova, Europa","tf"},{"Juan Fernandez Is.","cl"},{"Kaliningrad","ru"},
+            {"Kazakhstan","kz"},{"Kenya","ke"},{"Kerguelen Is.","tf"},{"Kermadec Is.","nz"},
+            {"Kuwait","kw"},{"Kyrgystan","kg"},{"Laos","la"},{"Latvia","lv"},
+            {"Lebanon","lb"},{"Lesotho","ls"},{"Liberia","lr"},{"Libya","ly"},
+            {"Liechtenstein","li"},{"Lithuania","lt"},{"Lord Howe I.","au"},{"Luxembourg","lu"},
+            {"Macao","mo"},{"Macedonia","mk"},{"Macquarie I.","au"},{"Madagascar","mg"},
+            {"Madeira Is.","pt"},{"Maldives","mv"},{"Malawi","mw"},{"Malaysia","my"},
+            {"Mali","ml"},{"Malpelo I.","co"},{"Malta","mt"},{"Mariana Is.","mp"},
+            {"Market Reef","fi"},{"Marshall Is.","mh"},{"Martinique","mq"},{"Mauritania","mr"},
+            {"Mauritius","mu"},{"Mayotte","yt"},{"Mellish Reef","au"},{"Mexico","mx"},
+            {"Micronesia","fm"},{"Midway I.","um"},{"Minami Torishima","jp"},{"Moldova","md"},
+            {"Monaco","mc"},{"Mongolia","mn"},{"Montenegro","me"},{"Montserrat","ms"},
+            {"Morocco","ma"},{"Mount Athos","gr"},{"Mozambique","mz"},{"Myanmar","mm"},
+            {"Namibia","na"},{"Nauru","nr"},{"Nepal","np"},{"Netherlands","nl"},
+            {"New Caledonia","nc"},{"New Zealand","nz"},{"New Zealand Subantarctic Islands","nz"},{"Nicaragua","ni"},
+            {"Niger","ne"},{"Nigeria","ng"},{"Niue","nu"},{"Norfolk I.","nf"},
+            {"North Korea","kp"},{"Northern Ireland","gb"},{"Norway","no"},{"Ogasawara","jp"},
+            {"Oman","om"},{"Pakistan","pk"},{"Palestine","ps"},{"Palau","pw"},
+            {"Panama","pa"},{"Papua New Guinea","pg"},{"Paraguay","py"},{"Peru","pe"},
+            {"Peter I I.","no"},{"Philippines","ph"},{"Pitcairn I.","pn"},{"Poland","pl"},
+            {"Portugal","pt"},{"Pratas","tw"},{"Puerto Rico","pr"},{"Qatar","qa"},
+            {"Republic of Kosovo","xk"},{"Reunion","re"},{"Rodriguez I.","mu"},{"Romania","ro"},
+            {"Rotuma I.","fj"},{"Russia","ru"},{"Asiatic Russia","ru"},{"Rwanda","rw"},
+            {"Saba & St. Eustatius","bq"},{"Saint Barthelemy","bl"},{"Saint Martin","mf"},{"Sao Tome & Principe","st"},
+            {"Sardinia","it"},{"Saudi Arabia","sa"},{"Scarborough Reef","ph"},{"Scotland","gb"},
+            {"Senegal","sn"},{"Serbia","rs"},{"Seychelles","sc"},{"Sierra Leone","sl"},
+            {"Singapore","sg"},{"Slovak Republic","sk"},{"Slovenia","si"},{"Solomon Is.","sb"},
+            {"Somalia","so"},{"South Africa","za"},{"South Georgia I.","gs"},{"South Korea","kr"},
+            {"South Orkney Is.","gs"},{"South Sandwich Is.","gs"},{"South Shetland Is.","gs"},{"South Sudan","ss"},
+            {"Sov. Mil. Order of Malta","it"},{"Spain","es"},{"Spratly Is.","ph"},{"Sri Lanka","lk"},
+            {"St. Helena","sh"},{"St. Kitts & Nevis","kn"},{"St. Lucia","lc"},{"St. Maarten","sx"},
+            {"St Maarten","sx"},{"St. Peter & St. Paul Rocks","br"},{"St. Pierre & Miquelon","pm"},{"St. Vincent","vc"},
+            {"Sudan","sd"},{"Suriname","sr"},{"Svalbard","sj"},{"Swaziland","sz"},
+            {"Sweden","se"},{"Switzerland","ch"},{"Syria","sy"},{"Taiwan","tw"},
+            {"Tajikistan","tj"},{"Tanzania","tz"},{"Temotu Province","sb"},{"Thailand","th"},
+            {"The Gambia","gm"},{"Togo","tg"},{"Tokelau Is.","tk"},{"Tonga","to"},
+            {"Trinidad & Tobago","tt"},{"Trindade & Martim Vaz Is.","br"},{"Tromelin I.","tf"},{"Tunisia","tn"},
+            {"Turkey","tr"},{"Turkmenistan","tm"},{"Turks & Caicos Is.","tc"},{"Tuvalu","tv"},
+            {"Uganda","ug"},{"UK Sovereign Base Areas on Cyprus","cy"},{"Ukraine","ua"},{"United Arab Emirates","ae"},
+            {"United Nations HQ","un"},{"United States of America","us"},{"Uruguay","uy"},{"Uzbekistan","uz"},
+            {"Vanuatu","vu"},{"Vatican","va"},{"Venezuela","ve"},{"Vietnam","vn"},
+            {"Virgin Is.","vi"},{"Wales","gb"},{"Wallis & Futuna Is.","wf"},{"West Malaysia","my"},
+            {"Western Sahara","eh"},{"Western Samoa","ws"},{"Willis I.","au"},{"Yemen","ye"},
+            {"Zambia","zm"},{"Zimbabwe","zw"},{"Balearic Is.","es"},{"C. Kiribati (British Phoenix Is.)","ki"},
+            {"E. Kiribati (Line Is.)","ki"},{"W. Kiribati (Gilbert Is. )","ki"},{"Banaba I. (Ocean I.)","ki"},
+            {"San Andres & Providencia","co"},{"San Felix & San Ambrosio","cl"},{"Navassa I.","ht"},
+        };
+
+        private void UpdateCountryFlag(string countryName)
+        {
+            if (string.IsNullOrWhiteSpace(countryName))
+            {
+                Img_CountryFlag.Visibility = Visibility.Collapsed;
+                L_CountryLabel.Visibility = Visibility.Visible;
+                return;
+            }
+            if (DxccNameToIso.TryGetValue(countryName, out string isoCode))
+            {
+                try
+                {
+                    var uri = new Uri($"pack://application:,,,/Images/flags/{isoCode}.png", UriKind.Absolute);
+                    Img_CountryFlag.Source = new System.Windows.Media.Imaging.BitmapImage(uri);
+                    Img_CountryFlag.ToolTip = countryName;
+                    Img_CountryFlag.Visibility = Visibility.Visible;
+                    L_CountryLabel.Visibility = Visibility.Collapsed;
+                    return;
+                }
+                catch { }
+            }
+            Img_CountryFlag.Visibility = Visibility.Collapsed;
+            L_CountryLabel.Visibility = Visibility.Visible;
         }
 
         private void ApplySelectedCallsignSuggestion()
         {
-            string selected = LB_DXCallsignSuggestions.SelectedItem as string;
+            string selected = (LB_DXCallsignSuggestions.SelectedItem as CallsignSuggestionItem)?.FullCallsign;
             if (string.IsNullOrWhiteSpace(selected)) return;
 
             isApplyingSuggestion = true;
@@ -2644,6 +2824,24 @@ namespace HolyLogger
         private void LB_DXCallsignSuggestions_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
             ApplySelectedCallsignSuggestion();
+        }
+
+        private class CallsignSuggestionItem
+        {
+            public string Before { get; set; }
+            public string Match { get; set; }
+            public string After { get; set; }
+            public string FullCallsign => Before + Match + After;
+        }
+
+        private CallsignSuggestionItem BuildSuggestionItem(string callsign, string matchTerm, int matchStart)
+        {
+            return new CallsignSuggestionItem
+            {
+                Before = callsign.Substring(0, matchStart),
+                Match = callsign.Substring(matchStart, matchTerm.Length),
+                After = callsign.Substring(matchStart + matchTerm.Length)
+            };
         }
 
         private int NormalizeCallsignSuggestionRows(int rows)
