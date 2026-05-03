@@ -157,7 +157,7 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
-    <SplashScreen Include="Images\splash.png" />
+    <Resource Include="Images\splash.png" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
