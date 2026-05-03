@@ -2669,7 +2669,7 @@ namespace HolyLogger
             Point dxCallPosition = TB_DXCallsign.TranslatePoint(new Point(0, 0), this);
             CallsignSuggestionsPopup.PlacementTarget = this;
             CallsignSuggestionsPopup.Placement = PlacementMode.Relative;
-            CallsignSuggestionsPopup.HorizontalOffset = dxCallPosition.X + TB_DXCallsign.ActualWidth;
+            CallsignSuggestionsPopup.HorizontalOffset = dxCallPosition.X + TB_DXCallsign.ActualWidth - 8;
             CallsignSuggestionsPopup.VerticalOffset = dxCallPosition.Y;
 
             LB_DXCallsignSuggestions.ItemsSource = matches;
