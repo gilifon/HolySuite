@@ -193,3 +193,14 @@ ModelManifest.xml
 
 # Local backup archives
 conflicted-files-*.zip
+# Installer executables
+*.exe
+
+# Large data files
+HolyLogger/l_amat/
+HolyLogger/l_amat.zip
+HolyLogger/MASTER.SCP
+HolyLogger/SCP.DB
+HolyLogger/lotw-user-activity.csv
+HolyLogger/AGMemberList.txt
+HolyLogger/*_wpftmp.csproj
