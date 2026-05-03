@@ -2,7 +2,7 @@
 ; Installs HolyLogger to Program Files and creates Start Menu + Desktop shortcuts
 
 !define APPNAME "HolyLogger"
-!define APPVERSION "8.1.6"
+!define APPVERSION "8.1.7"
 !define MANUFACTURER "4Z1KD"
 !define INSTALL_DIR "$PROGRAMFILES\${MANUFACTURER}\${APPNAME}"
 !define SOURCE_DIR "HolyLogger\bin\x86\Release"
