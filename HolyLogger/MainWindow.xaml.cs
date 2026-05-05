@@ -2829,9 +2829,16 @@ namespace HolyLogger
             CallsignSuggestionsPopup.IsOpen = false;
         }
 
-        private void LB_DXCallsignSuggestions_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void LB_DXCallsignSuggestions_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            ApplySelectedCallsignSuggestion();
+            var source = e.OriginalSource as DependencyObject;
+            var item = ItemsControl.ContainerFromElement(LB_DXCallsignSuggestions, source) as ListBoxItem;
+            if (item?.DataContext is CallsignSuggestionItem clicked)
+            {
+                LB_DXCallsignSuggestions.SelectedItem = clicked;
+                ApplySelectedCallsignSuggestion();
+                e.Handled = true;
+            }
         }
 
         private void LB_DXCallsignSuggestions_MouseDoubleClick(object sender, MouseButtonEventArgs e)

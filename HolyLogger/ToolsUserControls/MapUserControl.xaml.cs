@@ -88,10 +88,10 @@ namespace HolyLogger.ToolsUserControls
   #compass-ctrl {
     position:absolute; top:0; left:0; z-index:1000;
     display:flex; flex-direction:column; align-items:center;
-    background:linear-gradient(180deg, rgba(255,255,255,0.92), rgba(238,247,246,0.9));
-    border:1px solid #5f7a7b; padding:3px 4px 2px 4px;
+    background:transparent;
+    border:none; padding:2px 2px 1px 2px;
     border-radius:0; font-family:Segoe UI, Tahoma, sans-serif;
-    box-shadow:0 1px 4px rgba(0,0,0,0.25);
+    box-shadow:none;
   }
   #compass-ring {
     width:74px; height:74px; border:2px solid #25464a; border-radius:50%;
@@ -101,8 +101,12 @@ namespace HolyLogger.ToolsUserControls
   #compass-svg { width:100%; height:100%; display:block; }
   #compass-needle { transform-origin:50px 50px; }
   #compass-text {
-    margin-top:2px; font-size:11px; font-weight:700; color:#18393c;
+    margin-top:2px; font-size:13px; font-weight:700; color:#18393c;
     letter-spacing:0.3px;
+    background:rgba(255,255,255,0.88);
+    border:1px solid rgba(36,77,80,0.45);
+    border-radius:10px;
+    padding:2px 7px;
   }
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000;
@@ -167,22 +171,30 @@ namespace HolyLogger.ToolsUserControls
 </div>
 <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
 <script>
+window.onerror = function() { return true; };
 var homeLat = " + latStr + @", homeLon = " + lonStr + @";
 var azimuthDeg = " + azimuthJs + @";
-var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([homeLat, homeLon], 8);
+var radiusMeters = " + radiusMeters + @";
+var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([homeLat, homeLon], 5);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
 L.marker([homeLat, homeLon]).addTo(map);
-var rangeCircle = L.circle([homeLat, homeLon], { radius: " + radiusMeters + @", color: '#E53935', fill: false, weight: 2 }).addTo(map);
-map.fitBounds(rangeCircle.getBounds(), { padding: [10, 10] });
+
+// Create visible red circle to show the search radius
+var radiusCircle = L.circle([homeLat, homeLon], { radius: radiusMeters, color: '#E53935', fill: false, weight: 2 }).addTo(map);
+map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
 
 document.getElementById('compass-text').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
 document.getElementById('compass-needle').setAttribute('transform', 'rotate(' + azimuthDeg + ' 50 50)');
 
 function onRadiusChange(km) {
+    radiusMeters = km * 1000; // Convert km to meters and update immediately
+    radiusCircle.setRadius(radiusMeters);
+    map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
     try { window.external.SetRadius(km); } catch(e) {}
 }
 function recenter() {
-    map.fitBounds(rangeCircle.getBounds(), { padding: [10, 10] });
+    radiusCircle.setRadius(radiusMeters);
+    map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
 }
 </script>
 </body>
