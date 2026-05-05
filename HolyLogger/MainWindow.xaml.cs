@@ -2376,6 +2376,11 @@ namespace HolyLogger
                     ApplySelectedCallsignSuggestion();
                     e.Handled = true;
                 }
+                else if (Properties.Settings.Default.AddQSOWithEnter || !Properties.Settings.Default.DoNothing)
+                {
+                    AddBtn_Click(null, null);
+                    e.Handled = true;
+                }
             }
             else if (e.Key == Key.Escape)
             {
