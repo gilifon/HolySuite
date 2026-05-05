@@ -2661,12 +2661,21 @@ namespace HolyLogger
                 int index = callsignIndex.BinarySearch(prefix, StringComparer.Ordinal);
                 if (index < 0) index = ~index;
 
-                for (int i = index; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
+                // Two-pass: collect non-slash matches first, then slash matches.
+                var slashMatches = new List<CallsignSuggestionItem>();
+                for (int i = index; i < callsignIndex.Count; i++)
                 {
                     string call = callsignIndex[i];
                     if (!call.StartsWith(prefix, StringComparison.Ordinal)) break;
-                    matches.Add(BuildSuggestionItem(call, prefix, 0));
+                    if (call.Contains('/'))
+                        slashMatches.Add(BuildSuggestionItem(call, prefix, 0));
+                    else if (matches.Count < maxCallsignSuggestions)
+                        matches.Add(BuildSuggestionItem(call, prefix, 0));
                 }
+                // Fill remaining slots with slash matches
+                int remaining = maxCallsignSuggestions - matches.Count;
+                if (remaining > 0)
+                    matches.AddRange(slashMatches.Take(remaining));
             }
 
             // Show suggestions to the right of the DX callsign textbox, same vertical level.
