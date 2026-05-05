@@ -62,7 +62,7 @@ namespace HolyLogger.ToolsUserControls
             string latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
             int radiusMeters = radiusKm * 1000;
-            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 5000 };
+            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000 };
           string azimuthJs = "0";
           if (azimuthDeg.HasValue)
           {

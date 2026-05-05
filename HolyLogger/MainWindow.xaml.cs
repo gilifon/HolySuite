@@ -3066,7 +3066,7 @@ namespace HolyLogger
             int radiusKm = Properties.Settings.Default.MapRadiusKm;
             if (radiusKm < 100 || radiusKm > 5000)
             {
-                return 1000;
+                return 3500;
             }
 
             return radiusKm;
