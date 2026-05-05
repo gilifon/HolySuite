@@ -311,6 +311,9 @@ namespace HolyLogger
                 Properties.Settings.Default.UpdateSettings = false;
                 Properties.Settings.Default.Save();
             }
+
+            NormalizeEnterKeyBehaviorSettings();
+
             if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
             {
                 NotifyVersionUpToDate = false;
@@ -424,6 +427,24 @@ namespace HolyLogger
 
             NewDXCCTimer.Interval = 2500;    // or whatever you need it to be
             NewDXCCTimer.Tick += NewDXCCTimer_Tick;
+        }
+
+        private void NormalizeEnterKeyBehaviorSettings()
+        {
+            bool addQsoWithEnter = Properties.Settings.Default.AddQSOWithEnter;
+            bool doNothing = Properties.Settings.Default.DoNothing;
+
+            // Keep the Enter behavior options mutually exclusive and never both unchecked.
+            if (!addQsoWithEnter && !doNothing)
+            {
+                Properties.Settings.Default.DoNothing = true;
+                Properties.Settings.Default.Save();
+            }
+            else if (addQsoWithEnter && doNothing)
+            {
+                Properties.Settings.Default.DoNothing = false;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private async void StartUDPClient(IAsyncResult res)
