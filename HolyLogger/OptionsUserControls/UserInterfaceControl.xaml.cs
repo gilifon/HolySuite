@@ -66,5 +66,6 @@ namespace HolyLogger.OptionsUserControls
                 HasChanged = true;
             }
         }
+
     }
 }

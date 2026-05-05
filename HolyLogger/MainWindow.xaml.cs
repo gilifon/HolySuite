@@ -317,6 +317,7 @@ namespace HolyLogger
             }
             this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
+            Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
 
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
             L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
@@ -578,12 +579,12 @@ namespace HolyLogger
         {
             if (Properties.Settings.Default.IsShowAzimuthControl)
             {
-                AzimuthControl.Visibility = Visibility.Visible;
-                this.MinWidth = 1040;
+                MapControl.Visibility = Visibility.Visible;
+                this.MinWidth = 1120;
             }
             else
             {
-                AzimuthControl.Visibility = Visibility.Hidden;
+                MapControl.Visibility = Visibility.Hidden;
                 this.MinWidth = 800;
             }
         }
@@ -600,6 +601,9 @@ namespace HolyLogger
 
             if (Properties.Settings.Default.ShowTitleClock)
                 StartUTCTimer();
+
+            MapControl.RadiusChanged += OnMapRadiusChanged;
+            ShowHomeMap();
         }
 
         private void StartUTCTimer()
@@ -2941,8 +2945,19 @@ namespace HolyLogger
                 {
                     Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, QRZGrid);
                     var distance = MaidenheadLocator.Distance(TB_MyLocator.Text, QRZGrid);
-                    AzimuthControl.azimuthData.Azimuth = Azimuth;
-                    AzimuthControl.azimuthData.Distance = distance;
+                    int mapRadiusKm = GetMapRadiusKm();
+                    double mapLat, mapLon;
+                    if (!string.IsNullOrWhiteSpace(QRZLat) && !string.IsNullOrWhiteSpace(QRZLon) &&
+                        double.TryParse(QRZLat, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out mapLat) &&
+                        double.TryParse(QRZLon, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out mapLon))
+                    {
+                        MapControl.ShowMap(mapLat, mapLon, mapRadiusKm, Azimuth);
+                    }
+                    else if (!string.IsNullOrWhiteSpace(QRZGrid))
+                    {
+                        var ll = MaidenheadLocator.LocatorToLatLng(QRZGrid);
+                        MapControl.ShowMap(ll.Lat, ll.Long, mapRadiusKm, Azimuth);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -2971,8 +2986,49 @@ namespace HolyLogger
         private void ClearAzimuth()
         {
             Azimuth = 0;
-            AzimuthControl.azimuthData.Azimuth = Azimuth;
-            AzimuthControl.azimuthData.Distance = 0;
+            ShowHomeMap();
+        }
+
+        private void ShowHomeMap()
+        {
+            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text))
+            {
+                try
+                {
+                    var ll = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
+                    MapControl.ShowMap(ll.Lat, ll.Long, GetMapRadiusKm());
+                }
+                catch { }
+            }
+        }
+
+        private int GetMapRadiusKm()
+        {
+            int radiusKm = Properties.Settings.Default.MapRadiusKm;
+            if (radiusKm < 100 || radiusKm > 5000)
+            {
+                return 1000;
+            }
+
+            return radiusKm;
+        }
+
+        private void OnMapRadiusChanged(int radiusKm)
+        {
+            if (Properties.Settings.Default.MapRadiusKm != radiusKm)
+            {
+                Properties.Settings.Default.MapRadiusKm = radiusKm;
+                Properties.Settings.Default.Save();
+            }
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (MapControl != null && MapControl.Visibility == Visibility.Visible)
+                    SetAzimuth();
+            }), DispatcherPriority.Background);
+        }
+
+        private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
         }
 
         private async void GetQrzData()

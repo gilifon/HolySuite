@@ -7,7 +7,7 @@
         xmlns:gif="http://wpfanimatedgif.codeplex.com"
         xmlns:ToolsUserControls="clr-namespace:HolyLogger.ToolsUserControls"
         x:Class="HolyLogger.MainWindow"
-        Title="HolyLogger" Height="660" MinHeight="560" Width="1020" MinWidth="800" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
+        Title="HolyLogger" Height="660" MinHeight="560" Width="1160" MinWidth="800" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
 
     <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
@@ -487,7 +487,7 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <ToolsUserControls:AzimuthUserControl x:Name="AzimuthControl" HorizontalAlignment="Left" Height="220" Width="220" Margin="785,10,0,0" Grid.Row="1" VerticalAlignment="Top"/>
+        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
         <Label Content="Operator Callsign" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your Personal Callsign" />
         <TextBox x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="139,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="107" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Operator, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="10" TabIndex="4"/>
 

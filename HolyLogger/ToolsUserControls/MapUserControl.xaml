@@ -1,0 +1,16 @@
+<UserControl x:Class="HolyLogger.ToolsUserControls.MapUserControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             mc:Ignorable="d"
+             d:DesignHeight="220" d:DesignWidth="220">
+    <Grid>
+        <WebBrowser x:Name="MapBrowser" />
+        <Border x:Name="PlaceholderPanel" Background="#E3F2FD">
+            <TextBlock Text="Map will appear&#x0a;after callsign lookup"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       TextAlignment="Center" Foreground="#90A4AE" FontSize="13"/>
+        </Border>
+    </Grid>
+</UserControl>

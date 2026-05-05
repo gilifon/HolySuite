@@ -29,6 +29,16 @@ namespace HolyLogger
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // Enable IE11 rendering mode for the WebBrowser control (required for Leaflet.js map)
+            try
+            {
+                string exeName = System.IO.Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+                Microsoft.Win32.Registry.SetValue(
+                    @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION",
+                    exeName, 11001, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+
             bool aIsNewInstance = false;
             myMutex = new Mutex(true, "HolyLoggerApplication", out aIsNewInstance);
             if (!aIsNewInstance)
