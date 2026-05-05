@@ -2939,25 +2939,37 @@ namespace HolyLogger
 
         private void SetAzimuth()
         {
-            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text) && !string.IsNullOrWhiteSpace(QRZGrid))
+            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 try
                 {
-                    Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, QRZGrid);
-                    var distance = MaidenheadLocator.Distance(TB_MyLocator.Text, QRZGrid);
+                    // Priority for map center:
+                    // 1. QRZ grid — the station's declared operating grid square
+                    // 2. DXCC entity locator — country-level fallback
+                    // Note: QRZ lat/lon is intentionally skipped — it reflects the
+                    //       operator's home address which can be in a different country.
+                    string locator = null;
+
+                    if (!string.IsNullOrWhiteSpace(QRZGrid))
+                        locator = QRZGrid;
+
+                    if (string.IsNullOrWhiteSpace(locator))
+                    {
+                        DXCC entityDXCC = rem.GetDXCC(TB_DXCallsign.Text);
+                        if (entityDXCC != null && !string.IsNullOrWhiteSpace(entityDXCC.Locator))
+                            locator = entityDXCC.Locator;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(locator))
+                    {
+                        ClearAzimuth();
+                        return;
+                    }
+
+                    Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, locator);
                     int mapRadiusKm = GetMapRadiusKm();
-                    double mapLat, mapLon;
-                    if (!string.IsNullOrWhiteSpace(QRZLat) && !string.IsNullOrWhiteSpace(QRZLon) &&
-                        double.TryParse(QRZLat, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out mapLat) &&
-                        double.TryParse(QRZLon, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out mapLon))
-                    {
-                        MapControl.ShowMap(mapLat, mapLon, mapRadiusKm, Azimuth);
-                    }
-                    else if (!string.IsNullOrWhiteSpace(QRZGrid))
-                    {
-                        var ll = MaidenheadLocator.LocatorToLatLng(QRZGrid);
-                        MapControl.ShowMap(ll.Lat, ll.Long, mapRadiusKm, Azimuth);
-                    }
+                    var ll = MaidenheadLocator.LocatorToLatLng(locator);
+                    MapControl.ShowMap(ll.Lat, ll.Long, mapRadiusKm, Azimuth);
                 }
                 catch (Exception e)
                 {
