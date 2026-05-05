@@ -236,6 +236,7 @@ namespace HolyLogger
         private const int MaxCallsignSuggestionRows = 30;
         private const double CallsignSuggestionRowHeight = 22;
         private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
+        private bool callsignSuggestionMouseControl = false;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
@@ -2349,18 +2350,23 @@ namespace HolyLogger
 
         private void TB_DXCallsign_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
+            if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0 && !callsignSuggestionMouseControl)
             {
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
                 ApplyHighlightedCallsignSuggestionToTextBox();
                 e.Handled = true;
             }
-            else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
+            else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0 && !callsignSuggestionMouseControl)
             {
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
                 ApplyHighlightedCallsignSuggestionToTextBox();
+                e.Handled = true;
+            }
+            else if ((e.Key == Key.Down || e.Key == Key.Up) && CallsignSuggestionsPopup.IsOpen && callsignSuggestionMouseControl)
+            {
+                // While mouse owns the list selection, block arrow-key navigation updates.
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
@@ -2491,6 +2497,8 @@ namespace HolyLogger
                 UpdateCallsignSuggestions();
             }
 
+            // Clear stale values from the previously highlighted callsign until new data is loaded.
+            FName = string.Empty;
             ClearDXLocator();
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
@@ -2515,8 +2523,6 @@ namespace HolyLogger
                 QRZGrid = dXCC.Locator;
                 Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
                 SetAzimuth();
-                if (Properties.Settings.Default.UseDXCCDefaultGrid)
-                    SetDXLocator(QRZGrid);
                 if (state == State.New)
                     GetQrzData();
                 UpdateMatrix();
@@ -2531,6 +2537,7 @@ namespace HolyLogger
         
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
+            callsignSuggestionMouseControl = false;
             CallsignSuggestionsPopup.IsOpen = false;
             TB_Exchange.Focusable = true;
         }
@@ -2687,6 +2694,7 @@ namespace HolyLogger
 
             LB_DXCallsignSuggestions.ItemsSource = matches;
             LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
+            callsignSuggestionMouseControl = false;
             CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown;
 
             if (!Properties.Settings.Default.ShowCallsignDropdown && prefix.StartsWith("*", StringComparison.Ordinal))
@@ -2835,10 +2843,32 @@ namespace HolyLogger
             var item = ItemsControl.ContainerFromElement(LB_DXCallsignSuggestions, source) as ListBoxItem;
             if (item?.DataContext is CallsignSuggestionItem clicked)
             {
+                callsignSuggestionMouseControl = true;
                 LB_DXCallsignSuggestions.SelectedItem = clicked;
                 ApplySelectedCallsignSuggestion();
                 e.Handled = true;
             }
+        }
+
+        private void LB_DXCallsignSuggestions_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            var source = e.OriginalSource as DependencyObject;
+            var item = ItemsControl.ContainerFromElement(LB_DXCallsignSuggestions, source) as ListBoxItem;
+            if (item?.DataContext is CallsignSuggestionItem hovered)
+            {
+                callsignSuggestionMouseControl = true;
+                if (!Equals(LB_DXCallsignSuggestions.SelectedItem, hovered))
+                {
+                    LB_DXCallsignSuggestions.SelectedItem = hovered;
+                    ApplyHighlightedCallsignSuggestionToTextBox();
+                }
+            }
+        }
+
+        private void LB_DXCallsignSuggestions_MouseLeave(object sender, MouseEventArgs e)
+        {
+            // Keep the last highlighted row selected, but give arrow-key control back to keyboard.
+            callsignSuggestionMouseControl = false;
         }
 
         private void LB_DXCallsignSuggestions_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -2985,7 +3015,8 @@ namespace HolyLogger
                     Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, locator);
                     int mapRadiusKm = GetMapRadiusKm();
                     var ll = MaidenheadLocator.LocatorToLatLng(locator);
-                    MapControl.ShowMap(ll.Lat, ll.Long, mapRadiusKm, Azimuth);
+                    var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
+                    MapControl.ShowMap(ll.Lat, ll.Long, mapRadiusKm, Azimuth, homell.Lat, homell.Long);
                 }
                 catch (Exception e)
                 {

@@ -38,13 +38,13 @@ namespace HolyLogger.ToolsUserControls
             MapBrowser.LoadCompleted += (s, e) => SuppressScriptErrors();
         }
 
-        public void ShowMap(double lat, double lon, int radiusKm, double? azimuthDeg = null)
+        public void ShowMap(double lat, double lon, int radiusKm, double? azimuthDeg = null, double? homeLat = null, double? homeLon = null)
         {
             _currentLat = lat;
             _currentLon = lon;
             _currentRadiusKm = radiusKm;
             PlaceholderPanel.Visibility = System.Windows.Visibility.Collapsed;
-          string html = BuildMapHtml(lat, lon, radiusKm, azimuthDeg);
+          string html = BuildMapHtml(lat, lon, radiusKm, azimuthDeg, homeLat, homeLon);
             File.WriteAllText(_tempMapFile, html, System.Text.Encoding.UTF8);
             var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
             uriBuilder.Query = "v=" + DateTime.UtcNow.Ticks.ToString();
@@ -57,7 +57,7 @@ namespace HolyLogger.ToolsUserControls
             MapBrowser.NavigateToString("<html><body style='background:#E3F2FD;margin:0'></body></html>");
         }
 
-        private string BuildMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg)
+        private string BuildMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null)
         {
             string latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -70,8 +70,8 @@ namespace HolyLogger.ToolsUserControls
             if (normalizedAzimuth < 0)
               normalizedAzimuth += 360;
             azimuthJs = normalizedAzimuth.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
-          }
-            var options = new System.Text.StringBuilder();
+          }            string homeLatJs = homeLat.HasValue ? homeLat.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null";
+            string homeLonJs = homeLon.HasValue ? homeLon.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null";            var options = new System.Text.StringBuilder();
             foreach (int r in radiiOptions)
                 options.AppendFormat("<option value='{0}'{1}>{0} km</option>", r, r == radiusKm ? " selected" : "");
 
@@ -182,6 +182,15 @@ L.marker([homeLat, homeLon]).addTo(map);
 // Create visible red circle to show the search radius
 var radiusCircle = L.circle([homeLat, homeLon], { radius: radiusMeters, color: '#E53935', fill: false, weight: 2 }).addTo(map);
 map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+
+// Draw line from operator home to DX station if home location is known
+var operatorLat = " + homeLatJs + @";
+var operatorLon = " + homeLonJs + @";
+if (operatorLat !== null && operatorLon !== null) {
+    var homeIcon = L.divIcon({ className: '', html: '<div style=""width:10px;height:10px;background:#1565C0;border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,0.6)""></div>', iconAnchor:[5,5] });
+    L.marker([operatorLat, operatorLon], { icon: homeIcon }).addTo(map);
+    L.polyline([[operatorLat, operatorLon], [homeLat, homeLon]], { color: '#1565C0', weight: 2, dashArray: '6,5', opacity: 0.8 }).addTo(map);
+}
 
 document.getElementById('compass-text').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
 document.getElementById('compass-needle').setAttribute('transform', 'rotate(' + azimuthDeg + ' 50 50)');

@@ -9,6 +9,74 @@
         x:Class="HolyLogger.MainWindow"
         Title="HolyLogger" Height="660" MinHeight="560" Width="1160" MinWidth="800" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
 
+    <Window.Resources>
+        <Style x:Key="RaisedActionButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#1E2A34"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#7A95A8"/>
+            <Setter Property="Background" Value="#E8F2FA"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                CornerRadius="4"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                SnapsToDevicePixels="True">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#F7FBFF" Offset="0"/>
+                                    <GradientStop Color="#DCEAF6" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="3" ShadowDepth="1" Opacity="0.35" Color="#6A8296"/>
+                            </Border.Effect>
+                            <ContentPresenter x:Name="ContentHost"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#1F5C8E"/>
+                                <Setter TargetName="ButtonBorder" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#4D9AD8" Offset="0"/>
+                                            <GradientStop Color="#2E76B4" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#486A86"/>
+                                <Setter TargetName="ButtonBorder" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#C9DCEF" Offset="0"/>
+                                            <GradientStop Color="#B5CEE5" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="ButtonBorder" Property="Effect" Value="{x:Null}"/>
+                                <Setter TargetName="ContentHost" Property="Margin" Value="0,1,0,0"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55"/>
+                                <Setter Property="Foreground" Value="#8797A4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
     <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
             <RowDefinition Height="30" />
@@ -240,7 +308,7 @@
         </DockPanel>
 
 
-        <Rectangle Grid.Row="1" Fill="#E3F2FD" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" Margin="0,0,0,0" />
+        <Rectangle Grid.Row="1" Fill="#D2E9FF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" Margin="0,0,0,0" />
         <Label Content="Station Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Callsign used on the air" />
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="125,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="121" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="12" BorderBrush="#FFABADB3" TabIndex="1"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="252,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
@@ -274,7 +342,7 @@
         <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,101,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="12" Foreground="#555555" Visibility="Collapsed"/>
         <Popup x:Name="CallsignSuggestionsPopup" PlacementTarget="{Binding ElementName=TB_DXCallsign}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
             <Border BorderBrush="Gray" BorderThickness="1" Background="White">
-                <ListBox x:Name="LB_DXCallsignSuggestions" Width="160" MaxHeight="440" FontSize="14" PreviewMouseLeftButtonDown="LB_DXCallsignSuggestions_PreviewMouseLeftButtonDown" MouseDoubleClick="LB_DXCallsignSuggestions_MouseDoubleClick">
+                <ListBox x:Name="LB_DXCallsignSuggestions" Width="160" MaxHeight="440" FontSize="14" PreviewMouseMove="LB_DXCallsignSuggestions_PreviewMouseMove" MouseLeave="LB_DXCallsignSuggestions_MouseLeave" PreviewMouseLeftButtonDown="LB_DXCallsignSuggestions_PreviewMouseLeftButtonDown" MouseDoubleClick="LB_DXCallsignSuggestions_MouseDoubleClick">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Template">
@@ -285,7 +353,7 @@
                                         </Border>
                                         <ControlTemplate.Triggers>
                                             <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Bd" Property="Background" Value="#CCE8FF"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="#A9D4FF"/>
                                                 <Setter Property="Foreground" Value="Black"/>
                                             </Trigger>
                                             <MultiTrigger>
@@ -293,7 +361,7 @@
                                                     <Condition Property="IsMouseOver" Value="True"/>
                                                     <Condition Property="IsSelected" Value="False"/>
                                                 </MultiTrigger.Conditions>
-                                                <Setter TargetName="Bd" Property="Background" Value="#CCE8FF"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="#EAF5FF"/>
                                             </MultiTrigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -342,10 +410,9 @@
 
 
         <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,89,0,0" VerticalAlignment="Top" Width="707" Grid.Row="1" />
-        <Button x:Name="AddBtn" Content="Add (F1)" HorizontalAlignment="Left" Margin="640,144,0,0" VerticalAlignment="Top" Width="84" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" />
-        <Button x:Name="ClearBtn" HorizontalAlignment="Left" Margin="640,100,0,0" VerticalAlignment="Top" Width="84" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Left" Padding="6,0,0,0">
+        <Button x:Name="AddBtn" Style="{StaticResource RaisedActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="640,144,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
+        <Button x:Name="ClearBtn" Style="{StaticResource RaisedActionButtonStyle}" HorizontalAlignment="Left" Margin="640,100,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <Image Source="Images/broom.png" Width="18" Height="24" Margin="0,0,16,0" Stretch="Uniform" ToolTip="Set to current time" Cursor="Hand" PreviewMouseLeftButtonUp="RefreshIcon_PreviewMouseUp"/>
                 <TextBlock Text="Clear" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
