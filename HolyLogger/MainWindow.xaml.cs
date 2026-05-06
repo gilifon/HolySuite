@@ -62,6 +62,7 @@ namespace HolyLogger
 
         DataAccess dal;
         EntityResolver rem;
+        private Dictionary<string, string> DxccEntityToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public ObservableCollection<QSO> Qsos;
         public ObservableCollection<QSO> FilteredQsos;
@@ -262,6 +263,7 @@ namespace HolyLogger
 
             Qsos = new ObservableCollection<QSO>();
             rem = new EntityResolver();
+            BuildEntityToIsoMap();
             InitializeComponent();
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
@@ -2523,14 +2525,17 @@ namespace HolyLogger
                 UpdateCallsignSuggestions();
             }
 
-            // Clear stale values from the previously highlighted callsign until new data is loaded.
+            // Clear stale QRZ-derived values from the previously highlighted callsign until new data is loaded.
             FName = string.Empty;
+            QRZGrid = string.Empty;
+            QRZLat = string.Empty;
+            QRZLon = string.Empty;
+            TB_State.Text = string.Empty;
             ClearDXLocator();
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
-                TB_State.Text = "";
                 UpdateCountryFlag(null);
                 ClearAzimuth();
                 ClearMatrix();
@@ -2544,12 +2549,11 @@ namespace HolyLogger
                     RefreshDateTime_Btn_MouseUp(null, null);
                 DXCC dXCC = rem.GetDXCC(TB_DXCallsign.Text);
                 Country = dXCC.Name;
-                UpdateCountryFlag(dXCC.Name);
+                UpdateCountryFlag(dXCC.Name, dXCC.Entity);
                 Continent = dXCC.Continent;
-                QRZGrid = dXCC.Locator;
                 Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
                 SetAzimuth();
-                if (state == State.New)
+                if (state == State.New && isNetworkAvailable)
                     GetQrzData();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
@@ -2826,7 +2830,224 @@ namespace HolyLogger
             {"San Andres & Providencia","co"},{"San Felix & San Ambrosio","cl"},{"Navassa I.","ht"},
         };
 
-        private void UpdateCountryFlag(string countryName)
+        private static readonly Dictionary<string, string> DxccNameToIsoNormalized = BuildNormalizedCountryIsoMap();
+
+        private static Dictionary<string, string> BuildNormalizedCountryIsoMap()
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var kv in DxccNameToIso)
+            {
+                string normalized = NormalizeCountryName(kv.Key);
+                if (!string.IsNullOrWhiteSpace(normalized) && !map.ContainsKey(normalized))
+                {
+                    map[normalized] = kv.Value;
+                }
+            }
+
+            // Common cty.csv naming variants that differ from the UI flag dictionary wording.
+            AddCountryAlias(map, "kingdom of eswatini", "Swaziland");
+            AddCountryAlias(map, "timor leste", "East Timor");
+            AddCountryAlias(map, "dem rep of the congo", "Dem. Rep. Of Congo");
+            AddCountryAlias(map, "peter 1 island", "Peter I I.");
+            AddCountryAlias(map, "north macedonia", "Macedonia");
+            AddCountryAlias(map, "dpr of korea", "North Korea");
+            AddCountryAlias(map, "republic of korea", "South Korea");
+            AddCountryAlias(map, "united states", "United States of America");
+            AddCountryAlias(map, "vatican city", "Vatican");
+
+            return map;
+        }
+
+        private static void AddCountryAlias(Dictionary<string, string> map, string alias, string canonicalName)
+        {
+            if (map == null || string.IsNullOrWhiteSpace(alias) || string.IsNullOrWhiteSpace(canonicalName))
+            {
+                return;
+            }
+
+            string normalizedCanonical = NormalizeCountryName(canonicalName);
+            if (map.TryGetValue(normalizedCanonical, out string isoCode))
+            {
+                string normalizedAlias = NormalizeCountryName(alias);
+                if (!string.IsNullOrWhiteSpace(normalizedAlias) && !map.ContainsKey(normalizedAlias))
+                {
+                    map[normalizedAlias] = isoCode;
+                }
+            }
+        }
+
+        private static string NormalizeCountryName(string value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return string.Empty;
+            }
+
+            string normalized = value.Trim().ToLowerInvariant();
+            normalized = normalized.Replace("&", " and ");
+            normalized = normalized.Replace("'", "");
+            normalized = normalized.Replace(".", " ");
+            normalized = normalized.Replace("-", " ");
+            normalized = normalized.Replace("(", " ");
+            normalized = normalized.Replace(")", " ");
+            normalized = normalized.Replace("/", " ");
+
+            normalized = Regex.Replace(normalized, "\\bis\\b", " islands ");
+            normalized = Regex.Replace(normalized, "\\bi\\b", " island ");
+            normalized = Regex.Replace(normalized, "\\bst\\b", " saint ");
+
+            normalized = Regex.Replace(normalized, "[^a-z0-9]+", " ").Trim();
+            normalized = Regex.Replace(normalized, "\\s+", " ");
+
+            return normalized;
+        }
+
+        private static string ResolveIsoCodeFromCountry(string countryName)
+        {
+            if (string.IsNullOrWhiteSpace(countryName))
+            {
+                return null;
+            }
+
+            if (DxccNameToIso.TryGetValue(countryName, out string isoCode))
+            {
+                return isoCode;
+            }
+
+            string normalized = NormalizeCountryName(countryName);
+            if (!string.IsNullOrWhiteSpace(normalized) && DxccNameToIsoNormalized.TryGetValue(normalized, out isoCode))
+            {
+                return isoCode;
+            }
+
+            return null;
+        }
+
+        private void BuildEntityToIsoMap()
+        {
+            DxccEntityToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+            LoadDxccFlagMapFile(DxccEntityToIso);
+
+            foreach (DXCC dxcc in rem.GetAllDxccs())
+            {
+                if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || DxccEntityToIso.ContainsKey(dxcc.Entity))
+                {
+                    continue;
+                }
+
+                string isoCode = ResolveIsoCodeFromCountry(dxcc.Name);
+                if (!string.IsNullOrWhiteSpace(isoCode))
+                {
+                    DxccEntityToIso[dxcc.Entity] = isoCode;
+                }
+            }
+        }
+
+        private void LoadDxccFlagMapFile(Dictionary<string, string> targetMap)
+        {
+            if (targetMap == null)
+            {
+                return;
+            }
+
+            string path = FindDxccFlagMapPath();
+            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
+            {
+                return;
+            }
+
+            try
+            {
+                foreach (string rawLine in File.ReadAllLines(path))
+                {
+                    if (string.IsNullOrWhiteSpace(rawLine))
+                    {
+                        continue;
+                    }
+
+                    string line = rawLine.Trim();
+                    if (line.StartsWith("#") || line.StartsWith("entity", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    string[] parts = line.Split(',');
+                    if (parts.Length < 3)
+                    {
+                        continue;
+                    }
+
+                    string entityCode = parts[0].Trim();
+                    string isoCode = parts[2].Trim().ToLowerInvariant();
+
+                    if (!string.IsNullOrWhiteSpace(entityCode) && !string.IsNullOrWhiteSpace(isoCode) && !targetMap.ContainsKey(entityCode))
+                    {
+                        targetMap[entityCode] = isoCode;
+                    }
+                }
+            }
+            catch
+            {
+                // If mapping file is malformed/unavailable, fallback mapping remains in effect.
+            }
+        }
+
+        private string FindDxccFlagMapPath()
+        {
+            string baseCandidate = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "dxcc_flag_map.csv");
+            if (File.Exists(baseCandidate))
+            {
+                return baseCandidate;
+            }
+
+            string[] roots = new[]
+            {
+                AppDomain.CurrentDomain.BaseDirectory,
+                Directory.GetCurrentDirectory()
+            };
+
+            foreach (string root in roots)
+            {
+                if (string.IsNullOrWhiteSpace(root))
+                {
+                    continue;
+                }
+
+                DirectoryInfo current = new DirectoryInfo(root);
+                while (current != null)
+                {
+                    string candidate = Path.Combine(current.FullName, "HolyLogger", "Data", "dxcc_flag_map.csv");
+                    if (File.Exists(candidate))
+                    {
+                        return candidate;
+                    }
+
+                    string dataCandidate = Path.Combine(current.FullName, "Data", "dxcc_flag_map.csv");
+                    if (File.Exists(dataCandidate))
+                    {
+                        return dataCandidate;
+                    }
+
+                    current = current.Parent;
+                }
+            }
+
+            return string.Empty;
+        }
+
+        private string ResolveIsoCodeFromEntity(string entityCode)
+        {
+            if (string.IsNullOrWhiteSpace(entityCode))
+            {
+                return null;
+            }
+
+            return DxccEntityToIso.TryGetValue(entityCode, out string isoCode) ? isoCode : null;
+        }
+
+        private void UpdateCountryFlag(string countryName, string entityCode = null)
         {
             if (string.IsNullOrWhiteSpace(countryName))
             {
@@ -2834,7 +3055,9 @@ namespace HolyLogger
                 L_CountryLabel.Visibility = Visibility.Visible;
                 return;
             }
-            if (DxccNameToIso.TryGetValue(countryName, out string isoCode))
+
+            string isoCode = ResolveIsoCodeFromEntity(entityCode) ?? ResolveIsoCodeFromCountry(countryName);
+            if (!string.IsNullOrWhiteSpace(isoCode))
             {
                 try
                 {

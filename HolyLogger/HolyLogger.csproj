@@ -711,6 +711,12 @@
     <Resource Include="Images\flags\za.png" />
     <Resource Include="Images\flags\zm.png" />
     <Resource Include="Images\flags\zw.png" />
+    <Content Include="Data\cty.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="Data\dxcc_flag_map.csv">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="callsigns_merged_big.txt" />
     <Content Include="Server\AddLog.php" />
     <Content Include="Server\addParticipant.php" />
