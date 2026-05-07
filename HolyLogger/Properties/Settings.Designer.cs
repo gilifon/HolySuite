@@ -874,6 +874,18 @@ namespace HolyLogger.Properties {
                 this["MapRadiusKm"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool MapUsePolar {
+            get {
+                return ((bool)(this["MapUsePolar"]));
+            }
+            set {
+                this["MapUsePolar"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

@@ -18,6 +18,11 @@ namespace HolyLogger.ToolsUserControls
             if (int.TryParse(km, out int radiusKm))
                 _owner.RaiseRadiusChanged(radiusKm);
         }
+
+        public void ToggleProjection()
+        {
+            _owner.ToggleProjection();
+        }
     }
 
     public partial class MapUserControl : UserControl
@@ -25,14 +30,25 @@ namespace HolyLogger.ToolsUserControls
         private readonly string _tempMapFile;
         private int _currentRadiusKm = 1000;
         private double _currentLat, _currentLon;
+        private double? _currentAzimuth, _currentHomeLat, _currentHomeLon;
+        private bool _isPolar;
 
         public event Action<int> RadiusChanged;
 
         internal void RaiseRadiusChanged(int km) => RadiusChanged?.Invoke(km);
 
+        internal void ToggleProjection()
+        {
+            _isPolar = !_isPolar;
+          Properties.Settings.Default.MapUsePolar = _isPolar;
+          Properties.Settings.Default.Save();
+            RenderMap();
+        }
+
         public MapUserControl()
         {
             InitializeComponent();
+          _isPolar = Properties.Settings.Default.MapUsePolar;
             _tempMapFile = Path.Combine(Path.GetTempPath(), "holylogger_map.html");
             MapBrowser.ObjectForScripting = new MapScriptHelper(this);
             MapBrowser.LoadCompleted += (s, e) => SuppressScriptErrors();
@@ -43,8 +59,18 @@ namespace HolyLogger.ToolsUserControls
             _currentLat = lat;
             _currentLon = lon;
             _currentRadiusKm = radiusKm;
+            _currentAzimuth = azimuthDeg;
+            _currentHomeLat = homeLat;
+            _currentHomeLon = homeLon;
             PlaceholderPanel.Visibility = System.Windows.Visibility.Collapsed;
-          string html = BuildMapHtml(lat, lon, radiusKm, azimuthDeg, homeLat, homeLon);
+            RenderMap();
+        }
+
+        private void RenderMap()
+        {
+            string html = _isPolar
+                ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon)
+                : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon);
             File.WriteAllText(_tempMapFile, html, System.Text.Encoding.UTF8);
             var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
             uriBuilder.Query = "v=" + DateTime.UtcNow.Ticks.ToString();
@@ -57,12 +83,12 @@ namespace HolyLogger.ToolsUserControls
             MapBrowser.NavigateToString("<html><body style='background:#E3F2FD;margin:0'></body></html>");
         }
 
-        private string BuildMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null)
+        private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null)
         {
             string latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
             int radiusMeters = radiusKm * 1000;
-            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000 };
+            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
           string azimuthJs = "0";
           if (azimuthDeg.HasValue)
           {
@@ -126,11 +152,19 @@ namespace HolyLogger.ToolsUserControls
   }
   #center-btn:hover { background:rgba(220,220,255,0.95); }
   #center-btn svg { width:18px; height:18px; }
+  #proj-btn {
+    position:absolute; top:0; right:0; z-index:1000;
+    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    border-radius:0; padding:3px 7px; cursor:pointer;
+    font-size:12px; font-weight:700; font-family:sans-serif; color:#333;
+  }
+  #proj-btn:hover { background:rgba(220,240,255,0.95); }
 </style>
 <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
 </head>
 <body>
 <div id='map'></div>
+<button id='proj-btn' onclick='toggleProjection()' title='Switch to polar azimuthal map'>&#127757; Polar</button>
 <div id='compass-ctrl'>
   <div id='compass-ring'>
     <svg id='compass-svg' viewBox='0 0 100 100' aria-hidden='true'>
@@ -204,6 +238,243 @@ function onRadiusChange(km) {
 function recenter() {
     radiusCircle.setRadius(radiusMeters);
     map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+}
+function toggleProjection() {
+    try { window.external.ToggleProjection(); } catch(e) {}
+}
+</script>
+</body>
+</html>";
+        }
+
+        private string BuildPolarMapHtml(double dxLat, double dxLon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null)
+        {
+            // Center on home QTH; fall back to DX if no home available.
+            double centerLat = homeLat.HasValue ? homeLat.Value : dxLat;
+            double centerLon = homeLon.HasValue ? homeLon.Value : dxLon;
+            string centerLatJs = centerLat.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string centerLonJs = centerLon.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string dxLatJs = dxLat.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string dxLonJs = dxLon.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string azJs = "0";
+            if (azimuthDeg.HasValue)
+            {
+                double norm = azimuthDeg.Value % 360;
+                if (norm < 0) norm += 360;
+                azJs = norm.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+            }
+            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
+            var options = new System.Text.StringBuilder();
+            foreach (int r in radiiOptions)
+                options.AppendFormat("<option value='{0}'{1}>{0} km</option>", r, r == radiusKm ? " selected" : "");
+
+            return
+@"<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv='X-UA-Compatible' content='IE=edge'/>
+<meta charset='utf-8'/>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#1a2a3a; }
+  svg#polar-svg { width:100%; height:100%; display:block; }
+  #proj-btn {
+    position:absolute; top:0; right:0; z-index:1000;
+    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    padding:3px 7px; cursor:pointer;
+    font-size:12px; font-weight:700; font-family:sans-serif; color:#333;
+  }
+  #az-only {
+    position:absolute; top:-1px; left:-1px; z-index:1000;
+    font-size:14px; font-weight:700; color:#e0f0ff;
+    background:rgba(0,0,0,0.55); border-radius:0; padding:2px 6px;
+    font-family:sans-serif;
+  }
+  #bottom-ctrl {
+    position:absolute; bottom:0; left:0; z-index:1000;
+  }
+  #radius-ctrl {
+    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    padding:2px 4px; font-size:13px; cursor:pointer;
+  }
+</style>
+</head>
+<body>
+<svg id='polar-svg'></svg>
+<button id='proj-btn' onclick='toggleProjection()'>&#9974; Flat</button>
+<div id='az-only'>AZ 0&deg;</div>
+<div id='bottom-ctrl'>
+  <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
+</div>
+<script src='https://d3js.org/d3.v5.min.js'></script>
+<script src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'></script>
+<script>
+window.onerror = function() { return true; };
+
+var centerLat = " + centerLatJs + @";
+var centerLon = " + centerLonJs + @";
+var dxLat    = " + dxLatJs + @";
+var dxLon    = " + dxLonJs + @";
+var azimuthDeg = " + azJs + @";
+var radiusKm   = " + radiusKm.ToString() + @";
+var EARTH_KM   = 6371;
+
+// Azimuth label (polar mode has no compass ring)
+document.getElementById('az-only').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
+
+// SVG setup
+var W = window.innerWidth, H = window.innerHeight;
+var mapR = Math.floor((Math.min(W, H) / 2) - 4);
+var cx = W / 2, cy = H / 2;
+
+var svg = d3.select('#polar-svg').attr('width', W).attr('height', H);
+
+// Define clip path first so all subsequent elements can reference it
+var defs = svg.append('defs');
+defs.append('clipPath').attr('id', 'globe-clip')
+    .append('circle').attr('cx', cx).attr('cy', cy).attr('r', mapR - 1);
+
+var projection = d3.geoAzimuthalEquidistant()
+    .rotate([-centerLon, -centerLat])
+    .scale(mapR / Math.PI)
+    .translate([cx, cy])
+    .clipAngle(180);
+
+var path = d3.geoPath().projection(projection);
+var baseScale = mapR / Math.PI;
+
+function updateProjectionScaleFromRadius() {
+  var ang = radiusKm / EARTH_KM;
+  if (!isFinite(ang) || ang <= 0) {
+    projection.scale(baseScale);
+    return;
+  }
+  // Selected radius should reach the visible edge of the map.
+  var targetPx = mapR - 1;
+  var desiredScale = targetPx / ang;
+  var maxScale = baseScale * 35;
+  if (desiredScale > maxScale) desiredScale = maxScale;
+  projection.scale(desiredScale);
+}
+
+updateProjectionScaleFromRadius();
+
+// Ocean fill
+svg.append('circle')
+    .attr('cx', cx).attr('cy', cy).attr('r', mapR)
+    .attr('fill', '#4a90c4').attr('stroke', '#1a4060').attr('stroke-width', 2);
+
+// Layer for countries (inserted before overlays)
+var countriesG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
+
+// Graticule
+svg.append('path')
+    .datum(d3.geoGraticule().step([30, 30])())
+  .attr('class', 'graticule-path')
+    .attr('d', path)
+    .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.15)').attr('stroke-width', 0.7)
+    .attr('clip-path', 'url(#globe-clip)');
+
+// Distance rings layer (above countries)
+var ringsG = svg.append('g');
+function drawRings() {
+    ringsG.selectAll('*').remove();
+  var ringKms = [];
+  for (var i = 1; i <= 5; i++) {
+    ringKms.push(Math.round((radiusKm * i) / 5));
+  }
+    ringKms.forEach(function(km) {
+        var ang = km / EARTH_KM;
+        if (ang >= Math.PI) return;
+        var r = projection.scale() * ang;
+        ringsG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r)
+            .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.18)')
+            .attr('stroke-width', 1).attr('stroke-dasharray', '4,3');
+        ringsG.append('text').attr('x', cx + 3).attr('y', cy - r - 2)
+            .attr('fill', 'rgba(255,255,255,0.4)').attr('font-size', '9px').text(km + ' km');
+    });
+}
+drawRings();
+
+// Radius ring
+function drawRadiusRing(km) {
+    svg.selectAll('.radius-ring').remove();
+    var ang = km / EARTH_KM;
+    if (ang < Math.PI) {
+        var r = projection.scale() * ang;
+        svg.append('circle').attr('class', 'radius-ring')
+            .attr('cx', cx).attr('cy', cy).attr('r', r)
+            .attr('fill', 'none').attr('stroke', '#E53935').attr('stroke-width', 2);
+    }
+}
+drawRadiusRing(radiusKm);
+
+// Overlays layer (always on top)
+var overlaysG = svg.append('g');
+function drawOverlays() {
+    overlaysG.selectAll('*').remove();
+
+    // Great-circle line home -> DX
+    try {
+        var gcLine = { type: 'LineString', coordinates: [[centerLon, centerLat], [dxLon, dxLat]] };
+        overlaysG.append('path').datum(gcLine).attr('d', path)
+            .attr('fill', 'none').attr('stroke', '#90CAF9').attr('stroke-width', 2.5)
+            .attr('stroke-dasharray', '7,4').attr('clip-path', 'url(#globe-clip)');
+    } catch(e2) {}
+
+    // Home dot at center
+    overlaysG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 5)
+      .attr('fill', '#1565C0').attr('stroke', 'none');
+
+    // DX dot
+    try {
+        var dxPt = projection([dxLon, dxLat]);
+        if (dxPt && isFinite(dxPt[0]) && isFinite(dxPt[1])) {
+            overlaysG.append('circle')
+            .attr('cx', dxPt[0]).attr('cy', dxPt[1]).attr('r', 4)
+            .attr('fill', '#E53935').attr('stroke', 'none');
+        }
+    } catch(e3) {}
+
+    // Outer border ring
+    overlaysG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', mapR)
+        .attr('fill', 'none').attr('stroke', '#2a607a').attr('stroke-width', 2);
+}
+drawOverlays();
+
+// Load world countries via XHR (IE11-safe, no Promise)
+var xhr = new XMLHttpRequest();
+xhr.open('GET', 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json', true);
+xhr.onreadystatechange = function() {
+    if (xhr.readyState !== 4) return;
+    if (xhr.status === 200) {
+        try {
+            var world = JSON.parse(xhr.responseText);
+            var features = topojson.feature(world, world.objects.countries).features;
+            countriesG.selectAll('path').data(features).enter().append('path')
+                .attr('d', path)
+                .attr('fill', '#5a8a6a').attr('stroke', '#2a4a3a').attr('stroke-width', 0.5);
+        } catch(e4) {}
+    }
+    // Always redraw overlays on top after countries attempt
+    drawOverlays();
+    drawRadiusRing(radiusKm);
+};
+xhr.onerror = function() { drawOverlays(); };
+try { xhr.send(); } catch(e5) { drawOverlays(); }
+
+function onRadiusChange(km) {
+    radiusKm = parseInt(km, 10);
+  updateProjectionScaleFromRadius();
+  countriesG.selectAll('path').attr('d', path);
+  svg.selectAll('.graticule-path').attr('d', path);
+  drawRings();
+    drawRadiusRing(radiusKm);
+  drawOverlays();
+    try { window.external.SetRadius(km); } catch(e) {}
+}
+function toggleProjection() {
+    try { window.external.ToggleProjection(); } catch(e) {}
 }
 </script>
 </body>
