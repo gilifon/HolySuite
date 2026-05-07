@@ -63,6 +63,7 @@ namespace HolyLogger.ToolsUserControls
             _currentHomeLat = homeLat;
             _currentHomeLon = homeLon;
             PlaceholderPanel.Visibility = System.Windows.Visibility.Collapsed;
+            MapBrowser.Visibility = System.Windows.Visibility.Visible;
             RenderMap();
         }
 
@@ -79,8 +80,15 @@ namespace HolyLogger.ToolsUserControls
 
         public void ClearMap()
         {
+            MapBrowser.Visibility = System.Windows.Visibility.Collapsed;
             PlaceholderPanel.Visibility = System.Windows.Visibility.Visible;
-            MapBrowser.NavigateToString("<html><body style='background:#E3F2FD;margin:0'></body></html>");
+        }
+
+        public void ShowPlaceholder(string message)
+        {
+            PlaceholderText.Text = System.Net.WebUtility.HtmlDecode(message);
+            MapBrowser.Visibility = System.Windows.Visibility.Collapsed;
+            PlaceholderPanel.Visibility = System.Windows.Visibility.Visible;
         }
 
         private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null)
@@ -220,14 +228,38 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 
 
 // Create visible red circle to show the search radius (centered on home)
 var radiusCircle = L.circle([circleLat, circleLon], { radius: radiusMeters, color: '#E53935', fill: false, weight: 2 }).addTo(map);
-map.fitBounds(radiusCircle.getBounds(), { padding: [2, 2] });
+var fitBounds = radiusCircle.getBounds();
+// If DX station is outside the circle, expand bounds to include it
+if (operatorLat !== null && operatorLon !== null) {
+    fitBounds = fitBounds.extend(L.latLng(dxLat, dxLon));
+}
+map.fitBounds(fitBounds, { padding: [2, 2] });
 
-// Draw DX station marker and GC line if home location is known
+// Interpolate N points along a great circle arc (IE11-safe, no external lib)
+function gcArcPoints(lat1, lon1, lat2, lon2, n) {
+    var toRad = Math.PI/180, toDeg = 180/Math.PI;
+    var la1=lat1*toRad, lo1=lon1*toRad, la2=lat2*toRad, lo2=lon2*toRad;
+    var d = 2*Math.asin(Math.sqrt(Math.pow(Math.sin((la2-la1)/2),2)+Math.cos(la1)*Math.cos(la2)*Math.pow(Math.sin((lo2-lo1)/2),2)));
+    if (d < 0.0001) return [[lat1,lon1],[lat2,lon2]];
+    var pts = [];
+    for (var i=0; i<=n; i++) {
+        var f=i/n;
+        var A=Math.sin((1-f)*d)/Math.sin(d), B=Math.sin(f*d)/Math.sin(d);
+        var x=A*Math.cos(la1)*Math.cos(lo1)+B*Math.cos(la2)*Math.cos(lo2);
+        var y=A*Math.cos(la1)*Math.sin(lo1)+B*Math.cos(la2)*Math.sin(lo2);
+        var z=A*Math.sin(la1)+B*Math.sin(la2);
+        pts.push([Math.atan2(z,Math.sqrt(x*x+y*y))*toDeg, Math.atan2(y,x)*toDeg]);
+    }
+    return pts;
+}
+
+// Draw DX station marker and GC arc if home location is known
 if (operatorLat !== null && operatorLon !== null) {
     L.marker([dxLat, dxLon]).addTo(map);
     var homeIcon = L.divIcon({ className: '', html: '<div style=""width:10px;height:10px;background:#1565C0;border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,0.6)""></div>', iconAnchor:[5,5] });
     L.marker([operatorLat, operatorLon], { icon: homeIcon }).addTo(map);
-    L.polyline([[operatorLat, operatorLon], [dxLat, dxLon]], { color: '#1565C0', weight: 2, dashArray: '6,5', opacity: 0.8 }).addTo(map);
+    var arcPts = gcArcPoints(operatorLat, operatorLon, dxLat, dxLon, 100);
+    L.polyline(arcPts, { color: '#1565C0', weight: 2, dashArray: '6,5', opacity: 0.8 }).addTo(map);
 } else {
     L.marker([dxLat, dxLon]).addTo(map);
 }
@@ -235,16 +267,21 @@ if (operatorLat !== null && operatorLon !== null) {
 document.getElementById('compass-text').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
 document.getElementById('compass-needle').setAttribute('transform', 'rotate(' + azimuthDeg + ' 50 50)');
 
+function fitAll() {
+    var b = radiusCircle.getBounds();
+    if (operatorLat !== null && operatorLon !== null) b = b.extend(L.latLng(dxLat, dxLon));
+    map.fitBounds(b, { padding: [2, 2] });
+}
 function onRadiusChange(km) {
-    radiusMeters = km * 1000; // Convert km to meters and update immediately
+    radiusMeters = km * 1000;
     radiusCircle.setRadius(radiusMeters);
-    map.fitBounds(radiusCircle.getBounds(), { padding: [2, 2] });
+    fitAll();
     try { window.external.SetRadius(km); } catch(e) {}
 }
 function recenter() {
     radiusCircle.setLatLng([circleLat, circleLon]);
     radiusCircle.setRadius(radiusMeters);
-    map.fitBounds(radiusCircle.getBounds(), { padding: [2, 2] });
+    fitAll();
 }
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
@@ -326,6 +363,15 @@ var azimuthDeg = " + azJs + @";
 var radiusKm   = " + radiusKm.ToString() + @";
 var EARTH_KM   = 6371;
 
+// GC distance home->DX in km (haversine), so we can expand scale if DX is beyond selected radius
+function haversineKm(lat1, lon1, lat2, lon2) {
+  var toRad = Math.PI / 180;
+  var dLat = (lat2-lat1)*toRad, dLon = (lon2-lon1)*toRad;
+  var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*toRad)*Math.cos(lat2*toRad)*Math.sin(dLon/2)*Math.sin(dLon/2);
+  return EARTH_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+var dxDistKm = haversineKm(centerLat, centerLon, dxLat, dxLon);
+
 // Azimuth label (polar mode has no compass ring)
 document.getElementById('az-only').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
 
@@ -351,13 +397,14 @@ var path = d3.geoPath().projection(projection);
 var baseScale = mapR / Math.PI;
 
 function updateProjectionScaleFromRadius() {
-  var ang = radiusKm / EARTH_KM;
+  // Use whichever is larger: selected radius or actual DX distance — keeps DX dot always visible
+  var effectiveKm = Math.max(radiusKm, dxDistKm);
+  var ang = effectiveKm / EARTH_KM;
   if (!isFinite(ang) || ang <= 0) {
     projection.scale(baseScale);
     return;
   }
-  // Selected radius should reach the visible edge of the map.
-  var targetPx = mapR - 1;
+  var targetPx = mapR - 4;
   var desiredScale = targetPx / ang;
   var maxScale = baseScale * 35;
   if (desiredScale > maxScale) desiredScale = maxScale;

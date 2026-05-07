@@ -965,7 +965,7 @@ namespace HolyLogger
             {
                 OptionsMenuItemMenuItem_Click(null, null);
             }
-            else if ((e.Key == Key.Escape))
+            else if (e.Key == Key.F9 || e.Key == Key.Escape)
             {
                 ClearBtn_Click(null, null);
             }
@@ -2447,7 +2447,7 @@ namespace HolyLogger
             {
                 signboard.signboardData.Square = TB_MyHolyland.Text;
             }
-            
+            ShowHomeMap();
         }
 
         private void TB_Exchange_PreviewTextInput(object sender, TextCompositionEventArgs e)
@@ -3092,6 +3092,7 @@ namespace HolyLogger
 
         private void ShowHomeMap()
         {
+            if (MapControl == null) return;
             if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text))
             {
                 try
@@ -3100,6 +3101,10 @@ namespace HolyLogger
                     MapControl.ShowMap(ll.Lat, ll.Long, GetMapRadiusKm());
                 }
                 catch { }
+            }
+            else
+            {
+                MapControl.ShowPlaceholder("Please set My Locator&#x0a;to enable the map");
             }
         }
 

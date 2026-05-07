@@ -413,7 +413,7 @@
         <Button x:Name="AddBtn" Style="{StaticResource RaisedActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="640,144,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
         <Button x:Name="ClearBtn" Style="{StaticResource RaisedActionButtonStyle}" HorizontalAlignment="Left" Margin="640,100,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                <TextBlock Text="Clear" VerticalAlignment="Center"/>
+                <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
