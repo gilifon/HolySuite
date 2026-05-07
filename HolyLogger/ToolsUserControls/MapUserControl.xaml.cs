@@ -209,21 +209,27 @@ window.onerror = function() { return true; };
 var homeLat = " + latStr + @", homeLon = " + lonStr + @";
 var azimuthDeg = " + azimuthJs + @";
 var radiusMeters = " + radiusMeters + @";
-var map = L.map('map', { zoomControl: false, attributionControl: false }).setView([homeLat, homeLon], 5);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
-L.marker([homeLat, homeLon]).addTo(map);
-
-// Create visible red circle to show the search radius
-var radiusCircle = L.circle([homeLat, homeLon], { radius: radiusMeters, color: '#E53935', fill: false, weight: 2 }).addTo(map);
-map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
-
-// Draw line from operator home to DX station if home location is known
+var dxLat = homeLat, dxLon = homeLon;
 var operatorLat = " + homeLatJs + @";
 var operatorLon = " + homeLonJs + @";
+// Center map and radius circle on operator home; fall back to DX if home unknown
+var circleLat = (operatorLat !== null) ? operatorLat : dxLat;
+var circleLon = (operatorLon !== null) ? operatorLon : dxLon;
+var map = L.map('map', { zoomControl: false, attributionControl: false, zoomSnap: 0 }).setView([circleLat, circleLon], 5);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+
+// Create visible red circle to show the search radius (centered on home)
+var radiusCircle = L.circle([circleLat, circleLon], { radius: radiusMeters, color: '#E53935', fill: false, weight: 2 }).addTo(map);
+map.fitBounds(radiusCircle.getBounds(), { padding: [2, 2] });
+
+// Draw DX station marker and GC line if home location is known
 if (operatorLat !== null && operatorLon !== null) {
+    L.marker([dxLat, dxLon]).addTo(map);
     var homeIcon = L.divIcon({ className: '', html: '<div style=""width:10px;height:10px;background:#1565C0;border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,0.6)""></div>', iconAnchor:[5,5] });
     L.marker([operatorLat, operatorLon], { icon: homeIcon }).addTo(map);
-    L.polyline([[operatorLat, operatorLon], [homeLat, homeLon]], { color: '#1565C0', weight: 2, dashArray: '6,5', opacity: 0.8 }).addTo(map);
+    L.polyline([[operatorLat, operatorLon], [dxLat, dxLon]], { color: '#1565C0', weight: 2, dashArray: '6,5', opacity: 0.8 }).addTo(map);
+} else {
+    L.marker([dxLat, dxLon]).addTo(map);
 }
 
 document.getElementById('compass-text').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
@@ -232,12 +238,13 @@ document.getElementById('compass-needle').setAttribute('transform', 'rotate(' + 
 function onRadiusChange(km) {
     radiusMeters = km * 1000; // Convert km to meters and update immediately
     radiusCircle.setRadius(radiusMeters);
-    map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+    map.fitBounds(radiusCircle.getBounds(), { padding: [2, 2] });
     try { window.external.SetRadius(km); } catch(e) {}
 }
 function recenter() {
+    radiusCircle.setLatLng([circleLat, circleLon]);
     radiusCircle.setRadius(radiusMeters);
-    map.fitBounds(radiusCircle.getBounds(), { padding: [20, 20] });
+    map.fitBounds(radiusCircle.getBounds(), { padding: [2, 2] });
 }
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
