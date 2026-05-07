@@ -238,6 +238,7 @@ namespace HolyLogger
         private const int CallsignLookupDebounceMs = 280;
         private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
         private bool callsignSuggestionMouseControl = false;
+        private HashSet<string> newCallsignsSet = new HashSet<string>(StringComparer.Ordinal);
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
@@ -268,6 +269,7 @@ namespace HolyLogger
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
             LoadCallsignIndex();
+            LoadNewCallsignsSet();
 
             if (Properties.Settings.Default.EnableUDPClient)
             {
@@ -2593,6 +2595,50 @@ namespace HolyLogger
             TB_Exchange.Focusable = true;
         }
 
+        private void AddNewCallsignIfMissing(string bareCallsign)
+        {
+            if (string.IsNullOrWhiteSpace(bareCallsign)) return;
+            string call = bareCallsign.Trim().ToUpperInvariant();
+
+            // Add to in-memory dropdown index if not already there
+            int idx = callsignIndex.BinarySearch(call, StringComparer.Ordinal);
+            if (idx < 0)
+                callsignIndex.Insert(~idx, call);
+
+            // Append to callsigns_new.txt only if not already recorded
+            if (newCallsignsSet.Add(call))
+            {
+                try
+                {
+                    string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsigns_new.txt");
+                    File.AppendAllText(filePath, call + Environment.NewLine);
+                }
+                catch { }
+            }
+        }
+
+        private void LoadNewCallsignsSet()
+        {
+            try
+            {
+                string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsigns_new.txt");
+                if (!File.Exists(filePath)) return;
+
+                var deduped = new List<string>();
+                foreach (var rawLine in File.ReadLines(filePath))
+                {
+                    string call = rawLine.Trim().ToUpperInvariant();
+                    if (string.IsNullOrWhiteSpace(call)) continue;
+                    if (newCallsignsSet.Add(call))
+                        deduped.Add(call);
+                }
+
+                // Rewrite file without duplicates
+                File.WriteAllLines(filePath, deduped);
+            }
+            catch { }
+        }
+
         private void LoadCallsignIndex()
         {
             try
@@ -3220,6 +3266,8 @@ namespace HolyLogger
                                 SetAzimuth();
                                 SetDXLocator(QRZGrid);
                                 //*************************************************//
+
+                                AddNewCallsignIfMissing(bare_dxcall);
 
                                 string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
                                 if (SessionKey != key)
