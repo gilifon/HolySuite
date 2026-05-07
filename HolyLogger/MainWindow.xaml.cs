@@ -235,11 +235,13 @@ namespace HolyLogger
         private const int MinCallsignSuggestionRows = 10;
         private const int MaxCallsignSuggestionRows = 30;
         private const double CallsignSuggestionRowHeight = 22;
+        private const int CallsignLookupDebounceMs = 280;
         private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
         private bool callsignSuggestionMouseControl = false;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
+        DispatcherTimer CallsignLookupDebounceTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
         private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
@@ -297,6 +299,8 @@ namespace HolyLogger
 
             isNetworkAvailable = Helper.CheckForInternetConnection();
             HeartbeatTimer.Tick += HeartbeatTimer_Tick;
+            CallsignLookupDebounceTimer.Interval = TimeSpan.FromMilliseconds(CallsignLookupDebounceMs);
+            CallsignLookupDebounceTimer.Tick += CallsignLookupDebounceTimer_Tick;
             checkForAutoUpload();
             
 
@@ -2528,6 +2532,7 @@ namespace HolyLogger
             ClearDXLocator();
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
+                CallsignLookupDebounceTimer.Stop();
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
                 TB_State.Text = "";
@@ -2548,9 +2553,7 @@ namespace HolyLogger
                 Continent = dXCC.Continent;
                 QRZGrid = dXCC.Locator;
                 Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
-                SetAzimuth();
-                if (state == State.New)
-                    GetQrzData();
+                RestartCallsignLookupDebounce();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
                 {
@@ -2558,6 +2561,28 @@ namespace HolyLogger
                     if (LastQSO != null && Properties.Settings.Default.DisplayLastQSOinGrid) FilteredQsos.Insert(0, LastQSO);
                     DataContext = FilteredQsos;
                 }
+            }
+        }
+
+        private void RestartCallsignLookupDebounce()
+        {
+            CallsignLookupDebounceTimer.Stop();
+            CallsignLookupDebounceTimer.Start();
+        }
+
+        private void CallsignLookupDebounceTimer_Tick(object sender, EventArgs e)
+        {
+            CallsignLookupDebounceTimer.Stop();
+
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            {
+                return;
+            }
+
+            SetAzimuth();
+            if (state == State.New)
+            {
+                GetQrzData();
             }
         }
         
