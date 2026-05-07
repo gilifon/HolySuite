@@ -1,0 +1,343 @@
+Prefix,Entity,Cont,ITUZone,CQZone,UTC,Lat,Long,Col9_ITUAlloc,Col10_Other,Col11_FlagCountry,Col12_FlagFile
+T6,Afghanistan,As,40,21,4.5,35N,69E,"T6, YA",,Afghanistan,af.png
+3B6,Agalega & St. Brandon,Af,53,39,4,10S,57E,,3B7,Mauritius,mu.png
+OH0,Aland Is.,Eu,18,15,2,60N,20E,,,Finland,fi.png
+KL,Alaska,NA,"01, 02",1,-8,58N,134W,,"AL, NL, WL",United States of America,us.png
+ZA,Albania,Eu,28,15,1,41N,20E,ZA,,Albania,al.png
+7X,Algeria,Af,37,33,0,37N,3E,"7R, 7T-7Y",,Algeria,dz.png
+KH8,American Samoa,Oc,62,32,-11,14S,171W,,"AH8, NH8, WH8",United States of America,us.png
+FT_Z,Amsterdam & St. Paul Is.,Af,68,39,5,38S,78E,,TX,France,fr.png
+VU4,Andaman & Nicobar Is.,As,49,26,5.5,12N,93E,,,India,in.png
+C3,Andorra,Eu,27,14,1,43N,2E,C3,,Andorra,ad.png
+D2,Angola,Af,52,36,1,9S,13E,D2-D3,,Angola,ao.png
+VP2E,Anguilla,NA,11,8,-4,18N,63W,,,England,gb.png
+3C0,Pagalu I.,Af,52,36,-1,1S,6E,,,Equatorial Guinea,gq.png
+CE9,Antarctica,An,"67, 69-74","12, 13, 29, 30, 32, 38, 39",0,90S,0W,,"3Y, 4K1, 8J1, AT0, DP0, FT_Y, KC4, LU_Z, OR4, R1AN, VK0, VP8, ZL5, ZS7, ZX0",Chile,cl.png
+V2,Antigua & Barbuda,NA,11,8,-4,17N,62W,V2,,Antigua & Barbuda,ag.png
+LU,Argentina,SA,"14, 16",13,-3,35S,58W,"AY-AZ, LO-LW, L2-L9",,Argentina,ar.png
+EK,Armenia,As,29,21,4,40N,45E,EK,UG,Armenia,am.png
+P4,Aruba,SA,11,9,-4,13N,70W,P4,,Aruba,aw.png
+ZD8,Ascension I.,Af,66,36,0,8S,14W,,,England,gb.png
+FO0,Austral I.,Oc,63,32,-10,23S,149W,,TX,France,fr.png
+VK,Australia,Oc,"55, 58, 59","29, 30",10,35S,149E,"AX, VH-VN, VZ",,Australia,au.png
+OE,Austria,Eu,28,15,1,48N,16E,OE,,Austria,at.png
+YV0,Aves I.,NA,11,8,-4,16N,64W,,,Venezuela,ve.png
+4J,Azerbaijan,As,29,21,4,40N,50E,4J-4K,UD,Azerbaijan,az.png
+CU,Azores,Eu,36,14,-1,38N,26W,,,Portugal,pt.png
+C6,Bahamas,NA,11,8,-5,25N,77W,C6,,Bahamas,bs.png
+A9,Bahrain,As,39,21,4,26N,51E,A9,,Bahrain,bh.png
+KH1,Baker & Howland Is.,Oc,61,31,-12,0N,176W,,"AH1, NH1, WH1",United States of America,us.png
+EA6,Balearic Is.,Eu,37,14,1,38N,3E,,,Spain,es.png
+T33,Banaba I. (Ocean I.),Oc,65,31,11.5,1S,170E,,,C. Kiribati (British Phoenix Is.),ki.png
+S2,Bangladesh,As,41,22,6,24N,90E,S2-S3,,Bangladesh,bd.png
+8P,Barbados,NA,11,8,-4,13N,60W,8P,,Barbados,bb.png
+EV,Belarus,Eu,29,16,2,54N,28E,EU-EW,UC,Belarus,by.png
+ON,Belgium,Eu,27,14,1,51N,4E,ON-OT,,Belgium,be.png
+V3,Belize,NA,11,7,-5.5,17N,89W,V3,,Belize,bz.png
+TY,Benin,Af,46,35,0,6N,3E,TY,,Benin,bj.png
+VP9,Bermuda,NA,11,5,-4,32N,65W,,,England,gb.png
+A5,Bhutan,As,41,22,5.5,28N,90E,A5,,Bhutan,bt.png
+CP,Bolivia,SA,"12, 14",10,-4,17S,68W,CP,,Bolivia,bo.png
+PJ4,Bonaire,SA,11,9,-4,12N,68W,,,Netherlands,nl.png
+E7,Bosnia-Herzegovina,Eu,28,15,1,44N,18E,E7,T9,Bosnia-Herzegovina,ba.png
+A2,Botswana,Af,57,38,2,25S,26E,"8O, A2",,Botswana,bw.png
+3Y,Bouvet,Af,67,38,0,54S,3E,,,Norway,no.png
+VP2V,British Virgin Is.,NA,11,8,-4,18N,65W,,,England,gb.png
+PY,Brazil,SA,"12, 13, 15",11,-3,16S,48W,"PP-PY, ZV-ZZ",,Brazil,br.png
+V8,Brunei Darussalam,Oc,54,28,8,5N,115E,V8,,Brunei Darussalam,bn.png
+LZ,Bulgaria,Eu,28,20,2,43N,23E,LZ,,Bulgaria,bg.png
+XT,Burkina Faso,Af,46,35,0,12N,2W,XT,,Burkina Faso,bf.png
+9U,Burundi,Af,52,36,3,3S,29E,9U,,Burundi,bi.png
+XU,Cambodia,As,49,26,8,12N,105E,XU,,Cambodia,kh.png
+TJ,Cameroon,Af,47,36,1,4N,12E,TJ,,Cameroon,cm.png
+VE,Canada,NA,"02-04, 09, 75",01-מאי,-5,45N,76W,"CF-CK, CY-CZ, VA-VG, VO, VX-VY, XJ-XO","VA, VO, VY",Canada,ca.png
+EA8,Canary Is.,Af,36,33,0,28N,15W,,,Spain,es.png
+D4,Cape Verde,Af,46,35,-2,15N,23W,D4,,Cape Verde,cv.png
+ZF,Cayman Is.,NA,11,8,-5,19N,81W,,,England,gb.png
+TL,Central Africa,Af,47,36,1,5N,19E,TL,,Central Africa,cf.png
+T31,C. Kiribati (British Phoenix Is.),Oc,62,31,12,4S,171W,T3,,C. Kiribati (British Phoenix Is.),ki.png
+EA9,Ceuta & Melilla,Af,37,33,1,36N,5W,,,Spain,es.png
+TT,Chad,Af,47,36,1,12N,15E,TT,,Chad,td.png
+VQ9,Chagos Is.,Af,41,39,5,7S,72E,,,England,gb.png
+ZL7,Chatham Is.,Oc,60,32,12.75,44S,177W,,,New Zealand,nz.png
+FK,Chesterfield Is.,Oc,55,30,11,20S,158E,,TX,France,fr.png
+CE,Chile,SA,"14, 16",12,-4,33S,71W,"3G, CA-CE, XQ-XR",,Chile,cl.png
+BY,China,As,"33, 42-44","23, 24",8,40N,116E,"3H-3U, BA-BZ, VR, XS",,China,cn.png
+VK9X,Christmas I.,Oc,54,29,7,10S,106E,,,Australia,au.png
+FO0,Clipperton I.,NA,10,7,-7,10N,109W,,TX,France,fr.png
+TI9,Cocos I.,NA,11,7,-6,6N,87W,,,Costa Rica,cr.png
+VK9C,Cocos (Keeling) Is.,Oc,54,29,6.5,12S,97E,,VK9Y,Australia,au.png
+HK,Colombia,SA,12,9,-5,5N,74W,"5J-5K, HJ-HK",,Colombia,co.png
+D6,Comoros,Af,53,39,3,12S,43E,D6,,Comoros,km.png
+TN,Congo,Af,52,36,1,4S,15E,TN,,Congo,cg.png
+3D2,Conway Reef,Oc,56,32,12,22S,175E,,,Fiji,fj.png
+TK,Corsica,Eu,28,15,1,42N,9E,,,France,fr.png
+TI,Costa Rica,NA,11,7,-6,10N,84W,"TE, TI",,Costa Rica,cr.png
+SV9,Crete,Eu,28,20,2,36N,24E,,,Greece,gr.png
+9A,Croatia,Eu,28,15,1,46N,16E,9A,,Croatia,hr.png
+FT_W,Crozet I.,Af,68,39,3,46S,52E,,TX,France,fr.png
+CO,Cuba,NA,11,8,-5,23N,82W,"CL-CM, CO, T4",,Cuba,cu.png
+PJ2,Curacao,SA,11,9,-4,12N,69W,,,Netherlands,nl.png
+ZC,UK Sovereign Base Areas on Cyprus,As,39,20,2,35N,33E,,,England,gb.png
+5B,Cyprus,As,39,20,3,35N,33E,"5B, C4, H2, P3",,Cyprus,cy.png
+OK,Czech Republic,Eu,28,15,1,50N,15E,OK-OL,,Czech Republic,cz.png
+9Q,Dem. Rep. Of Congo,Af,52,36,1,4S,15E,9O-9T,,Dem. Rep. Of Congo,cd.png
+OZ,Denmark,Eu,18,14,1,56N,13E,"5P-5Q, OU-OZ, XP",,Denmark,dk.png
+KP5,Desecheo I.,NA,11,8,-4,18N,68W,,"NP5, WP5",United States of America,us.png
+J2,Djibouti,Af,48,37,3,12N,43E,J2,,Djibouti,dj.png
+SV5,Dodecanese,Eu,28,20,2,36N,28E,,,Greece,gr.png
+J7,Dominica,NA,11,8,-4,15N,61W,J7,,Dominica,dm.png
+HI,Dominican Republic,NA,11,8,-5,18N,70W,HI,,Dominican Republic,do.png
+VP6,Ducie I.,Oc,63,32,-8.5,25S,125W,,,England,gb.png
+T32,E. Kiribati (Line Is.),Oc,"61, 63",31,12,2N,158W,,,C. Kiribati (British Phoenix Is.),ki.png
+9M6,East Malaysia,Oc,54,28,8,2N,110E,,9M8,West Malaysia,my.png
+CE0Y,Easter I.,SA,63,12,-7,27S,109W,,,Chile,cl.png
+HC,Ecuador,SA,12,10,-5,0N,79W,HC-HD,,Ecuador,ec.png
+SU,Egypt,"Af, As",38,34,2,31N,31E,"6A-6B, SSA-SSM, SU",,Egypt,eg.png
+YS,El Salvador,NA,11,7,-6,14N,89W,"HU, YS",,El Salvador,sv.png
+G,England,Eu,27,14,0,52N,0W,"2A-2Z, GA-GZ, MA-MZ, VP-VQ, VS, ZB-ZJ, ZN-ZO, ZQ","2E, GX, M, MX",England,gb.png
+3C,Equatorial Guinea,Af,47,36,-1,4N,9E,3C,,Equatorial Guinea,gq.png
+E3,Eritrea,Af,48,37,3,15N,39E,E3,ET2,Eritrea,er.png
+ES,Estonia,Eu,29,15,2,59N,25E,ES,UR,Estonia,ee.png
+ET,Ethiopia,Af,48,37,3,9N,39E,"9E-9F, ET",,Ethiopia,et.png
+VP8,Falkland Is.,SA,16,13,-4,52S,58W,,,England,gb.png
+OY,Faroe Is.,Eu,18,14,0,62N,7W,,OW,Denmark,dk.png
+PY0F,Fernando de Noronha,SA,13,11,-2,4S,32W,,PY0ZF,Brazil,br.png
+3D2,Fiji,Oc,56,32,12,18S,178E,3DN-3DZ,,Fiji,fj.png
+OH,Finland,Eu,18,15,2,60N,25E,OF-OJ,,Finland,fi.png
+F,France,Eu,27,14,1,49N,2E,"FA-FZ, HW-HY, TH, TK, TM, TO-TQ, TV-TX",,France,fr.png
+R1FJ,Franz Josef Land,Eu,75,40,3,81N,48E,,4K2,European Russia,ru.png
+FY,French Guiana,SA,12,9,-4,5N,52W,,TO,France,fr.png
+FO,French Polynesia,Oc,63,32,-10,18S,150W,,TX,France,fr.png
+TR,Gabon,Af,52,36,1,1N,10E,TR,,Gabon,ga.png
+HC8,Galapagos Is.,SA,12,10,-6,1S,90W,,,Ecuador,ec.png
+C5,The Gambia,Af,46,35,0,13N,17W,C5,,The Gambia,gm.png
+4L,Georgia,As,29,21,4,42N,45E,4L,UF,Georgia,ge.png
+DL,Fed. Rep. of Germany,Eu,28,14,1,53N,13E,"DA-DR, Y2-Y9",,Fed. Rep. of Germany,de.png
+9G,Ghana,Af,46,35,0,5N,0W,9G,,Ghana,gh.png
+ZB,Gibraltar,Eu,37,14,1,37N,5W,,,England,gb.png
+FT_G,Glorioso Is.,Af,53,39,3,12S,47E,,"FR/G, TO",France,fr.png
+SV,Greece,Eu,28,20,2,38N,24E,"J4, SV-SZ",,Greece,gr.png
+OX,Greenland,NA,"05, 75",40,-3,64N,52W,,XP,Denmark,dk.png
+J3,Grenada,NA,11,8,-4,12N,62W,J3,,Grenada,gd.png
+FG,Guadeloupe,NA,11,8,-4,16N,62W,,TO,France,fr.png
+KH2,Guam,Oc,64,27,10,13N,145E,,"AH2, NH2, WH2",United States of America,us.png
+KG4,Guantanamo Bay,NA,11,8,-5,20N,75W,,,United States of America,us.png
+TG,Guatemala,NA,11,7,-6,16N,92W,"TD, TG",,Guatemala,gt.png
+GU,Guernsey,Eu,27,14,0,49N,3W,,"2U, GP, MU, MP",England,gb.png
+J5,Guinea-Bissau,Af,46,35,-1,12N,16W,J5,,Guinea-Bissau,gw.png
+3X,Guinea,Af,46,35,0,10N,14W,3X,,Guinea,gn.png
+8R,Guyana,SA,12,9,-3.75,6N,58W,8R,,Guyana,gy.png
+HH,Haiti,NA,11,8,-5,19N,72W,"4V, HH",,Haiti,ht.png
+KH6,Hawaii,Oc,61,31,-10,21N,158W,,"AH6, NH6, WH6, AH7, KH7, NH7, WH7",United States of America,us.png
+VK0,Heard I.,Af,68,39,5,53S,73E,,,Australia,au.png
+HR,Honduras,NA,11,7,-6,14N,87W,HQ-HR,,Honduras,hn.png
+VR2,Hong Kong,As,44,24,8,22N,114E,,VS6,China,cn.png
+HA,Hungary,Eu,28,15,1,48N,19E,"HA, HG",,Hungary,hu.png
+4U,ITU HQ,Eu,28,14,1,46N,6E,,,ITU HQ,ch.png
+TF,Iceland,Eu,17,40,0,64N,22W,TF,,Iceland,is.png
+VU,India,As,41,22,5.5,29N,77E,"8T-8Y, AT-AW, VT-VW",,India,in.png
+YB,Indonesia,Oc,"51, 54",28,7.5,6S,107E,"7A-7I, 8A-8I, JZ, PK-PO, YB-YH",,Indonesia,id.png
+EP,Iran,As,40,21,3.5,36N,51E,"9B-9D, EP-EQ",,Iran,ir.png
+YI,Iraq,As,39,21,3,32N,45E,"HN, YI",,Iraq,iq.png
+EI,Ireland,Eu,27,14,0,53N,6W,EI-EJ,,Ireland,ie.png
+GD,Isle of Man,Eu,27,14,0,54N,4W,,"2D, GT, MD, MT",England,gb.png
+4X,Israel,As,39,20,2,32N,35E,"4X, 4Z",,Israel,il.png
+I,Italy,"Eu, Af","28, 37","15, 33",1,42N,12E,IA-IZ,,Italy,it.png
+TU,Cote d'Ivoire,Af,46,35,0,7N,5W,TU,,Cote d'Ivoire,ci.png
+6Y,Jamaica,NA,11,8,-5,18N,77W,6Y,,Jamaica,jm.png
+JX,Jan Mayen,Eu,18,40,-1,71N,9W,,,Norway,no.png
+JA,Japan,As,45,25,9,36N,140E,"7J-7N, 8J-8N, JA-JS",,Japan,jp.png
+GJ,Jersey,Eu,27,14,0,49N,2W,,"2J, GH, MJ, MH",England,gb.png
+KH3,Johnston I.,Oc,61,31,-11,17N,170W,,"AH3, NH3, WH3",United States of America,us.png
+JY,Jordan,As,39,20,2,32N,36E,JY,,Jordan,jo.png
+CE0Z,Juan Fernandez Is.,SA,14,12,-4,34S,79W,,,Chile,cl.png
+FT_J,"Juan de Nova, Europa",Af,53,39,3,17S,43E,,"FT_E, FR/J, TO",France,fr.png
+UA2,Kaliningrad,Eu,29,15,2,55N,21E,,,Russia,ru.png
+UN,Kazakhstan,As,29-31,17,5.5,43N,77E,UN-UQ,UL,Kazakhstan,kz.png
+5Z,Kenya,Af,48,37,3,2S,37E,5Y-5Z,,Kenya,ke.png
+FT_X,Kerguelen Is.,Af,68,39,5,50S,70E,,TX,France,fr.png
+ZL8,Kermadec Is.,Oc,60,32,12,29S,178W,,,New Zealand,nz.png
+KH5K,Kingman Reef,Oc,61,31,-11,6N,162W,,"AH5K, NH5K, WH5K",United States of America,us.png
+Z6,Republic of Kosovo,Eu,28,15,1,42N,21E,,,Republic of Kosovo,xk.png
+KH7K,Kure I.,Oc,61,31,-11,29N,178W,,"AH7K, NH7K, WH7K",United States of America,us.png
+9K,Kuwait,As,39,21,3,29N,48E,9K,,Kuwait,kw.png
+EX,Kyrgystan,As,"30, 31",17,6,43N,75E,EX,UM,Kyrgystan,kg.png
+VU7,Lakshadweep Is.,As,41,22,5.5,11N,73E,,,India,in.png
+XW,Laos,As,49,26,7,20N,102E,XW,,Laos,la.png
+YL,Latvia,Eu,29,15,2,57N,24E,YL,UQ,Latvia,lv.png
+OD,Lebanon,As,39,20,2,34N,36E,OD,,Lebanon,lb.png
+7P,Lesotho,Af,57,38,2,29S,27E,7P,,Lesotho,ls.png
+EL,Liberia,Af,46,35,-0.75,6N,11W,"5L-5M, 6Z, A8, D5, EL",,Liberia,lr.png
+5A,Libya,Af,38,34,2,33N,13E,5A,,Libya,ly.png
+HB0,Liechtenstein,Eu,28,14,1,47N,10E,,,Switzerland,ch.png
+LY,Lithuania,Eu,29,15,2,55N,25E,LY,UP,Lithuania,lt.png
+VK9L,Lord Howe I.,Oc,60,30,10,31S,159E,,,Australia,au.png
+LX,Luxembourg,Eu,27,14,1,50N,6E,LX,,Luxembourg,lu.png
+XX9,Macao,As,44,24,8,22N,114E,,,Portugal,pt.png
+Z3,Macedonia,Eu,28,15,1,42N,22E,Z3,4N5,Macedonia,mk.png
+VK0,Macquarie I.,Oc,60,30,11,54S,159E,,,Australia,au.png
+5R,Madagascar,Af,53,39,3,19S,48E,"5R-5S, 6X",,Madagascar,mg.png
+CT3,Madeira Is.,Af,36,33,-1,33N,17W,,,Portugal,pt.png
+7Q,Malawi,Af,53,37,2,14S,34E,7Q,,Malawi,mw.png
+8Q,Maldives,"As, Af",41,22,5,4N,73E,8Q,,Maldives,mv.png
+TZ,Mali,Af,46,35,0,13N,8W,TZ,,Mali,ml.png
+HK0,Malpelo I.,SA,12,9,-5,4N,82W,,,Colombia,co.png
+9H,Malta,Eu,28,15,1,36N,15E,9H,,Malta,mt.png
+R1MV,Malyj Vysotskij Is,Eu,29,16,3,61N,29E,,4J1,European Russia,ru.png
+KH0,Mariana Is.,Oc,64,27,10,15N,146E,,"AH0, NH0, WH0",United States of America,us.png
+OJ0,Market Reef,Eu,18,15,2,60N,19E,,,Finland,fi.png
+FO0,Marquesas I.,Oc,63,31,-10,9S,140W,,TX,France,fr.png
+V7,Marshall Is.,Oc,65,31,12,7N,171E,V7,KX6,Marshall Is.,mh.png
+FM,Martinique,NA,11,8,-4,15N,61W,,TO,France,fr.png
+5T,Mauritania,Af,46,35,-1,18N,16W,5T,,Mauritania,mr.png
+3B8,Mauritius,Af,53,39,4,20S,58E,3B,,Mauritius,mu.png
+FH,Mayotte,Af,53,39,3,13S,45E,,TX,France,fr.png
+VK9M,Mellish Reef,Oc,55,30,10,17S,156E,,VK9Z,Australia,au.png
+XE,Mexico,NA,10,6,-6,20N,99W,"4A-4C, 6D-6J, XA-XI",,Mexico,mx.png
+V6,Micronesia,Oc,65,27,11,7N,158E,V6,KC6,Micronesia,fm.png
+KH4,Midway I.,Oc,61,31,-11,28N,177W,,"AH4, NH4, WH4",United States of America,us.png
+JD,Minami Torishima,Oc,90,27,10,24N,154E,,,Japan,jp.png
+ER,Moldova,Eu,29,16,3,47N,29E,ER,UO,Moldova,md.png
+3A,Monaco,Eu,27,14,1,44N,8E,3A,,Monaco,mc.png
+JT,Mongolia,As,"32, 33",23,7.5,48N,107E,JT-JV,,Mongolia,mn.png
+4O,Montenegro,Eu,28,15,1,42N,19E,4O,"YU3, YU6, ..",Montenegro,me.png
+VP2M,Montserrat,NA,11,8,-4,17N,62W,,,England,gb.png
+CN,Morocco,Af,37,33,0,34N,7W,"5C-5G, CN",,Morocco,ma.png
+C9,Mozambique,Af,53,37,2,26S,33E,C8-C9,,Mozambique,mz.png
+SV1/A,Mount Athos,Eu,28,20,2,40N,24E,,SY2,Greece,gr.png
+XZ,Myanmar,As,49,26,6.5,17N,96E,XY-XZ,,Myanmar,mm.png
+ZL9,New Zealand Subantarctic Islands,Oc,60,32,12,51S,166E,,,New Zealand,nz.png
+V5,Namibia,Af,57,38,2,22S,17E,V5,,Namibia,na.png
+C2,Nauru,Oc,65,31,11.5,1S,167E,C2,,Nauru,nr.png
+KP1,Navassa I.,NA,11,8,-5,18N,75W,,"NP1, WP1",United States of America,us.png
+9N,Nepal,As,42,22,5.75,28N,85E,9N,,Nepal,np.png
+PA,Netherlands,Eu,27,14,1,52N,5E,PA-PJ,,Netherlands,nl.png
+FK,New Caledonia,Oc,56,32,11,22S,167E,,TX,France,fr.png
+ZL,New Zealand,Oc,60,32,12,41S,175E,ZK-ZM,,New Zealand,nz.png
+YN,Nicaragua,NA,11,7,-6,12N,87W,"HT, H6-H7, YN",,Nicaragua,ni.png
+5U,Niger,Af,46,35,1,14N,2W,5U,,Niger,ne.png
+5N,Nigeria,Af,46,35,1,6N,3E,5N-5O,,Nigeria,ng.png
+E6,Niue,Oc,62,32,-11,19S,170W,,,Niue,nu.png
+E5,N. Cook Is.,Oc,"62, 63",32,-10.5,10S,161W,,ZK1,New Zealand,nz.png
+GI,Northern Ireland,Eu,27,14,0,55N,6W,,"2I, GN, MI, MN",England,gb.png
+P5,North Korea,As,44,25,9,39N,126E,"HM, P5-P9",,North Korea,kp.png
+VK9N,Norfolk I.,Oc,60,32,11.5,29S,168E,,,Australia,au.png
+LA,Norway,Eu,18,14,1,60N,11E,"3Y, JW-JX, LA-LN",,Norway,no.png
+JD,Ogasawara,As,45,27,10,28N,142E,,,Japan,jp.png
+A4,Oman,As,39,21,4,24N,59E,A4,,Oman,om.png
+AP,Pakistan,As,41,21,5,34N,73E,"6P-6S, AP-AS",,Pakistan,pk.png
+T8,Palau,Oc,64,27,10,7N,134E,T8,KC6,Palau,pw.png
+E4,Palestine,As,39,20,2,32N,34E,E4,,Palestine,ps.png
+KH5,Palmyra & Jarvis Is.,Oc,"61, 62",31,-11,6N,162W,,"AH5, NH5, WH5",United States of America,us.png
+HP,Panama,NA,11,7,-5,9N,80W,"3E-3F, HO-HP, H3, H8-H9",,Panama,pa.png
+P2,Papua New Guinea,Oc,51,28,10,10S,147E,P2,,Papua New Guinea,pg.png
+ZP,Paraguay,SA,14,11,-4,26S,57W,ZP,,Paraguay,py.png
+OA,Peru,SA,12,10,-5,12S,78W,"4T, OA-OC",,Peru,pe.png
+3Y,Peter I I.,An,72,12,-6,69S,91W,,,Norway,no.png
+DU,Philippines,Oc,50,27,8,15N,121E,"4D-4I, DU-DZ",,Philippines,ph.png
+VP6,Pitcairn I.,Oc,63,32,-8.5,25S,128W,,VR6,England,gb.png
+SP,Poland,Eu,28,15,1,52N,21E,"3Z, HF, SN-SR",,Poland,pl.png
+CT,Portugal,Eu,37,14,0,39N,9W,"CQ-CU, XX",,Portugal,pt.png
+ZS8,Prince Edward & Marion Is.,Af,57,38,3,47S,38E,,,South Africa,za.png
+BV9,Pratas,As,44,24,8,21N,116E,,BQ9,China,cn.png
+KP4,Puerto Rico,NA,11,8,-4,18N,66W,,"KP3, NP3, WP3, NP4, WP4",United States of America,us.png
+A7,Qatar,As,39,21,4,25N,52E,A7,,Qatar,qa.png
+FR,Reunion,Af,53,39,4,21S,55E,,TO,France,fr.png
+XF4,Revilla Gigedo,NA,10,6,-7,18N,113W,,,Mexico,mx.png
+3B9,Rodriguez I.,Af,53,39,4,20S,63E,,,Mauritius,mu.png
+YO,Romania,Eu,28,20,2,45N,26E,YO-YR,,Romania,ro.png
+3D2,Rotuma I.,Oc,56,32,12,13S,177E,,,Fiji,fj.png
+UA9,Asiatic Russia,As,"20-26, 30-35, 75","16-19, 23",7,52N,104E,,UA0,Russia,ru.png
+UA,European Russia,Eu,"19, 20, 29, 30",16,3,56N,37E,"RA-RZ, UA-UI",U,Russia,ru.png
+9X,Rwanda,Af,52,36,3,2S,30E,9X,,Rwanda,rw.png
+1A,Sov. Mil. Order of Malta,Eu,28,15,1,42N,13E,1A~,,Sov. Mil. Order of Malta,it.png
+PJ5,Saba & St. Eustatius,NA,11,8,-4,18N,63W,,PJ6,Netherlands,nl.png
+CY0,Sable I.,NA,9,5,-5,44N,60W,,,Canada,ca.png
+5W,Western Samoa,Oc,62,32,-11,14S,172W,5W,,Western Samoa,ws.png
+HK0,San Andres & Providencia,NA,11,7,-6,13N,82W,,,Colombia,co.png
+CE0X,San Felix & San Ambrosio,SA,14,12,-5,26S,80W,,,Chile,cl.png
+T7,San Marino,Eu,28,15,1,44N,12E,T7,,San Marino,sm.png
+S9,Sao Tome & Principe,Af,47,36,0,0N,7E,S9,,Sao Tome & Principe,st.png
+IS,Sardinia,Eu,28,15,1,39N,9E,,,Italy,it.png
+HZ,Saudi Arabia,As,39,21,3,25N,47E,"8Z, HZ, 7Z",,Saudi Arabia,sa.png
+BS7,Scarborough Reef,As,50,27,8,15N,118E,,,China,cn.png
+GM,Scotland,Eu,27,14,0,57N,2W,,"2M, GS, GZ, MM, MS, MZ",England,gb.png
+6W,Senegal,Af,46,35,0,15N,18W,6V-6W,,Senegal,sn.png
+YU,Serbia,Eu,28,15,1,45N,21E,YT-YU,,Serbia,rs.png
+S7,Seychelles,Af,53,39,4,5S,55E,S7,,Seychelles,sc.png
+9L,Sierra Leone,Af,46,35,0,9N,13W,9L,,Sierra Leone,sl.png
+9V,Singapore,As,54,28,7.5,1N,104E,"9V, S6",,Singapore,sg.png
+OM,Slovak Republic,Eu,28,15,1,48N,17E,OM,,Slovak Republic,sk.png
+S5,Slovenia,Eu,28,15,1,46N,15E,S5,,Slovenia,si.png
+ZS,South Africa,Af,57,38,2,26S,28E,"H5~, S4~, S8~, V9~, ZR-ZU",,South Africa,za.png
+E5,S. Cook Is.,Oc,63,32,-10.5,22S,158W,,ZK1,New Zealand,nz.png
+VP8,South Georgia I.,SA,73,13,-1.5,54S,37W,,LU_Z,England,gb.png
+HL,South Korea,As,44,25,9,38N,127E,"6K-6N, DS-DT, D7-D9, HL",,South Korea,kr.png
+VP8,South Orkney Is.,SA,73,13,-3,61S,45W,,LU_Z,England,gb.png
+VP8,South Sandwich Is.,SA,73,13,-3,59S,27W,,LU_Z,England,gb.png
+VP8,South Shetland Is.,SA,73,13,-4,62S,58W,,"LU_Z, CE9, HF0, R1AN, 4K1",England,gb.png
+H4,Solomon Is.,Oc,51,28,11,9S,160E,H4,,Solomon Is.,sb.png
+T5,Somalia,Af,48,37,3,2N,46E,"6O, T5",,Somalia,so.png
+Z8,South Sudan,Af,48,34,2,5N,32E,Z8,,South Sudan,ss.png
+EA,Spain,Eu,37,14,1,40N,4W,"AM-AO, EA-EH",,Spain,es.png
+1S,Spratly Is.,As,50,26,7,9N,112E,1S~,"9M0, XV9",Spratly Is.,ph.png
+4S,Sri Lanka,As,41,22,5.5,7N,80E,4P-4S,,Sri Lanka,lk.png
+FJ,Saint Barthelemy,NA,11,8,-4,18N,63W,,TO,France,fr.png
+ZD7,St. Helena,Af,66,36,0,16S,6W,,,England,gb.png
+V4,St. Kitts & Nevis,NA,11,8,-4,17N,63W,V4,,St. Kitts & Nevis,kn.png
+J6,St. Lucia,NA,11,8,-4,14N,61W,J6,,St. Lucia,lc.png
+PJ7,St Maarten,NA,11,8,-4,18N,63W,,,Netherlands,nl.png
+FS,Saint Martin,NA,11,8,-4,18N,63W,,TO,France,fr.png
+CY9,St. Paul I.,NA,9,5,-5,47N,60W,,,Canada,ca.png
+PY0P,St. Peter & St. Paul Rocks,SA,13,11,-2,1N,29W,,PY0ZP,Brazil,br.png
+FP,St. Pierre & Miquelon,NA,9,5,-4,47N,56W,,TX,France,fr.png
+J8,St. Vincent,NA,11,8,-4,13N,61W,J8,,St. Vincent,vc.png
+ST,Sudan,Af,48,34,2,16N,33E,"6T-6U, SSN-SSZ, ST",,Sudan,sd.png
+PZ,Suriname,SA,12,9,-3.5,6N,55W,PZ,,Suriname,sr.png
+JW,Svalbard,Eu,18,40,1,78N,16E,,,Norway,no.png
+KH8S,Swains I.,Oc,62,32,-11,11S,171W,,"AH8S, NH8S, WH8S",United States of America,us.png
+3DA,Swaziland,Af,57,38,2,26S,31E,3DA-3DM,3D6,Swaziland,sz.png
+SM,Sweden,Eu,18,14,1,59N,18E,"7S, 8S, SA-SM",,Sweden,se.png
+HB,Switzerland,Eu,28,14,1,47N,7E,"HB, HE",,Switzerland,ch.png
+YK,Syria,As,39,20,2,34N,36E,"6C, YK",,Syria,sy.png
+BV,Taiwan,As,44,24,8,25N,122E,,"BM-BQ, BU, BW, BX",China,cn.png
+EY,Tajikistan,As,30,17,6,39N,69E,EY,UJ,Tajikistan,tj.png
+5H,Tanzania,Af,53,37,3,7S,39E,5H-5I,,Tanzania,tz.png
+H40,Temotu Province,Oc,51,28,11,11S,166E,,,Solomon Is.,sb.png
+HS,Thailand,As,49,26,7,14N,101E,"E2, HS",,Thailand,th.png
+4W,East Timor,Oc,54,28,8,9S,126E,4W,,East Timor,tl.png
+5V,Togo,Af,46,35,0,6N,1E,5V,,Togo,tg.png
+ZK3,Tokelau Is.,Oc,62,31,-11,9S,171W,,,New Zealand,nz.png
+A3,Tonga,Oc,62,32,13,21S,175W,A3,,Tonga,to.png
+PY0T,Trindade & Martim Vaz Is.,SA,15,11,-2,21S,29W,,PY0ZT,Brazil,br.png
+9Y,Trinidad & Tobago,SA,11,9,-4,11N,62W,9Y-9Z,,Trinidad & Tobago,tt.png
+ZD9,Tristan da Cunha & Gough I.,Af,66,38,0,37S,12W,,,England,gb.png
+FT_T,Tromelin I.,Af,53,39,4,16S,54E,,"FR/T, TO",France,fr.png
+3V,Tunisia,Af,37,33,1,37N,10E,"3V, TS",,Tunisia,tn.png
+TA,Turkey,"As, Eu",39,20,2,40N,33E,"TA-TC, YM",,Turkey,tr.png
+EZ,Turkmenistan,As,30,17,5,38N,58E,EZ,UH,Turkmenistan,tm.png
+VP5,Turks & Caicos Is.,NA,11,8,-5,22N,71W,,,England,gb.png
+T2,Tuvalu,Oc,65,31,12,9S,179E,T2,,Tuvalu,tv.png
+4U,United Nations HQ,NA,8,5,-5,41N,74W,4U,,ITU HQ,ch.png
+5X,Uganda,Af,48,37,3,0N,33E,5X,,Uganda,ug.png
+UR,Ukraine,Eu,29,16,2,50N,30E,"EM-EO, UR-UZ",UB,Ukraine,ua.png
+A6,United Arab Emirates,As,39,21,4,24N,54E,A6,,United Arab Emirates,ae.png
+K,United States of America,NA,06-אוג,03-מאי,-5,39N,77W,"AA-AL, KA-KZ, NA-NZ, WA-WZ",,United States of America,us.png
+CX,Uruguay,SA,14,13,-3,35S,56W,CV-CX,,Uruguay,uy.png
+UK,Uzbekistan,As,30,17,6,41N,69E,UJ-UM,UI,Uzbekistan,uz.png
+YJ,Vanuatu,Oc,56,32,11,18S,168E,YJ,,Vanuatu,vu.png
+HV,Vatican,Eu,28,15,1,42N,13E,HV,,Vatican,va.png
+YV,Venezuela,SA,12,9,-4,10N,67W,"4M, YV-YY",,Venezuela,ve.png
+3W,Vietnam,As,49,26,7,11N,107E,"3W, XV",,Vietnam,vn.png
+KP2,Virgin Is.,NA,11,8,-4,18N,65W,,"NP2, WP2",United States of America,us.png
+KH9,Wake I.,Oc,65,31,12,19N,167E,,"AH9, NH9, WH9",United States of America,us.png
+GW,Wales,Eu,27,14,0,52N,3W,,"2W, GC, MW, MC",England,gb.png
+FW,Wallis & Futuna Is.,Oc,62,32,-10.5,14S,172W,,TX,France,fr.png
+T30,W. Kiribati (Gilbert Is. ),Oc,65,31,12,1S,173E,,,C. Kiribati (British Phoenix Is.),ki.png
+9M2,West Malaysia,As,54,28,7.5,3N,102E,"9M, 9W",9M4,West Malaysia,my.png
+S0,Western Sahara,Af,46,33,0,27N,13W,S0~,,Western Sahara,ma.png
+VK9W,Willis I.,Oc,55,30,10,16S,150E,,VK9Z,Australia,au.png
+7O,Yemen,As,39,21,3,13N,45E,7O,,Yemen,ye.png
+9J,Zambia,Af,53,36,2,15S,28E,9I-9J,,Zambia,zm.png
+Z2,Zimbabwe,Af,53,38,2,18S,31E,Z2,,Zimbabwe,zw.png

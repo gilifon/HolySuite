@@ -18,8 +18,9 @@ namespace HolyLogger
     public partial class App : Application
     {
         Mutex myMutex;
-        private SplashScreen _splash;
+        private SplashWindow _splash;
         private DispatcherTimer _splashCloseTimer;
+        private Window _realMainWindow;
         private bool _mainWindowRendered;
 
         public App()
@@ -29,6 +30,16 @@ namespace HolyLogger
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // Enable IE11 rendering mode for the WebBrowser control (required for Leaflet.js map)
+            try
+            {
+                string exeName = System.IO.Path.GetFileName(System.Diagnostics.Process.GetCurrentProcess().MainModule.FileName);
+                Microsoft.Win32.Registry.SetValue(
+                    @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION",
+                    exeName, 11001, Microsoft.Win32.RegistryValueKind.DWord);
+            }
+            catch { }
+
             bool aIsNewInstance = false;
             myMutex = new Mutex(true, "HolyLoggerApplication", out aIsNewInstance);
             if (!aIsNewInstance)
@@ -38,8 +49,11 @@ namespace HolyLogger
                 return;
             }
 
-            _splash = new SplashScreen("Images/splash.png");
-            _splash.Show(false, true); // no auto-close, topmost
+            // Keep app alive while splash is shown before the real main window is tracked.
+            ShutdownMode = ShutdownMode.OnLastWindowClose;
+
+            _splash = new SplashWindow();
+            _splash.Show(); // no auto-close, topmost
             Mouse.OverrideCursor = Cursors.Wait;
 
             // Hook main window events as soon as WPF creates StartupUri window.
@@ -53,27 +67,37 @@ namespace HolyLogger
 
         private void HookMainWindowForSplashClose()
         {
-            if (MainWindow != null)
-            {
-                MainWindow.SourceInitialized += OnMainWindowSourceInitialized;
-                MainWindow.ContentRendered += OnMainWindowContentRendered;
+            var realMain = Current.Windows.OfType<Window>().FirstOrDefault(w => w is MainWindow);
+            if (realMain == null)
+                return;
 
-                // If app is already rendered by the time we hook, finish immediately.
-                if (MainWindow.IsLoaded && MainWindow.IsVisible && _mainWindowRendered)
-                    CloseSplash();
-            }
+            if (_realMainWindow == realMain)
+                return;
+
+            _realMainWindow = realMain;
+            MainWindow = _realMainWindow;
+            ShutdownMode = ShutdownMode.OnMainWindowClose;
+
+            _realMainWindow.SourceInitialized += OnMainWindowSourceInitialized;
+            _realMainWindow.ContentRendered += OnMainWindowContentRendered;
+
+            // If app is already rendered by the time we hook, finish immediately.
+            if (_realMainWindow.IsLoaded && _realMainWindow.IsVisible && _mainWindowRendered)
+                CloseSplash();
         }
 
         private void SplashCloseTimer_Tick(object sender, EventArgs e)
         {
-            if (MainWindow != null && MainWindow.IsLoaded && MainWindow.IsVisible && _mainWindowRendered)
+            HookMainWindowForSplashClose();
+
+            if (_realMainWindow != null && _realMainWindow.IsLoaded && _realMainWindow.IsVisible && _mainWindowRendered)
                 CloseSplash();
         }
 
         private void OnMainWindowSourceInitialized(object sender, EventArgs e)
         {
-            if (MainWindow != null)
-                MainWindow.Cursor = Cursors.Wait;
+            if (_realMainWindow != null)
+                _realMainWindow.Cursor = Cursors.Wait;
         }
 
         private void OnMainWindowContentRendered(object sender, EventArgs e)
@@ -92,14 +116,14 @@ namespace HolyLogger
                 _splashCloseTimer = null;
             }
 
-            if (MainWindow != null)
+            if (_realMainWindow != null)
             {
-                MainWindow.SourceInitialized -= OnMainWindowSourceInitialized;
-                MainWindow.ContentRendered -= OnMainWindowContentRendered;
-                MainWindow.Cursor = null;
+                _realMainWindow.SourceInitialized -= OnMainWindowSourceInitialized;
+                _realMainWindow.ContentRendered -= OnMainWindowContentRendered;
+                _realMainWindow.Cursor = null;
             }
 
-            _splash?.Close(TimeSpan.FromSeconds(0.5));
+            _splash?.Close();
             _splash = null;
             Mouse.OverrideCursor = null;
         }

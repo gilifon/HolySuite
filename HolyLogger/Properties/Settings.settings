@@ -212,6 +212,12 @@
     <Setting Name="IsShowAzimuthControl" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="MapRadiusKm" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">3500</Value>
+    </Setting>
+    <Setting Name="MapUsePolar" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="Operator" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
@@ -219,7 +225,7 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="DoNothing" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="selectedEvent" Type="System.String" Scope="User">
       <Value Profile="(Default)" />

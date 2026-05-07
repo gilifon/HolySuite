@@ -12,7 +12,7 @@ namespace HolyLogger.Properties {
     
     
     [global::System.Runtime.CompilerServices.CompilerGeneratedAttribute()]
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "16.10.0.0")]
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("Microsoft.VisualStudio.Editors.SettingsDesigner.SettingsSingleFileGenerator", "17.14.0.0")]
     public sealed partial class Settings : global::System.Configuration.ApplicationSettingsBase {
         
         private static Settings defaultInstance = ((Settings)(global::System.Configuration.ApplicationSettingsBase.Synchronized(new Settings())));
@@ -862,6 +862,30 @@ namespace HolyLogger.Properties {
                 this["IsShowAzimuthControl"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1000")]
+        public int MapRadiusKm {
+            get {
+                return ((int)(this["MapRadiusKm"]));
+            }
+            set {
+                this["MapRadiusKm"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool MapUsePolar {
+            get {
+                return ((bool)(this["MapUsePolar"]));
+            }
+            set {
+                this["MapUsePolar"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
@@ -1054,7 +1078,19 @@ namespace HolyLogger.Properties {
                 this["selectedOverlay"] = value;
             }
         }
-
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool IsOverrideOperatorFromFile {
+            get {
+                return ((bool)(this["IsOverrideOperatorFromFile"]));
+            }
+            set {
+                this["IsOverrideOperatorFromFile"] = value;
+            }
+        }
+        
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("20")]
@@ -1076,18 +1112,6 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["ShowCallsignDropdown"] = value;
-            }
-        }
-        
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
-        public bool IsOverrideOperatorFromFile {
-            get {
-                return ((bool)(this["IsOverrideOperatorFromFile"]));
-            }
-            set {
-                this["IsOverrideOperatorFromFile"] = value;
             }
         }
     }

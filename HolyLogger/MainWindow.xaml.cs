@@ -235,10 +235,13 @@ namespace HolyLogger
         private const int MinCallsignSuggestionRows = 10;
         private const int MaxCallsignSuggestionRows = 30;
         private const double CallsignSuggestionRowHeight = 22;
+        private const int CallsignLookupDebounceMs = 280;
         private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
+        private bool callsignSuggestionMouseControl = false;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
+        DispatcherTimer CallsignLookupDebounceTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
         private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
@@ -296,6 +299,8 @@ namespace HolyLogger
 
             isNetworkAvailable = Helper.CheckForInternetConnection();
             HeartbeatTimer.Tick += HeartbeatTimer_Tick;
+            CallsignLookupDebounceTimer.Interval = TimeSpan.FromMilliseconds(CallsignLookupDebounceMs);
+            CallsignLookupDebounceTimer.Tick += CallsignLookupDebounceTimer_Tick;
             checkForAutoUpload();
             
 
@@ -310,6 +315,9 @@ namespace HolyLogger
                 Properties.Settings.Default.UpdateSettings = false;
                 Properties.Settings.Default.Save();
             }
+
+            NormalizeEnterKeyBehaviorSettings();
+
             if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
             {
                 NotifyVersionUpToDate = false;
@@ -317,6 +325,7 @@ namespace HolyLogger
             }
             this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
+            Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
 
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
             L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
@@ -422,6 +431,24 @@ namespace HolyLogger
 
             NewDXCCTimer.Interval = 2500;    // or whatever you need it to be
             NewDXCCTimer.Tick += NewDXCCTimer_Tick;
+        }
+
+        private void NormalizeEnterKeyBehaviorSettings()
+        {
+            bool addQsoWithEnter = Properties.Settings.Default.AddQSOWithEnter;
+            bool doNothing = Properties.Settings.Default.DoNothing;
+
+            // Keep the Enter behavior options mutually exclusive and never both unchecked.
+            if (!addQsoWithEnter && !doNothing)
+            {
+                Properties.Settings.Default.DoNothing = true;
+                Properties.Settings.Default.Save();
+            }
+            else if (addQsoWithEnter && doNothing)
+            {
+                Properties.Settings.Default.DoNothing = false;
+                Properties.Settings.Default.Save();
+            }
         }
 
         private async void StartUDPClient(IAsyncResult res)
@@ -578,12 +605,12 @@ namespace HolyLogger
         {
             if (Properties.Settings.Default.IsShowAzimuthControl)
             {
-                AzimuthControl.Visibility = Visibility.Visible;
-                this.MinWidth = 1040;
+                MapControl.Visibility = Visibility.Visible;
+                this.MinWidth = 1120;
             }
             else
             {
-                AzimuthControl.Visibility = Visibility.Hidden;
+                MapControl.Visibility = Visibility.Hidden;
                 this.MinWidth = 800;
             }
         }
@@ -600,6 +627,9 @@ namespace HolyLogger
 
             if (Properties.Settings.Default.ShowTitleClock)
                 StartUTCTimer();
+
+            MapControl.RadiusChanged += OnMapRadiusChanged;
+            ShowHomeMap();
         }
 
         private void StartUTCTimer()
@@ -939,7 +969,7 @@ namespace HolyLogger
             {
                 OptionsMenuItemMenuItem_Click(null, null);
             }
-            else if ((e.Key == Key.Escape))
+            else if (e.Key == Key.F9 || e.Key == Key.Escape)
             {
                 ClearBtn_Click(null, null);
             }
@@ -2345,18 +2375,23 @@ namespace HolyLogger
 
         private void TB_DXCallsign_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
+            if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0 && !callsignSuggestionMouseControl)
             {
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
                 ApplyHighlightedCallsignSuggestionToTextBox();
                 e.Handled = true;
             }
-            else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
+            else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0 && !callsignSuggestionMouseControl)
             {
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
                 ApplyHighlightedCallsignSuggestionToTextBox();
+                e.Handled = true;
+            }
+            else if ((e.Key == Key.Down || e.Key == Key.Up) && CallsignSuggestionsPopup.IsOpen && callsignSuggestionMouseControl)
+            {
+                // While mouse owns the list selection, block arrow-key navigation updates.
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
@@ -2364,6 +2399,11 @@ namespace HolyLogger
                 if (CallsignSuggestionsPopup.IsOpen)
                 {
                     ApplySelectedCallsignSuggestion();
+                    e.Handled = true;
+                }
+                else if (Properties.Settings.Default.AddQSOWithEnter || !Properties.Settings.Default.DoNothing)
+                {
+                    AddBtn_Click(null, null);
                     e.Handled = true;
                 }
             }
@@ -2411,7 +2451,7 @@ namespace HolyLogger
             {
                 signboard.signboardData.Square = TB_MyHolyland.Text;
             }
-            
+            ShowHomeMap();
         }
 
         private void TB_Exchange_PreviewTextInput(object sender, TextCompositionEventArgs e)
@@ -2487,9 +2527,12 @@ namespace HolyLogger
                 UpdateCallsignSuggestions();
             }
 
+            // Clear stale values from the previously highlighted callsign until new data is loaded.
+            FName = string.Empty;
             ClearDXLocator();
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
+                CallsignLookupDebounceTimer.Stop();
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
                 TB_State.Text = "";
@@ -2510,11 +2553,7 @@ namespace HolyLogger
                 Continent = dXCC.Continent;
                 QRZGrid = dXCC.Locator;
                 Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
-                SetAzimuth();
-                if (Properties.Settings.Default.UseDXCCDefaultGrid)
-                    SetDXLocator(QRZGrid);
-                if (state == State.New)
-                    GetQrzData();
+                RestartCallsignLookupDebounce();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
                 {
@@ -2524,9 +2563,32 @@ namespace HolyLogger
                 }
             }
         }
+
+        private void RestartCallsignLookupDebounce()
+        {
+            CallsignLookupDebounceTimer.Stop();
+            CallsignLookupDebounceTimer.Start();
+        }
+
+        private void CallsignLookupDebounceTimer_Tick(object sender, EventArgs e)
+        {
+            CallsignLookupDebounceTimer.Stop();
+
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            {
+                return;
+            }
+
+            SetAzimuth();
+            if (state == State.New)
+            {
+                GetQrzData();
+            }
+        }
         
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
+            callsignSuggestionMouseControl = false;
             CallsignSuggestionsPopup.IsOpen = false;
             TB_Exchange.Focusable = true;
         }
@@ -2657,12 +2719,21 @@ namespace HolyLogger
                 int index = callsignIndex.BinarySearch(prefix, StringComparer.Ordinal);
                 if (index < 0) index = ~index;
 
-                for (int i = index; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
+                // Two-pass: collect non-slash matches first, then slash matches.
+                var slashMatches = new List<CallsignSuggestionItem>();
+                for (int i = index; i < callsignIndex.Count; i++)
                 {
                     string call = callsignIndex[i];
                     if (!call.StartsWith(prefix, StringComparison.Ordinal)) break;
-                    matches.Add(BuildSuggestionItem(call, prefix, 0));
+                    if (call.Contains('/'))
+                        slashMatches.Add(BuildSuggestionItem(call, prefix, 0));
+                    else if (matches.Count < maxCallsignSuggestions)
+                        matches.Add(BuildSuggestionItem(call, prefix, 0));
                 }
+                // Fill remaining slots with slash matches
+                int remaining = maxCallsignSuggestions - matches.Count;
+                if (remaining > 0)
+                    matches.AddRange(slashMatches.Take(remaining));
             }
 
             // Show suggestions to the right of the DX callsign textbox, same vertical level.
@@ -2674,6 +2745,7 @@ namespace HolyLogger
 
             LB_DXCallsignSuggestions.ItemsSource = matches;
             LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
+            callsignSuggestionMouseControl = false;
             CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown;
 
             if (!Properties.Settings.Default.ShowCallsignDropdown && prefix.StartsWith("*", StringComparison.Ordinal))
@@ -2697,86 +2769,102 @@ namespace HolyLogger
         private static readonly Dictionary<string, string> DxccNameToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             {"Afghanistan","af"},{"Agalega & St. Brandon","mu"},{"Aland Is.","fi"},{"Alaska","us"},
-            {"Albania","al"},{"Algeria","dz"},{"Amsterdam & St. Paul Is.","tf"},{"Andaman & Nicobar Is.","in"},
-            {"Andorra","ad"},{"Angola","ao"},{"Anguilla","ai"},{"Antarctica","aq"},
+            {"Albania","al"},{"Algeria","dz"},{"Andaman & Nicobar Is.","in"},
+            {"Andorra","ad"},{"Angola","ao"},{"Antarctica","aq"},
             {"Antigua & Barbuda","ag"},{"Argentina","ar"},{"Armenia","am"},{"Aruba","aw"},
             {"Ascension I.","sh"},{"Australia","au"},{"Austria","at"},{"Aves I.","ve"},
             {"Azores","pt"},{"Azerbaijan","az"},{"Bahamas","bs"},{"Bahrain","bh"},
             {"Bangladesh","bd"},{"Barbados","bb"},{"Belarus","by"},{"Belgium","be"},
-            {"Belize","bz"},{"Benin","bj"},{"Bermuda","bm"},{"Bhutan","bt"},
-            {"Bolivia","bo"},{"Bonaire","bq"},{"Bosnia-Herzegovina","ba"},{"Botswana","bw"},
-            {"Bouvet","bv"},{"Brazil","br"},{"British Virgin Is.","vg"},{"Brunei Darussalam","bn"},
+            {"Belize","bz"},{"Benin","bj"},{"Bhutan","bt"},
+            {"Bolivia","bo"},{"Bosnia-Herzegovina","ba"},{"Botswana","bw"},
+            {"Bouvet","no"},{"Brazil","br"},{"British Virgin Is.","vg"},{"Brunei Darussalam","bn"},
             {"Bulgaria","bg"},{"Burkina Faso","bf"},{"Burundi","bi"},{"Cambodia","kh"},
             {"Cameroon","cm"},{"Canada","ca"},{"Canary Is.","es"},{"Cape Verde","cv"},
             {"Cayman Is.","ky"},{"Central Africa","cf"},{"Ceuta & Melilla","es"},{"Chad","td"},
-            {"Chagos Is.","io"},{"Chatham Is.","nz"},{"Chesterfield Is.","nc"},{"Chile","cl"},
-            {"China","cn"},{"Cocos (Keeling) Is.","cc"},{"Cocos I.","cr"},{"Colombia","co"},
+            {"Chagos Is.","gb"},{"Chatham Is.","nz"},{"Chesterfield Is.","nc"},{"Chile","cl"},
+            {"China","cn"},{"Cocos I.","cr"},{"Colombia","co"},
             {"Comoros","km"},{"Congo","cg"},{"Conway Reef","fj"},{"Corsica","fr"},
             {"Costa Rica","cr"},{"Cote d'Ivoire","ci"},{"Crete","gr"},{"Croatia","hr"},
-            {"Crozet I.","tf"},{"Cuba","cu"},{"Curacao","cw"},{"Cyprus","cy"},
+            {"Cuba","cu"},{"Cyprus","cy"},
             {"Czech Republic","cz"},{"Dem. Rep. Of Congo","cd"},{"Denmark","dk"},{"Desecheo I.","pr"},
             {"Djibouti","dj"},{"Dodecanese","gr"},{"Dominica","dm"},{"Dominican Republic","do"},
-            {"Ducie I.","pn"},{"East Malaysia","my"},{"East Timor","tl"},{"Easter I.","cl"},
+            {"East Malaysia","my"},{"East Timor","tl"},{"Easter I.","cl"},
             {"Ecuador","ec"},{"Egypt","eg"},{"El Salvador","sv"},{"England","gb"},
             {"Equatorial Guinea","gq"},{"Eritrea","er"},{"Estonia","ee"},{"Ethiopia","et"},
             {"European Russia","ru"},{"Falkland Is.","fk"},{"Faroe Is.","fo"},{"Fed. Rep. of Germany","de"},
             {"Fernando de Noronha","br"},{"Fiji","fj"},{"Finland","fi"},{"France","fr"},
-            {"Franz Josef Land","ru"},{"French Guiana","gf"},{"French Polynesia","pf"},{"Gabon","ga"},
+            {"Franz Josef Land","ru"},{"French Polynesia","pf"},{"Gabon","ga"},
             {"Galapagos Is.","ec"},{"Georgia","ge"},{"Ghana","gh"},{"Gibraltar","gi"},
-            {"Glorioso Is.","tf"},{"Greece","gr"},{"Greenland","gl"},{"Grenada","gd"},
-            {"Guadeloupe","gp"},{"Guam","gu"},{"Guantanamo Bay","cu"},{"Guatemala","gt"},
-            {"Guernsey","gg"},{"Guinea","gn"},{"Guinea-Bissau","gw"},{"Guyana","gy"},
-            {"Haiti","ht"},{"Hawaii","us"},{"Heard I.","hm"},{"Honduras","hn"},
+            {"Greece","gr"},{"Greenland","gl"},{"Grenada","gd"},
+            {"Guam","gu"},{"Guantanamo Bay","cu"},{"Guatemala","gt"},
+            {"Guinea","gn"},{"Guinea-Bissau","gw"},{"Guyana","gy"},
+            {"Haiti","ht"},{"Hawaii","us"},{"Honduras","hn"},
             {"Hong Kong","hk"},{"Hungary","hu"},{"Iceland","is"},{"India","in"},
             {"Indonesia","id"},{"Iran","ir"},{"Iraq","iq"},{"Ireland","ie"},
             {"Isle of Man","im"},{"Israel","il"},{"Italy","it"},{"ITU HQ","ch"},
             {"Jamaica","jm"},{"Jan Mayen","no"},{"Japan","jp"},{"Jersey","je"},
-            {"Jordan","jo"},{"Juan de Nova, Europa","tf"},{"Juan Fernandez Is.","cl"},{"Kaliningrad","ru"},
-            {"Kazakhstan","kz"},{"Kenya","ke"},{"Kerguelen Is.","tf"},{"Kermadec Is.","nz"},
+            {"Jordan","jo"},{"Juan Fernandez Is.","cl"},{"Kaliningrad","ru"},
+            {"Kazakhstan","kz"},{"Kenya","ke"},{"Kermadec Is.","nz"},
             {"Kuwait","kw"},{"Kyrgystan","kg"},{"Laos","la"},{"Latvia","lv"},
             {"Lebanon","lb"},{"Lesotho","ls"},{"Liberia","lr"},{"Libya","ly"},
             {"Liechtenstein","li"},{"Lithuania","lt"},{"Lord Howe I.","au"},{"Luxembourg","lu"},
             {"Macao","mo"},{"Macedonia","mk"},{"Macquarie I.","au"},{"Madagascar","mg"},
             {"Madeira Is.","pt"},{"Maldives","mv"},{"Malawi","mw"},{"Malaysia","my"},
             {"Mali","ml"},{"Malpelo I.","co"},{"Malta","mt"},{"Mariana Is.","mp"},
-            {"Market Reef","fi"},{"Marshall Is.","mh"},{"Martinique","mq"},{"Mauritania","mr"},
-            {"Mauritius","mu"},{"Mayotte","yt"},{"Mellish Reef","au"},{"Mexico","mx"},
-            {"Micronesia","fm"},{"Midway I.","um"},{"Minami Torishima","jp"},{"Moldova","md"},
+            {"Market Reef","fi"},{"Marshall Is.","mh"},{"Mauritania","mr"},
+            {"Mauritius","mu"},{"Mellish Reef","au"},{"Mexico","mx"},
+            {"Micronesia","fm"},{"Minami Torishima","jp"},{"Moldova","md"},
             {"Monaco","mc"},{"Mongolia","mn"},{"Montenegro","me"},{"Montserrat","ms"},
             {"Morocco","ma"},{"Mount Athos","gr"},{"Mozambique","mz"},{"Myanmar","mm"},
             {"Namibia","na"},{"Nauru","nr"},{"Nepal","np"},{"Netherlands","nl"},
             {"New Caledonia","nc"},{"New Zealand","nz"},{"New Zealand Subantarctic Islands","nz"},{"Nicaragua","ni"},
-            {"Niger","ne"},{"Nigeria","ng"},{"Niue","nu"},{"Norfolk I.","nf"},
+            {"Niger","ne"},{"Nigeria","ng"},{"Norfolk I.","nf"},
             {"North Korea","kp"},{"Northern Ireland","gb"},{"Norway","no"},{"Ogasawara","jp"},
             {"Oman","om"},{"Pakistan","pk"},{"Palestine","ps"},{"Palau","pw"},
             {"Panama","pa"},{"Papua New Guinea","pg"},{"Paraguay","py"},{"Peru","pe"},
-            {"Peter I I.","no"},{"Philippines","ph"},{"Pitcairn I.","pn"},{"Poland","pl"},
+            {"Peter I I.","no"},{"Philippines","ph"},{"Poland","pl"},
             {"Portugal","pt"},{"Pratas","tw"},{"Puerto Rico","pr"},{"Qatar","qa"},
             {"Republic of Kosovo","xk"},{"Reunion","re"},{"Rodriguez I.","mu"},{"Romania","ro"},
             {"Rotuma I.","fj"},{"Russia","ru"},{"Asiatic Russia","ru"},{"Rwanda","rw"},
-            {"Saba & St. Eustatius","bq"},{"Saint Barthelemy","bl"},{"Saint Martin","mf"},{"Sao Tome & Principe","st"},
+            {"Sao Tome & Principe","st"},
             {"Sardinia","it"},{"Saudi Arabia","sa"},{"Scarborough Reef","ph"},{"Scotland","gb"},
             {"Senegal","sn"},{"Serbia","rs"},{"Seychelles","sc"},{"Sierra Leone","sl"},
             {"Singapore","sg"},{"Slovak Republic","sk"},{"Slovenia","si"},{"Solomon Is.","sb"},
-            {"Somalia","so"},{"South Africa","za"},{"South Georgia I.","gs"},{"South Korea","kr"},
-            {"South Orkney Is.","gs"},{"South Sandwich Is.","gs"},{"South Shetland Is.","gs"},{"South Sudan","ss"},
+            {"Somalia","so"},{"South Africa","za"},{"South Korea","kr"},
+            {"South Sudan","ss"},
             {"Sov. Mil. Order of Malta","it"},{"Spain","es"},{"Spratly Is.","ph"},{"Sri Lanka","lk"},
             {"St. Helena","sh"},{"St. Kitts & Nevis","kn"},{"St. Lucia","lc"},{"St. Maarten","sx"},
-            {"St Maarten","sx"},{"St. Peter & St. Paul Rocks","br"},{"St. Pierre & Miquelon","pm"},{"St. Vincent","vc"},
-            {"Sudan","sd"},{"Suriname","sr"},{"Svalbard","sj"},{"Swaziland","sz"},
+            {"St. Peter & St. Paul Rocks","br"},{"St. Pierre & Miquelon","fr"},{"St. Vincent","vc"},
+            {"Sudan","sd"},{"Suriname","sr"},{"Swaziland","sz"},
             {"Sweden","se"},{"Switzerland","ch"},{"Syria","sy"},{"Taiwan","tw"},
             {"Tajikistan","tj"},{"Tanzania","tz"},{"Temotu Province","sb"},{"Thailand","th"},
-            {"The Gambia","gm"},{"Togo","tg"},{"Tokelau Is.","tk"},{"Tonga","to"},
-            {"Trinidad & Tobago","tt"},{"Trindade & Martim Vaz Is.","br"},{"Tromelin I.","tf"},{"Tunisia","tn"},
+            {"The Gambia","gm"},{"Togo","tg"},{"Tonga","to"},
+            {"Trinidad & Tobago","tt"},{"Trindade & Martim Vaz Is.","br"},{"Tunisia","tn"},
             {"Turkey","tr"},{"Turkmenistan","tm"},{"Turks & Caicos Is.","tc"},{"Tuvalu","tv"},
             {"Uganda","ug"},{"UK Sovereign Base Areas on Cyprus","cy"},{"Ukraine","ua"},{"United Arab Emirates","ae"},
-            {"United Nations HQ","un"},{"United States of America","us"},{"Uruguay","uy"},{"Uzbekistan","uz"},
+            {"United States of America","us"},{"Uruguay","uy"},{"Uzbekistan","uz"},
             {"Vanuatu","vu"},{"Vatican","va"},{"Venezuela","ve"},{"Vietnam","vn"},
             {"Virgin Is.","vi"},{"Wales","gb"},{"Wallis & Futuna Is.","wf"},{"West Malaysia","my"},
-            {"Western Sahara","eh"},{"Western Samoa","ws"},{"Willis I.","au"},{"Yemen","ye"},
+            {"Western Samoa","ws"},{"Willis I.","au"},{"Yemen","ye"},
             {"Zambia","zm"},{"Zimbabwe","zw"},{"Balearic Is.","es"},{"C. Kiribati (British Phoenix Is.)","ki"},
             {"E. Kiribati (Line Is.)","ki"},{"W. Kiribati (Gilbert Is. )","ki"},{"Banaba I. (Ocean I.)","ki"},
             {"San Andres & Providencia","co"},{"San Felix & San Ambrosio","cl"},{"Navassa I.","ht"},
+            {"American Samoa","us"},{"Austral I.","fr"},{"Baker & Howland Is.","us"},{"Christmas I.","au"},
+            {"Clipperton I.","fr"},{"Johnston I.","us"},{"Kure I.","us"},{"Lakshadweep Is.","in"},
+            {"Marquesas I.","fr"},{"N. Cook Is.","nz"},{"Pagalu I.","gq"},{"Palmyra & Jarvis Is.","us"},
+            {"Prince Edward & Marion Is.","za"},{"Revilla Gigedo","mx"},{"S. Cook Is.","nz"},{"Sable I.","ca"},
+            {"San Marino","sm"},{"St. Paul I.","ca"},{"Swains I.","us"},{"Tristan da Cunha & Gough I.","gb"},
+            {"Wake I.","us"},
+            {"Amsterdam & St. Paul Is.","fr"},{"Anguilla","gb"},{"Bermuda","gb"},
+            {"Bonaire","nl"},{"Cocos (Keeling) Is.","au"},{"Crozet I.","fr"},{"Curacao","nl"},
+            {"Ducie I.","gb"},{"French Guiana","fr"},{"Glorioso Is.","fr"},{"Guadeloupe","fr"},
+            {"Guernsey","gb"},{"Heard I.","au"},{"Juan de Nova, Europa","fr"},{"Kerguelen Is.","fr"},
+            {"Martinique","fr"},{"Mayotte","fr"},{"Midway I.","us"},
+            {"Pitcairn I.","gb"},{"Saba & St. Eustatius","nl"},
+            {"Saint Barthelemy","fr"},{"Saint Martin","fr"},{"South Georgia I.","gb"},
+            {"South Orkney Is.","gb"},{"South Sandwich Is.","gb"},{"South Shetland Is.","gb"},
+            {"St Maarten","nl"},{"Svalbard","no"},{"Tokelau Is.","nz"},{"Tromelin I.","fr"},
+            {"Western Sahara","ma"},{"Niue","nu"},{"United Nations HQ","un"},
         };
 
         private void UpdateCountryFlag(string countryName)
@@ -2816,9 +2904,38 @@ namespace HolyLogger
             CallsignSuggestionsPopup.IsOpen = false;
         }
 
-        private void LB_DXCallsignSuggestions_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void LB_DXCallsignSuggestions_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            ApplySelectedCallsignSuggestion();
+            var source = e.OriginalSource as DependencyObject;
+            var item = ItemsControl.ContainerFromElement(LB_DXCallsignSuggestions, source) as ListBoxItem;
+            if (item?.DataContext is CallsignSuggestionItem clicked)
+            {
+                callsignSuggestionMouseControl = true;
+                LB_DXCallsignSuggestions.SelectedItem = clicked;
+                ApplySelectedCallsignSuggestion();
+                e.Handled = true;
+            }
+        }
+
+        private void LB_DXCallsignSuggestions_PreviewMouseMove(object sender, MouseEventArgs e)
+        {
+            var source = e.OriginalSource as DependencyObject;
+            var item = ItemsControl.ContainerFromElement(LB_DXCallsignSuggestions, source) as ListBoxItem;
+            if (item?.DataContext is CallsignSuggestionItem hovered)
+            {
+                callsignSuggestionMouseControl = true;
+                if (!Equals(LB_DXCallsignSuggestions.SelectedItem, hovered))
+                {
+                    LB_DXCallsignSuggestions.SelectedItem = hovered;
+                    ApplyHighlightedCallsignSuggestionToTextBox();
+                }
+            }
+        }
+
+        private void LB_DXCallsignSuggestions_MouseLeave(object sender, MouseEventArgs e)
+        {
+            // Keep the last highlighted row selected, but give arrow-key control back to keyboard.
+            callsignSuggestionMouseControl = false;
         }
 
         private void LB_DXCallsignSuggestions_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -2935,14 +3052,38 @@ namespace HolyLogger
 
         private void SetAzimuth()
         {
-            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text) && !string.IsNullOrWhiteSpace(QRZGrid))
+            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 try
                 {
-                    Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, QRZGrid);
-                    var distance = MaidenheadLocator.Distance(TB_MyLocator.Text, QRZGrid);
-                    AzimuthControl.azimuthData.Azimuth = Azimuth;
-                    AzimuthControl.azimuthData.Distance = distance;
+                    // Priority for map center:
+                    // 1. QRZ grid — the station's declared operating grid square
+                    // 2. DXCC entity locator — country-level fallback
+                    // Note: QRZ lat/lon is intentionally skipped — it reflects the
+                    //       operator's home address which can be in a different country.
+                    string locator = null;
+
+                    if (!string.IsNullOrWhiteSpace(QRZGrid))
+                        locator = QRZGrid;
+
+                    if (string.IsNullOrWhiteSpace(locator))
+                    {
+                        DXCC entityDXCC = rem.GetDXCC(TB_DXCallsign.Text);
+                        if (entityDXCC != null && !string.IsNullOrWhiteSpace(entityDXCC.Locator))
+                            locator = entityDXCC.Locator;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(locator))
+                    {
+                        ClearAzimuth();
+                        return;
+                    }
+
+                    Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, locator);
+                    int mapRadiusKm = GetMapRadiusKm();
+                    var ll = MaidenheadLocator.LocatorToLatLng(locator);
+                    var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
+                    MapControl.ShowMap(ll.Lat, ll.Long, mapRadiusKm, Azimuth, homell.Lat, homell.Long);
                 }
                 catch (Exception e)
                 {
@@ -2971,8 +3112,54 @@ namespace HolyLogger
         private void ClearAzimuth()
         {
             Azimuth = 0;
-            AzimuthControl.azimuthData.Azimuth = Azimuth;
-            AzimuthControl.azimuthData.Distance = 0;
+            ShowHomeMap();
+        }
+
+        private void ShowHomeMap()
+        {
+            if (MapControl == null) return;
+            if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text))
+            {
+                try
+                {
+                    var ll = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
+                    MapControl.ShowMap(ll.Lat, ll.Long, GetMapRadiusKm());
+                }
+                catch { }
+            }
+            else
+            {
+                MapControl.ShowPlaceholder("Please set My Locator&#x0a;to enable the map");
+            }
+        }
+
+        private int GetMapRadiusKm()
+        {
+            int radiusKm = Properties.Settings.Default.MapRadiusKm;
+            if (radiusKm < 100 || radiusKm > 20000)
+            {
+                return 3500;
+            }
+
+            return radiusKm;
+        }
+
+        private void OnMapRadiusChanged(int radiusKm)
+        {
+            if (Properties.Settings.Default.MapRadiusKm != radiusKm)
+            {
+                Properties.Settings.Default.MapRadiusKm = radiusKm;
+                Properties.Settings.Default.Save();
+            }
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (MapControl != null && MapControl.Visibility == Visibility.Visible)
+                    SetAzimuth();
+            }), DispatcherPriority.Background);
+        }
+
+        private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
         }
 
         private async void GetQrzData()
@@ -3604,4 +3791,45 @@ namespace HolyLogger
 
         
     }
+
+    public class QsoDateDisplayConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string raw = value as string;
+            if (!string.IsNullOrWhiteSpace(raw) && raw.Length == 8 && DateTime.TryParseExact(raw, "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
+            {
+                return dt.ToString("dd-MM-yyyy", CultureInfo.InvariantCulture);
+            }
+
+            return value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return System.Windows.Data.Binding.DoNothing;
+        }
+    }
+
+    public class QsoTimeDisplayConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string raw = value as string;
+            if (!string.IsNullOrWhiteSpace(raw) && raw.Length == 6 && DateTime.TryParseExact(raw, "HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
+            {
+                return dt.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            }
+
+            return value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return System.Windows.Data.Binding.DoNothing;
+        }
+    }
 }
+
+
+
