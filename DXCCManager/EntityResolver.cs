@@ -1,8 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.ComponentModel;
-using System.Globalization;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -363,10 +361,7 @@ namespace DXCCManager
 
         public EntityResolver()
         {
-            if (!TryLoadFromCtyCsv())
-            {
-                GroupDXCCs();
-            }
+            GroupDXCCs();
             CachePrefixesRegexPatterns();
         }
         
@@ -386,207 +381,6 @@ namespace DXCCManager
                 string dxccLocator = entityInfo[4];
                 FinalDXCCs.Add(new DXCC() { Prefixes = dxccPrefix, Entity = dxccEntity, Name = dxccName, Continent = dxccContinent, Locator = dxccLocator });
             }
-        }
-
-        private bool TryLoadFromCtyCsv()
-        {
-            try
-            {
-                string csvPath = FindCtyCsvPath();
-                if (string.IsNullOrWhiteSpace(csvPath) || !File.Exists(csvPath))
-                {
-                    return false;
-                }
-
-                var loaded = new List<DXCC>(700);
-                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                string[] lines = File.ReadAllLines(csvPath);
-
-                foreach (string rawLine in lines)
-                {
-                    if (string.IsNullOrWhiteSpace(rawLine))
-                    {
-                        continue;
-                    }
-
-                    string line = rawLine.Trim();
-                    if (line.StartsWith("#"))
-                    {
-                        continue;
-                    }
-
-                    string[] fields = line.Split(',');
-                    if (fields.Length < 10)
-                    {
-                        continue;
-                    }
-
-                    string primaryPrefix = fields[0].Trim();
-                    string countryName = fields[1].Trim();
-                    string entityCode = fields[2].Trim();
-                    string continent = fields[3].Trim().ToUpperInvariant();
-                    string latText = fields[6].Trim();
-                    string lonText = fields[7].Trim();
-                    string prefixesField = fields[9].Trim();
-
-                    string locator = string.Empty;
-                    if (double.TryParse(latText, NumberStyles.Float, CultureInfo.InvariantCulture, out double latitude)
-                        && double.TryParse(lonText, NumberStyles.Float, CultureInfo.InvariantCulture, out double csvLongitude))
-                    {
-                        // cty.csv longitudes are west-positive/east-negative. Convert to standard east-positive.
-                        double longitude = -csvLongitude;
-                        locator = ToMaidenhead(latitude, longitude);
-                    }
-
-                    foreach (string prefix in ExtractPrefixes(primaryPrefix, prefixesField))
-                    {
-                        string escapedPrefix = Regex.Escape(prefix) + ".*";
-                        string dedupeKey = escapedPrefix + "|" + entityCode;
-                        if (seen.Contains(dedupeKey))
-                        {
-                            continue;
-                        }
-
-                        seen.Add(dedupeKey);
-                        loaded.Add(new DXCC()
-                        {
-                            Prefixes = escapedPrefix,
-                            Entity = entityCode,
-                            Name = countryName,
-                            Continent = continent,
-                            Locator = locator
-                        });
-                    }
-                }
-
-                if (loaded.Count == 0)
-                {
-                    return false;
-                }
-
-                FinalDXCCs = loaded;
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
-        private string FindCtyCsvPath()
-        {
-            string explicitProjectPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "cty.csv");
-            if (File.Exists(explicitProjectPath))
-            {
-                return explicitProjectPath;
-            }
-
-            string[] roots = new[]
-            {
-                AppDomain.CurrentDomain.BaseDirectory,
-                Directory.GetCurrentDirectory()
-            };
-
-            foreach (string root in roots)
-            {
-                string found = FindCtyCsvByWalkingParents(root);
-                if (!string.IsNullOrWhiteSpace(found))
-                {
-                    return found;
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private string FindCtyCsvByWalkingParents(string startPath)
-        {
-            if (string.IsNullOrWhiteSpace(startPath))
-            {
-                return string.Empty;
-            }
-
-            var current = new DirectoryInfo(startPath);
-            while (current != null)
-            {
-                string candidate = Path.Combine(current.FullName, "cty.csv");
-                if (File.Exists(candidate))
-                {
-                    return candidate;
-                }
-
-                string dataCandidate = Path.Combine(current.FullName, "Data", "cty.csv");
-                if (File.Exists(dataCandidate))
-                {
-                    return dataCandidate;
-                }
-
-                current = current.Parent;
-            }
-
-            return string.Empty;
-        }
-
-        private IEnumerable<string> ExtractPrefixes(string primaryPrefix, string rawPrefixes)
-        {
-            var prefixes = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            AddPrefixToken(prefixes, primaryPrefix);
-
-            if (!string.IsNullOrWhiteSpace(rawPrefixes))
-            {
-                string normalized = rawPrefixes.Replace(';', ' ').Trim();
-                foreach (string token in normalized.Split(new[] { ' ', '\t' }, StringSplitOptions.RemoveEmptyEntries))
-                {
-                    AddPrefixToken(prefixes, token);
-                }
-            }
-
-            return prefixes;
-        }
-
-        private void AddPrefixToken(HashSet<string> sink, string token)
-        {
-            if (sink == null || string.IsNullOrWhiteSpace(token))
-            {
-                return;
-            }
-
-            string value = token.Trim().ToUpperInvariant();
-            value = value.TrimStart('*');
-            value = value.TrimStart('=');
-            value = Regex.Replace(value, "\\([^\\)]*\\)", string.Empty);
-            value = Regex.Replace(value, "\\[[^\\]]*\\]", string.Empty);
-            value = value.Replace(";", string.Empty);
-            value = Regex.Replace(value, "[^A-Z0-9/]", string.Empty);
-
-            if (!string.IsNullOrWhiteSpace(value))
-            {
-                sink.Add(value);
-            }
-        }
-
-        private string ToMaidenhead(double latitude, double longitude)
-        {
-            if (latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180)
-            {
-                return string.Empty;
-            }
-
-            double lon = longitude + 180.0;
-            double lat = latitude + 90.0;
-
-            int lonField = (int)(lon / 20.0);
-            int latField = (int)(lat / 10.0);
-            int lonSquare = (int)((lon % 20.0) / 2.0);
-            int latSquare = (int)(lat % 10.0);
-
-            char fieldLonChar = (char)('A' + Math.Max(0, Math.Min(17, lonField)));
-            char fieldLatChar = (char)('A' + Math.Max(0, Math.Min(17, latField)));
-            char squareLonChar = (char)('0' + Math.Max(0, Math.Min(9, lonSquare)));
-            char squareLatChar = (char)('0' + Math.Max(0, Math.Min(9, latSquare)));
-
-            return new string(new[] { fieldLonChar, fieldLatChar, squareLonChar, squareLatChar });
         }
        
         private void CachePrefixesRegexPatterns()
@@ -612,12 +406,6 @@ namespace DXCCManager
             }
             return new DXCC() { Continent = "XX", Entity = "-1", Name = "Unknown", Prefixes = callsign.Length >= 2 ? callsign.ToUpper().Substring(0, 2) : callsign.ToUpper() };
         }
-
-        public IReadOnlyList<DXCC> GetAllDxccs()
-        {
-            return FinalDXCCs;
-        }
-
         public DXCC GetDXCCbyEntityCode(string entityCode)
         {
             foreach (DXCC item in FinalDXCCs)

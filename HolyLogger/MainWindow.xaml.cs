@@ -62,7 +62,6 @@ namespace HolyLogger
 
         DataAccess dal;
         EntityResolver rem;
-        private Dictionary<string, string> DxccEntityToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
 
         public ObservableCollection<QSO> Qsos;
         public ObservableCollection<QSO> FilteredQsos;
@@ -263,7 +262,6 @@ namespace HolyLogger
 
             Qsos = new ObservableCollection<QSO>();
             rem = new EntityResolver();
-            BuildEntityToIsoMap();
             InitializeComponent();
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
@@ -2525,17 +2523,14 @@ namespace HolyLogger
                 UpdateCallsignSuggestions();
             }
 
-            // Clear stale QRZ-derived values from the previously highlighted callsign until new data is loaded.
+            // Clear stale values from the previously highlighted callsign until new data is loaded.
             FName = string.Empty;
-            QRZGrid = string.Empty;
-            QRZLat = string.Empty;
-            QRZLon = string.Empty;
-            TB_State.Text = string.Empty;
             ClearDXLocator();
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
+                TB_State.Text = "";
                 UpdateCountryFlag(null);
                 ClearAzimuth();
                 ClearMatrix();
@@ -2549,11 +2544,12 @@ namespace HolyLogger
                     RefreshDateTime_Btn_MouseUp(null, null);
                 DXCC dXCC = rem.GetDXCC(TB_DXCallsign.Text);
                 Country = dXCC.Name;
-                UpdateCountryFlag(dXCC.Name, dXCC.Entity);
+                UpdateCountryFlag(dXCC.Name);
                 Continent = dXCC.Continent;
+                QRZGrid = dXCC.Locator;
                 Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
                 SetAzimuth();
-                if (state == State.New && isNetworkAvailable)
+                if (state == State.New)
                     GetQrzData();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
@@ -2748,306 +2744,105 @@ namespace HolyLogger
         private static readonly Dictionary<string, string> DxccNameToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             {"Afghanistan","af"},{"Agalega & St. Brandon","mu"},{"Aland Is.","fi"},{"Alaska","us"},
-            {"Albania","al"},{"Algeria","dz"},{"Amsterdam & St. Paul Is.","tf"},{"Andaman & Nicobar Is.","in"},
-            {"Andorra","ad"},{"Angola","ao"},{"Anguilla","ai"},{"Antarctica","aq"},
+            {"Albania","al"},{"Algeria","dz"},{"Andaman & Nicobar Is.","in"},
+            {"Andorra","ad"},{"Angola","ao"},{"Antarctica","aq"},
             {"Antigua & Barbuda","ag"},{"Argentina","ar"},{"Armenia","am"},{"Aruba","aw"},
             {"Ascension I.","sh"},{"Australia","au"},{"Austria","at"},{"Aves I.","ve"},
             {"Azores","pt"},{"Azerbaijan","az"},{"Bahamas","bs"},{"Bahrain","bh"},
             {"Bangladesh","bd"},{"Barbados","bb"},{"Belarus","by"},{"Belgium","be"},
-            {"Belize","bz"},{"Benin","bj"},{"Bermuda","bm"},{"Bhutan","bt"},
-            {"Bolivia","bo"},{"Bonaire","bq"},{"Bosnia-Herzegovina","ba"},{"Botswana","bw"},
-            {"Bouvet","bv"},{"Brazil","br"},{"British Virgin Is.","vg"},{"Brunei Darussalam","bn"},
+            {"Belize","bz"},{"Benin","bj"},{"Bhutan","bt"},
+            {"Bolivia","bo"},{"Bosnia-Herzegovina","ba"},{"Botswana","bw"},
+            {"Bouvet","no"},{"Brazil","br"},{"British Virgin Is.","vg"},{"Brunei Darussalam","bn"},
             {"Bulgaria","bg"},{"Burkina Faso","bf"},{"Burundi","bi"},{"Cambodia","kh"},
             {"Cameroon","cm"},{"Canada","ca"},{"Canary Is.","es"},{"Cape Verde","cv"},
             {"Cayman Is.","ky"},{"Central Africa","cf"},{"Ceuta & Melilla","es"},{"Chad","td"},
-            {"Chagos Is.","io"},{"Chatham Is.","nz"},{"Chesterfield Is.","nc"},{"Chile","cl"},
-            {"China","cn"},{"Cocos (Keeling) Is.","cc"},{"Cocos I.","cr"},{"Colombia","co"},
+            {"Chagos Is.","gb"},{"Chatham Is.","nz"},{"Chesterfield Is.","nc"},{"Chile","cl"},
+            {"China","cn"},{"Cocos I.","cr"},{"Colombia","co"},
             {"Comoros","km"},{"Congo","cg"},{"Conway Reef","fj"},{"Corsica","fr"},
             {"Costa Rica","cr"},{"Cote d'Ivoire","ci"},{"Crete","gr"},{"Croatia","hr"},
-            {"Crozet I.","tf"},{"Cuba","cu"},{"Curacao","cw"},{"Cyprus","cy"},
+            {"Cuba","cu"},{"Cyprus","cy"},
             {"Czech Republic","cz"},{"Dem. Rep. Of Congo","cd"},{"Denmark","dk"},{"Desecheo I.","pr"},
             {"Djibouti","dj"},{"Dodecanese","gr"},{"Dominica","dm"},{"Dominican Republic","do"},
-            {"Ducie I.","pn"},{"East Malaysia","my"},{"East Timor","tl"},{"Easter I.","cl"},
+            {"East Malaysia","my"},{"East Timor","tl"},{"Easter I.","cl"},
             {"Ecuador","ec"},{"Egypt","eg"},{"El Salvador","sv"},{"England","gb"},
             {"Equatorial Guinea","gq"},{"Eritrea","er"},{"Estonia","ee"},{"Ethiopia","et"},
             {"European Russia","ru"},{"Falkland Is.","fk"},{"Faroe Is.","fo"},{"Fed. Rep. of Germany","de"},
             {"Fernando de Noronha","br"},{"Fiji","fj"},{"Finland","fi"},{"France","fr"},
-            {"Franz Josef Land","ru"},{"French Guiana","gf"},{"French Polynesia","pf"},{"Gabon","ga"},
+            {"Franz Josef Land","ru"},{"French Polynesia","pf"},{"Gabon","ga"},
             {"Galapagos Is.","ec"},{"Georgia","ge"},{"Ghana","gh"},{"Gibraltar","gi"},
-            {"Glorioso Is.","tf"},{"Greece","gr"},{"Greenland","gl"},{"Grenada","gd"},
-            {"Guadeloupe","gp"},{"Guam","gu"},{"Guantanamo Bay","cu"},{"Guatemala","gt"},
-            {"Guernsey","gg"},{"Guinea","gn"},{"Guinea-Bissau","gw"},{"Guyana","gy"},
-            {"Haiti","ht"},{"Hawaii","us"},{"Heard I.","hm"},{"Honduras","hn"},
+            {"Greece","gr"},{"Greenland","gl"},{"Grenada","gd"},
+            {"Guam","gu"},{"Guantanamo Bay","cu"},{"Guatemala","gt"},
+            {"Guinea","gn"},{"Guinea-Bissau","gw"},{"Guyana","gy"},
+            {"Haiti","ht"},{"Hawaii","us"},{"Honduras","hn"},
             {"Hong Kong","hk"},{"Hungary","hu"},{"Iceland","is"},{"India","in"},
             {"Indonesia","id"},{"Iran","ir"},{"Iraq","iq"},{"Ireland","ie"},
             {"Isle of Man","im"},{"Israel","il"},{"Italy","it"},{"ITU HQ","ch"},
             {"Jamaica","jm"},{"Jan Mayen","no"},{"Japan","jp"},{"Jersey","je"},
-            {"Jordan","jo"},{"Juan de Nova, Europa","tf"},{"Juan Fernandez Is.","cl"},{"Kaliningrad","ru"},
-            {"Kazakhstan","kz"},{"Kenya","ke"},{"Kerguelen Is.","tf"},{"Kermadec Is.","nz"},
+            {"Jordan","jo"},{"Juan Fernandez Is.","cl"},{"Kaliningrad","ru"},
+            {"Kazakhstan","kz"},{"Kenya","ke"},{"Kermadec Is.","nz"},
             {"Kuwait","kw"},{"Kyrgystan","kg"},{"Laos","la"},{"Latvia","lv"},
             {"Lebanon","lb"},{"Lesotho","ls"},{"Liberia","lr"},{"Libya","ly"},
             {"Liechtenstein","li"},{"Lithuania","lt"},{"Lord Howe I.","au"},{"Luxembourg","lu"},
             {"Macao","mo"},{"Macedonia","mk"},{"Macquarie I.","au"},{"Madagascar","mg"},
             {"Madeira Is.","pt"},{"Maldives","mv"},{"Malawi","mw"},{"Malaysia","my"},
             {"Mali","ml"},{"Malpelo I.","co"},{"Malta","mt"},{"Mariana Is.","mp"},
-            {"Market Reef","fi"},{"Marshall Is.","mh"},{"Martinique","mq"},{"Mauritania","mr"},
-            {"Mauritius","mu"},{"Mayotte","yt"},{"Mellish Reef","au"},{"Mexico","mx"},
-            {"Micronesia","fm"},{"Midway I.","um"},{"Minami Torishima","jp"},{"Moldova","md"},
+            {"Market Reef","fi"},{"Marshall Is.","mh"},{"Mauritania","mr"},
+            {"Mauritius","mu"},{"Mellish Reef","au"},{"Mexico","mx"},
+            {"Micronesia","fm"},{"Minami Torishima","jp"},{"Moldova","md"},
             {"Monaco","mc"},{"Mongolia","mn"},{"Montenegro","me"},{"Montserrat","ms"},
             {"Morocco","ma"},{"Mount Athos","gr"},{"Mozambique","mz"},{"Myanmar","mm"},
             {"Namibia","na"},{"Nauru","nr"},{"Nepal","np"},{"Netherlands","nl"},
             {"New Caledonia","nc"},{"New Zealand","nz"},{"New Zealand Subantarctic Islands","nz"},{"Nicaragua","ni"},
-            {"Niger","ne"},{"Nigeria","ng"},{"Niue","nu"},{"Norfolk I.","nf"},
+            {"Niger","ne"},{"Nigeria","ng"},{"Norfolk I.","nf"},
             {"North Korea","kp"},{"Northern Ireland","gb"},{"Norway","no"},{"Ogasawara","jp"},
             {"Oman","om"},{"Pakistan","pk"},{"Palestine","ps"},{"Palau","pw"},
             {"Panama","pa"},{"Papua New Guinea","pg"},{"Paraguay","py"},{"Peru","pe"},
-            {"Peter I I.","no"},{"Philippines","ph"},{"Pitcairn I.","pn"},{"Poland","pl"},
+            {"Peter I I.","no"},{"Philippines","ph"},{"Poland","pl"},
             {"Portugal","pt"},{"Pratas","tw"},{"Puerto Rico","pr"},{"Qatar","qa"},
             {"Republic of Kosovo","xk"},{"Reunion","re"},{"Rodriguez I.","mu"},{"Romania","ro"},
             {"Rotuma I.","fj"},{"Russia","ru"},{"Asiatic Russia","ru"},{"Rwanda","rw"},
-            {"Saba & St. Eustatius","bq"},{"Saint Barthelemy","bl"},{"Saint Martin","mf"},{"Sao Tome & Principe","st"},
+            {"Sao Tome & Principe","st"},
             {"Sardinia","it"},{"Saudi Arabia","sa"},{"Scarborough Reef","ph"},{"Scotland","gb"},
             {"Senegal","sn"},{"Serbia","rs"},{"Seychelles","sc"},{"Sierra Leone","sl"},
             {"Singapore","sg"},{"Slovak Republic","sk"},{"Slovenia","si"},{"Solomon Is.","sb"},
-            {"Somalia","so"},{"South Africa","za"},{"South Georgia I.","gs"},{"South Korea","kr"},
-            {"South Orkney Is.","gs"},{"South Sandwich Is.","gs"},{"South Shetland Is.","gs"},{"South Sudan","ss"},
+            {"Somalia","so"},{"South Africa","za"},{"South Korea","kr"},
+            {"South Sudan","ss"},
             {"Sov. Mil. Order of Malta","it"},{"Spain","es"},{"Spratly Is.","ph"},{"Sri Lanka","lk"},
             {"St. Helena","sh"},{"St. Kitts & Nevis","kn"},{"St. Lucia","lc"},{"St. Maarten","sx"},
-            {"St Maarten","sx"},{"St. Peter & St. Paul Rocks","br"},{"St. Pierre & Miquelon","pm"},{"St. Vincent","vc"},
-            {"Sudan","sd"},{"Suriname","sr"},{"Svalbard","sj"},{"Swaziland","sz"},
+            {"St. Peter & St. Paul Rocks","br"},{"St. Pierre & Miquelon","fr"},{"St. Vincent","vc"},
+            {"Sudan","sd"},{"Suriname","sr"},{"Swaziland","sz"},
             {"Sweden","se"},{"Switzerland","ch"},{"Syria","sy"},{"Taiwan","tw"},
             {"Tajikistan","tj"},{"Tanzania","tz"},{"Temotu Province","sb"},{"Thailand","th"},
-            {"The Gambia","gm"},{"Togo","tg"},{"Tokelau Is.","tk"},{"Tonga","to"},
-            {"Trinidad & Tobago","tt"},{"Trindade & Martim Vaz Is.","br"},{"Tromelin I.","tf"},{"Tunisia","tn"},
+            {"The Gambia","gm"},{"Togo","tg"},{"Tonga","to"},
+            {"Trinidad & Tobago","tt"},{"Trindade & Martim Vaz Is.","br"},{"Tunisia","tn"},
             {"Turkey","tr"},{"Turkmenistan","tm"},{"Turks & Caicos Is.","tc"},{"Tuvalu","tv"},
             {"Uganda","ug"},{"UK Sovereign Base Areas on Cyprus","cy"},{"Ukraine","ua"},{"United Arab Emirates","ae"},
-            {"United Nations HQ","un"},{"United States of America","us"},{"Uruguay","uy"},{"Uzbekistan","uz"},
+            {"United States of America","us"},{"Uruguay","uy"},{"Uzbekistan","uz"},
             {"Vanuatu","vu"},{"Vatican","va"},{"Venezuela","ve"},{"Vietnam","vn"},
             {"Virgin Is.","vi"},{"Wales","gb"},{"Wallis & Futuna Is.","wf"},{"West Malaysia","my"},
-            {"Western Sahara","eh"},{"Western Samoa","ws"},{"Willis I.","au"},{"Yemen","ye"},
+            {"Western Samoa","ws"},{"Willis I.","au"},{"Yemen","ye"},
             {"Zambia","zm"},{"Zimbabwe","zw"},{"Balearic Is.","es"},{"C. Kiribati (British Phoenix Is.)","ki"},
             {"E. Kiribati (Line Is.)","ki"},{"W. Kiribati (Gilbert Is. )","ki"},{"Banaba I. (Ocean I.)","ki"},
             {"San Andres & Providencia","co"},{"San Felix & San Ambrosio","cl"},{"Navassa I.","ht"},
+            {"American Samoa","us"},{"Austral I.","fr"},{"Baker & Howland Is.","us"},{"Christmas I.","au"},
+            {"Clipperton I.","fr"},{"Johnston I.","us"},{"Kure I.","us"},{"Lakshadweep Is.","in"},
+            {"Marquesas I.","fr"},{"N. Cook Is.","nz"},{"Pagalu I.","gq"},{"Palmyra & Jarvis Is.","us"},
+            {"Prince Edward & Marion Is.","za"},{"Revilla Gigedo","mx"},{"S. Cook Is.","nz"},{"Sable I.","ca"},
+            {"San Marino","sm"},{"St. Paul I.","ca"},{"Swains I.","us"},{"Tristan da Cunha & Gough I.","gb"},
+            {"Wake I.","us"},
+            {"Amsterdam & St. Paul Is.","fr"},{"Anguilla","gb"},{"Bermuda","gb"},
+            {"Bonaire","nl"},{"Cocos (Keeling) Is.","au"},{"Crozet I.","fr"},{"Curacao","nl"},
+            {"Ducie I.","gb"},{"French Guiana","fr"},{"Glorioso Is.","fr"},{"Guadeloupe","fr"},
+            {"Guernsey","gb"},{"Heard I.","au"},{"Juan de Nova, Europa","fr"},{"Kerguelen Is.","fr"},
+            {"Martinique","fr"},{"Mayotte","fr"},{"Midway I.","us"},
+            {"Pitcairn I.","gb"},{"Saba & St. Eustatius","nl"},
+            {"Saint Barthelemy","fr"},{"Saint Martin","fr"},{"South Georgia I.","gb"},
+            {"South Orkney Is.","gb"},{"South Sandwich Is.","gb"},{"South Shetland Is.","gb"},
+            {"St Maarten","nl"},{"Svalbard","no"},{"Tokelau Is.","nz"},{"Tromelin I.","fr"},
+            {"Western Sahara","ma"},{"Niue","nu"},{"United Nations HQ","un"},
         };
 
-        private static readonly Dictionary<string, string> DxccNameToIsoNormalized = BuildNormalizedCountryIsoMap();
-
-        private static Dictionary<string, string> BuildNormalizedCountryIsoMap()
-        {
-            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var kv in DxccNameToIso)
-            {
-                string normalized = NormalizeCountryName(kv.Key);
-                if (!string.IsNullOrWhiteSpace(normalized) && !map.ContainsKey(normalized))
-                {
-                    map[normalized] = kv.Value;
-                }
-            }
-
-            // Common cty.csv naming variants that differ from the UI flag dictionary wording.
-            AddCountryAlias(map, "kingdom of eswatini", "Swaziland");
-            AddCountryAlias(map, "timor leste", "East Timor");
-            AddCountryAlias(map, "dem rep of the congo", "Dem. Rep. Of Congo");
-            AddCountryAlias(map, "peter 1 island", "Peter I I.");
-            AddCountryAlias(map, "north macedonia", "Macedonia");
-            AddCountryAlias(map, "dpr of korea", "North Korea");
-            AddCountryAlias(map, "republic of korea", "South Korea");
-            AddCountryAlias(map, "united states", "United States of America");
-            AddCountryAlias(map, "vatican city", "Vatican");
-
-            return map;
-        }
-
-        private static void AddCountryAlias(Dictionary<string, string> map, string alias, string canonicalName)
-        {
-            if (map == null || string.IsNullOrWhiteSpace(alias) || string.IsNullOrWhiteSpace(canonicalName))
-            {
-                return;
-            }
-
-            string normalizedCanonical = NormalizeCountryName(canonicalName);
-            if (map.TryGetValue(normalizedCanonical, out string isoCode))
-            {
-                string normalizedAlias = NormalizeCountryName(alias);
-                if (!string.IsNullOrWhiteSpace(normalizedAlias) && !map.ContainsKey(normalizedAlias))
-                {
-                    map[normalizedAlias] = isoCode;
-                }
-            }
-        }
-
-        private static string NormalizeCountryName(string value)
-        {
-            if (string.IsNullOrWhiteSpace(value))
-            {
-                return string.Empty;
-            }
-
-            string normalized = value.Trim().ToLowerInvariant();
-            normalized = normalized.Replace("&", " and ");
-            normalized = normalized.Replace("'", "");
-            normalized = normalized.Replace(".", " ");
-            normalized = normalized.Replace("-", " ");
-            normalized = normalized.Replace("(", " ");
-            normalized = normalized.Replace(")", " ");
-            normalized = normalized.Replace("/", " ");
-
-            normalized = Regex.Replace(normalized, "\\bis\\b", " islands ");
-            normalized = Regex.Replace(normalized, "\\bi\\b", " island ");
-            normalized = Regex.Replace(normalized, "\\bst\\b", " saint ");
-
-            normalized = Regex.Replace(normalized, "[^a-z0-9]+", " ").Trim();
-            normalized = Regex.Replace(normalized, "\\s+", " ");
-
-            return normalized;
-        }
-
-        private static string ResolveIsoCodeFromCountry(string countryName)
-        {
-            if (string.IsNullOrWhiteSpace(countryName))
-            {
-                return null;
-            }
-
-            if (DxccNameToIso.TryGetValue(countryName, out string isoCode))
-            {
-                return isoCode;
-            }
-
-            string normalized = NormalizeCountryName(countryName);
-            if (!string.IsNullOrWhiteSpace(normalized) && DxccNameToIsoNormalized.TryGetValue(normalized, out isoCode))
-            {
-                return isoCode;
-            }
-
-            return null;
-        }
-
-        private void BuildEntityToIsoMap()
-        {
-            DxccEntityToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-
-            LoadDxccFlagMapFile(DxccEntityToIso);
-
-            foreach (DXCC dxcc in rem.GetAllDxccs())
-            {
-                if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || DxccEntityToIso.ContainsKey(dxcc.Entity))
-                {
-                    continue;
-                }
-
-                string isoCode = ResolveIsoCodeFromCountry(dxcc.Name);
-                if (!string.IsNullOrWhiteSpace(isoCode))
-                {
-                    DxccEntityToIso[dxcc.Entity] = isoCode;
-                }
-            }
-        }
-
-        private void LoadDxccFlagMapFile(Dictionary<string, string> targetMap)
-        {
-            if (targetMap == null)
-            {
-                return;
-            }
-
-            string path = FindDxccFlagMapPath();
-            if (string.IsNullOrWhiteSpace(path) || !File.Exists(path))
-            {
-                return;
-            }
-
-            try
-            {
-                foreach (string rawLine in File.ReadAllLines(path))
-                {
-                    if (string.IsNullOrWhiteSpace(rawLine))
-                    {
-                        continue;
-                    }
-
-                    string line = rawLine.Trim();
-                    if (line.StartsWith("#") || line.StartsWith("entity", StringComparison.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
-                    string[] parts = line.Split(',');
-                    if (parts.Length < 3)
-                    {
-                        continue;
-                    }
-
-                    string entityCode = parts[0].Trim();
-                    string isoCode = parts[2].Trim().ToLowerInvariant();
-
-                    if (!string.IsNullOrWhiteSpace(entityCode) && !string.IsNullOrWhiteSpace(isoCode) && !targetMap.ContainsKey(entityCode))
-                    {
-                        targetMap[entityCode] = isoCode;
-                    }
-                }
-            }
-            catch
-            {
-                // If mapping file is malformed/unavailable, fallback mapping remains in effect.
-            }
-        }
-
-        private string FindDxccFlagMapPath()
-        {
-            string baseCandidate = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Data", "dxcc_flag_map.csv");
-            if (File.Exists(baseCandidate))
-            {
-                return baseCandidate;
-            }
-
-            string[] roots = new[]
-            {
-                AppDomain.CurrentDomain.BaseDirectory,
-                Directory.GetCurrentDirectory()
-            };
-
-            foreach (string root in roots)
-            {
-                if (string.IsNullOrWhiteSpace(root))
-                {
-                    continue;
-                }
-
-                DirectoryInfo current = new DirectoryInfo(root);
-                while (current != null)
-                {
-                    string candidate = Path.Combine(current.FullName, "HolyLogger", "Data", "dxcc_flag_map.csv");
-                    if (File.Exists(candidate))
-                    {
-                        return candidate;
-                    }
-
-                    string dataCandidate = Path.Combine(current.FullName, "Data", "dxcc_flag_map.csv");
-                    if (File.Exists(dataCandidate))
-                    {
-                        return dataCandidate;
-                    }
-
-                    current = current.Parent;
-                }
-            }
-
-            return string.Empty;
-        }
-
-        private string ResolveIsoCodeFromEntity(string entityCode)
-        {
-            if (string.IsNullOrWhiteSpace(entityCode))
-            {
-                return null;
-            }
-
-            return DxccEntityToIso.TryGetValue(entityCode, out string isoCode) ? isoCode : null;
-        }
-
-        private void UpdateCountryFlag(string countryName, string entityCode = null)
+        private void UpdateCountryFlag(string countryName)
         {
             if (string.IsNullOrWhiteSpace(countryName))
             {
@@ -3055,9 +2850,7 @@ namespace HolyLogger
                 L_CountryLabel.Visibility = Visibility.Visible;
                 return;
             }
-
-            string isoCode = ResolveIsoCodeFromEntity(entityCode) ?? ResolveIsoCodeFromCountry(countryName);
-            if (!string.IsNullOrWhiteSpace(isoCode))
+            if (DxccNameToIso.TryGetValue(countryName, out string isoCode))
             {
                 try
                 {
@@ -3969,3 +3762,6 @@ namespace HolyLogger
         
     }
 }
+
+
+
