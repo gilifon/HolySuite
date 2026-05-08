@@ -408,10 +408,12 @@ var baseScale = mapR / Math.PI;
 scaleToRadius();
 
 function scaleToRadius() {
-  // Zoom so the selected radius ring fills the map (ring near edge)
-  var ang = radiusKm / EARTH_KM;
+  // Use whichever is larger: selected radius or actual DX distance; keeps DX visible.
+  var effectiveKm = Math.max(radiusKm, dxDistKm);
+  var ang = effectiveKm / EARTH_KM;
   if (!isFinite(ang) || ang <= 0) { projection.scale(baseScale); return; }
-  projection.scale((mapR - 10) / ang);
+  var targetPx = mapR - 4;
+  projection.scale(targetPx / ang);
 }
 
 // Ocean fill

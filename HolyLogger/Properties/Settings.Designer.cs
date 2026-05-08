@@ -1114,5 +1114,17 @@ namespace HolyLogger.Properties {
                 this["ShowCallsignDropdown"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowOnTheAir {
+            get {
+                return ((bool)(this["ShowOnTheAir"]));
+            }
+            set {
+                this["ShowOnTheAir"] = value;
+            }
+        }
     }
 }
