@@ -239,6 +239,7 @@ namespace HolyLogger
         private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
         private bool callsignSuggestionMouseControl = false;
         private HashSet<string> newCallsignsSet = new HashSet<string>(StringComparer.Ordinal);
+        private CallsignUploader _callsignUploader;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
@@ -270,6 +271,8 @@ namespace HolyLogger
             ApplyCallsignSuggestionRowsSetting();
             LoadCallsignIndex();
             LoadNewCallsignsSet();
+            _callsignUploader = new CallsignUploader(AppDomain.CurrentDomain.BaseDirectory);
+            _callsignUploader.TrySendFireAndForget();
 
             if (Properties.Settings.Default.EnableUDPClient)
             {
@@ -2600,10 +2603,13 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(bareCallsign)) return;
             string call = bareCallsign.Trim().ToUpperInvariant();
 
-            // Add to in-memory dropdown index if not already there
+            // If the callsign is already known from the big index, it is not "new".
             int idx = callsignIndex.BinarySearch(call, StringComparer.Ordinal);
-            if (idx < 0)
-                callsignIndex.Insert(~idx, call);
+            if (idx >= 0)
+                return;
+
+            // Add truly new callsigns to the in-memory dropdown index.
+            callsignIndex.Insert(~idx, call);
 
             // Append to callsigns_new.txt only if not already recorded
             if (newCallsignsSet.Add(call))
@@ -2614,6 +2620,7 @@ namespace HolyLogger
                     File.AppendAllText(filePath, call + Environment.NewLine);
                 }
                 catch { }
+                _callsignUploader?.TrySendFireAndForget();
             }
         }
 
