@@ -154,8 +154,8 @@ namespace HolyLogger.ToolsUserControls
   }
   #center-btn {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:0; padding:0 6px; cursor:pointer;
-    font-size:16px; line-height:1; display:flex; align-items:center; justify-content:center;
+    border-radius:0; padding:0 4px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
     color:#333;
   }
   #center-btn:hover { background:rgba(220,220,255,0.95); }
@@ -336,11 +336,21 @@ function toggleProjection() {
   }
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000;
+    display:flex; align-items:stretch;
   }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    padding:2px 4px; font-size:13px; cursor:pointer;
+    border-right:none; border-radius:0;
+    padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
   }
+  #center-btn {
+    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    border-radius:0; padding:0 4px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    color:#333;
+  }
+  #center-btn:hover { background:rgba(220,220,255,0.95); }
+  #center-btn svg { width:18px; height:18px; }
 </style>
 </head>
 <body>
@@ -348,7 +358,7 @@ function toggleProjection() {
 <button id='proj-btn' onclick='toggleProjection()'>&#9974; Flat</button>
 <div id='az-only'>AZ 0&deg;</div>
 <div id='bottom-ctrl'>
-  <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
+  <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select><button id='center-btn' onclick='recenter()' title='Reset zoom to selected radius'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
 </div>
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'></script>
@@ -527,9 +537,34 @@ function onRadiusChange(km) {
   drawOverlays();
     try { window.external.SetRadius(km); } catch(e) {}
 }
+function recenter() {
+    updateProjectionScaleFromRadius();
+    countriesG.selectAll('path').attr('d', path);
+    svg.selectAll('.graticule-path').attr('d', path);
+    drawRings();
+    drawRadiusRing(radiusKm);
+    drawOverlays();
+}
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
 }
+
+// Mouse-wheel zoom: scale projection up/down and redraw everything
+document.addEventListener('wheel', function(e) {
+    e.preventDefault();
+    var factor = (e.deltaY < 0) ? 1.15 : (1 / 1.15);
+    var newScale = projection.scale() * factor;
+    var minScale = baseScale * 0.5;
+    var maxScale = baseScale * 100;
+    if (newScale < minScale) newScale = minScale;
+    if (newScale > maxScale) newScale = maxScale;
+    projection.scale(newScale);
+    countriesG.selectAll('path').attr('d', path);
+    svg.selectAll('.graticule-path').attr('d', path);
+    drawRings();
+    drawRadiusRing(radiusKm);
+    drawOverlays();
+}, { passive: false });
 </script>
 </body>
 </html>";
