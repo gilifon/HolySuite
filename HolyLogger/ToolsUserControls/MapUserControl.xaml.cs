@@ -405,23 +405,14 @@ var projection = d3.geoAzimuthalEquidistant()
 
 var path = d3.geoPath().projection(projection);
 var baseScale = mapR / Math.PI;
+scaleToRadius();
 
-function updateProjectionScaleFromRadius() {
-  // Use whichever is larger: selected radius or actual DX distance — keeps DX dot always visible
-  var effectiveKm = Math.max(radiusKm, dxDistKm);
-  var ang = effectiveKm / EARTH_KM;
-  if (!isFinite(ang) || ang <= 0) {
-    projection.scale(baseScale);
-    return;
-  }
-  var targetPx = mapR - 4;
-  var desiredScale = targetPx / ang;
-  var maxScale = baseScale * 35;
-  if (desiredScale > maxScale) desiredScale = maxScale;
-  projection.scale(desiredScale);
+function scaleToRadius() {
+  // Zoom so the selected radius ring fills the map (ring near edge)
+  var ang = radiusKm / EARTH_KM;
+  if (!isFinite(ang) || ang <= 0) { projection.scale(baseScale); return; }
+  projection.scale((mapR - 10) / ang);
 }
-
-updateProjectionScaleFromRadius();
 
 // Ocean fill
 svg.append('circle')
@@ -529,7 +520,7 @@ try { xhr.send(); } catch(e5) { drawOverlays(); }
 
 function onRadiusChange(km) {
     radiusKm = parseInt(km, 10);
-  updateProjectionScaleFromRadius();
+  scaleToRadius();
   countriesG.selectAll('path').attr('d', path);
   svg.selectAll('.graticule-path').attr('d', path);
   drawRings();
@@ -538,7 +529,7 @@ function onRadiusChange(km) {
     try { window.external.SetRadius(km); } catch(e) {}
 }
 function recenter() {
-    updateProjectionScaleFromRadius();
+    scaleToRadius();
     countriesG.selectAll('path').attr('d', path);
     svg.selectAll('.graticule-path').attr('d', path);
     drawRings();
