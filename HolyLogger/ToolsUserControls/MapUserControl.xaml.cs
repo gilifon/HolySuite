@@ -69,7 +69,18 @@ namespace HolyLogger.ToolsUserControls
 
         private void RenderMap()
         {
-            double marginMultiplier = Properties.Settings.Default.MapAutoFitMargin;
+            double marginMultiplier = 1.15; // default
+            try
+            {
+                marginMultiplier = Properties.Settings.Default.MapAutoFitMargin;
+                if (marginMultiplier < 1.0 || marginMultiplier > 2.0)
+                    marginMultiplier = 1.15;
+            }
+            catch
+            {
+                marginMultiplier = 1.15;
+            }
+
             string html = _isPolar
                 ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier)
                 : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier);
