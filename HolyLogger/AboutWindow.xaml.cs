@@ -23,12 +23,13 @@ namespace HolyLogger
     public partial class AboutWindow : Window
     {
         Mutex myMutex;
-        public AboutWindow()
+        public AboutWindow(int callsignVersion = 0)
         {
             InitializeComponent();
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
             Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
             L_Version.Text = "Version " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            L_CallsignVersion.Text = "Callsigns Version: " + callsignVersion.ToString();
             L_LastUpdate.Text = "Last Update: " + GetLinkerDateTime(Assembly.GetExecutingAssembly()).ToShortDateString();
         }
 

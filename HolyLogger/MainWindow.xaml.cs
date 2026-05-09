@@ -2251,7 +2251,7 @@ namespace HolyLogger
 
         private void GenerateNewAboutWindow()
         {
-            about = new AboutWindow();
+            about = new AboutWindow(callsignListVersion);
             about.Show();
         }
 
@@ -2754,21 +2754,12 @@ namespace HolyLogger
                         
                         File.AppendAllText(logPath, "Update result: " + updateResult + "\n");
 
-                        string msg = "Server response (version " + callsignListVersion.ToString(CultureInfo.InvariantCulture) + "): " + serverReply
-                            + "\n\nUpdate result: " + updateResult;
-
-                        Status = msg;
-                        
-                        this.Dispatcher.Invoke(() =>
-                        {
-                            System.Windows.Forms.MessageBox.Show(msg, "Callsign Update", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
-                        });
+                        // Keep startup UI quiet: no popup and no status bar updates.
                     }
                 }
                 catch (Exception ex)
                 {
                     string msg = "Callsign update request failed: " + ex.Message;
-                    Status = msg;
                     
                     string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
                     try
@@ -2777,10 +2768,7 @@ namespace HolyLogger
                     }
                     catch { }
                     
-                    this.Dispatcher.Invoke(() =>
-                    {
-                        System.Windows.Forms.MessageBox.Show(msg, "Callsign Update", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
-                    });
+                    // No popup on failure; error is kept in status and log.
                 }
             });
         }
