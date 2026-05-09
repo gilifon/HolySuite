@@ -238,6 +238,8 @@ namespace HolyLogger
         private const int CallsignLookupDebounceMs = 280;
         private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
         private bool callsignSuggestionMouseControl = false;
+        private HashSet<string> newCallsignsSet = new HashSet<string>(StringComparer.Ordinal);
+        private CallsignUploader _callsignUploader;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
@@ -268,6 +270,9 @@ namespace HolyLogger
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
             LoadCallsignIndex();
+            LoadNewCallsignsSet();
+            _callsignUploader = new CallsignUploader(AppDomain.CurrentDomain.BaseDirectory);
+            _callsignUploader.TrySendFireAndForget();
 
             if (Properties.Settings.Default.EnableUDPClient)
             {
@@ -308,6 +313,7 @@ namespace HolyLogger
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
 
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
+            UpdateShareIconVisibility();
 
             if (Properties.Settings.Default.UpdateSettings)
             {
@@ -584,6 +590,7 @@ namespace HolyLogger
             this.Dispatcher.Invoke(() =>
             {
                 NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
+                UpdateShareIconVisibility();
             });
         }
 
@@ -668,7 +675,7 @@ namespace HolyLogger
         private void HeartbeatTimer_Tick(object sender, EventArgs e)
         {
             uint idle_t = Helper.GetIdleTime();
-            if (isNetworkAvailable && idle_t < 1000 * 60 * 5)
+            if (isNetworkAvailable && idle_t < 1000 * 60 * 5 && Properties.Settings.Default.ShowOnTheAir)
             {
                 Helper.SendHeartbeat(MachineName, TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), TB_Frequency.Text.Trim(), CB_Mode.Text.Trim()); //1000->seconds 60->minute 5->minutes
             }
@@ -2593,6 +2600,54 @@ namespace HolyLogger
             TB_Exchange.Focusable = true;
         }
 
+        private void AddNewCallsignIfMissing(string bareCallsign)
+        {
+            if (string.IsNullOrWhiteSpace(bareCallsign)) return;
+            string call = bareCallsign.Trim().ToUpperInvariant();
+
+            // If the callsign is already known from the big index, it is not "new".
+            int idx = callsignIndex.BinarySearch(call, StringComparer.Ordinal);
+            if (idx >= 0)
+                return;
+
+            // Add truly new callsigns to the in-memory dropdown index.
+            callsignIndex.Insert(~idx, call);
+
+            // Append to callsigns_new.txt only if not already recorded
+            if (newCallsignsSet.Add(call))
+            {
+                try
+                {
+                    string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsigns_new.txt");
+                    File.AppendAllText(filePath, call + Environment.NewLine);
+                }
+                catch { }
+                _callsignUploader?.TrySendFireAndForget();
+            }
+        }
+
+        private void LoadNewCallsignsSet()
+        {
+            try
+            {
+                string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsigns_new.txt");
+                if (!File.Exists(filePath)) return;
+
+                var deduped = new List<string>();
+                foreach (var rawLine in File.ReadLines(filePath))
+                {
+                    string call = rawLine.Trim().ToUpperInvariant();
+                    if (string.IsNullOrWhiteSpace(call)) continue;
+                    if (newCallsignsSet.Add(call))
+                        deduped.Add(call);
+                }
+
+                // Rewrite file without duplicates
+                File.WriteAllLines(filePath, deduped);
+            }
+            catch { }
+        }
+
         private void LoadCallsignIndex()
         {
             try
@@ -3160,6 +3215,22 @@ namespace HolyLogger
 
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(Properties.Settings.Default.ShowOnTheAir))
+            {
+                Dispatcher.BeginInvoke(new Action(UpdateShareIconVisibility), DispatcherPriority.Background);
+            }
+        }
+
+        private void UpdateShareIconVisibility()
+        {
+            if (ShareStatusButton == null)
+            {
+                return;
+            }
+
+            ShareStatusButton.Visibility = isNetworkAvailable && Properties.Settings.Default.ShowOnTheAir
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private async void GetQrzData()
@@ -3220,6 +3291,8 @@ namespace HolyLogger
                                 SetAzimuth();
                                 SetDXLocator(QRZGrid);
                                 //*************************************************//
+
+                                AddNewCallsignIfMissing(bare_dxcall);
 
                                 string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
                                 if (SessionKey != key)

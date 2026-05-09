@@ -298,7 +298,26 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}"  Margin="0,0,0,0" FontSize="16" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}" Margin="0,0,0,0" FontSize="16" VerticalAlignment="Center"/>
+                        <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="30,0,0,0" Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1" ToolTipService.InitialShowDelay="200" ToolTipService.Placement="Top" Visibility="Collapsed">
+                            <Button.ToolTip>
+                                <TextBlock TextAlignment="Center">
+                                    <Run Text="Show me in HolyLogger"/>
+                                    <LineBreak/>
+                                    <Run Text="On The Air is selected"/>
+                                </TextBlock>
+                            </Button.ToolTip>
+                            <Viewbox Width="14" Height="14">
+                                <Canvas Width="24" Height="24">
+                                    <Path Stroke="#303030" StrokeThickness="2" Fill="Transparent" Data="M7,12 L16,7 M7,12 L16,17"/>
+                                    <Ellipse Canvas.Left="3.5" Canvas.Top="8.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                                    <Ellipse Canvas.Left="14.5" Canvas.Top="3.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                                    <Ellipse Canvas.Left="14.5" Canvas.Top="13.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
+                    </StackPanel>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">

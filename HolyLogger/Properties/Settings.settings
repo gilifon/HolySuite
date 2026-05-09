@@ -275,5 +275,11 @@
     <Setting Name="ShowCallsignDropdown" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="ShowOnTheAir" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="MapAutoFitMargin" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">1.15</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
