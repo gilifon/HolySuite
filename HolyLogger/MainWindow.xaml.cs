@@ -2724,7 +2724,12 @@ namespace HolyLogger
             // Log immediately at startup
             try
             {
-                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
+                string logDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "HolyLogger",
+                    "Logs");
+                Directory.CreateDirectory(logDir);
+                string logPath = Path.Combine(logDir, "callsign_update.log");
                 File.WriteAllText(logPath, "Update process started at " + DateTime.Now.ToString() + "\n");
             }
             catch { }
@@ -2734,25 +2739,147 @@ namespace HolyLogger
             {
                 try
                 {
-                    string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
-                    File.AppendAllText(logPath, "Building URL with version: " + callsignListVersion.ToString(CultureInfo.InvariantCulture) + "\n");
+                    string logDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "HolyLogger",
+                        "Logs");
+                    Directory.CreateDirectory(logDir);
+                    string logPath = Path.Combine(logDir, "callsign_update.log");
+                    string traceLogPath = Path.Combine(logDir, "callsign_sync_trace.log");
+                    bool verboseSyncTrace = Properties.Settings.Default.CallsignSyncVerboseLog;
 
-                    string url = "https://tools.iarc.org/holyland/server/getcallsign.php?version="
-                        + callsignListVersion.ToString(CultureInfo.InvariantCulture);
-                    
-                    File.AppendAllText(logPath, "URL: " + url + "\n");
-                    File.AppendAllText(logPath, "Making HTTP request...\n");
+                    // Keep trace log bounded by rolling it when it gets too large.
+                    try
+                    {
+                        if (verboseSyncTrace && File.Exists(traceLogPath))
+                        {
+                            var traceInfo = new FileInfo(traceLogPath);
+                            if (traceInfo.Length > (10 * 1024 * 1024))
+                            {
+                                string rolledPath = Path.Combine(
+                                    logDir,
+                                    "callsign_sync_trace_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + ".log");
+                                File.Move(traceLogPath, rolledPath);
+                            }
+                        }
+                    }
+                    catch { }
+
+                    Action<string> appendTrace = message =>
+                    {
+                        if (!verboseSyncTrace)
+                            return;
+
+                        try
+                        {
+                            File.AppendAllText(traceLogPath, message + "\n");
+                        }
+                        catch { }
+                    };
+
+                    appendTrace("============================================================");
+                    appendTrace("SYNC START " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+                    appendTrace("Initial local version: " + callsignListVersion.ToString(CultureInfo.InvariantCulture));
 
                     using (var client = new HttpClient())
                     {
                         client.Timeout = TimeSpan.FromSeconds(20);
-                        string serverReply = await client.GetStringAsync(url);
-                        
-                        File.AppendAllText(logPath, "Server reply received: " + serverReply.Substring(0, Math.Min(200, serverReply.Length)) + "...\n");
+                        const int maxBatches = 1000;
+                        int batchNumber = 0;
+                        bool hasMore;
 
-                        string updateResult = ApplyCallsignListUpdate(serverReply);
-                        
-                        File.AppendAllText(logPath, "Update result: " + updateResult + "\n");
+                        do
+                        {
+                            int requestVersion = callsignListVersion;
+                            File.AppendAllText(logPath, "Building URL with version: " + requestVersion.ToString(CultureInfo.InvariantCulture) + "\n");
+
+                            string url = "https://tools.iarc.org/holyland/server/getcallsign.php?version="
+                                + requestVersion.ToString(CultureInfo.InvariantCulture);
+
+                            appendTrace("---- BATCH " + (batchNumber + 1).ToString(CultureInfo.InvariantCulture) + " ----");
+                            appendTrace("Request time: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+                            appendTrace("Local version before request: " + requestVersion.ToString(CultureInfo.InvariantCulture));
+                            appendTrace("Request URL: " + url);
+
+                            File.AppendAllText(logPath, "URL: " + url + "\n");
+                            File.AppendAllText(logPath, "Making HTTP request...\n");
+
+                            string serverReply = await client.GetStringAsync(url);
+                            File.AppendAllText(logPath, "Server reply received: " + serverReply.Substring(0, Math.Min(200, serverReply.Length)) + "...\n");
+
+                            appendTrace("Raw server reply:");
+                            appendTrace(serverReply);
+
+                            var response = Newtonsoft.Json.Linq.JObject.Parse(serverReply);
+                            bool success = response["success"] != null && response["success"].ToObject<bool>();
+                            hasMore = response["hasMore"] != null && response["hasMore"].ToObject<bool>();
+                            int latestVersion = response["latestVersion"] != null
+                                ? response["latestVersion"].ToObject<int>()
+                                : -1;
+                            int itemCount = response["count"] != null
+                                ? response["count"].ToObject<int>()
+                                : ((response["data"] as Newtonsoft.Json.Linq.JArray)?.Count ?? 0);
+
+                            int addRequests = 0;
+                            int removeRequests = 0;
+                            var responseData = response["data"] as Newtonsoft.Json.Linq.JArray;
+                            if (responseData != null)
+                            {
+                                foreach (var row in responseData)
+                                {
+                                    int active = row["active"] != null ? row["active"].ToObject<int>() : 0;
+                                    if (active == 1)
+                                        addRequests++;
+                                    else if (active == -1)
+                                        removeRequests++;
+                                }
+                            }
+
+                            appendTrace(
+                                "Parsed reply: success=" + success.ToString(CultureInfo.InvariantCulture)
+                                + ", hasMore=" + hasMore.ToString(CultureInfo.InvariantCulture)
+                                + ", latestVersion=" + latestVersion.ToString(CultureInfo.InvariantCulture)
+                                + ", count=" + itemCount.ToString(CultureInfo.InvariantCulture));
+                            appendTrace(
+                                "Batch delta requests: adds=" + addRequests.ToString(CultureInfo.InvariantCulture)
+                                + ", removes=" + removeRequests.ToString(CultureInfo.InvariantCulture)
+                                + ", net=" + (addRequests - removeRequests).ToString(CultureInfo.InvariantCulture));
+
+                            string updateResult = ApplyCallsignListUpdate(serverReply);
+                            File.AppendAllText(logPath, "Update result: " + updateResult + "\n");
+                            appendTrace("Apply result: " + updateResult);
+                            appendTrace("Local version after apply: " + callsignListVersion.ToString(CultureInfo.InvariantCulture));
+
+                            if (updateResult.StartsWith("ERROR:", StringComparison.Ordinal))
+                            {
+                                appendTrace("Stopping sync because apply returned an error.");
+                                break;
+                            }
+
+                            batchNumber++;
+
+                            // Prevent infinite loops if the server reports hasMore without version progress.
+                            if (hasMore && callsignListVersion <= requestVersion)
+                            {
+                                File.AppendAllText(logPath, "ERROR: hasMore=true but version did not advance. Stopping to avoid loop.\n");
+                                appendTrace("Stopping sync because hasMore=true but version did not advance.");
+                                break;
+                            }
+
+                            if (batchNumber >= maxBatches)
+                            {
+                                File.AppendAllText(logPath, "ERROR: Reached max batches (" + maxBatches.ToString(CultureInfo.InvariantCulture) + "). Stopping.\n");
+                                appendTrace("Stopping sync because max batch limit was reached: " + maxBatches.ToString(CultureInfo.InvariantCulture));
+                                break;
+                            }
+
+                            appendTrace("Will request next batch: " + hasMore.ToString(CultureInfo.InvariantCulture));
+                        } while (hasMore);
+
+                        File.AppendAllText(logPath, "Update process finished after " + batchNumber.ToString(CultureInfo.InvariantCulture) + " batch(es).\n");
+                        appendTrace("SYNC END " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture));
+                        appendTrace("Final local version: " + callsignListVersion.ToString(CultureInfo.InvariantCulture));
+                        appendTrace("Batches completed: " + batchNumber.ToString(CultureInfo.InvariantCulture));
 
                         // Keep startup UI quiet: no popup and no status bar updates.
                     }
@@ -2760,11 +2887,25 @@ namespace HolyLogger
                 catch (Exception ex)
                 {
                     string msg = "Callsign update request failed: " + ex.Message;
-                    
-                    string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
+
+                    string logDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "HolyLogger",
+                        "Logs");
+                    string logPath = Path.Combine(logDir, "callsign_update.log");
                     try
                     {
+                        Directory.CreateDirectory(logDir);
                         File.AppendAllText(logPath, "ERROR: " + msg + "\n");
+
+                        if (Properties.Settings.Default.CallsignSyncVerboseLog)
+                        {
+                            string traceLogPath = Path.Combine(logDir, "callsign_sync_trace.log");
+                            File.AppendAllText(
+                                traceLogPath,
+                                "SYNC ERROR " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
+                                + " - " + msg + "\n");
+                        }
                     }
                     catch { }
                     
@@ -2792,6 +2933,17 @@ namespace HolyLogger
                 var callsignSet = new HashSet<string>(StringComparer.Ordinal);
                 var fileLines = File.ReadAllLines(callsignFilePath);
                 int newVersion = callsignListVersion;
+                bool hasLatestVersion = false;
+
+                if (response["latestVersion"] != null)
+                {
+                    int parsedLatestVersion;
+                    if (int.TryParse(response["latestVersion"].ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedLatestVersion))
+                    {
+                        newVersion = parsedLatestVersion;
+                        hasLatestVersion = true;
+                    }
+                }
 
                 foreach (var line in fileLines.Skip(1))
                 {
@@ -2807,6 +2959,8 @@ namespace HolyLogger
                 if (dataArray == null)
                     return "ERROR: Invalid data array in response";
 
+                int lastItemVersion = 0;
+
                 foreach (var item in dataArray)
                 {
                     string callsign = (item["callsign"]?.ToString() ?? "").ToUpperInvariant();
@@ -2821,8 +2975,11 @@ namespace HolyLogger
                             callsignSet.Remove(callsign);
                     }
 
-                    newVersion = version;
+                    lastItemVersion = version;
                 }
+
+                if (!hasLatestVersion && lastItemVersion > 0)
+                    newVersion = lastItemVersion;
 
                 var sortedCallsigns = callsignSet.ToList();
                 sortedCallsigns.Sort(StringComparer.Ordinal);
