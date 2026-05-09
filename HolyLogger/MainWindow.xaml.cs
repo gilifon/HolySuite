@@ -2724,7 +2724,12 @@ namespace HolyLogger
             // Log immediately at startup
             try
             {
-                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
+                string logDir = Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                    "HolyLogger",
+                    "Logs");
+                Directory.CreateDirectory(logDir);
+                string logPath = Path.Combine(logDir, "callsign_update.log");
                 File.WriteAllText(logPath, "Update process started at " + DateTime.Now.ToString() + "\n");
             }
             catch { }
@@ -2734,9 +2739,13 @@ namespace HolyLogger
             {
                 try
                 {
-                    string baseDir = AppDomain.CurrentDomain.BaseDirectory;
-                    string logPath = Path.Combine(baseDir, "callsign_update.log");
-                    string traceLogPath = Path.Combine(baseDir, "callsign_sync_trace.log");
+                    string logDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "HolyLogger",
+                        "Logs");
+                    Directory.CreateDirectory(logDir);
+                    string logPath = Path.Combine(logDir, "callsign_update.log");
+                    string traceLogPath = Path.Combine(logDir, "callsign_sync_trace.log");
                     bool verboseSyncTrace = Properties.Settings.Default.CallsignSyncVerboseLog;
 
                     // Keep trace log bounded by rolling it when it gets too large.
@@ -2748,7 +2757,7 @@ namespace HolyLogger
                             if (traceInfo.Length > (10 * 1024 * 1024))
                             {
                                 string rolledPath = Path.Combine(
-                                    baseDir,
+                                    logDir,
                                     "callsign_sync_trace_" + DateTime.Now.ToString("yyyyMMdd_HHmmss", CultureInfo.InvariantCulture) + ".log");
                                 File.Move(traceLogPath, rolledPath);
                             }
@@ -2878,15 +2887,20 @@ namespace HolyLogger
                 catch (Exception ex)
                 {
                     string msg = "Callsign update request failed: " + ex.Message;
-                    
-                    string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
+
+                    string logDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "HolyLogger",
+                        "Logs");
+                    string logPath = Path.Combine(logDir, "callsign_update.log");
                     try
                     {
+                        Directory.CreateDirectory(logDir);
                         File.AppendAllText(logPath, "ERROR: " + msg + "\n");
 
                         if (Properties.Settings.Default.CallsignSyncVerboseLog)
                         {
-                            string traceLogPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_sync_trace.log");
+                            string traceLogPath = Path.Combine(logDir, "callsign_sync_trace.log");
                             File.AppendAllText(
                                 traceLogPath,
                                 "SYNC ERROR " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss", CultureInfo.InvariantCulture)
