@@ -1126,5 +1126,15 @@ namespace HolyLogger.Properties {
                 this["ShowOnTheAir"] = value;
             }
         }
+
+        [global::System.Configuration.DefaultSettingValueAttribute("1.15")]
+        public double MapAutoFitMargin {
+            get {
+                return ((double)(this["MapAutoFitMargin"]));
+            }
+            set {
+                this["MapAutoFitMargin"] = value;
+            }
+        }
     }
 }

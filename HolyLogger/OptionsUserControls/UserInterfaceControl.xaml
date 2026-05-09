@@ -24,7 +24,16 @@
             <ComboBoxItem Content="25"/>
             <ComboBoxItem Content="30"/>
         </ComboBox>
-        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,246,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
+        <TextBlock Text="Increas Auto Fit Radius by" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,250,0,0" FontSize="16"/>
+        <ComboBox x:Name="CB_MapAutoFitMargin" HorizontalAlignment="Left" VerticalAlignment="Top" Width="60" Height="28" Margin="210,242,0,0" SelectionChanged="CB_MapAutoFitMargin_SelectionChanged" FontSize="16">
+            <ComboBoxItem Content="0"/>
+            <ComboBoxItem Content="5"/>
+            <ComboBoxItem Content="10"/>
+            <ComboBoxItem Content="20"/>
+            <ComboBoxItem Content="25"/>
+        </ComboBox>
+        <TextBlock Text="%" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="278,250,0,0" FontSize="16"/>
+        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,280,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>

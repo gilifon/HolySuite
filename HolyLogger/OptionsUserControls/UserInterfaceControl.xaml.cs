@@ -27,6 +27,7 @@ namespace HolyLogger.OptionsUserControls
             InitializeComponent();
             HasChanged = false;
             SetCallsignSuggestionRowsSelection();
+            SetMapAutoFitMarginSelection();
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)
@@ -62,6 +63,43 @@ namespace HolyLogger.OptionsUserControls
             if (Properties.Settings.Default.CallsignSuggestionRows != rows)
             {
                 Properties.Settings.Default.CallsignSuggestionRows = rows;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+            }
+        }
+
+        private void SetMapAutoFitMarginSelection()
+        {
+            double margin = Properties.Settings.Default.MapAutoFitMargin;
+            // Convert multiplier to percentage: 1.15 -> 15, 1.0 -> 0, etc.
+            int percentage = (int)Math.Round((margin - 1.0) * 100);
+            if (percentage != 0 && percentage != 5 && percentage != 10 && percentage != 20 && percentage != 25)
+            {
+                percentage = 15;
+            }
+
+            foreach (var item in CB_MapAutoFitMargin.Items)
+            {
+                ComboBoxItem comboItem = item as ComboBoxItem;
+                if (comboItem != null && (string)comboItem.Content == percentage.ToString())
+                {
+                    CB_MapAutoFitMargin.SelectedItem = comboItem;
+                    break;
+                }
+            }
+        }
+
+        private void CB_MapAutoFitMargin_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ComboBoxItem selected = CB_MapAutoFitMargin.SelectedItem as ComboBoxItem;
+            int percentage;
+            if (selected == null || !int.TryParse((string)selected.Content, out percentage)) return;
+
+            double multiplier = 1.0 + (percentage / 100.0);
+            
+            if (Math.Abs(Properties.Settings.Default.MapAutoFitMargin - multiplier) > 0.001)
+            {
+                Properties.Settings.Default.MapAutoFitMargin = multiplier;
                 Properties.Settings.Default.Save();
                 HasChanged = true;
             }

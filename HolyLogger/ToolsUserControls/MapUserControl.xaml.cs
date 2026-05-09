@@ -69,9 +69,10 @@ namespace HolyLogger.ToolsUserControls
 
         private void RenderMap()
         {
+            double marginMultiplier = Properties.Settings.Default.MapAutoFitMargin;
             string html = _isPolar
-                ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon)
-                : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon);
+                ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier)
+                : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier);
             File.WriteAllText(_tempMapFile, html, System.Text.Encoding.UTF8);
             var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
             uriBuilder.Query = "v=" + DateTime.UtcNow.Ticks.ToString();
@@ -91,10 +92,11 @@ namespace HolyLogger.ToolsUserControls
             PlaceholderPanel.Visibility = System.Windows.Visibility.Visible;
         }
 
-        private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null)
+        private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15)
         {
             string latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string marginJs = marginMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
             int radiusMeters = radiusKm * 1000;
             int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
           string azimuthJs = "0";
@@ -217,6 +219,7 @@ window.onerror = function() { return true; };
 var homeLat = " + latStr + @", homeLon = " + lonStr + @";
 var azimuthDeg = " + azimuthJs + @";
 var radiusMeters = " + radiusMeters + @";
+var marginMultiplier = " + marginJs + @";
 var dxLat = homeLat, dxLon = homeLon;
 var operatorLat = " + homeLatJs + @";
 var operatorLon = " + homeLonJs + @";
@@ -228,12 +231,56 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 
 
 // Create visible red circle to show the search radius (centered on home)
 var radiusCircle = L.circle([circleLat, circleLon], { radius: radiusMeters, color: '#E53935', fill: false, weight: 2 }).addTo(map);
-var fitBounds = radiusCircle.getBounds();
-// If DX station is outside the circle, expand bounds to include it
-if (operatorLat !== null && operatorLon !== null) {
-    fitBounds = fitBounds.extend(L.latLng(dxLat, dxLon));
+
+function haversineMeters(lat1, lon1, lat2, lon2) {
+  var toRad = Math.PI / 180;
+  var dLat = (lat2 - lat1) * toRad;
+  var dLon = (lon2 - lon1) * toRad;
+  var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
-map.fitBounds(fitBounds, { padding: [2, 2] });
+
+function destinationPoint(lat, lon, bearingRad, distanceMeters) {
+  var R = 6371000;
+  var angDist = distanceMeters / R;
+  var lat1 = lat * Math.PI / 180;
+  var lon1 = lon * Math.PI / 180;
+
+  var sinLat1 = Math.sin(lat1), cosLat1 = Math.cos(lat1);
+  var sinAng = Math.sin(angDist), cosAng = Math.cos(angDist);
+
+  var lat2 = Math.asin(sinLat1 * cosAng + cosLat1 * sinAng * Math.cos(bearingRad));
+  var lon2 = lon1 + Math.atan2(
+      Math.sin(bearingRad) * sinAng * cosLat1,
+      cosAng - sinLat1 * Math.sin(lat2)
+  );
+
+  return { lat: lat2 * 180 / Math.PI, lon: lon2 * 180 / Math.PI };
+}
+
+function buildFitBounds() {
+  var b = radiusCircle.getBounds();
+  if (operatorLat !== null && operatorLon !== null) {
+    var dxDistMeters = haversineMeters(operatorLat, operatorLon, dxLat, dxLon);
+    b = b.extend(L.latLng(dxLat, dxLon));
+
+    if (dxDistMeters > radiusMeters) {
+      var lat1 = operatorLat * Math.PI / 180;
+      var lat2 = dxLat * Math.PI / 180;
+      var dLon = (dxLon - operatorLon) * Math.PI / 180;
+      var y = Math.sin(dLon) * Math.cos(lat2);
+      var x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon);
+      var bearing = Math.atan2(y, x);
+      var p = destinationPoint(operatorLat, operatorLon, bearing, dxDistMeters * marginMultiplier);
+      b = b.extend(L.latLng(p.lat, p.lon));
+    }
+  }
+  return b;
+}
+
+map.fitBounds(buildFitBounds(), { padding: [2, 2] });
 
 // Interpolate N points along a great circle arc (IE11-safe, no external lib)
 function gcArcPoints(lat1, lon1, lat2, lon2, n) {
@@ -268,9 +315,7 @@ document.getElementById('compass-text').innerHTML = 'AZ ' + Math.round(azimuthDe
 document.getElementById('compass-needle').setAttribute('transform', 'rotate(' + azimuthDeg + ' 50 50)');
 
 function fitAll() {
-    var b = radiusCircle.getBounds();
-    if (operatorLat !== null && operatorLon !== null) b = b.extend(L.latLng(dxLat, dxLon));
-    map.fitBounds(b, { padding: [2, 2] });
+  map.fitBounds(buildFitBounds(), { padding: [2, 2] });
 }
 function onRadiusChange(km) {
     radiusMeters = km * 1000;
@@ -291,7 +336,7 @@ function toggleProjection() {
 </html>";
         }
 
-        private string BuildPolarMapHtml(double dxLat, double dxLon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null)
+        private string BuildPolarMapHtml(double dxLat, double dxLon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15)
         {
             // Center on home QTH; fall back to DX if no home available.
             double centerLat = homeLat.HasValue ? homeLat.Value : dxLat;
@@ -300,6 +345,7 @@ function toggleProjection() {
             string centerLonJs = centerLon.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string dxLatJs = dxLat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string dxLonJs = dxLon.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            string marginJs = marginMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string azJs = "0";
             if (azimuthDeg.HasValue)
             {
@@ -371,6 +417,7 @@ var dxLat    = " + dxLatJs + @";
 var dxLon    = " + dxLonJs + @";
 var azimuthDeg = " + azJs + @";
 var radiusKm   = " + radiusKm.ToString() + @";
+var marginMultiplier = " + marginJs + @";
 var EARTH_KM   = 6371;
 
 // GC distance home->DX in km (haversine), so we can expand scale if DX is beyond selected radius
@@ -408,8 +455,12 @@ var baseScale = mapR / Math.PI;
 scaleToRadius();
 
 function scaleToRadius() {
-  // Use whichever is larger: selected radius or actual DX distance; keeps DX visible.
-  var effectiveKm = Math.max(radiusKm, dxDistKm);
+  // Keep selected-radius behavior, but when DX is outside the selected radius
+  // add headroom so the DX marker is not glued to the edge.
+  var effectiveKm = radiusKm;
+  if (dxDistKm > radiusKm) {
+    effectiveKm = dxDistKm * marginMultiplier;
+  }
   var ang = effectiveKm / EARTH_KM;
   if (!isFinite(ang) || ang <= 0) { projection.scale(baseScale); return; }
   var targetPx = mapR - 4;
