@@ -154,7 +154,7 @@ namespace HolyLogger.ToolsUserControls
   }
   #center-btn {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:0; padding:0 4px; cursor:pointer;
+    border-radius:10px; padding:0 4px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333;
   }
@@ -345,7 +345,7 @@ function toggleProjection() {
   }
   #center-btn {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:0; padding:0 4px; cursor:pointer;
+    border-radius:10px; padding:0 4px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333;
   }

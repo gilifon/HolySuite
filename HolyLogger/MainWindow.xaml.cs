@@ -313,6 +313,7 @@ namespace HolyLogger
                 this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
 
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
+            UpdateShareIconVisibility();
 
             if (Properties.Settings.Default.UpdateSettings)
             {
@@ -589,6 +590,7 @@ namespace HolyLogger
             this.Dispatcher.Invoke(() =>
             {
                 NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
+                UpdateShareIconVisibility();
             });
         }
 
@@ -3213,6 +3215,22 @@ namespace HolyLogger
 
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)
         {
+            if (e.PropertyName == nameof(Properties.Settings.Default.ShowOnTheAir))
+            {
+                Dispatcher.BeginInvoke(new Action(UpdateShareIconVisibility), DispatcherPriority.Background);
+            }
+        }
+
+        private void UpdateShareIconVisibility()
+        {
+            if (ShareStatusButton == null)
+            {
+                return;
+            }
+
+            ShareStatusButton.Visibility = isNetworkAvailable && Properties.Settings.Default.ShowOnTheAir
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private async void GetQrzData()
