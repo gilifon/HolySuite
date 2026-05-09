@@ -72,8 +72,6 @@ namespace HolyLogger.ToolsUserControls
             double marginMultiplier = 1.15; // default
             try
             {
-                // Reload settings from disk to get latest values
-                Properties.Settings.Default.Reload();
                 marginMultiplier = Properties.Settings.Default.MapAutoFitMargin;
                 if (marginMultiplier < 1.0 || marginMultiplier > 2.0)
                     marginMultiplier = 1.15;
