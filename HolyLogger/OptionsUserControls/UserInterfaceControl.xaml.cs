@@ -137,22 +137,27 @@ namespace HolyLogger.OptionsUserControls
 
         private void CB_MapAutoFitMargin_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
+            ComboBoxItem selected = CB_MapAutoFitMargin.SelectedItem as ComboBoxItem;
+            if (selected == null)
+                return;
+            
+            int percentage;
+            if (!int.TryParse((string)selected.Content, out percentage))
+                return;
+
+            double multiplier = 1.0 + (percentage / 100.0);
+            
+            // Always save if there's a change, even if difference seems small
             try
             {
-                ComboBoxItem selected = CB_MapAutoFitMargin.SelectedItem as ComboBoxItem;
-                int percentage;
-                if (selected == null || !int.TryParse((string)selected.Content, out percentage)) return;
-
-                double multiplier = 1.0 + (percentage / 100.0);
-                
-                if (Math.Abs(Properties.Settings.Default.MapAutoFitMargin - multiplier) > 0.001)
-                {
-                    Properties.Settings.Default.MapAutoFitMargin = multiplier;
-                    Properties.Settings.Default.Save();
-                    HasChanged = true;
-                }
+                Properties.Settings.Default.MapAutoFitMargin = multiplier;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
             }
-            catch { }
+            catch
+            {
+                // Settings save failed silently
+            }
         }
 
     }
