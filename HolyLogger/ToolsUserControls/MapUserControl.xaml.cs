@@ -380,6 +380,14 @@ function recenter() {
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
 }
+
+// Auto-resize on window resize: invalidate map to reflow and refocus
+window.addEventListener('resize', function() {
+    if (map) {
+        map.invalidateSize();
+        fitAll();
+    }
+});
 </script>
 </body>
 </html>";
@@ -547,7 +555,7 @@ function scaleToRadius() {
 }
 
 // Ocean fill
-svg.append('circle')
+svg.append('circle').attr('class', 'ocean-fill')
     .attr('cx', cx).attr('cy', cy).attr('r', mapR)
     .attr('fill', '#4a90c4').attr('stroke', '#1a4060').attr('stroke-width', 2);
 
@@ -689,6 +697,37 @@ document.addEventListener('wheel', function(e) {
     drawRadiusRing(radiusKm);
     drawOverlays();
 }, { passive: false });
+
+// Auto-resize on window resize: recalculate dimensions and redraw polar map
+window.addEventListener('resize', function() {
+    var oldW = W, oldH = H;
+    W = window.innerWidth;
+    H = window.innerHeight;
+    if (W === oldW && H === oldH) return; // No size change
+    
+    mapR = Math.floor((Math.min(W, H) / 2) - 4);
+    cx = W / 2;
+    cy = H / 2;
+    baseScale = mapR / Math.PI;
+    
+    svg.attr('width', W).attr('height', H);
+    
+    // Update ocean fill background
+    svg.select('.ocean-fill').attr('cx', cx).attr('cy', cy).attr('r', mapR);
+    
+    // Update clip path circle
+    svg.select('#globe-clip circle').attr('cx', cx).attr('cy', cy).attr('r', mapR - 1);
+    
+    projection.translate([cx, cy]);
+    scaleToRadius();
+    
+    // Redraw all elements
+    countriesG.selectAll('path').attr('d', path);
+    svg.selectAll('.graticule-path').attr('d', path);
+    drawRings();
+    drawRadiusRing(radiusKm);
+    drawOverlays();
+});
 </script>
 </body>
 </html>";
