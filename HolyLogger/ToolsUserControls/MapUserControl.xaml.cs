@@ -67,6 +67,14 @@ namespace HolyLogger.ToolsUserControls
             RenderMap();
         }
 
+          public void RefreshMap()
+          {
+            if (MapBrowser.Visibility == System.Windows.Visibility.Visible)
+            {
+              RenderMap();
+            }
+          }
+
         private void RenderMap()
         {
             double marginMultiplier = 1.15; // default
@@ -108,6 +116,8 @@ namespace HolyLogger.ToolsUserControls
             string latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string marginJs = marginMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
+          bool useMiles = string.Equals(Properties.Settings.Default.MapDistanceUnit, "Miles", StringComparison.OrdinalIgnoreCase);
+          string useMilesJs = useMiles ? "true" : "false";
             int radiusMeters = radiusKm * 1000;
             int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
           string azimuthJs = "0";
@@ -120,7 +130,12 @@ namespace HolyLogger.ToolsUserControls
           }            string homeLatJs = homeLat.HasValue ? homeLat.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null";
             string homeLonJs = homeLon.HasValue ? homeLon.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "null";            var options = new System.Text.StringBuilder();
             foreach (int r in radiiOptions)
-                options.AppendFormat("<option value='{0}'{1}>{0} km</option>", r, r == radiusKm ? " selected" : "");
+            {
+              string optionText = useMiles
+                ? Math.Round(r * 0.621371).ToString(System.Globalization.CultureInfo.InvariantCulture) + " mi"
+                : r.ToString(System.Globalization.CultureInfo.InvariantCulture) + " km";
+              options.AppendFormat("<option value='{0}'{1}>{2}</option>", r, r == radiusKm ? " selected" : "", optionText);
+            }
 
             return
 @"<!DOCTYPE html>
@@ -180,6 +195,13 @@ namespace HolyLogger.ToolsUserControls
     font-size:12px; font-weight:700; font-family:sans-serif; color:#333;
   }
   #proj-btn:hover { background:rgba(220,240,255,0.95); }
+  #distance-box {
+    position:absolute; bottom:0; right:0; z-index:1000;
+    background:rgba(255,255,255,0.9); border:1px solid #aaa;
+    border-radius:0; padding:3px 7px;
+    font-size:13px; font-weight:700; font-family:sans-serif; color:#333;
+    white-space:nowrap;
+  }
 </style>
 <link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
 </head>
@@ -224,6 +246,7 @@ namespace HolyLogger.ToolsUserControls
     </svg>
   </button>
 </div>
+<div id='distance-box'>DIST --</div>
 <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
 <script>
 window.onerror = function() { return true; };
@@ -231,6 +254,7 @@ var homeLat = " + latStr + @", homeLon = " + lonStr + @";
 var azimuthDeg = " + azimuthJs + @";
 var radiusMeters = " + radiusMeters + @";
 var marginMultiplier = " + marginJs + @";
+var useMiles = " + useMilesJs + @";
 var dxLat = homeLat, dxLon = homeLon;
 var operatorLat = " + homeLatJs + @";
 var operatorLon = " + homeLonJs + @";
@@ -251,6 +275,16 @@ function haversineMeters(lat1, lon1, lat2, lon2) {
       Math.cos(lat1 * toRad) * Math.cos(lat2 * toRad) *
       Math.sin(dLon / 2) * Math.sin(dLon / 2);
   return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function formatDistanceText(distanceMeters) {
+  if (distanceMeters === null || !isFinite(distanceMeters)) {
+    return useMiles ? 'DIST 0 mi' : 'DIST 0 km';
+  }
+  if (useMiles) {
+    return 'DIST ' + Math.round(distanceMeters / 1609.344) + ' mi';
+  }
+  return 'DIST ' + Math.round(distanceMeters / 1000) + ' km';
 }
 
 function destinationPoint(lat, lon, bearingRad, distanceMeters) {
@@ -324,6 +358,10 @@ if (operatorLat !== null && operatorLon !== null) {
 
 document.getElementById('compass-text').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
 document.getElementById('compass-needle').setAttribute('transform', 'rotate(' + azimuthDeg + ' 50 50)');
+var dxDistanceMeters = (operatorLat !== null && operatorLon !== null)
+  ? haversineMeters(operatorLat, operatorLon, dxLat, dxLon)
+  : null;
+document.getElementById('distance-box').innerHTML = formatDistanceText(dxDistanceMeters);
 
 function fitAll() {
   map.fitBounds(buildFitBounds(), { padding: [2, 2] });
@@ -352,6 +390,10 @@ function toggleProjection() {
             // Center on home QTH; fall back to DX if no home available.
             double centerLat = homeLat.HasValue ? homeLat.Value : dxLat;
             double centerLon = homeLon.HasValue ? homeLon.Value : dxLon;
+          bool hasHomeReference = homeLat.HasValue && homeLon.HasValue;
+          bool useMiles = string.Equals(Properties.Settings.Default.MapDistanceUnit, "Miles", StringComparison.OrdinalIgnoreCase);
+          string useMilesJs = useMiles ? "true" : "false";
+          string hasHomeReferenceJs = hasHomeReference ? "true" : "false";
             string centerLatJs = centerLat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string centerLonJs = centerLon.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string dxLatJs = dxLat.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -367,7 +409,12 @@ function toggleProjection() {
             int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
             var options = new System.Text.StringBuilder();
             foreach (int r in radiiOptions)
-                options.AppendFormat("<option value='{0}'{1}>{0} km</option>", r, r == radiusKm ? " selected" : "");
+            {
+              string optionText = useMiles
+                ? Math.Round(r * 0.621371).ToString(System.Globalization.CultureInfo.InvariantCulture) + " mi"
+                : r.ToString(System.Globalization.CultureInfo.InvariantCulture) + " km";
+              options.AppendFormat("<option value='{0}'{1}>{2}</option>", r, r == radiusKm ? " selected" : "", optionText);
+            }
 
             return
 @"<!DOCTYPE html>
@@ -390,6 +437,13 @@ function toggleProjection() {
     font-size:14px; font-weight:700; color:#e0f0ff;
     background:rgba(0,0,0,0.55); border-radius:0; padding:2px 6px;
     font-family:sans-serif;
+  }
+  #distance-box {
+    position:absolute; bottom:0; right:0; z-index:1000;
+    background:rgba(255,255,255,0.9); border:1px solid #aaa;
+    border-radius:0; padding:3px 7px;
+    font-size:13px; font-weight:700; font-family:sans-serif; color:#333;
+    white-space:nowrap;
   }
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000;
@@ -417,6 +471,7 @@ function toggleProjection() {
 <div id='bottom-ctrl'>
   <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select><button id='center-btn' onclick='recenter()' title='Reset zoom to selected radius'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
 </div>
+<div id='distance-box'>DIST --</div>
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'></script>
 <script>
@@ -429,6 +484,8 @@ var dxLon    = " + dxLonJs + @";
 var azimuthDeg = " + azJs + @";
 var radiusKm   = " + radiusKm.ToString() + @";
 var marginMultiplier = " + marginJs + @";
+var useMiles = " + useMilesJs + @";
+var hasHomeReference = " + hasHomeReferenceJs + @";
 var EARTH_KM   = 6371;
 
 // GC distance home->DX in km (haversine), so we can expand scale if DX is beyond selected radius
@@ -438,10 +495,21 @@ function haversineKm(lat1, lon1, lat2, lon2) {
   var a = Math.sin(dLat/2)*Math.sin(dLat/2) + Math.cos(lat1*toRad)*Math.cos(lat2*toRad)*Math.sin(dLon/2)*Math.sin(dLon/2);
   return EARTH_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
-var dxDistKm = haversineKm(centerLat, centerLon, dxLat, dxLon);
+var dxDistKm = hasHomeReference ? haversineKm(centerLat, centerLon, dxLat, dxLon) : null;
+
+function formatDistanceText(distanceKm) {
+  if (distanceKm === null || !isFinite(distanceKm)) {
+    return useMiles ? 'DIST 0 mi' : 'DIST 0 km';
+  }
+  if (useMiles) {
+    return 'DIST ' + Math.round(distanceKm * 0.621371) + ' mi';
+  }
+  return 'DIST ' + Math.round(distanceKm) + ' km';
+}
 
 // Azimuth label (polar mode has no compass ring)
 document.getElementById('az-only').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
+document.getElementById('distance-box').innerHTML = formatDistanceText(dxDistKm);
 
 // SVG setup
 var W = window.innerWidth, H = window.innerHeight;
@@ -509,8 +577,9 @@ function drawRings() {
         ringsG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r)
             .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.18)')
             .attr('stroke-width', 1).attr('stroke-dasharray', '4,3');
+        var ringLabel = useMiles ? (Math.round(km * 0.621371) + ' mi') : (km + ' km');
         ringsG.append('text').attr('x', cx + 3).attr('y', cy - r - 2)
-            .attr('fill', 'rgba(255,255,255,0.4)').attr('font-size', '9px').text(km + ' km');
+          .attr('fill', 'rgba(255,255,255,0.4)').attr('font-size', '9px').text(ringLabel);
     });
 }
 drawRings();

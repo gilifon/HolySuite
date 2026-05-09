@@ -34,7 +34,12 @@
             <ComboBoxItem Content="25"/>
         </ComboBox>
         <TextBlock Text="%" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="278,250,0,0" FontSize="16"/>
-        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,280,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
+        <TextBlock Text="DX station distance unit" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,282,0,0" FontSize="16"/>
+        <ComboBox x:Name="CB_MapDistanceUnit" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="210,274,0,0" SelectionChanged="CB_MapDistanceUnit_SelectionChanged" FontSize="16">
+            <ComboBoxItem Content="KM"/>
+            <ComboBoxItem Content="Miles"/>
+        </ComboBox>
+        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,310,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>

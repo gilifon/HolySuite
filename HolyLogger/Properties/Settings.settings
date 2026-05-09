@@ -284,5 +284,8 @@
     <Setting Name="MapAutoFitMargin" Type="System.Double" Scope="User">
       <Value Profile="(Default)">1.15</Value>
     </Setting>
+    <Setting Name="MapDistanceUnit" Type="System.String" Scope="User">
+      <Value Profile="(Default)">KM</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

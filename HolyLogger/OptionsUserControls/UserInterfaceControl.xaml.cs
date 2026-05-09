@@ -28,6 +28,7 @@ namespace HolyLogger.OptionsUserControls
             HasChanged = false;
             SetCallsignSuggestionRowsSelection();
             SetMapAutoFitMarginSelection();
+            SetMapDistanceUnitSelection();
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)
@@ -157,6 +158,55 @@ namespace HolyLogger.OptionsUserControls
             catch
             {
                 // Settings save failed silently
+            }
+        }
+
+        private void SetMapDistanceUnitSelection()
+        {
+            string distanceUnit = Properties.Settings.Default.MapDistanceUnit;
+            if (!string.Equals(distanceUnit, "Miles", StringComparison.OrdinalIgnoreCase))
+            {
+                distanceUnit = "KM";
+            }
+
+            foreach (var item in CB_MapDistanceUnit.Items)
+            {
+                ComboBoxItem comboItem = item as ComboBoxItem;
+                if (comboItem == null)
+                    continue;
+
+                string content = comboItem.Content as string;
+                if (string.Equals(content, distanceUnit, StringComparison.OrdinalIgnoreCase))
+                {
+                    CB_MapDistanceUnit.SelectedItem = comboItem;
+                    break;
+                }
+            }
+        }
+
+        private void CB_MapDistanceUnit_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            ComboBoxItem selected = CB_MapDistanceUnit.SelectedItem as ComboBoxItem;
+            if (selected == null)
+                return;
+
+            string value = (selected.Content as string) ?? "KM";
+            if (!string.Equals(value, "Miles", StringComparison.OrdinalIgnoreCase))
+            {
+                value = "KM";
+            }
+
+            if (!string.Equals(Properties.Settings.Default.MapDistanceUnit, value, StringComparison.OrdinalIgnoreCase))
+            {
+                Properties.Settings.Default.MapDistanceUnit = value;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+
+                var mainWindow = Application.Current.Windows.OfType<HolyLogger.MainWindow>().FirstOrDefault();
+                if (mainWindow != null)
+                {
+                    mainWindow.RefreshMapAfterUnitChange();
+                }
             }
         }
 
