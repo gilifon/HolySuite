@@ -75,18 +75,48 @@ namespace HolyLogger.OptionsUserControls
                 double margin = Properties.Settings.Default.MapAutoFitMargin;
                 // Convert multiplier to percentage: 1.15 -> 15, 1.0 -> 0, etc.
                 int percentage = (int)Math.Round((margin - 1.0) * 100);
-                if (percentage != 0 && percentage != 5 && percentage != 10 && percentage != 20 && percentage != 25)
+                
+                // Validate percentage is one of the allowed values
+                int[] allowedValues = { 0, 5, 10, 15, 20, 25 };
+                bool isValid = false;
+                foreach (int val in allowedValues)
                 {
-                    percentage = 15;
+                    if (percentage == val)
+                    {
+                        isValid = true;
+                        break;
+                    }
+                }
+                
+                if (!isValid)
+                {
+                    percentage = 15; // default
                 }
 
+                // Try to find and select the matching item
+                bool found = false;
                 foreach (var item in CB_MapAutoFitMargin.Items)
                 {
                     ComboBoxItem comboItem = item as ComboBoxItem;
                     if (comboItem != null && (string)comboItem.Content == percentage.ToString())
                     {
                         CB_MapAutoFitMargin.SelectedItem = comboItem;
+                        found = true;
                         break;
+                    }
+                }
+                
+                // If we couldn't find it, select "15" as fallback
+                if (!found)
+                {
+                    foreach (var item in CB_MapAutoFitMargin.Items)
+                    {
+                        ComboBoxItem comboItem = item as ComboBoxItem;
+                        if (comboItem != null && (string)comboItem.Content == "15")
+                        {
+                            CB_MapAutoFitMargin.SelectedItem = comboItem;
+                            break;
+                        }
                     }
                 }
             }

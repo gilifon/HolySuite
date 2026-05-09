@@ -29,6 +29,7 @@
             <ComboBoxItem Content="0"/>
             <ComboBoxItem Content="5"/>
             <ComboBoxItem Content="10"/>
+            <ComboBoxItem Content="15"/>
             <ComboBoxItem Content="20"/>
             <ComboBoxItem Content="25"/>
         </ComboBox>
