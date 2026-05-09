@@ -72,6 +72,9 @@ namespace HolyLogger.OptionsUserControls
         {
             try
             {
+                // Reload settings from disk to get latest values
+                Properties.Settings.Default.Reload();
+                
                 double margin = Properties.Settings.Default.MapAutoFitMargin;
                 // Convert multiplier to percentage: 1.15 -> 15, 1.0 -> 0, etc.
                 int percentage = (int)Math.Round((margin - 1.0) * 100);
