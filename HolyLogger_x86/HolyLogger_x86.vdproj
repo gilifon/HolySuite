@@ -4052,7 +4052,8 @@
             "Exclude" = "11:FALSE"
             "IsDependency" = "11:FALSE"
             "IsolateTo" = "8:"
-            }        "MergeModule"
+            }
+        "MergeModule"
         {
         }
         "ProjectOutput"
