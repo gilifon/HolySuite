@@ -539,7 +539,25 @@ var projection = d3.geoAzimuthalEquidistant()
 
 var path = d3.geoPath().projection(projection);
 var baseScale = mapR / Math.PI;
+var viewCenterLat = centerLat;
+var viewCenterLon = centerLon;
 scaleToRadius();
+
+function normalizeLon(lon) {
+  while (lon < -180) lon += 360;
+  while (lon > 180) lon -= 360;
+  return lon;
+}
+
+function clampLat(lat) {
+  if (lat < -85) return -85;
+  if (lat > 85) return 85;
+  return lat;
+}
+
+function applyViewCenter() {
+  projection.rotate([-viewCenterLon, -viewCenterLat]);
+}
 
 function scaleToRadius() {
   // Keep selected-radius behavior, but when DX is outside the selected radius
@@ -618,9 +636,15 @@ function drawOverlays() {
             .attr('stroke-dasharray', '7,4').attr('clip-path', 'url(#globe-clip)');
     } catch(e2) {}
 
-    // Home dot at center
-    overlaysG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 5)
-      .attr('fill', '#1565C0').attr('stroke', 'none');
+    // Home dot (projected): may move away from center while dragging view
+    try {
+        var homePt = projection([centerLon, centerLat]);
+        if (homePt && isFinite(homePt[0]) && isFinite(homePt[1])) {
+            overlaysG.append('circle')
+              .attr('cx', homePt[0]).attr('cy', homePt[1]).attr('r', 5)
+              .attr('fill', '#1565C0').attr('stroke', 'none');
+        }
+    } catch(eHome) {}
 
     // DX dot
     try {
@@ -670,6 +694,9 @@ function onRadiusChange(km) {
     try { window.external.SetRadius(km); } catch(e) {}
 }
 function recenter() {
+  viewCenterLat = centerLat;
+  viewCenterLon = centerLon;
+  applyViewCenter();
     scaleToRadius();
     countriesG.selectAll('path').attr('d', path);
     svg.selectAll('.graticule-path').attr('d', path);
@@ -681,10 +708,39 @@ function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
 }
 
+// Mouse drag pan: rotate globe and redraw to create a new polar-centered view
+svg.call(
+  d3.drag()
+    .on('start', function() {
+      var ev = d3.event;
+      this._dragStartX = ev.x;
+      this._dragStartY = ev.y;
+      this._dragStartLon = viewCenterLon;
+      this._dragStartLat = viewCenterLat;
+    })
+    .on('drag', function() {
+      var ev = d3.event;
+      var dx = ev.x - this._dragStartX;
+      var dy = ev.y - this._dragStartY;
+      // Lower sensitivity so drag feels controlled and does not jump too much.
+      var degPerPixel = 20 / Math.max(mapR, 1);
+
+      viewCenterLon = normalizeLon(this._dragStartLon - (dx * degPerPixel));
+      viewCenterLat = clampLat(this._dragStartLat + (dy * degPerPixel));
+      applyViewCenter();
+
+      countriesG.selectAll('path').attr('d', path);
+      svg.selectAll('.graticule-path').attr('d', path);
+      drawRings();
+      drawRadiusRing(radiusKm);
+      drawOverlays();
+    })
+);
+
 // Mouse-wheel zoom: scale projection up/down and redraw everything
 document.addEventListener('wheel', function(e) {
     e.preventDefault();
-    var factor = (e.deltaY < 0) ? 1.15 : (1 / 1.15);
+    var factor = (e.deltaY < 0) ? 1.5 : (1 / 1.5);
     var newScale = projection.scale() * factor;
     var minScale = baseScale * 0.5;
     var maxScale = baseScale * 100;
@@ -719,6 +775,7 @@ window.addEventListener('resize', function() {
     svg.select('#globe-clip circle').attr('cx', cx).attr('cy', cy).attr('r', mapR - 1);
     
     projection.translate([cx, cy]);
+    applyViewCenter();
     scaleToRadius();
     
     // Redraw all elements
