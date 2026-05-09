@@ -240,6 +240,7 @@ namespace HolyLogger
         private bool callsignSuggestionMouseControl = false;
         private HashSet<string> newCallsignsSet = new HashSet<string>(StringComparer.Ordinal);
         private CallsignUploader _callsignUploader;
+        private int callsignListVersion = 0;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
@@ -270,6 +271,7 @@ namespace HolyLogger
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
             LoadCallsignIndex();
+            FetchCallsignListUpdateInfoFireAndForget();
             LoadNewCallsignsSet();
             _callsignUploader = new CallsignUploader(AppDomain.CurrentDomain.BaseDirectory);
             _callsignUploader.TrySendFireAndForget();
@@ -2655,8 +2657,11 @@ namespace HolyLogger
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 string[] bigTextCandidatePaths = new[]
                 {
+                    Path.Combine(baseDir, @"Data\callsigns_merged_big.txt"),
                     Path.Combine(baseDir, "callsigns_merged_big.txt"),
+                    Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\Data\callsigns_merged_big.txt")),
                     Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\callsigns_merged_big.txt")),
+                    Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\..\Data\callsigns_merged_big.txt")),
                     Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\..\callsigns_merged_big.txt"))
                 };
 
@@ -2679,13 +2684,26 @@ namespace HolyLogger
         {
             try
             {
+                callsignListVersion = 0;
                 var set = new HashSet<string>(StringComparer.Ordinal);
+                bool firstDataLineHandled = false;
                 foreach (var rawLine in File.ReadLines(filePath))
                 {
                     string line = rawLine.Trim().ToUpperInvariant();
                     if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";")) continue;
 
                     string token = line.Split(new[] { ' ', '\t', ',' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                    if (!firstDataLineHandled)
+                    {
+                        firstDataLineHandled = true;
+                        int parsedVersion;
+                        if (!string.IsNullOrWhiteSpace(token) && int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedVersion))
+                        {
+                            callsignListVersion = parsedVersion;
+                            continue;
+                        }
+                    }
+
                     if (string.IsNullOrWhiteSpace(token) || token.Length > 15) continue;
 
                     set.Add(token);
@@ -2698,6 +2716,151 @@ namespace HolyLogger
             catch
             {
                 return false;
+            }
+        }
+
+        private void FetchCallsignListUpdateInfoFireAndForget()
+        {
+            // Log immediately at startup
+            try
+            {
+                string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
+                File.WriteAllText(logPath, "Update process started at " + DateTime.Now.ToString() + "\n");
+            }
+            catch { }
+
+            // Run async work on background thread
+            Task.Run(async () =>
+            {
+                try
+                {
+                    string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
+                    File.AppendAllText(logPath, "Building URL with version: " + callsignListVersion.ToString(CultureInfo.InvariantCulture) + "\n");
+
+                    string url = "https://tools.iarc.org/holyland/server/getcallsign.php?version="
+                        + callsignListVersion.ToString(CultureInfo.InvariantCulture);
+                    
+                    File.AppendAllText(logPath, "URL: " + url + "\n");
+                    File.AppendAllText(logPath, "Making HTTP request...\n");
+
+                    using (var client = new HttpClient())
+                    {
+                        client.Timeout = TimeSpan.FromSeconds(20);
+                        string serverReply = await client.GetStringAsync(url);
+                        
+                        File.AppendAllText(logPath, "Server reply received: " + serverReply.Substring(0, Math.Min(200, serverReply.Length)) + "...\n");
+
+                        string updateResult = ApplyCallsignListUpdate(serverReply);
+                        
+                        File.AppendAllText(logPath, "Update result: " + updateResult + "\n");
+
+                        string msg = "Server response (version " + callsignListVersion.ToString(CultureInfo.InvariantCulture) + "): " + serverReply
+                            + "\n\nUpdate result: " + updateResult;
+
+                        Status = msg;
+                        
+                        this.Dispatcher.Invoke(() =>
+                        {
+                            System.Windows.Forms.MessageBox.Show(msg, "Callsign Update", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+                        });
+                    }
+                }
+                catch (Exception ex)
+                {
+                    string msg = "Callsign update request failed: " + ex.Message;
+                    Status = msg;
+                    
+                    string logPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsign_update.log");
+                    try
+                    {
+                        File.AppendAllText(logPath, "ERROR: " + msg + "\n");
+                    }
+                    catch { }
+                    
+                    this.Dispatcher.Invoke(() =>
+                    {
+                        System.Windows.Forms.MessageBox.Show(msg, "Callsign Update", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
+                    });
+                }
+            });
+        }
+
+        private string ApplyCallsignListUpdate(string jsonResponse)
+        {
+            try
+            {
+                var response = Newtonsoft.Json.Linq.JObject.Parse(jsonResponse);
+                if (response == null || response["success"] == null || !response["success"].ToObject<bool>())
+                    return "ERROR: Invalid server response or success field";
+
+                string callsignFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"Data\callsigns_merged_big.txt");
+                if (!File.Exists(callsignFilePath))
+                    return "ERROR: Callsign file not found at " + callsignFilePath;
+
+                // In dev runs (bin/x86/Debug or Release), also keep project Data file in sync.
+                string projectDataFilePath = Path.GetFullPath(
+                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\Data\callsigns_merged_big.txt"));
+
+                var callsignSet = new HashSet<string>(StringComparer.Ordinal);
+                var fileLines = File.ReadAllLines(callsignFilePath);
+                int newVersion = callsignListVersion;
+
+                foreach (var line in fileLines.Skip(1))
+                {
+                    string trimmed = line.Trim().ToUpperInvariant();
+                    if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#") || trimmed.StartsWith(";"))
+                        continue;
+                    string token = trimmed.Split(new[] { ' ', '\t', ',' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+                    if (!string.IsNullOrWhiteSpace(token) && token.Length <= 15)
+                        callsignSet.Add(token);
+                }
+
+                var dataArray = response["data"] as Newtonsoft.Json.Linq.JArray;
+                if (dataArray == null)
+                    return "ERROR: Invalid data array in response";
+
+                foreach (var item in dataArray)
+                {
+                    string callsign = (item["callsign"]?.ToString() ?? "").ToUpperInvariant();
+                    int active = item["active"] != null ? item["active"].ToObject<int>() : 0;
+                    int version = item["version"] != null ? item["version"].ToObject<int>() : 0;
+
+                    if (!string.IsNullOrEmpty(callsign))
+                    {
+                        if (active == 1)
+                            callsignSet.Add(callsign);
+                        else if (active == -1)
+                            callsignSet.Remove(callsign);
+                    }
+
+                    newVersion = version;
+                }
+
+                var sortedCallsigns = callsignSet.ToList();
+                sortedCallsigns.Sort(StringComparer.Ordinal);
+
+                var outputLines = new List<string> { newVersion.ToString(CultureInfo.InvariantCulture) };
+                outputLines.AddRange(sortedCallsigns);
+
+                File.WriteAllLines(callsignFilePath, outputLines);
+
+                bool projectFileUpdated = false;
+                if (!string.Equals(callsignFilePath, projectDataFilePath, StringComparison.OrdinalIgnoreCase)
+                    && File.Exists(projectDataFilePath))
+                {
+                    File.WriteAllLines(projectDataFilePath, outputLines);
+                    projectFileUpdated = true;
+                }
+
+                callsignListVersion = newVersion;
+                LoadCallsignIndex();
+
+                return "SUCCESS: File updated to version " + newVersion.ToString() + " with " + sortedCallsigns.Count + " callsigns"
+                    + (projectFileUpdated ? " (project Data file synced)" : "");
+            }
+            catch (Exception ex)
+            {
+                return "ERROR: " + ex.Message;
             }
         }
 

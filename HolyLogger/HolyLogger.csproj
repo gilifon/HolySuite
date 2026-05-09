@@ -712,7 +712,9 @@
     <Resource Include="Images\flags\za.png" />
     <Resource Include="Images\flags\zm.png" />
     <Resource Include="Images\flags\zw.png" />
-    <Content Include="callsigns_merged_big.txt" />
+    <Content Include="Data\callsigns_merged_big.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="Server\AddLog.php" />
     <Content Include="Server\addParticipant.php" />
     <Content Include="Server\addQSO.php" />
