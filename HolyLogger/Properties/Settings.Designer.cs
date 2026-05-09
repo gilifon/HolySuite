@@ -1129,6 +1129,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CallsignSyncVerboseLog {
+            get {
+                return ((bool)(this["CallsignSyncVerboseLog"]));
+            }
+            set {
+                this["CallsignSyncVerboseLog"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("1.15")]
         public double MapAutoFitMargin {
             get {
