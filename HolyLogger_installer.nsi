@@ -2,7 +2,7 @@
 ; Installs HolyLogger to Program Files and creates Start Menu + Desktop shortcuts
 
 !define APPNAME "HolyLogger"
-!define APPVERSION "8.3.8"
+!define APPVERSION "8.3.9"
 !define MANUFACTURER "4Z1KD"
 !define INSTALL_DIR "$PROGRAMFILES\${MANUFACTURER}\${APPNAME}"
 !define SOURCE_DIR "HolyLogger\bin\x86\Release"
@@ -29,7 +29,6 @@ Section "Install"
   ; Main files
   File "${SOURCE_DIR}\HolyLogger.exe"
   File "${SOURCE_DIR}\HolyLogger.exe.config"
-  File "${SOURCE_DIR}\callsigns_merged_big.txt"
   File "${SOURCE_DIR}\DXCCManager.dll"
   File "${SOURCE_DIR}\HolyParser.dll"
   File "${SOURCE_DIR}\HolyParser.dll.config"
@@ -50,6 +49,11 @@ Section "Install"
   File "${SOURCE_DIR}\Xceed.Wpf.AvalonDock.Themes.Metro.dll"
   File "${SOURCE_DIR}\Xceed.Wpf.AvalonDock.Themes.VS2010.dll"
   File "${SOURCE_DIR}\Xceed.Wpf.Toolkit.dll"
+
+  ; Callsign index data
+  SetOutPath "$INSTDIR\Data"
+  File "${SOURCE_DIR}\Data\callsigns_merged_big.txt"
+  SetOutPath "$INSTDIR"
 
   ; SQLite native DLLs (x86 and x64 subfolders)
   SetOutPath "$INSTDIR\x86"
@@ -110,6 +114,7 @@ Section "Uninstall"
   Delete "$INSTDIR\*.*"
   RMDir /r "$INSTDIR\x86"
   RMDir /r "$INSTDIR\x64"
+  RMDir /r "$INSTDIR\Data"
   RMDir /r "$INSTDIR\cs-CZ"
   RMDir /r "$INSTDIR\de"
   RMDir /r "$INSTDIR\es"

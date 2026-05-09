@@ -2655,8 +2655,11 @@ namespace HolyLogger
                 string baseDir = AppDomain.CurrentDomain.BaseDirectory;
                 string[] bigTextCandidatePaths = new[]
                 {
+                    Path.Combine(baseDir, @"Data\callsigns_merged_big.txt"),
                     Path.Combine(baseDir, "callsigns_merged_big.txt"),
+                    Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\Data\callsigns_merged_big.txt")),
                     Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\callsigns_merged_big.txt")),
+                    Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\..\Data\callsigns_merged_big.txt")),
                     Path.GetFullPath(Path.Combine(baseDir, @"..\..\..\..\callsigns_merged_big.txt"))
                 };
 
