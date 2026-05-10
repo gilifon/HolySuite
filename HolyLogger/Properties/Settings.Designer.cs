@@ -1150,5 +1150,17 @@ namespace HolyLogger.Properties {
                 this["MapAutoFitMargin"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("KM")]
+        public string MapDistanceUnit {
+            get {
+                return ((string)(this["MapDistanceUnit"]));
+            }
+            set {
+                this["MapDistanceUnit"] = value;
+            }
+        }
     }
 }

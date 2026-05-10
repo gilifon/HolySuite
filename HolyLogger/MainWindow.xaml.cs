@@ -3527,6 +3527,30 @@ namespace HolyLogger
             {
                 Dispatcher.BeginInvoke(new Action(UpdateShareIconVisibility), DispatcherPriority.Background);
             }
+
+            if (e.PropertyName == nameof(Properties.Settings.Default.MapDistanceUnit))
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (MapControl != null && MapControl.Visibility == Visibility.Visible)
+                    {
+                        SetAzimuth();
+                    }
+                }), DispatcherPriority.Background);
+            }
+        }
+
+        public void RefreshMapAfterUnitChange()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (MapControl == null || MapControl.Visibility != Visibility.Visible)
+                {
+                    return;
+                }
+
+                MapControl.RefreshMap();
+            }), DispatcherPriority.Background);
         }
 
         private void UpdateShareIconVisibility()
