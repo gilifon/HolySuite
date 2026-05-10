@@ -155,7 +155,9 @@ namespace HolyLogger.ToolsUserControls
     border-radius:0; font-family:Segoe UI, Tahoma, sans-serif;
     box-shadow:none;
   }
-  #compass-ring {
+      // Update marginMultiplier behavior for DX center button visibility
+      marginMultiplier = AdjustMarginForDX(marginMultiplier);
+      string html = _isPolar
     width:74px; height:74px; border:2px solid #25464a; border-radius:50%;
     position:relative; background:radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(220,228,236,0.95) 70%, rgba(200,212,224,0.95) 100%);
     overflow:hidden;
@@ -172,22 +174,27 @@ namespace HolyLogger.ToolsUserControls
   }
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000;
-    display:flex; align-items:stretch;
+    display:flex; align-items:flex-end;
+  }
+  #radius-stack {
+    display:flex; flex-direction:column; align-items:center;
   }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-right:none; border-radius:0;
+    border-radius:0;
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
     height:100%;
   }
   #center-btn {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:10px; padding:0 4px; cursor:pointer;
+    border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
-    color:#333;
+    color:#333; height:24px; margin-bottom:2px;
+    font-family:sans-serif; font-size:11px; font-weight:700;
   }
   #center-btn:hover { background:rgba(220,220,255,0.95); }
-  #center-btn svg { width:18px; height:18px; }
+  #center-btn svg { width:16px; height:16px; }
+  #center-btn .de-label { margin-right:4px; }
   #proj-btn {
     position:absolute; top:0; right:0; z-index:1000;
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
@@ -195,8 +202,21 @@ namespace HolyLogger.ToolsUserControls
     font-size:12px; font-weight:700; font-family:sans-serif; color:#333;
   }
   #proj-btn:hover { background:rgba(220,240,255,0.95); }
+  #distance-stack {
+    position:absolute; right:0; bottom:0; z-index:1000;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  #dx-center-btn {
+    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    border-radius:10px; padding:0 6px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    color:#333; height:24px; margin-bottom:2px;
+    font-family:sans-serif; font-size:11px; font-weight:700;
+  }
+  #dx-center-btn:hover { background:rgba(220,220,255,0.95); }
+  #dx-center-btn .dx-label { margin-right:4px; }
+  #dx-center-btn svg { width:16px; height:16px; }
   #distance-box {
-    position:absolute; bottom:0; right:0; z-index:1000;
     background:rgba(255,255,255,0.9); border:1px solid #aaa;
     border-radius:0; padding:3px 7px;
     font-size:13px; font-weight:700; font-family:sans-serif; color:#333;
@@ -235,8 +255,23 @@ namespace HolyLogger.ToolsUserControls
   <div id='compass-text'>AZ 0°</div>
 </div>
 <div id='bottom-ctrl'>
-  <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
-  <button id='center-btn' onclick='recenter()' title='Re-center map'>
+  <div id='radius-stack'>
+    <button id='center-btn' onclick='recenter()' title='Re-center map'>
+      <span class='de-label'>DE</span>
+      <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+        <circle cx='12' cy='12' r='3'/>
+        <line x1='12' y1='2' x2='12' y2='6'/>
+        <line x1='12' y1='18' x2='12' y2='22'/>
+        <line x1='2' y1='12' x2='6' y2='12'/>
+        <line x1='18' y1='12' x2='22' y2='12'/>
+      </svg>
+    </button>
+    <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
+  </div>
+</div>
+<div id='distance-stack'>
+  <button id='dx-center-btn' onclick='centerOnDx()' title='Center on DX station'>
+    <span class='dx-label'>DX</span>
     <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
       <circle cx='12' cy='12' r='3'/>
       <line x1='12' y1='2' x2='12' y2='6'/>
@@ -245,8 +280,8 @@ namespace HolyLogger.ToolsUserControls
       <line x1='18' y1='12' x2='22' y2='12'/>
     </svg>
   </button>
+  <div id='distance-box'>DIST --</div>
 </div>
-<div id='distance-box'>DIST --</div>
 <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
 <script>
 window.onerror = function() { return true; };
@@ -258,6 +293,7 @@ var useMiles = " + useMilesJs + @";
 var dxLat = homeLat, dxLon = homeLon;
 var operatorLat = " + homeLatJs + @";
 var operatorLon = " + homeLonJs + @";
+var hasDxReference = isFinite(dxLat) && isFinite(dxLon);
 // Center map and radius circle on operator home; fall back to DX if home unknown
 var circleLat = (operatorLat !== null) ? operatorLat : dxLat;
 var circleLon = (operatorLon !== null) ? operatorLon : dxLon;
@@ -362,6 +398,9 @@ var dxDistanceMeters = (operatorLat !== null && operatorLon !== null)
   ? haversineMeters(operatorLat, operatorLon, dxLat, dxLon)
   : null;
 document.getElementById('distance-box').innerHTML = formatDistanceText(dxDistanceMeters);
+if (!hasDxReference) {
+  document.getElementById('dx-center-btn').style.display = 'none';
+}
 
 function fitAll() {
   map.fitBounds(buildFitBounds(), { padding: [2, 2] });
@@ -376,6 +415,10 @@ function recenter() {
     radiusCircle.setLatLng([circleLat, circleLon]);
     radiusCircle.setRadius(radiusMeters);
     fitAll();
+}
+function centerOnDx() {
+  if (!hasDxReference) return;
+  map.setView([dxLat, dxLon], map.getZoom());
 }
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
@@ -446,8 +489,21 @@ window.addEventListener('resize', function() {
     background:rgba(0,0,0,0.55); border-radius:0; padding:2px 6px;
     font-family:sans-serif;
   }
+  #distance-stack {
+    position:absolute; right:0; bottom:0; z-index:1000;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  #dx-center-btn {
+    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    border-radius:10px; padding:0 6px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    color:#333; height:24px; margin-bottom:2px;
+    font-family:sans-serif; font-size:11px; font-weight:700;
+  }
+  #dx-center-btn:hover { background:rgba(220,220,255,0.95); }
+  #dx-center-btn .dx-label { margin-right:4px; }
+  #dx-center-btn svg { width:16px; height:16px; }
   #distance-box {
-    position:absolute; bottom:0; right:0; z-index:1000;
     background:rgba(255,255,255,0.9); border:1px solid #aaa;
     border-radius:0; padding:3px 7px;
     font-size:13px; font-weight:700; font-family:sans-serif; color:#333;
@@ -455,21 +511,26 @@ window.addEventListener('resize', function() {
   }
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000;
-    display:flex; align-items:stretch;
+    display:flex; align-items:flex-end;
+  }
+  #radius-stack {
+    display:flex; flex-direction:column; align-items:center;
   }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-right:none; border-radius:0;
+    border-radius:0;
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
   }
   #center-btn {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:10px; padding:0 4px; cursor:pointer;
+    border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
-    color:#333;
+    color:#333; height:24px; margin-bottom:2px;
+    font-family:sans-serif; font-size:11px; font-weight:700;
   }
   #center-btn:hover { background:rgba(220,220,255,0.95); }
-  #center-btn svg { width:18px; height:18px; }
+  #center-btn svg { width:16px; height:16px; }
+  #center-btn .de-label { margin-right:4px; }
 </style>
 </head>
 <body>
@@ -477,9 +538,15 @@ window.addEventListener('resize', function() {
 <button id='proj-btn' onclick='toggleProjection()'>&#9974; Flat</button>
 <div id='az-only'>AZ 0&deg;</div>
 <div id='bottom-ctrl'>
-  <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select><button id='center-btn' onclick='recenter()' title='Reset zoom to selected radius'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+  <div id='radius-stack'>
+    <button id='center-btn' onclick='recenter()' title='Reset zoom to selected radius'><span class='de-label'>DE</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+    <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
+  </div>
 </div>
-<div id='distance-box'>DIST --</div>
+<div id='distance-stack'>
+  <button id='dx-center-btn' onclick='centerOnDx()' title='Center on DX station'><span class='dx-label'>DX</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+  <div id='distance-box'>DIST --</div>
+</div>
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'></script>
 <script>
@@ -495,6 +562,7 @@ var marginMultiplier = " + marginJs + @";
 var useMiles = " + useMilesJs + @";
 var hasHomeReference = " + hasHomeReferenceJs + @";
 var EARTH_KM   = 6371;
+var hasDxReference = isFinite(dxLat) && isFinite(dxLon);
 
 // GC distance home->DX in km (haversine), so we can expand scale if DX is beyond selected radius
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -518,6 +586,9 @@ function formatDistanceText(distanceKm) {
 // Azimuth label (polar mode has no compass ring)
 document.getElementById('az-only').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
 document.getElementById('distance-box').innerHTML = formatDistanceText(dxDistKm);
+if (!hasDxReference) {
+  document.getElementById('dx-center-btn').style.display = 'none';
+}
 
 // SVG setup
 var W = window.innerWidth, H = window.innerHeight;
@@ -703,6 +774,18 @@ function recenter() {
     drawRings();
     drawRadiusRing(radiusKm);
     drawOverlays();
+}
+function centerOnDx() {
+  if (!hasDxReference) return;
+  viewCenterLat = dxLat;
+  viewCenterLon = dxLon;
+  applyViewCenter();
+  scaleToRadius();
+  countriesG.selectAll('path').attr('d', path);
+  svg.selectAll('.graticule-path').attr('d', path);
+  drawRings();
+  drawRadiusRing(radiusKm);
+  drawOverlays();
 }
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}

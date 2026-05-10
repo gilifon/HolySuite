@@ -15,6 +15,7 @@ namespace HolyLogger
     {
         private const string EndpointUrl = "https://tools.iarc.org/holyland/server/addcallsign.php";
         private const int BatchSize = 100;
+        private const bool ShowUploadPopups = false;
 
         private static readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);
@@ -146,6 +147,9 @@ namespace HolyLogger
 
             try
             {
+                if (!ShowUploadPopups)
+                    return;
+
                 if (Application.Current != null)
                 {
                     Application.Current.Dispatcher.BeginInvoke(new Action(() =>
