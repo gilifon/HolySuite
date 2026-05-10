@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="340" d:DesignWidth="380">
+             d:DesignHeight="440" d:DesignWidth="380">
 
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsShowMatrix" Content="Show matrix in main window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowMatrixControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
