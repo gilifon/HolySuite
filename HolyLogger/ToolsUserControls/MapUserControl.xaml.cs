@@ -172,31 +172,50 @@ namespace HolyLogger.ToolsUserControls
   }
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000;
-    display:flex; align-items:stretch;
+    display:flex; align-items:flex-end;
+  }
+  #radius-stack {
+    display:flex; flex-direction:column; align-items:center;
   }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-right:none; border-radius:0;
+    border-radius:0;
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
     height:100%;
   }
   #center-btn {
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:10px; padding:0 4px; cursor:pointer;
+    background:#9FCBF5; border:1px solid #4B76A0;
+    border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
-    color:#333;
+    color:#333; height:24px; margin-bottom:2px;
+    font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #center-btn:hover { background:rgba(220,220,255,0.95); }
-  #center-btn svg { width:18px; height:18px; }
+  #center-btn:hover { background:#8CBDF0; }
+  #center-btn svg { width:16px; height:16px; }
+  #center-btn .de-label { margin-right:4px; }
   #proj-btn {
     position:absolute; top:0; right:0; z-index:1000;
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:0; padding:3px 7px; cursor:pointer;
-    font-size:12px; font-weight:700; font-family:sans-serif; color:#333;
+    background:#9FCBF5; border:1px solid #4B76A0;
+    border-radius:10px; padding:0 6px; cursor:pointer;
+    height:24px; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; font-family:sans-serif; color:#333;
   }
-  #proj-btn:hover { background:rgba(220,240,255,0.95); }
+  #proj-btn:hover { background:#8CBDF0; }
+  #distance-stack {
+    position:absolute; right:0; bottom:0; z-index:1000;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  #dx-center-btn {
+    background:#9FCBF5; border:1px solid #4B76A0;
+    border-radius:10px; padding:0 6px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    color:#333; height:24px; margin-bottom:2px;
+    font-family:sans-serif; font-size:11px; font-weight:700;
+  }
+  #dx-center-btn:hover { background:#8CBDF0; }
+  #dx-center-btn .dx-label { margin-right:4px; }
+  #dx-center-btn svg { width:16px; height:16px; }
   #distance-box {
-    position:absolute; bottom:0; right:0; z-index:1000;
     background:rgba(255,255,255,0.9); border:1px solid #aaa;
     border-radius:0; padding:3px 7px;
     font-size:13px; font-weight:700; font-family:sans-serif; color:#333;
@@ -235,8 +254,23 @@ namespace HolyLogger.ToolsUserControls
   <div id='compass-text'>AZ 0°</div>
 </div>
 <div id='bottom-ctrl'>
-  <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
-  <button id='center-btn' onclick='recenter()' title='Re-center map'>
+  <div id='radius-stack'>
+    <button id='center-btn' onclick='recenter()' title='Re-center map'>
+      <span class='de-label'>DE</span>
+      <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
+        <circle cx='12' cy='12' r='3'/>
+        <line x1='12' y1='2' x2='12' y2='6'/>
+        <line x1='12' y1='18' x2='12' y2='22'/>
+        <line x1='2' y1='12' x2='6' y2='12'/>
+        <line x1='18' y1='12' x2='22' y2='12'/>
+      </svg>
+    </button>
+    <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
+  </div>
+</div>
+<div id='distance-stack'>
+  <button id='dx-center-btn' onclick='centerOnDx()' title='Center on DX station'>
+    <span class='dx-label'>DX</span>
     <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
       <circle cx='12' cy='12' r='3'/>
       <line x1='12' y1='2' x2='12' y2='6'/>
@@ -245,8 +279,8 @@ namespace HolyLogger.ToolsUserControls
       <line x1='18' y1='12' x2='22' y2='12'/>
     </svg>
   </button>
+  <div id='distance-box'>DIST --</div>
 </div>
-<div id='distance-box'>DIST --</div>
 <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
 <script>
 window.onerror = function() { return true; };
@@ -258,6 +292,7 @@ var useMiles = " + useMilesJs + @";
 var dxLat = homeLat, dxLon = homeLon;
 var operatorLat = " + homeLatJs + @";
 var operatorLon = " + homeLonJs + @";
+var hasDxReference = isFinite(dxLat) && isFinite(dxLon);
 // Center map and radius circle on operator home; fall back to DX if home unknown
 var circleLat = (operatorLat !== null) ? operatorLat : dxLat;
 var circleLon = (operatorLon !== null) ? operatorLon : dxLon;
@@ -362,6 +397,9 @@ var dxDistanceMeters = (operatorLat !== null && operatorLon !== null)
   ? haversineMeters(operatorLat, operatorLon, dxLat, dxLon)
   : null;
 document.getElementById('distance-box').innerHTML = formatDistanceText(dxDistanceMeters);
+if (!hasDxReference) {
+  document.getElementById('dx-center-btn').style.display = 'none';
+}
 
 function fitAll() {
   map.fitBounds(buildFitBounds(), { padding: [2, 2] });
@@ -377,9 +415,21 @@ function recenter() {
     radiusCircle.setRadius(radiusMeters);
     fitAll();
 }
+function centerOnDx() {
+  if (!hasDxReference) return;
+  map.setView([dxLat, dxLon], map.getZoom());
+}
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
 }
+
+// Auto-resize on window resize: invalidate map to reflow and refocus
+window.addEventListener('resize', function() {
+    if (map) {
+        map.invalidateSize();
+        fitAll();
+    }
+});
 </script>
 </body>
 </html>";
@@ -428,18 +478,33 @@ function toggleProjection() {
   svg#polar-svg { width:100%; height:100%; display:block; }
   #proj-btn {
     position:absolute; top:0; right:0; z-index:1000;
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    padding:3px 7px; cursor:pointer;
-    font-size:12px; font-weight:700; font-family:sans-serif; color:#333;
+    background:#9FCBF5; border:1px solid #4B76A0;
+    border-radius:10px; padding:0 6px; cursor:pointer;
+    height:24px; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; font-family:sans-serif; color:#333;
   }
+  #proj-btn:hover { background:#8CBDF0; }
   #az-only {
     position:absolute; top:-1px; left:-1px; z-index:1000;
     font-size:14px; font-weight:700; color:#e0f0ff;
     background:rgba(0,0,0,0.55); border-radius:0; padding:2px 6px;
     font-family:sans-serif;
   }
+  #distance-stack {
+    position:absolute; right:0; bottom:0; z-index:1000;
+    display:flex; flex-direction:column; align-items:center;
+  }
+  #dx-center-btn {
+    background:#9FCBF5; border:1px solid #4B76A0;
+    border-radius:10px; padding:0 6px; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    color:#333; height:24px; margin-bottom:2px;
+    font-family:sans-serif; font-size:11px; font-weight:700;
+  }
+  #dx-center-btn:hover { background:#8CBDF0; }
+  #dx-center-btn .dx-label { margin-right:4px; }
+  #dx-center-btn svg { width:16px; height:16px; }
   #distance-box {
-    position:absolute; bottom:0; right:0; z-index:1000;
     background:rgba(255,255,255,0.9); border:1px solid #aaa;
     border-radius:0; padding:3px 7px;
     font-size:13px; font-weight:700; font-family:sans-serif; color:#333;
@@ -447,21 +512,26 @@ function toggleProjection() {
   }
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000;
-    display:flex; align-items:stretch;
+    display:flex; align-items:flex-end;
+  }
+  #radius-stack {
+    display:flex; flex-direction:column; align-items:center;
   }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-right:none; border-radius:0;
+    border-radius:0;
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
   }
   #center-btn {
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:10px; padding:0 4px; cursor:pointer;
+    background:#9FCBF5; border:1px solid #4B76A0;
+    border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
-    color:#333;
+    color:#333; height:24px; margin-bottom:2px;
+    font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #center-btn:hover { background:rgba(220,220,255,0.95); }
-  #center-btn svg { width:18px; height:18px; }
+  #center-btn:hover { background:#8CBDF0; }
+  #center-btn svg { width:16px; height:16px; }
+  #center-btn .de-label { margin-right:4px; }
 </style>
 </head>
 <body>
@@ -469,9 +539,15 @@ function toggleProjection() {
 <button id='proj-btn' onclick='toggleProjection()'>&#9974; Flat</button>
 <div id='az-only'>AZ 0&deg;</div>
 <div id='bottom-ctrl'>
-  <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select><button id='center-btn' onclick='recenter()' title='Reset zoom to selected radius'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+  <div id='radius-stack'>
+    <button id='center-btn' onclick='recenter()' title='Reset zoom to selected radius'><span class='de-label'>DE</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+    <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
+  </div>
 </div>
-<div id='distance-box'>DIST --</div>
+<div id='distance-stack'>
+  <button id='dx-center-btn' onclick='centerOnDx()' title='Center on DX station'><span class='dx-label'>DX</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+  <div id='distance-box'>DIST --</div>
+</div>
 <script src='https://d3js.org/d3.v5.min.js'></script>
 <script src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'></script>
 <script>
@@ -487,6 +563,7 @@ var marginMultiplier = " + marginJs + @";
 var useMiles = " + useMilesJs + @";
 var hasHomeReference = " + hasHomeReferenceJs + @";
 var EARTH_KM   = 6371;
+var hasDxReference = isFinite(dxLat) && isFinite(dxLon);
 
 // GC distance home->DX in km (haversine), so we can expand scale if DX is beyond selected radius
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -510,6 +587,9 @@ function formatDistanceText(distanceKm) {
 // Azimuth label (polar mode has no compass ring)
 document.getElementById('az-only').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
 document.getElementById('distance-box').innerHTML = formatDistanceText(dxDistKm);
+if (!hasDxReference) {
+  document.getElementById('dx-center-btn').style.display = 'none';
+}
 
 // SVG setup
 var W = window.innerWidth, H = window.innerHeight;
@@ -531,7 +611,25 @@ var projection = d3.geoAzimuthalEquidistant()
 
 var path = d3.geoPath().projection(projection);
 var baseScale = mapR / Math.PI;
+var viewCenterLat = centerLat;
+var viewCenterLon = centerLon;
 scaleToRadius();
+
+function normalizeLon(lon) {
+  while (lon < -180) lon += 360;
+  while (lon > 180) lon -= 360;
+  return lon;
+}
+
+function clampLat(lat) {
+  if (lat < -85) return -85;
+  if (lat > 85) return 85;
+  return lat;
+}
+
+function applyViewCenter() {
+  projection.rotate([-viewCenterLon, -viewCenterLat]);
+}
 
 function scaleToRadius() {
   // Keep selected-radius behavior, but when DX is outside the selected radius
@@ -547,7 +645,7 @@ function scaleToRadius() {
 }
 
 // Ocean fill
-svg.append('circle')
+svg.append('circle').attr('class', 'ocean-fill')
     .attr('cx', cx).attr('cy', cy).attr('r', mapR)
     .attr('fill', '#4a90c4').attr('stroke', '#1a4060').attr('stroke-width', 2);
 
@@ -610,9 +708,15 @@ function drawOverlays() {
             .attr('stroke-dasharray', '7,4').attr('clip-path', 'url(#globe-clip)');
     } catch(e2) {}
 
-    // Home dot at center
-    overlaysG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 5)
-      .attr('fill', '#1565C0').attr('stroke', 'none');
+    // Home dot (projected): may move away from center while dragging view
+    try {
+        var homePt = projection([centerLon, centerLat]);
+        if (homePt && isFinite(homePt[0]) && isFinite(homePt[1])) {
+            overlaysG.append('circle')
+              .attr('cx', homePt[0]).attr('cy', homePt[1]).attr('r', 5)
+              .attr('fill', '#1565C0').attr('stroke', 'none');
+        }
+    } catch(eHome) {}
 
     // DX dot
     try {
@@ -662,6 +766,9 @@ function onRadiusChange(km) {
     try { window.external.SetRadius(km); } catch(e) {}
 }
 function recenter() {
+  viewCenterLat = centerLat;
+  viewCenterLon = centerLon;
+  applyViewCenter();
     scaleToRadius();
     countriesG.selectAll('path').attr('d', path);
     svg.selectAll('.graticule-path').attr('d', path);
@@ -669,14 +776,55 @@ function recenter() {
     drawRadiusRing(radiusKm);
     drawOverlays();
 }
+function centerOnDx() {
+  if (!hasDxReference) return;
+  viewCenterLat = dxLat;
+  viewCenterLon = dxLon;
+  applyViewCenter();
+  scaleToRadius();
+  countriesG.selectAll('path').attr('d', path);
+  svg.selectAll('.graticule-path').attr('d', path);
+  drawRings();
+  drawRadiusRing(radiusKm);
+  drawOverlays();
+}
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
 }
 
+// Mouse drag pan: rotate globe and redraw to create a new polar-centered view
+svg.call(
+  d3.drag()
+    .on('start', function() {
+      var ev = d3.event;
+      this._dragStartX = ev.x;
+      this._dragStartY = ev.y;
+      this._dragStartLon = viewCenterLon;
+      this._dragStartLat = viewCenterLat;
+    })
+    .on('drag', function() {
+      var ev = d3.event;
+      var dx = ev.x - this._dragStartX;
+      var dy = ev.y - this._dragStartY;
+      // Lower sensitivity so drag feels controlled and does not jump too much.
+      var degPerPixel = 20 / Math.max(mapR, 1);
+
+      viewCenterLon = normalizeLon(this._dragStartLon - (dx * degPerPixel));
+      viewCenterLat = clampLat(this._dragStartLat + (dy * degPerPixel));
+      applyViewCenter();
+
+      countriesG.selectAll('path').attr('d', path);
+      svg.selectAll('.graticule-path').attr('d', path);
+      drawRings();
+      drawRadiusRing(radiusKm);
+      drawOverlays();
+    })
+);
+
 // Mouse-wheel zoom: scale projection up/down and redraw everything
 document.addEventListener('wheel', function(e) {
     e.preventDefault();
-    var factor = (e.deltaY < 0) ? 1.15 : (1 / 1.15);
+    var factor = (e.deltaY < 0) ? 1.5 : (1 / 1.5);
     var newScale = projection.scale() * factor;
     var minScale = baseScale * 0.5;
     var maxScale = baseScale * 100;
@@ -689,6 +837,38 @@ document.addEventListener('wheel', function(e) {
     drawRadiusRing(radiusKm);
     drawOverlays();
 }, { passive: false });
+
+// Auto-resize on window resize: recalculate dimensions and redraw polar map
+window.addEventListener('resize', function() {
+    var oldW = W, oldH = H;
+    W = window.innerWidth;
+    H = window.innerHeight;
+    if (W === oldW && H === oldH) return; // No size change
+    
+    mapR = Math.floor((Math.min(W, H) / 2) - 4);
+    cx = W / 2;
+    cy = H / 2;
+    baseScale = mapR / Math.PI;
+    
+    svg.attr('width', W).attr('height', H);
+    
+    // Update ocean fill background
+    svg.select('.ocean-fill').attr('cx', cx).attr('cy', cy).attr('r', mapR);
+    
+    // Update clip path circle
+    svg.select('#globe-clip circle').attr('cx', cx).attr('cy', cy).attr('r', mapR - 1);
+    
+    projection.translate([cx, cy]);
+    applyViewCenter();
+    scaleToRadius();
+    
+    // Redraw all elements
+    countriesG.selectAll('path').attr('d', path);
+    svg.selectAll('.graticule-path').attr('d', path);
+    drawRings();
+    drawRadiusRing(radiusKm);
+    drawOverlays();
+});
 </script>
 </body>
 </html>";
