@@ -303,9 +303,9 @@
                         <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="30,0,0,0" Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1" ToolTipService.InitialShowDelay="200" ToolTipService.Placement="Top" Visibility="Collapsed">
                             <Button.ToolTip>
                                 <TextBlock TextAlignment="Center">
-                                    <Run Text="Show me in HolyLogger"/>
+                                    <Run Text="Send heartbeat to"/>
                                     <LineBreak/>
-                                    <Run Text="On The Air is selected"/>
+                                    <Run Text="HolyLogger On The Air"/>
                                 </TextBlock>
                             </Button.ToolTip>
                             <Viewbox Width="14" Height="14">
