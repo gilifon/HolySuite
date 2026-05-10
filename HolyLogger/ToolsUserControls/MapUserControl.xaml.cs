@@ -155,9 +155,7 @@ namespace HolyLogger.ToolsUserControls
     border-radius:0; font-family:Segoe UI, Tahoma, sans-serif;
     box-shadow:none;
   }
-      // Update marginMultiplier behavior for DX center button visibility
-      marginMultiplier = AdjustMarginForDX(marginMultiplier);
-      string html = _isPolar
+  #compass-ring {
     width:74px; height:74px; border:2px solid #25464a; border-radius:50%;
     position:relative; background:radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(220,228,236,0.95) 70%, rgba(200,212,224,0.95) 100%);
     overflow:hidden;
@@ -186,34 +184,35 @@ namespace HolyLogger.ToolsUserControls
     height:100%;
   }
   #center-btn {
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    background:#9FCBF5; border:1px solid #4B76A0;
     border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333; height:24px; margin-bottom:2px;
     font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #center-btn:hover { background:rgba(220,220,255,0.95); }
+  #center-btn:hover { background:#8CBDF0; }
   #center-btn svg { width:16px; height:16px; }
   #center-btn .de-label { margin-right:4px; }
   #proj-btn {
     position:absolute; top:0; right:0; z-index:1000;
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    border-radius:0; padding:3px 7px; cursor:pointer;
-    font-size:12px; font-weight:700; font-family:sans-serif; color:#333;
+    background:#9FCBF5; border:1px solid #4B76A0;
+    border-radius:10px; padding:0 6px; cursor:pointer;
+    height:24px; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; font-family:sans-serif; color:#333;
   }
-  #proj-btn:hover { background:rgba(220,240,255,0.95); }
+  #proj-btn:hover { background:#8CBDF0; }
   #distance-stack {
     position:absolute; right:0; bottom:0; z-index:1000;
     display:flex; flex-direction:column; align-items:center;
   }
   #dx-center-btn {
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    background:#9FCBF5; border:1px solid #4B76A0;
     border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333; height:24px; margin-bottom:2px;
     font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #dx-center-btn:hover { background:rgba(220,220,255,0.95); }
+  #dx-center-btn:hover { background:#8CBDF0; }
   #dx-center-btn .dx-label { margin-right:4px; }
   #dx-center-btn svg { width:16px; height:16px; }
   #distance-box {
@@ -479,10 +478,12 @@ window.addEventListener('resize', function() {
   svg#polar-svg { width:100%; height:100%; display:block; }
   #proj-btn {
     position:absolute; top:0; right:0; z-index:1000;
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
-    padding:3px 7px; cursor:pointer;
-    font-size:12px; font-weight:700; font-family:sans-serif; color:#333;
+    background:#9FCBF5; border:1px solid #4B76A0;
+    border-radius:10px; padding:0 6px; cursor:pointer;
+    height:24px; display:flex; align-items:center; justify-content:center;
+    font-size:11px; font-weight:700; font-family:sans-serif; color:#333;
   }
+  #proj-btn:hover { background:#8CBDF0; }
   #az-only {
     position:absolute; top:-1px; left:-1px; z-index:1000;
     font-size:14px; font-weight:700; color:#e0f0ff;
@@ -494,13 +495,13 @@ window.addEventListener('resize', function() {
     display:flex; flex-direction:column; align-items:center;
   }
   #dx-center-btn {
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    background:#9FCBF5; border:1px solid #4B76A0;
     border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333; height:24px; margin-bottom:2px;
     font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #dx-center-btn:hover { background:rgba(220,220,255,0.95); }
+  #dx-center-btn:hover { background:#8CBDF0; }
   #dx-center-btn .dx-label { margin-right:4px; }
   #dx-center-btn svg { width:16px; height:16px; }
   #distance-box {
@@ -522,13 +523,13 @@ window.addEventListener('resize', function() {
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
   }
   #center-btn {
-    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    background:#9FCBF5; border:1px solid #4B76A0;
     border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333; height:24px; margin-bottom:2px;
     font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #center-btn:hover { background:rgba(220,220,255,0.95); }
+  #center-btn:hover { background:#8CBDF0; }
   #center-btn svg { width:16px; height:16px; }
   #center-btn .de-label { margin-right:4px; }
 </style>
