@@ -444,6 +444,9 @@
         <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="449,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="188" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" IsReadOnly="True" FontSize="16" TabIndex="16" />
         <Label Content="State" HorizontalAlignment="Left" Margin="642,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="689,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" CharacterCasing="Upper" MaxLength="3" Grid.Row="1" FontSize="16" TabIndex="17" TextChanged="TB_State_TextChanged" />
+        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="752,94,0,0" Width="160" Height="160" BorderBrush="#7A95A8" BorderThickness="1" Background="#F5F7FA" CornerRadius="4" Panel.ZIndex="20">
+            <Image x:Name="Img_QRZPhoto" Stretch="UniformToFill" Visibility="Collapsed" ToolTip="QRZ callsign image" />
+        </Border>
 
         <Label Content="DX Locator" HorizontalAlignment="Left" Margin="6,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
         <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="101,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>

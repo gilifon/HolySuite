@@ -1,0 +1,13 @@
+<Window x:Class="HolyLogger.QRZPhotoWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="QRZ Photo" Width="420" Height="320" MinWidth="220" MinHeight="180" ResizeMode="CanResize" WindowStyle="SingleBorderWindow"
+    WindowStartupLocation="Manual" Topmost="True" Background="White" KeyDown="Window_KeyDown" Loaded="Window_Loaded" Closing="Window_Closing" MouseLeftButtonDown="Window_MouseLeftButtonDown">
+    <Border Margin="0" Padding="0" BorderBrush="#7A95A8" BorderThickness="1" CornerRadius="0" Background="White">
+        <Grid>
+            <Image x:Name="PhotoImage" Stretch="Uniform" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="2"/>
+            <TextBlock x:Name="StatusText" Text="Loading QRZ photo..." Foreground="#567" FontSize="14" TextAlignment="Center" Visibility="Collapsed"
+                       Background="#FFF" Opacity="0.9" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Grid>
+    </Border>
+</Window>

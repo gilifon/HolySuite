@@ -30,6 +30,7 @@ using System.Net.Sockets;
 using System.Windows.Controls.Primitives;
 using Newtonsoft.Json;
 using System.Text.RegularExpressions;
+using System.Net;
 using System.Data.SQLite;
 
 namespace HolyLogger
@@ -217,6 +218,11 @@ namespace HolyLogger
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
+        QRZPhotoWindow qrzPhotoWindow = null;
+        double? qrzPhotoLeft = null;
+        double? qrzPhotoTop = null;
+        double? qrzPhotoWidth = null;
+        double? qrzPhotoHeight = null;
 
         BackgroundWorker AdifHandlerWorker;
         //BackgroundWorker EntireLogQrzWorker;
@@ -264,6 +270,7 @@ namespace HolyLogger
         public MainWindow()
         {
             MachineName = Environment.MachineName;
+            LoadQrzPhotoWindowBoundsFromDisk();
 
             Qsos = new ObservableCollection<QSO>();
             rem = new EntityResolver();
@@ -948,6 +955,7 @@ namespace HolyLogger
             FName = string.Empty;
             Country = string.Empty;
             UpdateCountryFlag(null);
+            ClearQrzPhoto();
             Continent = string.Empty;
             if (!Properties.Settings.Default.isManualMode)
                 RefreshDateTime_Btn_MouseUp(null, null);
@@ -2500,6 +2508,169 @@ namespace HolyLogger
             TB_DX_Name.Width = rightEdge - newLeft;
         }
 
+        private void SetQrzPhoto(string imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl))
+            {
+                ClearQrzPhoto();
+                return;
+            }
+
+            try
+            {
+                ShowQrzPhotoWindow(imageUrl.Trim());
+            }
+            catch
+            {
+                ClearQrzPhoto();
+            }
+        }
+
+        private void ClearQrzPhoto()
+        {
+            if (qrzPhotoWindow != null)
+            {
+                SaveQrzPhotoWindowBounds(qrzPhotoWindow);
+                qrzPhotoWindow.Close();
+                qrzPhotoWindow = null;
+            }
+        }
+
+        private void SaveQrzPhotoWindowBounds(Window window)
+        {
+            if (window == null)
+            {
+                return;
+            }
+
+            var bounds = window.WindowState == WindowState.Normal
+                ? new Rect(window.Left, window.Top, window.Width, window.Height)
+                : window.RestoreBounds;
+
+            if (!double.IsNaN(bounds.Left) && !double.IsInfinity(bounds.Left) &&
+                !double.IsNaN(bounds.Top) && !double.IsInfinity(bounds.Top))
+            {
+                qrzPhotoLeft = bounds.Left;
+                qrzPhotoTop = bounds.Top;
+            }
+
+            if (!double.IsNaN(bounds.Width) && !double.IsInfinity(bounds.Width) &&
+                !double.IsNaN(bounds.Height) && !double.IsInfinity(bounds.Height))
+            {
+                qrzPhotoWidth = bounds.Width;
+                qrzPhotoHeight = bounds.Height;
+            }
+
+            PersistQrzPhotoWindowBoundsToDisk();
+        }
+
+        private string GetQrzPhotoBoundsPath()
+        {
+            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HolyLogger");
+            return Path.Combine(dir, "qrz_photo_window_bounds.txt");
+        }
+
+        private void LoadQrzPhotoWindowBoundsFromDisk()
+        {
+            try
+            {
+                string filePath = GetQrzPhotoBoundsPath();
+                if (!File.Exists(filePath))
+                {
+                    return;
+                }
+
+                string[] parts = File.ReadAllText(filePath).Split('|');
+                if (parts.Length != 4)
+                {
+                    return;
+                }
+
+                if (double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double left) &&
+                    double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double top) &&
+                    double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double width) &&
+                    double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double height))
+                {
+                    qrzPhotoLeft = left;
+                    qrzPhotoTop = top;
+                    qrzPhotoWidth = width;
+                    qrzPhotoHeight = height;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private void PersistQrzPhotoWindowBoundsToDisk()
+        {
+            try
+            {
+                if (!qrzPhotoLeft.HasValue || !qrzPhotoTop.HasValue || !qrzPhotoWidth.HasValue || !qrzPhotoHeight.HasValue)
+                {
+                    return;
+                }
+
+                string filePath = GetQrzPhotoBoundsPath();
+                Directory.CreateDirectory(Path.GetDirectoryName(filePath));
+
+                string line = string.Format(
+                    CultureInfo.InvariantCulture,
+                    "{0}|{1}|{2}|{3}",
+                    qrzPhotoLeft.Value,
+                    qrzPhotoTop.Value,
+                    qrzPhotoWidth.Value,
+                    qrzPhotoHeight.Value);
+
+                File.WriteAllText(filePath, line);
+            }
+            catch
+            {
+            }
+        }
+
+        private void ShowQrzPhotoWindow(string imageUrl)
+        {
+            if (string.IsNullOrWhiteSpace(imageUrl))
+            {
+                ClearQrzPhoto();
+                return;
+            }
+
+            if (qrzPhotoWindow == null)
+            {
+                qrzPhotoWindow = new QRZPhotoWindow();
+                qrzPhotoWindow.Owner = this;
+                qrzPhotoWindow.Closed += (sender, args) =>
+                {
+                    SaveQrzPhotoWindowBounds(qrzPhotoWindow);
+                    qrzPhotoWindow = null;
+                };
+
+                if (qrzPhotoWidth.HasValue && qrzPhotoHeight.HasValue)
+                {
+                    qrzPhotoWindow.Width = qrzPhotoWidth.Value;
+                    qrzPhotoWindow.Height = qrzPhotoHeight.Value;
+                }
+
+                if (qrzPhotoLeft.HasValue && qrzPhotoTop.HasValue)
+                {
+                    qrzPhotoWindow.Left = qrzPhotoLeft.Value;
+                    qrzPhotoWindow.Top = qrzPhotoTop.Value;
+                }
+                else
+                {
+                    qrzPhotoWindow.Left = Left + Width - qrzPhotoWindow.Width - 18;
+                    qrzPhotoWindow.Top = Top + 52;
+                }
+
+                qrzPhotoWindow.Show();
+            }
+
+            qrzPhotoWindow.SetPhoto(imageUrl);
+            qrzPhotoWindow.Activate();
+        }
+
         private void TB_State_TextChanged(object sender, TextChangedEventArgs e)
         {
             TB_State.TextAlignment = TB_State.Text.Length <= 2
@@ -2545,6 +2716,7 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 CallsignLookupDebounceTimer.Stop();
+                ClearQrzPhoto();
                 TB_DXCC.Text = "";
                 TB_DX_Name.Text = "";
                 TB_State.Text = "";
@@ -2557,6 +2729,13 @@ namespace HolyLogger
             }
             else
             {
+                // Prevent stale photo while callsign is not long enough for a QRZ lookup.
+                if (TB_DXCallsign.Text.Trim().Length < 3)
+                {
+                    CallsignLookupDebounceTimer.Stop();
+                    ClearQrzPhoto();
+                }
+
                 if (!Properties.Settings.Default.isManualMode && state == State.New)
                     RefreshDateTime_Btn_MouseUp(null, null);
                 DXCC dXCC = rem.GetDXCC(TB_DXCallsign.Text);
@@ -2588,6 +2767,7 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
+                ClearQrzPhoto();
                 return;
             }
 
@@ -3579,7 +3759,6 @@ namespace HolyLogger
                 string dxcall = TB_DXCallsign.Text.Trim();
                 string bare_dxcall = Services.getBareCallsign(dxcall);
 
-                /*****************************/
                 using (var client = new HttpClient())
                 {
                     try
@@ -3588,39 +3767,40 @@ namespace HolyLogger
                         var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + bare_dxcall);
                         var responseFromServer = await response.Content.ReadAsStringAsync();
                         XDocument xDoc = XDocument.Parse(responseFromServer);
+                        XNamespace ns = xDoc.Root.GetDefaultNamespace();
                         
                         if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && (dxcall == TB_DXCallsign.Text.Trim()))
                         {
-                            IEnumerable<XElement> xref = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "xref");
-                            IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
-                            IEnumerable<XElement> error = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Error");
+                            IEnumerable<XElement> xref = xDoc.Root.Descendants(ns + "xref");
+                            IEnumerable<XElement> call = xDoc.Root.Descendants(ns + "call");
+                            IEnumerable<XElement> error = xDoc.Root.Descendants(ns + "Error");
 
-                            if ((call.Count() > 0 && call.FirstOrDefault().Value == bare_dxcall) || (xref.Count() > 0 && xref.FirstOrDefault().Value == bare_dxcall))
+                            if (call.Count() > 0 || xref.Count() > 0)
                             {
-                                IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
+                                IEnumerable<XElement> fname = xDoc.Root.Descendants(ns + "fname");
                                 if (fname.Count() > 0)
                                     FName = fname.FirstOrDefault().Value;
                                 else
                                     FName = "";
 
-                                IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
+                                IEnumerable<XElement> lname = xDoc.Root.Descendants(ns + "name");
                                 if (lname.Count() > 0)
                                     FName += " " + lname.FirstOrDefault().Value;
 
                                 //****************** AZIMUTH *****************//
-                                IEnumerable<XElement> lat = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "lat");
+                                IEnumerable<XElement> lat = xDoc.Root.Descendants(ns + "lat");
                                 if (lat.Count() > 0)
                                     QRZLat = lat.FirstOrDefault().Value;
 
-                                IEnumerable<XElement> lon = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "lon");
+                                IEnumerable<XElement> lon = xDoc.Root.Descendants(ns + "lon");
                                 if (lon.Count() > 0)
                                     QRZLon = lon.FirstOrDefault().Value;
 
-                                IEnumerable<XElement> grid = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "grid");
+                                IEnumerable<XElement> grid = xDoc.Root.Descendants(ns + "grid");
                                 if (grid.Count() > 0)
                                     QRZGrid = grid.FirstOrDefault().Value.ToUpper();
 
-                                IEnumerable<XElement> stateEl = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "state");
+                                IEnumerable<XElement> stateEl = xDoc.Root.Descendants(ns + "state");
                                 TB_State.Text = stateEl.Count() > 0 ? stateEl.FirstOrDefault().Value.Trim() : string.Empty;
 
                                 SetAzimuth();
@@ -3629,7 +3809,20 @@ namespace HolyLogger
 
                                 AddNewCallsignIfMissing(bare_dxcall);
 
-                                string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
+                                try
+                                {
+                                    IEnumerable<XElement> image = xDoc.Root.Descendants(ns + "image");
+                                    if (image.Count() > 0)
+                                        SetQrzPhoto(image.FirstOrDefault().Value);
+                                    else
+                                        await LoadQrzPhotoFromWebAsync(bare_dxcall);
+                                }
+                                catch
+                                {
+                                    ClearQrzPhoto();
+                                }
+
+                                string key = xDoc.Root.Descendants(ns + "Key").FirstOrDefault().Value;
                                 if (SessionKey != key)
                                     if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
                             }
@@ -3640,23 +3833,75 @@ namespace HolyLogger
                                 {
                                     FName = "";
                                     TB_State.Text = "";
+                                    ClearQrzPhoto();
                                 }
                             }
-                        }                        
+                        }
                     }
                     catch (Exception)
                     {
                         FName = "";
                         TB_State.Text = "";
+                        ClearQrzPhoto();
                     }
                 }
-                /*****************************/
             }
             else
             {
                 FName = "";
                 TB_State.Text = "";
+                ClearQrzPhoto();
             }
+        }
+
+        private async Task LoadQrzPhotoFromWebAsync(string bareCallsign)
+        {
+            if (string.IsNullOrWhiteSpace(bareCallsign))
+            {
+                ClearQrzPhoto();
+                return;
+            }
+
+            try
+            {
+                using (var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
+                using (var client = new HttpClient(handler))
+                {
+                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36");
+                    client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
+                    client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+                    string html = string.Empty;
+
+                    if (!string.IsNullOrWhiteSpace(SessionKey))
+                    {
+                        html = await client.GetStringAsync("https://xmldata.qrz.com/xml/current/?s=" + SessionKey + ";html=" + bareCallsign);
+                    }
+
+                    if (string.IsNullOrWhiteSpace(html))
+                    {
+                        html = await client.GetStringAsync("https://www.qrz.com/db/" + bareCallsign);
+                    }
+
+                    Match match = Regex.Match(html, @"https://cdn-bio\.qrz\.com/[^""'<> --]+", RegexOptions.IgnoreCase);
+                    if (match.Success)
+                    {
+                        SetQrzPhoto(match.Value);
+                        return;
+                    }
+
+                    Match altMatch = Regex.Match(html, @"https?://[^""'<> --]+\.(jpg|jpeg|png|gif)", RegexOptions.IgnoreCase);
+                    if (altMatch.Success)
+                    {
+                        SetQrzPhoto(altMatch.Value);
+                        return;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            ClearQrzPhoto();
         }
 
         private async void EntireLogQrzServiseMenuItem_Click(object sender, RoutedEventArgs e)

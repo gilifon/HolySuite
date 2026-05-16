@@ -185,6 +185,9 @@
     <Compile Include="LogUploadWindow.xaml.cs">
       <DependentUpon>LogUploadWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="QRZPhotoWindow.xaml.cs">
+      <DependentUpon>QRZPhotoWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="MatrixWindow.xaml.cs">
       <DependentUpon>MatrixWindow.xaml</DependentUpon>
     </Compile>
@@ -240,6 +243,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="LogUploadWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="QRZPhotoWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
