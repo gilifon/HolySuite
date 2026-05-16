@@ -329,7 +329,9 @@ namespace HolyLogger
             if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
             {
                 NotifyVersionUpToDate = false;
-                UpdatesMenuItem_Click(null, null);
+                // Defer the update check until after the main window is initialized and shown so any dialogs are
+                // owned by the main window rather than the splash window (prevents them from being closed with the splash).
+                Dispatcher.BeginInvoke(new Action(() => UpdatesMenuItem_Click(null, null)), DispatcherPriority.ApplicationIdle);
             }
             this.Loaded += MainWindow_Loaded; ;
             this.PropertyChanged += MainWindow_PropertyChanged;
@@ -2311,7 +2313,8 @@ namespace HolyLogger
                         string caption = "New updates are available";
                         MessageBoxButton button = MessageBoxButton.YesNoCancel;
                         MessageBoxImage icon = MessageBoxImage.Warning;
-                        if (MessageBox.Show(messageBoxText, caption, button, icon) == MessageBoxResult.Yes)
+                        // Ensure the dialog is owned by the main window so it doesn't get closed when the splash window is closed
+                        if (MessageBox.Show(this, messageBoxText, caption, button, icon) == MessageBoxResult.Yes)
                         {
                             //HolyLoggerMenuItem_Click(null, null);
 
