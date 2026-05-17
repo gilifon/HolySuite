@@ -329,7 +329,7 @@
         </DockPanel>
 
 
-        <Rectangle Grid.Row="1" Fill="#D2E9FF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" Margin="0,0,0,0" />
+        <Rectangle Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" Margin="0,0,0,0" />
         <Label Content="Station Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Callsign used on the air" />
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="125,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="121" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="12" BorderBrush="#FFABADB3" TabIndex="1"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="252,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />

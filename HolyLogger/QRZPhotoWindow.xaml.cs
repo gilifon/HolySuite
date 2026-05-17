@@ -44,10 +44,17 @@ namespace HolyLogger
 
             try
             {
+                string normalized = imageUrl.Trim();
+                if (normalized.StartsWith("//"))
+                {
+                    normalized = "https:" + normalized;
+                }
+
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.UriSource = new Uri(imageUrl.Trim(), UriKind.Absolute);
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bitmap.UriSource = new Uri(normalized, UriKind.Absolute);
                 bitmap.EndInit();
                 PhotoImage.Source = bitmap;
             }

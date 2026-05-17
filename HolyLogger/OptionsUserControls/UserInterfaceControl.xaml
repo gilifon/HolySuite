@@ -12,20 +12,21 @@
         <CheckBox x:Name="CBX_IsShowAzimuth" Content="Show map" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowAzimuthControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,26,0,0"/>
         <CheckBox x:Name="CBX_ShowTitleClock" Content="Show UTC clock in the title" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowTitleClock, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,52,0,0" Click="HasChanged_Click"/>
         <CheckBox x:Name="CBX_ShowNetworkFlag" Content="Show the Network connectivity icon" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowNetworkFlag, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,78,0,0"/>
-        <CheckBox x:Name="CBX_Lock" Content="Lock My Callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isLocked, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,104,0,0"/>
-        <CheckBox x:Name="CBX_DisplayLastQSOinGrid" Content="Highlight last QSO" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.DisplayLastQSOinGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,130,0,0"/>
-        <CheckBox x:Name="CBX_UseDXCCDefaultGrid" Content="Use default grid for DXCC" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.UseDXCCDefaultGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,156,0,0"/>
-        <CheckBox x:Name="CBX_ShowCallsignDropdown" Content="Show callsign autocomplete dropdown" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowCallsignDropdown, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,182,0,0"/>
-        <Label Content="Callsign autocomplete # of lines" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,210,0,0" FontSize="16"/>
-        <ComboBox x:Name="CB_CallsignSuggestionRows" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="260,216,0,0" SelectionChanged="CB_CallsignSuggestionRows_SelectionChanged" FontSize="16">
+        <CheckBox x:Name="CBX_ShowPhotoFromQrz" Content="Show Photo From QRZ" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowPhotoFromQRZ, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,104,0,0" Click="HasChanged_Click"/>
+        <CheckBox x:Name="CBX_Lock" Content="Lock My Callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isLocked, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,130,0,0"/>
+        <CheckBox x:Name="CBX_DisplayLastQSOinGrid" Content="Highlight last QSO" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.DisplayLastQSOinGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,156,0,0"/>
+        <CheckBox x:Name="CBX_UseDXCCDefaultGrid" Content="Use default grid for DXCC" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.UseDXCCDefaultGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,182,0,0"/>
+        <CheckBox x:Name="CBX_ShowCallsignDropdown" Content="Show callsign autocomplete dropdown" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowCallsignDropdown, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,208,0,0"/>
+        <Label Content="Callsign autocomplete # of lines" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,236,0,0" FontSize="16"/>
+        <ComboBox x:Name="CB_CallsignSuggestionRows" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="260,242,0,0" SelectionChanged="CB_CallsignSuggestionRows_SelectionChanged" FontSize="16">
             <ComboBoxItem Content="10"/>
             <ComboBoxItem Content="15"/>
             <ComboBoxItem Content="20"/>
             <ComboBoxItem Content="25"/>
             <ComboBoxItem Content="30"/>
         </ComboBox>
-        <Label Content="Auto Fit Radius % Increas by" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,240,0,0" FontSize="16"/>
-        <ComboBox x:Name="CB_MapAutoFitMargin" HorizontalAlignment="Left" VerticalAlignment="Top" Width="60" Height="28" Margin="260,246,0,0" SelectionChanged="CB_MapAutoFitMargin_SelectionChanged" FontSize="16">
+        <Label Content="Auto Fit Radius % Increas by" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,266,0,0" FontSize="16"/>
+        <ComboBox x:Name="CB_MapAutoFitMargin" HorizontalAlignment="Left" VerticalAlignment="Top" Width="60" Height="28" Margin="260,272,0,0" SelectionChanged="CB_MapAutoFitMargin_SelectionChanged" FontSize="16">
             <ComboBoxItem Content="0"/>
             <ComboBoxItem Content="5"/>
             <ComboBoxItem Content="10"/>
@@ -33,12 +34,12 @@
             <ComboBoxItem Content="20"/>
             <ComboBoxItem Content="25"/>
         </ComboBox>
-        <Label Content="DX station distance unit" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,270,0,0" FontSize="16"/>
-        <ComboBox x:Name="CB_MapDistanceUnit" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="260,276,0,0" SelectionChanged="CB_MapDistanceUnit_SelectionChanged" FontSize="16">
+        <Label Content="DX station distance unit" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,296,0,0" FontSize="16"/>
+        <ComboBox x:Name="CB_MapDistanceUnit" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="260,302,0,0" SelectionChanged="CB_MapDistanceUnit_SelectionChanged" FontSize="16">
             <ComboBoxItem Content="KM"/>
             <ComboBoxItem Content="Miles"/>
         </ComboBox>
-        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,306,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
+        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,332,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>

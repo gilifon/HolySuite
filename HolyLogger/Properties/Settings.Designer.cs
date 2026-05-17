@@ -659,6 +659,18 @@ namespace HolyLogger.Properties {
                 this["ShowNetworkFlag"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowPhotoFromQRZ {
+            get {
+                return ((bool)(this["ShowPhotoFromQRZ"]));
+            }
+            set {
+                this["ShowPhotoFromQRZ"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

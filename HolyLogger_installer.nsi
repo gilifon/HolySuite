@@ -2,7 +2,7 @@
 ; Installs HolyLogger to Program Files and creates Start Menu + Desktop shortcuts
 
 !define APPNAME "HolyLogger"
-!define APPVERSION "8.5.3"
+!define APPVERSION "8.5.6"
 !define MANUFACTURER "4Z1KD"
 !define INSTALL_DIR "$PROGRAMFILES\${MANUFACTURER}\${APPNAME}"
 !define SOURCE_DIR "HolyLogger\bin\x86\Release"
@@ -134,3 +134,4 @@ Section "Uninstall"
   DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\${APPNAME}"
   DeleteRegKey HKLM "Software\${MANUFACTURER}\${APPNAME}"
 SectionEnd
+

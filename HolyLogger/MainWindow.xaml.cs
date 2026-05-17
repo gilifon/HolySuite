@@ -2510,6 +2510,12 @@ namespace HolyLogger
 
         private void SetQrzPhoto(string imageUrl)
         {
+            if (!Properties.Settings.Default.ShowPhotoFromQRZ)
+            {
+                ClearQrzPhoto();
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(imageUrl))
             {
                 ClearQrzPhoto();
@@ -2518,7 +2524,12 @@ namespace HolyLogger
 
             try
             {
-                ShowQrzPhotoWindow(imageUrl.Trim());
+                string normalized = imageUrl.Trim();
+                if (normalized.StartsWith("//"))
+                {
+                    normalized = "https:" + normalized;
+                }
+                ShowQrzPhotoWindow(normalized);
             }
             catch
             {
@@ -2668,7 +2679,6 @@ namespace HolyLogger
             }
 
             qrzPhotoWindow.SetPhoto(imageUrl);
-            qrzPhotoWindow.Activate();
         }
 
         private void TB_State_TextChanged(object sender, TextChangedEventArgs e)
@@ -2710,10 +2720,12 @@ namespace HolyLogger
                 UpdateCallsignSuggestions();
             }
 
+            string dxCallText = (TB_DXCallsign.Text ?? string.Empty).Trim();
+
             // Clear stale values from the previously highlighted callsign until new data is loaded.
             FName = string.Empty;
             ClearDXLocator();
-            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            if (string.IsNullOrWhiteSpace(dxCallText))
             {
                 CallsignLookupDebounceTimer.Stop();
                 ClearQrzPhoto();
@@ -2729,8 +2741,17 @@ namespace HolyLogger
             }
             else
             {
+                // Keep typing snappy: skip heavy DXCC/matrix/filter work until at least 2 chars.
+                if (dxCallText.Length < 2)
+                {
+                    CallsignLookupDebounceTimer.Stop();
+                    ClearQrzPhoto();
+                    Prefix = dxCallText.ToUpperInvariant();
+                    return;
+                }
+
                 // Prevent stale photo while callsign is not long enough for a QRZ lookup.
-                if (TB_DXCallsign.Text.Trim().Length < 3)
+                if (dxCallText.Length < 3)
                 {
                     CallsignLookupDebounceTimer.Stop();
                     ClearQrzPhoto();
@@ -2738,17 +2759,17 @@ namespace HolyLogger
 
                 if (!Properties.Settings.Default.isManualMode && state == State.New)
                     RefreshDateTime_Btn_MouseUp(null, null);
-                DXCC dXCC = rem.GetDXCC(TB_DXCallsign.Text);
+                DXCC dXCC = rem.GetDXCC(dxCallText);
                 Country = dXCC.Name;
                 UpdateCountryFlag(dXCC.Name);
                 Continent = dXCC.Continent;
                 QRZGrid = dXCC.Locator;
-                Prefix = TB_DXCallsign.Text.Length >= 2 ? TB_DXCallsign.Text.Substring(0, 2) : "";
+                Prefix = dxCallText.Length >= 2 ? dxCallText.Substring(0, 2) : "";
                 RestartCallsignLookupDebounce();
                 UpdateMatrix();
                 if (Properties.Settings.Default.IsFilterQSOs)
                 {
-                    FilteredQsos = new ObservableCollection<QSO>(Qsos.Where(p => p.DXCall.Contains(TB_DXCallsign.Text)));
+                    FilteredQsos = new ObservableCollection<QSO>(Qsos.Where(p => p.DXCall.Contains(dxCallText)));
                     if (LastQSO != null && Properties.Settings.Default.DisplayLastQSOinGrid) FilteredQsos.Insert(0, LastQSO);
                     DataContext = FilteredQsos;
                 }
@@ -3711,6 +3732,17 @@ namespace HolyLogger
                 Dispatcher.BeginInvoke(new Action(UpdateShareIconVisibility), DispatcherPriority.Background);
             }
 
+            if (e.PropertyName == nameof(Properties.Settings.Default.ShowPhotoFromQRZ))
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!Properties.Settings.Default.ShowPhotoFromQRZ)
+                    {
+                        ClearQrzPhoto();
+                    }
+                }), DispatcherPriority.Background);
+            }
+
             if (e.PropertyName == nameof(Properties.Settings.Default.MapDistanceUnit))
             {
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -3812,10 +3844,15 @@ namespace HolyLogger
                                 try
                                 {
                                     IEnumerable<XElement> image = xDoc.Root.Descendants(ns + "image");
-                                    if (image.Count() > 0)
-                                        SetQrzPhoto(image.FirstOrDefault().Value);
+                                    string xmlImageUrl = image.Select(i => i.Value).FirstOrDefault();
+                                    if (!string.IsNullOrWhiteSpace(xmlImageUrl))
+                                    {
+                                        SetQrzPhoto(xmlImageUrl);
+                                    }
                                     else
+                                    {
                                         await LoadQrzPhotoFromWebAsync(bare_dxcall);
+                                    }
                                 }
                                 catch
                                 {
