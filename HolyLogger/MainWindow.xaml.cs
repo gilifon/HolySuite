@@ -613,11 +613,13 @@ namespace HolyLogger
             {
                 MatrixC.Visibility = Visibility.Visible;
                 MainForm.Height = new GridLength(325);
+                MapControl.Height = 325;
             }
             else
             {
                 MatrixC.Visibility = Visibility.Hidden;
                 MainForm.Height = new GridLength(270);
+                MapControl.Height = 270;
             }
         }
 
