@@ -144,10 +144,10 @@
       <Value Profile="(Default)">0</Value>
     </Setting>
     <Setting Name="OptionsWindowWidth" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">300</Value>
+      <Value Profile="(Default)">580</Value>
     </Setting>
     <Setting Name="OptionsWindowHeight" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">450</Value>
+      <Value Profile="(Default)">700</Value>
     </Setting>
     <Setting Name="IsShowMatrixControl" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
