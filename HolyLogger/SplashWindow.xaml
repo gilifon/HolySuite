@@ -6,7 +6,14 @@
         SizeToContent="WidthAndHeight"
         WindowStartupLocation="CenterScreen">
     <Grid>
-        <Image x:Name="SplashImage" Stretch="None"/>
+        <Image x:Name="SplashImage" Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        
+        <Image x:Name="TimerIcon"
+               Width="34" Height="34"
+               HorizontalAlignment="Right"
+               VerticalAlignment="Center"
+               Margin="0,0,42,0"
+               Stretch="Uniform"/>
         <Border HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Height="30" Background="Transparent">
             <TextBlock x:Name="VersionText"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
