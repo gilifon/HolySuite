@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="440" d:DesignWidth="380">
+             d:DesignHeight="560" d:DesignWidth="380">
 
     <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsShowMatrix" Content="Show matrix in main window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowMatrixControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
@@ -44,6 +44,33 @@
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
+        </GroupBox>
+        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,452,0,0" Width="360" Height="100" FontSize="15">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="38"/>
+                    <RowDefinition Height="38"/>
+                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="188"/>
+                    <ColumnDefinition Width="52"/>
+                    <ColumnDefinition Width="110"/>
+                </Grid.ColumnDefinitions>
+
+                <Label Content="Main form background" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontSize="14"/>
+                <Border x:Name="MainFormBackgroundPreview" Grid.Row="0" Grid.Column="1" Width="40" Height="22" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="1" Background="#BDDFFF"/>
+                <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Button x:Name="BtnChooseMainFormBackground" Content="Choose" Width="58" Height="24" FontSize="12" Click="BtnChooseMainFormBackground_Click"/>
+                    <Button x:Name="BtnResetMainFormBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="6,0,0,0" Click="BtnResetMainFormBackground_Click"/>
+                </StackPanel>
+
+                <Label Content="QSO table header" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="14"/>
+                <Border x:Name="QsoTableHeaderBackgroundPreview" Grid.Row="1" Grid.Column="1" Width="40" Height="22" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="1" Background="#DEB887"/>
+                <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <Button x:Name="BtnChooseQsoTableHeaderBackground" Content="Choose" Width="58" Height="24" FontSize="12" Click="BtnChooseQsoTableHeaderBackground_Click"/>
+                    <Button x:Name="BtnResetQsoTableHeaderBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="6,0,0,0" Click="BtnResetQsoTableHeaderBackground_Click"/>
+                </StackPanel>
+            </Grid>
         </GroupBox>
         <!--<CheckBox x:Name="CBX_QRZAutoOpen" Content="Auto open QRZ.com page" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.QRZ_auto_open, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,156,0,0"/>-->
     </Grid>

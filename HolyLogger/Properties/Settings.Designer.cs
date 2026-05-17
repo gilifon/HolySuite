@@ -671,6 +671,30 @@ namespace HolyLogger.Properties {
                 this["ShowPhotoFromQRZ"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("#BDDFFF")]
+        public string MainFormBackgroundColor {
+            get {
+                return ((string)(this["MainFormBackgroundColor"]));
+            }
+            set {
+                this["MainFormBackgroundColor"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("#DEB887")]
+        public string QsoTableHeaderBackgroundColor {
+            get {
+                return ((string)(this["QsoTableHeaderBackgroundColor"]));
+            }
+            set {
+                this["QsoTableHeaderBackgroundColor"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

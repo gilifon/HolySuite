@@ -275,6 +275,8 @@ namespace HolyLogger
             Qsos = new ObservableCollection<QSO>();
             rem = new EntityResolver();
             InitializeComponent();
+            ApplyMainFormBackgroundFromSettings();
+            ApplyQsoTableHeaderBackgroundFromSettings();
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
             LoadCallsignIndex();
@@ -3732,6 +3734,16 @@ namespace HolyLogger
                 Dispatcher.BeginInvoke(new Action(UpdateShareIconVisibility), DispatcherPriority.Background);
             }
 
+            if (e.PropertyName == nameof(Properties.Settings.Default.MainFormBackgroundColor))
+            {
+                Dispatcher.BeginInvoke(new Action(ApplyMainFormBackgroundFromSettings), DispatcherPriority.Background);
+            }
+
+            if (e.PropertyName == nameof(Properties.Settings.Default.QsoTableHeaderBackgroundColor))
+            {
+                Dispatcher.BeginInvoke(new Action(ApplyQsoTableHeaderBackgroundFromSettings), DispatcherPriority.Background);
+            }
+
             if (e.PropertyName == nameof(Properties.Settings.Default.ShowPhotoFromQRZ))
             {
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -3778,6 +3790,62 @@ namespace HolyLogger
             ShareStatusButton.Visibility = isNetworkAvailable && Properties.Settings.Default.ShowOnTheAir
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        }
+
+        private Color ParseMainFormBackgroundColor(string colorText)
+        {
+            try
+            {
+                var parsed = (Color)ColorConverter.ConvertFromString(colorText);
+                return parsed;
+            }
+            catch
+            {
+                return (Color)ColorConverter.ConvertFromString("#BDDFFF");
+            }
+        }
+
+        private Color ParseQsoTableHeaderBackgroundColor(string colorText)
+        {
+            try
+            {
+                var parsed = (Color)ColorConverter.ConvertFromString(colorText);
+                return parsed;
+            }
+            catch
+            {
+                return (Color)ColorConverter.ConvertFromString("#DEB887");
+            }
+        }
+
+        private void ApplyMainFormBackgroundFromSettings()
+        {
+            if (MainFormBackgroundRect == null)
+            {
+                return;
+            }
+
+            Color color = ParseMainFormBackgroundColor(Properties.Settings.Default.MainFormBackgroundColor);
+            MainFormBackgroundRect.Fill = new SolidColorBrush(color);
+        }
+
+        private void ApplyQsoTableHeaderBackgroundFromSettings()
+        {
+            if (QSODataGrid == null)
+            {
+                return;
+            }
+
+            Color color = ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
+
+            var headerStyle = new Style(typeof(DataGridColumnHeader));
+            headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
+            headerStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
+            headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
+            headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
+
+            QSODataGrid.ColumnHeaderStyle = headerStyle;
         }
 
         private async void GetQrzData()

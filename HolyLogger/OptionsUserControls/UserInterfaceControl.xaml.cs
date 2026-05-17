@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
+using WinForms = System.Windows.Forms;
 
 namespace HolyLogger.OptionsUserControls
 {
@@ -20,6 +21,9 @@ namespace HolyLogger.OptionsUserControls
     /// </summary>
     public partial class UserInterfaceControl : UserControl
     {
+        private const string DefaultMainFormBackgroundColor = "#BDDFFF";
+        private const string DefaultQsoTableHeaderBackgroundColor = "#DEB887";
+
         public bool HasChanged { get; set; }
 
         public UserInterfaceControl()
@@ -29,6 +33,8 @@ namespace HolyLogger.OptionsUserControls
             SetCallsignSuggestionRowsSelection();
             SetMapAutoFitMarginSelection();
             SetMapDistanceUnitSelection();
+            RefreshMainFormBackgroundPreview();
+            RefreshQsoTableHeaderBackgroundPreview();
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)
@@ -208,6 +214,114 @@ namespace HolyLogger.OptionsUserControls
                     mainWindow.RefreshMapAfterUnitChange();
                 }
             }
+        }
+
+        private static Color ParseColor(string colorText, string fallbackHex)
+        {
+            try
+            {
+                object parsed = ColorConverter.ConvertFromString(colorText);
+                if (parsed is Color)
+                {
+                    return (Color)parsed;
+                }
+            }
+            catch
+            {
+            }
+
+            return (Color)ColorConverter.ConvertFromString(fallbackHex);
+        }
+
+        private static string PickColorHex(string currentHex)
+        {
+            Color current = ParseColor(currentHex, DefaultMainFormBackgroundColor);
+
+            using (var dlg = new WinForms.ColorDialog())
+            {
+                dlg.AllowFullOpen = true;
+                dlg.FullOpen = true;
+                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
+
+                if (dlg.ShowDialog() != WinForms.DialogResult.OK)
+                {
+                    return null;
+                }
+
+                return string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
+            }
+        }
+
+        private void RefreshMainFormBackgroundPreview()
+        {
+            Color color = ParseColor(Properties.Settings.Default.MainFormBackgroundColor, DefaultMainFormBackgroundColor);
+            MainFormBackgroundPreview.Background = new SolidColorBrush(color);
+        }
+
+        private void RefreshQsoTableHeaderBackgroundPreview()
+        {
+            Color color = ParseColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor, DefaultQsoTableHeaderBackgroundColor);
+            QsoTableHeaderBackgroundPreview.Background = new SolidColorBrush(color);
+        }
+
+        private void BtnChooseMainFormBackground_Click(object sender, RoutedEventArgs e)
+        {
+            string hex = PickColorHex(Properties.Settings.Default.MainFormBackgroundColor);
+            if (string.IsNullOrWhiteSpace(hex))
+            {
+                return;
+            }
+
+            if (!string.Equals(Properties.Settings.Default.MainFormBackgroundColor, hex, StringComparison.OrdinalIgnoreCase))
+            {
+                Properties.Settings.Default.MainFormBackgroundColor = hex;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+            }
+
+            RefreshMainFormBackgroundPreview();
+        }
+
+        private void BtnResetMainFormBackground_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.Equals(Properties.Settings.Default.MainFormBackgroundColor, DefaultMainFormBackgroundColor, StringComparison.OrdinalIgnoreCase))
+            {
+                Properties.Settings.Default.MainFormBackgroundColor = DefaultMainFormBackgroundColor;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+            }
+
+            RefreshMainFormBackgroundPreview();
+        }
+
+        private void BtnChooseQsoTableHeaderBackground_Click(object sender, RoutedEventArgs e)
+        {
+            string hex = PickColorHex(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
+            if (string.IsNullOrWhiteSpace(hex))
+            {
+                return;
+            }
+
+            if (!string.Equals(Properties.Settings.Default.QsoTableHeaderBackgroundColor, hex, StringComparison.OrdinalIgnoreCase))
+            {
+                Properties.Settings.Default.QsoTableHeaderBackgroundColor = hex;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+            }
+
+            RefreshQsoTableHeaderBackgroundPreview();
+        }
+
+        private void BtnResetQsoTableHeaderBackground_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.Equals(Properties.Settings.Default.QsoTableHeaderBackgroundColor, DefaultQsoTableHeaderBackgroundColor, StringComparison.OrdinalIgnoreCase))
+            {
+                Properties.Settings.Default.QsoTableHeaderBackgroundColor = DefaultQsoTableHeaderBackgroundColor;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+            }
+
+            RefreshQsoTableHeaderBackgroundPreview();
         }
 
     }

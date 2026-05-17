@@ -164,6 +164,12 @@
     <Setting Name="ShowPhotoFromQRZ" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="MainFormBackgroundColor" Type="System.String" Scope="User">
+      <Value Profile="(Default)">#BDDFFF</Value>
+    </Setting>
+    <Setting Name="QsoTableHeaderBackgroundColor" Type="System.String" Scope="User">
+      <Value Profile="(Default)">#DEB887</Value>
+    </Setting>
     <Setting Name="IsParseWARC" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
