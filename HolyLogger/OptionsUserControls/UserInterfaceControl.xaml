@@ -5,9 +5,9 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="560" d:DesignWidth="380">
+             d:DesignHeight="530" d:DesignWidth="380">
 
-    <Grid ShowGridLines="false" VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+    <Grid ShowGridLines="false" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsShowMatrix" Content="Show matrix in main window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowMatrixControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
         <CheckBox x:Name="CBX_IsShowAzimuth" Content="Show map" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowAzimuthControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,26,0,0"/>
         <CheckBox x:Name="CBX_ShowTitleClock" Content="Show UTC clock in the title" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowTitleClock, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,52,0,0" Click="HasChanged_Click"/>
@@ -39,13 +39,13 @@
             <ComboBoxItem Content="KM"/>
             <ComboBoxItem Content="Miles"/>
         </ComboBox>
-        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="120" Margin="0,332,0,0" VerticalAlignment="Top" Width="360" FontSize="16">
+        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="90" Margin="10,332,10,0" VerticalAlignment="Top" Width="360" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
-        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,452,0,0" Width="360" Height="100" FontSize="15">
+        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,430,10,0" Width="360" Height="100" FontSize="16">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="38"/>
@@ -53,22 +53,19 @@
                 </Grid.RowDefinitions>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="188"/>
-                    <ColumnDefinition Width="52"/>
-                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="162"/>
                 </Grid.ColumnDefinitions>
 
                 <Label Content="Main form background" Grid.Row="0" Grid.Column="0" VerticalAlignment="Center" FontSize="14"/>
-                <Border x:Name="MainFormBackgroundPreview" Grid.Row="0" Grid.Column="1" Width="40" Height="22" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="1" Background="#BDDFFF"/>
-                <StackPanel Grid.Row="0" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <Button x:Name="BtnChooseMainFormBackground" Content="Choose" Width="58" Height="24" FontSize="12" Click="BtnChooseMainFormBackground_Click"/>
-                    <Button x:Name="BtnResetMainFormBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="6,0,0,0" Click="BtnResetMainFormBackground_Click"/>
+                <StackPanel Grid.Row="0" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <Border x:Name="MainFormBackgroundPreview" Width="40" Height="28" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="2" Background="#BDDFFF" Cursor="Hand" MouseLeftButtonDown="MainFormBackgroundPreview_MouseLeftButtonDown" ToolTip="Click to pick a color"/>
+                    <Button x:Name="BtnResetMainFormBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Click="BtnResetMainFormBackground_Click"/>
                 </StackPanel>
 
                 <Label Content="QSO table header" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="14"/>
-                <Border x:Name="QsoTableHeaderBackgroundPreview" Grid.Row="1" Grid.Column="1" Width="40" Height="22" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="1" Background="#DEB887"/>
-                <StackPanel Grid.Row="1" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <Button x:Name="BtnChooseQsoTableHeaderBackground" Content="Choose" Width="58" Height="24" FontSize="12" Click="BtnChooseQsoTableHeaderBackground_Click"/>
-                    <Button x:Name="BtnResetQsoTableHeaderBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="6,0,0,0" Click="BtnResetQsoTableHeaderBackground_Click"/>
+                <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <Border x:Name="QsoTableHeaderBackgroundPreview" Width="40" Height="28" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="2" Background="#DEB887" Cursor="Hand" MouseLeftButtonDown="QsoTableHeaderBackgroundPreview_MouseLeftButtonDown" ToolTip="Click to pick a color"/>
+                    <Button x:Name="BtnResetQsoTableHeaderBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Click="BtnResetQsoTableHeaderBackground_Click"/>
                 </StackPanel>
             </Grid>
         </GroupBox>
