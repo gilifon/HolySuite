@@ -264,7 +264,7 @@ namespace HolyLogger.OptionsUserControls
             QsoTableHeaderBackgroundPreview.Background = new SolidColorBrush(color);
         }
 
-        private void BtnChooseMainFormBackground_Click(object sender, RoutedEventArgs e)
+        private void MainFormBackgroundPreview_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             string hex = PickColorHex(Properties.Settings.Default.MainFormBackgroundColor);
             if (string.IsNullOrWhiteSpace(hex))
@@ -294,7 +294,7 @@ namespace HolyLogger.OptionsUserControls
             RefreshMainFormBackgroundPreview();
         }
 
-        private void BtnChooseQsoTableHeaderBackground_Click(object sender, RoutedEventArgs e)
+        private void QsoTableHeaderBackgroundPreview_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
             string hex = PickColorHex(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
             if (string.IsNullOrWhiteSpace(hex))
