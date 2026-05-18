@@ -256,6 +256,30 @@ namespace HolyLogger
         private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
         private const int SEND_CHUNK_SIZE = 50;
 
+        private sealed class RadioVoiceCommandProfile
+        {
+            public RadioVoiceCommandProfile(string message1, string message2, string message3, string message4, string stop)
+            {
+                MessageCommands = new[] { message1, message2, message3, message4 };
+                StopCommand = stop;
+            }
+
+            public string[] MessageCommands { get; }
+
+            public string StopCommand { get; }
+        }
+
+        private static readonly Dictionary<string, RadioVoiceCommandProfile> VoiceCommandProfiles = new Dictionary<string, RadioVoiceCommandProfile>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "IC-7300", new RadioVoiceCommandProfile("FE FE 94 E0 28 00 01 FD", "FE FE 94 E0 28 00 02 FD", "FE FE 94 E0 28 00 03 FD", "FE FE 94 E0 28 00 04 FD", "FE FE 94 E0 28 00 00 FD") },
+            { "IC-7610", new RadioVoiceCommandProfile("FE FE 98 E0 28 00 01 FD", "FE FE 98 E0 28 00 02 FD", "FE FE 98 E0 28 00 03 FD", "FE FE 98 E0 28 00 04 FD", "FE FE 98 E0 28 00 00 FD") },
+            { "FTDX10", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
+        };
+
+        private int? pendingVoiceMessageNumber;
+        private int? activeVoiceMessageNumber;
+        private DateTime pendingVoiceMessageDeadlineUtc;
+
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
         BitmapImage lock_path = new BitmapImage(new Uri("Images/lock.png", UriKind.Relative));
         BitmapImage unlock_path = new BitmapImage(new Uri("Images/unlock.png", UriKind.Relative));
@@ -996,7 +1020,152 @@ namespace HolyLogger
             {
                 ClearBtn_Click(null, null);
             }
+            else if (e.Key >= Key.F5 && e.Key <= Key.F8)
+            {
+                TriggerVoiceMessage(e.Key - Key.F4);
+                e.Handled = true;
+            }
 
+        }
+
+        private void MessageButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is Button button && int.TryParse(button.Tag?.ToString(), out int messageNumber))
+            {
+                TriggerVoiceMessage(messageNumber);
+            }
+        }
+
+        private void TriggerVoiceMessage(int messageNumber)
+        {
+            if (messageNumber < 1 || messageNumber > 4)
+            {
+                return;
+            }
+
+            if (!TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out string rigType, out string errorMessage))
+            {
+                MessageBox.Show(errorMessage, "Voice Message", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (pendingVoiceMessageNumber.HasValue || activeVoiceMessageNumber.HasValue)
+            {
+                if (!string.IsNullOrWhiteSpace(profile.StopCommand) && !TrySendOmniRigCustomCommand(profile.StopCommand))
+                {
+                    MessageBox.Show("Failed to send the stop CAT command to " + rigType + ".", "Voice Message", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                ClearVoiceMessageState();
+                return;
+            }
+
+            string command = profile.MessageCommands[messageNumber - 1];
+
+            if (string.IsNullOrWhiteSpace(command))
+            {
+                MessageBox.Show("No voice-message CAT command is defined for this button.", "Voice Message", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (!TrySendOmniRigCustomCommand(command))
+            {
+                MessageBox.Show("Failed to send the CAT command to " + rigType + ".", "Voice Message", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+
+            pendingVoiceMessageNumber = messageNumber;
+            activeVoiceMessageNumber = null;
+            pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+        }
+
+        private bool TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out string rigType, out string errorMessage)
+        {
+            profile = null;
+            rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+            errorMessage = null;
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
+            {
+                errorMessage = "OmniRig CAT is not available.";
+                return false;
+            }
+
+            if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                errorMessage = "The radio is offline.";
+                return false;
+            }
+
+            if (string.IsNullOrWhiteSpace(rigType) || !VoiceCommandProfiles.TryGetValue(rigType, out profile))
+            {
+                errorMessage = "No voice-message CAT commands are defined for this radio model.";
+                return false;
+            }
+
+            return true;
+        }
+
+        private string NormalizeRigType(string rigType)
+        {
+            return string.IsNullOrWhiteSpace(rigType) ? string.Empty : rigType.Trim();
+        }
+
+        private bool TrySendOmniRigCustomCommand(string command)
+        {
+            try
+            {
+                byte[] rawCommand = ParseCustomCommand(command);
+                Rig.SendCustomCommand(rawCommand, 0, string.Empty);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private byte[] ParseCustomCommand(string command)
+        {
+            string[] parts = command.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            bool isHexCommand = parts.Length > 1 && parts.All(part => part.Length == 2 && part.All(Uri.IsHexDigit));
+
+            if (isHexCommand)
+            {
+                return parts.Select(part => byte.Parse(part, NumberStyles.HexNumber, CultureInfo.InvariantCulture)).ToArray();
+            }
+
+            return Encoding.ASCII.GetBytes(command);
+        }
+
+        private void UpdateVoiceMessageState()
+        {
+            bool txOn = Rig.Tx == (OmniRig.RigParamX)PM_TX;
+
+            if (pendingVoiceMessageNumber.HasValue)
+            {
+                if (txOn)
+                {
+                    activeVoiceMessageNumber = pendingVoiceMessageNumber;
+                    pendingVoiceMessageNumber = null;
+                }
+                else if (DateTime.UtcNow >= pendingVoiceMessageDeadlineUtc)
+                {
+                    pendingVoiceMessageNumber = null;
+                }
+            }
+            else if (activeVoiceMessageNumber.HasValue && !txOn)
+            {
+                activeVoiceMessageNumber = null;
+            }
+        }
+
+        private void ClearVoiceMessageState()
+        {
+            pendingVoiceMessageNumber = null;
+            activeVoiceMessageNumber = null;
+            pendingVoiceMessageDeadlineUtc = DateTime.MinValue;
         }
 
         private void RST_GotFocus(object sender, RoutedEventArgs e)
@@ -4440,6 +4609,8 @@ namespace HolyLogger
         private void UpdateStatus()
         {
             TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
+            L_OmniRig.Foreground = System.Windows.Media.Brushes.Black;
+            L_OmniRig.FontWeight = FontWeights.Normal;
             
             Status = "CAT Enabled";
             if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)//disabled or offline -> red border
@@ -4461,7 +4632,9 @@ namespace HolyLogger
             Status = Rig.StatusStr;
             if (Rig.Status == OmniRig.RigStatusX.ST_ONLINE)//online
             {
-                Status = "Cat Enabled";
+                Status = string.IsNullOrWhiteSpace(Rig.RigType) ? "CAT Enabled" : Rig.RigType;
+                L_OmniRig.Foreground = System.Windows.Media.Brushes.Green;
+                L_OmniRig.FontWeight = FontWeights.Bold;
             }
             if (!Properties.Settings.Default.EnableOmniRigCAT)//disabled
             {
@@ -4476,7 +4649,15 @@ namespace HolyLogger
         private void ShowRigParams()
         {
             ShowRigStatus();
-            if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || !Properties.Settings.Default.EnableOmniRigCAT || Properties.Settings.Default.isManualMode || state == State.Edit)
+            if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || !Properties.Settings.Default.EnableOmniRigCAT)
+            {
+                ClearVoiceMessageState();
+                return;
+            }
+
+            UpdateVoiceMessageState();
+
+            if (Properties.Settings.Default.isManualMode || state == State.Edit)
             {
                 return;
             }

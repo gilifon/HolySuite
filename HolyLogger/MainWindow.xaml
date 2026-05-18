@@ -366,25 +366,25 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
+                <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="1" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="Msg1" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
                         <TextBlock Text="F5" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
+                <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="2" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="Msg2" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
                         <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
+                <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="3" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="Msg3" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
                         <TextBlock Text="F7" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
+                <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="4" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="Msg4" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
                         <TextBlock Text="F8" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
