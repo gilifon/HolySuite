@@ -77,6 +77,26 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <Style x:Key="RoundedButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#E6CCFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                BorderBrush="#9966CC"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
@@ -333,6 +353,45 @@
         <Label Content="Station Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Callsign used on the air" />
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="125,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="244,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="270,5,0,0" Width="270" Height="44" BorderBrush="#9966CC" BorderThickness="2" CornerRadius="5" Background="Transparent">
+            <Grid Margin="0,2,0,2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Msg1" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
+                        <TextBlock Text="F5" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Msg2" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
+                        <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Msg3" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
+                        <TextBlock Text="F7" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Msg4" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
+                        <TextBlock Text="F8" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
         <Label Content="My Locator" HorizontalAlignment="Left" Margin="545,2,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
         <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="634,6,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="90" Height="22" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="8" TabIndex="3"/>
         <Label Content="Holyland Square" HorizontalAlignment="Left" Margin="545,26,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your Holyland square" />
@@ -345,9 +404,9 @@
             <ComboBoxItem x:Name="op_fm" Content="FM"/>
         </ComboBox>
         <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
-        <Label Content="Frequency" HorizontalAlignment="Left" Margin="260,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
+        <Label Content="Frequency" HorizontalAlignment="Left" Margin="240,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
         <!--<xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="348,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="9" />-->
-        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="345,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="70" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5"/>
+        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="325,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="85" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5"/>
         <Label Content="MHz" HorizontalAlignment="Left" Margin="415,59,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Padding="2,0,5,0" />
         <Label Content="Band" HorizontalAlignment="Left" Margin="464,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
