@@ -86,13 +86,30 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
+                        <Border x:Name="RoundedButtonBorder"
+                                Background="{TemplateBinding Background}"
                                 BorderBrush="#9966CC"
                                 BorderThickness="1"
                                 CornerRadius="8"
                                 SnapsToDevicePixels="True">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RoundedButtonBorder" Property="Background" Value="#CFA6FF"/>
+                                <Setter TargetName="RoundedButtonBorder" Property="BorderBrush" Value="#7A33CC"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="RoundedButtonBorder" Property="Background" Value="#B980F5"/>
+                                <Setter TargetName="RoundedButtonBorder" Property="BorderBrush" Value="#5E1FA8"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="RoundedButtonBorder" Property="Background" Value="#E4E4E4"/>
+                                <Setter TargetName="RoundedButtonBorder" Property="BorderBrush" Value="#B5B5B5"/>
+                                <Setter Property="Foreground" Value="#7A7A7A"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
@@ -353,7 +370,20 @@
         <Label Content="Station Callsign" HorizontalAlignment="Left" Margin="6,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Callsign used on the air" />
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="125,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="244,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
-        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="270,5,0,0" Width="270" Height="44" BorderBrush="#9966CC" BorderThickness="2" CornerRadius="5" Background="Transparent">
+        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="270,5,0,0" Width="270" Height="44" BorderThickness="2" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="BorderBrush" Value="#9966CC"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="BorderBrush" Value="#B5B5B5"/>
+                            <Setter Property="Background" Value="#F2F2F2"/>
+                            <Setter Property="Opacity" Value="0.85"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
             <Grid Margin="0,2,0,2">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />

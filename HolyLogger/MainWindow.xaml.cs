@@ -251,6 +251,7 @@ namespace HolyLogger
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
         DispatcherTimer CallsignLookupDebounceTimer = new DispatcherTimer();
+        DispatcherTimer VoiceMessageAvailabilityTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
         private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
@@ -272,13 +273,20 @@ namespace HolyLogger
         private static readonly Dictionary<string, RadioVoiceCommandProfile> VoiceCommandProfiles = new Dictionary<string, RadioVoiceCommandProfile>(StringComparer.OrdinalIgnoreCase)
         {
             { "IC-7300", new RadioVoiceCommandProfile("FE FE 94 E0 28 00 01 FD", "FE FE 94 E0 28 00 02 FD", "FE FE 94 E0 28 00 03 FD", "FE FE 94 E0 28 00 04 FD", "FE FE 94 E0 28 00 00 FD") },
+            { "IC-7300MK2", new RadioVoiceCommandProfile("FE FE B6 E0 28 00 01 FD", "FE FE B6 E0 28 00 02 FD", "FE FE B6 E0 28 00 03 FD", "FE FE B6 E0 28 00 04 FD", "FE FE B6 E0 28 00 00 FD") },
             { "IC-7610", new RadioVoiceCommandProfile("FE FE 98 E0 28 00 01 FD", "FE FE 98 E0 28 00 02 FD", "FE FE 98 E0 28 00 03 FD", "FE FE 98 E0 28 00 04 FD", "FE FE 98 E0 28 00 00 FD") },
+            { "K3", new RadioVoiceCommandProfile("SWT11;", "SWT12;", "SWT13;", "SWT24;", "SWT27;") },
             { "FTDX10", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
+            { "FTDX101D", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
+            { "FTDX3000", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
+            { "FT-891", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
         };
 
         private int? pendingVoiceMessageNumber;
         private int? activeVoiceMessageNumber;
         private DateTime pendingVoiceMessageDeadlineUtc;
+        private static readonly SolidColorBrush VoiceMessageDefaultBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xCC, 0xFF));
+        private static readonly SolidColorBrush VoiceMessageActiveBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xC9, 0x57));
 
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
         BitmapImage lock_path = new BitmapImage(new Uri("Images/lock.png", UriKind.Relative));
@@ -341,6 +349,10 @@ namespace HolyLogger
             HeartbeatTimer.Tick += HeartbeatTimer_Tick;
             CallsignLookupDebounceTimer.Interval = TimeSpan.FromMilliseconds(CallsignLookupDebounceMs);
             CallsignLookupDebounceTimer.Tick += CallsignLookupDebounceTimer_Tick;
+            VoiceMessageAvailabilityTimer.Interval = TimeSpan.FromMilliseconds(500);
+            VoiceMessageAvailabilityTimer.Tick += VoiceMessageAvailabilityTimer_Tick;
+            VoiceMessageAvailabilityTimer.Start();
+            UpdateVoiceMessageAvailabilityState();
             checkForAutoUpload();
             
 
@@ -1049,7 +1061,9 @@ namespace HolyLogger
                 return;
             }
 
-            if (pendingVoiceMessageNumber.HasValue || activeVoiceMessageNumber.HasValue)
+            int? currentMessageNumber = activeVoiceMessageNumber ?? pendingVoiceMessageNumber;
+
+            if (currentMessageNumber.HasValue)
             {
                 if (!string.IsNullOrWhiteSpace(profile.StopCommand) && !TrySendOmniRigCustomCommand(profile.StopCommand))
                 {
@@ -1058,7 +1072,11 @@ namespace HolyLogger
                 }
 
                 ClearVoiceMessageState();
-                return;
+
+                if (currentMessageNumber.Value == messageNumber)
+                {
+                    return;
+                }
             }
 
             string command = profile.MessageCommands[messageNumber - 1];
@@ -1083,6 +1101,17 @@ namespace HolyLogger
         private bool TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out string rigType, out string errorMessage)
         {
             profile = null;
+            if (!TryGetVoiceMessageAvailability(out rigType, out errorMessage))
+            {
+                return false;
+            }
+
+            profile = VoiceCommandProfiles[rigType];
+            return true;
+        }
+
+        private bool TryGetVoiceMessageAvailability(out string rigType, out string errorMessage)
+        {
             rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
             errorMessage = null;
 
@@ -1098,9 +1127,15 @@ namespace HolyLogger
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(rigType) || !VoiceCommandProfiles.TryGetValue(rigType, out profile))
+            if (string.IsNullOrWhiteSpace(rigType) || !VoiceCommandProfiles.ContainsKey(rigType))
             {
                 errorMessage = "No voice-message CAT commands are defined for this radio model.";
+                return false;
+            }
+
+            if (!IsVoiceMessageModeActive())
+            {
+                errorMessage = "Voice-message buttons are available only in SSB mode.";
                 return false;
             }
 
@@ -1110,6 +1145,43 @@ namespace HolyLogger
         private string NormalizeRigType(string rigType)
         {
             return string.IsNullOrWhiteSpace(rigType) ? string.Empty : rigType.Trim();
+        }
+
+        private bool IsVoiceMessageModeActive()
+        {
+            if (Rig == null)
+            {
+                return false;
+            }
+
+            return string.Equals(GetNormalizedRigMode(), "SSB", StringComparison.OrdinalIgnoreCase);
+        }
+
+        private string GetNormalizedRigMode()
+        {
+            if (Rig == null)
+            {
+                return null;
+            }
+
+            switch (Rig.Mode)
+            {
+                case (OmniRig.RigParamX)PM_CW_L:
+                case (OmniRig.RigParamX)PM_CW_U:
+                    return "CW";
+                case (OmniRig.RigParamX)PM_SSB_L:
+                case (OmniRig.RigParamX)PM_SSB_U:
+                    return "SSB";
+                case (OmniRig.RigParamX)PM_FM:
+                    return "FM";
+                case (OmniRig.RigParamX)PM_AM:
+                    return "AM";
+                case (OmniRig.RigParamX)PM_DIG_L:
+                case (OmniRig.RigParamX)PM_DIG_U:
+                    return "DIGI";
+                default:
+                    return "DIGI";
+            }
         }
 
         private bool TrySendOmniRigCustomCommand(string command)
@@ -1141,6 +1213,12 @@ namespace HolyLogger
 
         private void UpdateVoiceMessageState()
         {
+            if (Rig == null)
+            {
+                ClearVoiceMessageState();
+                return;
+            }
+
             bool txOn = Rig.Tx == (OmniRig.RigParamX)PM_TX;
 
             if (pendingVoiceMessageNumber.HasValue)
@@ -1159,6 +1237,8 @@ namespace HolyLogger
             {
                 activeVoiceMessageNumber = null;
             }
+
+            UpdateVoiceMessageButtonHighlight();
         }
 
         private void ClearVoiceMessageState()
@@ -1166,6 +1246,56 @@ namespace HolyLogger
             pendingVoiceMessageNumber = null;
             activeVoiceMessageNumber = null;
             pendingVoiceMessageDeadlineUtc = DateTime.MinValue;
+            UpdateVoiceMessageButtonHighlight();
+        }
+
+        private void VoiceMessageAvailabilityTimer_Tick(object sender, EventArgs e)
+        {
+            UpdateVoiceMessageAvailabilityState();
+        }
+
+        private void UpdateVoiceMessageAvailabilityState()
+        {
+            if (PlayCommandsBorder == null)
+            {
+                return;
+            }
+
+            bool isAvailable = TryGetVoiceMessageAvailability(out _, out string errorMessage);
+            PlayCommandsBorder.IsEnabled = isAvailable;
+            SetVoiceMessageButtonsEnabled(isAvailable);
+            PlayCommandsBorder.ToolTip = isAvailable ? "Play radio voice messages (F5-F8)" : errorMessage;
+
+            if (!isAvailable)
+            {
+                ClearVoiceMessageState();
+            }
+        }
+
+        private void SetVoiceMessageButtonsEnabled(bool isEnabled)
+        {
+            if (Btn_Msg1 != null) Btn_Msg1.IsEnabled = isEnabled;
+            if (Btn_Msg2 != null) Btn_Msg2.IsEnabled = isEnabled;
+            if (Btn_Msg3 != null) Btn_Msg3.IsEnabled = isEnabled;
+            if (Btn_Msg4 != null) Btn_Msg4.IsEnabled = isEnabled;
+        }
+
+        private void UpdateVoiceMessageButtonHighlight()
+        {
+            UpdateVoiceMessageButtonHighlight(Btn_Msg1, 1);
+            UpdateVoiceMessageButtonHighlight(Btn_Msg2, 2);
+            UpdateVoiceMessageButtonHighlight(Btn_Msg3, 3);
+            UpdateVoiceMessageButtonHighlight(Btn_Msg4, 4);
+        }
+
+        private void UpdateVoiceMessageButtonHighlight(Button button, int messageNumber)
+        {
+            if (button == null)
+            {
+                return;
+            }
+
+            button.Background = activeVoiceMessageNumber == messageNumber ? VoiceMessageActiveBrush : VoiceMessageDefaultBrush;
         }
 
         private void RST_GotFocus(object sender, RoutedEventArgs e)
@@ -1994,6 +2124,9 @@ namespace HolyLogger
         private void Window_Closed(object sender, EventArgs e)
         {
             UTCTimer.Tick -= UTCTimer_Elapsed;
+            VoiceMessageAvailabilityTimer.Tick -= VoiceMessageAvailabilityTimer_Tick;
+            if (VoiceMessageAvailabilityTimer.IsEnabled)
+                VoiceMessageAvailabilityTimer.Stop();
             if (OmniRigEngine != null)
             {
                 OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
@@ -2145,6 +2278,7 @@ namespace HolyLogger
 
             SelectRig();
             ShowRigParams();
+            UpdateVoiceMessageAvailabilityState();
         }
 
         private void GenerateNewOptionsWindow()
@@ -4482,9 +4616,7 @@ namespace HolyLogger
         /// The events subscribed
         /// </summary>
         private bool EventsSubscribed = false;
-
-        Thread thread1;
-        Thread thread2;
+        private bool _showRigParamsQueued;
 
         private void StartOmniRig()
         {
@@ -4579,17 +4711,28 @@ namespace HolyLogger
         //OmniRig ParamsChange events
         private void OmniRigEngine_ParamsChange(int RigNumber, int Params)
         {
-            thread1 = new Thread(new ThreadStart(ShowRigParams));
-            thread1.Name = "RigParams";
-            thread1.Start();
+            QueueShowRigParams();
         }
 
         //OmniRig StatusChange events
         private void OmniRigEngine_StatusChange(int RigNumber)
         {
-            thread2 = new Thread(new ThreadStart(ShowRigParams));
-            thread2.Name = "RigStatus";
-            thread2.Start();
+            QueueShowRigParams();
+        }
+
+        private void QueueShowRigParams()
+        {
+            if (_showRigParamsQueued)
+            {
+                return;
+            }
+
+            _showRigParamsQueued = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _showRigParamsQueued = false;
+                ShowRigParams();
+            }), DispatcherPriority.Background);
         }
 
         private void ShowRigStatus()
@@ -4655,8 +4798,6 @@ namespace HolyLogger
                 return;
             }
 
-            UpdateVoiceMessageState();
-
             if (Properties.Settings.Default.isManualMode || state == State.Edit)
             {
                 return;
@@ -4673,44 +4814,10 @@ namespace HolyLogger
                     TX = radioTX.ToString("###0.000000");
                     //TB_Frequency.Text = RX;
                     Properties.Settings.Default.Frequency = RX;
-                    switch (Rig.Mode)
-                    {
-                        case (OmniRig.RigParamX)PM_CW_L:
-                            //cmbMode.Text = cmbMode.Items[1].ToString();
-                            CB_Mode.Text = "CW";
-                            break;
-                        case (OmniRig.RigParamX)PM_CW_U:
-                            //cmbMode.Text = cmbMode.Items[0].ToString();
-                            CB_Mode.Text = "CW";
-                            break;
-                        case (OmniRig.RigParamX)PM_SSB_L:
-                            //cmbMode.Text = cmbMode.Items[3].ToString();
-                            CB_Mode.Text = "SSB";
-                            break;
-                        case (OmniRig.RigParamX)PM_SSB_U:
-                            // cmbMode.Text = cmbMode.Items[2].ToString();
-                            CB_Mode.Text = "SSB";
-                            break;
-                        case (OmniRig.RigParamX)PM_FM:
-                            // cmbMode.Text = cmbMode.Items[7].ToString();
-                            CB_Mode.Text = "FM";
-                            break;
-                        case (OmniRig.RigParamX)PM_AM:
-                            // cmbMode.Text = cmbMode.Items[7].ToString();
-                            CB_Mode.Text = "AM";
-                            break;
-                        case (OmniRig.RigParamX)PM_DIG_L:
-                            // cmbMode.Text = cmbMode.Items[7].ToString();
-                            CB_Mode.Text = "DIGI";
-                            break;
-                        case (OmniRig.RigParamX)PM_DIG_U:
-                            // cmbMode.Text = cmbMode.Items[7].ToString();
-                            CB_Mode.Text = "DIGI";
-                            break;
-                        default:
-                            CB_Mode.Text = "DIGI";
-                            break;
-                    }
+                    CB_Mode.Text = GetNormalizedRigMode();
+
+                    UpdateVoiceMessageState();
+                    UpdateVoiceMessageAvailabilityState();
                 });
             }
             catch (Exception e)
