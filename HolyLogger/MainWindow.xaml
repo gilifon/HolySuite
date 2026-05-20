@@ -367,7 +367,7 @@
 
 
         <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" Margin="0,0,0,0" />
-        <TextBlock HorizontalAlignment="Left" Margin="12,19,0,0" VerticalAlignment="Top" Grid.Row="1" Width="96" Height="34" FontSize="14" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="13" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="12,17,0,0" VerticalAlignment="Top" Grid.Row="1" Width="96" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" />
             <LineBreak />
             <Run Text="Callsign" />
