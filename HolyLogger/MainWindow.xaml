@@ -368,7 +368,7 @@
 
         <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" Margin="0,0,0,0" />
         <TextBlock HorizontalAlignment="Left" Margin="12,17,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
-            <Run Text="Station" />
+            <Run Text="Station" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
@@ -672,8 +672,12 @@
         </DataGrid>
 
         <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
-        <Label Content="Operator Callsign" HorizontalAlignment="Left" Margin="6,50,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your Personal Callsign" />
-        <TextBox x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="139,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Operator, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="4"/>
+        <TextBlock HorizontalAlignment="Left" Margin="12,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="Operator" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Callsign" />
+        </TextBlock>
+        <TextBox x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Operator, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="4"/>
     </Grid>
 
 </Window>
