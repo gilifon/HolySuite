@@ -367,12 +367,12 @@
 
 
         <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" Margin="0,0,0,0" />
-        <TextBlock HorizontalAlignment="Left" Margin="12,17,0,0" VerticalAlignment="Top" Grid.Row="1" Width="96" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="12,17,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" />
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="125,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="244,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="270,5,0,0" Width="270" Height="44" BorderThickness="2" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
             <Border.Style>
