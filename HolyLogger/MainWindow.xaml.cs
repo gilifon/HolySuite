@@ -280,6 +280,7 @@ namespace HolyLogger
             { "FTDX101D", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
             { "FTDX3000", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
             { "FT-891", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
+            { "FT-891 - DATA", new RadioVoiceCommandProfile("PB01;", "PB02;", "PB03;", "PB04;", "PB00;") },
         };
 
         private int? pendingVoiceMessageNumber;
@@ -1110,6 +1111,8 @@ namespace HolyLogger
             return true;
         }
 
+
+
         private bool TryGetVoiceMessageAvailability(out string rigType, out string errorMessage)
         {
             rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
@@ -1127,7 +1130,7 @@ namespace HolyLogger
                 return false;
             }
 
-            if (string.IsNullOrWhiteSpace(rigType) || !VoiceCommandProfiles.ContainsKey(rigType))
+            if (string.IsNullOrWhiteSpace(rigType) || !VoiceCommandProfiles.Keys.Contains(rigType))
             {
                 errorMessage = "No voice-message CAT commands are defined for this radio model.";
                 return false;

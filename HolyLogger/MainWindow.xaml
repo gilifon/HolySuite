@@ -125,146 +125,146 @@
         </Grid.RowDefinitions>
         <DockPanel x:Name="MainScreen" Grid.Row="0">
             <Menu DockPanel.Dock="Top">
-                        <MenuItem Header="File" FontSize="16">
-                            <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
-                                <MenuItem.Icon>
-                                    <Image Source="Images/import.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <Separator />
-                            <MenuItem x:Name="ExportMenuItem" Header="Export ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExportMenuItem_Click" >
-                                <MenuItem.Icon>
-                                    <Image Source="Images/exportA.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="ExportCabrilloMenuItem" Header="Export Cabrillo" ToolTip="Generates Cabrillo file from the QSO list" Click="ExportCabrilloMenuItem_Click" >
-                                <MenuItem.Icon>
-                                    <Image Source="Images/exportC.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="ExpotExlMenuItem" Header="Export CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >
-                                <MenuItem.Icon>
-                                    <Image Source="Images/exportX.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <Separator />
-                            <MenuItem x:Name="UploadMenuItem" Header="Send log" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show QSO Statistics" Visibility="Collapsed">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/statistics.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <Separator />
-                            <!--<MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
+                <MenuItem Header="File" FontSize="16">
+                    <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
+                        <MenuItem.Icon>
+                            <Image Source="Images/import.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="ExportMenuItem" Header="Export ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExportMenuItem_Click" >
+                        <MenuItem.Icon>
+                            <Image Source="Images/exportA.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="ExportCabrilloMenuItem" Header="Export Cabrillo" ToolTip="Generates Cabrillo file from the QSO list" Click="ExportCabrilloMenuItem_Click" >
+                        <MenuItem.Icon>
+                            <Image Source="Images/exportC.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="ExpotExlMenuItem" Header="Export CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >
+                        <MenuItem.Icon>
+                            <Image Source="Images/exportX.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="UploadMenuItem" Header="Send log" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show QSO Statistics" Visibility="Collapsed">
+                        <MenuItem.Icon>
+                            <Image Source="Images/statistics.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <!--<MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
                                 <MenuItem.Icon>
                                     <Image Source="Images/folder.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
-                            <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/exit.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </MenuItem>
-                        <MenuItem Header="View" FontSize="16">
-                            <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/sign.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="TimerItem" Header="Timer" ToolTip="Open a 1 hour countdown timer" Click="TimerMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="MatrixMenuItem" Header="Matrix" ToolTip="Open a matrix presentation for the DX station" Click="MatrixMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/matrix.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <!--<MenuItem x:Name="LogInfoMenuItem" Header="Statistics" ToolTip="Show some log statistics" Click="LogInfoMenuItem_Click">
+                    <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
+                        <MenuItem.Icon>
+                            <Image Source="Images/exit.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </MenuItem>
+                <MenuItem Header="View" FontSize="16">
+                    <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/sign.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="TimerItem" Header="Timer" ToolTip="Open a 1 hour countdown timer" Click="TimerMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="MatrixMenuItem" Header="Matrix" ToolTip="Open a matrix presentation for the DX station" Click="MatrixMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/matrix.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <!--<MenuItem x:Name="LogInfoMenuItem" Header="Statistics" ToolTip="Show some log statistics" Click="LogInfoMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/chart.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
-                        </MenuItem>
-                        <MenuItem Header="Tools" FontSize="16">
-                            <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
+                </MenuItem>
+                <MenuItem Header="Tools" FontSize="16">
+                    <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
                                 <MenuItem.Icon>
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
-                            <MenuItem x:Name="ClearLogMenuItem" Header="Clear Log" ToolTip="Clear Log" Click="ClearLogMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Full-Log QRZ Service" ToolTip="Try to get QRZ info for the entire log" Click="EntireLogQrzServiseMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="RemoveDuplicatesMenuItem" Header="Remove Duplicates" ToolTip="Remove duplicates from the log" Click="RemoveDuplicatesMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <Separator />
-                            <MenuItem x:Name="OptionsMenuItem" Header="Options (F2)" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </MenuItem>
-                        <MenuItem Header="Help" FontSize="16">
-                            <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/update.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <Separator />
-                            <MenuItem x:Name="HolyLogWebsiteMenuItem" Header="HolyLogger web page" ToolTip="Go to HolyLogger website" Click="HolyLoggerMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/crown.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="OmnirigMenuItem" Header="Omni-Rig web page" ToolTip="Go to Omni-Rig website" Click="OmnirigMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="GridSquareItem" Header="Grid / Square Map" ToolTip="Find your Grid / Square" Click="GridSquareMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/pin.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <MenuItem x:Name="OnTheAir" Header="HolyLogger On The Air" ToolTip="A cluster of HolyLogger user that are currently on the air" Click="OnTheAirMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                            <Separator />
-                            <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </MenuItem>
-                    </Menu>
+                    <MenuItem x:Name="ClearLogMenuItem" Header="Clear Log" ToolTip="Clear Log" Click="ClearLogMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Full-Log QRZ Service" ToolTip="Try to get QRZ info for the entire log" Click="EntireLogQrzServiseMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="RemoveDuplicatesMenuItem" Header="Remove Duplicates" ToolTip="Remove duplicates from the log" Click="RemoveDuplicatesMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="OptionsMenuItem" Header="Options (F2)" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </MenuItem>
+                <MenuItem Header="Help" FontSize="16">
+                    <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/update.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="HolyLogWebsiteMenuItem" Header="HolyLogger web page" ToolTip="Go to HolyLogger website" Click="HolyLoggerMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/crown.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="OmnirigMenuItem" Header="Omni-Rig web page" ToolTip="Go to Omni-Rig website" Click="OmnirigMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="GridSquareItem" Header="Grid / Square Map" ToolTip="Find your Grid / Square" Click="GridSquareMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/pin.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="OnTheAir" Header="HolyLogger On The Air" ToolTip="A cluster of HolyLogger user that are currently on the air" Click="OnTheAirMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </MenuItem>
+            </Menu>
         </DockPanel>
         <DockPanel Grid.Row="4">
             <StatusBar DockPanel.Dock="Bottom" MouseDoubleClick="StatusBar_MouseDoubleClick">
@@ -366,15 +366,15 @@
         </DockPanel>
 
 
-        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" Margin="0,0,0,0" />
-        <TextBlock HorizontalAlignment="Left" Margin="12,17,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" />
+        <TextBlock HorizontalAlignment="Left" Margin="12,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,16,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
-        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="190,18,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
-        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="243,5,0,0" Width="270" Height="44" BorderThickness="2" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
+        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="186,15,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="525,50,0,0" Width="205" Height="38" BorderThickness="1" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="BorderBrush" Value="#9966CC"/>
@@ -388,7 +388,7 @@
                     </Style.Triggers>
                 </Style>
             </Border.Style>
-            <Grid Margin="0,2,0,2">
+            <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
@@ -400,49 +400,50 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="1" Click="MessageButton_Click">
+                <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource RoundedButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="1" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg1" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
+                        <TextBlock Text="Msg1" FontSize="11" HorizontalAlignment="Center" />
                         <TextBlock Text="F5" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="2" Click="MessageButton_Click">
+                <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource RoundedButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="2" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg2" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
-                        <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="Msg2" FontSize="11" HorizontalAlignment="Center" />
+                            <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                        </StackPanel>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="3" Click="MessageButton_Click">
+                <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource RoundedButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="3" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg3" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
+                        <TextBlock Text="Msg3" FontSize="11" HorizontalAlignment="Center" />
                         <TextBlock Text="F7" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource RoundedButtonStyle}" Width="54" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="4" Click="MessageButton_Click">
+                <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource RoundedButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="4" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg4" HorizontalAlignment="Center" Margin="0,-2,0,-1"/>
+                        <TextBlock Text="Msg4" FontSize="11" HorizontalAlignment="Center" />
                         <TextBlock Text="F8" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </Grid>
         </Border>
-        <Label Content="My Locator" HorizontalAlignment="Left" Margin="545,16,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
-        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="634,16,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="90" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="8" TabIndex="3"/>
-        <Label Content="Holyland Sqr" HorizontalAlignment="Left" Margin="566,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your Holyland square" />
-        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="666,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="58" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="5" TabIndex="2"/>
-        <Label Content="Mode" HorizontalAlignment="Left" Margin="452,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="503,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="58" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged">
+        <Label Content="My Locator" HorizontalAlignment="Left" Margin="219,9,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
+        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="312,12,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="90" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="8" TabIndex="3"/>
+        <Label Content="Holyland Square" HorizontalAlignment="Left" Margin="407,11,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your Holyland square" />
+        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="534,13,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="58" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="5" TabIndex="2"/>
+        <Label Content="Mode" HorizontalAlignment="Left" Margin="407,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="459,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="58" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged">
             <ComboBoxItem x:Name="op_cw" Content="CW"/>
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
             <ComboBoxItem x:Name="op_ssb" Content="SSB"/>
             <ComboBoxItem x:Name="op_fm" Content="FM"/>
         </ComboBox>
         <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
-        <Label Content="Freq" HorizontalAlignment="Left" Margin="186,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
+        <Label Content="Freq" HorizontalAlignment="Left" Margin="176,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
         <!--<xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="348,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="9" />-->
-        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="229,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="85" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5"/>
-        <Label Content="MHz" HorizontalAlignment="Left" Margin="313,61,0,0" VerticalAlignment="Top" VerticalContentAlignment="Bottom" Grid.Row="1" FontSize="13" FontWeight="Bold" Padding="2,0,5,0" Height="22" />
-        <Label Content="Band" HorizontalAlignment="Left" Margin="346,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="217,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="85" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5"/>
+        <Label Content="Band" HorizontalAlignment="Left" Margin="307,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
@@ -450,7 +451,7 @@
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
         <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="712,18,0,0" Grid.Row="1" VerticalAlignment="Top" Width="60" Height="48" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="18" FontWeight="SemiBold" Visibility="Hidden"/>
 
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="393,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="354,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="The DX Station Callsign"/>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="150" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" FontSize="16" MaxLength="15" TabIndex="8"/>
         <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,101,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="12" Foreground="#555555" Visibility="Collapsed"/>
@@ -523,7 +524,7 @@
         <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm:ss" HorizontalAlignment="Left" TextAlignment="Left" Margin="542,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="90" FontSize="16" Height="28" IsTabStop="False" />
 
 
-        <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,89,0,0" VerticalAlignment="Top" Width="707" Grid.Row="1" />
+        <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="707" Grid.Row="1" />
         <Button x:Name="AddBtn" Style="{StaticResource RaisedActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="640,143,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
         <Button x:Name="ClearBtn" Style="{StaticResource RaisedActionButtonStyle}" HorizontalAlignment="Left" Margin="640,98,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -677,7 +678,7 @@
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Operator, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="4"/>
+        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="88" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="4"/>
     </Grid>
 
 </Window>
