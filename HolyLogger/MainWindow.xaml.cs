@@ -1034,6 +1034,10 @@ namespace HolyLogger
             {
                 OptionsMenuItemMenuItem_Click(null, null);
             }
+            else if (e.Key == Key.F3)
+            {
+                SpotButton_Click(null, null);
+            }
             else if (e.Key == Key.F9 || e.Key == Key.Escape)
             {
                 ClearBtn_Click(null, null);
