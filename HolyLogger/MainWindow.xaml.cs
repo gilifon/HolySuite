@@ -2981,8 +2981,8 @@ namespace HolyLogger
                 }
                 else
                 {
-                    qrzPhotoWindow.Left = Left + Width - qrzPhotoWindow.Width - 18;
-                    qrzPhotoWindow.Top = Top + 52;
+                    qrzPhotoWindow.Left = Left + Width - qrzPhotoWindow.Width;
+                    qrzPhotoWindow.Top = Top + Height - qrzPhotoWindow.Height;
                 }
 
                 qrzPhotoWindow.Show();

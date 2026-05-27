@@ -81,8 +81,8 @@ namespace HolyLogger
             }
             else if (Owner != null)
             {
-                Left = Owner.Left + Owner.ActualWidth - Width - 24;
-                Top = Owner.Top + 56;
+                Left = Owner.Left + Owner.Width - Width;
+                Top = Owner.Top + Owner.Height - Height;
             }
         }
 
