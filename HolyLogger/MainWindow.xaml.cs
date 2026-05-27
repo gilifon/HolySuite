@@ -1102,8 +1102,12 @@ namespace HolyLogger
             AddSpotDialogLabel(grid, "Spotted Callsign", 1, new Thickness(0, 8, 0, 0));
             TextBox spottedCallsignTextBox = AddSpotDialogTextBox(grid, defaultSpottedCallsign, 1, false, new Thickness(0, 8, 0, 0));
 
+            string defaultFrequency = string.IsNullOrWhiteSpace(TB_DXCallsign.Text)
+                ? (LastQSO != null ? LastQSO.Freq : string.Empty)
+                : TB_Frequency.Text;
+
             AddSpotDialogLabel(grid, "Frequency", 2, new Thickness(0, 8, 0, 0));
-            TextBox frequencyTextBox = AddSpotDialogTextBox(grid, TB_Frequency.Text, 2, false, new Thickness(0, 8, 0, 0));
+            TextBox frequencyTextBox = AddSpotDialogTextBox(grid, defaultFrequency, 2, false, new Thickness(0, 8, 0, 0));
 
             AddSpotDialogLabel(grid, "Comment", 3, new Thickness(0, 8, 0, 0), VerticalAlignment.Top);
             TextBox commentTextBox = AddSpotDialogTextBox(grid, string.Empty, 3, false, new Thickness(0, 8, 0, 0));
