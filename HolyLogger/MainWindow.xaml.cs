@@ -256,6 +256,11 @@ namespace HolyLogger
 
         private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
         private const int SEND_CHUNK_SIZE = 50;
+        private const string SpotClusterHost = "dxc.ai9t.com";
+        private const int SpotClusterPort = 7300;
+        private const int SpotClusterConnectAttempts = 5;
+        private const int SpotClusterConnectTimeoutMs = 3000;
+        private const int SpotClusterReadTimeoutMs = 10000;
 
         private sealed class RadioVoiceCommandProfile
         {
@@ -1090,8 +1095,12 @@ namespace HolyLogger
             myCallsignTextBox.IsTabStop = false;
             myCallsignTextBox.Focusable = false;
 
+            string defaultSpottedCallsign = string.IsNullOrWhiteSpace(TB_DXCallsign.Text)
+                ? (LastQSO != null ? LastQSO.DXCall : string.Empty)
+                : TB_DXCallsign.Text;
+
             AddSpotDialogLabel(grid, "Spotted Callsign", 1, new Thickness(0, 8, 0, 0));
-            TextBox spottedCallsignTextBox = AddSpotDialogTextBox(grid, TB_DXCallsign.Text, 1, false, new Thickness(0, 8, 0, 0));
+            TextBox spottedCallsignTextBox = AddSpotDialogTextBox(grid, defaultSpottedCallsign, 1, false, new Thickness(0, 8, 0, 0));
 
             AddSpotDialogLabel(grid, "Frequency", 2, new Thickness(0, 8, 0, 0));
             TextBox frequencyTextBox = AddSpotDialogTextBox(grid, TB_Frequency.Text, 2, false, new Thickness(0, 8, 0, 0));
@@ -1109,9 +1118,58 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 12, 0, 0),
                 FontSize = 16,
-                IsDefault = true
+                IsDefault = true,
+                IsEnabled = false
             };
-            sendButton.Click += (s, args) => dialog.Close();
+
+            bool isSendingSpot = false;
+            Action updateSendButtonState = () =>
+            {
+                sendButton.IsEnabled = !isSendingSpot
+                    && !string.IsNullOrWhiteSpace(spottedCallsignTextBox.Text)
+                    && !string.IsNullOrWhiteSpace(frequencyTextBox.Text);
+            };
+
+            spottedCallsignTextBox.TextChanged += (s, args) => updateSendButtonState();
+            frequencyTextBox.TextChanged += (s, args) => updateSendButtonState();
+            updateSendButtonState();
+
+            sendButton.Click += async (s, args) =>
+            {
+                if (isSendingSpot)
+                {
+                    return;
+                }
+
+                isSendingSpot = true;
+                updateSendButtonState();
+                dialog.Cursor = Cursors.Wait;
+
+                try
+                {
+                    await SubmitSpotToClusterAsync(
+                        myCallsignTextBox.Text,
+                        spottedCallsignTextBox.Text,
+                        frequencyTextBox.Text,
+                        commentTextBox.Text);
+
+                    await ShowTimedSpotSuccessWindowAsync(dialog);
+                    dialog.Close();
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show(dialog, ex.Message, "Spot Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                finally
+                {
+                    isSendingSpot = false;
+                    dialog.Cursor = null;
+                    if (dialog.IsLoaded)
+                    {
+                        updateSendButtonState();
+                    }
+                }
+            };
             Grid.SetRow(sendButton, 5);
             Grid.SetColumn(sendButton, 1);
             grid.Children.Add(sendButton);
@@ -1159,6 +1217,306 @@ namespace HolyLogger
             Grid.SetColumn(textBox, 1);
             grid.Children.Add(textBox);
             return textBox;
+        }
+
+        private static async Task ShowTimedSpotSuccessWindowAsync(Window owner)
+        {
+            Window successWindow = new Window
+            {
+                Title = "Spot",
+                Width = 300,
+                Height = 120,
+                MinWidth = 300,
+                MinHeight = 120,
+                MaxWidth = 300,
+                MaxHeight = 120,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ShowInTaskbar = false,
+                Owner = owner,
+                Background = new SolidColorBrush(Color.FromRgb(0xD9, 0xF7, 0xD6)),
+                Content = new Grid
+                {
+                    Margin = new Thickness(12),
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = "Spot sent successfully.",
+                            FontSize = 18,
+                            FontWeight = FontWeights.SemiBold,
+                            HorizontalAlignment = HorizontalAlignment.Center,
+                            VerticalAlignment = VerticalAlignment.Center,
+                            TextAlignment = TextAlignment.Center,
+                            Foreground = Brushes.DarkGreen
+                        }
+                    }
+                }
+            };
+
+            TaskCompletionSource<bool> closedTcs = new TaskCompletionSource<bool>();
+            successWindow.Closed += (s, e) => closedTcs.TrySetResult(true);
+            successWindow.Show();
+
+            Task delayTask = Task.Delay(2000);
+            Task completedTask = await Task.WhenAny(delayTask, closedTcs.Task);
+
+            if (completedTask == delayTask && successWindow.IsVisible)
+            {
+                successWindow.Close();
+                await closedTcs.Task;
+            }
+        }
+
+        private async Task SubmitSpotToClusterAsync(string spotterCallsign, string dxCallsign, string frequencyText, string comment)
+        {
+            List<string> clusterLines = new List<string>();
+            string spotCommand = null;
+
+            spotterCallsign = (spotterCallsign ?? string.Empty).Trim().ToUpperInvariant();
+            dxCallsign = (dxCallsign ?? string.Empty).Trim().ToUpperInvariant();
+            comment = ((comment ?? string.Empty).Trim()).Replace("\r", " ").Replace("\n", " ");
+
+            if (string.IsNullOrWhiteSpace(spotterCallsign))
+            {
+                throw new InvalidOperationException("My Callsign is missing.");
+            }
+
+            if (string.IsNullOrWhiteSpace(dxCallsign))
+            {
+                throw new InvalidOperationException("Spotted Callsign is missing.");
+            }
+
+            double frequency;
+            if (!double.TryParse(frequencyText, NumberStyles.Float, CultureInfo.InvariantCulture, out frequency)
+                && !double.TryParse(frequencyText, NumberStyles.Float, CultureInfo.CurrentCulture, out frequency))
+            {
+                throw new InvalidOperationException("Frequency is invalid.");
+            }
+
+            if (frequency < 1000)
+            {
+                frequency *= 1000;
+            }
+
+            string normalizedFrequency = frequency.ToString("0.0###############", CultureInfo.InvariantCulture);
+
+            try
+            {
+                using (TcpClient client = await ConnectToSpotClusterAsync())
+                using (NetworkStream networkStream = client.GetStream())
+                using (StreamReader reader = new StreamReader(networkStream, Encoding.UTF8, false, 1024, true))
+                using (StreamWriter writer = new StreamWriter(networkStream, new UTF8Encoding(false), 1024, true))
+                {
+                    writer.NewLine = "\n";
+                    writer.AutoFlush = true;
+
+                    await ExpectClusterLineAsync(
+                        reader,
+                        line => line.IndexOf("Please enter your call:", StringComparison.OrdinalIgnoreCase) >= 0,
+                        null,
+                        "Initial connection to the cluster failed.",
+                        clusterLines);
+
+                    await writer.WriteLineAsync(spotterCallsign);
+
+                    await ExpectClusterLineAsync(
+                        reader,
+                        line => line.IndexOf("Hello", StringComparison.OrdinalIgnoreCase) >= 0,
+                        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            { "is not a valid callsign", "Login failed: invalid spotter callsign." }
+                        },
+                        "Login to the cluster failed.",
+                        clusterLines);
+
+                    spotCommand = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "DX {0} {1}{2}",
+                        normalizedFrequency,
+                        dxCallsign,
+                        string.IsNullOrWhiteSpace(comment) ? string.Empty : " " + comment);
+
+                    await writer.WriteLineAsync(spotCommand);
+
+                    await ExpectClusterLineAsync(
+                        reader,
+                        line => IsSpotConfirmationLine(line, spotterCallsign, dxCallsign, frequency),
+                        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            { "command error", "The cluster rejected the spot command." },
+                            { "Error - DX", "The cluster rejected the spot." },
+                            { "Error - invalid frequency", "The cluster rejected the frequency." },
+                            { "Error - Invalid Dx Call", "The cluster rejected the DX callsign." }
+                        },
+                        "The cluster did not confirm that the spot was received.",
+                        clusterLines);
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(ex.Message + BuildSpotDevelopmentDetails(spotCommand, clusterLines), ex);
+            }
+        }
+
+        private async Task<TcpClient> ConnectToSpotClusterAsync()
+        {
+            Exception lastError = null;
+
+            for (int attempt = 0; attempt < SpotClusterConnectAttempts; attempt++)
+            {
+                TcpClient client = new TcpClient();
+
+                try
+                {
+                    await ConnectWithTimeoutAsync(client, SpotClusterHost, SpotClusterPort, SpotClusterConnectTimeoutMs);
+                    return client;
+                }
+                catch (Exception ex)
+                {
+                    lastError = ex;
+                    client.Dispose();
+                }
+            }
+
+            throw new InvalidOperationException(
+                string.Format(CultureInfo.InvariantCulture, "Failed to connect to cluster {0}:{1}.", SpotClusterHost, SpotClusterPort),
+                lastError);
+        }
+
+        private static async Task ConnectWithTimeoutAsync(TcpClient client, string host, int port, int timeoutMs)
+        {
+            Task connectTask = client.ConnectAsync(host, port);
+            Task completedTask = await Task.WhenAny(connectTask, Task.Delay(timeoutMs));
+
+            if (completedTask != connectTask)
+            {
+                throw new TimeoutException();
+            }
+
+            await connectTask;
+        }
+
+        private static async Task<string> ExpectClusterLineAsync(StreamReader reader, Func<string, bool> validLine, IDictionary<string, string> invalidLines, string timeoutMessage, IList<string> clusterLines)
+        {
+            DateTime deadlineUtc = DateTime.UtcNow.AddMilliseconds(SpotClusterReadTimeoutMs);
+
+            while (true)
+            {
+                int remainingTimeoutMs = (int)Math.Max(1, (deadlineUtc - DateTime.UtcNow).TotalMilliseconds);
+                string line;
+
+                try
+                {
+                    line = await ReadLineWithTimeoutAsync(reader, remainingTimeoutMs);
+                }
+                catch (TimeoutException)
+                {
+                    throw new InvalidOperationException(timeoutMessage);
+                }
+
+                if (line == null)
+                {
+                    throw new InvalidOperationException("The cluster connection closed unexpectedly.");
+                }
+
+                if (clusterLines != null)
+                {
+                    clusterLines.Add(line.TrimEnd());
+                }
+
+                if (validLine(line))
+                {
+                    return line.Trim();
+                }
+
+                if (invalidLines == null)
+                {
+                    continue;
+                }
+
+                foreach (KeyValuePair<string, string> invalidLine in invalidLines)
+                {
+                    if (line.IndexOf(invalidLine.Key, StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        throw new InvalidOperationException(invalidLine.Value);
+                    }
+                }
+            }
+        }
+
+        private static string BuildSpotDevelopmentDetails(string spotCommand, IList<string> clusterLines)
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.AppendLine();
+            builder.AppendLine();
+            builder.AppendLine("Development details:");
+            builder.Append("Sent command: ");
+            builder.AppendLine(string.IsNullOrWhiteSpace(spotCommand) ? "(not sent)" : spotCommand);
+            builder.AppendLine("Cluster reply:");
+
+            if (clusterLines == null || clusterLines.Count == 0)
+            {
+                builder.AppendLine("(no lines received)");
+            }
+            else
+            {
+                foreach (string line in clusterLines.Skip(Math.Max(0, clusterLines.Count - 12)))
+                {
+                    builder.AppendLine(line);
+                }
+            }
+
+            return builder.ToString();
+        }
+
+        private static bool IsSpotConfirmationLine(string line, string spotterCallsign, string dxCallsign, double expectedFrequencyKhz)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+            {
+                return false;
+            }
+
+            Match match = Regex.Match(
+                line,
+                @"DX de\s*(?<spotter>[A-Z0-9/\-]+):\s*(?<freq>[0-9]+(?:\.[0-9]+)?)\s*(?<dx>[A-Z0-9/\-]+)",
+                RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+            if (!match.Success)
+            {
+                return false;
+            }
+
+            if (!string.Equals(match.Groups["spotter"].Value, spotterCallsign, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (!string.Equals(match.Groups["dx"].Value, dxCallsign, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            double confirmedFrequencyKhz;
+            if (!double.TryParse(match.Groups["freq"].Value, NumberStyles.Float, CultureInfo.InvariantCulture, out confirmedFrequencyKhz))
+            {
+                return true;
+            }
+
+            return Math.Abs(confirmedFrequencyKhz - expectedFrequencyKhz) <= 1.0;
+        }
+
+        private static async Task<string> ReadLineWithTimeoutAsync(StreamReader reader, int timeoutMs)
+        {
+            Task<string> readTask = reader.ReadLineAsync();
+            Task completedTask = await Task.WhenAny(readTask, Task.Delay(timeoutMs));
+
+            if (completedTask != readTask)
+            {
+                throw new TimeoutException();
+            }
+
+            return await readTask;
         }
 
         private void TriggerVoiceMessage(int messageNumber)
