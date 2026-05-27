@@ -1049,6 +1049,118 @@ namespace HolyLogger
             }
         }
 
+        private void SpotButton_Click(object sender, RoutedEventArgs e)
+        {
+            Window dialog = BuildSpotDialog();
+            dialog.Owner = this;
+            dialog.ShowDialog();
+        }
+
+        private Window BuildSpotDialog()
+        {
+            Window dialog = new Window
+            {
+                Title = "Spot",
+                Width = 420,
+                Height = 265,
+                MinWidth = 420,
+                MinHeight = 265,
+                MaxWidth = 420,
+                MaxHeight = 265,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ShowInTaskbar = false,
+                Icon = Icon
+            };
+
+            Grid grid = new Grid { Margin = new Thickness(12) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(8) });
+
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            AddSpotDialogLabel(grid, "My Callsign", 0, new Thickness(0));
+            TextBox myCallsignTextBox = AddSpotDialogTextBox(grid, TB_MyCallsign.Text, 0, true, new Thickness(0));
+            myCallsignTextBox.IsTabStop = false;
+            myCallsignTextBox.Focusable = false;
+
+            AddSpotDialogLabel(grid, "Spotted Callsign", 1, new Thickness(0, 8, 0, 0));
+            TextBox spottedCallsignTextBox = AddSpotDialogTextBox(grid, TB_DXCallsign.Text, 1, false, new Thickness(0, 8, 0, 0));
+
+            AddSpotDialogLabel(grid, "Frequency", 2, new Thickness(0, 8, 0, 0));
+            TextBox frequencyTextBox = AddSpotDialogTextBox(grid, TB_Frequency.Text, 2, false, new Thickness(0, 8, 0, 0));
+
+            AddSpotDialogLabel(grid, "Comment", 3, new Thickness(0, 8, 0, 0), VerticalAlignment.Top);
+            TextBox commentTextBox = AddSpotDialogTextBox(grid, string.Empty, 3, false, new Thickness(0, 8, 0, 0));
+            commentTextBox.MaxLength = 60;
+
+            Button sendButton = new Button
+            {
+                Content = "Send",
+                Width = 78,
+                Height = 32,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 12, 0, 0),
+                FontSize = 16,
+                IsDefault = true
+            };
+            sendButton.Click += (s, args) => dialog.Close();
+            Grid.SetRow(sendButton, 5);
+            Grid.SetColumn(sendButton, 1);
+            grid.Children.Add(sendButton);
+
+            dialog.Content = grid;
+            dialog.KeyDown += (s, args) =>
+            {
+                if (args.Key == Key.Escape)
+                {
+                    dialog.Close();
+                }
+            };
+
+            dialog.Loaded += (s, args) => commentTextBox.Focus();
+            return dialog;
+        }
+
+        private static void AddSpotDialogLabel(Grid grid, string content, int row, Thickness margin, VerticalAlignment verticalAlignment = VerticalAlignment.Center)
+        {
+            Label label = new Label
+            {
+                Content = content,
+                VerticalAlignment = verticalAlignment,
+                FontSize = 16,
+                Margin = margin
+            };
+            Grid.SetRow(label, row);
+            Grid.SetColumn(label, 0);
+            grid.Children.Add(label);
+        }
+
+        private static TextBox AddSpotDialogTextBox(Grid grid, string text, int row, bool isReadOnly, Thickness margin)
+        {
+            TextBox textBox = new TextBox
+            {
+                Text = text ?? string.Empty,
+                Height = 28,
+                FontSize = 16,
+                IsReadOnly = isReadOnly,
+                Margin = margin,
+                CharacterCasing = CharacterCasing.Upper,
+                VerticalContentAlignment = VerticalAlignment.Center
+            };
+            Grid.SetRow(textBox, row);
+            Grid.SetColumn(textBox, 1);
+            grid.Children.Add(textBox);
+            return textBox;
+        }
+
         private void TriggerVoiceMessage(int messageNumber)
         {
             if (messageNumber < 1 || messageNumber > 4)
