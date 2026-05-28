@@ -788,6 +788,11 @@ namespace HolyLogger
                 }
                 UpdateNumOfQSOs();
             }
+
+            if (clusterVisibleSpots != null)
+            {
+                Dispatcher.BeginInvoke(new Action(RefreshClusterVisibleSpots));
+            }
         }
 
         private void Lock_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -3100,6 +3105,16 @@ namespace HolyLogger
                 Margin = new Thickness(0)
             };
 
+            var clusterRowStyle = new Style(typeof(DataGridRow));
+            var inLogTrigger = new DataTrigger
+            {
+                Binding = new System.Windows.Data.Binding("IsInLog"),
+                Value = true
+            };
+            inLogTrigger.Setters.Add(new Setter(DataGridRow.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0xE6, 0xF3, 0xFF))));
+            clusterRowStyle.Triggers.Add(inLogTrigger);
+            spotsGrid.RowStyle = clusterRowStyle;
+
             var dxColumn = new DataGridTextColumn { Header = "DX", Binding = new System.Windows.Data.Binding("DXCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
             var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
             var freqColumn = new DataGridTextColumn { Header = "Freq", Binding = new System.Windows.Data.Binding("FreqText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
@@ -3615,7 +3630,8 @@ namespace HolyLogger
                         Mode = mode,
                         DXCallsign = dx,
                         SpotterCallsign = spotter,
-                        Comment = comment
+                        Comment = comment,
+                        IsInLog = IsClusterCallsignInLog(dx)
                     };
 
                     Dispatcher.BeginInvoke(new Action(() =>
@@ -3672,6 +3688,18 @@ namespace HolyLogger
             public string DXCallsign { get; set; }
             public string SpotterCallsign { get; set; }
             public string Comment { get; set; }
+            public bool IsInLog { get; set; }
+        }
+
+        private bool IsClusterCallsignInLog(string dxCallsign)
+        {
+            string target = (dxCallsign ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(target) || Qsos == null)
+            {
+                return false;
+            }
+
+            return Qsos.Any(q => string.Equals((q.DXCall ?? string.Empty).Trim(), target, StringComparison.OrdinalIgnoreCase));
         }
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
@@ -3814,6 +3842,11 @@ namespace HolyLogger
             var filtered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
                                           .Take(500)
                                           .ToList();
+
+            foreach (var item in filtered)
+            {
+                item.IsInLog = IsClusterCallsignInLog(item.DXCallsign);
+            }
 
             clusterVisibleSpots.Clear();
             foreach (var item in filtered)
