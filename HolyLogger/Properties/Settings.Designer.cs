@@ -1259,5 +1259,149 @@ namespace HolyLogger.Properties {
                 this["ClusterWindowHeight"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("110")]
+        public double ClusterColWidthDX {
+            get {
+                return ((double)(this["ClusterColWidthDX"]));
+            }
+            set {
+                this["ClusterColWidthDX"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("110")]
+        public double ClusterColWidthSpotter {
+            get {
+                return ((double)(this["ClusterColWidthSpotter"]));
+            }
+            set {
+                this["ClusterColWidthSpotter"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("85")]
+        public double ClusterColWidthFreq {
+            get {
+                return ((double)(this["ClusterColWidthFreq"]));
+            }
+            set {
+                this["ClusterColWidthFreq"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("70")]
+        public double ClusterColWidthUtc {
+            get {
+                return ((double)(this["ClusterColWidthUtc"]));
+            }
+            set {
+                this["ClusterColWidthUtc"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("220")]
+        public double ClusterColWidthComment {
+            get {
+                return ((double)(this["ClusterColWidthComment"]));
+            }
+            set {
+                this["ClusterColWidthComment"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("140")]
+        public double ClusterSettingsWindowLeft {
+            get {
+                return ((double)(this["ClusterSettingsWindowLeft"]));
+            }
+            set {
+                this["ClusterSettingsWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("140")]
+        public double ClusterSettingsWindowTop {
+            get {
+                return ((double)(this["ClusterSettingsWindowTop"]));
+            }
+            set {
+                this["ClusterSettingsWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("380")]
+        public double ClusterSettingsWindowWidth {
+            get {
+                return ((double)(this["ClusterSettingsWindowWidth"]));
+            }
+            set {
+                this["ClusterSettingsWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("260")]
+        public double ClusterSettingsWindowHeight {
+            get {
+                return ((double)(this["ClusterSettingsWindowHeight"]));
+            }
+            set {
+                this["ClusterSettingsWindowHeight"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("160,80,60,40,30,20,17,15,12,10,6,VHF,UHF,SHF")]
+        public string ClusterEnabledBands {
+            get {
+                return ((string)(this["ClusterEnabledBands"]));
+            }
+            set {
+                this["ClusterEnabledBands"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ClusterUseActiveBand {
+            get {
+                return ((bool)(this["ClusterUseActiveBand"]));
+            }
+            set {
+                this["ClusterUseActiveBand"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("CW,DIGI,SSB,FM,FT8,RTTY,AM")]
+        public string ClusterEnabledModes {
+            get {
+                return ((string)(this["ClusterEnabledModes"]));
+            }
+            set {
+                this["ClusterEnabledModes"] = value;
+            }
+        }
     }
 }

@@ -311,5 +311,41 @@
     <Setting Name="ClusterWindowHeight" Type="System.Double" Scope="User">
       <Value Profile="(Default)">420</Value>
     </Setting>
+    <Setting Name="ClusterColWidthDX" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">110</Value>
+    </Setting>
+    <Setting Name="ClusterColWidthSpotter" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">110</Value>
+    </Setting>
+    <Setting Name="ClusterColWidthFreq" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">85</Value>
+    </Setting>
+    <Setting Name="ClusterColWidthUtc" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">70</Value>
+    </Setting>
+    <Setting Name="ClusterColWidthComment" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">220</Value>
+    </Setting>
+    <Setting Name="ClusterSettingsWindowLeft" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">140</Value>
+    </Setting>
+    <Setting Name="ClusterSettingsWindowTop" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">140</Value>
+    </Setting>
+    <Setting Name="ClusterSettingsWindowWidth" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">380</Value>
+    </Setting>
+    <Setting Name="ClusterSettingsWindowHeight" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">260</Value>
+    </Setting>
+    <Setting Name="ClusterEnabledBands" Type="System.String" Scope="User">
+      <Value Profile="(Default)">160,80,60,40,30,20,17,15,12,10,6,VHF,UHF,SHF</Value>
+    </Setting>
+    <Setting Name="ClusterUseActiveBand" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="ClusterEnabledModes" Type="System.String" Scope="User">
+      <Value Profile="(Default)">CW,DIGI,SSB,FM,FT8,RTTY,AM</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

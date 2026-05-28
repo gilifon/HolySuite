@@ -27,8 +27,10 @@ using System.Windows.Threading;
 using System.Net.NetworkInformation;
 using System.Windows.Media;
 using System.Net.Sockets;
+using System.Net.WebSockets;
 using System.Windows.Controls.Primitives;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
 using System.Net;
 using System.Data.SQLite;
@@ -216,6 +218,14 @@ namespace HolyLogger
         TimerWindow timerscreen = null;
         MatrixWindow matrix = null;
         Window clusterWindow = null;
+        Window clusterSettingsWindow = null;
+        ClientWebSocket clusterWebSocket = null;
+        CancellationTokenSource clusterWebSocketCts = null;
+        long clusterLastSpotTime = 0;
+        HashSet<string> clusterSpotKeys = new HashSet<string>(StringComparer.Ordinal);
+        List<ClusterSpotViewItem> clusterAllSpots = new List<ClusterSpotViewItem>();
+        ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
+        TextBlock clusterActiveBandText = null;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
@@ -262,6 +272,7 @@ namespace HolyLogger
         private const int SpotClusterConnectAttempts = 5;
         private const int SpotClusterConnectTimeoutMs = 3000;
         private const int SpotClusterReadTimeoutMs = 10000;
+        private const string HolyClusterWebSocketUrl = "wss://holycluster.iarc.org/spots_ws";
 
         private sealed class RadioVoiceCommandProfile
         {
@@ -2622,6 +2633,7 @@ namespace HolyLogger
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
+            CloseClusterWebSocket();
             Properties.Settings.Default.Save();
             if (dal != null) dal.Close();
         }
@@ -3045,8 +3057,91 @@ namespace HolyLogger
             GenerateNewClusterWindow();
         }
 
-        private void GenerateNewClusterWindow()
+        private async void GenerateNewClusterWindow()
         {
+            var titleText = new TextBlock
+            {
+                Text = "My Cluster",
+                FontSize = 18,
+                FontWeight = FontWeights.SemiBold,
+                Margin = new Thickness(0, 0, 8, 8),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var settingsButton = new Button
+            {
+                Content = "⚙",
+                Width = 28,
+                Height = 28,
+                FontSize = 16,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Cluster settings",
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+
+            var statusText = new TextBlock
+            {
+                Text = "(connecting...)",
+                FontSize = 13,
+                Foreground = Brushes.DimGray,
+                Margin = new Thickness(0, 0, 0, 8),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var spotsGrid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                AlternationCount = 2,
+                AlternatingRowBackground = Brushes.Gainsboro,
+                FontSize = 13,
+                Margin = new Thickness(0)
+            };
+
+            var dxColumn = new DataGridTextColumn { Header = "DX", Binding = new System.Windows.Data.Binding("DXCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
+            var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
+            var freqColumn = new DataGridTextColumn { Header = "Freq", Binding = new System.Windows.Data.Binding("FreqText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
+            var utcColumn = new DataGridTextColumn { Header = "UTC", Binding = new System.Windows.Data.Binding("TimeUtc"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthUtc)) };
+            var commentColumn = new DataGridTextColumn { Header = "Comment", Binding = new System.Windows.Data.Binding("Comment"), Width = new DataGridLength(Math.Max(60, Properties.Settings.Default.ClusterColWidthComment)) };
+
+            spotsGrid.Columns.Add(dxColumn);
+            spotsGrid.Columns.Add(spotterColumn);
+            spotsGrid.Columns.Add(freqColumn);
+            spotsGrid.Columns.Add(utcColumn);
+            spotsGrid.Columns.Add(commentColumn);
+
+            clusterAllSpots.Clear();
+            clusterSpotKeys.Clear();
+            clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
+            spotsGrid.ItemsSource = clusterVisibleSpots;
+
+            var titleStatusPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            titleStatusPanel.Children.Add(titleText);
+            titleStatusPanel.Children.Add(statusText);
+
+            var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(titleStatusPanel, 0);
+            Grid.SetColumn(settingsButton, 1);
+            headerGrid.Children.Add(titleStatusPanel);
+            headerGrid.Children.Add(settingsButton);
+
+            var layoutGrid = new Grid { Margin = new Thickness(12) };
+            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+            Grid.SetRow(headerGrid, 0);
+            Grid.SetRow(spotsGrid, 1);
+            layoutGrid.Children.Add(headerGrid);
+            layoutGrid.Children.Add(spotsGrid);
+
             clusterWindow = new Window
             {
                 Title = "Cluster",
@@ -3056,31 +3151,36 @@ namespace HolyLogger
                 MinHeight = 260,
                 Left = Properties.Settings.Default.ClusterWindowLeft,
                 Top = Properties.Settings.Default.ClusterWindowTop,
-                Content = new Grid
-                {
-                    Margin = new Thickness(12),
-                    Children =
-                    {
-                        new TextBlock
-                        {
-                            Text = "Cluster window",
-                            FontSize = 20,
-                            FontWeight = FontWeights.SemiBold,
-                            VerticalAlignment = VerticalAlignment.Top,
-                            HorizontalAlignment = HorizontalAlignment.Left
-                        }
-                    }
-                }
+                Content = layoutGrid
             };
             if (IsLoaded && IsVisible)
             {
                 clusterWindow.Owner = this;
             }
 
+            settingsButton.Click += (s, e) => OpenClusterSettingsWindow();
+
             clusterWindow.LocationChanged += ClusterWindow_LocationChanged;
             clusterWindow.SizeChanged += ClusterWindow_SizeChanged;
-            clusterWindow.Closed += (s, e) => clusterWindow = null;
+            clusterWindow.Closed += (s, e) =>
+            {
+                Properties.Settings.Default.ClusterColWidthDX = dxColumn.ActualWidth;
+                Properties.Settings.Default.ClusterColWidthSpotter = spotterColumn.ActualWidth;
+                Properties.Settings.Default.ClusterColWidthFreq = freqColumn.ActualWidth;
+                Properties.Settings.Default.ClusterColWidthUtc = utcColumn.ActualWidth;
+                Properties.Settings.Default.ClusterColWidthComment = commentColumn.ActualWidth;
+                if (clusterSettingsWindow != null)
+                {
+                    clusterSettingsWindow.Close();
+                    clusterSettingsWindow = null;
+                }
+                CloseClusterWebSocket();
+                clusterVisibleSpots = null;
+                clusterWindow = null;
+            };
             clusterWindow.Show();
+
+            await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
         }
 
         private void ClusterWindow_LocationChanged(object sender, EventArgs e)
@@ -3094,6 +3194,301 @@ namespace HolyLogger
             Properties.Settings.Default.ClusterWindowTop = clusterWindow.Top;
         }
 
+        private void OpenClusterSettingsWindow()
+        {
+            if (clusterSettingsWindow != null)
+            {
+                var existing = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == clusterSettingsWindow);
+                if (existing != null)
+                {
+                    existing.Activate();
+                    return;
+                }
+            }
+
+            var enabledBands = GetEnabledClusterBands();
+            var enabledModes = GetEnabledClusterModes();
+
+            var modePanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                Margin = new Thickness(12, 8, 12, 2)
+            };
+
+            var activeBandPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+
+            var rbActiveBand = new RadioButton
+            {
+                Content = "Active band",
+                IsChecked = Properties.Settings.Default.ClusterUseActiveBand,
+                Margin = new Thickness(0, 0, 8, 0),
+                GroupName = "ClusterBandMode",
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            clusterActiveBandText = new TextBlock
+            {
+                Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty),
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0)),
+                FontWeight = FontWeights.Bold,
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+
+            var rbManualBands = new RadioButton
+            {
+                Content = "Selected bands",
+                IsChecked = !Properties.Settings.Default.ClusterUseActiveBand,
+                Margin = new Thickness(0, 0, 0, 2),
+                GroupName = "ClusterBandMode"
+            };
+
+            activeBandPanel.Children.Add(rbActiveBand);
+            activeBandPanel.Children.Add(clusterActiveBandText);
+
+            modePanel.Children.Add(activeBandPanel);
+            modePanel.Children.Add(rbManualBands);
+
+            var bandsPanel = new StackPanel
+            {
+                Margin = new Thickness(10),
+                Orientation = Orientation.Vertical
+            };
+            var bandCheckBoxes = new List<CheckBox>();
+
+            foreach (string band in ClusterBandOptions)
+            {
+                string label = Regex.IsMatch(band, "^\\d+$") ? band + "m" : band;
+                var cb = new CheckBox
+                {
+                    Content = label,
+                    Margin = new Thickness(6, 3, 6, 3),
+                    IsChecked = enabledBands.Contains(band)
+                };
+
+                cb.Checked += (s, e) =>
+                {
+                    enabledBands.Add(band);
+                    SaveEnabledClusterBands(enabledBands);
+                    RefreshClusterVisibleSpots();
+                };
+                cb.Unchecked += (s, e) =>
+                {
+                    enabledBands.Remove(band);
+                    SaveEnabledClusterBands(enabledBands);
+                    RefreshClusterVisibleSpots();
+                };
+
+                bandCheckBoxes.Add(cb);
+                bandsPanel.Children.Add(cb);
+            }
+
+            var modesPanel = new StackPanel
+            {
+                Margin = new Thickness(10),
+                Orientation = Orientation.Vertical
+            };
+            var modeCheckBoxes = new List<CheckBox>();
+
+            foreach (string modeName in ClusterModeOptions)
+            {
+                var cbMode = new CheckBox
+                {
+                    Content = modeName,
+                    Margin = new Thickness(6, 3, 6, 3),
+                    IsChecked = enabledModes.Contains(modeName)
+                };
+
+                cbMode.Checked += (s, e) =>
+                {
+                    enabledModes.Add(modeName);
+                    SaveEnabledClusterModes(enabledModes);
+                    RefreshClusterVisibleSpots();
+                };
+                cbMode.Unchecked += (s, e) =>
+                {
+                    enabledModes.Remove(modeName);
+                    SaveEnabledClusterModes(enabledModes);
+                    RefreshClusterVisibleSpots();
+                };
+
+                modeCheckBoxes.Add(cbMode);
+                modesPanel.Children.Add(cbMode);
+            }
+
+            var settingsLayout = new Grid();
+            settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            settingsLayout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var header = new TextBlock
+            {
+                Text = "Visible bands",
+                Margin = new Thickness(12, 12, 12, 0),
+                FontSize = 15,
+                FontWeight = FontWeights.SemiBold
+            };
+            var bandsScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = bandsPanel,
+                Margin = new Thickness(0, 0, 0, 4),
+                IsEnabled = !Properties.Settings.Default.ClusterUseActiveBand,
+                Opacity = Properties.Settings.Default.ClusterUseActiveBand ? 0.45 : 1.0
+            };
+
+            rbActiveBand.Checked += (s, e) =>
+            {
+                Properties.Settings.Default.ClusterUseActiveBand = true;
+                bandsScroll.IsEnabled = false;
+                bandsScroll.Opacity = 0.45;
+                RefreshClusterVisibleSpots();
+            };
+
+            rbManualBands.Checked += (s, e) =>
+            {
+                Properties.Settings.Default.ClusterUseActiveBand = false;
+                bandsScroll.IsEnabled = true;
+                bandsScroll.Opacity = 1.0;
+                RefreshClusterVisibleSpots();
+            };
+
+            var showAllBandsButton = new Button
+            {
+                Content = "show all bands",
+                Margin = new Thickness(0, 0, 0, 6),
+                Padding = new Thickness(8, 3, 8, 3),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                MinWidth = 120
+            };
+            showAllBandsButton.Click += (s, e) =>
+            {
+                enabledBands.Clear();
+                foreach (string b in ClusterBandOptions)
+                {
+                    enabledBands.Add(b);
+                }
+
+                SaveEnabledClusterBands(enabledBands);
+
+                foreach (var cb in bandCheckBoxes)
+                {
+                    cb.IsChecked = true;
+                }
+
+                RefreshClusterVisibleSpots();
+            };
+            bandsPanel.Children.Insert(0, showAllBandsButton);
+
+            var modesHeader = new TextBlock
+            {
+                Text = "Visible modes",
+                Margin = new Thickness(12, 12, 12, 0),
+                FontSize = 15,
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Bottom
+            };
+
+            var modesScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = modesPanel,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+
+            var showAllModesButton = new Button
+            {
+                Content = "show all modes",
+                Margin = new Thickness(0, 0, 0, 6),
+                Padding = new Thickness(8, 3, 8, 3),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                MinWidth = 120
+            };
+            showAllModesButton.Click += (s, e) =>
+            {
+                enabledModes.Clear();
+                foreach (string m in ClusterModeOptions)
+                {
+                    enabledModes.Add(m);
+                }
+
+                SaveEnabledClusterModes(enabledModes);
+
+                foreach (var cb in modeCheckBoxes)
+                {
+                    cb.IsChecked = true;
+                }
+
+                RefreshClusterVisibleSpots();
+            };
+            modesPanel.Children.Insert(0, showAllModesButton);
+
+            Grid.SetRow(header, 0);
+            Grid.SetColumn(header, 0);
+
+            Grid.SetRow(modesHeader, 0);
+            Grid.SetColumn(modesHeader, 1);
+
+            Grid.SetRow(modePanel, 1);
+            Grid.SetColumn(modePanel, 0);
+            Grid.SetColumnSpan(modePanel, 2);
+
+            Grid.SetRow(bandsScroll, 2);
+            Grid.SetColumn(bandsScroll, 0);
+
+            Grid.SetRow(modesScroll, 2);
+            Grid.SetColumn(modesScroll, 1);
+
+            settingsLayout.Children.Add(header);
+            settingsLayout.Children.Add(modesHeader);
+            settingsLayout.Children.Add(modePanel);
+            settingsLayout.Children.Add(bandsScroll);
+            settingsLayout.Children.Add(modesScroll);
+
+            clusterSettingsWindow = new Window
+            {
+                Title = "Cluster Settings",
+                Width = Properties.Settings.Default.ClusterSettingsWindowWidth,
+                Height = Properties.Settings.Default.ClusterSettingsWindowHeight,
+                MinWidth = 260,
+                MinHeight = 180,
+                Left = Properties.Settings.Default.ClusterSettingsWindowLeft,
+                Top = Properties.Settings.Default.ClusterSettingsWindowTop,
+                Content = settingsLayout
+            };
+
+            if (clusterWindow != null && clusterWindow.IsVisible)
+            {
+                clusterSettingsWindow.Owner = clusterWindow;
+            }
+
+            clusterSettingsWindow.LocationChanged += (s, e) =>
+            {
+                if (clusterSettingsWindow == null) return;
+                Properties.Settings.Default.ClusterSettingsWindowLeft = clusterSettingsWindow.Left;
+                Properties.Settings.Default.ClusterSettingsWindowTop = clusterSettingsWindow.Top;
+            };
+
+            clusterSettingsWindow.SizeChanged += (s, e) =>
+            {
+                if (clusterSettingsWindow == null) return;
+                if (clusterSettingsWindow.Width > 0) Properties.Settings.Default.ClusterSettingsWindowWidth = clusterSettingsWindow.Width;
+                if (clusterSettingsWindow.Height > 0) Properties.Settings.Default.ClusterSettingsWindowHeight = clusterSettingsWindow.Height;
+            };
+
+            clusterSettingsWindow.Closed += (s, e) => clusterSettingsWindow = null;
+            clusterSettingsWindow.Show();
+        }
+
         private void ClusterWindow_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (clusterWindow == null)
@@ -3105,6 +3500,326 @@ namespace HolyLogger
                 Properties.Settings.Default.ClusterWindowWidth = clusterWindow.Width;
             if (clusterWindow.Height >= 0)
                 Properties.Settings.Default.ClusterWindowHeight = clusterWindow.Height;
+        }
+
+        private async Task ConnectClusterWebSocketAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots)
+        {
+            try
+            {
+                CloseClusterWebSocket();
+
+                clusterWebSocketCts = new CancellationTokenSource();
+                clusterWebSocket = new ClientWebSocket();
+
+                await clusterWebSocket.ConnectAsync(new Uri(HolyClusterWebSocketUrl), clusterWebSocketCts.Token);
+
+                statusText.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    statusText.Text = "(connected)";
+                    statusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0));
+                }));
+
+                string initJson = clusterLastSpotTime > 0
+                    ? "{\"last_time\":" + clusterLastSpotTime.ToString(CultureInfo.InvariantCulture) + "}"
+                    : "{\"initial\":true}";
+
+                byte[] initBytes = Encoding.UTF8.GetBytes(initJson);
+                await clusterWebSocket.SendAsync(new ArraySegment<byte>(initBytes), WebSocketMessageType.Text, true, clusterWebSocketCts.Token);
+
+                await ReceiveClusterMessagesAsync(statusText, spots, clusterWebSocketCts.Token);
+            }
+            catch (Exception ex)
+            {
+                statusText.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    statusText.Text = "(disconnected)";
+                    statusText.Foreground = Brushes.Red;
+                }));
+            }
+        }
+
+        private async Task ReceiveClusterMessagesAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots, CancellationToken cancellationToken)
+        {
+            byte[] buffer = new byte[8192];
+
+            while (clusterWebSocket != null && clusterWebSocket.State == WebSocketState.Open && !cancellationToken.IsCancellationRequested)
+            {
+                WebSocketReceiveResult result;
+                using (var ms = new MemoryStream())
+                {
+                    do
+                    {
+                        result = await clusterWebSocket.ReceiveAsync(new ArraySegment<byte>(buffer), cancellationToken);
+                        if (result.MessageType == WebSocketMessageType.Close)
+                        {
+                            await clusterWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed", CancellationToken.None);
+                            statusText.Dispatcher.BeginInvoke(new Action(() =>
+                            {
+                                statusText.Text = "(disconnected)";
+                                statusText.Foreground = Brushes.Red;
+                            }));
+                            return;
+                        }
+
+                        ms.Write(buffer, 0, result.Count);
+                    }
+                    while (!result.EndOfMessage);
+
+                    string payload = Encoding.UTF8.GetString(ms.ToArray());
+                    ApplyClusterPayload(payload, spots);
+                }
+            }
+        }
+
+        private void ApplyClusterPayload(string payload, ObservableCollection<ClusterSpotViewItem> spots)
+        {
+            try
+            {
+                JObject root = JObject.Parse(payload);
+                JToken spotsToken;
+                if (!root.TryGetValue("spots", out spotsToken) || spotsToken == null || spotsToken.Type != JTokenType.Array)
+                {
+                    return;
+                }
+
+                foreach (JToken spotToken in spotsToken)
+                {
+                    string dx = (string)spotToken["dx_callsign"] ?? string.Empty;
+                    string spotter = (string)spotToken["spotter_callsign"] ?? string.Empty;
+                    long unixTime = spotToken["time"] != null ? (long)spotToken["time"] : 0;
+                    string key = dx + "|" + spotter + "|" + unixTime.ToString(CultureInfo.InvariantCulture);
+
+                    if (clusterSpotKeys.Contains(key))
+                    {
+                        continue;
+                    }
+
+                    clusterSpotKeys.Add(key);
+                    if (unixTime > clusterLastSpotTime)
+                    {
+                        clusterLastSpotTime = unixTime;
+                    }
+
+                    double freq = spotToken["freq"] != null ? (double)spotToken["freq"] : 0;
+                    string bandText = spotToken["band"] != null ? spotToken["band"].ToString() : string.Empty;
+                    string mode = (string)spotToken["mode"] ?? string.Empty;
+                    string comment = (string)spotToken["comment"] ?? string.Empty;
+
+                    var item = new ClusterSpotViewItem
+                    {
+                        TimeUtc = unixTime > 0
+                            ? DateTimeOffset.FromUnixTimeSeconds(unixTime).UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)
+                            : string.Empty,
+                        FreqText = freq > 0 ? freq.ToString("0.0", CultureInfo.InvariantCulture) : string.Empty,
+                        BandText = bandText,
+                        Mode = mode,
+                        DXCallsign = dx,
+                        SpotterCallsign = spotter,
+                        Comment = comment
+                    };
+
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        clusterAllSpots.Insert(0, item);
+                        while (clusterAllSpots.Count > 1500)
+                        {
+                            clusterAllSpots.RemoveAt(clusterAllSpots.Count - 1);
+                        }
+
+                        RefreshClusterVisibleSpots();
+                    }));
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private void CloseClusterWebSocket()
+        {
+            try
+            {
+                if (clusterWebSocketCts != null)
+                {
+                    clusterWebSocketCts.Cancel();
+                    clusterWebSocketCts.Dispose();
+                    clusterWebSocketCts = null;
+                }
+            }
+            catch
+            {
+            }
+
+            try
+            {
+                if (clusterWebSocket != null)
+                {
+                    clusterWebSocket.Dispose();
+                    clusterWebSocket = null;
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private sealed class ClusterSpotViewItem
+        {
+            public string TimeUtc { get; set; }
+            public string FreqText { get; set; }
+            public string BandText { get; set; }
+            public string Mode { get; set; }
+            public string DXCallsign { get; set; }
+            public string SpotterCallsign { get; set; }
+            public string Comment { get; set; }
+        }
+
+        private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
+        private static readonly string[] ClusterModeOptions = new[] { "CW", "DIGI", "SSB", "FM", "FT8", "RTTY", "AM" };
+
+        private HashSet<string> GetEnabledClusterBands()
+        {
+            string raw = Properties.Settings.Default.ClusterEnabledBands ?? string.Empty;
+            var values = raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Select(v => v.Trim().ToUpperInvariant())
+                            .Where(v => !string.IsNullOrWhiteSpace(v));
+
+            var set = new HashSet<string>(values, StringComparer.OrdinalIgnoreCase);
+            if (set.Count == 0)
+            {
+                foreach (string band in ClusterBandOptions)
+                {
+                    set.Add(band);
+                }
+            }
+            return set;
+        }
+
+        private void SaveEnabledClusterBands(HashSet<string> enabled)
+        {
+            if (enabled == null || enabled.Count == 0)
+            {
+                enabled = new HashSet<string>(ClusterBandOptions, StringComparer.OrdinalIgnoreCase);
+            }
+
+            string csv = string.Join(",", ClusterBandOptions.Where(b => enabled.Contains(b)));
+            Properties.Settings.Default.ClusterEnabledBands = csv;
+        }
+
+        private string NormalizeClusterBandKey(string bandText)
+        {
+            string b = (bandText ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(b))
+                return string.Empty;
+
+            if (Regex.IsMatch(b, "^\\d+M$"))
+                return b.Substring(0, b.Length - 1);
+
+            if (Regex.IsMatch(b, "^\\d+$"))
+                return b;
+
+            if (b == "VHF" || b == "UHF" || b == "SHF")
+                return b;
+
+            if (b == "2M" || b == "4M" || b == "6M")
+                return b.Substring(0, b.Length - 1);
+
+            if (b == "70CM")
+                return "UHF";
+
+            if (b.EndsWith("CM", StringComparison.Ordinal))
+                return "SHF";
+
+            return b;
+        }
+
+        private string FormatClusterBandDisplay(string bandText)
+        {
+            string normalized = NormalizeClusterBandKey(bandText);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return string.Empty;
+            }
+
+            return Regex.IsMatch(normalized, "^\\d+$") ? normalized + "m" : normalized;
+        }
+
+        private bool IsClusterBandEnabled(string bandText)
+        {
+            string normalized = NormalizeClusterBandKey(bandText);
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return true;
+            }
+
+            if (Properties.Settings.Default.ClusterUseActiveBand)
+            {
+                string activeBand = TB_Band != null ? TB_Band.Text : string.Empty;
+                string active = NormalizeClusterBandKey(activeBand);
+                return !string.IsNullOrWhiteSpace(active) && string.Equals(active, normalized, StringComparison.OrdinalIgnoreCase);
+            }
+
+            var enabled = GetEnabledClusterBands();
+            return enabled.Contains(normalized);
+        }
+
+        private HashSet<string> GetEnabledClusterModes()
+        {
+            string raw = Properties.Settings.Default.ClusterEnabledModes ?? string.Empty;
+            var values = raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                            .Select(v => v.Trim().ToUpperInvariant())
+                            .Where(v => !string.IsNullOrWhiteSpace(v));
+
+            var set = new HashSet<string>(values, StringComparer.OrdinalIgnoreCase);
+            if (set.Count == 0)
+            {
+                foreach (string mode in ClusterModeOptions)
+                {
+                    set.Add(mode);
+                }
+            }
+            return set;
+        }
+
+        private void SaveEnabledClusterModes(HashSet<string> enabled)
+        {
+            if (enabled == null || enabled.Count == 0)
+            {
+                enabled = new HashSet<string>(ClusterModeOptions, StringComparer.OrdinalIgnoreCase);
+            }
+
+            string csv = string.Join(",", ClusterModeOptions.Where(m => enabled.Contains(m)));
+            Properties.Settings.Default.ClusterEnabledModes = csv;
+        }
+
+        private bool IsClusterModeEnabled(string modeText)
+        {
+            string normalized = (modeText ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return true;
+            }
+
+            var enabled = GetEnabledClusterModes();
+            return enabled.Contains(normalized);
+        }
+
+        private void RefreshClusterVisibleSpots()
+        {
+            if (clusterVisibleSpots == null)
+            {
+                return;
+            }
+
+            var filtered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
+                                          .Take(500)
+                                          .ToList();
+
+            clusterVisibleSpots.Clear();
+            foreach (var item in filtered)
+            {
+                clusterVisibleSpots.Add(item);
+            }
         }
 
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
@@ -3353,6 +4068,15 @@ namespace HolyLogger
         private void TB_Band_TextChanged(object sender, TextChangedEventArgs e)
         {
             UpdateDup();
+            if (clusterActiveBandText != null)
+            {
+                clusterActiveBandText.Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty);
+            }
+
+            if (Properties.Settings.Default.ClusterUseActiveBand)
+            {
+                RefreshClusterVisibleSpots();
+            }
         }
 
         private void TB_DX_Name_TextChanged(object sender, TextChangedEventArgs e)
