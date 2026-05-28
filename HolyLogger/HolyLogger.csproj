@@ -160,6 +160,10 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Images\splash.png" />
+  
+    <Resource Include="Images\icons8-undo-40.png" />
+  
+    <Resource Include="Images\UNDO_Icon.png" />
   </ItemGroup>
   <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
@@ -757,3 +761,4 @@
   </Target>
   -->
 </Project>
+

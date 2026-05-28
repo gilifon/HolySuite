@@ -226,6 +226,10 @@ namespace HolyLogger
         List<ClusterSpotViewItem> clusterAllSpots = new List<ClusterSpotViewItem>();
         ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
         TextBlock clusterActiveBandText = null;
+        Button clusterUndoButton = null;
+        string clusterUndoFrequencyText = string.Empty;
+        string clusterUndoModeText = string.Empty;
+        bool clusterHasUndoTuneState = false;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
@@ -3073,6 +3077,42 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center
             };
 
+            var undoButton = new Button
+            {
+                Width = 32,
+                Height = 32,
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                ToolTip = "Undo last spot tune",
+                Margin = new Thickness(0, 0, 12, 8),
+                IsEnabled = false,
+                Opacity = 0.35
+            };
+
+            var bitmapImage = new BitmapImage();
+            bitmapImage.BeginInit();
+            bitmapImage.UriSource = new Uri("pack://application:,,,/Images/UNDO_Icon.png");
+            bitmapImage.DecodePixelWidth = 24;
+            bitmapImage.DecodePixelHeight = 24;
+            bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
+            bitmapImage.EndInit();
+            bitmapImage.Freeze();
+
+            var undoIcon = new Image
+            {
+                Source = bitmapImage,
+                Width = 24,
+                Height = 24,
+                Stretch = Stretch.Uniform,
+                SnapsToDevicePixels = true
+            };
+            RenderOptions.SetBitmapScalingMode(undoIcon, BitmapScalingMode.HighQuality);
+
+            undoButton.Content = undoIcon;
+
             var settingsButton = new Button
             {
                 Content = "⚙",
@@ -3131,6 +3171,7 @@ namespace HolyLogger
             clusterSpotKeys.Clear();
             clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
             spotsGrid.ItemsSource = clusterVisibleSpots;
+            spotsGrid.PreviewMouseDoubleClick += ClusterSpotsGrid_MouseDoubleClick;
 
             var titleStatusPanel = new StackPanel
             {
@@ -3140,13 +3181,22 @@ namespace HolyLogger
             titleStatusPanel.Children.Add(titleText);
             titleStatusPanel.Children.Add(statusText);
 
+            var actionsPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            actionsPanel.Children.Add(undoButton);
+            actionsPanel.Children.Add(settingsButton);
+
             var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(titleStatusPanel, 0);
-            Grid.SetColumn(settingsButton, 1);
+            Grid.SetColumn(actionsPanel, 1);
             headerGrid.Children.Add(titleStatusPanel);
-            headerGrid.Children.Add(settingsButton);
+            headerGrid.Children.Add(actionsPanel);
 
             var layoutGrid = new Grid { Margin = new Thickness(12) };
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -3173,7 +3223,14 @@ namespace HolyLogger
                 clusterWindow.Owner = this;
             }
 
+            clusterUndoButton = undoButton;
+            clusterHasUndoTuneState = false;
+            clusterUndoFrequencyText = string.Empty;
+            clusterUndoModeText = string.Empty;
+            UpdateClusterUndoButtonState();
+
             settingsButton.Click += (s, e) => OpenClusterSettingsWindow();
+            undoButton.Click += ClusterUndoButton_Click;
 
             clusterWindow.LocationChanged += ClusterWindow_LocationChanged;
             clusterWindow.SizeChanged += ClusterWindow_SizeChanged;
@@ -3191,6 +3248,10 @@ namespace HolyLogger
                 }
                 CloseClusterWebSocket();
                 clusterVisibleSpots = null;
+                clusterUndoButton = null;
+                clusterHasUndoTuneState = false;
+                clusterUndoFrequencyText = string.Empty;
+                clusterUndoModeText = string.Empty;
                 clusterWindow = null;
             };
             clusterWindow.Show();
@@ -3853,6 +3914,241 @@ namespace HolyLogger
             {
                 clusterVisibleSpots.Add(item);
             }
+        }
+
+        private void ClusterSpotsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            var grid = sender as DataGrid;
+            var source = e.OriginalSource as DependencyObject;
+            while (source != null && !(source is DataGridRow))
+            {
+                source = VisualTreeHelper.GetParent(source);
+            }
+
+            var row = source as DataGridRow;
+            var selectedSpot = row?.Item as ClusterSpotViewItem ?? grid?.SelectedItem as ClusterSpotViewItem;
+            if (selectedSpot == null)
+            {
+                return;
+            }
+
+            TuneToClusterSpot(selectedSpot);
+        }
+
+        private void TuneToClusterSpot(ClusterSpotViewItem spot)
+        {
+            if (spot == null)
+            {
+                return;
+            }
+
+            string freqText = (spot.FreqText ?? string.Empty).Trim();
+            if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqValue) || freqValue <= 0)
+            {
+                return;
+            }
+
+            double freqMhz = freqValue >= 1000 ? (freqValue / 1000.0) : freqValue;
+            CaptureClusterUndoState();
+
+            TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+
+            string normalizedMode = NormalizeClusterModeForLogger(spot.Mode);
+            SelectLoggerMode(normalizedMode);
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                return;
+            }
+
+            int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
+            int? rigMode = MapClusterModeToRigMode(normalizedMode, freqMhz);
+            var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
+            TryTuneRigFrequency(freqHz, modeToSend, out _, out _);
+        }
+
+        private string NormalizeClusterModeForLogger(string clusterMode)
+        {
+            string mode = (clusterMode ?? string.Empty).Trim().ToUpperInvariant();
+            if (mode == "CW")
+            {
+                return "CW";
+            }
+
+            if (mode == "SSB" || mode == "FM" || mode == "AM")
+            {
+                return mode;
+            }
+
+            if (mode == "DIGI" || mode == "FT8" || mode == "RTTY" || mode == "PSK")
+            {
+                return "DIGI";
+            }
+
+            return "DIGI";
+        }
+
+        private void SelectLoggerMode(string mode)
+        {
+            string normalized = (mode ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return;
+            }
+
+            ComboBoxItem selectedItem = CB_Mode.Items.OfType<ComboBoxItem>()
+                .FirstOrDefault(i => string.Equals((i.Content as string) ?? string.Empty, normalized, StringComparison.OrdinalIgnoreCase));
+
+            if (selectedItem != null)
+            {
+                CB_Mode.SelectedItem = selectedItem;
+            }
+            else
+            {
+                CB_Mode.Text = normalized;
+            }
+        }
+
+        private int? MapClusterModeToRigMode(string loggerMode, double freqMhz)
+        {
+            string mode = (loggerMode ?? string.Empty).Trim().ToUpperInvariant();
+            switch (mode)
+            {
+                case "CW":
+                    return PM_CW_U;
+                case "SSB":
+                    return freqMhz < 10.0 ? PM_SSB_L : PM_SSB_U;
+                case "FM":
+                    return PM_FM;
+                case "AM":
+                    return PM_AM;
+                case "DIGI":
+                    return PM_DIG_U;
+                default:
+                    return null;
+            }
+        }
+
+        private void CaptureClusterUndoState()
+        {
+            clusterUndoFrequencyText = (TB_Frequency.Text ?? string.Empty).Trim();
+            clusterUndoModeText = (CB_Mode.Text ?? string.Empty).Trim().ToUpperInvariant();
+            clusterHasUndoTuneState = !string.IsNullOrWhiteSpace(clusterUndoFrequencyText) && !string.IsNullOrWhiteSpace(clusterUndoModeText);
+            UpdateClusterUndoButtonState();
+        }
+
+        private void ClusterUndoButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (!clusterHasUndoTuneState)
+            {
+                return;
+            }
+
+            string freqText = clusterUndoFrequencyText;
+            string modeText = clusterUndoModeText;
+
+            clusterHasUndoTuneState = false;
+            clusterUndoFrequencyText = string.Empty;
+            clusterUndoModeText = string.Empty;
+            UpdateClusterUndoButtonState();
+
+            if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqMhz) || freqMhz <= 0)
+            {
+                return;
+            }
+
+            TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+            SelectLoggerMode(modeText);
+
+            if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
+            {
+                int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
+                int? rigMode = MapClusterModeToRigMode(modeText, freqMhz);
+                var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
+                TryTuneRigFrequency(freqHz, modeToSend, out _, out _);
+            }
+        }
+
+        private void UpdateClusterUndoButtonState()
+        {
+            if (clusterUndoButton == null)
+            {
+                return;
+            }
+
+            clusterUndoButton.IsEnabled = clusterHasUndoTuneState;
+            clusterUndoButton.Opacity = clusterHasUndoTuneState ? 1.0 : 0.35;
+        }
+
+        private bool TryTuneRigFrequency(int frequencyHz, OmniRig.RigParamX mode, out string methodUsed, out int rxReadbackHz)
+        {
+            methodUsed = string.Empty;
+            rxReadbackHz = 0;
+
+            if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                return false;
+            }
+
+            try
+            {
+                int writable = (int)Rig.WriteableParams;
+                bool freqWritable = (writable & PM_FREQ) != 0;
+                bool freqAWritable = (writable & PM_FREQA) != 0;
+
+                try
+                {
+                    Rig.Mode = mode;
+                }
+                catch
+                {
+                }
+
+                if (freqWritable)
+                {
+                    Rig.Freq = frequencyHz;
+                    methodUsed = "Rig.Mode + Rig.Freq";
+                    return TryGetRigReadback(frequencyHz, out rxReadbackHz);
+                }
+
+                if (freqAWritable)
+                {
+                    Rig.FreqA = frequencyHz;
+                    methodUsed = "Rig.Mode + Rig.FreqA";
+                    return TryGetRigReadback(frequencyHz, out rxReadbackHz);
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+        private bool TryGetRigReadback(int targetHz, out int rxReadbackHz)
+        {
+            rxReadbackHz = 0;
+
+            for (int i = 0; i < 8; i++)
+            {
+                try
+                {
+                    rxReadbackHz = (int)Rig.GetRxFrequency();
+                    if (Math.Abs(rxReadbackHz - targetHz) <= 5000)
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+
+                Thread.Sleep(120);
+            }
+
+            return false;
         }
 
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
