@@ -384,7 +384,6 @@ namespace HolyLogger
 
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             UpdateShareIconVisibility();
-            UpdateClusterMenuVisibility();
 
             if (Properties.Settings.Default.UpdateSettings)
             {
@@ -3179,11 +3178,15 @@ namespace HolyLogger
             spotsGrid.Columns.Add(utcColumn);
             spotsGrid.Columns.Add(commentColumn);
 
-            clusterAllSpots.Clear();
-            clusterSpotKeys.Clear();
+            // Don't clear existing spots - keep them so window shows data immediately when reopened
+            // clusterAllSpots.Clear();
+            // clusterSpotKeys.Clear();
             clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
             spotsGrid.ItemsSource = clusterVisibleSpots;
             spotsGrid.PreviewMouseDoubleClick += ClusterSpotsGrid_MouseDoubleClick;
+
+            // Populate visible spots from existing data
+            RefreshClusterVisibleSpots();
 
             var titleStatusPanel = new StackPanel
             {
@@ -3253,6 +3256,7 @@ namespace HolyLogger
                 Properties.Settings.Default.ClusterColWidthFreq = freqColumn.ActualWidth;
                 Properties.Settings.Default.ClusterColWidthUtc = utcColumn.ActualWidth;
                 Properties.Settings.Default.ClusterColWidthComment = commentColumn.ActualWidth;
+
                 if (clusterSettingsWindow != null)
                 {
                     clusterSettingsWindow.Close();
@@ -5879,11 +5883,7 @@ namespace HolyLogger
 
             if (e.PropertyName == nameof(Properties.Settings.Default.ShowClusterWindowOption))
             {
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    UpdateClusterMenuVisibility();
-                    ApplyClusterWindowSetting();
-                }), DispatcherPriority.Background);
+                Dispatcher.BeginInvoke(new Action(ApplyClusterWindowSetting), DispatcherPriority.Background);
             }
 
             if (e.PropertyName == nameof(Properties.Settings.Default.MainFormBackgroundColor))
@@ -5940,19 +5940,6 @@ namespace HolyLogger
             }
 
             ShareStatusButton.Visibility = isNetworkAvailable && Properties.Settings.Default.ShowOnTheAir
-                ? Visibility.Visible
-                : Visibility.Collapsed;
-        }
-
-        private void UpdateClusterMenuVisibility()
-        {
-            var clusterMenuItem = FindName("ClusterMenuItem") as MenuItem;
-            if (clusterMenuItem == null)
-            {
-                return;
-            }
-
-            clusterMenuItem.Visibility = Properties.Settings.Default.ShowClusterWindowOption
                 ? Visibility.Visible
                 : Visibility.Collapsed;
         }

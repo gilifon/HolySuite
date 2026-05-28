@@ -8,7 +8,7 @@
              d:DesignHeight="530" d:DesignWidth="380">
 
     <Grid ShowGridLines="false" HorizontalAlignment="Stretch">
-        <CheckBox x:Name="CBX_ShowClusterWindowOption" Content="Show Cluster window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowClusterWindowOption, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16"/>
+        <CheckBox x:Name="CBX_ShowClusterWindow" Content="Show Cluster window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowClusterWindowOption, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,0,0,0"/>
         <CheckBox x:Name="CBX_IsShowMatrix" Content="Show matrix in main window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowMatrixControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,26,0,0"/>
         <CheckBox x:Name="CBX_IsShowAzimuth" Content="Show map" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowAzimuthControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,52,0,0"/>
         <CheckBox x:Name="CBX_ShowTitleClock" Content="Show UTC clock in the title" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowTitleClock, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,78,0,0" Click="HasChanged_Click"/>
