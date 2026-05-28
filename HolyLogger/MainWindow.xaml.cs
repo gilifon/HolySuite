@@ -215,6 +215,7 @@ namespace HolyLogger
         SignboardWindow signboard = null;
         TimerWindow timerscreen = null;
         MatrixWindow matrix = null;
+        Window clusterWindow = null;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
@@ -367,6 +368,7 @@ namespace HolyLogger
 
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             UpdateShareIconVisibility();
+            UpdateClusterMenuVisibility();
 
             if (Properties.Settings.Default.UpdateSettings)
             {
@@ -681,6 +683,8 @@ namespace HolyLogger
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            ApplyClusterWindowSetting();
+
             _stickyWindow = new StickyWindow(this);
             _stickyWindow.StickToScreen = true;
             _stickyWindow.StickToOther = true;
@@ -3025,6 +3029,84 @@ namespace HolyLogger
             }
         }
 
+        private void ClusterMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (clusterWindow != null)
+            {
+                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == clusterWindow);
+
+                if (existingWindow != null)
+                {
+                    existingWindow.Activate();
+                    return;
+                }
+            }
+
+            GenerateNewClusterWindow();
+        }
+
+        private void GenerateNewClusterWindow()
+        {
+            clusterWindow = new Window
+            {
+                Title = "Cluster",
+                Width = Properties.Settings.Default.ClusterWindowWidth,
+                Height = Properties.Settings.Default.ClusterWindowHeight,
+                MinWidth = 200,
+                MinHeight = 260,
+                Left = Properties.Settings.Default.ClusterWindowLeft,
+                Top = Properties.Settings.Default.ClusterWindowTop,
+                Content = new Grid
+                {
+                    Margin = new Thickness(12),
+                    Children =
+                    {
+                        new TextBlock
+                        {
+                            Text = "Cluster window",
+                            FontSize = 20,
+                            FontWeight = FontWeights.SemiBold,
+                            VerticalAlignment = VerticalAlignment.Top,
+                            HorizontalAlignment = HorizontalAlignment.Left
+                        }
+                    }
+                }
+            };
+            if (IsLoaded && IsVisible)
+            {
+                clusterWindow.Owner = this;
+            }
+
+            clusterWindow.LocationChanged += ClusterWindow_LocationChanged;
+            clusterWindow.SizeChanged += ClusterWindow_SizeChanged;
+            clusterWindow.Closed += (s, e) => clusterWindow = null;
+            clusterWindow.Show();
+        }
+
+        private void ClusterWindow_LocationChanged(object sender, EventArgs e)
+        {
+            if (clusterWindow == null)
+            {
+                return;
+            }
+
+            Properties.Settings.Default.ClusterWindowLeft = clusterWindow.Left;
+            Properties.Settings.Default.ClusterWindowTop = clusterWindow.Top;
+        }
+
+        private void ClusterWindow_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (clusterWindow == null)
+            {
+                return;
+            }
+
+            if (clusterWindow.Width >= 0)
+                Properties.Settings.Default.ClusterWindowWidth = clusterWindow.Width;
+            if (clusterWindow.Height >= 0)
+                Properties.Settings.Default.ClusterWindowHeight = clusterWindow.Height;
+        }
+
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (about != null)
@@ -4520,6 +4602,15 @@ namespace HolyLogger
                 Dispatcher.BeginInvoke(new Action(UpdateShareIconVisibility), DispatcherPriority.Background);
             }
 
+            if (e.PropertyName == nameof(Properties.Settings.Default.ShowClusterWindowOption))
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    UpdateClusterMenuVisibility();
+                    ApplyClusterWindowSetting();
+                }), DispatcherPriority.Background);
+            }
+
             if (e.PropertyName == nameof(Properties.Settings.Default.MainFormBackgroundColor))
             {
                 Dispatcher.BeginInvoke(new Action(ApplyMainFormBackgroundFromSettings), DispatcherPriority.Background);
@@ -4576,6 +4667,38 @@ namespace HolyLogger
             ShareStatusButton.Visibility = isNetworkAvailable && Properties.Settings.Default.ShowOnTheAir
                 ? Visibility.Visible
                 : Visibility.Collapsed;
+        }
+
+        private void UpdateClusterMenuVisibility()
+        {
+            var clusterMenuItem = FindName("ClusterMenuItem") as MenuItem;
+            if (clusterMenuItem == null)
+            {
+                return;
+            }
+
+            clusterMenuItem.Visibility = Properties.Settings.Default.ShowClusterWindowOption
+                ? Visibility.Visible
+                : Visibility.Collapsed;
+        }
+
+        private void ApplyClusterWindowSetting()
+        {
+            if (Properties.Settings.Default.ShowClusterWindowOption)
+            {
+                if (clusterWindow == null)
+                {
+                    GenerateNewClusterWindow();
+                }
+            }
+            else
+            {
+                if (clusterWindow != null)
+                {
+                    clusterWindow.Close();
+                    clusterWindow = null;
+                }
+            }
         }
 
         private Color ParseMainFormBackgroundColor(string colorText)

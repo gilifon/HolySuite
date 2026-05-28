@@ -1167,6 +1167,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ShowClusterWindowOption {
+            get {
+                return ((bool)(this["ShowClusterWindowOption"]));
+            }
+            set {
+                this["ShowClusterWindowOption"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool CallsignSyncVerboseLog {
             get {
                 return ((bool)(this["CallsignSyncVerboseLog"]));
@@ -1197,6 +1209,54 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["MapDistanceUnit"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public double ClusterWindowLeft {
+            get {
+                return ((double)(this["ClusterWindowLeft"]));
+            }
+            set {
+                this["ClusterWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public double ClusterWindowTop {
+            get {
+                return ((double)(this["ClusterWindowTop"]));
+            }
+            set {
+                this["ClusterWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("700")]
+        public double ClusterWindowWidth {
+            get {
+                return ((double)(this["ClusterWindowWidth"]));
+            }
+            set {
+                this["ClusterWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("420")]
+        public double ClusterWindowHeight {
+            get {
+                return ((double)(this["ClusterWindowHeight"]));
+            }
+            set {
+                this["ClusterWindowHeight"] = value;
             }
         }
     }

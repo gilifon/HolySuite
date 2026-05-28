@@ -186,6 +186,11 @@
                             <Image Source="Images/matrix.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="ClusterMenuItem" Header="Cluster" ToolTip="Open cluster window" Click="ClusterMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <!--<MenuItem x:Name="LogInfoMenuItem" Header="Statistics" ToolTip="Show some log statistics" Click="LogInfoMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/chart.png" Stretch="UniformToFill" Width="16" Height="16"/>
