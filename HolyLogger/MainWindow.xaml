@@ -377,6 +377,8 @@
         <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="668,6,0,0" Width="62" Height="38" Style="{StaticResource RaisedActionButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,26 7,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,26 11,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M49,3 C55,8 55,26 49,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M53,3 C59,8 59,26 53,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0">
                     <TextBlock Text="Spot" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,-2,0,0"/>
