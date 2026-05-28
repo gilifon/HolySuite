@@ -225,6 +225,7 @@ namespace HolyLogger
         HashSet<string> clusterSpotKeys = new HashSet<string>(StringComparer.Ordinal);
         List<ClusterSpotViewItem> clusterAllSpots = new List<ClusterSpotViewItem>();
         ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
+        HashSet<string> clusterWorkedCountries = null;
         TextBlock clusterActiveBandText = null;
         Button clusterUndoButton = null;
         string clusterUndoFrequencyText = string.Empty;
@@ -791,6 +792,9 @@ namespace HolyLogger
                     dal.Delete(qso.id);
                 }
                 UpdateNumOfQSOs();
+
+                // Rebuild worked countries list after deletion
+                RebuildWorkedCountriesAndRefreshCluster();
             }
 
             if (clusterVisibleSpots != null)
@@ -897,6 +901,8 @@ namespace HolyLogger
                     }                    
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
+
+                    AddWorkedCountryAndRefreshCluster(qso.DXCall);
                 }
                 catch (Exception ex)
                 {
@@ -953,6 +959,10 @@ namespace HolyLogger
                     q.SAT_NAME = QsoToUpdate.SAT_NAME;
                     QSODataGrid.Items.Refresh();
                 }
+
+                // Rebuild worked countries list after edit (callsign/country may have changed)
+                RebuildWorkedCountriesAndRefreshCluster();
+
                 LoadPreEditUserData();
             }
             ShowNewDXCC();
@@ -2663,6 +2673,7 @@ namespace HolyLogger
                 }
             }
 
+            UpdateClusterFrequencyHighlight();
         }
 
         private void TB_Frequency_KeyDown(object sender, KeyEventArgs e)
@@ -3146,16 +3157,17 @@ namespace HolyLogger
             };
 
             var clusterRowStyle = new Style(typeof(DataGridRow));
-            var inLogTrigger = new DataTrigger
-            {
-                Binding = new System.Windows.Data.Binding("IsInLog"),
-                Value = true
-            };
-            inLogTrigger.Setters.Add(new Setter(DataGridRow.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0xE6, 0xF3, 0xFF))));
-            clusterRowStyle.Triggers.Add(inLogTrigger);
+            clusterRowStyle.Setters.Add(new Setter(DataGridRow.BackgroundProperty, new System.Windows.Data.Binding("RowBackground")));
             spotsGrid.RowStyle = clusterRowStyle;
 
-            var dxColumn = new DataGridTextColumn { Header = "DX", Binding = new System.Windows.Data.Binding("DXCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
+            var dxColumnTemplate = new DataTemplate();
+            var dxTextBlockFactory = new FrameworkElementFactory(typeof(TextBlock));
+            dxTextBlockFactory.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("DXCallsign"));
+            dxTextBlockFactory.SetBinding(TextBlock.FontWeightProperty, new System.Windows.Data.Binding("DXFontWeight"));
+            dxTextBlockFactory.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("DXForeground"));
+            dxColumnTemplate.VisualTree = dxTextBlockFactory;
+
+            var dxColumn = new DataGridTemplateColumn { Header = "DX", CellTemplate = dxColumnTemplate, Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
             var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
             var freqColumn = new DataGridTextColumn { Header = "Freq", Binding = new System.Windows.Data.Binding("FreqText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
             var utcColumn = new DataGridTextColumn { Header = "UTC", Binding = new System.Windows.Data.Binding("TimeUtc"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthUtc)) };
@@ -3248,12 +3260,15 @@ namespace HolyLogger
                 }
                 CloseClusterWebSocket();
                 clusterVisibleSpots = null;
+                clusterWorkedCountries = null;
                 clusterUndoButton = null;
                 clusterHasUndoTuneState = false;
                 clusterUndoFrequencyText = string.Empty;
                 clusterUndoModeText = string.Empty;
                 clusterWindow = null;
             };
+
+            clusterWorkedCountries = GetWorkedCountriesFromLog();
             clusterWindow.Show();
 
             await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
@@ -3681,6 +3696,7 @@ namespace HolyLogger
                     string mode = (string)spotToken["mode"] ?? string.Empty;
                     string comment = (string)spotToken["comment"] ?? string.Empty;
 
+                    var workedCountries = GetWorkedCountriesFromLog();
                     var item = new ClusterSpotViewItem
                     {
                         TimeUtc = unixTime > 0
@@ -3692,7 +3708,8 @@ namespace HolyLogger
                         DXCallsign = dx,
                         SpotterCallsign = spotter,
                         Comment = comment,
-                        IsInLog = IsClusterCallsignInLog(dx)
+                        IsInLog = IsClusterCallsignInLog(dx),
+                        IsNeededCountry = IsNeededCountry(dx, workedCountries)
                     };
 
                     Dispatcher.BeginInvoke(new Action(() =>
@@ -3740,7 +3757,7 @@ namespace HolyLogger
             }
         }
 
-        private sealed class ClusterSpotViewItem
+        private sealed class ClusterSpotViewItem : INotifyPropertyChanged
         {
             public string TimeUtc { get; set; }
             public string FreqText { get; set; }
@@ -3750,6 +3767,56 @@ namespace HolyLogger
             public string SpotterCallsign { get; set; }
             public string Comment { get; set; }
             public bool IsInLog { get; set; }
+
+            private bool _isNeededCountry;
+            public bool IsNeededCountry
+            {
+                get => _isNeededCountry;
+                set
+                {
+                    if (_isNeededCountry != value)
+                    {
+                        _isNeededCountry = value;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsNeededCountry)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DXFontWeight)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DXForeground)));
+                    }
+                }
+            }
+
+            private bool _isOnFrequency;
+            public bool IsOnFrequency
+            {
+                get => _isOnFrequency;
+                set
+                {
+                    if (_isOnFrequency != value)
+                    {
+                        _isOnFrequency = value;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsOnFrequency)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowBackground)));
+                    }
+                }
+            }
+
+            public FontWeight DXFontWeight => (IsNeededCountry || IsInLog) ? FontWeights.Bold : FontWeights.Normal;
+            public Brush DXForeground
+            {
+                get
+                {
+                    if (IsNeededCountry)
+                        return Brushes.Red;
+                    if (IsInLog)
+                        return new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)); // Bold blue (not too dark)
+                    return Brushes.Black;
+                }
+            }
+
+            public Brush RowBackground => IsOnFrequency 
+                ? new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)) // Darker green (LightGreen)
+                : Brushes.Transparent;
+
+            public event PropertyChangedEventHandler PropertyChanged;
         }
 
         private bool IsClusterCallsignInLog(string dxCallsign)
@@ -3761,6 +3828,159 @@ namespace HolyLogger
             }
 
             return Qsos.Any(q => string.Equals((q.DXCall ?? string.Empty).Trim(), target, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private HashSet<string> GetWorkedCountriesFromLog()
+        {
+            var workedCountries = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (Qsos == null)
+            {
+                return workedCountries;
+            }
+
+            var entityResolver = new DXCCManager.EntityResolver();
+            foreach (var qso in Qsos)
+            {
+                if (!string.IsNullOrWhiteSpace(qso.DXCall))
+                {
+                    var dxcc = entityResolver.GetDXCC(qso.DXCall.Trim());
+                    if (dxcc != null && !string.IsNullOrWhiteSpace(dxcc.Entity) && dxcc.Entity != "-1")
+                    {
+                        workedCountries.Add(dxcc.Entity);
+                    }
+                }
+            }
+
+            return workedCountries;
+        }
+
+        private bool IsNeededCountry(string dxCallsign, HashSet<string> workedCountries)
+        {
+            if (string.IsNullOrWhiteSpace(dxCallsign) || workedCountries == null)
+            {
+                return false;
+            }
+
+            var entityResolver = new DXCCManager.EntityResolver();
+            var dxcc = entityResolver.GetDXCC(dxCallsign.Trim());
+            if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || dxcc.Entity == "-1")
+            {
+                return false;
+            }
+
+            return !workedCountries.Contains(dxcc.Entity);
+        }
+
+        private void RefreshClusterNeededCountries()
+        {
+            if (clusterVisibleSpots == null || clusterWorkedCountries == null)
+            {
+                return;
+            }
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                foreach (var spot in clusterVisibleSpots)
+                {
+                    bool wasNeeded = spot.IsNeededCountry;
+                    bool isNeeded = IsNeededCountry(spot.DXCallsign, clusterWorkedCountries);
+
+                    if (wasNeeded != isNeeded)
+                    {
+                        spot.IsNeededCountry = isNeeded;
+                    }
+                }
+
+                if (clusterAllSpots != null)
+                {
+                    foreach (var spot in clusterAllSpots)
+                    {
+                        spot.IsNeededCountry = IsNeededCountry(spot.DXCallsign, clusterWorkedCountries);
+                    }
+                }
+            }));
+        }
+
+        private void AddWorkedCountryAndRefreshCluster(string dxCallsign)
+        {
+            if (string.IsNullOrWhiteSpace(dxCallsign) || clusterWorkedCountries == null)
+            {
+                return;
+            }
+
+            var entityResolver = new DXCCManager.EntityResolver();
+            var dxcc = entityResolver.GetDXCC(dxCallsign.Trim());
+
+            if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || dxcc.Entity == "-1")
+            {
+                return;
+            }
+
+            bool wasNew = clusterWorkedCountries.Add(dxcc.Entity);
+
+            if (wasNew)
+            {
+                RefreshClusterNeededCountries();
+            }
+        }
+
+        private void RebuildWorkedCountriesAndRefreshCluster()
+        {
+            if (clusterWorkedCountries == null)
+            {
+                return;
+            }
+
+            clusterWorkedCountries = GetWorkedCountriesFromLog();
+            RefreshClusterNeededCountries();
+        }
+
+        private void UpdateClusterFrequencyHighlight()
+        {
+            if (clusterVisibleSpots == null)
+            {
+                return;
+            }
+
+            double currentFreqMhz = 0;
+            string freqText = TB_Frequency.Text?.Trim();
+            if (!string.IsNullOrWhiteSpace(freqText))
+            {
+                double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out currentFreqMhz);
+            }
+
+            if (currentFreqMhz <= 0)
+            {
+                foreach (var spot in clusterVisibleSpots)
+                {
+                    spot.IsOnFrequency = false;
+                }
+                return;
+            }
+
+            const double toleranceKhz = 0.5; // 0.5 kHz tolerance
+
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                foreach (var spot in clusterVisibleSpots)
+                {
+                    string spotFreqText = spot.FreqText?.Trim();
+                    if (!string.IsNullOrWhiteSpace(spotFreqText) &&
+                        double.TryParse(spotFreqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double spotFreqValue))
+                    {
+                        // Normalize cluster frequency to MHz (cluster can be in kHz if >= 1000, otherwise MHz)
+                        double spotFreqMhz = spotFreqValue >= 1000 ? (spotFreqValue / 1000.0) : spotFreqValue;
+
+                        // Compare in kHz for better precision
+                        double freqDiffKhz = Math.Abs(currentFreqMhz - spotFreqMhz) * 1000.0;
+                        spot.IsOnFrequency = freqDiffKhz <= toleranceKhz;
+                    }
+                    else
+                    {
+                        spot.IsOnFrequency = false;
+                    }
+                }
+            }));
         }
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
@@ -3914,6 +4134,8 @@ namespace HolyLogger
             {
                 clusterVisibleSpots.Add(item);
             }
+
+            UpdateClusterFrequencyHighlight();
         }
 
         private void ClusterSpotsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
