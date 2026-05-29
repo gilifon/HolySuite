@@ -3787,7 +3787,11 @@ namespace HolyLogger
                 }
 
                 e.Handled = true;
+                return;
             }
+
+            // Prevent default DataGrid row selection highlight on other columns (UTC/Mode/Comment/Freq single-click).
+            e.Handled = true;
         }
 
         private void ClusterSingleClickOpenQrzTimer_Tick(object sender, EventArgs e)
