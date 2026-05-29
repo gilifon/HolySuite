@@ -207,6 +207,7 @@ namespace HolyLogger
 
         private bool isRemoteServerLiveLog = false;
         private bool isInitializeComponentsComplete = false;
+        private bool hasRestoredMainWindowBounds = false;
 
         public bool isNetworkAvailable { get; set; }
 
@@ -330,8 +331,10 @@ namespace HolyLogger
             Qsos = new ObservableCollection<QSO>();
             rem = new EntityResolver();
             InitializeComponent();
+
             ApplyMainFormBackgroundFromSettings();
             ApplyQsoTableHeaderBackgroundFromSettings();
+
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
             LoadCallsignIndex();
@@ -701,7 +704,7 @@ namespace HolyLogger
             ApplyClusterWindowSetting();
 
             _stickyWindow = new StickyWindow(this);
-            _stickyWindow.StickToScreen = true;
+            _stickyWindow.StickToScreen = false;
             _stickyWindow.StickToOther = true;
             _stickyWindow.StickOnResize = true;
             _stickyWindow.StickOnMove = true;
@@ -713,6 +716,20 @@ namespace HolyLogger
 
             MapControl.RadiusChanged += OnMapRadiusChanged;
             ShowHomeMap();
+        }
+
+        private void Window_SourceInitialized(object sender, EventArgs e)
+        {
+            // Restore window position and size before first show.
+            if (Properties.Settings.Default.MainWindowWidth > 0)
+                Width = Properties.Settings.Default.MainWindowWidth;
+            if (Properties.Settings.Default.MainWindowHeight > 0)
+                Height = Properties.Settings.Default.MainWindowHeight;
+
+            Left = Properties.Settings.Default.MainWindowLeft;
+            Top = Properties.Settings.Default.MainWindowTop;
+
+            hasRestoredMainWindowBounds = true;
         }
 
         private void StartUTCTimer()
@@ -5754,16 +5771,30 @@ namespace HolyLogger
 
         private void Window_LocationChanged(object sender, EventArgs e)
         {
-            if (this.Left >= 0)
-                Properties.Settings.Default.MainWindowLeft = this.Left;
-            if (this.Top >= 0)
-                Properties.Settings.Default.MainWindowTop = this.Top;
+            SaveMainWindowBounds();
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            Properties.Settings.Default.MainWindowWidth = this.Width;
-            Properties.Settings.Default.MainWindowHeight = this.Height;
+            SaveMainWindowBounds();
+        }
+
+        private void SaveMainWindowBounds()
+        {
+            if (!hasRestoredMainWindowBounds)
+                return;
+
+            Rect bounds = WindowState == WindowState.Normal
+                ? new Rect(Left, Top, Width, Height)
+                : RestoreBounds;
+
+            if (bounds.Width > 0)
+                Properties.Settings.Default.MainWindowWidth = bounds.Width;
+            if (bounds.Height > 0)
+                Properties.Settings.Default.MainWindowHeight = bounds.Height;
+
+            Properties.Settings.Default.MainWindowLeft = bounds.Left;
+            Properties.Settings.Default.MainWindowTop = bounds.Top;
         }
 
         private void SetAzimuth()

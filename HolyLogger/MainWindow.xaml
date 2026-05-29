@@ -7,7 +7,11 @@
         xmlns:gif="http://wpfanimatedgif.codeplex.com"
         xmlns:ToolsUserControls="clr-namespace:HolyLogger.ToolsUserControls"
         x:Class="HolyLogger.MainWindow"
-        Title="HolyLogger" Height="660" MinHeight="560" Width="1160" MinWidth="800" Icon="Images/crown.png" KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
+        Title="HolyLogger" 
+        WindowStartupLocation="Manual"
+        MinHeight="560" MinWidth="800" 
+        Icon="Images/crown.png" 
+        KeyDown="Window_KeyDown" Closed="Window_Closed" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
 
     <Window.Resources>
         <local:QsoDateDisplayConverter x:Key="QsoDateDisplayConverter"/>
