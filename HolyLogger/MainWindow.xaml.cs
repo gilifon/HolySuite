@@ -24,6 +24,7 @@ using Blue.Windows;
 using System.Windows.Media.Imaging;
 using System.Runtime.InteropServices;
 using System.Windows.Threading;
+using System.Windows.Documents;
 using System.Net.NetworkInformation;
 using System.Windows.Media;
 using System.Net.Sockets;
@@ -228,10 +229,14 @@ namespace HolyLogger
         ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
         HashSet<string> clusterWorkedCountries = null;
         TextBlock clusterActiveBandText = null;
+        TextBlock clusterActiveBandIndicatorText = null;
+        DataGridColumn clusterDxColumn = null;
+        DataGridColumn clusterSpotterColumn = null;
+        DataGridColumn clusterFreqColumn = null;
+        DataGrid clusterSpotsDataGrid = null;
         Button clusterUndoButton = null;
-        string clusterUndoFrequencyText = string.Empty;
-        string clusterUndoModeText = string.Empty;
-        bool clusterHasUndoTuneState = false;
+        TextBlock clusterUndoCountText = null;
+        Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
@@ -3129,7 +3134,25 @@ namespace HolyLogger
             };
             RenderOptions.SetBitmapScalingMode(undoIcon, BitmapScalingMode.HighQuality);
 
-            undoButton.Content = undoIcon;
+            var undoCountText = new TextBlock
+            {
+                Text = string.Empty,
+                FontSize = 10,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 0, 0),
+                TextAlignment = TextAlignment.Center,
+                IsHitTestVisible = false
+            };
+
+            var undoContentGrid = new Grid();
+            undoContentGrid.Children.Add(undoIcon);
+            undoContentGrid.Children.Add(undoCountText);
+
+            undoButton.Content = undoContentGrid;
+            clusterUndoCountText = undoCountText;
 
             var settingsButton = new Button
             {
@@ -3162,7 +3185,7 @@ namespace HolyLogger
                 AlternationCount = 2,
                 AlternatingRowBackground = Brushes.Gainsboro,
                 FontSize = 13,
-                Margin = new Thickness(0)
+                Margin = new Thickness(0, -4, 0, 0)
             };
 
             var clusterRowStyle = new Style(typeof(DataGridRow));
@@ -3177,11 +3200,21 @@ namespace HolyLogger
             dxTextBlockFactory.SetBinding(TextBlock.BackgroundProperty, new System.Windows.Data.Binding("DXBackground"));
             dxColumnTemplate.VisualTree = dxTextBlockFactory;
 
-            var dxColumn = new DataGridTemplateColumn { Header = "DX", CellTemplate = dxColumnTemplate, Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
+            var dxHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            dxHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+
+            var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
             var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
-            var freqColumn = new DataGridTextColumn { Header = "Freq", Binding = new System.Windows.Data.Binding("FreqText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
+            var freqHeaderText = new TextBlock();
+            freqHeaderText.Inlines.Add(new Run("Freq "));
+            freqHeaderText.Inlines.Add(new Run("MHz") { FontSize = 10, FontWeight = FontWeights.Bold });
+            var freqColumn = new DataGridTextColumn { Header = freqHeaderText, Binding = new System.Windows.Data.Binding("FreqDisplayText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
             var utcColumn = new DataGridTextColumn { Header = "UTC", Binding = new System.Windows.Data.Binding("TimeUtc"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthUtc)) };
             var commentColumn = new DataGridTextColumn { Header = "Comment", Binding = new System.Windows.Data.Binding("Comment"), Width = new DataGridLength(Math.Max(60, Properties.Settings.Default.ClusterColWidthComment)) };
+
+            clusterDxColumn = dxColumn;
+            clusterSpotterColumn = spotterColumn;
+            clusterFreqColumn = freqColumn;
 
             utcColumn.SortDirection = ListSortDirection.Descending;
 
@@ -3197,6 +3230,8 @@ namespace HolyLogger
             clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
             spotsGrid.ItemsSource = clusterVisibleSpots;
             spotsGrid.PreviewMouseDoubleClick += ClusterSpotsGrid_MouseDoubleClick;
+            spotsGrid.SizeChanged += (s, e) => UpdateClusterActiveBandIndicatorPosition();
+            clusterSpotsDataGrid = spotsGrid;
 
             // Populate visible spots from existing data
             RefreshClusterVisibleSpots();
@@ -3205,40 +3240,54 @@ namespace HolyLogger
             {
                 Orientation = Orientation.Vertical,
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, 0, 8, 8)
+                Margin = new Thickness(0, 0, 4, 0)
             };
 
-            void AddLegendItem(Brush color, string text)
+            StackPanel BuildLegendItem(Brush color, string text, bool useTextBackground = false, Thickness? itemMargin = null)
             {
                 var itemPanel = new StackPanel
                 {
                     Orientation = Orientation.Horizontal,
                     VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 0, 4)
+                    Margin = itemMargin ?? new Thickness(0, 0, 0, 1)
                 };
 
-                itemPanel.Children.Add(new Border
+                if (!useTextBackground)
                 {
-                    Width = 20,
-                    Height = 3,
-                    Background = color,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 5, 0)
-                });
+                    itemPanel.Children.Add(new Border
+                    {
+                        Width = 20,
+                        Height = 3,
+                        Background = color,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 3, 0)
+                    });
+                }
 
                 itemPanel.Children.Add(new TextBlock
                 {
                     Text = text,
                     FontSize = 12,
+                    Background = useTextBackground ? color : Brushes.Transparent,
+                    Padding = useTextBackground ? new Thickness(3, 0, 3, 0) : new Thickness(0),
                     VerticalAlignment = VerticalAlignment.Center
                 });
 
-                legendPanel.Children.Add(itemPanel);
+                return itemPanel;
             }
 
-            AddLegendItem(Brushes.Red, "New Country");
-            AddLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before");
-            AddLegendItem(Brushes.Black, "Worked Country");
+            var legendTopRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 1)
+            };
+            legendTopRow.Children.Add(BuildLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 24, 0)));
+            legendTopRow.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On Frequency", true, new Thickness(0)));
+            legendPanel.Children.Add(legendTopRow);
+
+            legendPanel.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before"));
+            legendPanel.Children.Add(BuildLegendItem(Brushes.Black, "Worked Country"));
 
             var actionsPanel = new StackPanel
             {
@@ -3248,6 +3297,19 @@ namespace HolyLogger
             };
             actionsPanel.Children.Add(undoButton);
             actionsPanel.Children.Add(settingsButton);
+
+            var activeBandIndicator = new TextBlock
+            {
+                Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty),
+                Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0)),
+                FontWeight = FontWeights.Bold,
+                FontSize = 16,
+                Margin = new Thickness(0, -4, 0, 4),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                Visibility = Properties.Settings.Default.ClusterUseActiveBand ? Visibility.Visible : Visibility.Collapsed
+            };
+            clusterActiveBandIndicatorText = activeBandIndicator;
 
             var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -3260,11 +3322,14 @@ namespace HolyLogger
 
             var layoutGrid = new Grid { Margin = new Thickness(12) };
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
             Grid.SetRow(headerGrid, 0);
-            Grid.SetRow(spotsGrid, 1);
+            Grid.SetRow(activeBandIndicator, 1);
+            Grid.SetRow(spotsGrid, 2);
             layoutGrid.Children.Add(headerGrid);
+            layoutGrid.Children.Add(activeBandIndicator);
             layoutGrid.Children.Add(spotsGrid);
 
             clusterWindow = new Window
@@ -3284,9 +3349,7 @@ namespace HolyLogger
             }
 
             clusterUndoButton = undoButton;
-            clusterHasUndoTuneState = false;
-            clusterUndoFrequencyText = string.Empty;
-            clusterUndoModeText = string.Empty;
+            clusterUndoStates.Clear();
             UpdateClusterUndoButtonState();
 
             settingsButton.Click += (s, e) => OpenClusterSettingsWindow();
@@ -3311,16 +3374,43 @@ namespace HolyLogger
                 clusterVisibleSpots = null;
                 clusterWorkedCountries = null;
                 clusterUndoButton = null;
-                clusterHasUndoTuneState = false;
-                clusterUndoFrequencyText = string.Empty;
-                clusterUndoModeText = string.Empty;
+                clusterUndoCountText = null;
+                clusterActiveBandIndicatorText = null;
+                clusterDxColumn = null;
+                clusterSpotterColumn = null;
+                clusterFreqColumn = null;
+                clusterUndoStates.Clear();
                 clusterWindow = null;
             };
 
             clusterWorkedCountries = GetWorkedCountriesFromLog();
             clusterWindow.Show();
+            Dispatcher.BeginInvoke(new Action(UpdateClusterActiveBandIndicatorPosition), DispatcherPriority.Loaded);
 
             await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
+        }
+
+        private void UpdateClusterActiveBandIndicatorPosition()
+        {
+            if (clusterActiveBandIndicatorText == null)
+            {
+                return;
+            }
+
+            double dxWidth = clusterDxColumn != null && clusterDxColumn.ActualWidth > 0
+                ? clusterDxColumn.ActualWidth
+                : Math.Max(40, Properties.Settings.Default.ClusterColWidthDX);
+            double spotterWidth = clusterSpotterColumn != null && clusterSpotterColumn.ActualWidth > 0
+                ? clusterSpotterColumn.ActualWidth
+                : Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter);
+            double freqWidth = clusterFreqColumn != null && clusterFreqColumn.ActualWidth > 0
+                ? clusterFreqColumn.ActualWidth
+                : Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq);
+
+            clusterActiveBandIndicatorText.Width = freqWidth;
+            clusterActiveBandIndicatorText.TextAlignment = TextAlignment.Center;
+            double rowHeaderWidth = clusterSpotsDataGrid != null ? clusterSpotsDataGrid.RowHeaderActualWidth : 0;
+            clusterActiveBandIndicatorText.Margin = new Thickness(rowHeaderWidth + dxWidth + spotterWidth, -4, 0, 4);
         }
 
         private void ClusterWindow_LocationChanged(object sender, EventArgs e)
@@ -3594,13 +3684,20 @@ namespace HolyLogger
             settingsLayout.Children.Add(bandsScroll);
             settingsLayout.Children.Add(modesScroll);
 
+            const double clusterSettingsMinWidth = 285;
+            const double clusterSettingsMinHeight = 470;
+            const double clusterSettingsDefaultWidth = 320;
+            const double clusterSettingsDefaultHeight = 500;
+            double startupWidth = clusterSettingsDefaultWidth;
+            double startupHeight = clusterSettingsDefaultHeight;
+
             clusterSettingsWindow = new Window
             {
                 Title = "Cluster Settings",
-                Width = Properties.Settings.Default.ClusterSettingsWindowWidth,
-                Height = Properties.Settings.Default.ClusterSettingsWindowHeight,
-                MinWidth = 260,
-                MinHeight = 180,
+                Width = startupWidth,
+                Height = startupHeight,
+                MinWidth = clusterSettingsMinWidth,
+                MinHeight = clusterSettingsMinHeight,
                 Left = Properties.Settings.Default.ClusterSettingsWindowLeft,
                 Top = Properties.Settings.Default.ClusterSettingsWindowTop,
                 Content = settingsLayout
@@ -3753,6 +3850,7 @@ namespace HolyLogger
                             ? DateTimeOffset.FromUnixTimeSeconds(unixTime).UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)
                             : string.Empty,
                         FreqText = freq > 0 ? freq.ToString("0.0", CultureInfo.InvariantCulture) : string.Empty,
+                        FreqDisplayText = freq > 0 ? ((freq >= 1000 ? (freq / 1000.0) : freq).ToString("0.000", CultureInfo.InvariantCulture)) : string.Empty,
                         BandText = bandText,
                         Mode = mode,
                         DXCallsign = dx,
@@ -3813,6 +3911,7 @@ namespace HolyLogger
             public long UnixTime { get; set; }
             public string TimeUtc { get; set; }
             public string FreqText { get; set; }
+            public string FreqDisplayText { get; set; }
             public string BandText { get; set; }
             public string Mode { get; set; }
             public string DXCallsign { get; set; }
@@ -4274,6 +4373,7 @@ namespace HolyLogger
             CaptureClusterUndoState();
 
             TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+            TB_DXCallsign.Text = (spot.DXCallsign ?? string.Empty).Trim().ToUpperInvariant();
 
             string normalizedMode = NormalizeClusterModeForLogger(spot.Mode);
             SelectLoggerMode(normalizedMode);
@@ -4353,26 +4453,42 @@ namespace HolyLogger
 
         private void CaptureClusterUndoState()
         {
-            clusterUndoFrequencyText = (TB_Frequency.Text ?? string.Empty).Trim();
-            clusterUndoModeText = (CB_Mode.Text ?? string.Empty).Trim().ToUpperInvariant();
-            clusterHasUndoTuneState = !string.IsNullOrWhiteSpace(clusterUndoFrequencyText) && !string.IsNullOrWhiteSpace(clusterUndoModeText);
+            string frequencyText = (TB_Frequency.Text ?? string.Empty).Trim();
+            string modeText = (CB_Mode.Text ?? string.Empty).Trim().ToUpperInvariant();
+            string dxCallsignText = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(frequencyText) || string.IsNullOrWhiteSpace(modeText))
+            {
+                return;
+            }
+
+            if (clusterUndoStates.Count > 0)
+            {
+                var last = clusterUndoStates.Peek();
+                if (string.Equals(last.FrequencyText, frequencyText, StringComparison.Ordinal)
+                    && string.Equals(last.ModeText, modeText, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(last.DxCallsignText, dxCallsignText, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            clusterUndoStates.Push((frequencyText, modeText, dxCallsignText));
             UpdateClusterUndoButtonState();
         }
 
         private void ClusterUndoButton_Click(object sender, RoutedEventArgs e)
         {
-            if (!clusterHasUndoTuneState)
+            if (clusterUndoStates.Count == 0)
             {
                 return;
             }
 
-            string freqText = clusterUndoFrequencyText;
-            string modeText = clusterUndoModeText;
-
-            clusterHasUndoTuneState = false;
-            clusterUndoFrequencyText = string.Empty;
-            clusterUndoModeText = string.Empty;
+            var undoState = clusterUndoStates.Pop();
             UpdateClusterUndoButtonState();
+
+            string freqText = undoState.FrequencyText;
+            string modeText = undoState.ModeText;
+            string dxCallsignText = undoState.DxCallsignText;
 
             if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqMhz) || freqMhz <= 0)
             {
@@ -4381,6 +4497,7 @@ namespace HolyLogger
 
             TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
             SelectLoggerMode(modeText);
+            TB_DXCallsign.Text = dxCallsignText;
 
             if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
             {
@@ -4398,8 +4515,14 @@ namespace HolyLogger
                 return;
             }
 
-            clusterUndoButton.IsEnabled = clusterHasUndoTuneState;
-            clusterUndoButton.Opacity = clusterHasUndoTuneState ? 1.0 : 0.35;
+            bool hasUndo = clusterUndoStates.Count > 0;
+            clusterUndoButton.IsEnabled = hasUndo;
+            clusterUndoButton.Opacity = hasUndo ? 1.0 : 0.35;
+
+            if (clusterUndoCountText != null)
+            {
+                clusterUndoCountText.Text = hasUndo ? clusterUndoStates.Count.ToString(CultureInfo.InvariantCulture) : string.Empty;
+            }
         }
 
         private bool TryTuneRigFrequency(int frequencyHz, OmniRig.RigParamX mode, out string methodUsed, out int rxReadbackHz)
@@ -4741,6 +4864,12 @@ namespace HolyLogger
             if (clusterActiveBandText != null)
             {
                 clusterActiveBandText.Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty);
+            }
+
+            if (clusterActiveBandIndicatorText != null)
+            {
+                clusterActiveBandIndicatorText.Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty);
+                UpdateClusterActiveBandIndicatorPosition();
             }
 
             if (Properties.Settings.Default.ClusterUseActiveBand)
