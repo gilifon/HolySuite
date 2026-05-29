@@ -3095,15 +3095,6 @@ namespace HolyLogger
 
         private async void GenerateNewClusterWindow()
         {
-            var titleText = new TextBlock
-            {
-                Text = "My Cluster",
-                FontSize = 18,
-                FontWeight = FontWeights.SemiBold,
-                Margin = new Thickness(0, 0, 8, 8),
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
             var undoButton = new Button
             {
                 Width = 32,
@@ -3154,11 +3145,13 @@ namespace HolyLogger
 
             var statusText = new TextBlock
             {
-                Text = "(connecting...)",
-                FontSize = 13,
+                Text = string.Empty,
+                FontSize = 12,
                 Foreground = Brushes.DimGray,
                 Margin = new Thickness(0, 0, 0, 8),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Visibility = Visibility.Collapsed
             };
 
             var spotsGrid = new DataGrid
@@ -3181,6 +3174,7 @@ namespace HolyLogger
             dxTextBlockFactory.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("DXCallsign"));
             dxTextBlockFactory.SetBinding(TextBlock.FontWeightProperty, new System.Windows.Data.Binding("DXFontWeight"));
             dxTextBlockFactory.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("DXForeground"));
+            dxTextBlockFactory.SetBinding(TextBlock.BackgroundProperty, new System.Windows.Data.Binding("DXBackground"));
             dxColumnTemplate.VisualTree = dxTextBlockFactory;
 
             var dxColumn = new DataGridTemplateColumn { Header = "DX", CellTemplate = dxColumnTemplate, Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
@@ -3188,6 +3182,8 @@ namespace HolyLogger
             var freqColumn = new DataGridTextColumn { Header = "Freq", Binding = new System.Windows.Data.Binding("FreqText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
             var utcColumn = new DataGridTextColumn { Header = "UTC", Binding = new System.Windows.Data.Binding("TimeUtc"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthUtc)) };
             var commentColumn = new DataGridTextColumn { Header = "Comment", Binding = new System.Windows.Data.Binding("Comment"), Width = new DataGridLength(Math.Max(60, Properties.Settings.Default.ClusterColWidthComment)) };
+
+            utcColumn.SortDirection = ListSortDirection.Descending;
 
             spotsGrid.Columns.Add(dxColumn);
             spotsGrid.Columns.Add(spotterColumn);
@@ -3205,13 +3201,44 @@ namespace HolyLogger
             // Populate visible spots from existing data
             RefreshClusterVisibleSpots();
 
-            var titleStatusPanel = new StackPanel
+            var legendPanel = new StackPanel
             {
-                Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center
+                Orientation = Orientation.Vertical,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 0, 8, 8)
             };
-            titleStatusPanel.Children.Add(titleText);
-            titleStatusPanel.Children.Add(statusText);
+
+            void AddLegendItem(Brush color, string text)
+            {
+                var itemPanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 0, 4)
+                };
+
+                itemPanel.Children.Add(new Border
+                {
+                    Width = 20,
+                    Height = 3,
+                    Background = color,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 0, 5, 0)
+                });
+
+                itemPanel.Children.Add(new TextBlock
+                {
+                    Text = text,
+                    FontSize = 12,
+                    VerticalAlignment = VerticalAlignment.Center
+                });
+
+                legendPanel.Children.Add(itemPanel);
+            }
+
+            AddLegendItem(Brushes.Red, "New Country");
+            AddLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before");
+            AddLegendItem(Brushes.Black, "Worked Country");
 
             var actionsPanel = new StackPanel
             {
@@ -3225,9 +3252,10 @@ namespace HolyLogger
             var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            Grid.SetColumn(titleStatusPanel, 0);
+            Grid.SetColumn(legendPanel, 0);
+            headerGrid.Children.Add(legendPanel);
+            Grid.SetColumn(actionsPanel, 0);
             Grid.SetColumn(actionsPanel, 1);
-            headerGrid.Children.Add(titleStatusPanel);
             headerGrid.Children.Add(actionsPanel);
 
             var layoutGrid = new Grid { Margin = new Thickness(12) };
@@ -3720,6 +3748,7 @@ namespace HolyLogger
                     var workedCountries = GetWorkedCountriesFromLog();
                     var item = new ClusterSpotViewItem
                     {
+                        UnixTime = unixTime,
                         TimeUtc = unixTime > 0
                             ? DateTimeOffset.FromUnixTimeSeconds(unixTime).UtcDateTime.ToString("HH:mm", CultureInfo.InvariantCulture)
                             : string.Empty,
@@ -3730,6 +3759,7 @@ namespace HolyLogger
                         SpotterCallsign = spotter,
                         Comment = comment,
                         IsInLog = IsClusterCallsignInLog(dx),
+                        IsMyCallsign = IsMyStationCallsign(dx),
                         IsNeededCountry = IsNeededCountry(dx, workedCountries)
                     };
 
@@ -3780,6 +3810,7 @@ namespace HolyLogger
 
         private sealed class ClusterSpotViewItem : INotifyPropertyChanged
         {
+            public long UnixTime { get; set; }
             public string TimeUtc { get; set; }
             public string FreqText { get; set; }
             public string BandText { get; set; }
@@ -3820,11 +3851,29 @@ namespace HolyLogger
                 }
             }
 
-            public FontWeight DXFontWeight => (IsNeededCountry || IsInLog) ? FontWeights.Bold : FontWeights.Normal;
+            private bool _isMyCallsign;
+            public bool IsMyCallsign
+            {
+                get => _isMyCallsign;
+                set
+                {
+                    if (_isMyCallsign != value)
+                    {
+                        _isMyCallsign = value;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMyCallsign)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DXForeground)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DXBackground)));
+                    }
+                }
+            }
+
+            public FontWeight DXFontWeight => FontWeights.Bold;
             public Brush DXForeground
             {
                 get
                 {
+                    if (IsMyCallsign)
+                        return Brushes.White;
                     if (IsNeededCountry)
                         return Brushes.Red;
                     if (IsInLog)
@@ -3832,6 +3881,10 @@ namespace HolyLogger
                     return Brushes.Black;
                 }
             }
+
+            public Brush DXBackground => IsMyCallsign
+                ? new SolidColorBrush(Color.FromRgb(0x00, 0x33, 0x99))
+                : Brushes.Transparent;
 
             public Brush RowBackground => IsOnFrequency 
                 ? new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)) // Darker green (LightGreen)
@@ -3849,6 +3902,31 @@ namespace HolyLogger
             }
 
             return Qsos.Any(q => string.Equals((q.DXCall ?? string.Empty).Trim(), target, StringComparison.OrdinalIgnoreCase));
+        }
+
+        private bool IsMyStationCallsign(string dxCallsign)
+        {
+            string target = (dxCallsign ?? string.Empty).Trim();
+            string myCallsign = TB_MyCallsign != null ? (TB_MyCallsign.Text ?? string.Empty).Trim() : string.Empty;
+            if (string.IsNullOrWhiteSpace(target) || string.IsNullOrWhiteSpace(myCallsign))
+            {
+                return false;
+            }
+
+            return string.Equals(target, myCallsign, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private void RefreshClusterMyCallsignHighlight()
+        {
+            if (clusterAllSpots == null)
+            {
+                return;
+            }
+
+            foreach (var spot in clusterAllSpots)
+            {
+                spot.IsMyCallsign = IsMyStationCallsign(spot.DXCallsign);
+            }
         }
 
         private HashSet<string> GetWorkedCountriesFromLog()
@@ -4142,6 +4220,7 @@ namespace HolyLogger
             }
 
             var filtered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
+                                          .OrderByDescending(s => s.UnixTime)
                                           .Take(500)
                                           .ToList();
 
@@ -4620,6 +4699,7 @@ namespace HolyLogger
             }
             if (TB_MyHolyland == null) return;
             UpdateMatrix();
+            RefreshClusterMyCallsignHighlight();
         }
         
         private void TB_MyHolyland_TextChanged(object sender, TextChangedEventArgs e)
