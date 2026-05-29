@@ -3111,6 +3111,7 @@ namespace HolyLogger
         private async void GenerateNewClusterWindow()
         {
             clusterHoverPopupEnabled = LoadClusterHoverPopupSetting();
+            clusterLastMinutesFilterValue = LoadClusterLastMinutesFilterSetting();
 
             var undoButton = new Button
             {
@@ -3437,6 +3438,7 @@ namespace HolyLogger
                 if (int.TryParse(lastMinutesCombo.SelectedItem as string, NumberStyles.Integer, CultureInfo.InvariantCulture, out selectedMinutes) && selectedMinutes > 0)
                 {
                     clusterLastMinutesFilterValue = selectedMinutes;
+                    SaveClusterLastMinutesFilterSetting(clusterLastMinutesFilterValue);
                     RefreshClusterVisibleSpots();
                 }
             };
@@ -4230,6 +4232,59 @@ namespace HolyLogger
         {
             string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
             return Path.Combine(baseDir, "cluster-hover-popup-enabled.txt");
+        }
+
+        private int LoadClusterLastMinutesFilterSetting()
+        {
+            try
+            {
+                string path = GetClusterLastMinutesFilterSettingPath();
+                if (!File.Exists(path))
+                {
+                    return 60;
+                }
+
+                int value;
+                if (int.TryParse(File.ReadAllText(path).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
+                    && (value == 5 || value == 15 || value == 30 || value == 60))
+                {
+                    return value;
+                }
+            }
+            catch
+            {
+            }
+
+            return 60;
+        }
+
+        private void SaveClusterLastMinutesFilterSetting(int minutes)
+        {
+            if (!(minutes == 5 || minutes == 15 || minutes == 30 || minutes == 60))
+            {
+                return;
+            }
+
+            try
+            {
+                string path = GetClusterLastMinutesFilterSettingPath();
+                string directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(path, minutes.ToString(CultureInfo.InvariantCulture));
+            }
+            catch
+            {
+            }
+        }
+
+        private string GetClusterLastMinutesFilterSettingPath()
+        {
+            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
+            return Path.Combine(baseDir, "cluster-last-minutes-filter.txt");
         }
 
         private void ClusterWindow_SizeChanged(object sender, SizeChangedEventArgs e)
