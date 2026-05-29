@@ -233,7 +233,17 @@ namespace HolyLogger
         DataGridColumn clusterDxColumn = null;
         DataGridColumn clusterSpotterColumn = null;
         DataGridColumn clusterFreqColumn = null;
+        DataGridColumn clusterUtcColumn = null;
         DataGrid clusterSpotsDataGrid = null;
+        ScrollViewer clusterSpotsScrollViewer = null;
+        StackPanel clusterLastMinutesFilterPanel = null;
+        ComboBox clusterLastMinutesComboBox = null;
+        int clusterLastMinutesFilterValue = 60;
+        DispatcherTimer clusterSingleClickOpenQrzTimer = null;
+        string clusterPendingQrzCallsign = null;
+        DataGridColumn clusterLastHoverToolTipColumn = null;
+        ToolTip clusterHoverToolTip = null;
+        bool clusterHoverPopupEnabled = true;
         Button clusterUndoButton = null;
         TextBlock clusterUndoCountText = null;
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
@@ -3100,6 +3110,8 @@ namespace HolyLogger
 
         private async void GenerateNewClusterWindow()
         {
+            clusterHoverPopupEnabled = LoadClusterHoverPopupSetting();
+
             var undoButton = new Button
             {
                 Width = 32,
@@ -3182,14 +3194,36 @@ namespace HolyLogger
                 AutoGenerateColumns = false,
                 IsReadOnly = true,
                 CanUserAddRows = false,
+                SelectionMode = DataGridSelectionMode.Single,
+                SelectionUnit = DataGridSelectionUnit.FullRow,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                RowHeaderWidth = 0,
                 AlternationCount = 2,
                 AlternatingRowBackground = Brushes.Gainsboro,
                 FontSize = 13,
-                Margin = new Thickness(0, -4, 0, 0)
+                Margin = new Thickness(0, 0, 0, 0)
             };
+            ToolTipService.SetInitialShowDelay(spotsGrid, 50);
+            ToolTipService.SetShowDuration(spotsGrid, 3000);
+            clusterHoverToolTip = new ToolTip
+            {
+                Background = new SolidColorBrush(Color.FromRgb(0xB7, 0xE1, 0xB0)),
+                Foreground = Brushes.DarkRed,
+                FontWeight = FontWeights.Bold,
+                BorderBrush = Brushes.IndianRed,
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(6, 2, 6, 2),
+                Placement = PlacementMode.RelativePoint,
+                StaysOpen = true
+            };
+
+            var hiddenRowHeaderStyle = new Style(typeof(DataGridRowHeader));
+            hiddenRowHeaderStyle.Setters.Add(new Setter(UIElement.VisibilityProperty, Visibility.Collapsed));
+            spotsGrid.RowHeaderStyle = hiddenRowHeaderStyle;
 
             var clusterRowStyle = new Style(typeof(DataGridRow));
             clusterRowStyle.Setters.Add(new Setter(DataGridRow.BackgroundProperty, new System.Windows.Data.Binding("RowBackground")));
+            clusterRowStyle.Setters.Add(new Setter(DataGridRow.FocusVisualStyleProperty, null));
             spotsGrid.RowStyle = clusterRowStyle;
 
             var dxColumnTemplate = new DataTemplate();
@@ -3203,18 +3237,39 @@ namespace HolyLogger
             var dxHeaderStyle = new Style(typeof(DataGridColumnHeader));
             dxHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
 
+            const double clusterLastMinutesDropdownWidth = 44;
+
             var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
             var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
             var freqHeaderText = new TextBlock();
             freqHeaderText.Inlines.Add(new Run("Freq "));
             freqHeaderText.Inlines.Add(new Run("MHz") { FontSize = 10, FontWeight = FontWeights.Bold });
             var freqColumn = new DataGridTextColumn { Header = freqHeaderText, Binding = new System.Windows.Data.Binding("FreqDisplayText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
-            var utcColumn = new DataGridTextColumn { Header = "UTC", Binding = new System.Windows.Data.Binding("TimeUtc"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthUtc)) };
-            var commentColumn = new DataGridTextColumn { Header = "Comment", Binding = new System.Windows.Data.Binding("Comment"), Width = new DataGridLength(Math.Max(60, Properties.Settings.Default.ClusterColWidthComment)) };
+            var utcHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            utcHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            var utcTextStyle = new Style(typeof(TextBlock));
+            utcTextStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
+            utcTextStyle.Setters.Add(new Setter(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+            var utcColumn = new DataGridTextColumn { Header = "UTC", HeaderStyle = utcHeaderStyle, ElementStyle = utcTextStyle, Binding = new System.Windows.Data.Binding("TimeUtc"), Width = new DataGridLength(clusterLastMinutesDropdownWidth), CanUserResize = false };
+            var modeHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            modeHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            var modeTemplate = new DataTemplate();
+            var modeTextFactory = new FrameworkElementFactory(typeof(TextBlock));
+            modeTextFactory.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("Mode"));
+            modeTextFactory.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("ModeForeground"));
+            modeTextFactory.SetBinding(TextBlock.FontWeightProperty, new System.Windows.Data.Binding("ModeFontWeight"));
+            modeTextFactory.SetValue(TextBlock.TextAlignmentProperty, TextAlignment.Center);
+            modeTextFactory.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            modeTemplate.VisualTree = modeTextFactory;
+            var modeColumn = new DataGridTemplateColumn { Header = "Mode", HeaderStyle = modeHeaderStyle, CellTemplate = modeTemplate, Width = new DataGridLength(60) };
+            var commentHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            commentHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            var commentColumn = new DataGridTextColumn { Header = "Comment", HeaderStyle = commentHeaderStyle, Binding = new System.Windows.Data.Binding("Comment"), MinWidth = 60, Width = new DataGridLength(1, DataGridLengthUnitType.Star) };
 
             clusterDxColumn = dxColumn;
             clusterSpotterColumn = spotterColumn;
             clusterFreqColumn = freqColumn;
+            clusterUtcColumn = utcColumn;
 
             utcColumn.SortDirection = ListSortDirection.Descending;
 
@@ -3222,6 +3277,7 @@ namespace HolyLogger
             spotsGrid.Columns.Add(spotterColumn);
             spotsGrid.Columns.Add(freqColumn);
             spotsGrid.Columns.Add(utcColumn);
+            spotsGrid.Columns.Add(modeColumn);
             spotsGrid.Columns.Add(commentColumn);
 
             // Don't clear existing spots - keep them so window shows data immediately when reopened
@@ -3229,9 +3285,20 @@ namespace HolyLogger
             // clusterSpotKeys.Clear();
             clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
             spotsGrid.ItemsSource = clusterVisibleSpots;
-            spotsGrid.PreviewMouseDoubleClick += ClusterSpotsGrid_MouseDoubleClick;
+            spotsGrid.PreviewMouseLeftButtonDown += ClusterSpotsGrid_MouseLeftButtonDown;
+            spotsGrid.MouseMove += ClusterSpotsGrid_MouseMove;
+            spotsGrid.MouseLeave += ClusterSpotsGrid_MouseLeave;
             spotsGrid.SizeChanged += (s, e) => UpdateClusterActiveBandIndicatorPosition();
+            spotsGrid.ColumnReordered += (s, e) => Dispatcher.BeginInvoke(new Action(UpdateClusterActiveBandIndicatorPosition), DispatcherPriority.Loaded);
+            spotsGrid.ColumnDisplayIndexChanged += (s, e) => Dispatcher.BeginInvoke(new Action(UpdateClusterActiveBandIndicatorPosition), DispatcherPriority.Loaded);
+            spotsGrid.Loaded += (s, e) => EnsureClusterGridScrollTracking();
             clusterSpotsDataGrid = spotsGrid;
+
+            clusterSingleClickOpenQrzTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            clusterSingleClickOpenQrzTimer.Tick += ClusterSingleClickOpenQrzTimer_Tick;
 
             // Populate visible spots from existing data
             RefreshClusterVisibleSpots();
@@ -3283,7 +3350,7 @@ namespace HolyLogger
                 Margin = new Thickness(0, 0, 0, 1)
             };
             legendTopRow.Children.Add(BuildLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 24, 0)));
-            legendTopRow.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On Frequency", true, new Thickness(0)));
+            legendTopRow.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Freq", true, new Thickness(0)));
             legendPanel.Children.Add(legendTopRow);
 
             legendPanel.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before"));
@@ -3304,12 +3371,75 @@ namespace HolyLogger
                 Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0)),
                 FontWeight = FontWeights.Bold,
                 FontSize = 16,
-                Margin = new Thickness(0, -4, 0, 4),
+                Margin = new Thickness(0, -12, 0, 4),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Visibility = Properties.Settings.Default.ClusterUseActiveBand ? Visibility.Visible : Visibility.Collapsed
             };
             clusterActiveBandIndicatorText = activeBandIndicator;
+
+            var lastMinutesLabel = new TextBlock
+            {
+                Text = "Last",
+                FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Width = clusterLastMinutesDropdownWidth,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 1)
+            };
+
+            var lastMinutesCombo = new ComboBox
+            {
+                Width = clusterLastMinutesDropdownWidth,
+                Height = 22,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            lastMinutesCombo.Items.Add("5");
+            lastMinutesCombo.Items.Add("15");
+            lastMinutesCombo.Items.Add("30");
+            lastMinutesCombo.Items.Add("60");
+            lastMinutesCombo.SelectedItem = clusterLastMinutesFilterValue.ToString(CultureInfo.InvariantCulture);
+
+            var minutesUnitLabel = new TextBlock
+            {
+                Text = "min",
+                FontSize = 12,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, 0, 0, 0)
+            };
+
+            var lastMinutesValuePanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            lastMinutesValuePanel.Children.Add(lastMinutesCombo);
+            lastMinutesValuePanel.Children.Add(minutesUnitLabel);
+
+            var lastMinutesFilterPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, -8, 0, 0)
+            };
+            lastMinutesFilterPanel.Children.Add(lastMinutesLabel);
+            lastMinutesFilterPanel.Children.Add(lastMinutesValuePanel);
+            clusterLastMinutesFilterPanel = lastMinutesFilterPanel;
+            clusterLastMinutesComboBox = lastMinutesCombo;
+
+            lastMinutesCombo.SelectionChanged += (s, e) =>
+            {
+                int selectedMinutes;
+                if (int.TryParse(lastMinutesCombo.SelectedItem as string, NumberStyles.Integer, CultureInfo.InvariantCulture, out selectedMinutes) && selectedMinutes > 0)
+                {
+                    clusterLastMinutesFilterValue = selectedMinutes;
+                    RefreshClusterVisibleSpots();
+                }
+            };
 
             var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -3327,9 +3457,11 @@ namespace HolyLogger
 
             Grid.SetRow(headerGrid, 0);
             Grid.SetRow(activeBandIndicator, 1);
+            Grid.SetRow(lastMinutesFilterPanel, 1);
             Grid.SetRow(spotsGrid, 2);
             layoutGrid.Children.Add(headerGrid);
             layoutGrid.Children.Add(activeBandIndicator);
+            layoutGrid.Children.Add(lastMinutesFilterPanel);
             layoutGrid.Children.Add(spotsGrid);
 
             clusterWindow = new Window
@@ -3379,6 +3511,19 @@ namespace HolyLogger
                 clusterDxColumn = null;
                 clusterSpotterColumn = null;
                 clusterFreqColumn = null;
+                clusterUtcColumn = null;
+                clusterSpotsScrollViewer = null;
+                clusterLastMinutesFilterPanel = null;
+                clusterLastMinutesComboBox = null;
+                if (clusterSingleClickOpenQrzTimer != null)
+                {
+                    clusterSingleClickOpenQrzTimer.Stop();
+                    clusterSingleClickOpenQrzTimer.Tick -= ClusterSingleClickOpenQrzTimer_Tick;
+                    clusterSingleClickOpenQrzTimer = null;
+                }
+                clusterPendingQrzCallsign = null;
+                clusterLastHoverToolTipColumn = null;
+                clusterHoverToolTip = null;
                 clusterUndoStates.Clear();
                 clusterWindow = null;
             };
@@ -3397,20 +3542,291 @@ namespace HolyLogger
                 return;
             }
 
-            double dxWidth = clusterDxColumn != null && clusterDxColumn.ActualWidth > 0
-                ? clusterDxColumn.ActualWidth
-                : Math.Max(40, Properties.Settings.Default.ClusterColWidthDX);
-            double spotterWidth = clusterSpotterColumn != null && clusterSpotterColumn.ActualWidth > 0
-                ? clusterSpotterColumn.ActualWidth
-                : Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter);
-            double freqWidth = clusterFreqColumn != null && clusterFreqColumn.ActualWidth > 0
-                ? clusterFreqColumn.ActualWidth
-                : Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq);
-
+            double freqStart = GetClusterColumnLeft(clusterFreqColumn);
+            double utcStart = GetClusterColumnLeft(clusterUtcColumn);
+            double freqWidth = GetClusterColumnWidth(clusterFreqColumn);
             clusterActiveBandIndicatorText.Width = freqWidth;
             clusterActiveBandIndicatorText.TextAlignment = TextAlignment.Center;
-            double rowHeaderWidth = clusterSpotsDataGrid != null ? clusterSpotsDataGrid.RowHeaderActualWidth : 0;
-            clusterActiveBandIndicatorText.Margin = new Thickness(rowHeaderWidth + dxWidth + spotterWidth, -4, 0, 4);
+            double horizontalOffset = clusterSpotsScrollViewer != null ? clusterSpotsScrollViewer.HorizontalOffset : 0;
+            clusterActiveBandIndicatorText.Margin = new Thickness(freqStart - horizontalOffset, -24, 0, 4);
+
+            if (clusterLastMinutesFilterPanel != null)
+            {
+                clusterLastMinutesFilterPanel.Width = double.NaN;
+                clusterLastMinutesFilterPanel.Margin = new Thickness(utcStart - horizontalOffset, -20, 0, 0);
+            }
+        }
+
+        private double GetClusterColumnLeft(DataGridColumn targetColumn)
+        {
+            if (clusterSpotsDataGrid == null || targetColumn == null)
+            {
+                return 0;
+            }
+
+            double left = clusterSpotsDataGrid.RowHeaderActualWidth;
+            foreach (var column in clusterSpotsDataGrid.Columns.OrderBy(c => c.DisplayIndex))
+            {
+                if (column == targetColumn)
+                {
+                    return left;
+                }
+
+                left += GetClusterColumnWidth(column);
+            }
+
+            return left;
+        }
+
+        private static double GetClusterColumnWidth(DataGridColumn column)
+        {
+            if (column == null)
+            {
+                return 0;
+            }
+
+            if (column.ActualWidth > 0)
+            {
+                return column.ActualWidth;
+            }
+
+            return column.Width.DisplayValue > 0 ? column.Width.DisplayValue : 40;
+        }
+
+        private void EnsureClusterGridScrollTracking()
+        {
+            if (clusterSpotsDataGrid == null)
+            {
+                return;
+            }
+
+            var scrollViewer = FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
+            if (scrollViewer == null || scrollViewer == clusterSpotsScrollViewer)
+            {
+                return;
+            }
+
+            if (clusterSpotsScrollViewer != null)
+            {
+                clusterSpotsScrollViewer.ScrollChanged -= ClusterSpotsScrollViewer_ScrollChanged;
+            }
+
+            clusterSpotsScrollViewer = scrollViewer;
+            clusterSpotsScrollViewer.ScrollChanged += ClusterSpotsScrollViewer_ScrollChanged;
+            UpdateClusterActiveBandIndicatorPosition();
+        }
+
+        private void ClusterSpotsScrollViewer_ScrollChanged(object sender, ScrollChangedEventArgs e)
+        {
+            UpdateClusterActiveBandIndicatorPosition();
+        }
+
+        private static T FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+        {
+            if (parent == null)
+            {
+                return null;
+            }
+
+            int childrenCount = VisualTreeHelper.GetChildrenCount(parent);
+            for (int i = 0; i < childrenCount; i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(parent, i);
+                T typedChild = child as T;
+                if (typedChild != null)
+                {
+                    return typedChild;
+                }
+
+                T descendant = FindVisualChild<T>(child);
+                if (descendant != null)
+                {
+                    return descendant;
+                }
+            }
+
+            return null;
+        }
+
+        private void ClusterSpotsGrid_MouseMove(object sender, MouseEventArgs e)
+        {
+            var dataGrid = sender as DataGrid;
+            if (dataGrid == null)
+            {
+                return;
+            }
+
+            if (!clusterHoverPopupEnabled)
+            {
+                if (clusterHoverToolTip != null)
+                {
+                    clusterHoverToolTip.IsOpen = false;
+                }
+                clusterLastHoverToolTipColumn = null;
+            }
+
+            Point mousePoint = e.GetPosition(dataGrid);
+
+            DataGridCell cell = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
+            if (cell == null)
+            {
+                dataGrid.Cursor = Cursors.Arrow;
+                if (clusterHoverToolTip != null)
+                {
+                    clusterHoverToolTip.IsOpen = false;
+                }
+                clusterLastHoverToolTipColumn = null;
+                return;
+            }
+
+            bool isInteractiveColumn = cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn || cell.Column == clusterFreqColumn;
+            dataGrid.Cursor = isInteractiveColumn ? Cursors.Hand : Cursors.Arrow;
+
+            if (cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn)
+            {
+                UpdateClusterHoverToolTip(dataGrid, cell.Column, "QRZ", mousePoint);
+            }
+            else if (cell.Column == clusterFreqColumn)
+            {
+                UpdateClusterHoverToolTip(dataGrid, cell.Column, "Set Radio", mousePoint);
+            }
+            else
+            {
+                if (clusterHoverToolTip != null)
+                {
+                    clusterHoverToolTip.IsOpen = false;
+                }
+                clusterLastHoverToolTipColumn = null;
+            }
+        }
+
+        private void ClusterSpotsGrid_MouseLeave(object sender, MouseEventArgs e)
+        {
+            var dataGrid = sender as DataGrid;
+            if (dataGrid != null)
+            {
+                dataGrid.Cursor = Cursors.Arrow;
+                if (clusterHoverToolTip != null)
+                {
+                    clusterHoverToolTip.IsOpen = false;
+                }
+                clusterLastHoverToolTipColumn = null;
+            }
+        }
+
+        private void UpdateClusterHoverToolTip(DataGrid dataGrid, DataGridColumn column, string text, Point mousePoint)
+        {
+            if (dataGrid == null || !clusterHoverPopupEnabled)
+            {
+                if (clusterHoverToolTip != null)
+                {
+                    clusterHoverToolTip.IsOpen = false;
+                }
+                return;
+            }
+
+            if (clusterLastHoverToolTipColumn != column)
+            {
+                clusterLastHoverToolTipColumn = column;
+            }
+
+            if (clusterHoverToolTip != null)
+            {
+                clusterHoverToolTip.Content = text;
+                clusterHoverToolTip.PlacementTarget = dataGrid;
+                clusterHoverToolTip.HorizontalOffset = mousePoint.X + 12;
+                clusterHoverToolTip.VerticalOffset = mousePoint.Y + 12;
+                if (!clusterHoverToolTip.IsOpen)
+                {
+                    clusterHoverToolTip.IsOpen = true;
+                }
+            }
+        }
+
+        private void ClusterSpotsGrid_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var dataGrid = sender as DataGrid;
+            if (dataGrid == null)
+            {
+                return;
+            }
+
+            DataGridCell cell = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
+            if (cell == null)
+            {
+                return;
+            }
+
+            DataGridRow row = FindVisualParent<DataGridRow>(cell);
+            var spot = row != null ? row.Item as ClusterSpotViewItem : null;
+            if (spot == null)
+            {
+                return;
+            }
+
+            if (e.ClickCount >= 2)
+            {
+                if (clusterSingleClickOpenQrzTimer != null)
+                {
+                    clusterSingleClickOpenQrzTimer.Stop();
+                }
+
+                clusterPendingQrzCallsign = null;
+                TuneToClusterSpot(spot);
+                e.Handled = true;
+                return;
+            }
+
+            if (cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn)
+            {
+                clusterPendingQrzCallsign = cell.Column == clusterDxColumn ? spot.DXCallsign : spot.SpotterCallsign;
+                if (clusterSingleClickOpenQrzTimer != null)
+                {
+                    clusterSingleClickOpenQrzTimer.Stop();
+                    clusterSingleClickOpenQrzTimer.Start();
+                }
+
+                e.Handled = true;
+            }
+        }
+
+        private void ClusterSingleClickOpenQrzTimer_Tick(object sender, EventArgs e)
+        {
+            if (clusterSingleClickOpenQrzTimer != null)
+            {
+                clusterSingleClickOpenQrzTimer.Stop();
+            }
+
+            string callsign = (clusterPendingQrzCallsign ?? string.Empty).Trim().ToUpperInvariant();
+            clusterPendingQrzCallsign = null;
+            if (string.IsNullOrWhiteSpace(callsign))
+            {
+                return;
+            }
+
+            string url = "https://www.qrz.com/db/" + callsign;
+            try
+            {
+                Process.Start(url);
+            }
+            catch
+            {
+            }
+        }
+
+        private static T FindVisualParent<T>(DependencyObject child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T parent)
+                {
+                    return parent;
+                }
+
+                child = VisualTreeHelper.GetParent(child);
+            }
+
+            return null;
         }
 
         private void ClusterWindow_LocationChanged(object sender, EventArgs e)
@@ -3555,8 +3971,37 @@ namespace HolyLogger
             settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             settingsLayout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            var popupToggleCheckBox = new CheckBox
+            {
+                Content = "Turn On PopUp",
+                IsChecked = clusterHoverPopupEnabled,
+                Margin = new Thickness(12, 6, 0, 10),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            popupToggleCheckBox.Checked += (s, e) =>
+            {
+                clusterHoverPopupEnabled = true;
+                SaveClusterHoverPopupSetting(clusterHoverPopupEnabled);
+            };
+            popupToggleCheckBox.Unchecked += (s, e) =>
+            {
+                clusterHoverPopupEnabled = false;
+                SaveClusterHoverPopupSetting(clusterHoverPopupEnabled);
+                if (clusterHoverToolTip != null)
+                {
+                    clusterHoverToolTip.IsOpen = false;
+                }
+                if (clusterSpotsDataGrid != null)
+                {
+                    clusterSpotsDataGrid.Cursor = Cursors.Arrow;
+                }
+                clusterLastHoverToolTipColumn = null;
+            };
 
             var header = new TextBlock
             {
@@ -3580,6 +4025,11 @@ namespace HolyLogger
                 Properties.Settings.Default.ClusterUseActiveBand = true;
                 bandsScroll.IsEnabled = false;
                 bandsScroll.Opacity = 0.45;
+                if (clusterActiveBandIndicatorText != null)
+                {
+                    clusterActiveBandIndicatorText.Visibility = Visibility.Visible;
+                    UpdateClusterActiveBandIndicatorPosition();
+                }
                 RefreshClusterVisibleSpots();
             };
 
@@ -3588,6 +4038,10 @@ namespace HolyLogger
                 Properties.Settings.Default.ClusterUseActiveBand = false;
                 bandsScroll.IsEnabled = true;
                 bandsScroll.Opacity = 1.0;
+                if (clusterActiveBandIndicatorText != null)
+                {
+                    clusterActiveBandIndicatorText.Visibility = Visibility.Collapsed;
+                }
                 RefreshClusterVisibleSpots();
             };
 
@@ -3678,11 +4132,15 @@ namespace HolyLogger
             Grid.SetRow(modesScroll, 2);
             Grid.SetColumn(modesScroll, 1);
 
+            Grid.SetRow(popupToggleCheckBox, 3);
+            Grid.SetColumn(popupToggleCheckBox, 0);
+
             settingsLayout.Children.Add(header);
             settingsLayout.Children.Add(modesHeader);
             settingsLayout.Children.Add(modePanel);
             settingsLayout.Children.Add(bandsScroll);
             settingsLayout.Children.Add(modesScroll);
+            settingsLayout.Children.Add(popupToggleCheckBox);
 
             const double clusterSettingsMinWidth = 285;
             const double clusterSettingsMinHeight = 470;
@@ -3724,6 +4182,50 @@ namespace HolyLogger
 
             clusterSettingsWindow.Closed += (s, e) => clusterSettingsWindow = null;
             clusterSettingsWindow.Show();
+        }
+
+        private bool LoadClusterHoverPopupSetting()
+        {
+            try
+            {
+                string path = GetClusterHoverPopupSettingPath();
+                if (!File.Exists(path))
+                {
+                    return true;
+                }
+
+                string raw = File.ReadAllText(path).Trim();
+                bool enabled;
+                return bool.TryParse(raw, out enabled) ? enabled : true;
+            }
+            catch
+            {
+                return true;
+            }
+        }
+
+        private void SaveClusterHoverPopupSetting(bool enabled)
+        {
+            try
+            {
+                string path = GetClusterHoverPopupSettingPath();
+                string directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(path, enabled.ToString(CultureInfo.InvariantCulture));
+            }
+            catch
+            {
+            }
+        }
+
+        private string GetClusterHoverPopupSettingPath()
+        {
+            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
+            return Path.Combine(baseDir, "cluster-hover-popup-enabled.txt");
         }
 
         private void ClusterWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -3918,6 +4420,39 @@ namespace HolyLogger
             public string SpotterCallsign { get; set; }
             public string Comment { get; set; }
             public bool IsInLog { get; set; }
+
+            public Brush ModeForeground
+            {
+                get
+                {
+                    string mode = (Mode ?? string.Empty).Trim().ToUpperInvariant();
+                    if (mode == "CW")
+                    {
+                        return Brushes.Red;
+                    }
+
+                    if (mode == "SSB")
+                    {
+                        return Brushes.Blue;
+                    }
+
+                    return Brushes.Black;
+                }
+            }
+
+            public FontWeight ModeFontWeight
+            {
+                get
+                {
+                    string mode = (Mode ?? string.Empty).Trim().ToUpperInvariant();
+                    if (mode == "CW" || mode == "SSB")
+                    {
+                        return FontWeights.Bold;
+                    }
+
+                    return FontWeights.Normal;
+                }
+            }
 
             private bool _isNeededCountry;
             public bool IsNeededCountry
@@ -4319,6 +4854,7 @@ namespace HolyLogger
             }
 
             var filtered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
+                                          .Where(s => s.UnixTime > 0 && s.UnixTime >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
                                           .OrderByDescending(s => s.UnixTime)
                                           .Take(500)
                                           .ToList();
