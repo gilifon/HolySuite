@@ -4631,6 +4631,24 @@ namespace HolyLogger
             ShowHomeMap();
         }
 
+        private void TB_MyLocator_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (TB_MyLocator == null)
+                return;
+
+            string locator = (TB_MyLocator.Text ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(locator))
+                return;
+
+            if (!Regex.IsMatch(locator, "^[A-Z]{2}[0-9]{2}[A-Z]{2}$"))
+            {
+                e.Handled = true;
+                MessageBox.Show("Wrong locator format", "HolyLogger", MessageBoxButton.OK, MessageBoxImage.Warning);
+                TB_MyLocator.Focus();
+                TB_MyLocator.SelectAll();
+            }
+        }
+
         private void TB_Exchange_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             //if (!char.IsDigit(e.Text, e.Text.Length - 1))
