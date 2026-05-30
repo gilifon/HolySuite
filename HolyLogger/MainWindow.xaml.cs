@@ -2696,6 +2696,12 @@ namespace HolyLogger
                 Rig = null;
                 OmniRigEngine = null;
             }
+            NetworkChange.NetworkAvailabilityChanged -= NetworkChange_NetworkAvailabilityChanged;
+            NewDXCCTimer.Stop();
+            NewDXCCTimer.Tick -= NewDXCCTimer_Tick;
+            NewDXCCTimer.Dispose();
+            try { Client?.Close(); } catch { }
+            try { N1MMClient?.Close(); } catch { }
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
