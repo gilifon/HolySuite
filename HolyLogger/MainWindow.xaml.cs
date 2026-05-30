@@ -549,6 +549,8 @@ namespace HolyLogger
 
         private async void StartUDPClient(IAsyncResult res)
         {
+            try
+            {
             if (!Properties.Settings.Default.EnableUDPClient)
             {
                 return;
@@ -613,10 +615,18 @@ namespace HolyLogger
                 }
             });
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
+            }
+            catch (ObjectDisposedException) { /* socket closed during shutdown — expected */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("StartUDPClient error: " + ex.Message);
+            }
         }
 
         private void StartN1MMUDPClient(IAsyncResult res)
         {
+            try
+            {
             if (!Properties.Settings.Default.EnableN1MMUDPClient)
             {
                 return;
@@ -671,6 +681,12 @@ namespace HolyLogger
                 }
             });
             N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
+            }
+            catch (ObjectDisposedException) { /* socket closed during shutdown — expected */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine("StartN1MMUDPClient error: " + ex.Message);
+            }
         }
 
         private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
