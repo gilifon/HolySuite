@@ -3829,7 +3829,20 @@ namespace HolyLogger
                     return parent;
                 }
 
-                child = VisualTreeHelper.GetParent(child);
+                if (child is ContentElement contentElement)
+                {
+                    child = ContentOperations.GetParent(contentElement)
+                            ?? (contentElement as FrameworkContentElement)?.Parent;
+                    continue;
+                }
+
+                if (child is Visual || child is System.Windows.Media.Media3D.Visual3D)
+                {
+                    child = VisualTreeHelper.GetParent(child);
+                    continue;
+                }
+
+                child = LogicalTreeHelper.GetParent(child);
             }
 
             return null;
