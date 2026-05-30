@@ -4993,7 +4993,7 @@ namespace HolyLogger
             TuneToClusterSpot(selectedSpot);
         }
 
-        private void TuneToClusterSpot(ClusterSpotViewItem spot)
+        private async void TuneToClusterSpot(ClusterSpotViewItem spot)
         {
             if (spot == null)
             {
@@ -5023,7 +5023,7 @@ namespace HolyLogger
             int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
             int? rigMode = MapClusterModeToRigMode(normalizedMode, freqMhz);
             var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
-            TryTuneRigFrequency(freqHz, modeToSend, out _, out _);
+            await TryTuneRigFrequencyAsync(freqHz, modeToSend);
         }
 
         private string NormalizeClusterModeForLogger(string clusterMode)
@@ -5113,7 +5113,7 @@ namespace HolyLogger
             UpdateClusterUndoButtonState();
         }
 
-        private void ClusterUndoButton_Click(object sender, RoutedEventArgs e)
+        private async void ClusterUndoButton_Click(object sender, RoutedEventArgs e)
         {
             if (clusterUndoStates.Count == 0)
             {
@@ -5141,7 +5141,7 @@ namespace HolyLogger
                 int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
                 int? rigMode = MapClusterModeToRigMode(modeText, freqMhz);
                 var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
-                TryTuneRigFrequency(freqHz, modeToSend, out _, out _);
+                await TryTuneRigFrequencyAsync(freqHz, modeToSend);
             }
         }
 
@@ -5162,14 +5162,11 @@ namespace HolyLogger
             }
         }
 
-        private bool TryTuneRigFrequency(int frequencyHz, OmniRig.RigParamX mode, out string methodUsed, out int rxReadbackHz)
+        private async Task TryTuneRigFrequencyAsync(int frequencyHz, OmniRig.RigParamX mode)
         {
-            methodUsed = string.Empty;
-            rxReadbackHz = 0;
-
             if (Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
-                return false;
+                return;
             }
 
             try
@@ -5189,28 +5186,24 @@ namespace HolyLogger
                 if (freqWritable)
                 {
                     Rig.Freq = frequencyHz;
-                    methodUsed = "Rig.Mode + Rig.Freq";
-                    return TryGetRigReadback(frequencyHz, out rxReadbackHz);
+                    await TryGetRigReadbackAsync(frequencyHz);
+                    return;
                 }
 
                 if (freqAWritable)
                 {
                     Rig.FreqA = frequencyHz;
-                    methodUsed = "Rig.Mode + Rig.FreqA";
-                    return TryGetRigReadback(frequencyHz, out rxReadbackHz);
+                    await TryGetRigReadbackAsync(frequencyHz);
                 }
             }
             catch
             {
-                return false;
             }
-
-            return false;
         }
 
-        private bool TryGetRigReadback(int targetHz, out int rxReadbackHz)
+        private async Task<bool> TryGetRigReadbackAsync(int targetHz)
         {
-            rxReadbackHz = 0;
+            int rxReadbackHz = 0;
 
             for (int i = 0; i < 8; i++)
             {
@@ -5227,7 +5220,7 @@ namespace HolyLogger
                     return false;
                 }
 
-                Thread.Sleep(120);
+                await Task.Delay(120);
             }
 
             return false;
