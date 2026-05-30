@@ -3356,7 +3356,7 @@ namespace HolyLogger
             legendPanel.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before"));
             legendPanel.Children.Add(BuildLegendItem(Brushes.Black, "Worked Country"));
 
-            var onMyFreqLegend = BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Freq", true, new Thickness(0, 4, 0, 0));
+            var onMyFreqLegend = BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Frequency", true, new Thickness(0, 4, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
             onMyFreqLegend.VerticalAlignment = VerticalAlignment.Top;
 
