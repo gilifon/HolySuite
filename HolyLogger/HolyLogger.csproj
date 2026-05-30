@@ -160,9 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <Resource Include="Images\splash.png" />
-  
     <Resource Include="Images\icons8-undo-40.png" />
-  
     <Resource Include="Images\UNDO_Icon.png" />
   </ItemGroup>
   <ItemGroup>
@@ -726,6 +724,7 @@
     <Content Include="Data\callsigns_merged_big.txt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <Resource Include="Image1.png" />
     <Content Include="Server\AddLog.php" />
     <Content Include="Server\addParticipant.php" />
     <Content Include="Server\addQSO.php" />
@@ -761,4 +760,3 @@
   </Target>
   -->
 </Project>
-
