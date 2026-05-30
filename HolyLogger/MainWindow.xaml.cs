@@ -3240,7 +3240,7 @@ namespace HolyLogger
 
             const double clusterLastMinutesDropdownWidth = 44;
 
-            var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
+            var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, SortMemberPath = "DXCallsign", Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
             var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
             var freqHeaderText = new TextBlock();
             freqHeaderText.Inlines.Add(new Run("Freq "));
@@ -3308,7 +3308,7 @@ namespace HolyLogger
             {
                 Orientation = Orientation.Vertical,
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, 0, 4, 0)
+                Margin = new Thickness(0, -6, 4, 0)
             };
 
             StackPanel BuildLegendItem(Brush color, string text, bool useTextBackground = false, Thickness? itemMargin = null)
@@ -3351,11 +3351,14 @@ namespace HolyLogger
                 Margin = new Thickness(0, 0, 0, 1)
             };
             legendTopRow.Children.Add(BuildLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 24, 0)));
-            legendTopRow.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Freq", true, new Thickness(0)));
             legendPanel.Children.Add(legendTopRow);
 
             legendPanel.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before"));
             legendPanel.Children.Add(BuildLegendItem(Brushes.Black, "Worked Country"));
+
+            var onMyFreqLegend = BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Freq", true, new Thickness(0, 4, 0, 0));
+            onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
+            onMyFreqLegend.VerticalAlignment = VerticalAlignment.Top;
 
             var actionsPanel = new StackPanel
             {
@@ -3372,7 +3375,7 @@ namespace HolyLogger
                 Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0)),
                 FontWeight = FontWeights.Bold,
                 FontSize = 16,
-                Margin = new Thickness(0, -12, 0, 4),
+                Margin = new Thickness(0, -8, 0, 4),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Bottom,
                 Visibility = Properties.Settings.Default.ClusterUseActiveBand ? Visibility.Visible : Visibility.Collapsed
@@ -3459,10 +3462,12 @@ namespace HolyLogger
 
             Grid.SetRow(headerGrid, 0);
             Grid.SetRow(activeBandIndicator, 1);
+            Grid.SetRow(onMyFreqLegend, 1);
             Grid.SetRow(lastMinutesFilterPanel, 1);
             Grid.SetRow(spotsGrid, 2);
             layoutGrid.Children.Add(headerGrid);
             layoutGrid.Children.Add(activeBandIndicator);
+            layoutGrid.Children.Add(onMyFreqLegend);
             layoutGrid.Children.Add(lastMinutesFilterPanel);
             layoutGrid.Children.Add(spotsGrid);
 
@@ -3550,12 +3555,12 @@ namespace HolyLogger
             clusterActiveBandIndicatorText.Width = freqWidth;
             clusterActiveBandIndicatorText.TextAlignment = TextAlignment.Center;
             double horizontalOffset = clusterSpotsScrollViewer != null ? clusterSpotsScrollViewer.HorizontalOffset : 0;
-            clusterActiveBandIndicatorText.Margin = new Thickness(freqStart - horizontalOffset, -24, 0, 4);
+            clusterActiveBandIndicatorText.Margin = new Thickness(freqStart - horizontalOffset, 4, 0, 0);
 
             if (clusterLastMinutesFilterPanel != null)
             {
                 clusterLastMinutesFilterPanel.Width = double.NaN;
-                clusterLastMinutesFilterPanel.Margin = new Thickness(utcStart - horizontalOffset, -20, 0, 0);
+                clusterLastMinutesFilterPanel.Margin = new Thickness(utcStart - horizontalOffset, -12, 0, 0);
             }
         }
 
