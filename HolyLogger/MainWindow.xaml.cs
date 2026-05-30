@@ -66,6 +66,7 @@ namespace HolyLogger
 
         DataAccess dal;
         EntityResolver rem;
+        TextBlock TB_FrequencyDisplay;
 
         public ObservableCollection<QSO> Qsos;
         public ObservableCollection<QSO> FilteredQsos;
@@ -346,6 +347,26 @@ namespace HolyLogger
             Qsos = new ObservableCollection<QSO>();
             rem = new EntityResolver();
             InitializeComponent();
+
+            TB_FrequencyDisplay = new TextBlock
+            {
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(228, 57, 0, 0),
+                Width = 79,
+                Height = 22,
+                FontSize = 16,
+                Foreground = System.Windows.Media.Brushes.Black,
+                Background = System.Windows.Media.Brushes.Transparent,
+                IsHitTestVisible = false,
+                Visibility = Visibility.Collapsed
+            };
+            Grid.SetRow(TB_FrequencyDisplay, 1);
+            ((Grid)this.Content).Children.Add(TB_FrequencyDisplay);
+
+            TB_Frequency.GotFocus += TB_Frequency_GotFocus;
+            TB_Frequency.LostFocus += TB_Frequency_LostFocus;
+            UpdateFrequencyDisplay();
 
             ApplyMainFormBackgroundFromSettings();
             ApplyQsoTableHeaderBackgroundFromSettings();
@@ -2727,6 +2748,45 @@ namespace HolyLogger
             }
 
             UpdateClusterFrequencyHighlight();
+            UpdateFrequencyDisplay();
+        }
+
+        private void TB_Frequency_GotFocus(object sender, RoutedEventArgs e)
+        {
+            if (TB_FrequencyDisplay != null)
+                TB_FrequencyDisplay.Visibility = Visibility.Collapsed;
+            TB_Frequency.Foreground = System.Windows.Media.Brushes.Black;
+        }
+
+        private void TB_Frequency_LostFocus(object sender, RoutedEventArgs e)
+        {
+            UpdateFrequencyDisplay();
+        }
+
+        private void UpdateFrequencyDisplay()
+        {
+            if (TB_FrequencyDisplay == null) return;
+
+            string raw = TB_Frequency.Text.Trim();
+            if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double mhz) || mhz <= 0)
+            {
+                TB_FrequencyDisplay.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            // Format as MHz with two dot separators: 14.312.000
+            // Convert to Hz integer, then format as ##,###,### using dots
+            long hz = (long)Math.Round(mhz * 1000000.0);
+            // Build groups: MHz . kHz . Hz
+            long mhzPart = hz / 1000000;
+            long khzPart = (hz % 1000000) / 1000;
+            long hzPart = hz % 1000;
+            string formatted = $"{mhzPart}.{khzPart:D3}.{hzPart:D3}";
+
+            TB_FrequencyDisplay.Text = formatted;
+            bool showOverlay = !TB_Frequency.IsFocused;
+            TB_FrequencyDisplay.Visibility = showOverlay ? Visibility.Visible : Visibility.Collapsed;
+            TB_Frequency.Foreground = showOverlay ? System.Windows.Media.Brushes.Transparent : System.Windows.Media.Brushes.Black;
         }
 
         private void TB_Frequency_KeyDown(object sender, KeyEventArgs e)
