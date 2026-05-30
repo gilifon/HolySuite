@@ -4437,7 +4437,8 @@ namespace HolyLogger
                         Comment = comment,
                         IsInLog = IsClusterCallsignInLog(dx),
                         IsMyCallsign = IsMyStationCallsign(dx),
-                        IsNeededCountry = IsNeededCountry(dx, workedCountries)
+                        IsNeededCountry = IsNeededCountry(dx, workedCountries),
+                        SpotKey = key
                     };
 
                     Dispatcher.BeginInvoke(new Action(() =>
@@ -4445,6 +4446,9 @@ namespace HolyLogger
                         clusterAllSpots.Insert(0, item);
                         while (clusterAllSpots.Count > 1500)
                         {
+                            var evicted = clusterAllSpots[clusterAllSpots.Count - 1];
+                            if (evicted.SpotKey != null)
+                                clusterSpotKeys.Remove(evicted.SpotKey);
                             clusterAllSpots.RemoveAt(clusterAllSpots.Count - 1);
                         }
 
@@ -4497,6 +4501,7 @@ namespace HolyLogger
             public string SpotterCallsign { get; set; }
             public string Comment { get; set; }
             public bool IsInLog { get; set; }
+            public string SpotKey { get; set; }
 
             public Brush ModeForeground
             {
