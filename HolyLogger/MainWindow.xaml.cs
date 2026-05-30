@@ -4653,12 +4653,11 @@ namespace HolyLogger
                 return workedCountries;
             }
 
-            var entityResolver = new DXCCManager.EntityResolver();
             foreach (var qso in Qsos)
             {
                 if (!string.IsNullOrWhiteSpace(qso.DXCall))
                 {
-                    var dxcc = entityResolver.GetDXCC(qso.DXCall.Trim());
+                    var dxcc = rem.GetDXCC(qso.DXCall.Trim());
                     if (dxcc != null && !string.IsNullOrWhiteSpace(dxcc.Entity) && dxcc.Entity != "-1")
                     {
                         workedCountries.Add(dxcc.Entity);
@@ -4676,8 +4675,7 @@ namespace HolyLogger
                 return false;
             }
 
-            var entityResolver = new DXCCManager.EntityResolver();
-            var dxcc = entityResolver.GetDXCC(dxCallsign.Trim());
+            var dxcc = rem.GetDXCC(dxCallsign.Trim());
             if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || dxcc.Entity == "-1")
             {
                 return false;
@@ -4723,8 +4721,7 @@ namespace HolyLogger
                 return;
             }
 
-            var entityResolver = new DXCCManager.EntityResolver();
-            var dxcc = entityResolver.GetDXCC(dxCallsign.Trim());
+            var dxcc = rem.GetDXCC(dxCallsign.Trim());
 
             if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || dxcc.Entity == "-1")
             {
