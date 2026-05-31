@@ -247,7 +247,9 @@ namespace HolyLogger
         bool clusterHoverPopupEnabled = true;
         Button clusterUndoButton = null;
         TextBlock clusterUndoCountText = null;
+        TextBlock clusterSpotCountText = null;
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
+        bool clusterHeaderAlignmentRefreshPending = false;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
@@ -3357,6 +3359,7 @@ namespace HolyLogger
 
             var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, SortMemberPath = "DXCallsign", Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
             var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
+            var countryColumn = new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(Math.Max(40, LoadClusterCountryColumnWidthSetting())) };
             var freqHeaderText = new TextBlock();
             freqHeaderText.Inlines.Add(new Run("Freq "));
             freqHeaderText.Inlines.Add(new Run("MHz") { FontSize = 10, FontWeight = FontWeights.Bold });
@@ -3391,10 +3394,17 @@ namespace HolyLogger
 
             spotsGrid.Columns.Add(dxColumn);
             spotsGrid.Columns.Add(spotterColumn);
+            spotsGrid.Columns.Add(countryColumn);
             spotsGrid.Columns.Add(freqColumn);
             spotsGrid.Columns.Add(utcColumn);
             spotsGrid.Columns.Add(modeColumn);
             spotsGrid.Columns.Add(commentColumn);
+
+            int countryDisplayIndex = LoadClusterCountryColumnDisplayIndexSetting();
+            if (countryDisplayIndex >= 0 && countryDisplayIndex < spotsGrid.Columns.Count)
+            {
+                countryColumn.DisplayIndex = countryDisplayIndex;
+            }
 
             // Don't clear existing spots - keep them so window shows data immediately when reopened
             // clusterAllSpots.Clear();
@@ -3404,10 +3414,14 @@ namespace HolyLogger
             spotsGrid.PreviewMouseLeftButtonDown += ClusterSpotsGrid_MouseLeftButtonDown;
             spotsGrid.MouseMove += ClusterSpotsGrid_MouseMove;
             spotsGrid.MouseLeave += ClusterSpotsGrid_MouseLeave;
-            spotsGrid.SizeChanged += (s, e) => UpdateClusterActiveBandIndicatorPosition();
-            spotsGrid.ColumnReordered += (s, e) => Dispatcher.BeginInvoke(new Action(UpdateClusterActiveBandIndicatorPosition), DispatcherPriority.Loaded);
-            spotsGrid.ColumnDisplayIndexChanged += (s, e) => Dispatcher.BeginInvoke(new Action(UpdateClusterActiveBandIndicatorPosition), DispatcherPriority.Loaded);
-            spotsGrid.Loaded += (s, e) => EnsureClusterGridScrollTracking();
+            spotsGrid.SizeChanged += (s, e) => RequestClusterHeaderAlignmentRefresh();
+            spotsGrid.ColumnReordered += (s, e) => RequestClusterHeaderAlignmentRefresh();
+            spotsGrid.ColumnDisplayIndexChanged += (s, e) => RequestClusterHeaderAlignmentRefresh();
+            spotsGrid.Loaded += (s, e) =>
+            {
+                EnsureClusterGridScrollTracking();
+                RequestClusterHeaderAlignmentRefresh();
+            };
             clusterSpotsDataGrid = spotsGrid;
 
             clusterSingleClickOpenQrzTimer = new DispatcherTimer
@@ -3471,9 +3485,34 @@ namespace HolyLogger
             legendPanel.Children.Add(BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before"));
             legendPanel.Children.Add(BuildLegendItem(Brushes.Black, "Worked Country"));
 
-            var onMyFreqLegend = BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Frequency", true, new Thickness(0, 4, 0, 0));
+            var onMyFreqLegend = BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Frequency", true, new Thickness(0, 4, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
             onMyFreqLegend.VerticalAlignment = VerticalAlignment.Top;
+
+            var spotCountText = new TextBlock
+            {
+                Text = "0",
+                Foreground = new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)),
+                FontWeight = FontWeights.Bold,
+                FontSize = 16,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
+            };
+
+            var spotCountBadge = new Border
+            {
+                Width = 34,
+                Height = 34,
+                CornerRadius = new CornerRadius(17),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)),
+                BorderThickness = new Thickness(2),
+                Background = Brushes.Transparent,
+                Margin = new Thickness(8, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Top,
+                Child = spotCountText
+            };
+            clusterSpotCountText = spotCountText;
 
             var actionsPanel = new StackPanel
             {
@@ -3566,6 +3605,13 @@ namespace HolyLogger
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             Grid.SetColumn(legendPanel, 0);
             headerGrid.Children.Add(legendPanel);
+
+            spotCountBadge.HorizontalAlignment = HorizontalAlignment.Left;
+            spotCountBadge.VerticalAlignment = VerticalAlignment.Top;
+            spotCountBadge.Margin = new Thickness(132, 0, 0, 0);
+            Grid.SetColumn(spotCountBadge, 0);
+            headerGrid.Children.Add(spotCountBadge);
+
             Grid.SetColumn(actionsPanel, 0);
             Grid.SetColumn(actionsPanel, 1);
             headerGrid.Children.Add(actionsPanel);
@@ -3615,6 +3661,8 @@ namespace HolyLogger
             {
                 Properties.Settings.Default.ClusterColWidthDX = dxColumn.ActualWidth;
                 Properties.Settings.Default.ClusterColWidthSpotter = spotterColumn.ActualWidth;
+                SaveClusterCountryColumnWidthSetting(countryColumn.ActualWidth);
+                SaveClusterCountryColumnDisplayIndexSetting(countryColumn.DisplayIndex);
                 Properties.Settings.Default.ClusterColWidthFreq = freqColumn.ActualWidth;
                 Properties.Settings.Default.ClusterColWidthUtc = utcColumn.ActualWidth;
                 Properties.Settings.Default.ClusterColWidthComment = commentColumn.ActualWidth;
@@ -3629,6 +3677,7 @@ namespace HolyLogger
                 clusterWorkedCountries = null;
                 clusterUndoButton = null;
                 clusterUndoCountText = null;
+                clusterSpotCountText = null;
                 clusterActiveBandIndicatorText = null;
                 clusterDxColumn = null;
                 clusterSpotterColumn = null;
@@ -3655,6 +3704,26 @@ namespace HolyLogger
             Dispatcher.BeginInvoke(new Action(UpdateClusterActiveBandIndicatorPosition), DispatcherPriority.Loaded);
 
             await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
+        }
+
+        private void RequestClusterHeaderAlignmentRefresh()
+        {
+            if (clusterHeaderAlignmentRefreshPending || clusterWindow == null || clusterSpotsDataGrid == null)
+            {
+                return;
+            }
+
+            clusterHeaderAlignmentRefreshPending = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                UpdateClusterActiveBandIndicatorPosition();
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    UpdateClusterActiveBandIndicatorPosition();
+                    clusterHeaderAlignmentRefreshPending = false;
+                }), DispatcherPriority.ApplicationIdle);
+            }), DispatcherPriority.Render);
         }
 
         private void UpdateClusterActiveBandIndicatorPosition()
@@ -4414,6 +4483,110 @@ namespace HolyLogger
             }
         }
 
+        private double LoadClusterCountryColumnWidthSetting()
+        {
+            try
+            {
+                string path = GetClusterCountryColumnWidthSettingPath();
+                if (!File.Exists(path))
+                {
+                    return 100;
+                }
+
+                double value;
+                if (double.TryParse(File.ReadAllText(path).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out value) && value >= 40)
+                {
+                    return value;
+                }
+            }
+            catch
+            {
+            }
+
+            return 100;
+        }
+
+        private void SaveClusterCountryColumnWidthSetting(double width)
+        {
+            if (double.IsNaN(width) || double.IsInfinity(width) || width < 40)
+            {
+                return;
+            }
+
+            try
+            {
+                string path = GetClusterCountryColumnWidthSettingPath();
+                string directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(path, width.ToString(CultureInfo.InvariantCulture));
+            }
+            catch
+            {
+            }
+        }
+
+        private int LoadClusterCountryColumnDisplayIndexSetting()
+        {
+            try
+            {
+                string path = GetClusterCountryColumnDisplayIndexSettingPath();
+                if (!File.Exists(path))
+                {
+                    return 2;
+                }
+
+                int value;
+                if (int.TryParse(File.ReadAllText(path).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value) && value >= 0)
+                {
+                    return value;
+                }
+            }
+            catch
+            {
+            }
+
+            return 2;
+        }
+
+        private void SaveClusterCountryColumnDisplayIndexSetting(int displayIndex)
+        {
+            if (displayIndex < 0)
+            {
+                return;
+            }
+
+            try
+            {
+                string path = GetClusterCountryColumnDisplayIndexSettingPath();
+                string directory = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
+                {
+                    Directory.CreateDirectory(directory);
+                }
+
+                File.WriteAllText(path, displayIndex.ToString(CultureInfo.InvariantCulture));
+            }
+            catch
+            {
+            }
+        }
+
+        private string GetClusterCountryColumnWidthSettingPath()
+        {
+            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
+            return Path.Combine(baseDir, "cluster-country-col-width.txt");
+        }
+
+        private string GetClusterCountryColumnDisplayIndexSettingPath()
+        {
+            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
+            return Path.Combine(baseDir, "cluster-country-col-display-index.txt");
+        }
+
         private string GetClusterLastMinutesFilterSettingPath()
         {
             string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
@@ -4537,6 +4710,7 @@ namespace HolyLogger
                     string comment = (string)spotToken["comment"] ?? string.Empty;
 
                     var workedCountries = GetWorkedCountriesFromLog();
+                    var dxccInfo = rem.GetDXCC(dx.Trim());
                     var item = new ClusterSpotViewItem
                     {
                         UnixTime = unixTime,
@@ -4550,6 +4724,7 @@ namespace HolyLogger
                         DXCallsign = dx,
                         SpotterCallsign = spotter,
                         Comment = comment,
+                        Country = dxccInfo != null ? dxccInfo.Name : string.Empty,
                         IsInLog = IsClusterCallsignInLog(dx),
                         IsMyCallsign = IsMyStationCallsign(dx),
                         IsNeededCountry = IsNeededCountry(dx, workedCountries),
@@ -4615,6 +4790,7 @@ namespace HolyLogger
             public string DXCallsign { get; set; }
             public string SpotterCallsign { get; set; }
             public string Comment { get; set; }
+            public string Country { get; set; }
             public bool IsInLog { get; set; }
             public string SpotKey { get; set; }
 
@@ -5065,6 +5241,19 @@ namespace HolyLogger
             }
 
             UpdateClusterFrequencyHighlight();
+            UpdateClusterSpotCountIndicator();
+            RequestClusterHeaderAlignmentRefresh();
+        }
+
+        private void UpdateClusterSpotCountIndicator()
+        {
+            if (clusterSpotCountText == null)
+            {
+                return;
+            }
+
+            int count = clusterVisibleSpots != null ? clusterVisibleSpots.Count : 0;
+            clusterSpotCountText.Text = count.ToString(CultureInfo.InvariantCulture);
         }
 
         private void ClusterSpotsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
