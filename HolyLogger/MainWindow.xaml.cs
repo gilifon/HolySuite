@@ -3360,10 +3360,24 @@ namespace HolyLogger
             var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, SortMemberPath = "DXCallsign", Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
             var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
             var countryColumn = new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(Math.Max(40, LoadClusterCountryColumnWidthSetting())) };
-            var freqHeaderText = new TextBlock();
-            freqHeaderText.Inlines.Add(new Run("Freq "));
-            freqHeaderText.Inlines.Add(new Run("MHz") { FontSize = 10, FontWeight = FontWeights.Bold });
-            var freqColumn = new DataGridTextColumn { Header = freqHeaderText, Binding = new System.Windows.Data.Binding("FreqDisplayText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
+            var freqHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            freqHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            freqHeaderStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
+            freqHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(2, 1, 2, 1)));
+
+            var freqHeaderText = new TextBlock
+            {
+                TextAlignment = TextAlignment.Center,
+                LineHeight = 10,
+                LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                Margin = new Thickness(0, -1, 0, -1),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            freqHeaderText.Inlines.Add(new Run("Freq") { FontSize = 12, FontWeight = FontWeights.Normal });
+            freqHeaderText.Inlines.Add(new LineBreak());
+            freqHeaderText.Inlines.Add(new Run("MHz") { FontSize = 8, FontWeight = FontWeights.Bold });
+            var freqColumn = new DataGridTextColumn { Header = freqHeaderText, HeaderStyle = freqHeaderStyle, Binding = new System.Windows.Data.Binding("FreqDisplayText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
             var utcHeaderStyle = new Style(typeof(DataGridColumnHeader));
             utcHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             var utcTextStyle = new Style(typeof(TextBlock));
@@ -3417,6 +3431,7 @@ namespace HolyLogger
             spotsGrid.SizeChanged += (s, e) => RequestClusterHeaderAlignmentRefresh();
             spotsGrid.ColumnReordered += (s, e) => RequestClusterHeaderAlignmentRefresh();
             spotsGrid.ColumnDisplayIndexChanged += (s, e) => RequestClusterHeaderAlignmentRefresh();
+            AttachClusterColumnWidthTracking(dxColumn, spotterColumn, countryColumn, freqColumn, utcColumn, modeColumn, commentColumn);
             spotsGrid.Loaded += (s, e) =>
             {
                 EnsureClusterGridScrollTracking();
@@ -3704,6 +3719,25 @@ namespace HolyLogger
             Dispatcher.BeginInvoke(new Action(UpdateClusterActiveBandIndicatorPosition), DispatcherPriority.Loaded);
 
             await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
+        }
+
+        private void AttachClusterColumnWidthTracking(params DataGridColumn[] columns)
+        {
+            var widthDescriptor = DependencyPropertyDescriptor.FromProperty(DataGridColumn.WidthProperty, typeof(DataGridColumn));
+            if (widthDescriptor == null || columns == null)
+            {
+                return;
+            }
+
+            foreach (var column in columns)
+            {
+                if (column == null)
+                {
+                    continue;
+                }
+
+                widthDescriptor.AddValueChanged(column, (s, e) => RequestClusterHeaderAlignmentRefresh());
+            }
         }
 
         private void RequestClusterHeaderAlignmentRefresh()
