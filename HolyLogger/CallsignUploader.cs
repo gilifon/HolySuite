@@ -11,7 +11,7 @@ using Newtonsoft.Json;
 
 namespace HolyLogger
 {
-    internal class CallsignUploader
+    internal class CallsignUploader : IDisposable
     {
         private const string EndpointUrl = "https://tools.iarc.org/holyland/server/addcallsign.php";
         private const int BatchSize = 100;
@@ -167,6 +167,12 @@ namespace HolyLogger
             catch
             {
             }
+        }
+
+        public void Dispose()
+        {
+            NetworkChange.NetworkAvailabilityChanged -= OnNetworkAvailabilityChanged;
+            _lock?.Dispose();
         }
     }
 }

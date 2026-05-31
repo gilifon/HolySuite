@@ -287,6 +287,10 @@ namespace HolyLogger
         DispatcherTimer VoiceMessageAvailabilityTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
+        // High-Priority Stability Improvements
+        private static readonly HttpClient _sharedHttpClient = new HttpClient(new WebRequestHandler { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.BypassCache) }) { Timeout = TimeSpan.FromSeconds(20) };
+        private readonly object _syncLock = new object();
+
         private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
         private const int SEND_CHUNK_SIZE = 50;
         private const string SpotClusterHost = "dxc.ai9t.com";
@@ -604,7 +608,7 @@ namespace HolyLogger
                     qso.Comment = string.IsNullOrWhiteSpace(qso.Comment) ? TB_Comment.Text : qso.Comment;
                     qso.STX = string.IsNullOrWhiteSpace(qso.STX) ? TB_MyHolyland.Text : qso.STX;
 
-                    lock (this)
+                    lock (_syncLock)
                     {
                         if (!string.IsNullOrWhiteSpace(qso.Freq))
                         {
@@ -2183,23 +2187,20 @@ namespace HolyLogger
            string participantJSON = JsonConvert.SerializeObject(participant);
 
             //************************************************** ASYNC ********************************************//
-            using (var client = new HttpClient())
+            var values = new Dictionary<string, string>
+                {
+                    { "data", participantJSON }
+                };
+            var content = new FormUrlEncodedContent(values);
+            try
             {
-                var values = new Dictionary<string, string>
-                    {
-                        { "data", participantJSON }
-                    };
-                var content = new FormUrlEncodedContent(values);
-                try
-                {
-                    var response = await client.PostAsync("https://tools.iarc.org/Holyland/Server/AddParticipant.php", content);
-                    var responseString = await response.Content.ReadAsStringAsync();
-                    return responseString;
-                }
-                catch (Exception ex)
-                {
-                    return ex.Message + " Connection with server failed! Check your internet connection";
-                }
+                var response = await _sharedHttpClient.PostAsync("https://tools.iarc.org/Holyland/Server/AddParticipant.php", content);
+                var responseString = await response.Content.ReadAsStringAsync();
+                return responseString;
+            }
+            catch (Exception ex)
+            {
+                return ex.Message + " Connection with server failed! Check your internet connection";
             }
         }
 
@@ -2214,27 +2215,24 @@ namespace HolyLogger
                 string chunkJSON = JsonConvert.SerializeObject(chunk).Replace("'", "");
                 //string insert = GenerateMultipleInsert(chunk);
 
-                using (var client = new HttpClient())
+                var values = new Dictionary<string, string>
                 {
-                    var values = new Dictionary<string, string>
-                    {
-                        { "data", chunkJSON }
-                    };
-                    var content = new FormUrlEncodedContent(values);
-                    try
-                    {
-                        var response = await client.PostAsync("https://tools.iarc.org/Holyland/Server/AddQSO.php", content);
-                        //var response = await client.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php", content);
-                        var responseString = await response.Content.ReadAsStringAsync();
-                        errorLog.AppendLine("Chunk #" + c + ":");
-                        errorLog.AppendLine(responseString);
-                        if (responseString != "Done!") allSuccessfullyDone = false;
-                        progress.Report(c++ * 100 / ChunkedQSOs.Count);
-                    }
-                    catch (Exception)
-                    {
-                        return "Connection with server failed! Check your internet connection";
-                    }
+                    { "data", chunkJSON }
+                };
+                var content = new FormUrlEncodedContent(values);
+                try
+                {
+                    var response = await _sharedHttpClient.PostAsync("https://tools.iarc.org/Holyland/Server/AddQSO.php", content);
+                    //var response = await _sharedHttpClient.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php", content);
+                    var responseString = await response.Content.ReadAsStringAsync();
+                    errorLog.AppendLine("Chunk #" + c + ":");
+                    errorLog.AppendLine(responseString);
+                    if (responseString != "Done!") allSuccessfullyDone = false;
+                    progress.Report(c++ * 100 / ChunkedQSOs.Count);
+                }
+                catch (Exception)
+                {
+                    return "Connection with server failed! Check your internet connection";
                 }
             }
             ToggleUploadProgress(Visibility.Hidden);
@@ -2251,7 +2249,7 @@ namespace HolyLogger
 
         private async Task<string> UploadCabrilloToIARC(string callsign, string op, string mode, string band, string power, string overlay, string email, string name, string country, ObservableCollection<QSO> QSOList)
         {
-            using (var client = new HttpClient())
+            try
             {
                 //prepare the header data
                 Contester c = new Contester();
@@ -2280,7 +2278,7 @@ namespace HolyLogger
                 c.timestamp = DateTime.UtcNow.Ticks.ToString();
 
                 //post file
-                var response = await client.PostAsync("https://tools.iarc.org/iarc/Server/ftp.php", formData);
+                var response = await _sharedHttpClient.PostAsync("https://tools.iarc.org/iarc/Server/ftp.php", formData);
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -2293,7 +2291,7 @@ namespace HolyLogger
                     {
                         // Send a POST request to the URL with the JSON data
                         //upload_log.php
-                        response = await client.PostAsync("https://tools.iarc.org/iarc/Server/upload_log.php", formData);
+                        response = await _sharedHttpClient.PostAsync("https://tools.iarc.org/iarc/Server/upload_log.php", formData);
 
                         // Check if the request was successful
                         if (response.IsSuccessStatusCode)
@@ -2331,6 +2329,10 @@ namespace HolyLogger
                 {
                     return $"Error uploading file. Status code: {response.StatusCode}";
                 }
+            }
+            catch (Exception ex)
+            {
+                return $"Error uploading file: {ex.Message}";
             }
         }
 
@@ -2704,8 +2706,39 @@ namespace HolyLogger
             UpdateStatus();
         }
 
+        private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
+        {
+            // Stop all timers before shutdown to prevent pending async operations
+            try { if (HeartbeatTimer != null && HeartbeatTimer.IsEnabled) HeartbeatTimer.Stop(); } catch { }
+            try { if (UTCTimer != null && UTCTimer.IsEnabled) UTCTimer.Stop(); } catch { }
+            try { if (CallsignLookupDebounceTimer != null && CallsignLookupDebounceTimer.IsEnabled) CallsignLookupDebounceTimer.Stop(); } catch { }
+            try { if (VoiceMessageAvailabilityTimer != null && VoiceMessageAvailabilityTimer.IsEnabled) VoiceMessageAvailabilityTimer.Stop(); } catch { }
+            try { if (NewDXCCTimer != null) NewDXCCTimer.Stop(); } catch { }
+
+            // Unsubscribe from network availability events
+            try { NetworkChange.NetworkAvailabilityChanged -= NetworkChange_NetworkAvailabilityChanged; } catch { }
+
+            // Dispose CallsignUploader to unsubscribe from NetworkChange events
+            try { _callsignUploader?.Dispose(); } catch { }
+
+            // Unsubscribe from MapControl events
+            try { MapControl.RadiusChanged -= OnMapRadiusChanged; } catch { }
+        }
+
         private void Window_Closed(object sender, EventArgs e)
         {
+            // Unsubscribe from event handlers to prevent memory leaks
+            try { this.Loaded -= MainWindow_Loaded; } catch { }
+            try { this.PropertyChanged -= MainWindow_PropertyChanged; } catch { }
+            try { Properties.Settings.Default.PropertyChanged -= Settings_PropertyChanged; } catch { }
+
+            if (AdifHandlerWorker != null)
+            {
+                try { AdifHandlerWorker.DoWork -= AdifHandlerWorker_DoWork; } catch { }
+                try { AdifHandlerWorker.ProgressChanged -= AdifHandlerWorker_ProgressChanged; } catch { }
+                try { AdifHandlerWorker.RunWorkerCompleted -= AdifHandlerWorker_RunWorkerCompleted; } catch { }
+            }
+
             UTCTimer.Tick -= UTCTimer_Elapsed;
             VoiceMessageAvailabilityTimer.Tick -= VoiceMessageAvailabilityTimer_Tick;
             if (VoiceMessageAvailabilityTimer.IsEnabled)
