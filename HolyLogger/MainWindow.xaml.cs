@@ -4507,7 +4507,7 @@ namespace HolyLogger
 
             Grid.SetRow(modePanel, 1);
             Grid.SetColumn(modePanel, 0);
-            Grid.SetColumnSpan(modePanel, 3);
+            Grid.SetColumnSpan(modePanel, 2);
 
             Grid.SetRow(bandsScroll, 2);
             Grid.SetColumn(bandsScroll, 0);
@@ -4518,7 +4518,7 @@ namespace HolyLogger
             Grid.SetRow(bandColorsScroll, 2);
             Grid.SetColumn(bandColorsScroll, 2);
 
-            // Bottom row: checkboxes in cols 0-1, reset button centered in col 2
+            // Checkboxes span full width in bottom row
             var checkboxPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -4528,34 +4528,43 @@ namespace HolyLogger
             checkboxPanel.Children.Add(popupToggleCheckBox);
             checkboxPanel.Children.Add(mapToggleCheckBox);
 
-            // Reset button with label, centered under the band colors column
+            // Reset button above the band colors list (col 2, row 1)
             resetColorsBtn.HorizontalAlignment = HorizontalAlignment.Center;
-            resetColorsBtn.Margin = new Thickness(4, 2, 4, 6);
-            var resetLabel = new TextBlock
+            resetColorsBtn.VerticalAlignment = VerticalAlignment.Center;
+            resetColorsBtn.Margin = new Thickness(2, 4, 6, 4);
+            resetColorsBtn.Padding = new Thickness(6, 4, 6, 4);
+            var resetIcon = new TextBlock
             {
-                Text = "Reset to defaults",
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(6, 0, 0, 0),
-                FontSize = 11
+                Text = "\u21BA",
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center
             };
-            resetColorsBtn.Content = "↺";
-            resetColorsBtn.FontSize = 14;
+            var resetTextBlock = new TextBlock
+            {
+                Text = "Reset to\nDefault Colors",
+                FontSize = 11,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(5, 0, 0, 0),
+                LineHeight = 15
+            };
+            var resetBtnContent = new StackPanel { Orientation = Orientation.Horizontal };
+            resetBtnContent.Children.Add(resetIcon);
+            resetBtnContent.Children.Add(resetTextBlock);
+            resetColorsBtn.Content = resetBtnContent;
             resetColorsBtn.ToolTip = "Reset band colors to defaults";
             var resetPanel = new StackPanel
             {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 2, 0, 6)
+                Margin = new Thickness(4, 2, 4, 2)
             };
             resetPanel.Children.Add(resetColorsBtn);
-            resetPanel.Children.Add(resetLabel);
 
             Grid.SetRow(checkboxPanel, 3);
             Grid.SetColumn(checkboxPanel, 0);
-            Grid.SetColumnSpan(checkboxPanel, 2);
+            Grid.SetColumnSpan(checkboxPanel, 3);
 
-            Grid.SetRow(resetPanel, 3);
+            Grid.SetRow(resetPanel, 1);
             Grid.SetColumn(resetPanel, 2);
 
             settingsLayout.Children.Add(header);
