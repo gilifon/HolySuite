@@ -777,6 +777,7 @@ namespace HolyLogger
                 StartUTCTimer();
 
             MapControl.RadiusChanged += OnMapRadiusChanged;
+            MapControl.SpotTuneRequested += OnMapSpotTuneRequested;
             ShowHomeMap();
         }
 
@@ -2729,6 +2730,7 @@ namespace HolyLogger
 
             // Unsubscribe from MapControl events
             try { MapControl.RadiusChanged -= OnMapRadiusChanged; } catch { }
+            try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch { }
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -4870,6 +4872,24 @@ namespace HolyLogger
                         }
                     }
 
+                    double? spotterLat = null;
+                    double? spotterLon = null;
+                    var spotterLocToken = spotToken["spotter_loc"];
+                    if (spotterLocToken != null && spotterLocToken.Type == Newtonsoft.Json.Linq.JTokenType.Array)
+                    {
+                        var arr2 = spotterLocToken as Newtonsoft.Json.Linq.JArray;
+                        if (arr2 != null && arr2.Count >= 2)
+                        {
+                            double tmpLon2, tmpLat2;
+                            if (double.TryParse(arr2[0].ToString(), System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out tmpLon2)
+                                && double.TryParse(arr2[1].ToString(), System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out tmpLat2))
+                            {
+                                spotterLon = tmpLon2;
+                                spotterLat = tmpLat2;
+                            }
+                        }
+                    }
+
                     var dxccInfo = rem.GetDXCC(dx.Trim());
                     var item = new ClusterSpotViewItem
                     {
@@ -4887,6 +4907,8 @@ namespace HolyLogger
                         Locator = dxLocator,
                         DxLat = dxLat,
                         DxLon = dxLon,
+                        SpotterLat = spotterLat,
+                        SpotterLon = spotterLon,
                         Country = dxccInfo != null ? dxccInfo.Name : string.Empty,
                         IsInLog = IsClusterCallsignInLog(dx),
                         IsMyCallsign = IsMyStationCallsign(dx),
@@ -4966,6 +4988,8 @@ namespace HolyLogger
             public string Locator { get; set; }
             public double? DxLat { get; set; }
             public double? DxLon { get; set; }
+            public double? SpotterLat { get; set; }
+            public double? SpotterLon { get; set; }
             public string Country { get; set; }
             public bool IsInLog { get; set; }
             public string SpotKey { get; set; }
@@ -5449,12 +5473,25 @@ namespace HolyLogger
             try
             {
                 var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
-                var spots = new System.Collections.Generic.List<double[]>();
+                var spots = new System.Collections.Generic.List<HolyLogger.ToolsUserControls.ClusterSpotInfo>();
                 foreach (var spot in clusterVisibleSpots)
                 {
                     if (spot.DxLat.HasValue && spot.DxLon.HasValue)
                     {
-                        spots.Add(new double[] { spot.DxLat.Value, spot.DxLon.Value });
+                        double freqMhz = 0;
+                        if (double.TryParse(spot.FreqText ?? string.Empty, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out double fv) && fv > 0)
+                            freqMhz = fv >= 1000 ? fv / 1000.0 : fv;
+
+                        spots.Add(new HolyLogger.ToolsUserControls.ClusterSpotInfo
+                        {
+                            Lat = spot.DxLat.Value,
+                            Lon = spot.DxLon.Value,
+                            SpotterLat = spot.SpotterLat,
+                            SpotterLon = spot.SpotterLon,
+                            Callsign = spot.DXCallsign ?? string.Empty,
+                            Freq = freqMhz > 0 ? freqMhz.ToString("0.###", CultureInfo.InvariantCulture) : (spot.FreqText ?? string.Empty),
+                            Mode = spot.Mode ?? string.Empty
+                        });
                     }
                 }
 
@@ -7327,6 +7364,42 @@ namespace HolyLogger
                         SetAzimuth();
                 }
             }), DispatcherPriority.Background);
+        }
+
+        private void OnMapSpotTuneRequested(string freq, string mode)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                // Find the matching visible spot by freq+mode and reuse TuneToClusterSpot
+                if (clusterVisibleSpots == null) return;
+                double freqVal;
+                if (!double.TryParse(freq, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out freqVal) || freqVal <= 0)
+                    return;
+                // Build a temporary spot so TuneToClusterSpot can do the full tune sequence
+                var tempSpot = clusterVisibleSpots.FirstOrDefault(s =>
+                {
+                    if (!double.TryParse(s.FreqText ?? string.Empty, System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out double sv) || sv <= 0)
+                        return false;
+                    double sMhz = sv >= 1000 ? sv / 1000.0 : sv;
+                    return Math.Abs(sMhz - freqVal) < 0.001 &&
+                           string.Equals(s.Mode ?? string.Empty, mode ?? string.Empty, StringComparison.OrdinalIgnoreCase);
+                });
+                if (tempSpot != null)
+                {
+                    TuneToClusterSpot(tempSpot);
+                }
+                else
+                {
+                    // Fallback: build a minimal spot from the raw freq/mode strings
+                    var fallback = new ClusterSpotViewItem
+                    {
+                        FreqText = freq,
+                        Mode = mode,
+                        DXCallsign = string.Empty
+                    };
+                    TuneToClusterSpot(fallback);
+                }
+            }), DispatcherPriority.Normal);
         }
 
         private void Settings_PropertyChanged(object sender, PropertyChangedEventArgs e)

@@ -6,6 +6,18 @@ using System.Windows.Controls;
 
 namespace HolyLogger.ToolsUserControls
 {
+    /// <summary>A cluster spot with coordinates and radio data for map display.</summary>
+    public struct ClusterSpotInfo
+    {
+        public double Lat;
+        public double Lon;
+        public double? SpotterLat;
+        public double? SpotterLon;
+        public string Callsign;
+        public string Freq;   // e.g. "14.025"
+        public string Mode;   // e.g. "CW"
+    }
+
     /// <summary>Exposes methods callable from JavaScript via window.external</summary>
     [ComVisible(true)]
     public class MapScriptHelper
@@ -23,6 +35,11 @@ namespace HolyLogger.ToolsUserControls
         {
             _owner.ToggleProjection();
         }
+
+        public void TuneToSpot(string freq, string mode)
+        {
+            _owner.RaiseSpotTuneRequested(freq, mode);
+        }
     }
 
     public partial class MapUserControl : UserControl
@@ -33,15 +50,17 @@ namespace HolyLogger.ToolsUserControls
         private double? _currentAzimuth, _currentHomeLat, _currentHomeLon;
         private bool _isPolar;
         private bool _isClusterMode;
-        private System.Collections.Generic.List<double[]> _clusterSpots;
+        private System.Collections.Generic.List<ClusterSpotInfo> _clusterSpots;
         private double _clusterHomeLat, _clusterHomeLon;
         private bool _clusterMapLoaded;
 
         public bool IsClusterMode => _isClusterMode;
 
         public event Action<int> RadiusChanged;
+        public event Action<string, string> SpotTuneRequested;
 
         internal void RaiseRadiusChanged(int km) => RadiusChanged?.Invoke(km);
+        internal void RaiseSpotTuneRequested(string freq, string mode) => SpotTuneRequested?.Invoke(freq, mode);
 
         internal void ToggleProjection()
         {
@@ -70,7 +89,7 @@ namespace HolyLogger.ToolsUserControls
         }
 
         // Updates only spot markers on the already-loaded map via JS — no page reload
-        private void UpdateClusterSpotsJs(System.Collections.Generic.List<double[]> spots)
+        private void UpdateClusterSpotsJs(System.Collections.Generic.List<ClusterSpotInfo> spots)
         {
             if (!_clusterMapLoaded)
                 return;
@@ -80,12 +99,21 @@ namespace HolyLogger.ToolsUserControls
             for (int i = 0; i < spots.Count; i++)
             {
                 if (i > 0) sb.Append(",");
+                var s = spots[i];
+                string callsign = (s.Callsign ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+                string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
+                string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
+                string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
+                    ? (isPolar
+                        ? "[" + s.SpotterLon.Value.ToString(ic) + "," + s.SpotterLat.Value.ToString(ic) + "]"
+                        : "[" + s.SpotterLat.Value.ToString(ic) + "," + s.SpotterLon.Value.ToString(ic) + "]")
+                    : "null";
                 if (isPolar)
-                    // polar expects [lon, lat]
-                    sb.Append("[").Append(spots[i][1].ToString(ic)).Append(",").Append(spots[i][0].ToString(ic)).Append("]");
+                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\"}}",
+                        s.Lon, s.Lat, spStr, callsign, freq, mode);
                 else
-                    // flat expects [lat, lon]
-                    sb.Append("[").Append(spots[i][0].ToString(ic)).Append(",").Append(spots[i][1].ToString(ic)).Append("]");
+                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\"}}",
+                        s.Lat, s.Lon, spStr, callsign, freq, mode);
             }
             sb.Append("]");
             try
@@ -95,9 +123,9 @@ namespace HolyLogger.ToolsUserControls
             catch { }
         }
 
-        public void ShowClusterSpots(System.Collections.Generic.IList<double[]> spots, double homeLat, double homeLon, int radiusKm)
+        public void ShowClusterSpots(System.Collections.Generic.IList<ClusterSpotInfo> spots, double homeLat, double homeLon, int radiusKm)
         {
-            var newSpots = new System.Collections.Generic.List<double[]>(spots);
+            var newSpots = new System.Collections.Generic.List<ClusterSpotInfo>(spots);
 
             bool homeChanged = !_isClusterMode
                 || Math.Abs(_clusterHomeLat - homeLat) > 0.0001
@@ -126,7 +154,7 @@ namespace HolyLogger.ToolsUserControls
 
         private void RenderClusterMap()
         {
-            var spots = _clusterSpots ?? new System.Collections.Generic.List<double[]>();
+            var spots = _clusterSpots ?? new System.Collections.Generic.List<ClusterSpotInfo>();
             double homeLat = _clusterHomeLat;
             double homeLon = _clusterHomeLon;
             int radiusKm = _currentRadiusKm;
@@ -167,7 +195,15 @@ namespace HolyLogger.ToolsUserControls
             for (int i = 0; i < spots.Count; i++)
             {
                 if (i > 0) spotsJs.Append(",");
-                spotsJs.Append("[").Append(spots[i][0].ToString(ic)).Append(",").Append(spots[i][1].ToString(ic)).Append("]");
+                var s = spots[i];
+                string callsign = (s.Callsign ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+                string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
+                string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
+                string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
+                    ? "[" + s.SpotterLat.Value.ToString(ic) + "," + s.SpotterLon.Value.ToString(ic) + "]"
+                    : "null";
+                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\"}}",
+                    s.Lat, s.Lon, spStr, callsign, freq, mode);
             }
             spotsJs.Append("]");
 
@@ -303,7 +339,35 @@ var spotsLayer = L.layerGroup().addTo(map);
 function renderSpots() {
     spotsLayer.clearLayers();
     for (var i = 0; i < clusterSpots.length; i++) {
-        L.marker([clusterSpots[i][0], clusterSpots[i][1]], { icon:spotIcon }).addTo(spotsLayer);
+        var sp = clusterSpots[i];
+        // White line spotter -> DX
+        if (sp.sp) {
+            L.polyline([sp.sp, sp.c], {
+                color: 'white', weight: 0.8, opacity: 0.6, interactive: false
+            }).addTo(spotsLayer);
+        }
+        // Blue spotter dot
+        if (sp.sp) {
+            L.circleMarker(sp.sp, {
+                radius: 4, color: '#1565C0', fillColor: '#1565C0', fillOpacity: 1,
+                weight: 0, interactive: false
+            }).addTo(spotsLayer);
+        }
+        // Orange DX dot with tooltip and click
+        var m = L.circleMarker(sp.c, {
+            radius: 5, color: '#FF6600', fillColor: '#FF6600', fillOpacity: 1,
+            weight: 0, interactive: true
+        });
+        m.bindTooltip('<b>' + sp.cs + '</b><br/>' + sp.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + sp.m, {
+            permanent: false, sticky: true, direction: 'top',
+            className: 'spot-tip'
+        });
+        (function(freq, mode) {
+            m.on('click', function() {
+                try { window.external.TuneToSpot(freq, mode); } catch(e) {}
+            });
+        })(sp.f, sp.m);
+        m.addTo(spotsLayer);
     }
 }
 renderSpots();
@@ -332,7 +396,7 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
             MapBrowser.Navigate(uriBuilder.Uri);
         }
 
-        private void RenderClusterPolarMap(System.Collections.Generic.List<double[]> spots, double homeLat, double homeLon, int radiusKm)
+        private void RenderClusterPolarMap(System.Collections.Generic.List<ClusterSpotInfo> spots, double homeLat, double homeLon, int radiusKm)
         {
             var ic = System.Globalization.CultureInfo.InvariantCulture;
             double marginMultiplier = 1.15;
@@ -358,7 +422,16 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
             for (int i = 0; i < spots.Count; i++)
             {
                 if (i > 0) spotsJs.Append(",");
-                spotsJs.Append("[").Append(spots[i][1].ToString(ic)).Append(",").Append(spots[i][0].ToString(ic)).Append("]"); // [lon, lat]
+                var s = spots[i];
+                string callsign = (s.Callsign ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
+                string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
+                string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
+                // polar projection expects [lon, lat]
+                string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
+                    ? "[" + s.SpotterLon.Value.ToString(ic) + "," + s.SpotterLat.Value.ToString(ic) + "]"
+                    : "null";
+                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\"}}",
+                    s.Lon, s.Lat, spStr, callsign, freq, mode);
             }
             spotsJs.Append("]");
 
@@ -512,6 +585,12 @@ function drawRadiusRing(km) {
 }
 drawRadiusRing(radiusKm);
 var overlaysG = svg.append('g');
+var tooltip = d3.select('body').append('div')
+    .style('position','absolute').style('pointer-events','none')
+    .style('background','rgba(255,255,255,0.95)').style('border','1px solid #aaa')
+    .style('border-radius','4px').style('padding','3px 7px')
+    .style('font-size','12px').style('font-family','sans-serif')
+    .style('color','#222').style('display','none').style('z-index','9999');
 function drawOverlays() {
     overlaysG.selectAll('*').remove();
     // Home dot
@@ -522,14 +601,48 @@ function drawOverlays() {
                 .attr('fill', '#1565C0').attr('stroke', 'none');
         }
     } catch(e) {}
-    // Cluster spot dots
+    // Cluster spots: lines, spotter dots, DX dots
     for (var i = 0; i < clusterSpots.length; i++) {
         try {
-            var pt = projection(clusterSpots[i]);
-            if (pt && isFinite(pt[0]) && isFinite(pt[1])) {
-                overlaysG.append('circle').attr('cx', pt[0]).attr('cy', pt[1]).attr('r', 4)
-                    .attr('fill', '#FF6600').attr('stroke', 'none')
+            var sp = clusterSpots[i];
+            var pt = projection(sp.c);
+            var spt = sp.sp ? projection(sp.sp) : null;
+            // White line spotter -> DX
+            if (spt && isFinite(spt[0]) && isFinite(spt[1]) && pt && isFinite(pt[0]) && isFinite(pt[1])) {
+                overlaysG.append('line')
+                    .attr('x1', spt[0]).attr('y1', spt[1])
+                    .attr('x2', pt[0]).attr('y2', pt[1])
+                    .attr('stroke', 'white').attr('stroke-width', 0.8).attr('opacity', 0.6)
                     .attr('clip-path', 'url(#globe-clip)');
+            }
+            // Blue spotter dot
+            if (spt && isFinite(spt[0]) && isFinite(spt[1])) {
+                overlaysG.append('circle')
+                    .attr('cx', spt[0]).attr('cy', spt[1]).attr('r', 3)
+                    .attr('fill', '#1565C0').attr('stroke', 'none')
+                    .attr('clip-path', 'url(#globe-clip)');
+            }
+            // Orange DX dot with tooltip and click
+            if (pt && isFinite(pt[0]) && isFinite(pt[1])) {
+                (function(spot, px, py) {
+                    overlaysG.append('circle')
+                        .attr('cx', px).attr('cy', py).attr('r', 4)
+                        .attr('fill', '#FF6600').attr('stroke', 'none')
+                        .attr('clip-path', 'url(#globe-clip)')
+                        .style('cursor', 'pointer')
+                        .on('mouseover', function() {
+                            tooltip.style('display','block')
+                                .html('<b>' + spot.cs + '</b><br/>' + spot.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + spot.m);
+                        })
+                        .on('mousemove', function() {
+                            tooltip.style('left', (d3.event.pageX + 10) + 'px')
+                                   .style('top',  (d3.event.pageY - 28) + 'px');
+                        })
+                        .on('mouseout', function() { tooltip.style('display','none'); })
+                        .on('click', function() {
+                            try { window.external.TuneToSpot(spot.f, spot.m); } catch(e2) {}
+                        });
+                })(sp, pt[0], pt[1]);
             }
         } catch(es) {}
     }
