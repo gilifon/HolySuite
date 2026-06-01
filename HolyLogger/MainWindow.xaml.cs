@@ -4231,7 +4231,7 @@ namespace HolyLogger
             {
                 Content = "Turn On PopUp",
                 IsChecked = clusterHoverPopupEnabled,
-                Margin = new Thickness(12, 6, 0, 4),
+                Margin = new Thickness(12, 4, 12, 4),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -4259,7 +4259,7 @@ namespace HolyLogger
             {
                 Content = "Plot spots on map",
                 IsChecked = Properties.Settings.Default.ClusterMapEnabled,
-                Margin = new Thickness(12, 0, 0, 8),
+                Margin = new Thickness(0, 4, 12, 4),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -4316,15 +4316,6 @@ namespace HolyLogger
                     FontWeight = FontWeights.SemiBold
                 };
 
-                var hexLabel = new TextBlock
-                {
-                    Text = hex.ToUpperInvariant(),
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Foreground = System.Windows.Media.Brushes.Gray,
-                    FontSize = 11,
-                    Margin = new Thickness(6, 0, 0, 0)
-                };
-
                 string capturedBand = band;
                 swatch.MouseLeftButtonUp += (s, e) =>
                 {
@@ -4345,7 +4336,6 @@ namespace HolyLogger
                         currentColors[capturedBand] = newHex;
                         try { swatch.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(newHex)); }
                         catch { }
-                        hexLabel.Text = newHex.ToUpperInvariant();
                         SaveBandColors(currentColors);
                         UpdateClusterSpotsOnMap();
                     }
@@ -4353,7 +4343,6 @@ namespace HolyLogger
 
                 row.Children.Add(swatch);
                 row.Children.Add(bandLabel);
-                row.Children.Add(hexLabel);
                 bandColorsPanel.Children.Add(row);
             }
 
@@ -4381,15 +4370,13 @@ namespace HolyLogger
                 foreach (StackPanel row2 in bandColorsPanel.Children.OfType<StackPanel>())
                 {
                     var sw = row2.Children.OfType<Border>().FirstOrDefault();
-                    var hl = row2.Children.OfType<TextBlock>().LastOrDefault();
                     var bl = row2.Children.OfType<TextBlock>().FirstOrDefault();
-                    if (sw != null && bl != null && hl != null)
+                    if (sw != null && bl != null)
                     {
                         string bName = Regex.IsMatch(bl.Text, "^\\d+m$") ? bl.Text.TrimEnd('m') : bl.Text;
                         if (DefaultBandColors.TryGetValue(bName, out string defHex))
                         {
                             try { sw.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(defHex)); } catch { }
-                            hl.Text = defHex.ToUpperInvariant();
                         }
                     }
                 }
@@ -4531,19 +4518,45 @@ namespace HolyLogger
             Grid.SetRow(bandColorsScroll, 2);
             Grid.SetColumn(bandColorsScroll, 2);
 
-            // Bottom row: checkboxes + reset button
-            var bottomPanel = new StackPanel
+            // Bottom row: checkboxes in cols 0-1, reset button centered in col 2
+            var checkboxPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Margin = new Thickness(6, 2, 6, 6)
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 6)
             };
-            bottomPanel.Children.Add(popupToggleCheckBox);
-            bottomPanel.Children.Add(mapToggleCheckBox);
-            bottomPanel.Children.Add(resetColorsBtn);
+            checkboxPanel.Children.Add(popupToggleCheckBox);
+            checkboxPanel.Children.Add(mapToggleCheckBox);
 
-            Grid.SetRow(bottomPanel, 3);
-            Grid.SetColumn(bottomPanel, 0);
-            Grid.SetColumnSpan(bottomPanel, 3);
+            // Reset button with label, centered under the band colors column
+            resetColorsBtn.HorizontalAlignment = HorizontalAlignment.Center;
+            resetColorsBtn.Margin = new Thickness(4, 2, 4, 6);
+            var resetLabel = new TextBlock
+            {
+                Text = "Reset to defaults",
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                FontSize = 11
+            };
+            resetColorsBtn.Content = "↺";
+            resetColorsBtn.FontSize = 14;
+            resetColorsBtn.ToolTip = "Reset band colors to defaults";
+            var resetPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 6)
+            };
+            resetPanel.Children.Add(resetColorsBtn);
+            resetPanel.Children.Add(resetLabel);
+
+            Grid.SetRow(checkboxPanel, 3);
+            Grid.SetColumn(checkboxPanel, 0);
+            Grid.SetColumnSpan(checkboxPanel, 2);
+
+            Grid.SetRow(resetPanel, 3);
+            Grid.SetColumn(resetPanel, 2);
 
             settingsLayout.Children.Add(header);
             settingsLayout.Children.Add(modesHeader);
@@ -4552,7 +4565,8 @@ namespace HolyLogger
             settingsLayout.Children.Add(bandsScroll);
             settingsLayout.Children.Add(modesScroll);
             settingsLayout.Children.Add(bandColorsScroll);
-            settingsLayout.Children.Add(bottomPanel);
+            settingsLayout.Children.Add(checkboxPanel);
+            settingsLayout.Children.Add(resetPanel);
 
             const double clusterSettingsMinWidth = 480;
             const double clusterSettingsMinHeight = 470;
