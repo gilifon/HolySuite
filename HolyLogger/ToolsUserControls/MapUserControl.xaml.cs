@@ -181,7 +181,7 @@ namespace HolyLogger.ToolsUserControls
             bool useMiles = string.Equals(Properties.Settings.Default.MapDistanceUnit, "Miles", System.StringComparison.OrdinalIgnoreCase);
             string useMilesJs = useMiles ? "true" : "false";
 
-            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
+            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000, 20000 };
             var options = new System.Text.StringBuilder();
             foreach (int r in radiiOptions)
             {
@@ -336,14 +336,31 @@ L.marker([homeLat, homeLon], { icon:homeIcon }).addTo(map);
 var radiusCircle = L.circle([homeLat, homeLon], { radius:radiusMeters, color:'#E53935', fill:false, weight:2 }).addTo(map);
 var spotIcon = L.divIcon({ className:'', html:'<div style=""width:8px;height:8px;background:#FF6600;border-radius:50%;box-shadow:0 0 2px rgba(0,0,0,0.5)""></div>', iconAnchor:[4,4] });
 var spotsLayer = L.layerGroup().addTo(map);
+function gcArcPoints(lat1, lon1, lat2, lon2, n) {
+    var toRad = Math.PI/180, toDeg = 180/Math.PI;
+    var la1=lat1*toRad, lo1=lon1*toRad, la2=lat2*toRad, lo2=lon2*toRad;
+    var d = 2*Math.asin(Math.sqrt(Math.pow(Math.sin((la2-la1)/2),2)+Math.cos(la1)*Math.cos(la2)*Math.pow(Math.sin((lo2-lo1)/2),2)));
+    if (d < 0.0001) return [[lat1,lon1],[lat2,lon2]];
+    var pts = [];
+    for (var i=0; i<=n; i++) {
+        var f=i/n;
+        var A=Math.sin((1-f)*d)/Math.sin(d), B=Math.sin(f*d)/Math.sin(d);
+        var x=A*Math.cos(la1)*Math.cos(lo1)+B*Math.cos(la2)*Math.cos(lo2);
+        var y=A*Math.cos(la1)*Math.sin(lo1)+B*Math.cos(la2)*Math.sin(lo2);
+        var z=A*Math.sin(la1)+B*Math.sin(la2);
+        pts.push([Math.atan2(z,Math.sqrt(x*x+y*y))*toDeg, Math.atan2(y,x)*toDeg]);
+    }
+    return pts;
+}
 function renderSpots() {
     spotsLayer.clearLayers();
     for (var i = 0; i < clusterSpots.length; i++) {
         var sp = clusterSpots[i];
-        // White line spotter -> DX
+        // Great circle line spotter -> DX
         if (sp.sp) {
-            L.polyline([sp.sp, sp.c], {
-                color: 'white', weight: 0.8, opacity: 0.6, interactive: false
+            var arcPts = gcArcPoints(sp.sp[0], sp.sp[1], sp.c[0], sp.c[1], 50);
+            L.polyline(arcPts, {
+                color: '#333333', weight: 0.8, opacity: 0.7, interactive: false
             }).addTo(spotsLayer);
         }
         // Blue spotter dot
@@ -408,7 +425,7 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
             catch { marginMultiplier = 1.15; }
 
             bool useMiles = string.Equals(Properties.Settings.Default.MapDistanceUnit, "Miles", System.StringComparison.OrdinalIgnoreCase);
-            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
+            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000, 20000 };
             var options = new System.Text.StringBuilder();
             foreach (int r in radiiOptions)
             {
@@ -607,13 +624,17 @@ function drawOverlays() {
             var sp = clusterSpots[i];
             var pt = projection(sp.c);
             var spt = sp.sp ? projection(sp.sp) : null;
-            // White line spotter -> DX
-            if (spt && isFinite(spt[0]) && isFinite(spt[1]) && pt && isFinite(pt[0]) && isFinite(pt[1])) {
-                overlaysG.append('line')
-                    .attr('x1', spt[0]).attr('y1', spt[1])
-                    .attr('x2', pt[0]).attr('y2', pt[1])
-                    .attr('stroke', 'white').attr('stroke-width', 0.8).attr('opacity', 0.6)
-                    .attr('clip-path', 'url(#globe-clip)');
+            // Great circle line spotter -> DX (D3 geoPath draws it curved automatically)
+            if (sp.sp) {
+                try {
+                    var gcLine = { type: 'LineString', coordinates: [sp.sp, sp.c] };
+                    overlaysG.append('path')
+                        .datum(gcLine)
+                        .attr('d', path)
+                        .attr('fill', 'none')
+                        .attr('stroke', 'white').attr('stroke-width', 0.8).attr('opacity', 0.6)
+                        .attr('clip-path', 'url(#globe-clip)');
+                } catch(el) {}
             }
             // Blue spotter dot
             if (spt && isFinite(spt[0]) && isFinite(spt[1])) {
@@ -796,7 +817,7 @@ window.addEventListener('resize', function() {
           bool useMiles = string.Equals(Properties.Settings.Default.MapDistanceUnit, "Miles", StringComparison.OrdinalIgnoreCase);
           string useMilesJs = useMiles ? "true" : "false";
             int radiusMeters = radiusKm * 1000;
-            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
+            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000, 20000 };
           string azimuthJs = "0";
           if (azimuthDeg.HasValue)
           {
@@ -1133,7 +1154,7 @@ window.addEventListener('resize', function() {
                 if (norm < 0) norm += 360;
                 azJs = norm.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
             }
-            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 20000 };
+            int[] radiiOptions = { 100, 250, 500, 1000, 2000, 3500, 5000, 7500, 10000, 15000, 20000 };
             var options = new System.Text.StringBuilder();
             foreach (int r in radiiOptions)
             {
