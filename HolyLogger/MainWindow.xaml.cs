@@ -4541,38 +4541,49 @@ namespace HolyLogger
             Grid.SetColumn(bandsModesBottom, 0);
             Grid.SetColumnSpan(bandsModesBottom, 2);
 
-            // Reset button: icon centered above two-line text, placed above band colors list (col 2, row 1)
-            resetColorsBtn.HorizontalAlignment = HorizontalAlignment.Center;
-            resetColorsBtn.VerticalAlignment = VerticalAlignment.Center;
-            resetColorsBtn.Margin = new Thickness(4, 4, 4, 4);
-            resetColorsBtn.Padding = new Thickness(10, 6, 10, 6);
-            var resetIcon = new TextBlock
+            // Reset: plain Image icon + TextBlock side by side, no button frame, no template padding.
+            // bandColorsPanel has Margin.Left=8, swatch has no extra left margin → swatch left edge at 8px.
+            // So resetPanel.Margin.Left = 8 aligns the icon's left edge exactly with the 160m square.
+            var resetIconBmp = new BitmapImage();
+            resetIconBmp.BeginInit();
+            resetIconBmp.UriSource = new Uri("pack://application:,,,/Images/UNDO_Icon.png");
+            resetIconBmp.DecodePixelHeight = 22;
+            resetIconBmp.EndInit();
+            var resetIconImg = new Image
             {
-                Text = "\u21BA",
-                FontSize = 18,
-                HorizontalAlignment = HorizontalAlignment.Center
+                Source = resetIconBmp,
+                Width = 22,
+                Height = 22,
+                VerticalAlignment = VerticalAlignment.Center,
+                Cursor = Cursors.Hand,
+                ToolTip = "Reset band colors to defaults"
             };
+            RenderOptions.SetBitmapScalingMode(resetIconImg, BitmapScalingMode.HighQuality);
+            resetIconImg.MouseLeftButtonUp += (s, e) => resetColorsBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
             var resetTextBlock = new TextBlock
             {
-                Text = "Reset to\nDefault Colors",
+                Text = "Reset to Default Colors",
                 FontSize = 11,
-                TextAlignment = TextAlignment.Center,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                Margin = new Thickness(0, 2, 0, 0),
-                LineHeight = 15
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(6, 0, 0, 0),
+                Cursor = Cursors.Hand
             };
-            var resetBtnContent = new StackPanel { Orientation = Orientation.Vertical, HorizontalAlignment = HorizontalAlignment.Center };
-            resetBtnContent.Children.Add(resetIcon);
-            resetBtnContent.Children.Add(resetTextBlock);
-            resetColorsBtn.Content = resetBtnContent;
-            resetColorsBtn.ToolTip = "Reset band colors to defaults";
+            resetTextBlock.MouseLeftButtonUp += (s, e) => resetColorsBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+            // Hide the original button — it stays in the tree to keep Click logic working
+            resetColorsBtn.Visibility = Visibility.Collapsed;
+
             var resetPanel = new StackPanel
             {
-                HorizontalAlignment = HorizontalAlignment.Center,
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(4, 2, 4, 2)
+                Margin = new Thickness(8, 4, 4, 4)   // matches bandColorsPanel.Margin.Left = 8
             };
-            resetPanel.Children.Add(resetColorsBtn);
+            resetPanel.Children.Add(resetIconImg);
+            resetPanel.Children.Add(resetTextBlock);
+            resetPanel.Children.Add(resetColorsBtn);  // hidden, keeps click handler in tree
 
             Grid.SetRow(resetPanel, 1);
             Grid.SetColumn(resetPanel, 2);
@@ -4585,20 +4596,19 @@ namespace HolyLogger
             settingsLayout.Children.Add(bandColorsScroll);
             settingsLayout.Children.Add(resetPanel);
 
-            const double clusterSettingsMinWidth = 480;
-            const double clusterSettingsMinHeight = 470;
             const double clusterSettingsDefaultWidth = 560;
             const double clusterSettingsDefaultHeight = 520;
-            double startupWidth = clusterSettingsDefaultWidth;
-            double startupHeight = clusterSettingsDefaultHeight;
+            double savedWidth = Properties.Settings.Default.ClusterSettingsWindowWidth;
+            double savedHeight = Properties.Settings.Default.ClusterSettingsWindowHeight;
+            double startupWidth = savedWidth > 100 ? savedWidth : clusterSettingsDefaultWidth;
+            double startupHeight = savedHeight > 100 ? savedHeight : clusterSettingsDefaultHeight;
 
             clusterSettingsWindow = new Window
             {
                 Title = "Cluster Settings",
                 Width = startupWidth,
                 Height = startupHeight,
-                MinWidth = clusterSettingsMinWidth,
-                MinHeight = clusterSettingsMinHeight,
+                ResizeMode = ResizeMode.NoResize,
                 Left = Properties.Settings.Default.ClusterSettingsWindowLeft,
                 Top = Properties.Settings.Default.ClusterSettingsWindowTop,
                 Content = settingsLayout
