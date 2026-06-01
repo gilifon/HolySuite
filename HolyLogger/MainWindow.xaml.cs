@@ -4225,12 +4225,13 @@ namespace HolyLogger
             settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
 
             var popupToggleCheckBox = new CheckBox
             {
                 Content = "Turn On PopUp",
                 IsChecked = clusterHoverPopupEnabled,
-                Margin = new Thickness(12, 6, 0, 10),
+                Margin = new Thickness(12, 6, 0, 4),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -4252,6 +4253,147 @@ namespace HolyLogger
                     clusterSpotsDataGrid.Cursor = Cursors.Arrow;
                 }
                 clusterLastHoverToolTipColumn = null;
+            };
+
+            var mapToggleCheckBox = new CheckBox
+            {
+                Content = "Plot spots on map",
+                IsChecked = Properties.Settings.Default.ClusterMapEnabled,
+                Margin = new Thickness(12, 0, 0, 8),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            mapToggleCheckBox.Checked += (s, e) =>
+            {
+                Properties.Settings.Default.ClusterMapEnabled = true;
+                Properties.Settings.Default.Save();
+                UpdateClusterSpotsOnMap();
+            };
+            mapToggleCheckBox.Unchecked += (s, e) =>
+            {
+                Properties.Settings.Default.ClusterMapEnabled = false;
+                Properties.Settings.Default.Save();
+                if (MapControl != null)
+                    MapControl.ShowClusterSpots(new System.Collections.Generic.List<HolyLogger.ToolsUserControls.ClusterSpotInfo>(),
+                        0, 0, GetMapRadiusKm());
+            };
+
+            // Band colors section
+            var bandColorsHeader = new TextBlock
+            {
+                Text = "Band colors",
+                Margin = new Thickness(12, 4, 12, 2),
+                FontSize = 15,
+                FontWeight = FontWeights.SemiBold
+            };
+
+            var bandColorsPanel = new StackPanel { Margin = new Thickness(8, 0, 8, 4), Orientation = Orientation.Vertical };
+            var currentColors = new Dictionary<string, string>(GetBandColors(), StringComparer.OrdinalIgnoreCase);
+
+            foreach (string band in ClusterBandOptions)
+            {
+                string label = Regex.IsMatch(band, "^\\d+$") ? band + "m" : band;
+                string hex = currentColors.ContainsKey(band) ? currentColors[band] : "#FF6600";
+
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
+
+                var swatch = new Border
+                {
+                    Width = 22, Height = 22,
+                    CornerRadius = new CornerRadius(3),
+                    Margin = new Thickness(0, 0, 6, 0),
+                    Cursor = Cursors.Hand,
+                    ToolTip = "Click to change color"
+                };
+                try { swatch.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); }
+                catch { swatch.Background = new SolidColorBrush(Colors.OrangeRed); }
+
+                var bandLabel = new TextBlock
+                {
+                    Text = label,
+                    Width = 40,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    FontWeight = FontWeights.SemiBold
+                };
+
+                var hexLabel = new TextBlock
+                {
+                    Text = hex.ToUpperInvariant(),
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Foreground = System.Windows.Media.Brushes.Gray,
+                    FontSize = 11,
+                    Margin = new Thickness(6, 0, 0, 0)
+                };
+
+                string capturedBand = band;
+                swatch.MouseLeftButtonUp += (s, e) =>
+                {
+                    var dlg = new System.Windows.Forms.ColorDialog
+                    {
+                        FullOpen = true
+                    };
+                    try
+                    {
+                        var cur = (Color)ColorConverter.ConvertFromString(currentColors.ContainsKey(capturedBand) ? currentColors[capturedBand] : "#FF6600");
+                        dlg.Color = System.Drawing.Color.FromArgb(cur.R, cur.G, cur.B);
+                    }
+                    catch { }
+
+                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                    {
+                        string newHex = string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
+                        currentColors[capturedBand] = newHex;
+                        try { swatch.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(newHex)); }
+                        catch { }
+                        hexLabel.Text = newHex.ToUpperInvariant();
+                        SaveBandColors(currentColors);
+                        UpdateClusterSpotsOnMap();
+                    }
+                };
+
+                row.Children.Add(swatch);
+                row.Children.Add(bandLabel);
+                row.Children.Add(hexLabel);
+                bandColorsPanel.Children.Add(row);
+            }
+
+            var bandColorsScroll = new ScrollViewer
+            {
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                Content = bandColorsPanel,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+
+            var resetColorsBtn = new Button
+            {
+                Content = "Reset to defaults",
+                Margin = new Thickness(12, 0, 12, 6),
+                Padding = new Thickness(8, 3, 8, 3),
+                HorizontalAlignment = HorizontalAlignment.Left
+            };
+            resetColorsBtn.Click += (s, e) =>
+            {
+                currentColors.Clear();
+                foreach (var kv in DefaultBandColors) currentColors[kv.Key] = kv.Value;
+                SaveBandColors(currentColors);
+                // Rebuild the swatch visuals
+                foreach (StackPanel row2 in bandColorsPanel.Children.OfType<StackPanel>())
+                {
+                    var sw = row2.Children.OfType<Border>().FirstOrDefault();
+                    var hl = row2.Children.OfType<TextBlock>().LastOrDefault();
+                    var bl = row2.Children.OfType<TextBlock>().FirstOrDefault();
+                    if (sw != null && bl != null && hl != null)
+                    {
+                        string bName = Regex.IsMatch(bl.Text, "^\\d+m$") ? bl.Text.TrimEnd('m') : bl.Text;
+                        if (DefaultBandColors.TryGetValue(bName, out string defHex))
+                        {
+                            try { sw.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(defHex)); } catch { }
+                            hl.Text = defHex.ToUpperInvariant();
+                        }
+                    }
+                }
+                UpdateClusterSpotsOnMap();
             };
 
             var header = new TextBlock
@@ -4373,9 +4515,12 @@ namespace HolyLogger
             Grid.SetRow(modesHeader, 0);
             Grid.SetColumn(modesHeader, 1);
 
+            Grid.SetRow(bandColorsHeader, 0);
+            Grid.SetColumn(bandColorsHeader, 2);
+
             Grid.SetRow(modePanel, 1);
             Grid.SetColumn(modePanel, 0);
-            Grid.SetColumnSpan(modePanel, 2);
+            Grid.SetColumnSpan(modePanel, 3);
 
             Grid.SetRow(bandsScroll, 2);
             Grid.SetColumn(bandsScroll, 0);
@@ -4383,20 +4528,36 @@ namespace HolyLogger
             Grid.SetRow(modesScroll, 2);
             Grid.SetColumn(modesScroll, 1);
 
-            Grid.SetRow(popupToggleCheckBox, 3);
-            Grid.SetColumn(popupToggleCheckBox, 0);
+            Grid.SetRow(bandColorsScroll, 2);
+            Grid.SetColumn(bandColorsScroll, 2);
+
+            // Bottom row: checkboxes + reset button
+            var bottomPanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(6, 2, 6, 6)
+            };
+            bottomPanel.Children.Add(popupToggleCheckBox);
+            bottomPanel.Children.Add(mapToggleCheckBox);
+            bottomPanel.Children.Add(resetColorsBtn);
+
+            Grid.SetRow(bottomPanel, 3);
+            Grid.SetColumn(bottomPanel, 0);
+            Grid.SetColumnSpan(bottomPanel, 3);
 
             settingsLayout.Children.Add(header);
             settingsLayout.Children.Add(modesHeader);
+            settingsLayout.Children.Add(bandColorsHeader);
             settingsLayout.Children.Add(modePanel);
             settingsLayout.Children.Add(bandsScroll);
             settingsLayout.Children.Add(modesScroll);
-            settingsLayout.Children.Add(popupToggleCheckBox);
+            settingsLayout.Children.Add(bandColorsScroll);
+            settingsLayout.Children.Add(bottomPanel);
 
-            const double clusterSettingsMinWidth = 285;
+            const double clusterSettingsMinWidth = 480;
             const double clusterSettingsMinHeight = 470;
-            const double clusterSettingsDefaultWidth = 320;
-            const double clusterSettingsDefaultHeight = 500;
+            const double clusterSettingsDefaultWidth = 560;
+            const double clusterSettingsDefaultHeight = 520;
             double startupWidth = clusterSettingsDefaultWidth;
             double startupHeight = clusterSettingsDefaultHeight;
 
@@ -5289,6 +5450,53 @@ namespace HolyLogger
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
         private static readonly string[] ClusterModeOptions = new[] { "CW", "DIGI", "SSB", "FM", "FT8", "RTTY", "AM" };
 
+        private static readonly Dictionary<string, string> DefaultBandColors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "160", "#156184" }, { "80", "#903727" }, { "60", "#152F47" }, { "40", "#18A018" },
+            { "30", "#FAFA00" }, { "20", "#DC2828" }, { "17", "#751F6B" }, { "15", "#1515CB" },
+            { "12", "#47DFF0" }, { "10", "#E87421" }, { "6",  "#FF61EA" },
+            { "VHF", "#5EFFA0" }, { "UHF", "#5ECFFF" }, { "SHF", "#A07CFF" }
+        };
+
+        private Dictionary<string, string> _bandColorCache = null;
+
+        private Dictionary<string, string> GetBandColors()
+        {
+            if (_bandColorCache != null) return _bandColorCache;
+            var colors = new Dictionary<string, string>(DefaultBandColors, StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                string raw = Properties.Settings.Default.ClusterBandColors ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(raw))
+                {
+                    var saved = Newtonsoft.Json.JsonConvert.DeserializeObject<Dictionary<string, string>>(raw);
+                    if (saved != null)
+                        foreach (var kv in saved) colors[kv.Key] = kv.Value;
+                }
+            }
+            catch { }
+            _bandColorCache = colors;
+            return colors;
+        }
+
+        private string GetBandColor(string band)
+        {
+            var colors = GetBandColors();
+            if (!string.IsNullOrEmpty(band) && colors.TryGetValue(band, out string c)) return c;
+            return "#FF6600";
+        }
+
+        private void SaveBandColors(Dictionary<string, string> colors)
+        {
+            try
+            {
+                Properties.Settings.Default.ClusterBandColors = Newtonsoft.Json.JsonConvert.SerializeObject(colors);
+                Properties.Settings.Default.Save();
+            }
+            catch { }
+            _bandColorCache = null;
+        }
+
         private HashSet<string> GetEnabledClusterBands()
         {
             string raw = Properties.Settings.Default.ClusterEnabledBands ?? string.Empty;
@@ -5450,6 +5658,8 @@ namespace HolyLogger
         {
             if (MapControl == null || MapControl.Visibility != Visibility.Visible)
                 return;
+            if (!Properties.Settings.Default.ClusterMapEnabled)
+                return;
             if (_mapUpdateDebounceTimer == null)
             {
                 DoUpdateClusterSpotsOnMap();
@@ -5462,6 +5672,8 @@ namespace HolyLogger
         private void DoUpdateClusterSpotsOnMap()
         {
             if (MapControl == null || MapControl.Visibility != Visibility.Visible)
+                return;
+            if (!Properties.Settings.Default.ClusterMapEnabled)
                 return;
 
             if (string.IsNullOrWhiteSpace(TB_MyLocator.Text))
@@ -5490,7 +5702,8 @@ namespace HolyLogger
                             SpotterLon = spot.SpotterLon,
                             Callsign = spot.DXCallsign ?? string.Empty,
                             Freq = freqMhz > 0 ? freqMhz.ToString("0.###", CultureInfo.InvariantCulture) : (spot.FreqText ?? string.Empty),
-                            Mode = spot.Mode ?? string.Empty
+                            Mode = spot.Mode ?? string.Empty,
+                            Color = GetBandColor(spot.BandText ?? string.Empty)
                         });
                     }
                 }

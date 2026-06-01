@@ -16,6 +16,7 @@ namespace HolyLogger.ToolsUserControls
         public string Callsign;
         public string Freq;   // e.g. "14.025"
         public string Mode;   // e.g. "CW"
+        public string Color;  // e.g. "#DC2828"
     }
 
     /// <summary>Exposes methods callable from JavaScript via window.external</summary>
@@ -103,17 +104,18 @@ namespace HolyLogger.ToolsUserControls
                 string callsign = (s.Callsign ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
                 string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
                 string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
+                string color = (s.Color ?? "#FF6600").Replace("\"", "\\\"");
                 string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
                     ? (isPolar
                         ? "[" + s.SpotterLon.Value.ToString(ic) + "," + s.SpotterLat.Value.ToString(ic) + "]"
                         : "[" + s.SpotterLat.Value.ToString(ic) + "," + s.SpotterLon.Value.ToString(ic) + "]")
                     : "null";
                 if (isPolar)
-                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\"}}",
-                        s.Lon, s.Lat, spStr, callsign, freq, mode);
+                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\"}}",
+                        s.Lon, s.Lat, spStr, callsign, freq, mode, color);
                 else
-                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\"}}",
-                        s.Lat, s.Lon, spStr, callsign, freq, mode);
+                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\"}}",
+                        s.Lat, s.Lon, spStr, callsign, freq, mode, color);
             }
             sb.Append("]");
             try
@@ -199,11 +201,12 @@ namespace HolyLogger.ToolsUserControls
                 string callsign = (s.Callsign ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
                 string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
                 string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
+                string color = (s.Color ?? "#FF6600").Replace("\"", "\\\"");
                 string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
                     ? "[" + s.SpotterLat.Value.ToString(ic) + "," + s.SpotterLon.Value.ToString(ic) + "]"
                     : "null";
-                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\"}}",
-                    s.Lat, s.Lon, spStr, callsign, freq, mode);
+                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\"}}",
+                    s.Lat, s.Lon, spStr, callsign, freq, mode, color);
             }
             spotsJs.Append("]");
 
@@ -370,9 +373,10 @@ function renderSpots() {
                 weight: 0, interactive: false
             }).addTo(spotsLayer);
         }
-        // Orange DX dot with tooltip and click
+        // Band-colored DX dot with tooltip and click
+        var dotColor = sp.k || '#FF6600';
         var m = L.circleMarker(sp.c, {
-            radius: 5, color: '#FF6600', fillColor: '#FF6600', fillOpacity: 1,
+            radius: 5, color: dotColor, fillColor: dotColor, fillOpacity: 1,
             weight: 0, interactive: true
         });
         m.bindTooltip('<b>' + sp.cs + '</b><br/>' + sp.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + sp.m, {
@@ -443,12 +447,13 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
                 string callsign = (s.Callsign ?? string.Empty).Replace("\\", "\\\\").Replace("\"", "\\\"");
                 string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
                 string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
+                string color = (s.Color ?? "#FF6600").Replace("\"", "\\\"");
                 // polar projection expects [lon, lat]
                 string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
                     ? "[" + s.SpotterLon.Value.ToString(ic) + "," + s.SpotterLat.Value.ToString(ic) + "]"
                     : "null";
-                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\"}}",
-                    s.Lon, s.Lat, spStr, callsign, freq, mode);
+                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\"}}",
+                    s.Lon, s.Lat, spStr, callsign, freq, mode, color);
             }
             spotsJs.Append("]");
 
@@ -643,12 +648,13 @@ function drawOverlays() {
                     .attr('fill', '#1565C0').attr('stroke', 'none')
                     .attr('clip-path', 'url(#globe-clip)');
             }
-            // Orange DX dot with tooltip and click
+            // Band-colored DX dot with tooltip and click
             if (pt && isFinite(pt[0]) && isFinite(pt[1])) {
                 (function(spot, px, py) {
+                    var dotColor = spot.k || '#FF6600';
                     overlaysG.append('circle')
                         .attr('cx', px).attr('cy', py).attr('r', 4)
-                        .attr('fill', '#FF6600').attr('stroke', 'none')
+                        .attr('fill', dotColor).attr('stroke', 'none')
                         .attr('clip-path', 'url(#globe-clip)')
                         .style('cursor', 'pointer')
                         .on('mouseover', function() {

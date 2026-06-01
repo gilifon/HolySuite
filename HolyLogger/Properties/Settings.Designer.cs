@@ -1415,5 +1415,23 @@ namespace HolyLogger.Properties {
                 this["ClusterEnabledModes"] = value;
             }
         }
+
+        public string ClusterBandColors {
+            get {
+                return ((string)(this["ClusterBandColors"]));
+            }
+            set {
+                this["ClusterBandColors"] = value;
+            }
+        }
+
+        public bool ClusterMapEnabled {
+            get {
+                return ((bool)(this["ClusterMapEnabled"]));
+            }
+            set {
+                this["ClusterMapEnabled"] = value;
+            }
+        }
     }
 }

@@ -350,5 +350,11 @@
     <Setting Name="ClusterEnabledModes" Type="System.String" Scope="User">
       <Value Profile="(Default)">CW,DIGI,SSB,FM,FT8,RTTY,AM</Value>
     </Setting>
+    <Setting Name="ClusterBandColors" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="ClusterMapEnabled" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
   </Settings>
 </SettingsFile>
