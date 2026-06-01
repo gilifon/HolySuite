@@ -363,7 +363,7 @@ function renderSpots() {
         if (sp.sp) {
             var arcPts = gcArcPoints(sp.sp[0], sp.sp[1], sp.c[0], sp.c[1], 50);
             L.polyline(arcPts, {
-                color: '#333333', weight: 0.8, opacity: 0.7, interactive: false
+                color: sp.k || '#FF6600', weight: 0.8, opacity: 0.7, interactive: false
             }).addTo(spotsLayer);
         }
         // Blue spotter dot
@@ -637,7 +637,7 @@ function drawOverlays() {
                         .datum(gcLine)
                         .attr('d', path)
                         .attr('fill', 'none')
-                        .attr('stroke', 'white').attr('stroke-width', 0.8).attr('opacity', 0.6)
+                        .attr('stroke', sp.k || '#FF6600').attr('stroke-width', 0.8).attr('opacity', 0.6)
                         .attr('clip-path', 'url(#globe-clip)');
                 } catch(el) {}
             }
