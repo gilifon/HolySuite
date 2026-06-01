@@ -368,10 +368,10 @@ function renderSpots() {
                 color: sp.k || '#FF6600', weight: 0.8, opacity: 0.7, interactive: false
             }).addTo(spotsLayer);
         }
-        // Blue spotter dot
+        // Spotter dot (black)
         if (sp.sp) {
             L.circleMarker(sp.sp, {
-                radius: 4, color: '#1565C0', fillColor: '#1565C0', fillOpacity: 1,
+                radius: 2, color: '#000000', fillColor: '#000000', fillOpacity: 1,
                 weight: 0, interactive: false
             }).addTo(spotsLayer);
         }
@@ -495,6 +495,12 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
   }
+  #radius-label {
+    display:none;
+    background:rgba(255,255,255,0.88); border:1px solid #aaa;
+    padding:2px 6px; font-size:13px; font-weight:700; font-family:sans-serif;
+    color:#1a9e55; white-space:nowrap; text-align:center;
+  }
   #center-btn {
     background:#9FCBF5; border:1px solid #4B76A0; border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
@@ -522,16 +528,50 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
     padding:3px 7px; font-size:13px; font-weight:700;
     font-family:sans-serif; color:#333; white-space:nowrap;
   }
+  #autozoom-wrap {
+    position:absolute; top:4px; left:6px; z-index:1000;
+    display:flex; flex-direction:column; align-items:center;
+    cursor:pointer; user-select:none;
+  }
+  #autozoom-toggle {
+    width:34px; height:18px; border-radius:9px;
+    background:#888; border:2px solid #666;
+    position:relative; transition:background 0.2s, border-color 0.2s;
+    box-shadow:inset 0 1px 3px rgba(0,0,0,0.4);
+  }
+  #autozoom-toggle .knob {
+    position:absolute; top:1px; left:1px;
+    width:12px; height:12px; border-radius:50%;
+    background:#fff;
+    box-shadow:0 1px 3px rgba(0,0,0,0.4);
+    transition:left 0.2s;
+  }
+  #autozoom-wrap.active #autozoom-toggle {
+    background:#2ecc71; border-color:#1a9e55;
+  }
+  #autozoom-wrap.active #autozoom-toggle .knob {
+    left:17px;
+  }
+  #autozoom-label {
+    font-size:10px; font-weight:700; color:rgba(255,255,255,0.9);
+    font-family:sans-serif; margin-top:2px; text-shadow:0 1px 2px rgba(0,0,0,0.8);
+    letter-spacing:0.3px;
+  }
 </style>
 </head>
 <body>
 <svg id='polar-svg'></svg>
 <button id='proj-btn' onclick='toggleProjection()'>&#9974; Flat</button>
+<div id='autozoom-wrap' onclick='toggleAutoZoom()' title='Auto Zoom: fit all spots in view'>
+  <div id='autozoom-toggle'><div class='knob'></div></div>
+  <div id='autozoom-label'>Auto Zoom</div>
+</div>
 <div id='az-only'>AZ --</div>
 <div id='bottom-ctrl'>
   <div id='radius-stack'>
     <button id='center-btn' onclick='recenter()' title='Re-center map'><span class='de-label'>DE</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
     <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
+    <div id='radius-label'>-- km</div>
   </div>
 </div>
 <div id='distance-stack'>
@@ -647,11 +687,11 @@ function drawOverlays() {
                         .attr('clip-path', 'url(#globe-clip)');
                 } catch(el) {}
             }
-            // Blue spotter dot
+            // Spotter dot (black)
             if (spt && isFinite(spt[0]) && isFinite(spt[1])) {
                 overlaysG.append('circle')
-                    .attr('cx', spt[0]).attr('cy', spt[1]).attr('r', 3)
-                    .attr('fill', '#1565C0').attr('stroke', 'none')
+                    .attr('cx', spt[0]).attr('cy', spt[1]).attr('r', 2)
+                    .attr('fill', '#000000').attr('stroke', 'none')
                     .attr('clip-path', 'url(#globe-clip)');
             }
             // Band-colored DX dot with tooltip and click
@@ -722,6 +762,79 @@ function toggleProjection() { try { window.external.ToggleProjection(); } catch(
 function updateClusterSpots(json) {
     try { clusterSpots = JSON.parse(json); } catch(e) { return; }
     drawOverlays();
+    if (autoZoomActive) applyAutoZoom();
+}
+var autoZoomActive = false;
+var autoZoomSavedRadiusKm = -1;
+function haversineKm(lat1, lon1, lat2, lon2) {
+    var R = 6371, toR = Math.PI/180;
+    var dLat = (lat2-lat1)*toR, dLon = (lon2-lon1)*toR;
+    var a = Math.sin(dLat/2)*Math.sin(dLat/2) +
+            Math.cos(lat1*toR)*Math.cos(lat2*toR)*Math.sin(dLon/2)*Math.sin(dLon/2);
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+function applyAutoZoom() {
+    if (!clusterSpots || clusterSpots.length === 0) return;
+    var distances = [];
+    for (var i = 0; i < clusterSpots.length; i++) {
+        var sp = clusterSpots[i];
+        // DX point: sp.c = [lon, lat] — validate strictly
+        if (sp.c && sp.c.length === 2
+            && isFinite(sp.c[0]) && isFinite(sp.c[1])
+            && sp.c[0] >= -180 && sp.c[0] <= 180
+            && sp.c[1] >= -90  && sp.c[1] <= 90) {
+            var dxKm = haversineKm(centerLat, centerLon, sp.c[1], sp.c[0]);
+            if (isFinite(dxKm) && dxKm > 0) distances.push(dxKm);
+        }
+    }
+    if (distances.length === 0) return;
+    // Find the farthest DX station from home
+    var maxKm = 0;
+    for (var j = 0; j < distances.length; j++) { if (distances[j] > maxKm) maxKm = distances[j]; }
+    if (maxKm < 100) maxKm = 100;
+    // Use farthest distance + 10% padding — no snapping, map renders at any radius
+    var newKm = Math.ceil(maxKm * 1.10);
+    // Update label
+    var lbl = document.getElementById('radius-label');
+    if (lbl) lbl.textContent = useMiles ? (Math.round(newKm * 0.621371) + ' mi') : (newKm + ' km');
+    if (newKm !== radiusKm) {
+        radiusKm = newKm;
+        document.getElementById('radius-ctrl').value = newKm;
+        scaleToRadius();
+        countriesG.selectAll('path').attr('d', path);
+        svg.selectAll('.graticule-path').attr('d', path);
+        drawRings(); drawRadiusRing(radiusKm); drawOverlays();
+        // Do NOT notify C# — auto zoom radius is visual only, not persisted
+    }
+}
+function setRadiusControlVisibility(azActive) {
+    var sel = document.getElementById('radius-ctrl');
+    var lbl = document.getElementById('radius-label');
+    if (sel) sel.style.display = azActive ? 'none' : '';
+    if (lbl) lbl.style.display = azActive ? 'block' : 'none';
+}
+function restoreRadius(km) {
+    radiusKm = km;
+    document.getElementById('radius-ctrl').value = km;
+    scaleToRadius();
+    countriesG.selectAll('path').attr('d', path);
+    svg.selectAll('.graticule-path').attr('d', path);
+    drawRings(); drawRadiusRing(radiusKm); drawOverlays();
+    try { window.external.SetRadius(km); } catch(e) {}  // restore persisted radius
+}
+function toggleAutoZoom() {
+    autoZoomActive = !autoZoomActive;
+    var btn = document.getElementById('autozoom-wrap');
+    if (autoZoomActive) {
+        autoZoomSavedRadiusKm = radiusKm;  // save current radius
+        btn.classList.add('active');
+        setRadiusControlVisibility(true);
+        applyAutoZoom();
+    } else {
+        btn.classList.remove('active');
+        setRadiusControlVisibility(false);
+        if (autoZoomSavedRadiusKm > 0) restoreRadius(autoZoomSavedRadiusKm);
+    }
 }
 svg.call(d3.drag()
     .on('start', function() {})
