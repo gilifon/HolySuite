@@ -334,7 +334,8 @@ var useMiles = " + useMilesJs + @";
 var clusterSpots = " + spotsJs.ToString() + @";
 var map = L.map('map', { zoomControl:false, attributionControl:false, zoomSnap:0 }).setView([homeLat, homeLon], 4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:18 }).addTo(map);
-var homeIcon = L.divIcon({ className:'', html:'<div style=""width:10px;height:10px;background:#1565C0;border:2px solid #fff;border-radius:50%;box-shadow:0 0 3px rgba(0,0,0,0.6)""></div>', iconAnchor:[5,5] });
+// Equator
+L.polyline([[0,-180],[0,-90],[0,0],[0,90],[0,180]], { color:'#000000', weight:1.2, opacity:0.5, interactive:false }).addTo(map);
 L.marker([homeLat, homeLon], { icon:homeIcon }).addTo(map);
 var radiusCircle = L.circle([homeLat, homeLon], { radius:radiusMeters, color:'#E53935', fill:false, weight:2 }).addTo(map);
 var spotIcon = L.divIcon({ className:'', html:'<div style=""width:8px;height:8px;background:#FF6600;border-radius:50%;box-shadow:0 0 2px rgba(0,0,0,0.5)""></div>', iconAnchor:[4,4] });
@@ -579,6 +580,10 @@ var countriesG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 svg.append('path').datum(d3.geoGraticule().step([30, 30])())
     .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.15)').attr('stroke-width', 0.7)
     .attr('d', path).attr('clip-path', 'url(#globe-clip)');
+// Equator
+svg.append('path').datum({type:'LineString', coordinates:[[-180,0],[-90,0],[0,0],[90,0],[180,0]]})
+    .attr('fill','none').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.2)
+    .attr('d',path).attr('clip-path','url(#globe-clip)');
 var ringsG = svg.append('g');
 function drawRings() {
     ringsG.selectAll('*').remove();
@@ -1002,6 +1007,8 @@ var circleLat = (operatorLat !== null) ? operatorLat : dxLat;
 var circleLon = (operatorLon !== null) ? operatorLon : dxLon;
 var map = L.map('map', { zoomControl: false, attributionControl: false, zoomSnap: 0 }).setView([circleLat, circleLon], 5);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map);
+// Equator
+L.polyline([[0,-180],[0,-90],[0,0],[0,90],[0,180]], { color:'#000000', weight:1.2, opacity:0.5, interactive:false }).addTo(map);
 
 // Create visible red circle to show the search radius (centered on home)
 var radiusCircle = L.circle([circleLat, circleLon], { radius: radiusMeters, color: '#E53935', fill: false, weight: 2 }).addTo(map);
@@ -1363,6 +1370,11 @@ svg.append('path')
     .attr('d', path)
     .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.15)').attr('stroke-width', 0.7)
     .attr('clip-path', 'url(#globe-clip)');
+// Equator
+svg.append('path').datum({type:'LineString', coordinates:[[-180,0],[-90,0],[0,0],[90,0],[180,0]]})
+    .attr('class', 'graticule-path')
+    .attr('fill','none').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.2)
+    .attr('d',path).attr('clip-path','url(#globe-clip)');
 
 // Distance rings layer (above countries)
 var ringsG = svg.append('g');
