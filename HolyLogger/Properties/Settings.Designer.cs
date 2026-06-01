@@ -1416,6 +1416,9 @@ namespace HolyLogger.Properties {
             }
         }
 
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ClusterBandColors {
             get {
                 return ((string)(this["ClusterBandColors"]));
@@ -1425,6 +1428,9 @@ namespace HolyLogger.Properties {
             }
         }
 
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool ClusterMapEnabled {
             get {
                 return ((bool)(this["ClusterMapEnabled"]));
