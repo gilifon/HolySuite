@@ -250,6 +250,7 @@ namespace HolyLogger
         TextBlock clusterSpotCountText = null;
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
         bool clusterHeaderAlignmentRefreshPending = false;
+        DispatcherTimer _mapUpdateDebounceTimer = null;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
@@ -420,6 +421,8 @@ namespace HolyLogger
             VoiceMessageAvailabilityTimer.Interval = TimeSpan.FromMilliseconds(500);
             VoiceMessageAvailabilityTimer.Tick += VoiceMessageAvailabilityTimer_Tick;
             VoiceMessageAvailabilityTimer.Start();
+            _mapUpdateDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };
+            _mapUpdateDebounceTimer.Tick += (s, e) => { _mapUpdateDebounceTimer.Stop(); DoUpdateClusterSpotsOnMap(); };
             UpdateVoiceMessageAvailabilityState();
             checkForAutoUpload();
             
@@ -749,6 +752,7 @@ namespace HolyLogger
             {
                 MapControl.Visibility = Visibility.Visible;
                 this.MinWidth = 1120;
+                UpdateClusterSpotsOnMap();
             }
             else
             {
@@ -3983,14 +3987,17 @@ namespace HolyLogger
             }
 
             DataGridRow row = FindVisualParent<DataGridRow>(cell);
-            var spot = row != null ? row.Item as ClusterSpotViewItem : null;
+            var spot = (row != null ? row.Item : cell.DataContext) as ClusterSpotViewItem;
             if (spot == null)
             {
-                return;
+                spot = dataGrid.SelectedItem as ClusterSpotViewItem;
+                if (spot == null)
+                {
+                    return;
+                }
             }
 
-            if (e.ClickCount >= 2)
-            {
+            if (e.ClickCount >= 2)            {
                 if (clusterSingleClickOpenQrzTimer != null)
                 {
                     clusterSingleClickOpenQrzTimer.Stop();
@@ -4709,6 +4716,102 @@ namespace HolyLogger
             }
         }
 
+        private string ExtractClusterSpotLocator(JToken spotToken, string comment)
+        {
+            if (spotToken == null)
+            {
+                return ExtractValidMaidenheadLocator(comment);
+            }
+
+            string[] preferredFieldNames =
+            {
+                "locator", "dx_locator", "grid", "dx_grid", "dxlocator", "maidenhead", "dx_loc"
+            };
+
+            foreach (string fieldName in preferredFieldNames)
+            {
+                JToken valueToken = spotToken[fieldName];
+                string locator = string.Empty;
+
+                if (valueToken != null && valueToken.Type == JTokenType.Array)
+                {
+                    var arr = valueToken as JArray;
+                    if (arr != null && arr.Count >= 2)
+                    {
+                        double lon;
+                        double lat;
+                        if (double.TryParse(arr[0].ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out lon)
+                            && double.TryParse(arr[1].ToString(), NumberStyles.Float, CultureInfo.InvariantCulture, out lat))
+                        {
+                            try
+                            {
+                                locator = MaidenheadLocator.LatLngToLocator(lat, lon);
+                            }
+                            catch
+                            {
+                                locator = string.Empty;
+                            }
+                        }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(locator))
+                {
+                    locator = ExtractValidMaidenheadLocator(valueToken != null ? valueToken.ToString() : string.Empty);
+                }
+
+                if (!string.IsNullOrWhiteSpace(locator))
+                {
+                    return locator;
+                }
+            }
+
+            var spotObject = spotToken as JObject;
+            if (spotObject != null)
+            {
+                foreach (var prop in spotObject.Properties())
+                {
+                    string name = prop.Name ?? string.Empty;
+                    if (name.IndexOf("loc", StringComparison.OrdinalIgnoreCase) >= 0 ||
+                        name.IndexOf("grid", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        string locator = ExtractValidMaidenheadLocator(prop.Value != null ? prop.Value.ToString() : string.Empty);
+                        if (!string.IsNullOrWhiteSpace(locator))
+                        {
+                            return locator;
+                        }
+                    }
+                }
+            }
+
+            return ExtractValidMaidenheadLocator(comment);
+        }
+
+        private string ExtractValidMaidenheadLocator(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return string.Empty;
+            }
+
+            var match = Regex.Match(text.ToUpperInvariant(), "\\b([A-R]{2}\\d{2}(?:[A-X]{2}(?:\\d{2})?)?)\\b");
+            if (!match.Success)
+            {
+                return string.Empty;
+            }
+
+            string locator = match.Groups[1].Value;
+            try
+            {
+                MaidenheadLocator.LocatorToLatLng(locator);
+                return locator;
+            }
+            catch
+            {
+                return string.Empty;
+            }
+        }
+
         private void ApplyClusterPayload(string payload, ObservableCollection<ClusterSpotViewItem> spots)
         {
             try
@@ -4719,6 +4822,11 @@ namespace HolyLogger
                 {
                     return;
                 }
+
+                // Compute worked countries once for the whole payload instead of per-spot
+                var workedCountries = GetWorkedCountriesFromLog();
+
+                var newItems = new System.Collections.Generic.List<ClusterSpotViewItem>();
 
                 foreach (JToken spotToken in spotsToken)
                 {
@@ -4742,8 +4850,26 @@ namespace HolyLogger
                     string bandText = spotToken["band"] != null ? spotToken["band"].ToString() : string.Empty;
                     string mode = (string)spotToken["mode"] ?? string.Empty;
                     string comment = (string)spotToken["comment"] ?? string.Empty;
+                    string dxLocator = ExtractClusterSpotLocator(spotToken, comment);
 
-                    var workedCountries = GetWorkedCountriesFromLog();
+                    double? dxLat = null;
+                    double? dxLon = null;
+                    var dxLocToken = spotToken["dx_loc"];
+                    if (dxLocToken != null && dxLocToken.Type == JTokenType.Array)
+                    {
+                        var arr = dxLocToken as Newtonsoft.Json.Linq.JArray;
+                        if (arr != null && arr.Count >= 2)
+                        {
+                            double tmpLon, tmpLat;
+                            if (double.TryParse(arr[0].ToString(), System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out tmpLon)
+                                && double.TryParse(arr[1].ToString(), System.Globalization.NumberStyles.Float, CultureInfo.InvariantCulture, out tmpLat))
+                            {
+                                dxLon = tmpLon;
+                                dxLat = tmpLat;
+                            }
+                        }
+                    }
+
                     var dxccInfo = rem.GetDXCC(dx.Trim());
                     var item = new ClusterSpotViewItem
                     {
@@ -4758,6 +4884,9 @@ namespace HolyLogger
                         DXCallsign = dx,
                         SpotterCallsign = spotter,
                         Comment = comment,
+                        Locator = dxLocator,
+                        DxLat = dxLat,
+                        DxLon = dxLon,
                         Country = dxccInfo != null ? dxccInfo.Name : string.Empty,
                         IsInLog = IsClusterCallsignInLog(dx),
                         IsMyCallsign = IsMyStationCallsign(dx),
@@ -4765,20 +4894,30 @@ namespace HolyLogger
                         SpotKey = key
                     };
 
-                    Dispatcher.BeginInvoke(new Action(() =>
+                    newItems.Add(item);
+                }
+
+                if (newItems.Count == 0)
+                    return;
+
+                // Single dispatcher call for the whole batch
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    foreach (var item in newItems)
                     {
                         clusterAllSpots.Insert(0, item);
-                        while (clusterAllSpots.Count > 1500)
-                        {
-                            var evicted = clusterAllSpots[clusterAllSpots.Count - 1];
-                            if (evicted.SpotKey != null)
-                                clusterSpotKeys.Remove(evicted.SpotKey);
-                            clusterAllSpots.RemoveAt(clusterAllSpots.Count - 1);
-                        }
+                    }
+                    // Trim excess once after inserting the whole batch
+                    while (clusterAllSpots.Count > 1500)
+                    {
+                        var evicted = clusterAllSpots[clusterAllSpots.Count - 1];
+                        if (evicted.SpotKey != null)
+                            clusterSpotKeys.Remove(evicted.SpotKey);
+                        clusterAllSpots.RemoveAt(clusterAllSpots.Count - 1);
+                    }
 
-                        RefreshClusterVisibleSpots();
-                    }));
-                }
+                    RefreshClusterVisibleSpots();
+                }));
             }
             catch
             {
@@ -4824,6 +4963,9 @@ namespace HolyLogger
             public string DXCallsign { get; set; }
             public string SpotterCallsign { get; set; }
             public string Comment { get; set; }
+            public string Locator { get; set; }
+            public double? DxLat { get; set; }
+            public double? DxLon { get; set; }
             public string Country { get; set; }
             public bool IsInLog { get; set; }
             public string SpotKey { get; set; }
@@ -5277,6 +5419,50 @@ namespace HolyLogger
             UpdateClusterFrequencyHighlight();
             UpdateClusterSpotCountIndicator();
             RequestClusterHeaderAlignmentRefresh();
+            UpdateClusterSpotsOnMap();
+        }
+
+        private void UpdateClusterSpotsOnMap()
+        {
+            if (MapControl == null || MapControl.Visibility != Visibility.Visible)
+                return;
+            if (_mapUpdateDebounceTimer == null)
+            {
+                DoUpdateClusterSpotsOnMap();
+                return;
+            }
+            _mapUpdateDebounceTimer.Stop();
+            _mapUpdateDebounceTimer.Start();
+        }
+
+        private void DoUpdateClusterSpotsOnMap()
+        {
+            if (MapControl == null || MapControl.Visibility != Visibility.Visible)
+                return;
+
+            if (string.IsNullOrWhiteSpace(TB_MyLocator.Text))
+                return;
+
+            if (clusterVisibleSpots == null)
+                return;
+
+            try
+            {
+                var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
+                var spots = new System.Collections.Generic.List<double[]>();
+                foreach (var spot in clusterVisibleSpots)
+                {
+                    if (spot.DxLat.HasValue && spot.DxLon.HasValue)
+                    {
+                        spots.Add(new double[] { spot.DxLat.Value, spot.DxLon.Value });
+                    }
+                }
+
+                MapControl.ShowClusterSpots(spots, homell.Lat, homell.Long, GetMapRadiusKm());
+            }
+            catch
+            {
+            }
         }
 
         private void UpdateClusterSpotCountIndicator()
@@ -5294,19 +5480,79 @@ namespace HolyLogger
         {
             var grid = sender as DataGrid;
             var source = e.OriginalSource as DependencyObject;
-            while (source != null && !(source is DataGridRow))
+            DataGridCell cell = FindVisualParent<DataGridCell>(source);
+            ClusterSpotViewItem selectedSpot = null;
+
+            if (cell != null)
             {
-                source = VisualTreeHelper.GetParent(source);
+                selectedSpot = cell.DataContext as ClusterSpotViewItem;
             }
 
-            var row = source as DataGridRow;
-            var selectedSpot = row?.Item as ClusterSpotViewItem ?? grid?.SelectedItem as ClusterSpotViewItem;
+            if (selectedSpot == null)
+            {
+                while (source != null && !(source is DataGridRow))
+                {
+                    source = VisualTreeHelper.GetParent(source);
+                }
+
+                var row = source as DataGridRow;
+                selectedSpot = row?.Item as ClusterSpotViewItem ?? grid?.SelectedItem as ClusterSpotViewItem;
+            }
+
             if (selectedSpot == null)
             {
                 return;
             }
 
             TuneToClusterSpot(selectedSpot);
+        }
+
+        private void ShowClusterSpotOnMap(ClusterSpotViewItem spot)
+        {
+            if (spot == null)
+                return;
+
+            if (MapControl == null || MapControl.Visibility != Visibility.Visible)
+                return;
+
+            if (string.IsNullOrWhiteSpace(TB_MyLocator.Text))
+                return;
+
+            try
+            {
+                // Use the lat/lon stored directly from the server's dx_loc field.
+                // Fall back to DXCC locator only when no coordinates were received.
+                double dxLat, dxLon;
+                if (spot.DxLat.HasValue && spot.DxLon.HasValue)
+                {
+                    dxLat = spot.DxLat.Value;
+                    dxLon = spot.DxLon.Value;
+                }
+                else
+                {
+                    string locator = spot.Locator;
+                    if (string.IsNullOrWhiteSpace(locator))
+                    {
+                        var dxcc = rem.GetDXCC((spot.DXCallsign ?? string.Empty).Trim());
+                        locator = dxcc != null ? dxcc.Locator : string.Empty;
+                    }
+
+                    if (string.IsNullOrWhiteSpace(locator))
+                        return;
+
+                    var ll = MaidenheadLocator.LocatorToLatLng(locator);
+                    dxLat = ll.Lat;
+                    dxLon = ll.Long;
+                }
+
+                var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
+                var dxLatLng = new HolyParser.LatLng { Lat = dxLat, Long = dxLon };
+                Azimuth = MaidenheadLocator.Azimuth(homell, dxLatLng);
+                MapControl.ShowMap(dxLat, dxLon, GetMapRadiusKm(), Azimuth, homell.Lat, homell.Long);
+            }
+            catch
+            {
+            }
         }
 
         private async void TuneToClusterSpot(ClusterSpotViewItem spot)
@@ -7074,7 +7320,12 @@ namespace HolyLogger
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (MapControl != null && MapControl.Visibility == Visibility.Visible)
-                    SetAzimuth();
+                {
+                    if (MapControl.IsClusterMode)
+                        UpdateClusterSpotsOnMap();
+                    else
+                        SetAzimuth();
+                }
             }), DispatcherPriority.Background);
         }
 
