@@ -4282,9 +4282,10 @@ namespace HolyLogger
             var bandColorsHeader = new TextBlock
             {
                 Text = "Band colors",
-                Margin = new Thickness(12, 4, 12, 2),
+                Margin = new Thickness(12, 12, 12, 0),
                 FontSize = 15,
-                FontWeight = FontWeights.SemiBold
+                FontWeight = FontWeights.SemiBold,
+                VerticalAlignment = VerticalAlignment.Bottom
             };
 
             var bandColorsPanel = new StackPanel { Margin = new Thickness(8, 0, 8, 4), Orientation = Orientation.Vertical };
