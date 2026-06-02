@@ -261,6 +261,7 @@ namespace HolyLogger
         // Layout constants for the cluster window floating overlay panels
         const double ClusterOffScreenPosition = -400;
         const double ClusterHeaderCanvasHeight = 72;
+        const double ClusterTableTopGap = 6;
         const double ClusterShowBandsPanelWidth = 115;
         const double ClusterBaseSharedVerticalShift = -45.0;
         const double ClusterLastMinutesDropdownTop = -45.0;
@@ -3288,6 +3289,7 @@ namespace HolyLogger
 
             var headerCanvas = new Canvas { Height = ClusterHeaderCanvasHeight, IsHitTestVisible = true };
             clusterHeaderCanvas = headerCanvas;
+            Panel.SetZIndex(headerCanvas, 1);
 
             Canvas.SetTop(showBandsPanel, 0);
             Canvas.SetLeft(showBandsPanel, ClusterOffScreenPosition);
@@ -3335,7 +3337,6 @@ namespace HolyLogger
 
             clusterWorkedCountries = GetWorkedCountriesFromLog();
             clusterWindow.Show();
-            Dispatcher.BeginInvoke(new Action(UpdateClusterActiveBandIndicatorPosition), DispatcherPriority.Loaded);
 
             await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
         }
@@ -3466,8 +3467,8 @@ namespace HolyLogger
                 AlternationCount = 2,
                 AlternatingRowBackground = Brushes.Gainsboro,
                 FontSize = 13,
-                Margin = new Thickness(0, -80, 0, 0),
-                Opacity = 0
+                Margin = new Thickness(0, -(ClusterHeaderCanvasHeight - ClusterTableTopGap), 0, 0),
+                Opacity = 1
             };
             ToolTipService.SetInitialShowDelay(spotsGrid, 50);
             ToolTipService.SetShowDuration(spotsGrid, 3000);
@@ -3594,7 +3595,6 @@ namespace HolyLogger
                 RequestClusterHeaderAlignmentRefresh();
             };
             clusterSpotsDataGrid = spotsGrid;
-            clusterTableMarginInitialized = false;
 
             clusterSingleClickOpenQrzTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
             clusterSingleClickOpenQrzTimer.Tick += ClusterSingleClickOpenQrzTimer_Tick;
@@ -3933,12 +3933,7 @@ namespace HolyLogger
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 UpdateClusterActiveBandIndicatorPosition();
-
-                Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    UpdateClusterActiveBandIndicatorPosition();
-                    clusterHeaderAlignmentRefreshPending = false;
-                }), DispatcherPriority.ApplicationIdle);
+                clusterHeaderAlignmentRefreshPending = false;
             }), DispatcherPriority.Render);
         }
 
@@ -3962,12 +3957,17 @@ namespace HolyLogger
                 double panelWidth = clusterShowBandsPanel.ActualWidth > 0 ? clusterShowBandsPanel.ActualWidth : ClusterShowBandsPanelWidth;
                 double freqCenter = freqStart - horizontalOffset + freqWidth / 2.0;
                 double indicatorCenterOffset = panelWidth;
-                if (clusterActiveBandIndicatorText != null
-                    && clusterActiveBandIndicatorText.ActualWidth > 0
-                    && clusterActiveBandIndicatorText.IsArrangeValid)
+                if (clusterActiveBandIndicatorText != null)
                 {
-                    Point indicatorTopInShow = clusterActiveBandIndicatorText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
-                    indicatorCenterOffset = indicatorTopInShow.X + (clusterActiveBandIndicatorText.ActualWidth / 2.0);
+                    try
+                    {
+                        Point indicatorTopInShow = clusterActiveBandIndicatorText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
+                        indicatorCenterOffset = indicatorTopInShow.X + (clusterActiveBandIndicatorText.ActualWidth / 2.0);
+                    }
+                    catch
+                    {
+                        indicatorCenterOffset = panelWidth;
+                    }
                 }
 
                 double panelLeft = freqCenter - indicatorCenterOffset;
@@ -3975,40 +3975,41 @@ namespace HolyLogger
                 Canvas.SetLeft(clusterShowBandsPanel, panelLeft);
 
                 double showPanelTop = 0;
-                if (clusterBandFilterActiveBtn != null
-                    && clusterBandFilterActiveBtn.ActualHeight > 0
-                    && clusterBandFilterActiveBtn.IsArrangeValid
-                    && clusterLastMinutesComboBox != null
-                    && clusterLastMinutesComboBox.ActualHeight > 0
-                    && clusterLastMinutesComboBox.IsArrangeValid
-                    && clusterLastMinutesFilterPanel != null)
+                if (clusterBandFilterActiveBtn != null && clusterLastMinutesComboBox != null && clusterLastMinutesFilterPanel != null)
                 {
-                    // Active button bottom relative to showBandsPanel
-                    Point activeBtnTopInShow = clusterBandFilterActiveBtn.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
-                    double activeBtnBottomOffset = activeBtnTopInShow.Y + clusterBandFilterActiveBtn.ActualHeight;
+                    try
+                    {
+                        Point activeBtnTopInShow = clusterBandFilterActiveBtn.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
+                        double activeBtnBottomOffset = activeBtnTopInShow.Y + clusterBandFilterActiveBtn.ActualHeight;
 
-                    // Dropdown combo bottom relative to header canvas
-                    Point comboTopInDrop = clusterLastMinutesComboBox.TranslatePoint(new Point(0, 0), clusterLastMinutesFilterPanel);
-                    double dropdownPanelTop = 0;
-                    double dropdownBottomInCanvas = dropdownPanelTop + comboTopInDrop.Y + clusterLastMinutesComboBox.ActualHeight;
+                        Point comboTopInDrop = clusterLastMinutesComboBox.TranslatePoint(new Point(0, 0), clusterLastMinutesFilterPanel);
+                        double dropdownPanelTop = 0;
+                        double dropdownBottomInCanvas = dropdownPanelTop + comboTopInDrop.Y + clusterLastMinutesComboBox.ActualHeight;
 
-                    showPanelTop = dropdownBottomInCanvas - activeBtnBottomOffset;
+                        showPanelTop = dropdownBottomInCanvas - activeBtnBottomOffset;
+                    }
+                    catch
+                    {
+                        showPanelTop = 0;
+                    }
                 }
 
                 double showTop = showPanelTop + ClusterBaseSharedVerticalShift;
                 double dropdownTop = ClusterLastMinutesDropdownTop;
 
-                // Keep Show Bands label on the same level as New Country by shifting both controls as one unit.
-                if (clusterShowBandsLabelText != null
-                    && clusterShowBandsLabelText.IsArrangeValid
-                    && clusterNewCountryLegendText != null
-                    && clusterNewCountryLegendText.IsArrangeValid)
+                if (clusterShowBandsLabelText != null && clusterNewCountryLegendText != null)
                 {
-                    Point showLabelOffset = clusterShowBandsLabelText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
-                    Point newCountryInCanvas = clusterNewCountryLegendText.TranslatePoint(new Point(0, 0), clusterHeaderCanvas);
-                    double delta = newCountryInCanvas.Y - (showTop + showLabelOffset.Y);
-                    showTop += delta;
-                    dropdownTop += delta;
+                    try
+                    {
+                        Point showLabelOffset = clusterShowBandsLabelText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
+                        Point newCountryInCanvas = clusterNewCountryLegendText.TranslatePoint(new Point(0, 0), clusterHeaderCanvas);
+                        double delta = newCountryInCanvas.Y - (showTop + showLabelOffset.Y);
+                        showTop += delta;
+                        dropdownTop += delta;
+                    }
+                    catch
+                    {
+                    }
                 }
 
                 Canvas.SetTop(clusterShowBandsPanel, showTop);
@@ -4019,46 +4020,12 @@ namespace HolyLogger
                 }
             }
 
-            // Last/minutes dropdown is ALWAYS above the UTC column — never moved
             if (clusterLastMinutesFilterPanel != null && clusterHeaderCanvas != null)
             {
                 Canvas.SetLeft(clusterLastMinutesFilterPanel, utcStart - horizontalOffset);
             }
 
-            // Move ONLY the table so its top edge touches the lower edge of Active Band / dropdown.
-            // Reset and re-applied whenever clusterTableMarginInitialized is false (e.g. on resize).
-            if (!clusterTableMarginInitialized && clusterHeaderCanvas != null && clusterSpotsDataGrid != null)
-            {
-                double controlsBottom = double.MinValue;
-
-                if (clusterBandFilterActiveBtn != null
-                    && clusterBandFilterActiveBtn.ActualHeight > 0
-                    && clusterBandFilterActiveBtn.IsArrangeValid)
-                {
-                    double activeBottom = clusterBandFilterActiveBtn
-                        .TranslatePoint(new Point(0, clusterBandFilterActiveBtn.ActualHeight), clusterHeaderCanvas).Y;
-                    controlsBottom = Math.Max(controlsBottom, activeBottom);
-                }
-
-                if (clusterLastMinutesComboBox != null
-                    && clusterLastMinutesComboBox.ActualHeight > 0
-                    && clusterLastMinutesComboBox.IsArrangeValid)
-                {
-                    double dropdownBottom = clusterLastMinutesComboBox
-                        .TranslatePoint(new Point(0, clusterLastMinutesComboBox.ActualHeight), clusterHeaderCanvas).Y;
-                    controlsBottom = Math.Max(controlsBottom, dropdownBottom);
-                }
-
-                if (controlsBottom > double.MinValue / 2)
-                {
-                    double marginTop = controlsBottom - clusterHeaderCanvas.Height;
-                    clusterSpotsDataGrid.Margin = new Thickness(0, marginTop, 0, 0);
-                    clusterSpotsDataGrid.Opacity = 1;
-                    clusterTableMarginInitialized = true;
-                }
             }
-
-        }
 
         private double GetClusterColumnLeft(DataGridColumn targetColumn)
         {
@@ -5029,10 +4996,6 @@ namespace HolyLogger
             if (clusterWindow.Height >= 0)
                 Properties.Settings.Default.ClusterWindowHeight = clusterWindow.Height;
             Properties.Settings.Default.Save();
-
-            // Re-evaluate floating overlay positions when the window is resized
-            clusterTableMarginInitialized = false;
-            RequestClusterHeaderAlignmentRefresh();
         }
 
         private async Task ConnectClusterWebSocketAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots)
