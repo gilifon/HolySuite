@@ -3701,8 +3701,7 @@ namespace HolyLogger
             {
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, -8, 0, 0)
+                VerticalAlignment = VerticalAlignment.Top
             };
             lastMinutesFilterPanel.Children.Add(lastMinutesLabel);
             lastMinutesFilterPanel.Children.Add(lastMinutesValuePanel);
@@ -3899,10 +3898,8 @@ namespace HolyLogger
             double freqWidth = GetClusterColumnWidth(clusterFreqColumn);
             double horizontalOffset = clusterSpotsScrollViewer != null ? clusterSpotsScrollViewer.HorizontalOffset : 0;
 
-            // Position the panel so the band indicator (at the right end of the bottom row)
-            // is centered on the Freq column center.
-            // indicator is at ~panelWidth from the left edge, so:
-            //   panelLeft + panelWidth = freqCenter  → panelLeft = freqCenter - panelWidth
+            // Keep horizontal placement logic unchanged; only compute vertical top for showBandsPanel
+            // so the bottom frame of Active Band button aligns with the bottom frame of the dropdown.
             if (clusterShowBandsPanel != null && clusterHeaderCanvas != null)
             {
                 double panelWidth = clusterShowBandsPanel.Width > 0 ? clusterShowBandsPanel.Width : 115;
@@ -3910,7 +3907,31 @@ namespace HolyLogger
                 double panelLeft = freqCenter - panelWidth;
                 if (panelLeft < 0) panelLeft = 0;
                 Canvas.SetLeft(clusterShowBandsPanel, panelLeft);
-                Canvas.SetTop(clusterShowBandsPanel, 2);
+
+                double showPanelTop = 0;
+                if (clusterBandFilterActiveBtn != null && clusterLastMinutesComboBox != null && clusterLastMinutesFilterPanel != null)
+                {
+                    try
+                    {
+                        // Active button bottom relative to showBandsPanel
+                        Point activeBtnTopInShow = clusterBandFilterActiveBtn.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
+                        double activeBtnBottomOffset = activeBtnTopInShow.Y + clusterBandFilterActiveBtn.ActualHeight;
+
+                        // Dropdown combo bottom relative to header canvas
+                        Point comboTopInDrop = clusterLastMinutesComboBox.TranslatePoint(new Point(0, 0), clusterLastMinutesFilterPanel);
+                        double dropdownPanelTop = Canvas.GetTop(clusterLastMinutesFilterPanel);
+                        if (double.IsNaN(dropdownPanelTop)) dropdownPanelTop = 0;
+                        double dropdownBottomInCanvas = dropdownPanelTop + comboTopInDrop.Y + clusterLastMinutesComboBox.ActualHeight;
+
+                        showPanelTop = dropdownBottomInCanvas - activeBtnBottomOffset;
+                    }
+                    catch
+                    {
+                        showPanelTop = 0;
+                    }
+                }
+
+                Canvas.SetTop(clusterShowBandsPanel, showPanelTop);
             }
 
             // Last/minutes dropdown is ALWAYS above the UTC column — never moved
