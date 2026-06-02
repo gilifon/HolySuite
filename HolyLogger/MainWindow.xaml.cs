@@ -3597,7 +3597,8 @@ namespace HolyLogger
                 Text = "Show Bands",
                 FontSize = 11,
                 FontWeight = FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Left,
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                TextAlignment = TextAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 2)
             };
             var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
