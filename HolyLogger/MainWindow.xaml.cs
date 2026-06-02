@@ -3600,7 +3600,6 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = new Thickness(0, 0, 0, 2)
             };
-
             var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
             var btnPreSelected = new Button { Content = "Pre Selected", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
             var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
@@ -3898,15 +3897,32 @@ namespace HolyLogger
             double freqWidth = GetClusterColumnWidth(clusterFreqColumn);
             double horizontalOffset = clusterSpotsScrollViewer != null ? clusterSpotsScrollViewer.HorizontalOffset : 0;
 
-            // Keep horizontal placement logic unchanged; only compute vertical top for showBandsPanel
-            // so the bottom frame of Active Band button aligns with the bottom frame of the dropdown.
+            // Move Show Bands + dropdown vertically as one unit.
+            // Horizontal target: band indicator center aligned to Freq column center.
+            // Vertical target inside the unit: Active Band button bottom aligned to dropdown bottom.
             if (clusterShowBandsPanel != null && clusterHeaderCanvas != null)
             {
                 double panelWidth = clusterShowBandsPanel.Width > 0 ? clusterShowBandsPanel.Width : 115;
                 double freqCenter = freqStart - horizontalOffset + freqWidth / 2.0;
-                double panelLeft = freqCenter - panelWidth;
+                double indicatorCenterOffset = panelWidth;
+                if (clusterActiveBandIndicatorText != null)
+                {
+                    try
+                    {
+                        Point indicatorTopInShow = clusterActiveBandIndicatorText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
+                        indicatorCenterOffset = indicatorTopInShow.X + (clusterActiveBandIndicatorText.ActualWidth / 2.0);
+                    }
+                    catch
+                    {
+                        indicatorCenterOffset = panelWidth;
+                    }
+                }
+
+                double panelLeft = freqCenter - indicatorCenterOffset;
                 if (panelLeft < 0) panelLeft = 0;
                 Canvas.SetLeft(clusterShowBandsPanel, panelLeft);
+
+                const double baseSharedVerticalShift = -45.0;
 
                 double showPanelTop = 0;
                 if (clusterBandFilterActiveBtn != null && clusterLastMinutesComboBox != null && clusterLastMinutesFilterPanel != null)
@@ -3919,8 +3935,7 @@ namespace HolyLogger
 
                         // Dropdown combo bottom relative to header canvas
                         Point comboTopInDrop = clusterLastMinutesComboBox.TranslatePoint(new Point(0, 0), clusterLastMinutesFilterPanel);
-                        double dropdownPanelTop = Canvas.GetTop(clusterLastMinutesFilterPanel);
-                        if (double.IsNaN(dropdownPanelTop)) dropdownPanelTop = 0;
+                        double dropdownPanelTop = 0;
                         double dropdownBottomInCanvas = dropdownPanelTop + comboTopInDrop.Y + clusterLastMinutesComboBox.ActualHeight;
 
                         showPanelTop = dropdownBottomInCanvas - activeBtnBottomOffset;
@@ -3931,14 +3946,14 @@ namespace HolyLogger
                     }
                 }
 
-                Canvas.SetTop(clusterShowBandsPanel, showPanelTop);
+                Canvas.SetTop(clusterShowBandsPanel, showPanelTop + baseSharedVerticalShift);
             }
 
             // Last/minutes dropdown is ALWAYS above the UTC column — never moved
             if (clusterLastMinutesFilterPanel != null && clusterHeaderCanvas != null)
             {
                 Canvas.SetLeft(clusterLastMinutesFilterPanel, utcStart - horizontalOffset);
-                Canvas.SetTop(clusterLastMinutesFilterPanel, 0);
+                Canvas.SetTop(clusterLastMinutesFilterPanel, -45.0);
             }
         }
 
