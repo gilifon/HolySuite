@@ -742,6 +742,7 @@ function drawOverlays() {
         .attr('fill', 'none').attr('stroke', '#2a607a').attr('stroke-width', 2);
 }
 drawOverlays();
+if (autoZoomActive) applyAutoZoom();
 
 var xhr = new XMLHttpRequest();
 xhr.open('GET', 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json', true);
@@ -757,9 +758,10 @@ xhr.onreadystatechange = function() {
     }
     drawOverlays();
     drawRadiusRing(radiusKm);
+    if (autoZoomActive) applyAutoZoom();
 };
-xhr.onerror = function() { drawOverlays(); };
-try { xhr.send(); } catch(e) { drawOverlays(); }
+xhr.onerror = function() { drawOverlays(); if (autoZoomActive) applyAutoZoom(); };
+try { xhr.send(); } catch(e) { drawOverlays(); if (autoZoomActive) applyAutoZoom(); }
 
 function onRadiusChange(km) {
     radiusKm = parseInt(km, 10);
