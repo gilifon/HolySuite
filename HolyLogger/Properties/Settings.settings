@@ -350,6 +350,9 @@
     <Setting Name="ClusterUseActiveBand" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="ClusterBandFilterMode" Type="System.String" Scope="User">
+      <Value Profile="(Default)">PreSelected</Value>
+    </Setting>
     <Setting Name="ClusterEnabledModes" Type="System.String" Scope="User">
       <Value Profile="(Default)">CW,DIGI,SSB,FM,FT8,RTTY,AM</Value>
     </Setting>

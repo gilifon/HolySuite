@@ -1418,6 +1418,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("PreSelected")]
+        public string ClusterBandFilterMode {
+            get {
+                return ((string)(this["ClusterBandFilterMode"]));
+            }
+            set {
+                this["ClusterBandFilterMode"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("CW,DIGI,SSB,FM,FT8,RTTY,AM")]
         public string ClusterEnabledModes {
             get {

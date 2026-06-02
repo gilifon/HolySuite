@@ -229,8 +229,12 @@ namespace HolyLogger
         List<ClusterSpotViewItem> clusterAllSpots = new List<ClusterSpotViewItem>();
         ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
         HashSet<string> clusterWorkedCountries = null;
-        TextBlock clusterActiveBandText = null;
         TextBlock clusterActiveBandIndicatorText = null;
+        Button clusterBandFilterAllBtn = null;
+        Button clusterBandFilterPreSelectedBtn = null;
+        Button clusterBandFilterActiveBtn = null;
+        StackPanel clusterShowBandsPanel = null;
+        Canvas clusterHeaderCanvas = null;
         DataGridColumn clusterDxColumn = null;
         DataGridColumn clusterSpotterColumn = null;
         DataGridColumn clusterFreqColumn = null;
@@ -3510,6 +3514,7 @@ namespace HolyLogger
             var onMyFreqLegend = BuildLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Frequency", true, new Thickness(0, 4, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
             onMyFreqLegend.VerticalAlignment = VerticalAlignment.Top;
+            legendPanel.Children.Add(onMyFreqLegend);
 
             var spotCountText = new TextBlock
             {
@@ -3545,18 +3550,111 @@ namespace HolyLogger
             actionsPanel.Children.Add(undoButton);
             actionsPanel.Children.Add(settingsButton);
 
+            bool isActiveModeNow = string.Equals(Properties.Settings.Default.ClusterBandFilterMode, "Active", StringComparison.OrdinalIgnoreCase);
             var activeBandIndicator = new TextBlock
             {
                 Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty),
-                Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0)),
+                Foreground = isActiveModeNow
+                    ? new SolidColorBrush(Color.FromRgb(0, 190, 0))
+                    : (Brush)new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA)),
                 FontWeight = FontWeights.Bold,
                 FontSize = 16,
-                Margin = new Thickness(0, -8, 0, 4),
+                Margin = new Thickness(6, 0, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Bottom,
-                Visibility = Properties.Settings.Default.ClusterUseActiveBand ? Visibility.Visible : Visibility.Collapsed
+                VerticalAlignment = VerticalAlignment.Center,
+                Visibility = Visibility.Visible
             };
             clusterActiveBandIndicatorText = activeBandIndicator;
+
+            // --- Show Bands selector panel (sits in blank area between band indicator and Last filter) ---
+            string currentFilterMode = Properties.Settings.Default.ClusterBandFilterMode ?? "PreSelected";
+
+            Style MakeBandFilterBtnStyle(bool highlighted)
+            {
+                var st = new Style(typeof(Button));
+                st.Setters.Add(new Setter(Button.FontSizeProperty, 11.0));
+                st.Setters.Add(new Setter(Button.PaddingProperty, new Thickness(4, 1, 4, 1)));
+                st.Setters.Add(new Setter(Button.MarginProperty, new Thickness(0, 1, 0, 1)));
+                st.Setters.Add(new Setter(Button.BorderThicknessProperty, new Thickness(1)));
+                st.Setters.Add(new Setter(Button.CursorProperty, System.Windows.Input.Cursors.Hand));
+                if (highlighted)
+                {
+                    st.Setters.Add(new Setter(Button.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x1E, 0x90, 0xFF))));
+                    st.Setters.Add(new Setter(Button.ForegroundProperty, Brushes.White));
+                    st.Setters.Add(new Setter(Button.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x1E, 0x70, 0xCC))));
+                }
+                else
+                {
+                    st.Setters.Add(new Setter(Button.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8))));
+                    st.Setters.Add(new Setter(Button.ForegroundProperty, Brushes.Black));
+                    st.Setters.Add(new Setter(Button.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA))));
+                }
+                return st;
+            }
+
+            var showBandsLabel = new TextBlock
+            {
+                Text = "Show Bands",
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(0, 0, 0, 2)
+            };
+
+            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
+            var btnPreSelected = new Button { Content = "Pre Selected", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
+            var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
+
+            // Active Band row: button + band indicator side by side
+            var activeBandRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            activeBandRow.Children.Add(btnActiveBand);
+            activeBandRow.Children.Add(activeBandIndicator);
+
+            // No fixed width — panel sizes to its content naturally
+            const double showBandsPanelWidth = 115; // kept for positioning math only
+            var showBandsPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            showBandsPanel.Children.Add(showBandsLabel);
+            showBandsPanel.Children.Add(btnAllBands);
+            showBandsPanel.Children.Add(btnPreSelected);
+            showBandsPanel.Children.Add(activeBandRow);
+
+            clusterBandFilterAllBtn = btnAllBands;
+            clusterBandFilterPreSelectedBtn = btnPreSelected;
+            clusterBandFilterActiveBtn = btnActiveBand;
+            clusterShowBandsPanel = showBandsPanel;
+
+            Action<string> applyBandFilterMode = (newMode) =>
+            {
+                Properties.Settings.Default.ClusterBandFilterMode = newMode;
+                // Keep legacy bool in sync for any code that still reads it
+                Properties.Settings.Default.ClusterUseActiveBand = string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase);
+                Properties.Settings.Default.Save();
+                if (clusterBandFilterAllBtn != null)
+                    clusterBandFilterAllBtn.Style = MakeBandFilterBtnStyle(string.Equals(newMode, "All", StringComparison.OrdinalIgnoreCase));
+                if (clusterBandFilterPreSelectedBtn != null)
+                    clusterBandFilterPreSelectedBtn.Style = MakeBandFilterBtnStyle(string.Equals(newMode, "PreSelected", StringComparison.OrdinalIgnoreCase));
+                if (clusterBandFilterActiveBtn != null)
+                    clusterBandFilterActiveBtn.Style = MakeBandFilterBtnStyle(string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase));
+                bool isActive = string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase);
+                if (clusterActiveBandIndicatorText != null)
+                {
+                    clusterActiveBandIndicatorText.Foreground = isActive
+                        ? new SolidColorBrush(Color.FromRgb(0, 190, 0))
+                        : (Brush)new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+                    clusterActiveBandIndicatorText.Visibility = Visibility.Visible;
+                }
+                RefreshClusterVisibleSpots();
+            };
+
+            btnAllBands.Click += (s, e) => applyBandFilterMode("All");
+            btnPreSelected.Click += (s, e) => applyBandFilterMode("PreSelected");
+            btnActiveBand.Click += (s, e) => applyBandFilterMode("Active");
+            // --- end Show Bands panel ---
 
             var lastMinutesLabel = new TextBlock
             {
@@ -3628,30 +3726,47 @@ namespace HolyLogger
             Grid.SetColumn(legendPanel, 0);
             headerGrid.Children.Add(legendPanel);
 
-            spotCountBadge.HorizontalAlignment = HorizontalAlignment.Left;
+            // Right column: undo+settings buttons on top, spot-count badge below them
+            var rightColumnPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            rightColumnPanel.Children.Add(actionsPanel);
+            spotCountBadge.HorizontalAlignment = HorizontalAlignment.Right;
             spotCountBadge.VerticalAlignment = VerticalAlignment.Top;
-            spotCountBadge.Margin = new Thickness(132, 0, 0, 0);
-            Grid.SetColumn(spotCountBadge, 0);
-            headerGrid.Children.Add(spotCountBadge);
+            spotCountBadge.Margin = new Thickness(0, 4, 0, 0);
+            rightColumnPanel.Children.Add(spotCountBadge);
+            Grid.SetColumn(rightColumnPanel, 1);
+            headerGrid.Children.Add(rightColumnPanel);
 
-            Grid.SetColumn(actionsPanel, 0);
-            Grid.SetColumn(actionsPanel, 1);
-            headerGrid.Children.Add(actionsPanel);
+            // Overlay grid: showBandsPanel and lastMinutesFilterPanel float over the top of spotsGrid
+            // so the table header row is the zero-gap boundary. The Canvas is kept only as a thin
+            // transparent hit-test surface; real positioning done by UpdateClusterActiveBandIndicatorPosition.
+            const double headerCanvasHeight = 82;
+            var headerCanvas = new Canvas { Height = headerCanvasHeight, IsHitTestVisible = true };
+            clusterHeaderCanvas = headerCanvas;
+
+            // Start off-screen; UpdateClusterActiveBandIndicatorPosition moves them to correct positions
+            Canvas.SetTop(showBandsPanel, 0);
+            Canvas.SetLeft(showBandsPanel, -400);
+            headerCanvas.Children.Add(showBandsPanel);
+
+            Canvas.SetTop(lastMinutesFilterPanel, 0);
+            Canvas.SetLeft(lastMinutesFilterPanel, -400);
+            headerCanvas.Children.Add(lastMinutesFilterPanel);
 
             var layoutGrid = new Grid { Margin = new Thickness(12) };
-            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });  // row 0: legends
+            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });  // row 1: buttons canvas
+            layoutGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // row 2: table
 
             Grid.SetRow(headerGrid, 0);
-            Grid.SetRow(activeBandIndicator, 1);
-            Grid.SetRow(onMyFreqLegend, 1);
-            Grid.SetRow(lastMinutesFilterPanel, 1);
+            Grid.SetRow(headerCanvas, 1);
             Grid.SetRow(spotsGrid, 2);
             layoutGrid.Children.Add(headerGrid);
-            layoutGrid.Children.Add(activeBandIndicator);
-            layoutGrid.Children.Add(onMyFreqLegend);
-            layoutGrid.Children.Add(lastMinutesFilterPanel);
+            layoutGrid.Children.Add(headerCanvas);
             layoutGrid.Children.Add(spotsGrid);
 
             clusterWindow = new Window
@@ -3709,6 +3824,10 @@ namespace HolyLogger
                 clusterSpotsScrollViewer = null;
                 clusterLastMinutesFilterPanel = null;
                 clusterLastMinutesComboBox = null;
+                clusterBandFilterAllBtn = null;
+                clusterBandFilterPreSelectedBtn = null;
+                clusterBandFilterActiveBtn = null;
+                clusterShowBandsPanel = null;
                 if (clusterSingleClickOpenQrzTimer != null)
                 {
                     clusterSingleClickOpenQrzTimer.Stop();
@@ -3778,15 +3897,27 @@ namespace HolyLogger
             double freqStart = GetClusterColumnLeft(clusterFreqColumn);
             double utcStart = GetClusterColumnLeft(clusterUtcColumn);
             double freqWidth = GetClusterColumnWidth(clusterFreqColumn);
-            clusterActiveBandIndicatorText.Width = freqWidth;
-            clusterActiveBandIndicatorText.TextAlignment = TextAlignment.Center;
             double horizontalOffset = clusterSpotsScrollViewer != null ? clusterSpotsScrollViewer.HorizontalOffset : 0;
-            clusterActiveBandIndicatorText.Margin = new Thickness(freqStart - horizontalOffset, 4, 0, 0);
 
-            if (clusterLastMinutesFilterPanel != null)
+            // Position the panel so the band indicator (at the right end of the bottom row)
+            // is centered on the Freq column center.
+            // indicator is at ~panelWidth from the left edge, so:
+            //   panelLeft + panelWidth = freqCenter  → panelLeft = freqCenter - panelWidth
+            if (clusterShowBandsPanel != null && clusterHeaderCanvas != null)
             {
-                clusterLastMinutesFilterPanel.Width = double.NaN;
-                clusterLastMinutesFilterPanel.Margin = new Thickness(utcStart - horizontalOffset, -12, 0, 0);
+                double panelWidth = clusterShowBandsPanel.Width > 0 ? clusterShowBandsPanel.Width : 115;
+                double freqCenter = freqStart - horizontalOffset + freqWidth / 2.0;
+                double panelLeft = freqCenter - panelWidth;
+                if (panelLeft < 0) panelLeft = 0;
+                Canvas.SetLeft(clusterShowBandsPanel, panelLeft);
+                Canvas.SetTop(clusterShowBandsPanel, 2);
+            }
+
+            // Last/minutes dropdown is ALWAYS above the UTC column — never moved
+            if (clusterLastMinutesFilterPanel != null && clusterHeaderCanvas != null)
+            {
+                Canvas.SetLeft(clusterLastMinutesFilterPanel, utcStart - horizontalOffset);
+                Canvas.SetTop(clusterLastMinutesFilterPanel, 0);
             }
         }
 
@@ -4109,50 +4240,7 @@ namespace HolyLogger
             var enabledBands = GetEnabledClusterBands();
             var enabledModes = GetEnabledClusterModes();
 
-            var modePanel = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                Margin = new Thickness(12, 8, 12, 2)
-            };
 
-            var activeBandPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 4)
-            };
-
-            var rbActiveBand = new RadioButton
-            {
-                Content = "Active band",
-                IsChecked = Properties.Settings.Default.ClusterUseActiveBand,
-                Margin = new Thickness(0, 0, 8, 0),
-                GroupName = "ClusterBandMode",
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            clusterActiveBandText = new TextBlock
-            {
-                Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty),
-                Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0)),
-                FontWeight = FontWeights.Bold,
-                FontSize = 16,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-
-            var rbManualBands = new RadioButton
-            {
-                Content = "Selected bands",
-                IsChecked = !Properties.Settings.Default.ClusterUseActiveBand,
-                Margin = new Thickness(0, 0, 0, 2),
-                GroupName = "ClusterBandMode"
-            };
-
-            activeBandPanel.Children.Add(rbActiveBand);
-            activeBandPanel.Children.Add(clusterActiveBandText);
-
-            modePanel.Children.Add(activeBandPanel);
-            modePanel.Children.Add(rbManualBands);
 
             var bandsPanel = new StackPanel
             {
@@ -4388,7 +4476,7 @@ namespace HolyLogger
 
             var header = new TextBlock
             {
-                Text = "Visible bands",
+                Text = "Pre Selected Bands",
                 Margin = new Thickness(12, 12, 12, 0),
                 FontSize = 15,
                 FontWeight = FontWeights.SemiBold
@@ -4398,64 +4486,12 @@ namespace HolyLogger
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 Content = bandsPanel,
-                Margin = new Thickness(0, 0, 0, 4),
-                IsEnabled = !Properties.Settings.Default.ClusterUseActiveBand,
-                Opacity = Properties.Settings.Default.ClusterUseActiveBand ? 0.45 : 1.0
+                Margin = new Thickness(0, 2, 0, 4),
+                IsEnabled = true,
+                Opacity = 1.0
             };
 
-            rbActiveBand.Checked += (s, e) =>
-            {
-                Properties.Settings.Default.ClusterUseActiveBand = true;
-                Properties.Settings.Default.Save();
-                bandsScroll.IsEnabled = false;
-                bandsScroll.Opacity = 0.45;
-                if (clusterActiveBandIndicatorText != null)
-                {
-                    clusterActiveBandIndicatorText.Visibility = Visibility.Visible;
-                    UpdateClusterActiveBandIndicatorPosition();
-                }
-                RefreshClusterVisibleSpots();
-            };
 
-            rbManualBands.Checked += (s, e) =>
-            {
-                Properties.Settings.Default.ClusterUseActiveBand = false;
-                Properties.Settings.Default.Save();
-                bandsScroll.IsEnabled = true;
-                bandsScroll.Opacity = 1.0;
-                if (clusterActiveBandIndicatorText != null)
-                {
-                    clusterActiveBandIndicatorText.Visibility = Visibility.Collapsed;
-                }
-                RefreshClusterVisibleSpots();
-            };
-
-            var showAllBandsButton = new Button
-            {
-                Content = "show all bands",
-                Margin = new Thickness(0, 0, 0, 6),
-                Padding = new Thickness(8, 3, 8, 3),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                MinWidth = 120
-            };
-            showAllBandsButton.Click += (s, e) =>
-            {
-                enabledBands.Clear();
-                foreach (string b in ClusterBandOptions)
-                {
-                    enabledBands.Add(b);
-                }
-
-                SaveEnabledClusterBands(enabledBands);
-
-                foreach (var cb in bandCheckBoxes)
-                {
-                    cb.IsChecked = true;
-                }
-
-                RefreshClusterVisibleSpots();
-            };
-            bandsPanel.Children.Insert(0, showAllBandsButton);
 
             var modesHeader = new TextBlock
             {
@@ -4501,6 +4537,7 @@ namespace HolyLogger
             };
             modesPanel.Children.Insert(0, showAllModesButton);
 
+
             Grid.SetRow(header, 0);
             Grid.SetColumn(header, 0);
 
@@ -4510,9 +4547,7 @@ namespace HolyLogger
             Grid.SetRow(bandColorsHeader, 0);
             Grid.SetColumn(bandColorsHeader, 2);
 
-            Grid.SetRow(modePanel, 1);
-            Grid.SetColumn(modePanel, 0);
-            Grid.SetColumnSpan(modePanel, 2);
+
 
             Grid.SetRow(bandColorsScroll, 2);
             Grid.SetColumn(bandColorsScroll, 2);
@@ -4542,7 +4577,8 @@ namespace HolyLogger
             bandsModesSplit.Children.Add(modesScroll);
             bandsModesBottom.Children.Add(bandsModesSplit);
 
-            Grid.SetRow(bandsModesBottom, 2);
+            Grid.SetRow(bandsModesBottom, 1);
+            Grid.SetRowSpan(bandsModesBottom, 2);
             Grid.SetColumn(bandsModesBottom, 0);
             Grid.SetColumnSpan(bandsModesBottom, 2);
 
@@ -4596,7 +4632,7 @@ namespace HolyLogger
             settingsLayout.Children.Add(header);
             settingsLayout.Children.Add(modesHeader);
             settingsLayout.Children.Add(bandColorsHeader);
-            settingsLayout.Children.Add(modePanel);
+
             settingsLayout.Children.Add(bandsModesBottom);
             settingsLayout.Children.Add(bandColorsScroll);
             settingsLayout.Children.Add(resetPanel);
@@ -5616,17 +5652,21 @@ namespace HolyLogger
         {
             string normalized = NormalizeClusterBandKey(bandText);
             if (string.IsNullOrWhiteSpace(normalized))
-            {
                 return true;
-            }
 
-            if (Properties.Settings.Default.ClusterUseActiveBand)
+            string mode = Properties.Settings.Default.ClusterBandFilterMode ?? "PreSelected";
+
+            if (string.Equals(mode, "All", StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            if (string.Equals(mode, "Active", StringComparison.OrdinalIgnoreCase))
             {
                 string activeBand = TB_Band != null ? TB_Band.Text : string.Empty;
                 string active = NormalizeClusterBandKey(activeBand);
                 return !string.IsNullOrWhiteSpace(active) && string.Equals(active, normalized, StringComparison.OrdinalIgnoreCase);
             }
 
+            // PreSelected
             var enabled = GetEnabledClusterBands();
             return enabled.Contains(normalized);
         }
@@ -6354,18 +6394,13 @@ namespace HolyLogger
         private void TB_Band_TextChanged(object sender, TextChangedEventArgs e)
         {
             UpdateDup();
-            if (clusterActiveBandText != null)
-            {
-                clusterActiveBandText.Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty);
-            }
-
             if (clusterActiveBandIndicatorText != null)
             {
                 clusterActiveBandIndicatorText.Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty);
                 UpdateClusterActiveBandIndicatorPosition();
             }
 
-            if (Properties.Settings.Default.ClusterUseActiveBand)
+            if (string.Equals(Properties.Settings.Default.ClusterBandFilterMode, "Active", StringComparison.OrdinalIgnoreCase))
             {
                 RefreshClusterVisibleSpots();
             }
