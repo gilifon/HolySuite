@@ -793,24 +793,53 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 function applyAutoZoom() {
     if (!clusterSpots || clusterSpots.length === 0) return;
+    // Helper: validate a [lon,lat] pair and push its distance from home.
+    function pushDist(arr, distances) {
+        if (!arr || arr.length !== 2) return;
+        var lon = arr[0], lat = arr[1];
+        if (!isFinite(lon) || !isFinite(lat)) return;
+        if (lon < -180 || lon > 180 || lat < -90 || lat > 90) return;
+        var km = haversineKm(centerLat, centerLon, lat, lon);
+        if (isFinite(km) && km > 0) distances.push(km);
+    }
+    // Helper: sample N intermediate great-circle points between two [lon,lat] coords
+    // and push their distances.  Arc midpoints can bow farther from home than the
+    // endpoints on an azimuthal equidistant projection — this is why arcs were
+    // escaping the circle even when both endpoints were inside.
+    function pushArcDists(a, b, n, distances) {
+        if (!a || !b) return;
+        var toRad = Math.PI/180, toDeg = 180/Math.PI;
+        var la1=a[1]*toRad, lo1=a[0]*toRad, la2=b[1]*toRad, lo2=b[0]*toRad;
+        var d = 2*Math.asin(Math.sqrt(
+            Math.pow(Math.sin((la2-la1)/2),2) +
+            Math.cos(la1)*Math.cos(la2)*Math.pow(Math.sin((lo2-lo1)/2),2)));
+        if (d < 0.0001) return;
+        for (var k=1; k<n; k++) {
+            var f=k/n;
+            var A=Math.sin((1-f)*d)/Math.sin(d), B=Math.sin(f*d)/Math.sin(d);
+            var x=A*Math.cos(la1)*Math.cos(lo1)+B*Math.cos(la2)*Math.cos(lo2);
+            var y=A*Math.cos(la1)*Math.sin(lo1)+B*Math.cos(la2)*Math.sin(lo2);
+            var z=A*Math.sin(la1)+B*Math.sin(la2);
+            var ptLat=Math.atan2(z,Math.sqrt(x*x+y*y))*toDeg;
+            var ptLon=Math.atan2(y,x)*toDeg;
+            var km=haversineKm(centerLat, centerLon, ptLat, ptLon);
+            if (isFinite(km) && km > 0) distances.push(km);
+        }
+    }
     var distances = [];
     for (var i = 0; i < clusterSpots.length; i++) {
         var sp = clusterSpots[i];
-        // DX point: sp.c = [lon, lat] — validate strictly
-        if (sp.c && sp.c.length === 2
-            && isFinite(sp.c[0]) && isFinite(sp.c[1])
-            && sp.c[0] >= -180 && sp.c[0] <= 180
-            && sp.c[1] >= -90  && sp.c[1] <= 90) {
-            var dxKm = haversineKm(centerLat, centerLon, sp.c[1], sp.c[0]);
-            if (isFinite(dxKm) && dxKm > 0) distances.push(dxKm);
-        }
+        pushDist(sp.c,  distances);   // DX endpoint
+        pushDist(sp.sp, distances);   // Spotter endpoint
+        // Sample 10 intermediate points along the spotter→DX arc so that arcs
+        // bowing outward on the azimuthal projection are also accounted for.
+        if (sp.sp && sp.c) pushArcDists(sp.sp, sp.c, 10, distances);
     }
     if (distances.length === 0) return;
-    // Find the farthest DX station from home
+    // Radius = farthest station (DX, spotter, or arc midpoint) + 10% padding.
     var maxKm = 0;
     for (var j = 0; j < distances.length; j++) { if (distances[j] > maxKm) maxKm = distances[j]; }
     if (maxKm < 100) maxKm = 100;
-    // Use farthest distance + 10% padding — no snapping, map renders at any radius
     var newKm = Math.ceil(maxKm * 1.10);
     // Update label
     var lbl = document.getElementById('radius-label');

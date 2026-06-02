@@ -251,6 +251,7 @@ namespace HolyLogger
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
         bool clusterHeaderAlignmentRefreshPending = false;
         DispatcherTimer _mapUpdateDebounceTimer = null;
+        bool _dxQsoInProgress = false;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
@@ -5708,6 +5709,8 @@ namespace HolyLogger
                 return;
             if (!Properties.Settings.Default.ClusterMapEnabled)
                 return;
+            if (_dxQsoInProgress)
+                return;
             if (_mapUpdateDebounceTimer == null)
             {
                 DoUpdateClusterSpotsOnMap();
@@ -7544,10 +7547,13 @@ namespace HolyLogger
                     }
 
                     Azimuth = MaidenheadLocator.Azimuth(TB_MyLocator.Text, locator);
-                    int mapRadiusKm = GetMapRadiusKm();
                     var ll = MaidenheadLocator.LocatorToLatLng(locator);
                     var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
-                    MapControl.ShowMap(ll.Lat, ll.Long, mapRadiusKm, Azimuth, homell.Lat, homell.Long);
+                    // Auto-fit: compute distance between home and DX, add 10% padding.
+                    double distKm = MaidenheadLocator.Distance(homell, ll);
+                    int autoFitRadius = Math.Max(500, (int)(distKm * 1.10));
+                    _dxQsoInProgress = true;
+                    MapControl.ShowMap(ll.Lat, ll.Long, autoFitRadius, Azimuth, homell.Lat, homell.Long);
                 }
                 catch (Exception e)
                 {
@@ -7576,7 +7582,17 @@ namespace HolyLogger
         private void ClearAzimuth()
         {
             Azimuth = 0;
-            ShowHomeMap();
+            _dxQsoInProgress = false;
+            // Immediately repaint cluster spots instead of waiting for the debounce timer.
+            if (MapControl != null && MapControl.Visibility == Visibility.Visible
+                && Properties.Settings.Default.ClusterMapEnabled)
+            {
+                DoUpdateClusterSpotsOnMap();
+            }
+            else
+            {
+                ShowHomeMap();
+            }
         }
 
         private void ShowHomeMap()
