@@ -234,6 +234,8 @@ namespace HolyLogger
         Button clusterBandFilterPreSelectedBtn = null;
         Button clusterBandFilterActiveBtn = null;
         StackPanel clusterShowBandsPanel = null;
+        TextBlock clusterShowBandsLabelText = null;
+        TextBlock clusterNewCountryLegendText = null;
         Canvas clusterHeaderCanvas = null;
         DataGridColumn clusterDxColumn = null;
         DataGridColumn clusterSpotterColumn = null;
@@ -241,6 +243,7 @@ namespace HolyLogger
         DataGridColumn clusterUtcColumn = null;
         DataGrid clusterSpotsDataGrid = null;
         ScrollViewer clusterSpotsScrollViewer = null;
+        bool clusterTableMarginInitialized = false;
         StackPanel clusterLastMinutesFilterPanel = null;
         ComboBox clusterLastMinutesComboBox = null;
         int clusterLastMinutesFilterValue = 60;
@@ -3330,7 +3333,8 @@ namespace HolyLogger
                 AlternationCount = 2,
                 AlternatingRowBackground = Brushes.Gainsboro,
                 FontSize = 13,
-                Margin = new Thickness(0, 0, 0, 0)
+                Margin = new Thickness(0, -80, 0, 0),
+                Opacity = 0
             };
             ToolTipService.SetInitialShowDelay(spotsGrid, 50);
             ToolTipService.SetShowDuration(spotsGrid, 3000);
@@ -3449,6 +3453,7 @@ namespace HolyLogger
                 RequestClusterHeaderAlignmentRefresh();
             };
             clusterSpotsDataGrid = spotsGrid;
+            clusterTableMarginInitialized = false;
 
             clusterSingleClickOpenQrzTimer = new DispatcherTimer
             {
@@ -3487,14 +3492,20 @@ namespace HolyLogger
                     });
                 }
 
-                itemPanel.Children.Add(new TextBlock
+                var itemText = new TextBlock
                 {
                     Text = text,
                     FontSize = 12,
                     Background = useTextBackground ? color : Brushes.Transparent,
                     Padding = useTextBackground ? new Thickness(3, 0, 3, 0) : new Thickness(0),
                     VerticalAlignment = VerticalAlignment.Center
-                });
+                };
+                itemPanel.Children.Add(itemText);
+
+                if (string.Equals(text, "New Country", StringComparison.Ordinal))
+                {
+                    clusterNewCountryLegendText = itemText;
+                }
 
                 return itemPanel;
             }
@@ -3601,6 +3612,7 @@ namespace HolyLogger
                 TextAlignment = TextAlignment.Center,
                 Margin = new Thickness(0, 0, 0, 2)
             };
+            clusterShowBandsLabelText = showBandsLabel;
             var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
             var btnPreSelected = new Button { Content = "Pre Selected", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
             var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Style = MakeBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
@@ -3735,7 +3747,7 @@ namespace HolyLogger
             rightColumnPanel.Children.Add(actionsPanel);
             spotCountBadge.HorizontalAlignment = HorizontalAlignment.Right;
             spotCountBadge.VerticalAlignment = VerticalAlignment.Top;
-            spotCountBadge.Margin = new Thickness(0, 4, 0, 0);
+            spotCountBadge.Margin = new Thickness(0, -6, 0, 0);
             rightColumnPanel.Children.Add(spotCountBadge);
             Grid.SetColumn(rightColumnPanel, 1);
             headerGrid.Children.Add(rightColumnPanel);
@@ -3743,7 +3755,7 @@ namespace HolyLogger
             // Overlay grid: showBandsPanel and lastMinutesFilterPanel float over the top of spotsGrid
             // so the table header row is the zero-gap boundary. The Canvas is kept only as a thin
             // transparent hit-test surface; real positioning done by UpdateClusterActiveBandIndicatorPosition.
-            const double headerCanvasHeight = 82;
+            const double headerCanvasHeight = 72;
             var headerCanvas = new Canvas { Height = headerCanvasHeight, IsHitTestVisible = true };
             clusterHeaderCanvas = headerCanvas;
 
@@ -3947,15 +3959,76 @@ namespace HolyLogger
                     }
                 }
 
-                Canvas.SetTop(clusterShowBandsPanel, showPanelTop + baseSharedVerticalShift);
+                double showTop = showPanelTop + baseSharedVerticalShift;
+                double dropdownTop = -45.0;
+
+                // Keep Show Bands label on the same level as New Country by shifting both controls as one unit.
+                if (clusterShowBandsLabelText != null && clusterNewCountryLegendText != null)
+                {
+                    try
+                    {
+                        Point showLabelOffset = clusterShowBandsLabelText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
+                        Point newCountryInCanvas = clusterNewCountryLegendText.TranslatePoint(new Point(0, 0), clusterHeaderCanvas);
+                        double delta = newCountryInCanvas.Y - (showTop + showLabelOffset.Y);
+                        showTop += delta;
+                        dropdownTop += delta;
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                Canvas.SetTop(clusterShowBandsPanel, showTop);
+
+                if (clusterLastMinutesFilterPanel != null)
+                {
+                    Canvas.SetTop(clusterLastMinutesFilterPanel, dropdownTop);
+                }
             }
 
             // Last/minutes dropdown is ALWAYS above the UTC column — never moved
             if (clusterLastMinutesFilterPanel != null && clusterHeaderCanvas != null)
             {
                 Canvas.SetLeft(clusterLastMinutesFilterPanel, utcStart - horizontalOffset);
-                Canvas.SetTop(clusterLastMinutesFilterPanel, -45.0);
             }
+
+            // Move ONLY the table so its top edge touches the lower edge of Active Band / dropdown.
+            // Apply once per window open to avoid visible re-position jumps.
+            if (!clusterTableMarginInitialized && clusterHeaderCanvas != null && clusterSpotsDataGrid != null)
+            {
+                double controlsBottom = double.MinValue;
+
+                if (clusterBandFilterActiveBtn != null)
+                {
+                    try
+                    {
+                        double activeBottom = clusterBandFilterActiveBtn
+                            .TranslatePoint(new Point(0, clusterBandFilterActiveBtn.ActualHeight), clusterHeaderCanvas).Y;
+                        controlsBottom = Math.Max(controlsBottom, activeBottom);
+                    }
+                    catch { }
+                }
+
+                if (clusterLastMinutesComboBox != null)
+                {
+                    try
+                    {
+                        double dropdownBottom = clusterLastMinutesComboBox
+                            .TranslatePoint(new Point(0, clusterLastMinutesComboBox.ActualHeight), clusterHeaderCanvas).Y;
+                        controlsBottom = Math.Max(controlsBottom, dropdownBottom);
+                    }
+                    catch { }
+                }
+
+                if (controlsBottom > double.MinValue / 2)
+                {
+                    double marginTop = controlsBottom - clusterHeaderCanvas.Height;
+                    clusterSpotsDataGrid.Margin = new Thickness(0, marginTop, 0, 0);
+                    clusterSpotsDataGrid.Opacity = 1;
+                    clusterTableMarginInitialized = true;
+                }
+            }
+
         }
 
         private double GetClusterColumnLeft(DataGridColumn targetColumn)
