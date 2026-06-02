@@ -1346,6 +1346,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("60")]
+        public double ClusterColWidthMode {
+            get {
+                return ((double)(this["ClusterColWidthMode"]));
+            }
+            set {
+                this["ClusterColWidthMode"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("140")]
         public double ClusterSettingsWindowLeft {
             get {

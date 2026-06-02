@@ -332,6 +332,9 @@
     <Setting Name="ClusterColWidthComment" Type="System.Double" Scope="User">
       <Value Profile="(Default)">220</Value>
     </Setting>
+    <Setting Name="ClusterColWidthMode" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">60</Value>
+    </Setting>
     <Setting Name="ClusterSettingsWindowLeft" Type="System.Double" Scope="User">
       <Value Profile="(Default)">140</Value>
     </Setting>
