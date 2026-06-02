@@ -37,6 +37,13 @@ namespace HolyLogger.ToolsUserControls
             _owner.ToggleProjection();
         }
 
+        public void SetAutoZoom(string active)
+        {
+            bool isActive = active == "1";
+            Properties.Settings.Default.MapAutoZoom = isActive;
+            Properties.Settings.Default.Save();
+        }
+
         public void TuneToSpot(string freq, string mode)
         {
             _owner.RaiseSpotTuneRequested(freq, mode);
@@ -588,6 +595,7 @@ var radiusKm = " + radiusKm.ToString() + @";
 var marginMultiplier = " + marginJs + @";
 var useMiles = " + useMilesJs + @";
 var clusterSpots = " + spotsJs.ToString() + @"; // [[lon,lat],...]
+var autoZoomInitActive = " + (Properties.Settings.Default.MapAutoZoom ? "true" : "false") + @";
 var EARTH_KM = 6371;
 
 var W = window.innerWidth, H = window.innerHeight;
@@ -606,6 +614,16 @@ var path = d3.geoPath().projection(projection);
 var baseScale = mapR / Math.PI;
 var viewCenterLat = centerLat, viewCenterLon = centerLon;
 scaleToRadius();
+// Restore saved auto zoom state
+var autoZoomActive = false;
+var autoZoomSavedRadiusKm = -1;
+if (autoZoomInitActive) {
+    autoZoomActive = true;
+    autoZoomSavedRadiusKm = radiusKm;
+    var azBtn = document.getElementById('autozoom-wrap');
+    if (azBtn) azBtn.classList.add('active');
+    setRadiusControlVisibility(true);
+}
 
 function scaleToRadius() {
     var ang = radiusKm / EARTH_KM;
@@ -764,8 +782,6 @@ function updateClusterSpots(json) {
     drawOverlays();
     if (autoZoomActive) applyAutoZoom();
 }
-var autoZoomActive = false;
-var autoZoomSavedRadiusKm = -1;
 function haversineKm(lat1, lon1, lat2, lon2) {
     var R = 6371, toR = Math.PI/180;
     var dLat = (lat2-lat1)*toR, dLon = (lon2-lon1)*toR;
@@ -835,6 +851,7 @@ function toggleAutoZoom() {
         setRadiusControlVisibility(false);
         if (autoZoomSavedRadiusKm > 0) restoreRadius(autoZoomSavedRadiusKm);
     }
+    try { window.external.SetAutoZoom(autoZoomActive ? '1' : '0'); } catch(e) {}
 }
 svg.call(d3.drag()
     .on('start', function() {})

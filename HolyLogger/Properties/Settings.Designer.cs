@@ -923,6 +923,18 @@ namespace HolyLogger.Properties {
                 this["MapUsePolar"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool MapAutoZoom {
+            get {
+                return ((bool)(this["MapAutoZoom"]));
+            }
+            set {
+                this["MapAutoZoom"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
