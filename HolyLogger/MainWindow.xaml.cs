@@ -3687,6 +3687,7 @@ namespace HolyLogger
                 Properties.Settings.Default.ClusterColWidthFreq = freqColumn.ActualWidth;
                 Properties.Settings.Default.ClusterColWidthUtc = utcColumn.ActualWidth;
                 Properties.Settings.Default.ClusterColWidthComment = commentColumn.ActualWidth;
+                Properties.Settings.Default.Save();
 
                 if (clusterSettingsWindow != null)
                 {
@@ -4089,6 +4090,7 @@ namespace HolyLogger
 
             Properties.Settings.Default.ClusterWindowLeft = clusterWindow.Left;
             Properties.Settings.Default.ClusterWindowTop = clusterWindow.Top;
+            Properties.Settings.Default.Save();
         }
 
         private void OpenClusterSettingsWindow()
@@ -4403,6 +4405,7 @@ namespace HolyLogger
             rbActiveBand.Checked += (s, e) =>
             {
                 Properties.Settings.Default.ClusterUseActiveBand = true;
+                Properties.Settings.Default.Save();
                 bandsScroll.IsEnabled = false;
                 bandsScroll.Opacity = 0.45;
                 if (clusterActiveBandIndicatorText != null)
@@ -4416,6 +4419,7 @@ namespace HolyLogger
             rbManualBands.Checked += (s, e) =>
             {
                 Properties.Settings.Default.ClusterUseActiveBand = false;
+                Properties.Settings.Default.Save();
                 bandsScroll.IsEnabled = true;
                 bandsScroll.Opacity = 1.0;
                 if (clusterActiveBandIndicatorText != null)
@@ -4849,9 +4853,10 @@ namespace HolyLogger
                 Properties.Settings.Default.ClusterWindowWidth = clusterWindow.Width;
             if (clusterWindow.Height >= 0)
                 Properties.Settings.Default.ClusterWindowHeight = clusterWindow.Height;
+            Properties.Settings.Default.Save();
         }
 
-        private async Task ConnectClusterWebSocketAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots)
+        private async Task ConnectClusterWebSocketAsync
         {
             try
             {
@@ -5565,9 +5570,10 @@ namespace HolyLogger
 
             string csv = string.Join(",", ClusterBandOptions.Where(b => enabled.Contains(b)));
             Properties.Settings.Default.ClusterEnabledBands = csv;
+            Properties.Settings.Default.Save();
         }
 
-        private string NormalizeClusterBandKey(string bandText)
+        private string NormalizeClusterBandKey
         {
             string b = (bandText ?? string.Empty).Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(b))
@@ -5651,9 +5657,10 @@ namespace HolyLogger
 
             string csv = string.Join(",", ClusterModeOptions.Where(m => enabled.Contains(m)));
             Properties.Settings.Default.ClusterEnabledModes = csv;
+            Properties.Settings.Default.Save();
         }
 
-        private bool IsClusterModeEnabled(string modeText)
+        private bool IsClusterModeEnabled
         {
             string normalized = (modeText ?? string.Empty).Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(normalized))
