@@ -4856,7 +4856,7 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
-        private async Task ConnectClusterWebSocketAsync
+        private async Task ConnectClusterWebSocketAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots)
         {
             try
             {
@@ -5573,7 +5573,7 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
-        private string NormalizeClusterBandKey
+        private string NormalizeClusterBandKey(string bandText)
         {
             string b = (bandText ?? string.Empty).Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(b))
@@ -5660,7 +5660,7 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
-        private bool IsClusterModeEnabled
+        private bool IsClusterModeEnabled(string modeText)
         {
             string normalized = (modeText ?? string.Empty).Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(normalized))

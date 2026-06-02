@@ -1598,9 +1598,11 @@ xhr.onreadystatechange = function() {
     // Always redraw overlays on top after countries attempt
     drawOverlays();
     drawRadiusRing(radiusKm);
+    // If auto zoom was restored from settings, apply it now that all functions are ready
+    if (autoZoomActive) applyAutoZoom();
 };
-xhr.onerror = function() { drawOverlays(); };
-try { xhr.send(); } catch(e5) { drawOverlays(); }
+xhr.onerror = function() { drawOverlays(); if (autoZoomActive) applyAutoZoom(); };
+try { xhr.send(); } catch(e5) { drawOverlays(); if (autoZoomActive) applyAutoZoom(); }
 
 function onRadiusChange(km) {
     radiusKm = parseInt(km, 10);
