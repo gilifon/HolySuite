@@ -6939,6 +6939,7 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 ClearQrzPhoto();
+                ClearAzimuth();
                 return;
             }
 
@@ -7847,15 +7848,12 @@ namespace HolyLogger
         {
             Azimuth = 0;
             _dxQsoInProgress = false;
-            // Immediately repaint cluster spots instead of waiting for the debounce timer.
+            // Always reset to home first to clear any DX arc, then repaint cluster spots on top if needed.
+            ShowHomeMap();
             if (MapControl != null && MapControl.Visibility == Visibility.Visible
                 && Properties.Settings.Default.ClusterMapEnabled)
             {
                 DoUpdateClusterSpotsOnMap();
-            }
-            else
-            {
-                ShowHomeMap();
             }
         }
 
