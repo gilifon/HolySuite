@@ -33,7 +33,6 @@ using System.Windows.Controls.Primitives;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System.Text.RegularExpressions;
-using System.Net;
 using System.Data.SQLite;
 
 namespace HolyLogger
@@ -225,6 +224,9 @@ namespace HolyLogger
         ClientWebSocket clusterWebSocket = null;
         CancellationTokenSource clusterWebSocketCts = null;
         long clusterLastSpotTime = 0;
+        static readonly string ClusterLogPath = System.IO.Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+            "HolyLogger", "cluster_connection.log");
         HashSet<string> clusterSpotKeys = new HashSet<string>(StringComparer.Ordinal);
         List<ClusterSpotViewItem> clusterAllSpots = new List<ClusterSpotViewItem>();
         ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
@@ -257,11 +259,12 @@ namespace HolyLogger
         TextBlock clusterSpotCountText = null;
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
         bool clusterHeaderAlignmentRefreshPending = false;
+        Action _clusterWidthHandlerCleanup = null;
 
         // Layout constants for the cluster window floating overlay panels
         const double ClusterOffScreenPosition = -400;
-        const double ClusterHeaderCanvasHeight = 72;
-        const double ClusterTableTopGap = 6;
+        const double ClusterHeaderCanvasHeight = 92;
+        const double ClusterTableTopGap = 20;
         const double ClusterShowBandsPanelWidth = 115;
         const double ClusterBaseSharedVerticalShift = -45.0;
         const double ClusterLastMinutesDropdownTop = -45.0;
@@ -2000,50 +2003,57 @@ namespace HolyLogger
          
         private void AdifHandlerWorker_DoWork(object sender, DoWorkEventArgs e)
         {
-            this.Dispatcher.Invoke(() =>
-            {
-                int faultyQSO = 0;
-                foreach (var filename in ImportFileQ) //for each file in the Q
-                {
-                    string RawAdif = File.ReadAllText(filename, Encoding.UTF8); //read it
-                    _holyLogParser = new HolyLogParser(RawAdif, (HolyLogParser.IsIsraeliStation(Properties.Settings.Default.my_callsign)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
-                    try
-                    {
-                        _holyLogParser.Parse(); //try to parse it
-                        List<QSO> rawQSOList = _holyLogParser.GetRawQSO();//get the qso list
-                        int count = rawQSOList.Count;
+            // Capture UI-dependent values on the calling thread before going to background work
+            string overrideOperator = this.Dispatcher.Invoke(() => TB_Operator.Text);
+            bool isOverride = Properties.Settings.Default.IsOverrideOperatorFromFile;
+            bool isParseDuplicates = Properties.Settings.Default.IsParseDuplicates;
+            bool isParseWARC = Properties.Settings.Default.IsParseWARC;
+            string myCallsign = Properties.Settings.Default.my_callsign;
+            List<string> files = this.Dispatcher.Invoke(() => ImportFileQ.ToList());
 
-                        int c = 1;
-                        foreach (var rq in rawQSOList)
+            int faultyQSO = 0;
+            foreach (var filename in files)
+            {
+                string RawAdif = File.ReadAllText(filename, Encoding.UTF8);
+                var parser = new HolyLogParser(RawAdif,
+                    HolyLogParser.IsIsraeliStation(myCallsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign,
+                    isParseDuplicates, isParseWARC);
+                try
+                {
+                    parser.Parse();
+                    List<QSO> rawQSOList = parser.GetRawQSO();
+                    int count = rawQSOList.Count;
+                    int c = 1;
+                    foreach (var rq in rawQSOList)
+                    {
+                        if (isOverride)
                         {
-                            if (Properties.Settings.Default.IsOverrideOperatorFromFile)
+                            rq.Operator = overrideOperator;
+                        }
+                        try
+                        {
+                            lock (this)
                             {
-                                rq.Operator = TB_Operator.Text;
+                                dal.Insert(rq);
                             }
-                            try
-                            {
-                                lock (this)
-                                {
-                                    QSO q = dal.Insert(rq);
-                                }
-                                float p = (float)(c++) * 100 / count;
-                                AdifHandlerWorker.ReportProgress((int)(Math.Ceiling(p)));
-                            }
-                            catch (Exception ex)
-                            {
-                                faultyQSO++;
-                                //System.Windows.Forms.MessageBox.Show(ex.Message);
-                            }
+                            float p = (float)(c++) * 100 / count;
+                            AdifHandlerWorker.ReportProgress((int)(Math.Ceiling(p)));
+                        }
+                        catch (Exception)
+                        {
+                            faultyQSO++;
                         }
                     }
-                    catch (Exception exc)
-                    {
-                        System.Windows.Forms.MessageBox.Show(filename + " Failed to load! check the file.");
-                    }
                 }
-                e.Result = faultyQSO;
-                ImportFileQ.Clear();
-            });
+                catch (Exception)
+                {
+                    string failedFile = filename;
+                    this.Dispatcher.Invoke(() =>
+                        System.Windows.Forms.MessageBox.Show(failedFile + " Failed to load! check the file."));
+                }
+            }
+            e.Result = faultyQSO;
+            this.Dispatcher.Invoke(() => ImportFileQ.Clear());
         }
         
         private void QSODataGrid_Drop(object sender, DragEventArgs e)
@@ -2385,14 +2395,14 @@ namespace HolyLogger
 
         private void PostQSO(QSO qso)
         {
-            //************************************************** ASYNC ********************************************//
-            using (WebClient client = new WebClient())
+            string content = GenerateMultipleInsert(new List<QSO> { qso });
+            var formData = new System.Collections.Generic.Dictionary<string, string>
             {
-                client.UploadValuesAsync(new Uri("https://tools.iarc.org/Holyland/Server/AddLog.php"), new NameValueCollection()
-                    {
-                        { "insertlog", GenerateMultipleInsert(new List<QSO>{qso}) }
-                    });
-            }
+                { "insertlog", content }
+            };
+            var formContent = new FormUrlEncodedContent(formData);
+            _sharedHttpClient.PostAsync("https://tools.iarc.org/Holyland/Server/AddLog.php", formContent)
+                             .ContinueWith(_ => { });
         }
        
         private string GenerateMultipleInsert(IList<QSO> qsos)
@@ -3362,6 +3372,8 @@ namespace HolyLogger
                 clusterSettingsWindow = null;
             }
             CloseClusterWebSocket();
+            try { _clusterWidthHandlerCleanup?.Invoke(); } catch { }
+            _clusterWidthHandlerCleanup = null;
             clusterVisibleSpots = null;
             clusterWorkedCountries = null;
             clusterUndoButton = null;
@@ -3730,24 +3742,62 @@ namespace HolyLogger
 
         private Style MakeClusterBandFilterBtnStyle(bool highlighted)
         {
-            var st = new Style(typeof(Button));
-            st.Setters.Add(new Setter(Button.FontSizeProperty, 11.0));
-            st.Setters.Add(new Setter(Button.PaddingProperty, new Thickness(4, 1, 4, 1)));
-            st.Setters.Add(new Setter(Button.MarginProperty, new Thickness(0, 1, 0, 1)));
-            st.Setters.Add(new Setter(Button.BorderThicknessProperty, new Thickness(1)));
-            st.Setters.Add(new Setter(Button.CursorProperty, System.Windows.Input.Cursors.Hand));
+            Color bgTop, bgBottom, fg, border, borderBottom;
             if (highlighted)
             {
-                st.Setters.Add(new Setter(Button.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x1E, 0x90, 0xFF))));
-                st.Setters.Add(new Setter(Button.ForegroundProperty, Brushes.White));
-                st.Setters.Add(new Setter(Button.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x1E, 0x70, 0xCC))));
+                bgTop        = Color.FromRgb(0x4A, 0xA8, 0xFF);
+                bgBottom     = Color.FromRgb(0x1E, 0x70, 0xCC);
+                fg           = Colors.White;
+                border       = Color.FromRgb(0x18, 0x60, 0xB0);
+                borderBottom = Color.FromRgb(0x0E, 0x44, 0x88);
             }
             else
             {
-                st.Setters.Add(new Setter(Button.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0xE8, 0xE8, 0xE8))));
-                st.Setters.Add(new Setter(Button.ForegroundProperty, Brushes.Black));
-                st.Setters.Add(new Setter(Button.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA))));
+                bgTop        = Color.FromRgb(0xF8, 0xF8, 0xF8);
+                bgBottom     = Color.FromRgb(0xD0, 0xD0, 0xD0);
+                fg           = Colors.Black;
+                border       = Color.FromRgb(0xAA, 0xAA, 0xAA);
+                borderBottom = Color.FromRgb(0x88, 0x88, 0x88);
             }
+
+            // Build a ControlTemplate so we can apply CornerRadius
+            var template = new ControlTemplate(typeof(Button));
+
+            // Outer border — gives the darker "bottom edge" of the key
+            var outerBorderFactory = new FrameworkElementFactory(typeof(Border));
+            outerBorderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
+            outerBorderFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(borderBottom));
+            outerBorderFactory.SetValue(Border.PaddingProperty, new Thickness(0, 0, 0, 2)); // bottom shadow
+
+            // Inner border — the key face with gradient
+            var innerBorderFactory = new FrameworkElementFactory(typeof(Border));
+            innerBorderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
+            innerBorderFactory.SetValue(Border.BorderBrushProperty, new SolidColorBrush(border));
+            innerBorderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+            innerBorderFactory.SetValue(Border.BackgroundProperty, new LinearGradientBrush(
+                new GradientStopCollection
+                {
+                    new GradientStop(bgTop,    0.0),
+                    new GradientStop(bgBottom, 1.0)
+                },
+                new Point(0, 0), new Point(0, 1)));
+            innerBorderFactory.SetValue(Border.PaddingProperty, new Thickness(4, 2, 4, 2));
+
+            // Content presenter
+            var cpFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            cpFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            cpFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+            innerBorderFactory.AppendChild(cpFactory);
+            outerBorderFactory.AppendChild(innerBorderFactory);
+            template.VisualTree = outerBorderFactory;
+
+            var st = new Style(typeof(Button));
+            st.Setters.Add(new Setter(Button.TemplateProperty, template));
+            st.Setters.Add(new Setter(Button.FontSizeProperty, 11.0));
+            st.Setters.Add(new Setter(Button.ForegroundProperty, new SolidColorBrush(fg)));
+            st.Setters.Add(new Setter(Button.MarginProperty, new Thickness(0, 1, 0, 1)));
+            st.Setters.Add(new Setter(Button.CursorProperty, System.Windows.Input.Cursors.Hand));
             return st;
         }
 
@@ -3911,6 +3961,8 @@ namespace HolyLogger
                 return;
             }
 
+            EventHandler handler = (s, e) => RequestClusterHeaderAlignmentRefresh();
+
             foreach (var column in columns)
             {
                 if (column == null)
@@ -3918,8 +3970,21 @@ namespace HolyLogger
                     continue;
                 }
 
-                widthDescriptor.AddValueChanged(column, (s, e) => RequestClusterHeaderAlignmentRefresh());
+                widthDescriptor.AddValueChanged(column, handler);
             }
+
+            // Store cleanup so we can remove handlers when the cluster window closes
+            var capturedColumns = columns;
+            _clusterWidthHandlerCleanup = () =>
+            {
+                foreach (var col in capturedColumns)
+                {
+                    if (col != null)
+                    {
+                        try { widthDescriptor.RemoveValueChanged(col, handler); } catch { }
+                    }
+                }
+            };
         }
 
         private void RequestClusterHeaderAlignmentRefresh()
@@ -4998,40 +5063,95 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
-        private async Task ConnectClusterWebSocketAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots)
+        private static void AppendClusterLog(string message)
         {
             try
             {
-                CloseClusterWebSocket();
-
-                clusterWebSocketCts = new CancellationTokenSource();
-                clusterWebSocket = new ClientWebSocket();
-
-                await clusterWebSocket.ConnectAsync(new Uri(HolyClusterWebSocketUrl), clusterWebSocketCts.Token);
-
-                statusText.Dispatcher.BeginInvoke(new Action(() =>
-                {
-                    statusText.Text = "(connected)";
-                    statusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0));
-                }));
-
-                string initJson = clusterLastSpotTime > 0
-                    ? "{\"last_time\":" + clusterLastSpotTime.ToString(CultureInfo.InvariantCulture) + "}"
-                    : "{\"initial\":true}";
-
-                byte[] initBytes = Encoding.UTF8.GetBytes(initJson);
-                await clusterWebSocket.SendAsync(new ArraySegment<byte>(initBytes), WebSocketMessageType.Text, true, clusterWebSocketCts.Token);
-
-                await ReceiveClusterMessagesAsync(statusText, spots, clusterWebSocketCts.Token);
+                string dir = System.IO.Path.GetDirectoryName(ClusterLogPath);
+                if (!System.IO.Directory.Exists(dir))
+                    System.IO.Directory.CreateDirectory(dir);
+                string line = string.Format("[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}",
+                    DateTime.Now, message, Environment.NewLine);
+                System.IO.File.AppendAllText(ClusterLogPath, line, Encoding.UTF8);
             }
-            catch (Exception ex)
+            catch { }
+        }
+
+        private async Task ConnectClusterWebSocketAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots)
+        {
+            CloseClusterWebSocket();
+            clusterWebSocketCts = new CancellationTokenSource();
+            CancellationToken token = clusterWebSocketCts.Token;
+            int attempt = 0;
+
+            AppendClusterLog("Cluster connection started.");
+
+            while (!token.IsCancellationRequested)
             {
+                attempt++;
+                try
+                {
+                    DisposeClusterWebSocket();
+                    clusterWebSocket = new ClientWebSocket();
+
+                    AppendClusterLog(string.Format("Connecting to cluster (attempt {0})...", attempt));
+                    await clusterWebSocket.ConnectAsync(new Uri(HolyClusterWebSocketUrl), token);
+                    AppendClusterLog("Connected successfully.");
+                    attempt = 0;
+
+                    statusText.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        statusText.Text = "(connected)";
+                        statusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0));
+                    }));
+
+                    string initJson = clusterLastSpotTime > 0
+                        ? "{\"last_time\":" + clusterLastSpotTime.ToString(CultureInfo.InvariantCulture) + "}"
+                        : "{\"initial\":true}";
+
+                    byte[] initBytes = Encoding.UTF8.GetBytes(initJson);
+                    await clusterWebSocket.SendAsync(new ArraySegment<byte>(initBytes), WebSocketMessageType.Text, true, token);
+
+                    await ReceiveClusterMessagesAsync(statusText, spots, token);
+
+                    AppendClusterLog("WebSocket receive loop ended (connection closed by server).");
+                }
+                catch (OperationCanceledException)
+                {
+                    AppendClusterLog("Cluster connection cancelled (window closed).");
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    AppendClusterLog(string.Format("Disconnected with error: {0}", ex.Message));
+                }
+
+                if (token.IsCancellationRequested)
+                    break;
+
+                AppendClusterLog("Waiting 10 seconds before reconnecting...");
                 statusText.Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    statusText.Text = "(disconnected)";
-                    statusText.Foreground = Brushes.Red;
+                    statusText.Text = "(reconnecting...)";
+                    statusText.Foreground = Brushes.Orange;
                 }));
+
+                try
+                {
+                    await Task.Delay(10000, token);
+                }
+                catch (OperationCanceledException)
+                {
+                    AppendClusterLog("Cluster connection cancelled during reconnect wait (window closed).");
+                    break;
+                }
             }
+
+            statusText.Dispatcher.BeginInvoke(new Action(() =>
+            {
+                statusText.Text = "(disconnected)";
+                statusText.Foreground = Brushes.Red;
+            }));
         }
 
         private async Task ReceiveClusterMessagesAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots, CancellationToken cancellationToken)
@@ -5293,6 +5413,19 @@ namespace HolyLogger
             catch
             {
             }
+        }
+
+        private void DisposeClusterWebSocket()
+        {
+            try
+            {
+                if (clusterWebSocket != null)
+                {
+                    clusterWebSocket.Dispose();
+                    clusterWebSocket = null;
+                }
+            }
+            catch { }
         }
 
         private void CloseClusterWebSocket()
@@ -6366,7 +6499,7 @@ namespace HolyLogger
             if (e.Error == null)
             {
                 Process.Start(filename);
-                Environment.Exit(0);
+                Application.Current.Dispatcher.Invoke(() => Application.Current.Shutdown());
             }
             else
             {
@@ -7975,96 +8108,93 @@ namespace HolyLogger
                 string dxcall = TB_DXCallsign.Text.Trim();
                 string bare_dxcall = Services.getBareCallsign(dxcall);
 
-                using (var client = new HttpClient())
+                try
                 {
-                    try
+                    string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
+                    var response = await _sharedHttpClient.GetAsync(baseRequest + SessionKey + ";callsign=" + bare_dxcall);
+                    var responseFromServer = await response.Content.ReadAsStringAsync();
+                    XDocument xDoc = XDocument.Parse(responseFromServer);
+                    XNamespace ns = xDoc.Root.GetDefaultNamespace();
+
+                    if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && (dxcall == TB_DXCallsign.Text.Trim()))
                     {
-                        string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
-                        var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + bare_dxcall);
-                        var responseFromServer = await response.Content.ReadAsStringAsync();
-                        XDocument xDoc = XDocument.Parse(responseFromServer);
-                        XNamespace ns = xDoc.Root.GetDefaultNamespace();
-                        
-                        if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && (dxcall == TB_DXCallsign.Text.Trim()))
+                        IEnumerable<XElement> xref = xDoc.Root.Descendants(ns + "xref");
+                        IEnumerable<XElement> call = xDoc.Root.Descendants(ns + "call");
+                        IEnumerable<XElement> error = xDoc.Root.Descendants(ns + "Error");
+
+                        if (call.Count() > 0 || xref.Count() > 0)
                         {
-                            IEnumerable<XElement> xref = xDoc.Root.Descendants(ns + "xref");
-                            IEnumerable<XElement> call = xDoc.Root.Descendants(ns + "call");
-                            IEnumerable<XElement> error = xDoc.Root.Descendants(ns + "Error");
+                            IEnumerable<XElement> fname = xDoc.Root.Descendants(ns + "fname");
+                            if (fname.Count() > 0)
+                                FName = fname.FirstOrDefault().Value;
+                            else
+                                FName = "";
 
-                            if (call.Count() > 0 || xref.Count() > 0)
+                            IEnumerable<XElement> lname = xDoc.Root.Descendants(ns + "name");
+                            if (lname.Count() > 0)
+                                FName += " " + lname.FirstOrDefault().Value;
+
+                            //****************** AZIMUTH *****************//
+                            IEnumerable<XElement> lat = xDoc.Root.Descendants(ns + "lat");
+                            if (lat.Count() > 0)
+                                QRZLat = lat.FirstOrDefault().Value;
+
+                            IEnumerable<XElement> lon = xDoc.Root.Descendants(ns + "lon");
+                            if (lon.Count() > 0)
+                                QRZLon = lon.FirstOrDefault().Value;
+
+                            IEnumerable<XElement> grid = xDoc.Root.Descendants(ns + "grid");
+                            if (grid.Count() > 0)
+                                QRZGrid = grid.FirstOrDefault().Value.ToUpper();
+
+                            IEnumerable<XElement> stateEl = xDoc.Root.Descendants(ns + "state");
+                            TB_State.Text = stateEl.Count() > 0 ? stateEl.FirstOrDefault().Value.Trim() : string.Empty;
+
+                            SetAzimuth();
+                            SetDXLocator(QRZGrid);
+                            //*************************************************//
+
+                            AddNewCallsignIfMissing(bare_dxcall);
+
+                            try
                             {
-                                IEnumerable<XElement> fname = xDoc.Root.Descendants(ns + "fname");
-                                if (fname.Count() > 0)
-                                    FName = fname.FirstOrDefault().Value;
+                                IEnumerable<XElement> image = xDoc.Root.Descendants(ns + "image");
+                                string xmlImageUrl = image.Select(i => i.Value).FirstOrDefault();
+                                if (!string.IsNullOrWhiteSpace(xmlImageUrl))
+                                {
+                                    SetQrzPhoto(xmlImageUrl);
+                                }
                                 else
-                                    FName = "";
-
-                                IEnumerable<XElement> lname = xDoc.Root.Descendants(ns + "name");
-                                if (lname.Count() > 0)
-                                    FName += " " + lname.FirstOrDefault().Value;
-
-                                //****************** AZIMUTH *****************//
-                                IEnumerable<XElement> lat = xDoc.Root.Descendants(ns + "lat");
-                                if (lat.Count() > 0)
-                                    QRZLat = lat.FirstOrDefault().Value;
-
-                                IEnumerable<XElement> lon = xDoc.Root.Descendants(ns + "lon");
-                                if (lon.Count() > 0)
-                                    QRZLon = lon.FirstOrDefault().Value;
-
-                                IEnumerable<XElement> grid = xDoc.Root.Descendants(ns + "grid");
-                                if (grid.Count() > 0)
-                                    QRZGrid = grid.FirstOrDefault().Value.ToUpper();
-
-                                IEnumerable<XElement> stateEl = xDoc.Root.Descendants(ns + "state");
-                                TB_State.Text = stateEl.Count() > 0 ? stateEl.FirstOrDefault().Value.Trim() : string.Empty;
-
-                                SetAzimuth();
-                                SetDXLocator(QRZGrid);
-                                //*************************************************//
-
-                                AddNewCallsignIfMissing(bare_dxcall);
-
-                                try
                                 {
-                                    IEnumerable<XElement> image = xDoc.Root.Descendants(ns + "image");
-                                    string xmlImageUrl = image.Select(i => i.Value).FirstOrDefault();
-                                    if (!string.IsNullOrWhiteSpace(xmlImageUrl))
-                                    {
-                                        SetQrzPhoto(xmlImageUrl);
-                                    }
-                                    else
-                                    {
-                                        await LoadQrzPhotoFromWebAsync(bare_dxcall);
-                                    }
+                                    await LoadQrzPhotoFromWebAsync(bare_dxcall);
                                 }
-                                catch
-                                {
-                                    ClearQrzPhoto();
-                                }
-
-                                string key = xDoc.Root.Descendants(ns + "Key").FirstOrDefault().Value;
-                                if (SessionKey != key)
-                                    if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
                             }
-                            else if (error.Count() > 0)
+                            catch
                             {
-                                string errorCall = error.FirstOrDefault().Value.Split(':')[1].Trim();
-                                if (errorCall == dxcall || errorCall == bare_dxcall)
-                                {
-                                    FName = "";
-                                    TB_State.Text = "";
-                                    ClearQrzPhoto();
-                                }
+                                ClearQrzPhoto();
+                            }
+
+                            string key = xDoc.Root.Descendants(ns + "Key").FirstOrDefault().Value;
+                            if (SessionKey != key)
+                                if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
+                        }
+                        else if (error.Count() > 0)
+                        {
+                            string errorCall = error.FirstOrDefault().Value.Split(':')[1].Trim();
+                            if (errorCall == dxcall || errorCall == bare_dxcall)
+                            {
+                                FName = "";
+                                TB_State.Text = "";
+                                ClearQrzPhoto();
                             }
                         }
                     }
-                    catch (Exception)
-                    {
-                        FName = "";
-                        TB_State.Text = "";
-                        ClearQrzPhoto();
-                    }
+                }
+                catch (Exception)
+                {
+                    FName = "";
+                    TB_State.Text = "";
+                    ClearQrzPhoto();
                 }
             }
             else
@@ -8161,47 +8291,45 @@ namespace HolyLogger
         
         private async Task<string> GetQrzForCall(string callsign)
         {
-            using (var client = new HttpClient())
+            try
             {
-                try
+                string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
+                var response = await _sharedHttpClient.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(callsign));
+                var responseFromServer = await response.Content.ReadAsStringAsync();
+                XDocument xDoc = XDocument.Parse(responseFromServer);
+
+                if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(callsign))
                 {
-                    string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
-                    var response = await client.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(callsign));
-                    var responseFromServer = await response.Content.ReadAsStringAsync();
-                    XDocument xDoc = XDocument.Parse(responseFromServer);
+                    XNamespace ns = xDoc.Root.GetDefaultNamespace();
+                    IEnumerable<XElement> call = xDoc.Root.Descendants(ns + "call");
 
-                    if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(callsign))
+                    if (call.Count() > 0)
                     {
-                        IEnumerable<XElement> call = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "call");
+                        string name = "";
+                        IEnumerable<XElement> fname = xDoc.Root.Descendants(ns + "fname");
+                        if (fname.Count() > 0)
+                            name = fname.FirstOrDefault().Value;
 
-                        if (call.Count() > 0)
-                        {
-                            string name = "";
-                            IEnumerable<XElement> fname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "fname");
-                            if (fname.Count() > 0)
-                                name = fname.FirstOrDefault().Value;
+                        IEnumerable<XElement> lname = xDoc.Root.Descendants(ns + "name");
+                        if (lname.Count() > 0)
+                            name += " " + lname.FirstOrDefault().Value;
 
-                            IEnumerable<XElement> lname = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "name");
-                            if (lname.Count() > 0)
-                                name += " " + lname.FirstOrDefault().Value;
+                        string key = xDoc.Root.Descendants(ns + "Key").FirstOrDefault().Value;
+                        if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
 
-                            string key = xDoc.Root.Descendants(xDoc.Root.GetDefaultNamespace‌​() + "Key").FirstOrDefault().Value;
-                            if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
-
-                            return name;
-                        }
-                        else
-                        {
-                            return "";
-                        }
+                        return name;
+                    }
+                    else
+                    {
+                        return "";
                     }
                 }
-                catch (Exception)
-                {
-                    return "";
-                }
+            }
+            catch (Exception)
+            {
                 return "";
             }
+            return "";
         }
 
         private async void RemoveDuplicatesMenuItem_Click(object sender, RoutedEventArgs e)
