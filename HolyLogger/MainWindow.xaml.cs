@@ -3280,7 +3280,8 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
                 ToolTip = "Cluster settings",
-                Margin = new Thickness(0, 0, 0, 8)
+                Margin = new Thickness(0, 0, 0, 8),
+                Style = MakeClusterBandFilterBtnStyle(false)
             };
 
             var statusText = new TextBlock
