@@ -2790,7 +2790,6 @@ namespace HolyLogger
                 Rig = null;
                 OmniRigEngine = null;
             }
-            NetworkChange.NetworkAvailabilityChanged -= NetworkChange_NetworkAvailabilityChanged;
             NewDXCCTimer.Tick -= NewDXCCTimer_Tick;
             NewDXCCTimer.Stop();
             NewDXCCTimer.Dispose();
