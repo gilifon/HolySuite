@@ -2753,8 +2753,9 @@ namespace HolyLogger
             try { if (HeartbeatTimer != null && HeartbeatTimer.IsEnabled) HeartbeatTimer.Stop(); } catch { }
             try { if (UTCTimer != null && UTCTimer.IsEnabled) UTCTimer.Stop(); } catch { }
             try { if (CallsignLookupDebounceTimer != null && CallsignLookupDebounceTimer.IsEnabled) CallsignLookupDebounceTimer.Stop(); } catch { }
-            try { if (VoiceMessageAvailabilityTimer != null && VoiceMessageAvailabilityTimer.IsEnabled) VoiceMessageAvailabilityTimer.Stop(); } catch { }
+            try { VoiceMessageAvailabilityTimer.Tick -= VoiceMessageAvailabilityTimer_Tick; if (VoiceMessageAvailabilityTimer.IsEnabled) VoiceMessageAvailabilityTimer.Stop(); } catch { }
             try { if (NewDXCCTimer != null) NewDXCCTimer.Stop(); } catch { }
+            try { if (_mapUpdateDebounceTimer != null) { _mapUpdateDebounceTimer.Stop(); _mapUpdateDebounceTimer = null; } } catch { }
 
             // Unsubscribe from network availability events
             try { NetworkChange.NetworkAvailabilityChanged -= NetworkChange_NetworkAvailabilityChanged; } catch { }
@@ -2782,9 +2783,6 @@ namespace HolyLogger
             }
 
             UTCTimer.Tick -= UTCTimer_Elapsed;
-            VoiceMessageAvailabilityTimer.Tick -= VoiceMessageAvailabilityTimer_Tick;
-            if (VoiceMessageAvailabilityTimer.IsEnabled)
-                VoiceMessageAvailabilityTimer.Stop();
             if (OmniRigEngine != null)
             {
                 OmniRigEngine.StatusChange -= OmniRigEngine_StatusChange;
@@ -2793,8 +2791,8 @@ namespace HolyLogger
                 OmniRigEngine = null;
             }
             NetworkChange.NetworkAvailabilityChanged -= NetworkChange_NetworkAvailabilityChanged;
-            NewDXCCTimer.Stop();
             NewDXCCTimer.Tick -= NewDXCCTimer_Tick;
+            NewDXCCTimer.Stop();
             NewDXCCTimer.Dispose();
             try { Client?.Close(); } catch { }
             try { N1MMClient?.Close(); } catch { }

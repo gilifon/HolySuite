@@ -42,12 +42,17 @@ namespace HolyLogger
 
                 con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
                 con.Open();
+                try
+                {
+                    UpdateSchema();
+                }
+                finally
+                {
+                    con.Close();
+                    con.Dispose();
+                    con = null;
+                }
 
-                UpdateSchema();
-                
-                con.Close();
-                con.Dispose();
-                
                 con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
                 con.Open();
 
@@ -74,6 +79,7 @@ namespace HolyLogger
         {
             con.Close();
             con.Dispose();
+            instance = null;
         }
 
         public QSO Insert(QSO qso)
