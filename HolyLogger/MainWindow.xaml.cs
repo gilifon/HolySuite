@@ -1915,7 +1915,8 @@ namespace HolyLogger
                 return;
             }
 
-            button.Background = activeVoiceMessageNumber == messageNumber ? VoiceMessageActiveBrush : VoiceMessageDefaultBrush;
+            bool isActive = activeVoiceMessageNumber == messageNumber;
+            button.Background = isActive ? VoiceMessageActiveBrush : VoiceMessageDefaultBrush;
         }
 
         private void RST_GotFocus(object sender, RoutedEventArgs e)

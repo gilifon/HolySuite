@@ -119,6 +119,92 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Msg button style: same keyboard-key shape as cluster band filter buttons, purple when CAT OK / gray when disabled -->
+        <Style x:Key="MsgButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#E6CCFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,1,0,1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <!-- Outer border: darker bottom edge like a physical key -->
+                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#7A33CC" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                            <!-- Inner face with gradient -->
+                            <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#9966CC" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#5E1FA8"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#CFA6FF"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#7A33CC"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                                <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#B980F5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                                <Setter Property="Foreground" Value="#7A7A7A"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SpotButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#1E2A34"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#888888" SnapsToDevicePixels="True">
+                            <Border x:Name="KeyFace" CornerRadius="4,4,3,3" BorderThickness="1" BorderBrush="#AAAAAA" Margin="0,0,0,3" SnapsToDevicePixels="True">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#F8F8F8" Offset="0"/>
+                                        <GradientStop Color="#D0D0D0" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#1F5C8E"/>
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#1860B0"/>
+                                <Setter TargetName="KeyFace" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#4D9AD8" Offset="0"/>
+                                            <GradientStop Color="#2E76B4" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,1"/>
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#666666"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="KeyOuter" Property="Opacity" Value="0.55"/>
+                                <Setter Property="Foreground" Value="#8797A4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
@@ -384,7 +470,7 @@
         </TextBlock>
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="186,15,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
-        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="668,6,0,0" Width="62" Height="38" Style="{StaticResource RaisedActionButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="668,6,0,0" Width="62" Height="38" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,26 7,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,26 11,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -422,27 +508,25 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
-                <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource RoundedButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="1" Click="MessageButton_Click">
+                <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="1" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="Msg1" FontSize="11" HorizontalAlignment="Center" />
                         <TextBlock Text="F5" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource RoundedButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="2" Click="MessageButton_Click">
+                <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="2" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                            <TextBlock Text="Msg2" FontSize="11" HorizontalAlignment="Center" />
-                            <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
-                        </StackPanel>
+                        <TextBlock Text="Msg2" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource RoundedButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="3" Click="MessageButton_Click">
+                <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="3" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="Msg3" FontSize="11" HorizontalAlignment="Center" />
                         <TextBlock Text="F7" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
-                <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource RoundedButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="4" Click="MessageButton_Click">
+                <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="4" Click="MessageButton_Click">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <TextBlock Text="Msg4" FontSize="11" HorizontalAlignment="Center" />
                         <TextBlock Text="F8" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
