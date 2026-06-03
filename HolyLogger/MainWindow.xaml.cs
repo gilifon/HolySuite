@@ -1128,6 +1128,7 @@ namespace HolyLogger
             }
             UpdateState(State.New);
             ShowRigParams();
+            ShowHomeMap();
             RestoreDataContext();
         }
 
