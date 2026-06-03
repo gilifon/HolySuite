@@ -32,4 +32,4 @@
 - Change inline creation of `Regex` objects in `StartN1MMUDPClient` to use static readonly compiled regexes for performance improvement.
 
 ## General Guidelines
-- Avoid using the terminal in this workspace when possible because it times out; prefer direct file/code tools instead.
+- Avoid using the terminal in the HolySuite workspace when possible because it frequently times out; prefer direct file/code tools instead.
