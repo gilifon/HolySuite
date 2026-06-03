@@ -30,3 +30,6 @@
 ### Low Risk
 - Add error handling for `Properties.Settings.Default.Save()` calls to prevent unhandled exceptions.
 - Change inline creation of `Regex` objects in `StartN1MMUDPClient` to use static readonly compiled regexes for performance improvement.
+
+## General Guidelines
+- Avoid using the terminal in this workspace when possible because it times out; prefer direct file/code tools instead.

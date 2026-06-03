@@ -160,6 +160,45 @@
                 </Setter.Value>
             </Setter>
         </Style>
+        <!-- Action button style: same keyboard-key shape, light blue for Add/Clear -->
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#CCE8FF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,1,0,1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#3A80C8" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                            <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#5599DD" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#1F5C8E"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#A8D8FF"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#3A80C8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                                <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#7DC0F5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                                <Setter Property="Foreground" Value="#7A7A7A"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
         <Style x:Key="SpotButtonStyle" TargetType="Button">
             <Setter Property="Foreground" Value="#1E2A34"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -167,12 +206,12 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#888888" SnapsToDevicePixels="True">
-                            <Border x:Name="KeyFace" CornerRadius="4,4,3,3" BorderThickness="1" BorderBrush="#AAAAAA" Margin="0,0,0,3" SnapsToDevicePixels="True">
+                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#C9A800" SnapsToDevicePixels="True">
+                            <Border x:Name="KeyFace" CornerRadius="4,4,3,3" BorderThickness="1" BorderBrush="#E0C94A" Margin="0,0,0,3" SnapsToDevicePixels="True">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#F8F8F8" Offset="0"/>
-                                        <GradientStop Color="#D0D0D0" Offset="1"/>
+                                        <GradientStop Color="#FFF9C4" Offset="0"/>
+                                        <GradientStop Color="#FFEB3B" Offset="1"/>
                                     </LinearGradientBrush>
                                 </Border.Background>
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -470,15 +509,15 @@
         </TextBlock>
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="186,15,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
-        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="668,6,0,0" Width="62" Height="38" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="668,12,0,0" Width="62" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
-                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,26 7,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,26 11,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M49,3 C55,8 55,26 49,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M53,3 C59,8 59,26 53,31" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0">
-                    <TextBlock Text="Spot" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,-2,0,0"/>
-                    <TextBlock Text="(F3)" FontSize="11" HorizontalAlignment="Center" Margin="0,0,0,0"/>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M49,3 C55,8 55,24 49,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M53,3 C59,8 59,24 53,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0">
+                    <TextBlock Text="Spot" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,-1,0,0"/>
+                    <TextBlock Text="(F3)" FontSize="11" HorizontalAlignment="Center" Margin="0,-4,0,0"/>
                 </StackPanel>
             </Grid>
         </Button>
@@ -631,8 +670,8 @@
 
 
         <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="707" Grid.Row="1" />
-        <Button x:Name="AddBtn" Style="{StaticResource RaisedActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="640,143,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
-        <Button x:Name="ClearBtn" Style="{StaticResource RaisedActionButtonStyle}" HorizontalAlignment="Left" Margin="640,98,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="640,143,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
+        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="640,98,0,0" VerticalAlignment="Top" Width="84" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>
