@@ -475,9 +475,8 @@ namespace HolyLogger
                 // owned by the main window rather than the splash window (prevents them from being closed with the splash).
                 Dispatcher.BeginInvoke(new Action(() => UpdatesMenuItem_Click(null, null)), DispatcherPriority.ApplicationIdle);
             }
-            this.Loaded += MainWindow_Loaded; ;
-            this.PropertyChanged += MainWindow_PropertyChanged;
-            Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
+            this.Loaded += MainWindow_Loaded;
+                Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
 
             ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
             L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
@@ -863,30 +862,7 @@ namespace HolyLogger
             }
         }
 
-        private void MainWindow_PropertyChanged(object sender, PropertyChangedEventArgs e)
-        {
-            //switch (e.PropertyName)
-            //{
-            //    case FLD_Mode:
-            //        if (state == State.New)
-            //        {
-            //            if (mMode == "SSB" || mMode == "FM")
-            //            {
-            //                TB_RSTSent.Text = "59";
-            //                TB_RSTRcvd.Text = "59";
-            //            }
-            //            else
-            //            {
-            //                TB_RSTSent.Text = "599";
-            //                TB_RSTRcvd.Text = "599";
-            //            }
-            //        }
-            //        UpdateDup();
-            //        break;
-            //    default:
-            //        break;
-            //}
-        }
+
         
         public void Qsos_CollectionChanged(object sender, NotifyCollectionChangedEventArgs e)
         {
@@ -2105,7 +2081,7 @@ namespace HolyLogger
             }
         }
 
-        private void ExportCabrilloMenuItem_Click
+        private void ExportCabrilloMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Contester c = new Contester();
             c.Callsign = Properties.Settings.Default.PersonalInfoCallsign;
@@ -2148,7 +2124,7 @@ namespace HolyLogger
             }
         }
 
-        private void ExpotCSVMenuItem_Click
+        private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string adif = Services.GenerateCSV(dal.GetAllQSOs());
 
@@ -2180,7 +2156,7 @@ namespace HolyLogger
 
         }
 
-        private async void L_SendLog
+        private async void L_SendLog(object sender, EventArgs e)
         {
             LogUploadWindow w = (LogUploadWindow)sender;
             if (Qsos.Count == 0)
@@ -2772,7 +2748,6 @@ namespace HolyLogger
         {
             // Unsubscribe from event handlers to prevent memory leaks
             try { this.Loaded -= MainWindow_Loaded; } catch { }
-            try { this.PropertyChanged -= MainWindow_PropertyChanged; } catch { }
             try { Properties.Settings.Default.PropertyChanged -= Settings_PropertyChanged; } catch { }
 
             if (AdifHandlerWorker != null)

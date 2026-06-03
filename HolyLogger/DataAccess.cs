@@ -42,19 +42,7 @@ namespace HolyLogger
 
                 con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
                 con.Open();
-                try
-                {
-                    UpdateSchema();
-                }
-                finally
-                {
-                    con.Close();
-                    con.Dispose();
-                    con = null;
-                }
-
-                con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
-                con.Open();
+                UpdateSchema();
 
             }
             catch (Exception e)
