@@ -17,6 +17,7 @@ namespace HolyLogger.ToolsUserControls
         public string Freq;   // e.g. "14.025"
         public string Mode;   // e.g. "CW"
         public string Color;  // e.g. "#DC2828"
+        public string Band;   // e.g. "40"
     }
 
     /// <summary>Exposes methods callable from JavaScript via window.external</summary>
@@ -112,17 +113,18 @@ namespace HolyLogger.ToolsUserControls
                 string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
                 string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
                 string color = (s.Color ?? "#FF6600").Replace("\"", "\\\"");
+                string band = (s.Band ?? string.Empty).Replace("\"", "\\\"");
                 string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
                     ? (isPolar
                         ? "[" + s.SpotterLon.Value.ToString(ic) + "," + s.SpotterLat.Value.ToString(ic) + "]"
                         : "[" + s.SpotterLat.Value.ToString(ic) + "," + s.SpotterLon.Value.ToString(ic) + "]")
                     : "null";
                 if (isPolar)
-                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\"}}",
-                        s.Lon, s.Lat, spStr, callsign, freq, mode, color);
+                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\"}}",
+                        s.Lon, s.Lat, spStr, callsign, freq, mode, color, band);
                 else
-                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\"}}",
-                        s.Lat, s.Lon, spStr, callsign, freq, mode, color);
+                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\"}}",
+                        s.Lat, s.Lon, spStr, callsign, freq, mode, color, band);
             }
             sb.Append("]");
             try
@@ -209,11 +211,12 @@ namespace HolyLogger.ToolsUserControls
                 string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
                 string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
                 string color = (s.Color ?? "#FF6600").Replace("\"", "\\\"");
+                string band = (s.Band ?? string.Empty).Replace("\"", "\\\"");
                 string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
                     ? "[" + s.SpotterLat.Value.ToString(ic) + "," + s.SpotterLon.Value.ToString(ic) + "]"
                     : "null";
-                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\"}}",
-                    s.Lat, s.Lon, spStr, callsign, freq, mode, color);
+                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\"}}",
+                    s.Lat, s.Lon, spStr, callsign, freq, mode, color, band);
             }
             spotsJs.Append("]");
 
@@ -371,8 +374,9 @@ function renderSpots() {
         // Great circle line spotter -> DX
         if (sp.sp) {
             var arcPts = gcArcPoints(sp.sp[0], sp.sp[1], sp.c[0], sp.c[1], 50);
+            var arcColor = (sp.b === '40' || sp.b === '40m' || (parseFloat(sp.f) >= 7.0 && parseFloat(sp.f) <= 7.3)) ? '#FFFFFF' : (sp.k || '#FF6600');
             L.polyline(arcPts, {
-                color: sp.k || '#FF6600', weight: 0.8, opacity: 0.7, interactive: false
+                color: arcColor, weight: 0.8, opacity: 0.7, interactive: false
             }).addTo(spotsLayer);
         }
         // Spotter dot (black)
@@ -457,12 +461,13 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
                 string freq = (s.Freq ?? string.Empty).Replace("\"", "\\\"");
                 string mode = (s.Mode ?? string.Empty).Replace("\"", "\\\"");
                 string color = (s.Color ?? "#FF6600").Replace("\"", "\\\"");
+                string band = (s.Band ?? string.Empty).Replace("\"", "\\\"");
                 // polar projection expects [lon, lat]
                 string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
                     ? "[" + s.SpotterLon.Value.ToString(ic) + "," + s.SpotterLat.Value.ToString(ic) + "]"
                     : "null";
-                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\"}}",
-                    s.Lon, s.Lat, spStr, callsign, freq, mode, color);
+                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\"}}",
+                    s.Lon, s.Lat, spStr, callsign, freq, mode, color, band);
             }
             spotsJs.Append("]");
 
@@ -697,11 +702,12 @@ function drawOverlays() {
             if (sp.sp) {
                 try {
                     var gcLine = { type: 'LineString', coordinates: [sp.sp, sp.c] };
+                    var arcColor = (sp.b === '40' || sp.b === '40m' || (parseFloat(sp.f) >= 7.0 && parseFloat(sp.f) <= 7.3)) ? '#FFFFFF' : (sp.k || '#FF6600');
                     overlaysG.append('path')
                         .datum(gcLine)
                         .attr('d', path)
                         .attr('fill', 'none')
-                        .attr('stroke', sp.k || '#FF6600').attr('stroke-width', 0.8).attr('opacity', 0.6)
+                        .attr('stroke', arcColor).attr('stroke-width', 0.8).attr('opacity', 0.6)
                         .attr('clip-path', 'url(#globe-clip)');
                 } catch(el) {}
             }

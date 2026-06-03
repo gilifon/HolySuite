@@ -6048,7 +6048,8 @@ namespace HolyLogger
                             Callsign = spot.DXCallsign ?? string.Empty,
                             Freq = freqMhz > 0 ? freqMhz.ToString("0.###", CultureInfo.InvariantCulture) : (spot.FreqText ?? string.Empty),
                             Mode = spot.Mode ?? string.Empty,
-                            Color = GetBandColor(spot.BandText ?? string.Empty)
+                            Color = GetBandColor(spot.BandText ?? string.Empty),
+                            Band = spot.BandText ?? string.Empty
                         });
                     }
                 }

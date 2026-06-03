@@ -32,4 +32,5 @@
 - Change inline creation of `Regex` objects in `StartN1MMUDPClient` to use static readonly compiled regexes for performance improvement.
 
 ## General Guidelines
+- **Never use the terminal in this workspace.** The terminal frequently times out and wastes time. Always use file tools (`get_file`, `replace_string_in_file`, `code_search`, `find_symbol`, `get_files_in_project`, etc.) instead. Git operations are the only allowed exception and must be kept minimal.
 - Avoid using the terminal in the HolySuite workspace when possible because it frequently times out; prefer direct file/code tools instead.
