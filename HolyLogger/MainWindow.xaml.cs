@@ -1,4 +1,4 @@
-ï»¿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -238,6 +238,7 @@ namespace HolyLogger
         StackPanel clusterShowBandsPanel = null;
         TextBlock clusterShowBandsLabelText = null;
         TextBlock clusterNewCountryLegendText = null;
+        StackPanel clusterOnMyFreqLegendItem = null;
         Canvas clusterHeaderCanvas = null;
         DataGridColumn clusterDxColumn = null;
         DataGridColumn clusterSpotterColumn = null;
@@ -264,7 +265,7 @@ namespace HolyLogger
         // Layout constants for the cluster window floating overlay panels
         const double ClusterOffScreenPosition = -400;
         const double ClusterHeaderCanvasHeight = 92;
-        const double ClusterTableTopGap = 20;
+        const double ClusterTableTopGap = 26;
         const double ClusterShowBandsPanelWidth = 115;
         const double ClusterBaseSharedVerticalShift = -45.0;
         const double ClusterLastMinutesDropdownTop = -45.0;
@@ -671,7 +672,7 @@ namespace HolyLogger
             });
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
             }
-            catch (ObjectDisposedException) { /* socket closed during shutdown â€” expected */ }
+            catch (ObjectDisposedException) { /* socket closed during shutdown — expected */ }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("StartUDPClient error: " + ex.Message);
@@ -737,7 +738,7 @@ namespace HolyLogger
             });
             N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
             }
-            catch (ObjectDisposedException) { /* socket closed during shutdown â€” expected */ }
+            catch (ObjectDisposedException) { /* socket closed during shutdown — expected */ }
             catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine("StartN1MMUDPClient error: " + ex.Message);
@@ -3271,7 +3272,7 @@ namespace HolyLogger
             var undoButton = BuildClusterUndoButton();
             var settingsButton = new Button
             {
-                Content = "âš™",
+                Content = "?",
                 Width = 28,
                 Height = 28,
                 FontSize = 16,
@@ -3309,7 +3310,7 @@ namespace HolyLogger
             Canvas.SetLeft(lastMinutesFilterPanel, ClusterOffScreenPosition);
             headerCanvas.Children.Add(lastMinutesFilterPanel);
 
-            var layoutGrid = new Grid { Margin = new Thickness(12) };
+            var layoutGrid = new Grid { Margin = new Thickness(12, 8, 12, 12) };
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -3506,6 +3507,14 @@ namespace HolyLogger
             clusterRowStyle.Setters.Add(new Setter(DataGridRow.FocusVisualStyleProperty, null));
             spotsGrid.RowStyle = clusterRowStyle;
 
+            var clusterColumnHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor))));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0))));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            spotsGrid.ColumnHeaderStyle = clusterColumnHeaderStyle;
+
             // DX column
             var dxColumnTemplate = new DataTemplate();
             var dxTextBlockFactory = new FrameworkElementFactory(typeof(TextBlock));
@@ -3514,7 +3523,7 @@ namespace HolyLogger
             dxTextBlockFactory.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("DXForeground"));
             dxTextBlockFactory.SetBinding(TextBlock.BackgroundProperty, new System.Windows.Data.Binding("DXBackground"));
             dxColumnTemplate.VisualTree = dxTextBlockFactory;
-            var dxHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            var dxHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             dxHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, SortMemberPath = "DXCallsign", Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
 
@@ -3523,7 +3532,7 @@ namespace HolyLogger
             var countryColumn = new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(Math.Max(40, LoadClusterCountryColumnWidthSetting())) };
 
             // Freq column
-            var freqHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            var freqHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             freqHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             freqHeaderStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
             freqHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(2, 1, 2, 1)));
@@ -3542,7 +3551,7 @@ namespace HolyLogger
             var freqColumn = new DataGridTextColumn { Header = freqHeaderText, HeaderStyle = freqHeaderStyle, Binding = new System.Windows.Data.Binding("FreqDisplayText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
 
             // UTC column
-            var utcHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            var utcHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             utcHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             var utcTextStyle = new Style(typeof(TextBlock));
             utcTextStyle.Setters.Add(new Setter(TextBlock.TextAlignmentProperty, TextAlignment.Center));
@@ -3550,7 +3559,7 @@ namespace HolyLogger
             var utcColumn = new DataGridTextColumn { Header = "UTC", HeaderStyle = utcHeaderStyle, ElementStyle = utcTextStyle, Binding = new System.Windows.Data.Binding("TimeUtc"), Width = new DataGridLength(ClusterLastMinutesDropdownWidth), CanUserResize = false };
 
             // Mode column
-            var modeHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            var modeHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             modeHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             var modeTemplate = new DataTemplate();
             var modeTextFactory = new FrameworkElementFactory(typeof(TextBlock));
@@ -3563,7 +3572,7 @@ namespace HolyLogger
             var modeColumn = new DataGridTemplateColumn { Header = "Mode", HeaderStyle = modeHeaderStyle, CellTemplate = modeTemplate, Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthMode)) };
 
             // Comment column
-            var commentHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            var commentHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             commentHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             var commentColumn = new DataGridTextColumn { Header = "Comment", HeaderStyle = commentHeaderStyle, Binding = new System.Windows.Data.Binding("Comment"), MinWidth = 60, Width = new DataGridLength(1, DataGridLengthUnitType.Star) };
 
@@ -3626,12 +3635,13 @@ namespace HolyLogger
             };
 
             legendPanel.Children.Add(BuildClusterLegendTopRow());
-            legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before"));
-            legendPanel.Children.Add(BuildClusterLegendItem(Brushes.Black, "Worked Country"));
+            legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before", false, new Thickness(0, 7, 0, 0)));
+            legendPanel.Children.Add(BuildClusterLegendItem(Brushes.Black, "Worked Country", false, new Thickness(0, 7, 0, 0)));
 
-            var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Frequency", true, new Thickness(0, 4, 0, 0));
+            var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Frequency", true, new Thickness(0, 7, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
             onMyFreqLegend.VerticalAlignment = VerticalAlignment.Top;
+            clusterOnMyFreqLegendItem = onMyFreqLegend;
             legendPanel.Children.Add(onMyFreqLegend);
 
             var spotCountText = new TextBlock
@@ -3646,25 +3656,12 @@ namespace HolyLogger
             };
             clusterSpotCountText = spotCountText;
 
-            var spotCountBadge = new Border
-            {
-                Width = 34,
-                Height = 34,
-                CornerRadius = new CornerRadius(17),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)),
-                BorderThickness = new Thickness(2),
-                Background = Brushes.Transparent,
-                Margin = new Thickness(0, -6, 0, 0),
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Top,
-                Child = spotCountText
-            };
-
             var actionsPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, -8, 0, 0)
             };
             actionsPanel.Children.Add(undoButton);
             actionsPanel.Children.Add(settingsButton);
@@ -3676,7 +3673,6 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Top
             };
             rightColumnPanel.Children.Add(actionsPanel);
-            rightColumnPanel.Children.Add(spotCountBadge);
 
             var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -3763,13 +3759,13 @@ namespace HolyLogger
             // Build a ControlTemplate so we can apply CornerRadius
             var template = new ControlTemplate(typeof(Button));
 
-            // Outer border â€” gives the darker "bottom edge" of the key
+            // Outer border — gives the darker "bottom edge" of the key
             var outerBorderFactory = new FrameworkElementFactory(typeof(Border));
             outerBorderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
             outerBorderFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(borderBottom));
             outerBorderFactory.SetValue(Border.PaddingProperty, new Thickness(0, 0, 0, 2)); // bottom shadow
 
-            // Inner border â€” the key face with gradient
+            // Inner border — the key face with gradient
             var innerBorderFactory = new FrameworkElementFactory(typeof(Border));
             innerBorderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(5));
             innerBorderFactory.SetValue(Border.BorderBrushProperty, new SolidColorBrush(border));
@@ -3824,11 +3820,11 @@ namespace HolyLogger
             var showBandsLabel = new TextBlock
             {
                 Text = "Show Bands",
-                FontSize = 11,
+                FontSize = 13,
                 FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Stretch,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 2)
+                Margin = new Thickness(0, -2, 0, 2)
             };
             clusterShowBandsLabelText = showBandsLabel;
 
@@ -3940,12 +3936,27 @@ namespace HolyLogger
             lastMinutesValuePanel.Children.Add(lastMinutesCombo);
             lastMinutesValuePanel.Children.Add(minutesUnitLabel);
 
+            var spotCountBadge = new Border
+            {
+                Width = 34,
+                Height = 34,
+                CornerRadius = new CornerRadius(17),
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)),
+                BorderThickness = new Thickness(2),
+                Background = Brushes.Transparent,
+                Margin = new Thickness((ClusterLastMinutesDropdownWidth - 34) / 2, 0, 0, 2),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = clusterSpotCountText
+            };
+
             var lastMinutesFilterPanel = new StackPanel
             {
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top
             };
+            lastMinutesFilterPanel.Children.Add(spotCountBadge);
             lastMinutesFilterPanel.Children.Add(lastMinutesLabel);
             lastMinutesFilterPanel.Children.Add(lastMinutesValuePanel);
             clusterLastMinutesFilterPanel = lastMinutesFilterPanel;
@@ -4062,13 +4073,17 @@ namespace HolyLogger
                 double showTop = showPanelTop + ClusterBaseSharedVerticalShift;
                 double dropdownTop = ClusterLastMinutesDropdownTop;
 
-                if (clusterShowBandsLabelText != null && clusterNewCountryLegendText != null)
+                if (clusterBandFilterActiveBtn != null && clusterOnMyFreqLegendItem != null)
                 {
                     try
                     {
-                        Point showLabelOffset = clusterShowBandsLabelText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
-                        Point newCountryInCanvas = clusterNewCountryLegendText.TranslatePoint(new Point(0, 0), clusterHeaderCanvas);
-                        double delta = newCountryInCanvas.Y - (showTop + showLabelOffset.Y);
+                        Point activeBtnOffset = clusterBandFilterActiveBtn.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
+                        double activeBtnCenterInPanel = activeBtnOffset.Y + clusterBandFilterActiveBtn.ActualHeight / 2.0;
+
+                        Point onMyFreqInCanvas = clusterOnMyFreqLegendItem.TranslatePoint(new Point(0, 0), clusterHeaderCanvas);
+                        double onMyFreqCenterInCanvas = onMyFreqInCanvas.Y + clusterOnMyFreqLegendItem.ActualHeight / 2.0;
+
+                        double delta = onMyFreqCenterInCanvas - (showTop + activeBtnCenterInPanel);
                         showTop += delta;
                         dropdownTop += delta;
                     }
@@ -4753,7 +4768,7 @@ namespace HolyLogger
             Grid.SetColumnSpan(bandsModesBottom, 2);
 
             // Reset: plain Image icon + TextBlock side by side, no button frame, no template padding.
-            // bandColorsPanel has Margin.Left=8, swatch has no extra left margin â†’ swatch left edge at 8px.
+            // bandColorsPanel has Margin.Left=8, swatch has no extra left margin ? swatch left edge at 8px.
             // So resetPanel.Margin.Left = 8 aligns the icon's left edge exactly with the 160m square.
             var resetIconBmp = new BitmapImage();
             resetIconBmp.BeginInit();
@@ -4782,7 +4797,7 @@ namespace HolyLogger
             };
             resetTextBlock.MouseLeftButtonUp += (s, e) => resetColorsBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
-            // Hide the original button â€” it stays in the tree to keep Click logic working
+            // Hide the original button — it stays in the tree to keep Click logic working
             resetColorsBtn.Visibility = Visibility.Collapsed;
 
             var resetPanel = new StackPanel
@@ -7478,7 +7493,7 @@ namespace HolyLogger
             {
                 var tt = new ToolTip
                 {
-                    Content = "Autocomplete dropdown is disabled.\nEnable it in Tools â†’ Options â†’ User Interface\nâ†’ \"Show callsign autocomplete dropdown\"",
+                    Content = "Autocomplete dropdown is disabled.\nEnable it in Tools ? Options ? User Interface\n? \"Show callsign autocomplete dropdown\"",
                     PlacementTarget = TB_DXCallsign,
                     Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
                     IsOpen = true,
@@ -7797,9 +7812,9 @@ namespace HolyLogger
                 try
                 {
                     // Priority for map center:
-                    // 1. QRZ grid â€” the station's declared operating grid square
-                    // 2. DXCC entity locator â€” country-level fallback
-                    // Note: QRZ lat/lon is intentionally skipped â€” it reflects the
+                    // 1. QRZ grid — the station's declared operating grid square
+                    // 2. DXCC entity locator — country-level fallback
+                    // Note: QRZ lat/lon is intentionally skipped — it reflects the
                     //       operator's home address which can be in a different country.
                     string locator = null;
 
@@ -8095,6 +8110,29 @@ namespace HolyLogger
             headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
 
             QSODataGrid.ColumnHeaderStyle = headerStyle;
+
+            ApplyClusterTableHeaderBackgroundFromSettings(color);
+        }
+
+        private void ApplyClusterTableHeaderBackgroundFromSettings(Color color)
+        {
+            if (clusterSpotsDataGrid == null)
+            {
+                return;
+            }
+
+            var clusterHeaderStyle = new Style(typeof(DataGridColumnHeader));
+            clusterHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
+            clusterHeaderStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
+            clusterHeaderStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
+            clusterHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
+            clusterHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+
+            clusterSpotsDataGrid.ColumnHeaderStyle = clusterHeaderStyle;
+            foreach (var col in clusterSpotsDataGrid.Columns)
+            {
+                col.HeaderStyle = new Style(typeof(DataGridColumnHeader), clusterHeaderStyle);
+            }
         }
 
         private async void GetQrzData()
@@ -8817,6 +8855,8 @@ namespace HolyLogger
         }
     }
 }
+
+
 
 
 
