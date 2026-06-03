@@ -265,7 +265,7 @@ namespace HolyLogger
         // Layout constants for the cluster window floating overlay panels
         const double ClusterOffScreenPosition = -400;
         const double ClusterHeaderCanvasHeight = 92;
-        const double ClusterTableTopGap = 26;
+        const double ClusterTableTopGap = 10;
         const double ClusterShowBandsPanelWidth = 115;
         const double ClusterBaseSharedVerticalShift = -45.0;
         const double ClusterLastMinutesDropdownTop = -45.0;
