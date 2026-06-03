@@ -59,14 +59,11 @@ namespace HolyLogger
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             if (string.IsNullOrEmpty(callsign) || string.IsNullOrEmpty(frequency) || string.IsNullOrEmpty(mode)) return;
             WebRequest request = WebRequest.Create("https://tools.iarc.org/Holyland/Server/heartbeat.php?callsign=" + callsign + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode + "&machine=" + machineName);
-            try
+            request.GetResponseAsync().ContinueWith(t =>
             {
-                var response = request.GetResponseAsync();
-            }
-            catch (Exception e)
-            {
-
-            }            
+                if (t.Status == TaskStatus.RanToCompletion)
+                    t.Result?.Dispose();
+            });
         }
 
         public static bool CheckForInternetConnection()
