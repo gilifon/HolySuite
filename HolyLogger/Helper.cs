@@ -27,25 +27,23 @@ namespace HolyLogger
             try
             {
                 WebRequest request = WebRequest.Create("http://xmldata.qrz.com/xml/current/?username=" + Properties.Settings.Default.qrz_username + ";password=" + Properties.Settings.Default.qrz_password);
-                WebResponse response = request.GetResponse();
-                string status = ((HttpWebResponse)response).StatusDescription;
-                Stream dataStream = response.GetResponseStream();
-                StreamReader reader = new StreamReader(dataStream);
-                string responseFromServer = reader.ReadToEnd();
-
-                XElement xml = XElement.Parse(responseFromServer);
-                XElement element = xml.Elements().FirstOrDefault();
-                SessionKey = element.Elements().FirstOrDefault().Value;
-
-                reader.Close();
-                response.Close();
-
-                if (SessionKey.Contains("incorrect"))
+                using (WebResponse response = request.GetResponse())
+                using (Stream dataStream = response.GetResponseStream())
+                using (StreamReader reader = new StreamReader(dataStream))
                 {
-                    SessionKey = "";
-                    return false;
+                    string responseFromServer = reader.ReadToEnd();
+
+                    XElement xml = XElement.Parse(responseFromServer);
+                    XElement element = xml.Elements().FirstOrDefault();
+                    SessionKey = element.Elements().FirstOrDefault().Value;
+
+                    if (SessionKey.Contains("incorrect"))
+                    {
+                        SessionKey = "";
+                        return false;
+                    }
+                    return true;
                 }
-                return true;
             }
             catch (Exception ex)
             {
