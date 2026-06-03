@@ -2092,10 +2092,10 @@ namespace HolyLogger
                 {
                     // Saves the Image via a FileStream created by the OpenFile method.
                     System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
-                    StreamWriter sw = new StreamWriter(fs);
-                    sw.Write(adif);
-                    sw.Close();
-                    fs.Close();
+                    using (StreamWriter sw = new StreamWriter(fs))
+                    {
+                        sw.Write(adif);
+                    }
                     MessageBox.Show("File created successfully!");
                 }
             }
@@ -2105,7 +2105,7 @@ namespace HolyLogger
             }
         }
 
-        private void ExportCabrilloMenuItem_Click(object sender, RoutedEventArgs e)
+        private void ExportCabrilloMenuItem_Click
         {
             Contester c = new Contester();
             c.Callsign = Properties.Settings.Default.PersonalInfoCallsign;
@@ -2135,10 +2135,10 @@ namespace HolyLogger
                 {
                     // Saves the Image via a FileStream created by the OpenFile method.
                     System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
-                    StreamWriter sw = new StreamWriter(fs);
-                    sw.Write(cabrillo);
-                    sw.Close();
-                    fs.Close();
+                    using (StreamWriter sw = new StreamWriter(fs))
+                    {
+                        sw.Write(cabrillo);
+                    }
                     MessageBox.Show("File created successfully!");
                 }
             }
@@ -2148,7 +2148,7 @@ namespace HolyLogger
             }
         }
 
-        private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)
+        private void ExpotCSVMenuItem_Click
         {
             string adif = Services.GenerateCSV(dal.GetAllQSOs());
 
@@ -2166,10 +2166,10 @@ namespace HolyLogger
                 {
                     // Saves the Image via a FileStream created by the OpenFile method.
                     System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
-                    StreamWriter sw = new StreamWriter(fs);
-                    sw.Write(adif);
-                    sw.Close();
-                    fs.Close();
+                    using (StreamWriter sw = new StreamWriter(fs))
+                    {
+                        sw.Write(adif);
+                    }
                     MessageBox.Show("File created successfully!");
                 }
             }
@@ -2179,8 +2179,8 @@ namespace HolyLogger
             }
 
         }
-        
-        private async void L_SendLog(object sender, EventArgs e)
+
+        private async void L_SendLog
         {
             LogUploadWindow w = (LogUploadWindow)sender;
             if (Qsos.Count == 0)
