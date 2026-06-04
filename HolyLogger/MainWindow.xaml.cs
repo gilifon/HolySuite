@@ -5237,18 +5237,16 @@ namespace HolyLogger
             settingsLayout.Children.Add(bandColorsScroll);
             settingsLayout.Children.Add(resetPanel);
 
-            const double clusterSettingsDefaultWidth = 560;
-            const double clusterSettingsDefaultHeight = 520;
-            double savedWidth = Properties.Settings.Default.ClusterSettingsWindowWidth;
-            double savedHeight = Properties.Settings.Default.ClusterSettingsWindowHeight;
-            double startupWidth = savedWidth > 100 ? savedWidth : clusterSettingsDefaultWidth;
-            double startupHeight = savedHeight > 100 ? savedHeight : clusterSettingsDefaultHeight;
+            // Let the window grow to fit its content at any DPI/screen resolution so the
+            // column headers can never be clipped. MinWidth keeps it at least as wide as the
+            // original default even if a previously-clamped width was saved.
+            const double clusterSettingsMinWidth = 560;
 
             clusterSettingsWindow = new Window
             {
                 Title = "Cluster Settings",
-                Width = startupWidth,
-                Height = startupHeight,
+                SizeToContent = SizeToContent.WidthAndHeight,
+                MinWidth = clusterSettingsMinWidth,
                 ResizeMode = ResizeMode.NoResize,
                 Left = Properties.Settings.Default.ClusterSettingsWindowLeft,
                 Top = Properties.Settings.Default.ClusterSettingsWindowTop,
