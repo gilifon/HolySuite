@@ -687,9 +687,8 @@
                 <ToolTip>
                     <StackPanel>
                         <TextBlock FontWeight="Bold" Text="Smart Callsign Search"/>
-                        <TextBlock Text="4Z1     ? starts with 4Z1"/>
-                        <TextBlock Text="*KD     ? ends with KD"/>
-                        <TextBlock Text="*KD*   ? contains KD anywhere"/>
+                        <TextBlock Text="Type ? in any location"/>
+                        <TextBlock Text="you are not sure about"/>
                     </StackPanel>
                 </ToolTip>
             </Border.ToolTip>

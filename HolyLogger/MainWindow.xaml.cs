@@ -304,8 +304,15 @@ namespace HolyLogger
         private const int MaxCallsignSuggestionRows = 30;
         private const double CallsignSuggestionRowHeight = 22;
         private const int CallsignLookupDebounceMs = 280;
-        private int maxCallsignSuggestions = DefaultCallsignSuggestionRows;
+        // The visible-rows setting only controls how many rows are shown at once; the list can hold
+        // up to this many matches so the user can scroll through the full set (often hundreds).
+        private const int MaxCallsignSuggestionResults = 500;
+        private int maxCallsignSuggestions = MaxCallsignSuggestionResults;
         private bool callsignSuggestionMouseControl = false;
+        // Last physical cursor position over the suggestion list. Used to ignore synthetic MouseMove
+        // events WPF raises when the item under a stationary cursor changes (list re-populates after
+        // deleting '?', or scrolls via the keyboard).
+        private Point? lastCallsignSuggestionMousePos = null;
         private HashSet<string> newCallsignsSet = new HashSet<string>(StringComparer.Ordinal);
         private CallsignUploader _callsignUploader;
         private int callsignListVersion = 0;
@@ -7013,25 +7020,61 @@ namespace HolyLogger
             }
         }
 
+        // When the user starts navigating the suggestion list with the keyboard, nudge the OS cursor
+        // just outside the dropdown ONLY if it is currently resting over the list. This guarantees the
+        // mouse can never re-grab the list (via a synthetic MouseMove from rows shifting underneath it)
+        // and surprise the user mid-typing. If the cursor is anywhere else on screen it is left alone.
+        private void MoveMouseOutOfSuggestionsIfHovering()
+        {
+            try
+            {
+                if (!CallsignSuggestionsPopup.IsOpen) return;
+                if (LB_DXCallsignSuggestions.ActualWidth <= 0 || LB_DXCallsignSuggestions.ActualHeight <= 0) return;
+
+                // Screen rectangle of the suggestion list (device pixels).
+                Point topLeft = LB_DXCallsignSuggestions.PointToScreen(new Point(0, 0));
+                Point bottomRight = LB_DXCallsignSuggestions.PointToScreen(
+                    new Point(LB_DXCallsignSuggestions.ActualWidth, LB_DXCallsignSuggestions.ActualHeight));
+
+                var cursor = System.Windows.Forms.Cursor.Position;
+                bool overList = cursor.X >= topLeft.X && cursor.X <= bottomRight.X &&
+                                cursor.Y >= topLeft.Y && cursor.Y <= bottomRight.Y;
+                if (!overList) return;
+
+                // Park the cursor well to the left of the list (keep the same Y) so it no longer hovers a row.
+                int targetX = (int)topLeft.X - 60;
+                if (targetX < 0) targetX = (int)bottomRight.X + 60;
+                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(targetX, cursor.Y);
+
+                callsignSuggestionMouseControl = false;
+                lastCallsignSuggestionMousePos = null;
+            }
+            catch
+            {
+                // Cursor relocation is best-effort; never let it break keyboard navigation.
+            }
+        }
+
         private void TB_DXCallsign_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0 && !callsignSuggestionMouseControl)
+            if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
+                // An arrow key always hands control back to the keyboard (even right after the mouse
+                // hovered/scrolled the list), so navigation is never blocked.
+                MoveMouseOutOfSuggestionsIfHovering();
+                callsignSuggestionMouseControl = false;
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
                 ApplyHighlightedCallsignSuggestionToTextBox();
                 e.Handled = true;
             }
-            else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0 && !callsignSuggestionMouseControl)
+            else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
+                MoveMouseOutOfSuggestionsIfHovering();
+                callsignSuggestionMouseControl = false;
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
                 ApplyHighlightedCallsignSuggestionToTextBox();
-                e.Handled = true;
-            }
-            else if ((e.Key == Key.Down || e.Key == Key.Up) && CallsignSuggestionsPopup.IsOpen && callsignSuggestionMouseControl)
-            {
-                // While mouse owns the list selection, block arrow-key navigation updates.
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
@@ -7063,6 +7106,11 @@ namespace HolyLogger
 
         private void ApplyHighlightedCallsignSuggestionToTextBox()
         {
+            // When a '?' search pattern is active, do not feed the highlighted callsign into the
+            // textbox while navigating/scrolling - that would destroy the pattern and collapse the
+            // result list. The full callsign is only committed on explicit selection (Enter/click).
+            if ((TB_DXCallsign.Text ?? string.Empty).IndexOf('?') >= 0) return;
+
             string highlighted = (LB_DXCallsignSuggestions.SelectedItem as CallsignSuggestionItem)?.FullCallsign;
             if (string.IsNullOrWhiteSpace(highlighted)) return;
 
@@ -7374,6 +7422,16 @@ namespace HolyLogger
             // Clear stale values from the previously highlighted callsign until new data is loaded.
             FName = string.Empty;
             ClearDXLocator();
+
+            // A pattern containing '?' is a search filter, not a real callsign: only drive the
+            // suggestions dropdown and skip DXCC / QRZ / azimuth / matrix lookups.
+            if (dxCallText.IndexOf('?') >= 0)
+            {
+                CallsignLookupDebounceTimer.Stop();
+                ClearQrzPhoto();
+                return;
+            }
+
             if (string.IsNullOrWhiteSpace(dxCallText))
             {
                 CallsignLookupDebounceTimer.Stop();
@@ -7895,63 +7953,65 @@ namespace HolyLogger
 
         private void UpdateCallsignSuggestions()
         {
-            string prefix = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
+            string pattern = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
+
+            // Rule: no search until at least 2 characters are typed.
+            if (pattern.Length < 2)
+            {
+                CallsignSuggestionsPopup.IsOpen = false;
+                LB_DXCallsignSuggestions.ItemsSource = null;
+                TB_DXCallsign.ToolTip = null;
+                return;
+            }
+
             var matches = new List<CallsignSuggestionItem>(maxCallsignSuggestions);
+            var slashMatches = new List<CallsignSuggestionItem>();
 
-            // Wildcard modes:
-            // *ABC   -> callsigns ending with ABC
-            // *ABC*  -> callsigns containing ABC
-            if (prefix.StartsWith("*", StringComparison.Ordinal))
-            {
-                if (prefix.EndsWith("*", StringComparison.Ordinal) && prefix.Length > 2)
-                {
-                    string containsTerm = prefix.Substring(1, prefix.Length - 2);
-                    for (int i = 0; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
-                    {
-                        string call = callsignIndex[i];
-                        int pos = call.IndexOf(containsTerm, StringComparison.Ordinal);
-                        if (pos >= 0)
-                            matches.Add(BuildSuggestionItem(call, containsTerm, pos));
-                    }
-                }
-                else if (prefix.Length > 1)
-                {
-                    string suffixTerm = prefix.Substring(1);
-                    for (int i = 0; i < callsignIndex.Count && matches.Count < maxCallsignSuggestions; i++)
-                    {
-                        string call = callsignIndex[i];
-                        if (call.EndsWith(suffixTerm, StringComparison.Ordinal))
-                            matches.Add(BuildSuggestionItem(call, suffixTerm, call.Length - suffixTerm.Length));
-                    }
-                }
-            }
-            else
-            {
-                if (prefix.Length < 2)
-                {
-                    CallsignSuggestionsPopup.IsOpen = false;
-                    return;
-                }
+            // '?' is a single-character wildcard that must match exactly one character at that position.
+            // Literal characters must match the same position. Anything after the pattern is allowed.
+            // With no '?' the pattern behaves as a plain prefix search.
+            int firstWildcard = pattern.IndexOf('?');
+            bool hasWildcard = firstWildcard >= 0;
 
-                int index = callsignIndex.BinarySearch(prefix, StringComparer.Ordinal);
+            // Use the literal prefix (characters before the first '?') to jump into the sorted index quickly.
+            string literalPrefix = hasWildcard ? pattern.Substring(0, firstWildcard) : pattern;
+
+            int start = 0;
+            if (literalPrefix.Length > 0)
+            {
+                int index = callsignIndex.BinarySearch(literalPrefix, StringComparer.Ordinal);
                 if (index < 0) index = ~index;
-
-                // Two-pass: collect non-slash matches first, then slash matches.
-                var slashMatches = new List<CallsignSuggestionItem>();
-                for (int i = index; i < callsignIndex.Count; i++)
-                {
-                    string call = callsignIndex[i];
-                    if (!call.StartsWith(prefix, StringComparison.Ordinal)) break;
-                    if (call.Contains('/'))
-                        slashMatches.Add(BuildSuggestionItem(call, prefix, 0));
-                    else if (matches.Count < maxCallsignSuggestions)
-                        matches.Add(BuildSuggestionItem(call, prefix, 0));
-                }
-                // Fill remaining slots with slash matches
-                int remaining = maxCallsignSuggestions - matches.Count;
-                if (remaining > 0)
-                    matches.AddRange(slashMatches.Take(remaining));
+                start = index;
             }
+
+            for (int i = start; i < callsignIndex.Count; i++)
+            {
+                string call = callsignIndex[i];
+
+                if (literalPrefix.Length > 0)
+                {
+                    // Past the literal-prefix block: nothing else can match.
+                    if (!call.StartsWith(literalPrefix, StringComparison.Ordinal)) break;
+                }
+                else if (matches.Count >= maxCallsignSuggestions)
+                {
+                    // No literal prefix to bound the scan (e.g. "?E"): stop once the list is full.
+                    break;
+                }
+
+                if (hasWildcard && !MatchesPositionalPattern(call, pattern)) continue;
+
+                int matchLength = hasWildcard ? pattern.Length : literalPrefix.Length;
+                if (call.Contains('/'))
+                    slashMatches.Add(BuildSuggestionItem(call, call.Substring(0, matchLength), 0));
+                else if (matches.Count < maxCallsignSuggestions)
+                    matches.Add(BuildSuggestionItem(call, call.Substring(0, matchLength), 0));
+            }
+
+            // Fill remaining slots with slash matches (non-slash callsigns are shown first).
+            int remaining = maxCallsignSuggestions - matches.Count;
+            if (remaining > 0)
+                matches.AddRange(slashMatches.Take(remaining));
 
             // Show suggestions to the right of the DX callsign textbox, same vertical level.
             Point dxCallPosition = TB_DXCallsign.TranslatePoint(new Point(0, 0), this);
@@ -7965,7 +8025,7 @@ namespace HolyLogger
             callsignSuggestionMouseControl = false;
             CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown;
 
-            if (!Properties.Settings.Default.ShowCallsignDropdown && prefix.StartsWith("*", StringComparison.Ordinal))
+            if (!Properties.Settings.Default.ShowCallsignDropdown && hasWildcard)
             {
                 var tt = new ToolTip
                 {
@@ -7981,6 +8041,19 @@ namespace HolyLogger
             {
                 TB_DXCallsign.ToolTip = null;
             }
+        }
+
+        // Positional match: each '?' matches any single character, every other character must match the
+        // same position in the callsign, and anything after the pattern is allowed.
+        private static bool MatchesPositionalPattern(string call, string pattern)
+        {
+            if (call.Length < pattern.Length) return false;
+            for (int j = 0; j < pattern.Length; j++)
+            {
+                char pc = pattern[j];
+                if (pc != '?' && pc != call[j]) return false;
+            }
+            return true;
         }
 
         private static readonly Dictionary<string, string> DxccNameToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -8136,6 +8209,14 @@ namespace HolyLogger
 
         private void LB_DXCallsignSuggestions_PreviewMouseMove(object sender, MouseEventArgs e)
         {
+            // WPF raises synthetic MouseMove events when the item under a stationary cursor changes
+            // (e.g. the list re-populates after deleting '?', or the keyboard scrolls the list).
+            // Only let the mouse take control when the cursor physically moved.
+            Point pos = e.GetPosition(LB_DXCallsignSuggestions);
+            if (lastCallsignSuggestionMousePos.HasValue && lastCallsignSuggestionMousePos.Value == pos)
+                return;
+            lastCallsignSuggestionMousePos = pos;
+
             var source = e.OriginalSource as DependencyObject;
             var item = ItemsControl.ContainerFromElement(LB_DXCallsignSuggestions, source) as ListBoxItem;
             if (item?.DataContext is CallsignSuggestionItem hovered)
@@ -8153,6 +8234,7 @@ namespace HolyLogger
         {
             // Keep the last highlighted row selected, but give arrow-key control back to keyboard.
             callsignSuggestionMouseControl = false;
+            lastCallsignSuggestionMousePos = null;
         }
 
         private void LB_DXCallsignSuggestions_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -8188,7 +8270,9 @@ namespace HolyLogger
         {
             int rows = NormalizeCallsignSuggestionRows(Properties.Settings.Default.CallsignSuggestionRows);
 
-            maxCallsignSuggestions = rows;
+            // The setting controls only how many rows are visible at once. The result list itself
+            // always collects up to MaxCallsignSuggestionResults so the user can scroll the full list.
+            maxCallsignSuggestions = MaxCallsignSuggestionResults;
             LB_DXCallsignSuggestions.MaxHeight = rows * CallsignSuggestionRowHeight;
         }
 
