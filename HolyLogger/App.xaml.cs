@@ -126,6 +126,16 @@ namespace HolyLogger
             _splash?.Close();
             _splash = null;
             Mouse.OverrideCursor = null;
+
+            // The splash was topmost and stole activation. Explicitly re-activate the main window
+            // and move keyboard focus into it; otherwise it has no focus until the user clicks it,
+            // which is why the F-keys (SSB and CW) did nothing until the first mouse click.
+            if (_realMainWindow != null)
+            {
+                _realMainWindow.Activate();
+                _realMainWindow.Focus();
+                Keyboard.Focus(_realMainWindow);
+            }
         }
 
     }

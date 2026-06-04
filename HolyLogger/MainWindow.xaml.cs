@@ -1142,28 +1142,16 @@ namespace HolyLogger
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            if ((e.Key == Key.F1) || (e.Key == Key.Enter && Properties.Settings.Default.AddQSOWithEnter))
+            if (e.Key == Key.Enter && Properties.Settings.Default.AddQSOWithEnter)
             {
                 AddBtn_Click(null, null);
-            }
-            else if ((e.Key == Key.F2))
-            {
-                OptionsMenuItemMenuItem_Click(null, null);
-            }
-            else if (e.Key == Key.F3)
-            {
-                SpotButton_Click(null, null);
-            }
-            else if (e.Key == Key.F9 || e.Key == Key.Escape)
-            {
-                ClearBtn_Click(null, null);
-            }
-            else if (e.Key >= Key.F5 && e.Key <= Key.F8)
-            {
-                TriggerVoiceMessage(e.Key - Key.F4);
-                e.Handled = true;
+                return;
             }
 
+            if (HandleGlobalFunctionKey(e.Key, e.IsRepeat))
+            {
+                e.Handled = true;
+            }
         }
 
         private void MessageButton_Click(object sender, RoutedEventArgs e)
@@ -1325,6 +1313,28 @@ namespace HolyLogger
                 return;
             }
 
+            // Toggle/stop: if a CW message is already being sent, a second press aborts it
+            // (same pattern as SSB voice messages, using the radio-specific CW stop command).
+            int? currentMessageNumber = activeVoiceMessageNumber ?? pendingVoiceMessageNumber;
+
+            if (currentMessageNumber.HasValue)
+            {
+                string stopCommand = BuildCwStopCommand(rigType);
+
+                if (!string.IsNullOrWhiteSpace(stopCommand) && !TrySendOmniRigCustomCommand(stopCommand))
+                {
+                    MessageBox.Show("Failed to send the CW stop CAT command to " + rigType + ".", "CW Text", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                ClearVoiceMessageState();
+
+                if (currentMessageNumber.Value == messageNumber)
+                {
+                    return;
+                }
+            }
+
             string cwText = GetCwMessageText(messageNumber);
 
             if (string.IsNullOrWhiteSpace(cwText))
@@ -1344,7 +1354,12 @@ namespace HolyLogger
             if (!TrySendOmniRigCustomCommand(command))
             {
                 MessageBox.Show("Failed to send CW text CAT command to " + rigType + ".", "CW Text", MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
             }
+
+            pendingVoiceMessageNumber = messageNumber;
+            activeVoiceMessageNumber = null;
+            pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
         }
 
         private static string BuildCwSendCommand(string rigType, string text)
@@ -1374,6 +1389,20 @@ namespace HolyLogger
                 if (string.IsNullOrEmpty(safe)) return null;
                 string textHex = string.Join(" ", safe.Select(c => ((byte)c).ToString("X2")));
                 return "FE FE " + icomAddress + " E0 17 00 " + textHex + " FD";
+            }
+
+            return null;
+        }
+
+        // Builds the CAT command that aborts an in-progress CW transmission.
+        // Icom CI-V: command 17 with data byte FF stops CW sending (FE FE <addr> E0 17 FF FD).
+        // Returns null for radios where a verified CW-abort command is not available.
+        private static string BuildCwStopCommand(string rigType)
+        {
+            string icomAddress = GetIcomCivAddress(rigType);
+            if (icomAddress != null)
+            {
+                return "FE FE " + icomAddress + " E0 17 FF FD";
             }
 
             return null;
@@ -3600,6 +3629,7 @@ namespace HolyLogger
             clusterWindow.LocationChanged += ClusterWindow_LocationChanged;
             clusterWindow.SizeChanged += ClusterWindow_SizeChanged;
             clusterWindow.Closed += ClusterWindow_Closed;
+            clusterWindow.PreviewKeyDown += ForwardGlobalFunctionKeys;
 
             clusterWorkedCountries = GetWorkedCountriesFromLog();
             clusterWindow.Show();
@@ -5115,6 +5145,7 @@ namespace HolyLogger
             };
 
             clusterSettingsWindow.Closed += (s, e) => clusterSettingsWindow = null;
+            clusterSettingsWindow.PreviewKeyDown += ForwardGlobalFunctionKeys;
             clusterSettingsWindow.Show();
         }
 
@@ -6789,6 +6820,66 @@ namespace HolyLogger
         protected override void OnPreviewKeyDown(KeyEventArgs e)
         {
             if (e.Key == Key.Insert)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // Handle the function/message keys here (tunneling preview) so they work regardless of
+            // which child control currently has keyboard focus. The bubbling Window_KeyDown only
+            // fires if the focused control (e.g. the callsign box or QSO grid) doesn't consume the
+            // key first, which is why the keys appeared "blocked" until a control was clicked.
+            if (HandleGlobalFunctionKey(e.Key, e.IsRepeat))
+            {
+                e.Handled = true;
+            }
+        }
+
+        // Central handler for the application-wide function keys. Returns true if the key was handled.
+        // Shared by the main window preview and the cluster window so the keys keep responding even
+        // when a secondary window (e.g. the Cluster window) has keyboard focus.
+        // Ignores auto-repeat for the F5-F8 message keys so a held key doesn't toggle CW on and off.
+        private bool HandleGlobalFunctionKey(Key key, bool isRepeat)
+        {
+            if (key == Key.F1)
+            {
+                AddBtn_Click(null, null);
+                return true;
+            }
+            if (key == Key.F2)
+            {
+                OptionsMenuItemMenuItem_Click(null, null);
+                return true;
+            }
+            if (key == Key.F3)
+            {
+                SpotButton_Click(null, null);
+                return true;
+            }
+            if (key == Key.F9 || key == Key.Escape)
+            {
+                ClearBtn_Click(null, null);
+                return true;
+            }
+            if (key >= Key.F5 && key <= Key.F8)
+            {
+                if (!isRepeat)
+                {
+                    TriggerVoiceMessage(key - Key.F4);
+                }
+                return true;
+            }
+
+            return false;
+        }
+
+        // Forwards function keys pressed while a secondary window (e.g. the Cluster window or the
+        // Cluster Settings window) has focus, so F1/F2/F3/F5-F8/F9 keep working without switching
+        // back to the main window first. Attach this to any new top-level window that should
+        // inherit the global function-key behavior.
+        private void ForwardGlobalFunctionKeys(object sender, KeyEventArgs e)
+        {
+            if (HandleGlobalFunctionKey(e.Key, e.IsRepeat))
             {
                 e.Handled = true;
             }
