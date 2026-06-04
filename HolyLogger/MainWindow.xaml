@@ -180,14 +180,14 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="KeyOuter" Property="Background" Value="#0077AA"/>
-                                <Setter TargetName="KeyFace" Property="Background" Value="#5FFFF7"/>
-                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#0099CC"/>
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#005C80"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#33C2D6"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#0077AA"/>
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
                                 <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
                                 <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
-                                <Setter TargetName="KeyFace" Property="Background" Value="#40FFFF"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#1FA6BC"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
                                 <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>

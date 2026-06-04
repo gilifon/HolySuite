@@ -1222,8 +1222,10 @@ namespace HolyLogger
             tb.PreviewTextInput += (s, e) =>
             {
                 // Valid CW characters: A-Z, 0-9, space, . , ? / @ = + -
+                // Compare case-insensitively so lowercase typing (Caps Lock off) is accepted;
+                // CharacterCasing.Upper still displays the letters as capitals.
                 string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,?/@=+-";
-                if (!validChars.Contains(e.Text))
+                if (!validChars.Contains(e.Text.ToUpperInvariant()))
                 {
                     e.Handled = true;  // Block invalid character
                 }
@@ -1408,7 +1410,7 @@ namespace HolyLogger
 
             if (panel.Children[0] is TextBlock labelBlock)
             {
-                labelBlock.Text = isCw ? "Txt" + messageNumber : "Msg" + messageNumber;
+                labelBlock.Text = isCw ? "Txt " + messageNumber : "Msg" + messageNumber;
                 labelBlock.Foreground = System.Windows.Media.Brushes.Black;
             }
 
@@ -2160,10 +2162,13 @@ namespace HolyLogger
                 return;
             }
 
-            // In CW mode the style controls all colours — do not override with SSB brushes
+            // In CW mode the style controls all colours — do not override with SSB brushes.
+            // Use ClearValue (not Background = null): a local null value would beat the style's
+            // Background setter and make the inner KeyFace transparent, exposing the dark outer
+            // border across the whole button. ClearValue lets the style's bright cyan (#7FFEFF) apply.
             if (IsCwModeActive())
             {
-                button.Background = null;
+                button.ClearValue(Control.BackgroundProperty);
                 return;
             }
 
