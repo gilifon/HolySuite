@@ -361,6 +361,16 @@ namespace HolyLogger
         private static readonly SolidColorBrush VoiceMessageDefaultBrush = new SolidColorBrush(Color.FromRgb(0xE6, 0xCC, 0xFF));
         private static readonly SolidColorBrush VoiceMessageActiveBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xC9, 0x57));
 
+        // CW sending monitor: visualises the keyed text with a blinking cursor advancing in sync
+        // with the radio. The radio does not report keying progress, so the cursor is driven by a
+        // self-calibrated WPM estimate (cwLearnedWpm), refined after each transmission from the real
+        // elapsed TX time divided by the message's PARIS unit count.
+        private CwSendMonitorWindow cwSendMonitor;
+        private bool cwMonitorCursorStarted;
+        private double cwMonitorTotalUnits;
+        private DateTime cwMonitorStartUtc;
+        private double cwLearnedWpm = 20.0;
+
         BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
         BitmapImage lock_path = new BitmapImage(new Uri("Images/lock.png", UriKind.Relative));
         BitmapImage unlock_path = new BitmapImage(new Uri("Images/unlock.png", UriKind.Relative));
@@ -1360,6 +1370,110 @@ namespace HolyLogger
             pendingVoiceMessageNumber = messageNumber;
             activeVoiceMessageNumber = null;
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+
+            ShowCwSendMonitor(cwText);
+        }
+
+        // Opens (or replaces) the CW sending monitor window for the given text. The cursor does not
+        // start moving until the radio actually keys up (UpdateVoiceMessageState detects TX on);
+        // this keeps the visual aligned with the real start of transmission regardless of CAT latency.
+        private void ShowCwSendMonitor(string cwText)
+        {
+            CloseCwSendMonitor(false);
+
+            if (string.IsNullOrWhiteSpace(cwText))
+            {
+                return;
+            }
+
+            try
+            {
+                cwMonitorTotalUnits = CwSendMonitorWindow.ComputeTotalUnits(cwText);
+                cwMonitorCursorStarted = false;
+
+                cwSendMonitor = new CwSendMonitorWindow(cwText, cwLearnedWpm, "CW Sending");
+                cwSendMonitor.Owner = this;
+                cwSendMonitor.Closed += (s, e) =>
+                {
+                    if (ReferenceEquals(s, cwSendMonitor))
+                    {
+                        cwSendMonitor = null;
+                    }
+                };
+                cwSendMonitor.Show();
+            }
+            catch
+            {
+                cwSendMonitor = null;
+            }
+        }
+
+        // Called when the radio reports it has actually started transmitting. Starts the cursor and
+        // records the real start time so we can learn the radio's true WPM when TX ends.
+        private void OnCwTransmitStarted()
+        {
+            cwMonitorStartUtc = DateTime.UtcNow;
+
+            if (cwSendMonitor != null && !cwMonitorCursorStarted)
+            {
+                cwMonitorCursorStarted = true;
+                cwSendMonitor.UpdateWpm(cwLearnedWpm);
+                cwSendMonitor.StartCursor();
+            }
+        }
+
+        // Called when the radio reports it has returned to receive after keying our message.
+        // Self-calibration: real elapsed TX seconds / PARIS units gives the unit duration, from which
+        // we derive the radio's actual WPM (units/sec * 1.2). This refines the cursor speed used for
+        // the next message, so changing the radio's keyer speed is automatically tracked.
+        private void OnCwTransmitEnded()
+        {
+            if (cwMonitorCursorStarted && cwMonitorTotalUnits > 0)
+            {
+                double elapsed = (DateTime.UtcNow - cwMonitorStartUtc).TotalSeconds;
+                if (elapsed > 0.2)
+                {
+                    double unitSeconds = elapsed / cwMonitorTotalUnits;
+                    double measuredWpm = 1.2 / unitSeconds;
+                    if (measuredWpm >= 5 && measuredWpm <= 80)
+                    {
+                        // Light smoothing so a single odd reading doesn't swing the estimate.
+                        cwLearnedWpm = (cwLearnedWpm * 0.4) + (measuredWpm * 0.6);
+                    }
+                }
+            }
+
+            CloseCwSendMonitor(true);
+        }
+
+        // Closes the CW monitor. completed=true flashes the "done" state briefly and auto-closes;
+        // completed=false freezes the cursor (used when the transmission was aborted).
+        private void CloseCwSendMonitor(bool completed)
+        {
+            var monitor = cwSendMonitor;
+            cwSendMonitor = null;
+            cwMonitorCursorStarted = false;
+
+            if (monitor == null)
+            {
+                return;
+            }
+
+            try
+            {
+                if (completed)
+                {
+                    monitor.Complete();
+                }
+                else
+                {
+                    monitor.Freeze();
+                }
+            }
+            catch
+            {
+                try { monitor.Close(); } catch { }
+            }
         }
 
         private static string BuildCwSendCommand(string rigType, string text)
@@ -2110,15 +2224,18 @@ namespace HolyLogger
                 {
                     activeVoiceMessageNumber = pendingVoiceMessageNumber;
                     pendingVoiceMessageNumber = null;
+                    OnCwTransmitStarted();
                 }
                 else if (DateTime.UtcNow >= pendingVoiceMessageDeadlineUtc)
                 {
                     pendingVoiceMessageNumber = null;
+                    CloseCwSendMonitor(false);
                 }
             }
             else if (activeVoiceMessageNumber.HasValue && !txOn)
             {
                 activeVoiceMessageNumber = null;
+                OnCwTransmitEnded();
             }
 
             UpdateVoiceMessageButtonHighlight();
@@ -2129,6 +2246,7 @@ namespace HolyLogger
             pendingVoiceMessageNumber = null;
             activeVoiceMessageNumber = null;
             pendingVoiceMessageDeadlineUtc = DateTime.MinValue;
+            CloseCwSendMonitor(false);
             UpdateVoiceMessageButtonHighlight();
         }
 
@@ -2191,17 +2309,25 @@ namespace HolyLogger
                 return;
             }
 
-            // In CW mode the style controls all colours — do not override with SSB brushes.
-            // Use ClearValue (not Background = null): a local null value would beat the style's
-            // Background setter and make the inner KeyFace transparent, exposing the dark outer
-            // border across the whole button. ClearValue lets the style's bright cyan (#7FFEFF) apply.
+            bool isActive = activeVoiceMessageNumber == messageNumber;
+
+            // In CW mode the style controls the idle colour (bright cyan). Use ClearValue (not
+            // Background = null) when idle: a local null value would beat the style's Background
+            // setter and make the inner KeyFace transparent, exposing the dark outer border across
+            // the whole button. While transmitting, apply the same orange highlight as SSB.
             if (IsCwModeActive())
             {
-                button.ClearValue(Control.BackgroundProperty);
+                if (isActive)
+                {
+                    button.Background = VoiceMessageActiveBrush;
+                }
+                else
+                {
+                    button.ClearValue(Control.BackgroundProperty);
+                }
                 return;
             }
 
-            bool isActive = activeVoiceMessageNumber == messageNumber;
             button.Background = isActive ? VoiceMessageActiveBrush : VoiceMessageDefaultBrush;
         }
 
