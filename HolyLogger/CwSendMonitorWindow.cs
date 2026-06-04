@@ -84,14 +84,19 @@ namespace HolyLogger
             _totalUnits = running;
 
             Title = title;
-            Width = 620;
-            Height = 220;
-            MinWidth = 360;
-            MinHeight = 160;
+            // Frameless, compact: no title bar/chrome, and the window shrinks to fit its content.
+            WindowStyle = WindowStyle.None;
             ResizeMode = ResizeMode.NoResize;
+            AllowsTransparency = true;
+            SizeToContent = SizeToContent.WidthAndHeight;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ShowInTaskbar = false;
-            Background = new SolidColorBrush(Color.FromRgb(0xF7, 0xFB, 0xFF));
+            // Never steal focus: the main window must keep keyboard focus so the F-keys keep
+            // working (pressing the same key again stops the transmission and closes this window).
+            ShowActivated = false;
+            Focusable = false;
+            IsHitTestVisible = false;
+            Background = Brushes.Transparent;
 
             var rootBorder = new Border
             {
@@ -99,13 +104,14 @@ namespace HolyLogger
                 BorderThickness = new Thickness(1),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0x00, 0xCC, 0xFF)),
                 Margin = new Thickness(10),
-                Background = Brushes.White,
+                MinWidth = 260,
+                Background = new SolidColorBrush(Color.FromRgb(0xF7, 0xFB, 0xFF)),
                 Effect = new DropShadowEffect { BlurRadius = 8, ShadowDepth = 1, Opacity = 0.3, Color = Color.FromRgb(0x6A, 0x82, 0x96) }
             };
 
             var grid = new Grid { Margin = new Thickness(14) };
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             // Title row: caption + live WPM
@@ -142,6 +148,7 @@ namespace HolyLogger
             {
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
+                MaxWidth = 560,
                 Margin = new Thickness(0, 10, 0, 10)
             };
 
@@ -251,40 +258,24 @@ namespace HolyLogger
             _wpmLabel.Text = "~" + Math.Round(_wpm) + " WPM";
         }
 
-        /// <summary>Transmission ended normally: snap the cursor to the end, flash done, auto-close.</summary>
+        /// <summary>Transmission ended normally: close the window immediately, no delay.</summary>
         public void Complete()
         {
             if (_finished) return;
             _finished = true;
             _advanceTimer.Stop();
             _blinkTimer.Stop();
-            _currentIndex = _text.Length;
-            _progress.Value = 100;
-            RepaintAll();
-            CloseAfter(900);
+            try { Close(); } catch { }
         }
 
-        /// <summary>Transmission aborted early: freeze the cursor where it is, dim, then close.</summary>
+        /// <summary>Transmission aborted early: close the window immediately, no delay.</summary>
         public void Freeze()
         {
             if (_finished) return;
             _finished = true;
             _advanceTimer.Stop();
             _blinkTimer.Stop();
-            _cursorOn = false;
-            RepaintAll();
-            CloseAfter(500);
-        }
-
-        private void CloseAfter(int milliseconds)
-        {
-            var closeTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(milliseconds) };
-            closeTimer.Tick += (s, e) =>
-            {
-                closeTimer.Stop();
-                try { Close(); } catch { }
-            };
-            closeTimer.Start();
+            try { Close(); } catch { }
         }
 
         private void AdvanceTimer_Tick(object sender, EventArgs e)
