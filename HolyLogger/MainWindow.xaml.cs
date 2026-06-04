@@ -2989,10 +2989,12 @@ namespace HolyLogger
             if (state == State.Edit)
             {
                 AddBtn.Content = "Update (F1)";
+                ClearBtn.Content = "Exit (F9)";
             }
             else if (state == State.New)
             {
                 AddBtn.Content = "Add (F1)";
+                ClearBtn.Content = "Clear (F9)";
             }
         }
         
