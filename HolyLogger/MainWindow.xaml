@@ -171,9 +171,9 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <!-- Outer border: darker cyan bottom edge like a physical key -->
+                        <!-- Outer border: darker bottom edge like a physical key -->
                         <Border x:Name="KeyOuter" CornerRadius="5" Background="#0099CC" SnapsToDevicePixels="True" Padding="0,0,0,3">
-                            <!-- Inner face with bright cyan -->
+                            <!-- Inner face -->
                             <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#00CCFF" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
                             </Border>
