@@ -670,8 +670,8 @@
 
 
         <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="707" Grid.Row="1" />
-        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="629,143,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
-        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="629,98,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="634,143,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
+        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="634,98,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>
