@@ -1174,6 +1174,255 @@ namespace HolyLogger
             }
         }
 
+        private void MessageButton_RightClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is Button button && int.TryParse(button.Tag?.ToString(), out int messageNumber))
+            {
+                e.Handled = true;
+                ShowCwMessageEditDialog(messageNumber);
+            }
+        }
+
+        private void ShowCwMessageEditDialog(int messageNumber)
+        {
+            string currentText = GetCwMessageText(messageNumber);
+
+            Window dialog = new Window
+            {
+                Title = "Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")",
+                Width = 360,
+                Height = 130,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ShowInTaskbar = false,
+                Owner = this,
+                Icon = Icon
+            };
+
+            Grid grid = new Grid { Margin = new Thickness(10) };
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(8) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            TextBox tb = new TextBox
+            {
+                Text = currentText,
+                FontSize = 14,
+                Height = 28,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                Padding = new Thickness(4, 0, 4, 0),
+                CharacterCasing = CharacterCasing.Upper,
+                MaxLength = 120
+            };
+
+            // Add validation for CW-valid characters only
+            tb.PreviewTextInput += (s, e) =>
+            {
+                // Valid CW characters: A-Z, 0-9, space, . , ? / @ = + -
+                string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,?/@=+-";
+                if (!validChars.Contains(e.Text))
+                {
+                    e.Handled = true;  // Block invalid character
+                }
+            };
+
+            Grid.SetRow(tb, 0);
+            Grid.SetColumnSpan(tb, 3);
+            grid.Children.Add(tb);
+
+            Button btnSave = new Button
+            {
+                Content = "Save",
+                Width = 70,
+                Height = 28,
+                IsDefault = true
+            };
+            Grid.SetRow(btnSave, 2);
+            Grid.SetColumn(btnSave, 2);
+            grid.Children.Add(btnSave);
+
+            Button btnCancel = new Button
+            {
+                Content = "Cancel",
+                Width = 70,
+                Height = 28,
+                IsCancel = true
+            };
+            Grid.SetRow(btnCancel, 2);
+            Grid.SetColumn(btnCancel, 0);
+            grid.Children.Add(btnCancel);
+
+            dialog.Content = grid;
+
+            btnSave.Click += (s, e) =>
+            {
+                SetCwMessageText(messageNumber, tb.Text.Trim());
+                UpdateMessageButtonLabel(GetMessageButton(messageNumber), messageNumber, isCw: true);
+                dialog.DialogResult = true;
+            };
+            btnCancel.Click += (s, e) => { dialog.DialogResult = false; };
+
+            tb.SelectAll();
+            tb.Focus();
+            dialog.ShowDialog();
+        }
+
+        private string GetCwMessageText(int messageNumber)
+        {
+            switch (messageNumber)
+            {
+                case 1: return Properties.Settings.Default.CwMsgText1 ?? string.Empty;
+                case 2: return Properties.Settings.Default.CwMsgText2 ?? string.Empty;
+                case 3: return Properties.Settings.Default.CwMsgText3 ?? string.Empty;
+                case 4: return Properties.Settings.Default.CwMsgText4 ?? string.Empty;
+                default: return string.Empty;
+            }
+        }
+
+        private void SetCwMessageText(int messageNumber, string text)
+        {
+            switch (messageNumber)
+            {
+                case 1: Properties.Settings.Default.CwMsgText1 = text; break;
+                case 2: Properties.Settings.Default.CwMsgText2 = text; break;
+                case 3: Properties.Settings.Default.CwMsgText3 = text; break;
+                case 4: Properties.Settings.Default.CwMsgText4 = text; break;
+            }
+
+            try { Properties.Settings.Default.Save(); } catch { }
+        }
+
+        private Button GetMessageButton(int messageNumber)
+        {
+            switch (messageNumber)
+            {
+                case 1: return Btn_Msg1;
+                case 2: return Btn_Msg2;
+                case 3: return Btn_Msg3;
+                case 4: return Btn_Msg4;
+                default: return null;
+            }
+        }
+
+        private void TriggerCwTextMessage(int messageNumber)
+        {
+            string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
+            {
+                MessageBox.Show("OmniRig CAT is not available.", "CW Text", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                MessageBox.Show("The radio is offline.", "CW Text", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string cwText = GetCwMessageText(messageNumber);
+
+            if (string.IsNullOrWhiteSpace(cwText))
+            {
+                MessageBox.Show("CW text " + messageNumber + " is empty. Right-click the button to edit it.", "CW Text", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            string command = BuildCwSendCommand(rigType, cwText);
+
+            if (command == null)
+            {
+                MessageBox.Show("CW text keying via CAT is not supported for this radio model (" + rigType + ").", "CW Text", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            if (!TrySendOmniRigCustomCommand(command))
+            {
+                MessageBox.Show("Failed to send CW text CAT command to " + rigType + ".", "CW Text", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        private static string BuildCwSendCommand(string rigType, string text)
+        {
+            // Yaesu: KY text; (max ~28 chars per command, space-pad to 28)
+            bool isYaesu = rigType.StartsWith("FT", StringComparison.OrdinalIgnoreCase)
+                        || rigType.StartsWith("FTDX", StringComparison.OrdinalIgnoreCase);
+            // Elecraft K3
+            bool isElecraft = rigType.StartsWith("K3", StringComparison.OrdinalIgnoreCase);
+            // Kenwood (if added later)
+            bool isKenwood = rigType.StartsWith("TS", StringComparison.OrdinalIgnoreCase);
+
+            if (isYaesu || isElecraft || isKenwood)
+            {
+                string safe = new string(text.ToUpper().Where(c => c >= ' ' && c <= 'Z').ToArray());
+                if (safe.Length > 28) safe = safe.Substring(0, 28);
+                safe = safe.PadRight(28);
+                return "KY " + safe + ";";
+            }
+
+            // Icom CI-V: FE FE <addr> E0 17 00 <ASCII bytes as hex> FD
+            string icomAddress = GetIcomCivAddress(rigType);
+            if (icomAddress != null)
+            {
+                // Keep only printable ASCII (space–Z range is safe for CW keyer)
+                string safe = new string(text.ToUpper().Where(c => c >= ' ' && c <= 'Z').ToArray());
+                if (string.IsNullOrEmpty(safe)) return null;
+                string textHex = string.Join(" ", safe.Select(c => ((byte)c).ToString("X2")));
+                return "FE FE " + icomAddress + " E0 17 00 " + textHex + " FD";
+            }
+
+            return null;
+        }
+
+        private static readonly Dictionary<string, string> IcomCivAddresses = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "IC-7300",    "94" },
+            { "IC-7300MK2", "B6" },
+            { "IC-7610",    "98" },
+        };
+
+        private static string GetIcomCivAddress(string rigType)
+        {
+            string key = IcomCivAddresses.Keys.FirstOrDefault(k => string.Equals(k, rigType, StringComparison.OrdinalIgnoreCase));
+            return key != null ? IcomCivAddresses[key] : null;
+        }
+
+        private void UpdateMessageButtonLabels()
+        {
+            bool isCw = IsCwModeActive();
+            UpdateMessageButtonLabel(Btn_Msg1, 1, isCw);
+            UpdateMessageButtonLabel(Btn_Msg2, 2, isCw);
+            UpdateMessageButtonLabel(Btn_Msg3, 3, isCw);
+            UpdateMessageButtonLabel(Btn_Msg4, 4, isCw);
+        }
+
+        private void UpdateMessageButtonLabel(Button button, int messageNumber, bool isCw)
+        {
+            if (button == null) return;
+
+            var panel = button.Content as StackPanel;
+            if (panel == null || panel.Children.Count < 1) return;
+
+            if (panel.Children[0] is TextBlock labelBlock)
+            {
+                labelBlock.Text = isCw ? "Txt" + messageNumber : "Msg" + messageNumber;
+                labelBlock.Foreground = System.Windows.Media.Brushes.Black;
+            }
+
+            // Swap the entire style so hover/press colours are also correct
+            Style cwStyle  = (Style)FindResource("MsgButtonCwStyle");
+            Style ssbStyle = (Style)FindResource("MsgButtonStyle");
+            button.Style = isCw ? cwStyle : ssbStyle;
+        }
+
+        private bool IsCwModeActive()
+        {
+            return string.Equals(GetNormalizedRigMode(), "CW", StringComparison.OrdinalIgnoreCase);
+        }
+
         private void SpotButton_Click(object sender, RoutedEventArgs e)
         {
             Window dialog = BuildSpotDialog();
@@ -1650,6 +1899,12 @@ namespace HolyLogger
                 return;
             }
 
+            if (IsCwModeActive())
+            {
+                TriggerCwTextMessage(messageNumber);
+                return;
+            }
+
             if (!TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out string rigType, out string errorMessage))
             {
                 MessageBox.Show(errorMessage, "Voice Message", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -1858,15 +2113,28 @@ namespace HolyLogger
                 return;
             }
 
-            bool isAvailable = TryGetVoiceMessageAvailability(out _, out string errorMessage);
+            bool isCw = IsCwModeActive();
+            bool isVoiceAvailable = TryGetVoiceMessageAvailability(out _, out string errorMessage);
+            bool isAvailable = isVoiceAvailable || (isCw && Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE);
+
             PlayCommandsBorder.IsEnabled = isAvailable;
             SetVoiceMessageButtonsEnabled(isAvailable);
-            PlayCommandsBorder.ToolTip = isAvailable ? "Play radio voice messages (F5-F8)" : errorMessage;
+
+            if (isCw)
+            {
+                PlayCommandsBorder.ToolTip = isAvailable ? "Send CW text to radio (F5-F8) — right-click to edit" : (errorMessage ?? "OmniRig CAT is not available.");
+            }
+            else
+            {
+                PlayCommandsBorder.ToolTip = isVoiceAvailable ? "Play radio voice messages (F5-F8)" : errorMessage;
+            }
 
             if (!isAvailable)
             {
                 ClearVoiceMessageState();
             }
+
+            UpdateMessageButtonLabels();
         }
 
         private void SetVoiceMessageButtonsEnabled(bool isEnabled)
@@ -1889,6 +2157,13 @@ namespace HolyLogger
         {
             if (button == null)
             {
+                return;
+            }
+
+            // In CW mode the style controls all colours — do not override with SSB brushes
+            if (IsCwModeActive())
+            {
+                button.Background = null;
                 return;
             }
 
@@ -6860,7 +7135,7 @@ namespace HolyLogger
 
                 //throw;
             }
-            
+
         }
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)

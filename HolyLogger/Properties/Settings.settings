@@ -365,5 +365,17 @@
     <Setting Name="ClusterMapEnabled" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
+    <Setting Name="CwMsgText1" Type="System.String" Scope="User">
+      <Value Profile="(Default)">CQ CQ DE K</Value>
+    </Setting>
+    <Setting Name="CwMsgText2" Type="System.String" Scope="User">
+      <Value Profile="(Default)">DE K</Value>
+    </Setting>
+    <Setting Name="CwMsgText3" Type="System.String" Scope="User">
+      <Value Profile="(Default)">TU 73</Value>
+    </Setting>
+    <Setting Name="CwMsgText4" Type="System.String" Scope="User">
+      <Value Profile="(Default)">NR?</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

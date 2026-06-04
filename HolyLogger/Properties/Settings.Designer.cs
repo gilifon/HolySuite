@@ -1475,5 +1475,53 @@ namespace HolyLogger.Properties {
                 this["ClusterMapEnabled"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ DE K")]
+        public string CwMsgText1 {
+            get {
+                return ((string)(this["CwMsgText1"]));
+            }
+            set {
+                this["CwMsgText1"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("DE K")]
+        public string CwMsgText2 {
+            get {
+                return ((string)(this["CwMsgText2"]));
+            }
+            set {
+                this["CwMsgText2"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("TU 73")]
+        public string CwMsgText3 {
+            get {
+                return ((string)(this["CwMsgText3"]));
+            }
+            set {
+                this["CwMsgText3"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NR?")]
+        public string CwMsgText4 {
+            get {
+                return ((string)(this["CwMsgText4"]));
+            }
+            set {
+                this["CwMsgText4"] = value;
+            }
+        }
     }
 }

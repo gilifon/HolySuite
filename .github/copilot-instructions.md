@@ -2,6 +2,7 @@
 
 ## Project Guidelines
 - When the user asks to commit changes in this repository, do not bump or modify the version number unless they explicitly ask for a version change.
+- Never run git commit without the user explicitly asking to commit. Always wait for the user to say "commit" before committing.
 
 ## UI Guidelines
 - Always simulate the net UI/layout effect (pixel-level if needed) before applying changes, so proposed edits produce a measurable movement on first try and avoid repeated user retesting.
