@@ -786,12 +786,14 @@ namespace HolyLogger
             if (Properties.Settings.Default.IsShowAzimuthControl)
             {
                 MapControl.Visibility = Visibility.Visible;
+                MapDisabledPanel.Visibility = Visibility.Collapsed;
                 this.MinWidth = 1120;
                 UpdateClusterSpotsOnMap();
             }
             else
             {
                 MapControl.Visibility = Visibility.Hidden;
+                MapDisabledPanel.Visibility = Visibility.Visible;
                 this.MinWidth = 800;
             }
         }

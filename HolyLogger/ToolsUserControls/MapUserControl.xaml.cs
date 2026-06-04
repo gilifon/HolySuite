@@ -642,10 +642,12 @@ svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', mapR)
     .attr('fill', '#4a90c4').attr('stroke', '#1a4060').attr('stroke-width', 2);
 var countriesG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 svg.append('path').datum(d3.geoGraticule().step([30, 30])())
+    .attr('class', 'graticule-path')
     .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.15)').attr('stroke-width', 0.7)
     .attr('d', path).attr('clip-path', 'url(#globe-clip)');
 // Equator
 svg.append('path').datum({type:'LineString', coordinates:[[-180,0],[-90,0],[0,0],[90,0],[180,0]]})
+    .attr('class', 'graticule-path')
     .attr('fill','none').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.2)
     .attr('d',path).attr('clip-path','url(#globe-clip)');
 var ringsG = svg.append('g');

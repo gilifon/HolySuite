@@ -859,6 +859,7 @@
         </DataGrid>
 
         <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
+        <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
         <TextBlock HorizontalAlignment="Left" Margin="12,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Operator" FontWeight="Bold" />
             <LineBreak />
