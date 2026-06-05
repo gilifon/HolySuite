@@ -1147,7 +1147,10 @@ namespace HolyLogger
             }
             UpdateState(State.New);
             ShowRigParams();
-            ShowHomeMap();
+            // Don't reset the map to the home view while it is showing cluster spots — clearing the
+            // QSO entry fields (F9) must not wipe the spotted stations from the cluster map.
+            if (MapControl == null || !MapControl.IsClusterMode)
+                ShowHomeMap();
             RestoreDataContext();
         }
 
@@ -7020,6 +7023,33 @@ namespace HolyLogger
             }
         }
 
+        // Moves the cursor to a safe position BEFORE opening the dropdown to prevent it from being
+        // inside the list area when the popup appears. Uses the textbox position to predict where
+        // the dropdown will appear and moves the cursor above it with margin.
+        private void MoveMouseAwayBeforeOpeningDropdown()
+        {
+            try
+            {
+                // Predict where the dropdown will appear based on the textbox position.
+                Point textboxScreen = TB_DXCallsign.PointToScreen(new Point(0, 0));
+                const int margin = 30;
+
+                // Move cursor above the textbox (where the dropdown will appear below).
+                int targetX = (int)textboxScreen.X + (int)(TB_DXCallsign.ActualWidth / 2);
+                int targetY = (int)textboxScreen.Y - margin;
+
+                var virtualScreen = System.Windows.Forms.SystemInformation.VirtualScreen;
+                targetX = Math.Max(virtualScreen.Left, Math.Min(virtualScreen.Right - 1, targetX));
+                targetY = Math.Max(virtualScreen.Top, Math.Min(virtualScreen.Bottom - 1, targetY));
+
+                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(targetX, targetY);
+            }
+            catch
+            {
+                // Cursor relocation is best-effort; never let it interfere with typing.
+            }
+        }
+
         // When the user starts navigating the suggestion list with the keyboard, nudge the OS cursor
         // just outside the dropdown ONLY if it is currently resting over the list. This guarantees the
         // mouse can never re-grab the list (via a synthetic MouseMove from rows shifting underneath it)
@@ -7041,10 +7071,39 @@ namespace HolyLogger
                                 cursor.Y >= topLeft.Y && cursor.Y <= bottomRight.Y;
                 if (!overList) return;
 
-                // Park the cursor well to the left of the list (keep the same Y) so it no longer hovers a row.
-                int targetX = (int)topLeft.X - 60;
-                if (targetX < 0) targetX = (int)bottomRight.X + 60;
-                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(targetX, cursor.Y);
+                // Park the cursor at a guaranteed outside point with margin, while staying on-screen.
+                const int margin = 24;
+                var virtualScreen = System.Windows.Forms.SystemInformation.VirtualScreen;
+
+                int left = (int)Math.Floor(topLeft.X);
+                int top = (int)Math.Floor(topLeft.Y);
+                int right = (int)Math.Ceiling(bottomRight.X);
+                int bottom = (int)Math.Ceiling(bottomRight.Y);
+
+                // Prefer moving above the dropdown first, then left/right, then below.
+                int targetX = cursor.X;
+                int targetY = top - margin;
+
+                if (targetY < virtualScreen.Top)
+                {
+                    targetY = cursor.Y;
+                    targetX = left - margin;
+
+                    if (targetX < virtualScreen.Left)
+                    {
+                        targetX = right + margin;
+                        if (targetX > virtualScreen.Right - 1)
+                        {
+                            targetX = cursor.X;
+                            targetY = bottom + margin;
+                        }
+                    }
+                }
+
+                targetX = Math.Max(virtualScreen.Left, Math.Min(virtualScreen.Right - 1, targetX));
+                targetY = Math.Max(virtualScreen.Top, Math.Min(virtualScreen.Bottom - 1, targetY));
+
+                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(targetX, targetY);
 
                 callsignSuggestionMouseControl = false;
                 lastCallsignSuggestionMousePos = null;
@@ -8023,6 +8082,13 @@ namespace HolyLogger
             LB_DXCallsignSuggestions.ItemsSource = matches;
             LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
             callsignSuggestionMouseControl = false;
+
+            // Move cursor to safe position before opening to prevent it from being inside the dropdown area.
+            if (matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown)
+            {
+                MoveMouseAwayBeforeOpeningDropdown();
+            }
+
             CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown;
 
             if (!Properties.Settings.Default.ShowCallsignDropdown && hasWildcard)
