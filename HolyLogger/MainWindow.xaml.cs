@@ -480,7 +480,7 @@ namespace HolyLogger
             {
                 Properties.Settings.Default.Upgrade();
                 Properties.Settings.Default.UpdateSettings = false;
-                Properties.Settings.Default.Save();
+                try { Properties.Settings.Default.Save(); } catch { }
             }
 
             NormalizeEnterKeyBehaviorSettings();
@@ -610,12 +610,12 @@ namespace HolyLogger
             if (!addQsoWithEnter && !doNothing)
             {
                 Properties.Settings.Default.DoNothing = true;
-                Properties.Settings.Default.Save();
+                try { Properties.Settings.Default.Save(); } catch { }
             }
             else if (addQsoWithEnter && doNothing)
             {
                 Properties.Settings.Default.DoNothing = false;
-                Properties.Settings.Default.Save();
+                try { Properties.Settings.Default.Save(); } catch { }
             }
         }
 
@@ -635,9 +635,18 @@ namespace HolyLogger
             QSO qso = _holyLogParser.ParseRawQSO(data);
             qso.GenerateSoapBox();
 
+            // Perform QRZ lookup outside Dispatcher to avoid blocking UI and ensure proper exception handling
+            string qrzName = string.Empty;
             if (string.IsNullOrWhiteSpace(qso.Name) && isNetworkAvailable)
             {
-                qso.Name = await GetQrzForCall(qso.DXCall);
+                try
+                {
+                    qrzName = await GetQrzForCall(qso.DXCall);
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"QRZ lookup failed for {qso.DXCall}: {ex.Message}");
+                }
             }
 
             this.Dispatcher.Invoke(() =>
@@ -645,6 +654,10 @@ namespace HolyLogger
                 try
                 {
                     bool isValid = false;
+                    if (!string.IsNullOrWhiteSpace(qrzName))
+                    {
+                        qso.Name = qrzName;
+                    }
                     qso.MyCall = string.IsNullOrWhiteSpace(qso.MyCall) ? TB_MyCallsign.Text : qso.MyCall;
                     qso.Operator = string.IsNullOrWhiteSpace(qso.Operator) ? TB_Operator.Text : qso.Operator;
                     if (Properties.Settings.Default.IsOverrideOperator)
@@ -3224,7 +3237,7 @@ namespace HolyLogger
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
             CloseClusterWebSocket();
-            Properties.Settings.Default.Save();
+            try { Properties.Settings.Default.Save(); } catch { }
             if (dal != null) dal.Close();
         }
 
@@ -3790,7 +3803,7 @@ namespace HolyLogger
             Properties.Settings.Default.ClusterColWidthUtc = clusterUtcColumn != null ? clusterUtcColumn.ActualWidth : Properties.Settings.Default.ClusterColWidthUtc;
             Properties.Settings.Default.ClusterColWidthMode = clusterModeColumn != null ? clusterModeColumn.ActualWidth : Properties.Settings.Default.ClusterColWidthMode;
             Properties.Settings.Default.ClusterColWidthComment = clusterCommentColumn != null ? clusterCommentColumn.ActualWidth : Properties.Settings.Default.ClusterColWidthComment;
-            Properties.Settings.Default.Save();
+            try { Properties.Settings.Default.Save(); } catch { }
 
             if (clusterSettingsWindow != null)
             {
@@ -4288,7 +4301,7 @@ namespace HolyLogger
         {
             Properties.Settings.Default.ClusterBandFilterMode = newMode;
             Properties.Settings.Default.ClusterUseActiveBand = string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase);
-            Properties.Settings.Default.Save();
+            try { Properties.Settings.Default.Save(); } catch { }
             if (clusterBandFilterAllBtn != null)
                 clusterBandFilterAllBtn.Style = MakeClusterBandFilterBtnStyle(string.Equals(newMode, "All", StringComparison.OrdinalIgnoreCase));
             if (clusterBandFilterPreSelectedBtn != null)
@@ -4834,7 +4847,7 @@ namespace HolyLogger
 
             Properties.Settings.Default.ClusterWindowLeft = clusterWindow.Left;
             Properties.Settings.Default.ClusterWindowTop = clusterWindow.Top;
-            Properties.Settings.Default.Save();
+            try { Properties.Settings.Default.Save(); } catch { }
         }
 
         private void OpenClusterSettingsWindow()
@@ -4966,13 +4979,13 @@ namespace HolyLogger
             mapToggleCheckBox.Checked += (s, e) =>
             {
                 Properties.Settings.Default.ClusterMapEnabled = true;
-                Properties.Settings.Default.Save();
+                try { Properties.Settings.Default.Save(); } catch { }
                 UpdateClusterSpotsOnMap();
             };
             mapToggleCheckBox.Unchecked += (s, e) =>
             {
                 Properties.Settings.Default.ClusterMapEnabled = false;
-                Properties.Settings.Default.Save();
+                try { Properties.Settings.Default.Save(); } catch { }
                 if (MapControl != null)
                     MapControl.ShowClusterSpots(new System.Collections.Generic.List<HolyLogger.ToolsUserControls.ClusterSpotInfo>(),
                         0, 0, GetMapRadiusKm());
@@ -7525,20 +7538,17 @@ namespace HolyLogger
 
                 if (!Properties.Settings.Default.isManualMode && state == State.New)
                     RefreshDateTime_Btn_MouseUp(null, null);
+
+                // Perform immediate lightweight DXCC lookup (cached by EntityResolver)
                 DXCC dXCC = rem.GetDXCC(dxCallText);
                 Country = dXCC.Name;
                 UpdateCountryFlag(dXCC.Name);
                 Continent = dXCC.Continent;
                 QRZGrid = dXCC.Locator;
                 Prefix = dxCallText.Length >= 2 ? dxCallText.Substring(0, 2) : "";
+
+                // Defer heavy operations (Matrix update and QSO filtering) to debounce timer for smoother typing
                 RestartCallsignLookupDebounce();
-                UpdateMatrix();
-                if (Properties.Settings.Default.IsFilterQSOs)
-                {
-                    FilteredQsos = new ObservableCollection<QSO>(Qsos.Where(p => p.DXCall.Contains(dxCallText)));
-                    if (LastQSO != null && Properties.Settings.Default.DisplayLastQSOinGrid) FilteredQsos.Insert(0, LastQSO);
-                    DataContext = FilteredQsos;
-                }
             }
         }
 
@@ -7557,6 +7567,17 @@ namespace HolyLogger
                 ClearQrzPhoto();
                 ClearAzimuth();
                 return;
+            }
+
+            string dxCallText = TB_DXCallsign.Text.Trim();
+
+            // Perform heavy operations after debounce delay
+            UpdateMatrix();
+            if (Properties.Settings.Default.IsFilterQSOs)
+            {
+                FilteredQsos = new ObservableCollection<QSO>(Qsos.Where(p => p.DXCall.Contains(dxCallText)));
+                if (LastQSO != null && Properties.Settings.Default.DisplayLastQSOinGrid) FilteredQsos.Insert(0, LastQSO);
+                DataContext = FilteredQsos;
             }
 
             SetAzimuth();
