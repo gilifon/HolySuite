@@ -17,6 +17,7 @@
     <Window.Resources>
         <local:QsoDateDisplayConverter x:Key="QsoDateDisplayConverter"/>
         <local:QsoTimeDisplayConverter x:Key="QsoTimeDisplayConverter"/>
+        <local:BoolToFontWeightConverter x:Key="BoolToFontWeightConverter"/>
         <Style x:Key="RaisedActionButtonStyle" TargetType="Button">
             <Setter Property="Foreground" Value="#1E2A34"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -672,9 +673,34 @@
                     </ListBox.ItemContainerStyle>
                     <ListBox.ItemTemplate>
                         <DataTemplate>
-                            <TextBlock>
-                                <Run Text="{Binding Before}"/><Run Text="{Binding Match}" Foreground="Green" FontWeight="Bold"/><Run Text="{Binding After}"/>
-                            </TextBlock>
+                            <ItemsControl ItemsSource="{Binding Segments}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Text}" FontWeight="{Binding IsBold, Converter={StaticResource BoolToFontWeightConverter}}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Color}" Value="Green">
+                                                            <Setter Property="Foreground" Value="Green"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Color}" Value="Red">
+                                                            <Setter Property="Foreground" Value="Red"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Color}" Value="Normal">
+                                                            <Setter Property="Foreground" Value="Black"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

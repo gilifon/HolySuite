@@ -8083,9 +8083,9 @@ namespace HolyLogger
 
                 int matchLength = hasWildcard ? pattern.Length : literalPrefix.Length;
                 if (call.Contains('/'))
-                    slashMatches.Add(BuildSuggestionItem(call, call.Substring(0, matchLength), 0));
+                    slashMatches.Add(BuildSuggestionItem(call, pattern, hasWildcard, matchLength));
                 else if (matches.Count < maxCallsignSuggestions)
-                    matches.Add(BuildSuggestionItem(call, call.Substring(0, matchLength), 0));
+                    matches.Add(BuildSuggestionItem(call, pattern, hasWildcard, matchLength));
             }
 
             // Fill remaining slots with slash matches (non-slash callsigns are shown first).
@@ -8331,21 +8331,85 @@ namespace HolyLogger
 
         private class CallsignSuggestionItem
         {
+            // Legacy properties for backward compatibility with non-wildcard searches
             public string Before { get; set; }
             public string Match { get; set; }
             public string After { get; set; }
+
+            // New properties for wildcard-aware display
+            public List<CallsignSegment> Segments { get; set; }
             public string FullCallsign => Before + Match + After;
         }
 
-        private CallsignSuggestionItem BuildSuggestionItem(string callsign, string matchTerm, int matchStart)
+        private class CallsignSegment
         {
-            return new CallsignSuggestionItem
-            {
-                Before = callsign.Substring(0, matchStart),
-                Match = callsign.Substring(matchStart, matchTerm.Length),
-                After = callsign.Substring(matchStart + matchTerm.Length)
-            };
+            public string Text { get; set; }
+            public string Color { get; set; }  // "Normal", "Green", "Red"
+            public bool IsBold { get; set; }
         }
+
+        private CallsignSuggestionItem BuildSuggestionItem(string callsign, string pattern, bool hasWildcard, int matchLength)
+        {
+            var item = new CallsignSuggestionItem
+            {
+                Before = string.Empty,
+                Match = callsign.Length >= matchLength ? callsign.Substring(0, matchLength) : callsign,
+                After = callsign.Length > matchLength ? callsign.Substring(matchLength) : string.Empty,
+                Segments = new List<CallsignSegment>()
+            };
+
+            if (!hasWildcard)
+            {
+                // No wildcards: simple green prefix match
+                item.Segments.Add(new CallsignSegment { Text = item.Match, Color = "Green", IsBold = true });
+                if (!string.IsNullOrEmpty(item.After))
+                    item.Segments.Add(new CallsignSegment { Text = item.After, Color = "Normal", IsBold = false });
+            }
+            else
+            {
+                // Wildcards: color wildcard positions red, literal matches green
+                for (int i = 0; i < pattern.Length && i < callsign.Length; i++)
+                {
+                    char patternChar = pattern[i];
+                    char callsignChar = callsign[i];
+
+                    if (patternChar == '?')
+                    {
+                        // Wildcard position: red
+                        item.Segments.Add(new CallsignSegment 
+                        { 
+                            Text = callsignChar.ToString(), 
+                            Color = "Red", 
+                            IsBold = true 
+                        });
+                    }
+                    else
+                    {
+                        // Literal match: green
+                        item.Segments.Add(new CallsignSegment 
+                        { 
+                            Text = callsignChar.ToString(), 
+                            Color = "Green", 
+                            IsBold = true 
+                        });
+                    }
+                }
+
+                // Add remainder (after pattern) in normal color
+                if (callsign.Length > pattern.Length)
+                {
+                    item.Segments.Add(new CallsignSegment 
+                    { 
+                        Text = callsign.Substring(pattern.Length), 
+                        Color = "Normal", 
+                        IsBold = false 
+                    });
+                }
+            }
+
+            return item;
+        }
+
 
         private int NormalizeCallsignSuggestionRows(int rows)
         {
@@ -9491,6 +9555,23 @@ namespace HolyLogger
             }
 
             return value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return System.Windows.Data.Binding.DoNothing;
+        }
+    }
+
+    public class BoolToFontWeightConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            if (value is bool isBold && isBold)
+            {
+                return System.Windows.FontWeights.Bold;
+            }
+            return System.Windows.FontWeights.Normal;
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
