@@ -4415,12 +4415,13 @@ namespace HolyLogger
             // Custom template for the checkbox
             var checkBoxTemplate = new ControlTemplate(typeof(CheckBox));
             var templateFactory = new FrameworkElementFactory(typeof(Border));
-            templateFactory.SetValue(Border.WidthProperty, 12.0);
-            templateFactory.SetValue(Border.HeightProperty, 12.0);
+            templateFactory.SetValue(Border.WidthProperty, 14.0);
+            templateFactory.SetValue(Border.HeightProperty, 14.0);
             templateFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x15, 0x61, 0x84)));
             templateFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(2));
             templateFactory.SetValue(Border.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            templateFactory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Center);
+            templateFactory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
+            templateFactory.SetValue(Border.MarginProperty, new Thickness(0, -2, 0, 0));
 
             // Add checkmark (white text "✓")
             var checkMarkFactory = new FrameworkElementFactory(typeof(TextBlock));
