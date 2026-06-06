@@ -59,7 +59,7 @@ namespace HolyLogger
             ServicePointManager.Expect100Continue = true;
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             if (string.IsNullOrEmpty(callsign) || string.IsNullOrEmpty(frequency) || string.IsNullOrEmpty(mode)) return;
-            string IsVisible = is_visible ? "0" : "1";
+            string IsVisible = is_visible ? "1" : "0";
             WebRequest request = WebRequest.Create("https://tools.iarc.org/Holyland/Server/heartbeat.php?callsign=" + callsign + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode + "&machine=" + machineName + "&is_visible=" + IsVisible);
             request.GetResponseAsync().ContinueWith(t =>
             {
