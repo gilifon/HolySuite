@@ -4125,11 +4125,13 @@ namespace HolyLogger
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 RowHeaderWidth = 0,
                 AlternationCount = 2,
-                AlternatingRowBackground = Brushes.Gainsboro,
+                //AlternatingRowBackground = Brushes.Gainsboro,
                 FontSize = 13,
                 Margin = new Thickness(0, -(ClusterHeaderCanvasHeight - ClusterTableTopGap), 0, 0),
                 Opacity = 1
             };
+
+
             ToolTipService.SetInitialShowDelay(spotsGrid, 50);
             ToolTipService.SetShowDuration(spotsGrid, 3000);
 
@@ -6286,13 +6288,33 @@ namespace HolyLogger
                 }
             }
 
-            public Brush DXBackground => IsMyCallsign
-                ? new SolidColorBrush(Color.FromRgb(0x00, 0x33, 0x99))
-                : Brushes.Transparent;
+            public Brush DXBackground
+            {
+                get
+                {
+                    if (IsMyCallsign)
+                    {
+                        return new SolidColorBrush(Color.FromRgb(0x00, 0x33, 0x99));
+                    }
 
-            public Brush RowBackground => IsOnFrequency 
-                ? new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)) // Darker green (LightGreen)
-                : Brushes.Transparent;
+                    return Brushes.Transparent;
+                }
+            }
+
+            public Brush RowBackground
+            {
+                get
+                {
+                    if (IsOnFrequency)
+                    {
+                        return new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)); // LightGreen
+                    }
+                    else
+                    {
+                        return Brushes.Transparent;
+                    }
+                }
+            }
 
             public event PropertyChangedEventHandler PropertyChanged;
         }
