@@ -6387,27 +6387,24 @@ namespace HolyLogger
 
             const double toleranceKhz = 0.5; // 0.5 kHz tolerance
 
-            Dispatcher.BeginInvoke(new Action(() =>
+            foreach (var spot in clusterVisibleSpots)
             {
-                foreach (var spot in clusterVisibleSpots)
+                string spotFreqText = spot.FreqText?.Trim();
+                if (!string.IsNullOrWhiteSpace(spotFreqText) &&
+                    double.TryParse(spotFreqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double spotFreqValue))
                 {
-                    string spotFreqText = spot.FreqText?.Trim();
-                    if (!string.IsNullOrWhiteSpace(spotFreqText) &&
-                        double.TryParse(spotFreqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double spotFreqValue))
-                    {
-                        // Normalize cluster frequency to MHz (cluster can be in kHz if >= 1000, otherwise MHz)
-                        double spotFreqMhz = spotFreqValue >= 1000 ? (spotFreqValue / 1000.0) : spotFreqValue;
+                    // Normalize cluster frequency to MHz (cluster can be in kHz if >= 1000, otherwise MHz)
+                    double spotFreqMhz = spotFreqValue >= 1000 ? (spotFreqValue / 1000.0) : spotFreqValue;
 
-                        // Compare in kHz for better precision
-                        double freqDiffKhz = Math.Abs(currentFreqMhz - spotFreqMhz) * 1000.0;
-                        spot.IsOnFrequency = freqDiffKhz <= toleranceKhz;
-                    }
-                    else
-                    {
-                        spot.IsOnFrequency = false;
-                    }
+                    // Compare in kHz for better precision
+                    double freqDiffKhz = Math.Abs(currentFreqMhz - spotFreqMhz) * 1000.0;
+                    spot.IsOnFrequency = freqDiffKhz <= toleranceKhz;
                 }
-            }));
+                else
+                {
+                    spot.IsOnFrequency = false;
+                }
+            }
         }
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
