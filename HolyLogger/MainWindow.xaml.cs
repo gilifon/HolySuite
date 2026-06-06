@@ -4141,6 +4141,60 @@ namespace HolyLogger
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+
+            // Create template via XAML string for reliability
+            string templateXaml = @"
+                <ControlTemplate xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+                                 xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'
+                                 TargetType='{x:Type DataGridColumnHeader}'>
+                    <Grid>
+                        <Border Background='{TemplateBinding Background}'
+                                BorderBrush='{TemplateBinding BorderBrush}'
+                                BorderThickness='{TemplateBinding BorderThickness}'>
+                            <Grid>
+                                <ContentPresenter HorizontalAlignment='{TemplateBinding HorizontalContentAlignment}'
+                                                  VerticalAlignment='{TemplateBinding VerticalContentAlignment}'
+                                                  Margin='{TemplateBinding Padding}' />
+                                <Path x:Name='SortArrow'
+                                      HorizontalAlignment='Center'
+                                      VerticalAlignment='Top'
+                                      Margin='0,0,0,0'
+                                      Fill='#000000'
+                                      Stretch='Uniform'
+                                      Width='8'
+                                      Height='6'
+                                      Data='M 0,0 L 1,1 L 2,0 Z'
+                                      Visibility='Collapsed'
+                                      RenderTransformOrigin='0.5,0.5'>
+                                    <Path.RenderTransform>
+                                        <ScaleTransform ScaleY='1' />
+                                    </Path.RenderTransform>
+                                </Path>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property='SortDirection' Value='Ascending'>
+                            <Setter TargetName='SortArrow' Property='Visibility' Value='Visible' />
+                            <Setter TargetName='SortArrow' Property='RenderTransform'>
+                                <Setter.Value>
+                                    <ScaleTransform ScaleY='1' />
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                        <Trigger Property='SortDirection' Value='Descending'>
+                            <Setter TargetName='SortArrow' Property='Visibility' Value='Visible' />
+                            <Setter TargetName='SortArrow' Property='RenderTransform'>
+                                <Setter.Value>
+                                    <ScaleTransform ScaleY='-1' />
+                                </Setter.Value>
+                            </Setter>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>";
+
+            var headerTemplate = (ControlTemplate)System.Windows.Markup.XamlReader.Parse(templateXaml);
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.TemplateProperty, headerTemplate));
             spotsGrid.ColumnHeaderStyle = clusterColumnHeaderStyle;
 
             // DX column
@@ -4156,8 +4210,8 @@ namespace HolyLogger
             var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, SortMemberPath = "DXCallsign", Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthDX)) };
 
             // Spotter / Country columns
-            var spotterColumn = new DataGridTextColumn { Header = "Spotter", Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
-            var countryColumn = new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(Math.Max(40, LoadClusterCountryColumnWidthSetting())) };
+            var spotterColumn = new DataGridTextColumn { Header = "Spotter", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
+            var countryColumn = new DataGridTextColumn { Header = "Country", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(Math.Max(40, LoadClusterCountryColumnWidthSetting())) };
 
             // Freq column
             var freqHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
