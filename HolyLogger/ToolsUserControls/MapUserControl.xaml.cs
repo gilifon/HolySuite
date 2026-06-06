@@ -3,6 +3,8 @@ using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Windows.Controls;
+using System.Windows.Media;
+
 
 namespace HolyLogger.ToolsUserControls
 {
@@ -1003,6 +1005,7 @@ window.addEventListener('resize', function() {
             MapBrowser.Visibility = System.Windows.Visibility.Collapsed;
             PlaceholderPanel.Visibility = System.Windows.Visibility.Visible;
         }
+
 
         private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15)
         {

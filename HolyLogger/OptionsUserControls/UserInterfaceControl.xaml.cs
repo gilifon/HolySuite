@@ -353,16 +353,34 @@ namespace HolyLogger.OptionsUserControls
             if (!IsLoaded) return;
 
             int mode = 0; // Default: Map
-            if (RB_MapDisplay_Compass.IsChecked == true)
+            bool showGraphicsBox = true;
+
+            if (RB_MapDisplay_None.IsChecked == true)
+            {
+                mode = -1; // None - show blank panel
+                showGraphicsBox = true; // Keep graphics box visible but blank
+            }
+            else if (RB_MapDisplay_Compass.IsChecked == true)
                 mode = 1;
             else if (RB_MapDisplay_QRZPhoto.IsChecked == true)
                 mode = 2;
             else if (RB_MapDisplay_CustomImage.IsChecked == true)
                 mode = 3;
+            else
+                mode = 0; // Map
 
+            // Update the display mode setting
             if (Properties.Settings.Default.MapAreaDisplayMode != mode)
             {
                 Properties.Settings.Default.MapAreaDisplayMode = mode;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+            }
+
+            // Update the show/hide setting - always show when using radio buttons
+            if (Properties.Settings.Default.IsShowAzimuthControl != showGraphicsBox)
+            {
+                Properties.Settings.Default.IsShowAzimuthControl = showGraphicsBox;
                 Properties.Settings.Default.Save();
                 HasChanged = true;
             }
@@ -429,21 +447,33 @@ namespace HolyLogger.OptionsUserControls
 
         private void LoadMapDisplayModeSettings()
         {
+            // Check if graphics box should be hidden (legacy setting or mode -1)
+            bool isShowAzimuth = Properties.Settings.Default.IsShowAzimuthControl;
             int mode = Properties.Settings.Default.MapAreaDisplayMode;
-            switch (mode)
+
+            // If graphics box is hidden via old checkbox setting, select "None"
+            if (!isShowAzimuth || mode == -1)
             {
-                case 1:
-                    RB_MapDisplay_Compass.IsChecked = true;
-                    break;
-                case 2:
-                    RB_MapDisplay_QRZPhoto.IsChecked = true;
-                    break;
-                case 3:
-                    RB_MapDisplay_CustomImage.IsChecked = true;
-                    break;
-                default:
-                    RB_MapDisplay_Map.IsChecked = true;
-                    break;
+                RB_MapDisplay_None.IsChecked = true;
+            }
+            else
+            {
+                // Select the appropriate display mode
+                switch (mode)
+                {
+                    case 1:
+                        RB_MapDisplay_Compass.IsChecked = true;
+                        break;
+                    case 2:
+                        RB_MapDisplay_QRZPhoto.IsChecked = true;
+                        break;
+                    case 3:
+                        RB_MapDisplay_CustomImage.IsChecked = true;
+                        break;
+                    default:
+                        RB_MapDisplay_Map.IsChecked = true;
+                        break;
+                }
             }
 
             TB_CustomImagePath.Text = Properties.Settings.Default.CustomMapImagePath ?? string.Empty;

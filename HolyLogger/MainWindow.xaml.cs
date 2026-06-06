@@ -854,19 +854,31 @@ namespace HolyLogger
                 return; // Graphics box is hidden, nothing to update
             }
 
-            // Hide all options first
+            int mode = Properties.Settings.Default.MapAreaDisplayMode;
+
+            // Always hide MapDisabledPanel first (it has highest ZIndex)
+            MapDisabledPanel.Visibility = Visibility.Collapsed;
+
+            // Hide all content options
             MapControl.Visibility = Visibility.Hidden;
             CustomGraphicsBorder.Visibility = Visibility.Collapsed;
             QRZGraphicsBorder.Visibility = Visibility.Collapsed;
             CompassBorder.Visibility = Visibility.Collapsed;
-            MapDisabledPanel.Visibility = Visibility.Collapsed;
 
-            int mode = Properties.Settings.Default.MapAreaDisplayMode;
+            // Force UI update before showing new content
+            this.UpdateLayout();
 
             switch (mode)
             {
+                case -1: // None - show blank panel with background color
+                    MapDisabledPanel.Visibility = Visibility.Visible;
+                    break;
                 case 0: // Map
                     MapControl.Visibility = Visibility.Visible;
+                    // Force map to render immediately with current data
+                    MapControl.InvalidateVisual();
+                    MapControl.UpdateLayout();
+                    UpdateClusterSpotsOnMap();
                     break;
                 case 1: // Compass
                     CompassBorder.Visibility = Visibility.Visible;
@@ -879,9 +891,15 @@ namespace HolyLogger
                 case 3: // Custom Image
                     CustomGraphicsBorder.Visibility = Visibility.Visible;
                     LoadCustomImageToGraphicsBox();
+                    // Force custom image to render immediately
+                    CustomGraphicsBorder.InvalidateVisual();
+                    CustomGraphicsBorder.UpdateLayout();
                     break;
                 default:
                     MapControl.Visibility = Visibility.Visible;
+                    MapControl.InvalidateVisual();
+                    MapControl.UpdateLayout();
+                    UpdateClusterSpotsOnMap();
                     break;
             }
         }
@@ -929,11 +947,15 @@ namespace HolyLogger
                     bitmap.BeginInit();
                     bitmap.UriSource = new Uri(imagePath, UriKind.Absolute);
                     bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache; // Force fresh load
                     bitmap.EndInit();
+                    bitmap.Freeze(); // Freeze to improve performance
                     Img_CustomGraphics.Source = bitmap;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    // Log error and clear image
+                    System.Diagnostics.Debug.WriteLine($"Failed to load custom image: {ex.Message}");
                     Img_CustomGraphics.Source = null;
                 }
             }
@@ -6785,6 +6807,10 @@ namespace HolyLogger
             if (MapControl == null || MapControl.Visibility != Visibility.Visible)
                 return;
 
+            // Don't show map if Empty mode is active
+            if (Properties.Settings.Default.MapAreaDisplayMode == 4)
+                return;
+
             if (string.IsNullOrWhiteSpace(TB_MyLocator.Text))
                 return;
 
@@ -8813,7 +8839,12 @@ namespace HolyLogger
                     double distKm = MaidenheadLocator.Distance(homell, ll);
                     int autoFitRadius = Math.Max(500, (int)(distKm * 1.10));
                     _dxQsoInProgress = true;
-                    MapControl.ShowMap(ll.Lat, ll.Long, autoFitRadius, Azimuth, homell.Lat, homell.Long);
+
+                    // Don't update map if Empty mode is active
+                    if (Properties.Settings.Default.MapAreaDisplayMode != 4)
+                    {
+                        MapControl.ShowMap(ll.Lat, ll.Long, autoFitRadius, Azimuth, homell.Lat, homell.Long);
+                    }
                 }
                 catch (Exception e)
                 {
@@ -8855,6 +8886,11 @@ namespace HolyLogger
         private void ShowHomeMap()
         {
             if (MapControl == null) return;
+
+            // Don't show map if Empty mode is active
+            if (Properties.Settings.Default.MapAreaDisplayMode == 4)
+                return;
+
             if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text))
             {
                 try
