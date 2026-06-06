@@ -968,9 +968,7 @@
                 </Border>
             </Grid>
         </Border>
-        <!-- Graphics Box Decorative Frame (visible only for QRZ Photo and Custom Image modes) -->
-        <Border x:Name="GraphicsBoxFrame" HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" 
-                BorderBrush="#9966CC" BorderThickness="3" CornerRadius="8" Panel.ZIndex="25" IsHitTestVisible="False" Visibility="Collapsed"/>
+        
         <TextBlock HorizontalAlignment="Left" Margin="12,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Operator" FontWeight="Bold" />
             <LineBreak />

@@ -860,7 +860,6 @@ namespace HolyLogger
             QRZGraphicsBorder.Visibility = Visibility.Collapsed;
             CompassBorder.Visibility = Visibility.Collapsed;
             MapDisabledPanel.Visibility = Visibility.Collapsed;
-            GraphicsBoxFrame.Visibility = Visibility.Collapsed;
 
             int mode = Properties.Settings.Default.MapAreaDisplayMode;
 
@@ -875,12 +874,10 @@ namespace HolyLogger
                     break;
                 case 2: // QRZ Photo
                     QRZGraphicsBorder.Visibility = Visibility.Visible;
-                    GraphicsBoxFrame.Visibility = Visibility.Visible;
                     LoadCurrentQRZPhotoToGraphicsBox();
                     break;
                 case 3: // Custom Image
                     CustomGraphicsBorder.Visibility = Visibility.Visible;
-                    GraphicsBoxFrame.Visibility = Visibility.Visible;
                     LoadCustomImageToGraphicsBox();
                     break;
                 default:
