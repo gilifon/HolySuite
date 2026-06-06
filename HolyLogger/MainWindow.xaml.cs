@@ -4193,6 +4193,34 @@ namespace HolyLogger
                                 </Path>
                             </Grid>
                         </Border>
+                        <Thumb x:Name='PART_LeftHeaderGripper' HorizontalAlignment='Left' Width='4' Cursor='SizeWE'>
+                            <Thumb.Style>
+                                <Style TargetType='Thumb'>
+                                    <Setter Property='Background' Value='Transparent'/>
+                                    <Setter Property='Template'>
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType='Thumb'>
+                                                <Border Background='{TemplateBinding Background}' Padding='0'/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Thumb.Style>
+                        </Thumb>
+                        <Thumb x:Name='PART_RightHeaderGripper' HorizontalAlignment='Right' Width='4' Cursor='SizeWE'>
+                            <Thumb.Style>
+                                <Style TargetType='Thumb'>
+                                    <Setter Property='Background' Value='Transparent'/>
+                                    <Setter Property='Template'>
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType='Thumb'>
+                                                <Border Background='{TemplateBinding Background}' Padding='0'/>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </Thumb.Style>
+                        </Thumb>
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property='SortDirection' Value='Ascending'>
@@ -4359,6 +4387,73 @@ namespace HolyLogger
             };
             clusterSpotCountText = spotCountText;
 
+            // 160m band indicator - text and colored square
+            var band160Text = new TextBlock
+            {
+                Text = "160",
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 2)
+            };
+
+            // Create CheckBox with custom template for 160m band indicator
+            var band160CheckBox = new CheckBox
+            {
+                Width = 12,
+                Height = 12,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsChecked = false,
+                Cursor = Cursors.Hand,
+                ToolTip = "Toggle 160m band filter"
+            };
+
+            // Custom template for the checkbox
+            var checkBoxTemplate = new ControlTemplate(typeof(CheckBox));
+            var templateFactory = new FrameworkElementFactory(typeof(Border));
+            templateFactory.SetValue(Border.WidthProperty, 12.0);
+            templateFactory.SetValue(Border.HeightProperty, 12.0);
+            templateFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x15, 0x61, 0x84)));
+            templateFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(2));
+            templateFactory.SetValue(Border.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            templateFactory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Center);
+
+            // Add checkmark (white text "✓")
+            var checkMarkFactory = new FrameworkElementFactory(typeof(TextBlock));
+            checkMarkFactory.SetValue(TextBlock.TextProperty, "✓");
+            checkMarkFactory.SetValue(TextBlock.ForegroundProperty, Brushes.White);
+            checkMarkFactory.SetValue(TextBlock.FontSizeProperty, 10.0);
+            checkMarkFactory.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+            checkMarkFactory.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            checkMarkFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+            checkMarkFactory.SetValue(TextBlock.MarginProperty, new Thickness(0, -1, 0, 0));
+            checkMarkFactory.SetValue(TextBlock.VisibilityProperty, Visibility.Collapsed);
+            checkMarkFactory.Name = "CheckMark";
+
+            templateFactory.AppendChild(checkMarkFactory);
+            checkBoxTemplate.VisualTree = templateFactory;
+
+            // Add trigger to show checkmark when checked
+            var trigger = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
+            trigger.Setters.Add(new Setter(TextBlock.VisibilityProperty, Visibility.Visible, "CheckMark"));
+            checkBoxTemplate.Triggers.Add(trigger);
+
+            band160CheckBox.Template = checkBoxTemplate;
+
+            var band160Indicator = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, -12, 8, 0)
+            };
+            band160Indicator.Children.Add(band160Text);
+            band160Indicator.Children.Add(band160CheckBox);
+
             var actionsPanel = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -4366,6 +4461,7 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, -8, 0, 0)
             };
+            actionsPanel.Children.Add(band160Indicator);
             actionsPanel.Children.Add(undoButton);
             actionsPanel.Children.Add(settingsButton);
 
