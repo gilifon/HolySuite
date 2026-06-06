@@ -1,5 +1,57 @@
 # Copilot Instructions
 
+## Required Workflow for All Code Changes
+**MANDATORY: Follow this workflow for every implementation request. Never skip these steps.**
+
+### 1. Investigation Phase (Always Do First)
+- **Search and analyze** existing code related to the request using `code_search`, `find_symbol`, and `get_file`
+- **Understand** the current architecture, data flow, and how related features work
+- **Identify** all affected files, methods, and components
+- **Report findings** to the user with a summary of what you discovered
+
+### 2. Planning Phase (Explain Before Coding)
+- **Describe** your implementation approach in detail
+- **List** specific files and methods you'll modify
+- **Explain WHY** each change is needed and how it fits the architecture
+- **Highlight** any risks, dependencies, or architectural concerns
+- **Present the plan** to the user and wait for confirmation before proceeding
+
+### 3. Implementation Phase (Code with Verification)
+- Make the planned changes using file tools
+- Run `get_errors` or `run_build` to check for compilation errors
+- **Review** the changes for logical correctness
+- **Verify** the implementation matches the plan
+
+### 4. Completion Phase (Only When Truly Ready)
+- Confirm zero compilation errors in affected files
+- Summarize all changes made
+- **Only then** declare the work ready for testing
+- Never say "it's done" without completing verification
+
+**Example of proper workflow:**
+```
+User: "Add feature X"
+
+AI: "Let me investigate how [related feature] currently works..."
+    [searches code]
+    "I found that [explanation]. To implement your request, I plan to:
+    1. Modify [FileA.cs] method [MethodB] to [reason]
+    2. Add [new setting C] because [reason]
+    3. Update [UI control D] to [reason]
+
+    This will work because [architectural explanation].
+    Should I proceed with this plan?"
+
+User: "Yes" or provides feedback
+
+AI: [makes changes]
+    [verifies build]
+    "Implementation complete. Changed:
+    - [FileA]: [what changed]
+    - [FileB]: [what changed]
+    No compilation errors. Ready for testing."
+```
+
 ## Project Guidelines
 - When the user asks to commit changes in this repository, do not bump or modify the version number unless they explicitly ask for a version change.
 - Never run git commit without the user explicitly asking to commit. Always wait for the user to say "commit" before committing.

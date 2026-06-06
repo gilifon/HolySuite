@@ -194,7 +194,17 @@ namespace HolyLogger
         public string QRZLat { get; set; }
         public string QRZLon { get; set; }
         public string QRZGrid { get; set; }
-        public double Azimuth { get; set; }
+
+        private double _azimuth;
+        public double Azimuth
+        {
+            get { return _azimuth; }
+            set
+            {
+                _azimuth = value;
+                UpdateCompassDisplay();
+            }
+        }
 
         private string _SessionKey;
         public string SessionKey
@@ -285,6 +295,7 @@ namespace HolyLogger
         double? qrzPhotoTop = null;
         double? qrzPhotoWidth = null;
         double? qrzPhotoHeight = null;
+        string currentQrzImageUrl = null; // Track current QRZ photo URL for graphics box display
 
         BackgroundWorker AdifHandlerWorker;
         //BackgroundWorker EntireLogQrzWorker;
@@ -805,17 +816,135 @@ namespace HolyLogger
         {
             if (Properties.Settings.Default.IsShowAzimuthControl)
             {
-                MapControl.Visibility = Visibility.Visible;
-                MapDisabledPanel.Visibility = Visibility.Collapsed;
+                // Show the map area - now controlled by MapAreaDisplayMode setting
+                UpdateGraphicsBoxDisplay();
                 this.MinWidth = 1120;
                 UpdateClusterSpotsOnMap();
             }
             else
             {
+                // Hide all graphics options
                 MapControl.Visibility = Visibility.Hidden;
+                Img_CustomGraphics.Visibility = Visibility.Collapsed;
+                Img_QRZGraphics.Visibility = Visibility.Collapsed;
                 MapDisabledPanel.Visibility = Visibility.Visible;
                 this.MinWidth = 800;
             }
+        }
+
+        private void UpdateGraphicsBoxDisplay()
+        {
+            if (!Properties.Settings.Default.IsShowAzimuthControl)
+            {
+                return; // Graphics box is hidden, nothing to update
+            }
+
+            // Hide all options first
+            MapControl.Visibility = Visibility.Hidden;
+            CustomGraphicsBorder.Visibility = Visibility.Collapsed;
+            QRZGraphicsBorder.Visibility = Visibility.Collapsed;
+            CompassBorder.Visibility = Visibility.Collapsed;
+            MapDisabledPanel.Visibility = Visibility.Collapsed;
+            GraphicsBoxFrame.Visibility = Visibility.Collapsed;
+
+            int mode = Properties.Settings.Default.MapAreaDisplayMode;
+
+            switch (mode)
+            {
+                case 0: // Map
+                    MapControl.Visibility = Visibility.Visible;
+                    break;
+                case 1: // Compass
+                    CompassBorder.Visibility = Visibility.Visible;
+                    UpdateCompassDisplay();
+                    break;
+                case 2: // QRZ Photo
+                    QRZGraphicsBorder.Visibility = Visibility.Visible;
+                    GraphicsBoxFrame.Visibility = Visibility.Visible;
+                    LoadCurrentQRZPhotoToGraphicsBox();
+                    break;
+                case 3: // Custom Image
+                    CustomGraphicsBorder.Visibility = Visibility.Visible;
+                    GraphicsBoxFrame.Visibility = Visibility.Visible;
+                    LoadCustomImageToGraphicsBox();
+                    break;
+                default:
+                    MapControl.Visibility = Visibility.Visible;
+                    break;
+            }
+        }
+
+        private void LoadCurrentQRZPhotoToGraphicsBox()
+        {
+            if (string.IsNullOrWhiteSpace(currentQrzImageUrl))
+            {
+                // No QRZ photo available - clear the image but background stays white
+                Img_QRZGraphics.Source = null;
+                return;
+            }
+
+            try
+            {
+                string normalized = currentQrzImageUrl.Trim();
+                if (normalized.StartsWith("//"))
+                {
+                    normalized = "https:" + normalized;
+                }
+
+                var bitmap = new BitmapImage();
+                bitmap.BeginInit();
+                bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
+                bitmap.UriSource = new Uri(normalized, UriKind.Absolute);
+                bitmap.EndInit();
+                Img_QRZGraphics.Source = bitmap;
+            }
+            catch
+            {
+                // Failed to load image - clear but keep white background
+                Img_QRZGraphics.Source = null;
+            }
+        }
+
+        private void LoadCustomImageToGraphicsBox()
+        {
+            string imagePath = Properties.Settings.Default.CustomMapImagePath;
+            if (!string.IsNullOrEmpty(imagePath) && File.Exists(imagePath))
+            {
+                try
+                {
+                    BitmapImage bitmap = new BitmapImage();
+                    bitmap.BeginInit();
+                    bitmap.UriSource = new Uri(imagePath, UriKind.Absolute);
+                    bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                    bitmap.EndInit();
+                    Img_CustomGraphics.Source = bitmap;
+                }
+                catch
+                {
+                    Img_CustomGraphics.Source = null;
+                }
+            }
+            else
+            {
+                Img_CustomGraphics.Source = null;
+            }
+        }
+
+        private void UpdateCompassDisplay()
+        {
+            if (CompassBorder == null || CompassNeedleRotation == null || CompassAzimuthText == null)
+                return;
+
+            // Only update if compass is currently visible
+            if (CompassBorder.Visibility != Visibility.Visible)
+                return;
+
+            // Update needle rotation
+            CompassNeedleRotation.Angle = Azimuth;
+
+            // Update azimuth text
+            CompassAzimuthText.Text = $"AZ {Math.Round(Azimuth, 0)}°";
         }
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
@@ -3429,7 +3558,17 @@ namespace HolyLogger
             options.Top = Properties.Settings.Default.OptionsWindowTop < 0 ? 0 : Properties.Settings.Default.OptionsWindowTop;
             options.Width = Properties.Settings.Default.OptionsWindowWidth;
             options.Height = Properties.Settings.Default.OptionsWindowHeight;
+
+            // Subscribe to graphics box mode changes for immediate refresh
+            options.UserInterfaceControlInstance.GraphicsBoxModeChanged += UserInterfaceControl_GraphicsBoxModeChanged;
+
             options.Show();
+        }
+
+        private void UserInterfaceControl_GraphicsBoxModeChanged(object sender, EventArgs e)
+        {
+            // Immediately refresh graphics box display when settings change
+            UpdateGraphicsBoxDisplay();
         }
 
         private void Options_Closed(object sender, EventArgs e)
@@ -7298,7 +7437,21 @@ namespace HolyLogger
                 {
                     normalized = "https:" + normalized;
                 }
-                ShowQrzPhotoWindow(normalized);
+
+                // Track current QRZ image URL
+                currentQrzImageUrl = normalized;
+
+                // Update graphics box if in QRZ Photo mode
+                if (Properties.Settings.Default.MapAreaDisplayMode == 2)
+                {
+                    LoadCurrentQRZPhotoToGraphicsBox();
+                }
+
+                // Show separate photo window only if NOT showing in graphics box
+                if (Properties.Settings.Default.MapAreaDisplayMode != 2)
+                {
+                    ShowQrzPhotoWindow(normalized);
+                }
             }
             catch
             {
@@ -7308,6 +7461,15 @@ namespace HolyLogger
 
         private void ClearQrzPhoto()
         {
+            // Clear tracked image URL
+            currentQrzImageUrl = null;
+
+            // Update graphics box if in QRZ Photo mode
+            if (Properties.Settings.Default.MapAreaDisplayMode == 2)
+            {
+                LoadCurrentQRZPhotoToGraphicsBox();
+            }
+
             if (qrzPhotoWindow != null)
             {
                 SaveQrzPhotoWindowBounds(qrzPhotoWindow);

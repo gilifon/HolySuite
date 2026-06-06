@@ -26,6 +26,9 @@ namespace HolyLogger.OptionsUserControls
 
         public bool HasChanged { get; set; }
 
+        // Event to notify main window of graphics box mode changes
+        public event EventHandler GraphicsBoxModeChanged;
+
         public UserInterfaceControl()
         {
             InitializeComponent();
@@ -35,11 +38,18 @@ namespace HolyLogger.OptionsUserControls
             SetMapDistanceUnitSelection();
             RefreshMainFormBackgroundPreview();
             RefreshQsoTableHeaderBackgroundPreview();
+            LoadMapDisplayModeSettings();
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)
         {
             HasChanged = true;
+        }
+
+        private void ShowPhotoFromQRZ_Click(object sender, RoutedEventArgs e)
+        {
+            HasChanged = true;
+            UpdateMapDisplayModeUI();
         }
 
         private void SetCallsignSuggestionRowsSelection()
@@ -322,6 +332,108 @@ namespace HolyLogger.OptionsUserControls
             }
 
             RefreshQsoTableHeaderBackgroundPreview();
+        }
+
+        private void MapDisplayMode_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!IsLoaded) return;
+
+            int mode = 0; // Default: Map
+            if (RB_MapDisplay_Compass.IsChecked == true)
+                mode = 1;
+            else if (RB_MapDisplay_QRZPhoto.IsChecked == true)
+                mode = 2;
+            else if (RB_MapDisplay_CustomImage.IsChecked == true)
+                mode = 3;
+
+            if (Properties.Settings.Default.MapAreaDisplayMode != mode)
+            {
+                Properties.Settings.Default.MapAreaDisplayMode = mode;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+            }
+
+            UpdateMapDisplayModeUI();
+
+            // Trigger immediate graphics box refresh in main window
+            GraphicsBoxModeChanged?.Invoke(this, EventArgs.Empty);
+
+            // Auto-open file browser when Custom image is selected for the first time
+            if (mode == 3 && string.IsNullOrWhiteSpace(Properties.Settings.Default.CustomMapImagePath))
+            {
+                Btn_BrowseImage_Click(sender, e);
+            }
+        }
+
+        private void Btn_BrowseImage_Click(object sender, RoutedEventArgs e)
+        {
+            var dialog = new WinForms.OpenFileDialog
+            {
+                Filter = "Image Files (*.jpg, *.jpeg, *.png, *.bmp, *.gif, *.tif, *.tiff)|*.jpg;*.jpeg;*.png;*.bmp;*.gif;*.tif;*.tiff|" +
+                         "JPEG Files (*.jpg, *.jpeg)|*.jpg;*.jpeg|" +
+                         "PNG Files (*.png)|*.png|" +
+                         "BMP Files (*.bmp)|*.bmp|" +
+                         "GIF Files (*.gif)|*.gif|" +
+                         "TIFF Files (*.tif, *.tiff)|*.tif;*.tiff|" +
+                         "All Files (*.*)|*.*",
+                Title = "Select Custom Image for Graphics Box",
+                FilterIndex = 1
+            };
+
+            if (dialog.ShowDialog() == WinForms.DialogResult.OK)
+            {
+                TB_CustomImagePath.Text = dialog.FileName;
+                Properties.Settings.Default.CustomMapImagePath = dialog.FileName;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+
+                // Trigger immediate graphics box refresh in main window
+                GraphicsBoxModeChanged?.Invoke(this, EventArgs.Empty);
+            }
+        }
+
+        private void UpdateMapDisplayModeUI()
+        {
+            // Gray out QRZ Photo option when ShowPhotoFromQRZ is unchecked
+            bool showPhotoFromQRZ = CBX_ShowPhotoFromQrz.IsChecked == true;
+            RB_MapDisplay_QRZPhoto.IsEnabled = showPhotoFromQRZ;
+
+            // If QRZ Photo option is being disabled and it's currently selected,
+            // automatically select Map instead
+            if (!showPhotoFromQRZ && RB_MapDisplay_QRZPhoto.IsChecked == true)
+            {
+                RB_MapDisplay_Map.IsChecked = true;
+                Properties.Settings.Default.MapAreaDisplayMode = 0; // Map
+                Properties.Settings.Default.Save();
+            }
+
+            // Enable/disable custom image path controls based on selection
+            bool isCustomSelected = RB_MapDisplay_CustomImage.IsChecked == true;
+            TB_CustomImagePath.IsEnabled = isCustomSelected;
+            Btn_BrowseImage.IsEnabled = isCustomSelected;
+        }
+
+        private void LoadMapDisplayModeSettings()
+        {
+            int mode = Properties.Settings.Default.MapAreaDisplayMode;
+            switch (mode)
+            {
+                case 1:
+                    RB_MapDisplay_Compass.IsChecked = true;
+                    break;
+                case 2:
+                    RB_MapDisplay_QRZPhoto.IsChecked = true;
+                    break;
+                case 3:
+                    RB_MapDisplay_CustomImage.IsChecked = true;
+                    break;
+                default:
+                    RB_MapDisplay_Map.IsChecked = true;
+                    break;
+            }
+
+            TB_CustomImagePath.Text = Properties.Settings.Default.CustomMapImagePath ?? string.Empty;
+            UpdateMapDisplayModeUI();
         }
 
     }

@@ -144,7 +144,7 @@
       <Value Profile="(Default)">0</Value>
     </Setting>
     <Setting Name="OptionsWindowWidth" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">580</Value>
+      <Value Profile="(Default)">1020</Value>
     </Setting>
     <Setting Name="OptionsWindowHeight" Type="System.Double" Scope="User">
       <Value Profile="(Default)">700</Value>
@@ -376,6 +376,12 @@
     </Setting>
     <Setting Name="CwMsgText4" Type="System.String" Scope="User">
       <Value Profile="(Default)">NR?</Value>
+    </Setting>
+    <Setting Name="MapAreaDisplayMode" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="CustomMapImagePath" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
     </Setting>
   </Settings>
 </SettingsFile>

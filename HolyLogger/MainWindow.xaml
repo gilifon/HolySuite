@@ -885,6 +885,92 @@
 
         <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
         <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
+            <Image x:Name="Img_CustomGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
+        </Border>
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="QRZGraphicsBorder">
+            <Image x:Name="Img_QRZGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
+        </Border>
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="#4A90E2" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CompassBorder">
+            <Grid>
+                <Viewbox Width="280" Height="280" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Canvas Width="100" Height="100">
+                        <!-- Compass ring background -->
+                        <Ellipse Width="100" Height="100" Canvas.Left="0" Canvas.Top="0" StrokeThickness="2">
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#25464a"/>
+                            </Ellipse.Stroke>
+                            <Ellipse.Fill>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#FFFCFC" Offset="0"/>
+                                    <GradientStop Color="#DCE4EC" Offset="0.7"/>
+                                    <GradientStop Color="#C8D4E0" Offset="1"/>
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                        </Ellipse>
+
+                        <!-- Inner compass face -->
+                        <Ellipse Width="78" Height="78" Canvas.Left="11" Canvas.Top="11" StrokeThickness="2">
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#b9b37e"/>
+                            </Ellipse.Stroke>
+                            <Ellipse.Fill>
+                                <SolidColorBrush Color="#efe6a0"/>
+                            </Ellipse.Fill>
+                        </Ellipse>
+
+                        <!-- Cardinal direction markers (N, E, S, W) -->
+                        <TextBlock Text="N" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="6" FontFamily="Segoe UI"/>
+                        <TextBlock Text="E" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="82" Canvas.Top="46" FontFamily="Segoe UI"/>
+                        <TextBlock Text="S" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="82" FontFamily="Segoe UI"/>
+                        <TextBlock Text="W" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="8" Canvas.Top="46" FontFamily="Segoe UI"/>
+
+                        <!-- Compass needle (rotates based on azimuth) -->
+                        <Canvas x:Name="CompassNeedle" Width="100" Height="100" RenderTransformOrigin="0.5,0.5">
+                            <Canvas.RenderTransform>
+                                <RotateTransform x:Name="CompassNeedleRotation" Angle="0"/>
+                            </Canvas.RenderTransform>
+                            <!-- North pointer (red) -->
+                            <Polygon Points="50,12 58,50 42,50" StrokeThickness="1.2">
+                                <Polygon.Fill>
+                                    <SolidColorBrush Color="#d10f20"/>
+                                </Polygon.Fill>
+                                <Polygon.Stroke>
+                                    <SolidColorBrush Color="#7b0d18"/>
+                                </Polygon.Stroke>
+                            </Polygon>
+                            <!-- South pointer (blue/green) -->
+                            <Polygon Points="50,88 58,50 42,50" StrokeThickness="1.2">
+                                <Polygon.Fill>
+                                    <SolidColorBrush Color="#197a74"/>
+                                </Polygon.Fill>
+                                <Polygon.Stroke>
+                                    <SolidColorBrush Color="#0f4e4a"/>
+                                </Polygon.Stroke>
+                            </Polygon>
+                        </Canvas>
+
+                        <!-- Center pivot -->
+                        <Ellipse Width="9" Height="9" Canvas.Left="45.5" Canvas.Top="45.5" StrokeThickness="1.2">
+                            <Ellipse.Fill>
+                                <SolidColorBrush Color="#e9e4b9"/>
+                            </Ellipse.Fill>
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#6f6a4d"/>
+                            </Ellipse.Stroke>
+                        </Ellipse>
+                    </Canvas>
+                </Viewbox>
+
+                <!-- Azimuth text display in top-left corner -->
+                <Border Background="White" BorderBrush="#aaa" BorderThickness="1" CornerRadius="3" Padding="4,2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5,5,0,0">
+                    <TextBlock x:Name="CompassAzimuthText" Text="AZ 0°" FontSize="14" FontWeight="Bold" Foreground="#18393c" FontFamily="Segoe UI"/>
+                </Border>
+            </Grid>
+        </Border>
+        <!-- Graphics Box Decorative Frame (visible only for QRZ Photo and Custom Image modes) -->
+        <Border x:Name="GraphicsBoxFrame" HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" 
+                BorderBrush="#9966CC" BorderThickness="3" CornerRadius="8" Panel.ZIndex="25" IsHitTestVisible="False" Visibility="Collapsed"/>
         <TextBlock HorizontalAlignment="Left" Margin="12,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Operator" FontWeight="Bold" />
             <LineBreak />

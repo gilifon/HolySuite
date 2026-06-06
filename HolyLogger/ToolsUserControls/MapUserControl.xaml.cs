@@ -71,6 +71,16 @@ namespace HolyLogger.ToolsUserControls
         internal void RaiseRadiusChanged(int km) => RadiusChanged?.Invoke(km);
         internal void RaiseSpotTuneRequested(string freq, string mode) => SpotTuneRequested?.Invoke(freq, mode);
 
+        public bool IsPolarProjection => _isPolar;
+
+        public void EnsureFlatProjection()
+        {
+            if (_isPolar)
+            {
+                ToggleProjection();
+            }
+        }
+
         internal void ToggleProjection()
         {
             _isPolar = !_isPolar;
@@ -432,6 +442,9 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
 
         private void RenderClusterPolarMap(System.Collections.Generic.List<ClusterSpotInfo> spots, double homeLat, double homeLon, int radiusKm)
         {
+            // Check if we should show compass instead of map
+            bool showCompass = Properties.Settings.Default.MapAreaDisplayMode == 1;
+
             var ic = System.Globalization.CultureInfo.InvariantCulture;
             double marginMultiplier = 1.15;
             try
@@ -992,6 +1005,9 @@ window.addEventListener('resize', function() {
 
         private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15)
         {
+            // Check if we should show compass instead of map
+            bool showCompass = Properties.Settings.Default.MapAreaDisplayMode == 1;
+
             string latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string marginJs = marginMultiplier.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -1024,34 +1040,49 @@ window.addEventListener('resize', function() {
 <meta charset='utf-8'/>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  html, body { width:100%; height:100%; margin:0; padding:0; overflow:hidden; }
-  #map { width:100%; height:100%; }
+  html, body { width:100%; height:100%; margin:0; padding:0; overflow:hidden; background:" + (showCompass ? "white" : "transparent") + @"; }
+  #map { width:100%; height:100%; display:" + (showCompass ? "none" : "block") + @"; }
   #compass-ctrl {
-    position:absolute; top:0; left:0; z-index:1000;
-    display:flex; flex-direction:column; align-items:center;
+    position:absolute; 
+    top:" + (showCompass ? "50%" : "0") + @"; 
+    left:" + (showCompass ? "50%" : "0") + @"; 
+    " + (showCompass ? "transform: translate(-50%, -50%);" : "") + @"
+    z-index:1000;
+    display:" + (showCompass ? "flex" : "none") + @"; 
+    flex-direction:column; 
+    align-items:center;
     background:transparent;
-    border:none; padding:2px 2px 1px 2px;
-    border-radius:0; font-family:Segoe UI, Tahoma, sans-serif;
+    border:none; 
+    padding:2px 2px 1px 2px;
+    border-radius:0; 
+    font-family:Segoe UI, Tahoma, sans-serif;
     box-shadow:none;
   }
   #compass-ring {
-    width:74px; height:74px; border:2px solid #25464a; border-radius:50%;
-    position:relative; background:radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(220,228,236,0.95) 70%, rgba(200,212,224,0.95) 100%);
+    width:" + (showCompass ? "280px" : "74px") + @"; 
+    height:" + (showCompass ? "280px" : "74px") + @"; 
+    border:2px solid #25464a; 
+    border-radius:50%;
+    position:relative; 
+    background:radial-gradient(circle, rgba(255,255,255,0.98) 0%, rgba(220,228,236,0.95) 70%, rgba(200,212,224,0.95) 100%);
     overflow:hidden;
   }
   #compass-svg { width:100%; height:100%; display:block; }
   #compass-needle { transform-origin:50px 50px; }
   #compass-text {
-    margin-top:2px; font-size:13px; font-weight:700; color:#18393c;
+    margin-top:" + (showCompass ? "8px" : "2px") + @"; 
+    font-size:" + (showCompass ? "24px" : "13px") + @"; 
+    font-weight:700; 
+    color:#18393c;
     letter-spacing:0.3px;
     background:rgba(255,255,255,0.88);
     border:1px solid rgba(36,77,80,0.45);
     border-radius:10px;
-    padding:2px 7px;
+    padding:" + (showCompass ? "6px 14px" : "2px 7px") + @";
   }
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000;
-    display:flex; align-items:flex-end;
+    display:" + (showCompass ? "none" : "flex") + @"; align-items:flex-end;
   }
   #radius-stack {
     display:flex; flex-direction:column; align-items:center;
@@ -1076,13 +1107,13 @@ window.addEventListener('resize', function() {
     position:absolute; top:0; right:0; z-index:1000;
     background:#9FCBF5; border:1px solid #4B76A0;
     border-radius:10px; padding:0 6px; cursor:pointer;
-    height:24px; display:flex; align-items:center; justify-content:center;
+    height:24px; display:" + (showCompass ? "none" : "flex") + @"; align-items:center; justify-content:center;
     font-size:11px; font-weight:700; font-family:sans-serif; color:#333;
   }
   #proj-btn:hover { background:#8CBDF0; }
   #distance-stack {
     position:absolute; right:0; bottom:0; z-index:1000;
-    display:flex; flex-direction:column; align-items:center;
+    display:" + (showCompass ? "none" : "flex") + @"; flex-direction:column; align-items:center;
   }
   #dx-center-btn {
     background:#9FCBF5; border:1px solid #4B76A0;
@@ -1302,6 +1333,14 @@ function centerOnDx() {
 }
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
+}
+
+function showMapView() {
+    document.getElementById('compass-ctrl').style.display = 'none';
+}
+
+function showCompassView() {
+    document.getElementById('compass-ctrl').style.display = 'flex';
 }
 
 // Auto-resize on window resize: invalidate map to reflow and refocus
@@ -1771,6 +1810,24 @@ window.addEventListener('resize', function() {
                     ?.GetValue(MapBrowser, null);
                 if (activeX != null)
                     activeX.Silent = true;
+            }
+            catch { }
+        }
+
+        public void ShowMapView()
+        {
+            try
+            {
+                MapBrowser.InvokeScript("showMapView");
+            }
+            catch { }
+        }
+
+        public void ShowCompassView()
+        {
+            try
+            {
+                MapBrowser.InvokeScript("showCompassView");
             }
             catch { }
         }

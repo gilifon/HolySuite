@@ -1523,5 +1523,29 @@ namespace HolyLogger.Properties {
                 this["CwMsgText4"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int MapAreaDisplayMode {
+            get {
+                return ((int)(this["MapAreaDisplayMode"]));
+            }
+            set {
+                this["MapAreaDisplayMode"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CustomMapImagePath {
+            get {
+                return ((string)(this["CustomMapImagePath"]));
+            }
+            set {
+                this["CustomMapImagePath"] = value;
+            }
+        }
     }
 }

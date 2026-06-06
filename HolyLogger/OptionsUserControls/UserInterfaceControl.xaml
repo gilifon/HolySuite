@@ -1,11 +1,11 @@
 ﻿<UserControl x:Class="HolyLogger.OptionsUserControls.UserInterfaceControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="530" d:DesignWidth="380">
+             d:DesignHeight="530" d:DesignWidth="850">
 
     <Grid ShowGridLines="false" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_ShowClusterWindow" Content="Show Cluster window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowClusterWindowOption, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,0,0,0"/>
@@ -13,7 +13,7 @@
         <CheckBox x:Name="CBX_IsShowAzimuth" Content="Show map" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowAzimuthControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,52,0,0"/>
         <CheckBox x:Name="CBX_ShowTitleClock" Content="Show UTC clock in the title" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowTitleClock, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,78,0,0" Click="HasChanged_Click"/>
         <CheckBox x:Name="CBX_ShowNetworkFlag" Content="Show the Network connectivity icon" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowNetworkFlag, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,104,0,0"/>
-        <CheckBox x:Name="CBX_ShowPhotoFromQrz" Content="Show Photo From QRZ" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowPhotoFromQRZ, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,130,0,0" Click="HasChanged_Click"/>
+        <CheckBox x:Name="CBX_ShowPhotoFromQrz" Content="Show Photo From QRZ" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowPhotoFromQRZ, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,130,0,0" Click="ShowPhotoFromQRZ_Click"/>
         <CheckBox x:Name="CBX_Lock" Content="Lock My Callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isLocked, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,156,0,0"/>
         <CheckBox x:Name="CBX_DisplayLastQSOinGrid" Content="Highlight last QSO" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.DisplayLastQSOinGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,182,0,0"/>
         <CheckBox x:Name="CBX_UseDXCCDefaultGrid" Content="Use default grid for DXCC" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.UseDXCCDefaultGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,208,0,0"/>
@@ -40,13 +40,13 @@
             <ComboBoxItem Content="KM"/>
             <ComboBoxItem Content="Miles"/>
         </ComboBox>
-        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="90" Margin="10,358,10,0" VerticalAlignment="Top" Width="360" FontSize="16">
+        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="90" Margin="0,358,0,0" VerticalAlignment="Top" Width="360" FontSize="16" HorizontalAlignment="Left">
             <StackPanel>
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
-        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,456,10,0" Width="360" Height="100" FontSize="16">
+        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,456,0,0" Width="360" Height="100" FontSize="16">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="38"/>
@@ -63,12 +63,22 @@
                     <Button x:Name="BtnResetMainFormBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Click="BtnResetMainFormBackground_Click"/>
                 </StackPanel>
 
-                <Label Content="QSO table header" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="14"/>
+                <Label Content="Tables header row" Grid.Row="1" Grid.Column="0" VerticalAlignment="Center" FontSize="14"/>
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
                     <Border x:Name="QsoTableHeaderBackgroundPreview" Width="40" Height="28" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="2" Background="#DEB887" Cursor="Hand" MouseLeftButtonDown="QsoTableHeaderBackgroundPreview_MouseLeftButtonDown" ToolTip="Click to pick a color"/>
                     <Button x:Name="BtnResetQsoTableHeaderBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Click="BtnResetQsoTableHeaderBackground_Click"/>
                 </StackPanel>
             </Grid>
+        </GroupBox>
+        <GroupBox Header="Graphics Box" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,0,0,0" Width="300" Height="195" FontSize="16">
+            <StackPanel Margin="10">
+                <RadioButton x:Name="RB_MapDisplay_Map" Content="Map" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <RadioButton x:Name="RB_MapDisplay_Compass" Content="Compass" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <RadioButton x:Name="RB_MapDisplay_QRZPhoto" Content="Photo from QRZ.com" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <RadioButton x:Name="RB_MapDisplay_CustomImage" Content="Custom image" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <TextBox x:Name="TB_CustomImagePath" Height="24" FontSize="11" Margin="0,5,0,0" IsReadOnly="True" VerticalContentAlignment="Center" BorderBrush="#AAAAAA" BorderThickness="1" HorizontalAlignment="Stretch"/>
+                <Button x:Name="Btn_BrowseImage" Content="Browse..." Width="80" Height="24" FontSize="11" Margin="0,5,0,0" HorizontalAlignment="Left" Click="Btn_BrowseImage_Click"/>
+            </StackPanel>
         </GroupBox>
         <!--<CheckBox x:Name="CBX_QRZAutoOpen" Content="Auto open QRZ.com page" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.QRZ_auto_open, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,156,0,0"/>-->
     </Grid>
