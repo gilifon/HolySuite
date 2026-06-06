@@ -7863,7 +7863,7 @@ namespace HolyLogger
             if (Properties.Settings.Default.IsFilterQSOs)
             {
                 FilteredQsos = new ObservableCollection<QSO>(Qsos.Where(p => p.DXCall.Contains(dxCallText)));
-                if (LastQSO != null && Properties.Settings.Default.DisplayLastQSOinGrid) FilteredQsos.Insert(0, LastQSO);
+                if (LastQSO != null && state != State.Edit && Properties.Settings.Default.DisplayLastQSOinGrid) FilteredQsos.Insert(0, LastQSO);
                 DataContext = FilteredQsos;
             }
 
