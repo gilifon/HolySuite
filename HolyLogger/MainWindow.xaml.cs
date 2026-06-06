@@ -7300,96 +7300,6 @@ namespace HolyLogger
             }
         }
 
-        // Moves the cursor to a safe position BEFORE opening the dropdown to prevent it from being
-        // inside the list area when the popup appears. Uses the textbox position to predict where
-        // the dropdown will appear and moves the cursor above it with margin.
-        private void MoveMouseAwayBeforeOpeningDropdown()
-        {
-            try
-            {
-                // Predict where the dropdown will appear based on the textbox position.
-                Point textboxScreen = TB_DXCallsign.PointToScreen(new Point(0, 0));
-                const int margin = 30;
-
-                // Move cursor above the textbox (where the dropdown will appear below).
-                int targetX = (int)textboxScreen.X + (int)(TB_DXCallsign.ActualWidth / 2);
-                int targetY = (int)textboxScreen.Y - margin;
-
-                var virtualScreen = System.Windows.Forms.SystemInformation.VirtualScreen;
-                targetX = Math.Max(virtualScreen.Left, Math.Min(virtualScreen.Right - 1, targetX));
-                targetY = Math.Max(virtualScreen.Top, Math.Min(virtualScreen.Bottom - 1, targetY));
-
-                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(targetX, targetY);
-            }
-            catch
-            {
-                // Cursor relocation is best-effort; never let it interfere with typing.
-            }
-        }
-
-        // When the user starts navigating the suggestion list with the keyboard, nudge the OS cursor
-        // just outside the dropdown ONLY if it is currently resting over the list. This guarantees the
-        // mouse can never re-grab the list (via a synthetic MouseMove from rows shifting underneath it)
-        // and surprise the user mid-typing. If the cursor is anywhere else on screen it is left alone.
-        private void MoveMouseOutOfSuggestionsIfHovering()
-        {
-            try
-            {
-                if (!CallsignSuggestionsPopup.IsOpen) return;
-                if (LB_DXCallsignSuggestions.ActualWidth <= 0 || LB_DXCallsignSuggestions.ActualHeight <= 0) return;
-
-                // Screen rectangle of the suggestion list (device pixels).
-                Point topLeft = LB_DXCallsignSuggestions.PointToScreen(new Point(0, 0));
-                Point bottomRight = LB_DXCallsignSuggestions.PointToScreen(
-                    new Point(LB_DXCallsignSuggestions.ActualWidth, LB_DXCallsignSuggestions.ActualHeight));
-
-                var cursor = System.Windows.Forms.Cursor.Position;
-                bool overList = cursor.X >= topLeft.X && cursor.X <= bottomRight.X &&
-                                cursor.Y >= topLeft.Y && cursor.Y <= bottomRight.Y;
-                if (!overList) return;
-
-                // Park the cursor at a guaranteed outside point with margin, while staying on-screen.
-                const int margin = 24;
-                var virtualScreen = System.Windows.Forms.SystemInformation.VirtualScreen;
-
-                int left = (int)Math.Floor(topLeft.X);
-                int top = (int)Math.Floor(topLeft.Y);
-                int right = (int)Math.Ceiling(bottomRight.X);
-                int bottom = (int)Math.Ceiling(bottomRight.Y);
-
-                // Prefer moving above the dropdown first, then left/right, then below.
-                int targetX = cursor.X;
-                int targetY = top - margin;
-
-                if (targetY < virtualScreen.Top)
-                {
-                    targetY = cursor.Y;
-                    targetX = left - margin;
-
-                    if (targetX < virtualScreen.Left)
-                    {
-                        targetX = right + margin;
-                        if (targetX > virtualScreen.Right - 1)
-                        {
-                            targetX = cursor.X;
-                            targetY = bottom + margin;
-                        }
-                    }
-                }
-
-                targetX = Math.Max(virtualScreen.Left, Math.Min(virtualScreen.Right - 1, targetX));
-                targetY = Math.Max(virtualScreen.Top, Math.Min(virtualScreen.Bottom - 1, targetY));
-
-                System.Windows.Forms.Cursor.Position = new System.Drawing.Point(targetX, targetY);
-
-                callsignSuggestionMouseControl = false;
-                lastCallsignSuggestionMousePos = null;
-            }
-            catch
-            {
-                // Cursor relocation is best-effort; never let it break keyboard navigation.
-            }
-        }
 
         private void TB_DXCallsign_KeyDown(object sender, KeyEventArgs e)
         {
@@ -7397,7 +7307,6 @@ namespace HolyLogger
             {
                 // An arrow key always hands control back to the keyboard (even right after the mouse
                 // hovered/scrolled the list), so navigation is never blocked.
-                MoveMouseOutOfSuggestionsIfHovering();
                 callsignSuggestionMouseControl = false;
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
@@ -7406,7 +7315,6 @@ namespace HolyLogger
             }
             else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
-                MoveMouseOutOfSuggestionsIfHovering();
                 callsignSuggestionMouseControl = false;
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
@@ -8390,12 +8298,6 @@ namespace HolyLogger
             LB_DXCallsignSuggestions.ItemsSource = matches;
             LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
             callsignSuggestionMouseControl = false;
-
-            // Move cursor to safe position before opening to prevent it from being inside the dropdown area.
-            if (matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown)
-            {
-                MoveMouseAwayBeforeOpeningDropdown();
-            }
 
             CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown;
 
