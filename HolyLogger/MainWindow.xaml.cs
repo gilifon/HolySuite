@@ -1029,9 +1029,9 @@ namespace HolyLogger
         private void HeartbeatTimer_Tick(object sender, EventArgs e)
         {
             uint idle_t = Helper.GetIdleTime();
-            if (isNetworkAvailable && idle_t < 1000 * 60 * 5 && Properties.Settings.Default.ShowOnTheAir)
+            if (isNetworkAvailable && idle_t < 1000 * 60 * 5)
             {
-                Helper.SendHeartbeat(MachineName, TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), TB_Frequency.Text.Trim(), CB_Mode.Text.Trim()); //1000->seconds 60->minute 5->minutes
+                Helper.SendHeartbeat(MachineName, TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), TB_Frequency.Text.Trim(), CB_Mode.Text.Trim(), Properties.Settings.Default.ShowOnTheAir); //1000->seconds 60->minute 5->minutes
             }
         }
 
