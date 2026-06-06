@@ -852,12 +852,13 @@ function applyAutoZoom() {
         var sp = clusterSpots[i];
         pushDist(sp.c,  distances);   // DX endpoint
         pushDist(sp.sp, distances);   // Spotter endpoint
-        // Sample 10 intermediate points along the spotter→DX arc so that arcs
-        // bowing outward on the azimuthal projection are also accounted for.
-        if (sp.sp && sp.c) pushArcDists(sp.sp, sp.c, 10, distances);
+        // FIX: Do NOT include arc intermediate points in auto-zoom calculation.
+        // The arc is just a visual connector; only the actual station positions matter.
+        // Previously this was sampling arc points which made the zoom radius too large:
+        // if (sp.sp && sp.c) pushArcDists(sp.sp, sp.c, 10, distances);
     }
     if (distances.length === 0) return;
-    // Radius = farthest station (DX, spotter, or arc midpoint) + 10% padding.
+    // Radius = farthest station (DX or spotter) + 10% padding.
     var maxKm = 0;
     for (var j = 0; j < distances.length; j++) { if (distances[j] > maxKm) maxKm = distances[j]; }
     if (maxKm < 100) maxKm = 100;
