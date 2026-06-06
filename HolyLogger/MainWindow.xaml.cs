@@ -7137,7 +7137,7 @@ namespace HolyLogger
                 callsignSuggestionMouseControl = false;
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
-                ApplyHighlightedCallsignSuggestionToTextBox();
+                // Arrow keys only navigate; do not auto-fill the textbox
                 e.Handled = true;
             }
             else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
@@ -7146,7 +7146,7 @@ namespace HolyLogger
                 callsignSuggestionMouseControl = false;
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
-                ApplyHighlightedCallsignSuggestionToTextBox();
+                // Arrow keys only navigate; do not auto-fill the textbox
                 e.Handled = true;
             }
             else if (e.Key == Key.Enter)
@@ -8312,7 +8312,7 @@ namespace HolyLogger
                 if (!Equals(LB_DXCallsignSuggestions.SelectedItem, hovered))
                 {
                     LB_DXCallsignSuggestions.SelectedItem = hovered;
-                    ApplyHighlightedCallsignSuggestionToTextBox();
+                    // Mouse hover only highlights; do not auto-fill the textbox
                 }
             }
         }
