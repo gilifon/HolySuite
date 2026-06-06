@@ -223,7 +223,9 @@ namespace HolyLogger
         public bool isNetworkAvailable { get; set; }
 
         HolyLogParser _holyLogParser;
-        Process QRZProcess;
+        // UNUSED: Process field was declared but never used in the codebase.
+        // If you need to launch QRZ processes in the future, uncomment this:
+        // Process QRZProcess;
 
         LogUploadWindow logupload = null;
         SignboardWindow signboard = null;
@@ -298,7 +300,9 @@ namespace HolyLogger
         string currentQrzImageUrl = null; // Track current QRZ photo URL for graphics box display
 
         BackgroundWorker AdifHandlerWorker;
-        //BackgroundWorker EntireLogQrzWorker;
+        // UNUSED: BackgroundWorker for entire log QRZ processing was disabled.
+        // Left commented for future reference if batch QRZ processing is needed:
+        // BackgroundWorker EntireLogQrzWorker;
 
         private StickyWindow _stickyWindow;
         private State state = State.New;
@@ -389,7 +393,9 @@ namespace HolyLogger
         private DateTime cwMonitorStartUtc;
         private double cwLearnedWpm = 20.0;
 
-        BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
+        // UNUSED: qrz_path was declared but never used. The image is referenced directly in XAML instead.
+        // If you need programmatic access to the QRZ icon, uncomment this:
+        // BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
         BitmapImage lock_path = new BitmapImage(new Uri("Images/lock.png", UriKind.Relative));
         BitmapImage unlock_path = new BitmapImage(new Uri("Images/unlock.png", UriKind.Relative));
 
@@ -397,6 +403,10 @@ namespace HolyLogger
 
         public static UdpClient Client;
         public static UdpClient N1MMClient;
+
+        // Static compiled regex for N1MM+ UDP parsing (performance optimization)
+        private static readonly Regex N1MMTxFreqRegex = new Regex(@"<TXFreq>(.*)?<", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+        private static readonly Regex N1MMModeRegex = new Regex(@"<Mode>(.*)?<", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         string MachineName = "Default";
 
@@ -491,7 +501,14 @@ namespace HolyLogger
             {
                 Properties.Settings.Default.Upgrade();
                 Properties.Settings.Default.UpdateSettings = false;
-                try { Properties.Settings.Default.Save(); } catch { }
+                try 
+                { 
+                    Properties.Settings.Default.Save(); 
+                } 
+                catch (Exception ex) 
+                { 
+                    System.Diagnostics.Debug.WriteLine($"Failed to save settings after upgrade: {ex.Message}");
+                }
             }
 
             NormalizeEnterKeyBehaviorSettings();
@@ -735,8 +752,7 @@ namespace HolyLogger
             {
                 try
                 {
-                    Regex regex = new Regex(@"<TXFreq>(.*)?<", RegexOptions.IgnoreCase);
-                    Match match = regex.Match(data);
+                    Match match = N1MMTxFreqRegex.Match(data);
                     if (match.Success)
                     {
                         string freq_str = Regex.Split(data, @"<TXFreq>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
@@ -747,8 +763,7 @@ namespace HolyLogger
                         }
                     }
 
-                    regex = new Regex(@"<Mode>(.*)?<", RegexOptions.IgnoreCase);
-                    match = regex.Match(data);
+                    match = N1MMModeRegex.Match(data);
                     if (match.Success)
                     {
                         string mode = Regex.Split(data, @"<Mode>(.*)?<", RegexOptions.IgnoreCase)[1].Trim().ToUpper();
@@ -3322,7 +3337,7 @@ namespace HolyLogger
             try { if (UTCTimer != null && UTCTimer.IsEnabled) UTCTimer.Stop(); } catch { }
             try { if (CallsignLookupDebounceTimer != null && CallsignLookupDebounceTimer.IsEnabled) CallsignLookupDebounceTimer.Stop(); } catch { }
             try { VoiceMessageAvailabilityTimer.Tick -= VoiceMessageAvailabilityTimer_Tick; if (VoiceMessageAvailabilityTimer.IsEnabled) VoiceMessageAvailabilityTimer.Stop(); } catch { }
-            try { if (NewDXCCTimer != null) NewDXCCTimer.Stop(); } catch { }
+            try { if (NewDXCCTimer != null) { NewDXCCTimer.Stop(); NewDXCCTimer.Dispose(); } } catch { }
             try { if (_mapUpdateDebounceTimer != null) { _mapUpdateDebounceTimer.Stop(); _mapUpdateDebounceTimer = null; } } catch { }
 
             // Unsubscribe from network availability events
@@ -3331,9 +3346,45 @@ namespace HolyLogger
             // Dispose CallsignUploader to unsubscribe from NetworkChange events
             try { _callsignUploader?.Dispose(); } catch { }
 
+            // Close and dispose UDP clients
+            try 
+            { 
+                if (Client != null)
+                {
+                    Client.Close();
+                    Client.Dispose();
+                    Client = null;
+                }
+            } 
+            catch { }
+
+            try 
+            { 
+                if (N1MMClient != null)
+                {
+                    N1MMClient.Close();
+                    N1MMClient.Dispose();
+                    N1MMClient = null;
+                }
+            } 
+            catch { }
+
+            // Close cluster WebSocket
+            try { CloseClusterWebSocket(); } catch { }
+
             // Unsubscribe from MapControl events
             try { MapControl.RadiusChanged -= OnMapRadiusChanged; } catch { }
             try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch { }
+
+            // Save settings with error handling
+            try 
+            { 
+                Properties.Settings.Default.Save(); 
+            } 
+            catch (Exception ex) 
+            { 
+                System.Diagnostics.Debug.WriteLine($"Failed to save settings on close: {ex.Message}");
+            }
         }
 
         private void Window_Closed(object sender, EventArgs e)

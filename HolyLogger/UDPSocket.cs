@@ -5,13 +5,14 @@ using System.Text;
 
 namespace HolyLogger
 {
-    public class UDPSocket
+    public class UDPSocket : IDisposable
     {
         private Socket _socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
         private const int bufSize = 8 * 1024;
         private State state = new State();
         private EndPoint epFrom = new IPEndPoint(IPAddress.Any, 0);
         private AsyncCallback recv = null;
+        private bool disposed = false;
 
         public class State
         {
@@ -54,6 +55,39 @@ namespace HolyLogger
                 _socket.BeginReceiveFrom(so.buffer, 0, bufSize, SocketFlags.None, ref epFrom, recv, so);
                 Console.WriteLine("RECV: {0}: {1}, {2}", epFrom.ToString(), bytes, Encoding.UTF8.GetString(so.buffer, 0, bytes));
             }, state);
+        }
+
+        public void Dispose()
+        {
+            Dispose(true);
+            GC.SuppressFinalize(this);
+        }
+
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!disposed)
+            {
+                if (disposing)
+                {
+                    // Dispose managed resources
+                    if (_socket != null)
+                    {
+                        try
+                        {
+                            _socket.Close();
+                            _socket.Dispose();
+                        }
+                        catch { }
+                        _socket = null;
+                    }
+                }
+                disposed = true;
+            }
+        }
+
+        ~UDPSocket()
+        {
+            Dispose(false);
         }
     }
 }

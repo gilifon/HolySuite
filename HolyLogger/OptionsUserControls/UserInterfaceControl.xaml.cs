@@ -297,7 +297,14 @@ namespace HolyLogger.OptionsUserControls
             if (!string.Equals(Properties.Settings.Default.MainFormBackgroundColor, DefaultMainFormBackgroundColor, StringComparison.OrdinalIgnoreCase))
             {
                 Properties.Settings.Default.MainFormBackgroundColor = DefaultMainFormBackgroundColor;
-                Properties.Settings.Default.Save();
+                try
+                {
+                    Properties.Settings.Default.Save();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to save main form background setting: {ex.Message}");
+                }
                 HasChanged = true;
             }
 
@@ -327,7 +334,14 @@ namespace HolyLogger.OptionsUserControls
             if (!string.Equals(Properties.Settings.Default.QsoTableHeaderBackgroundColor, DefaultQsoTableHeaderBackgroundColor, StringComparison.OrdinalIgnoreCase))
             {
                 Properties.Settings.Default.QsoTableHeaderBackgroundColor = DefaultQsoTableHeaderBackgroundColor;
-                Properties.Settings.Default.Save();
+                try
+                {
+                    Properties.Settings.Default.Save();
+                }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"Failed to save QSO table header background setting: {ex.Message}");
+                }
                 HasChanged = true;
             }
 
