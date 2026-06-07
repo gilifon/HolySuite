@@ -4370,7 +4370,7 @@ namespace HolyLogger
 
             legendPanel.Children.Add(BuildClusterLegendTopRow());
             legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before", false, new Thickness(0, 7, 0, 0)));
-            legendPanel.Children.Add(BuildClusterLegendItem(Brushes.Black, "Worked Country", false, new Thickness(0, 7, 0, 0)));
+            legendPanel.Children.Add(BuildClusterLegendItem(Brushes.Black, "Worked Country", false, new Thickness(0, 5, 0, 0)));
 
             var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Freq", true, new Thickness(0, 7, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
@@ -4440,7 +4440,7 @@ namespace HolyLogger
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 1)
+                Margin = new Thickness(0, 8, 0, 1)
             };
             row.Children.Add(BuildClusterLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 24, 0)));
             return row;
@@ -4512,6 +4512,13 @@ namespace HolyLogger
         {
             var enabledModes = GetEnabledClusterModes();
 
+            // If no modes are enabled, enable all by default
+            if (enabledModes.Count == 0)
+            {
+                enabledModes = new HashSet<string>(ClusterModeOptions, StringComparer.OrdinalIgnoreCase);
+                SaveEnabledClusterModes(enabledModes);
+            }
+
             var row = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -4520,8 +4527,8 @@ namespace HolyLogger
                 Margin = new Thickness(0, 0, 0, 0)
             };
 
-            // Mode list in order: SSB, CW, FT8, DIGI, RTTY, FM
-            string[] allModes = { "SSB", "CW", "FT8", "DIGI", "RTTY", "FM" };
+            // Mode list in order: SSB, CW, FT8, DIGI, RTTY, FM, AM
+            string[] allModes = { "SSB", "CW", "FT8", "DIGI", "RTTY", "FM", "AM" };
 
             foreach (string mode in allModes)
             {
@@ -4556,8 +4563,11 @@ namespace HolyLogger
                 Tag = mode
             };
 
+            bool isUpdating = false;
+
             checkBox.Checked += (s, e) =>
             {
+                if (isUpdating) return;
                 var enabledModes = GetEnabledClusterModes();
                 if (!enabledModes.Contains(mode))
                 {
@@ -4569,13 +4579,16 @@ namespace HolyLogger
 
             checkBox.Unchecked += (s, e) =>
             {
+                if (isUpdating) return;
                 var enabledModes = GetEnabledClusterModes();
                 if (enabledModes.Contains(mode))
                 {
                     // Prevent unchecking the last selected mode
                     if (enabledModes.Count <= 1)
                     {
+                        isUpdating = true;
                         checkBox.IsChecked = true;
+                        isUpdating = false;
                         return;
                     }
                     enabledModes.Remove(mode);
@@ -4589,7 +4602,7 @@ namespace HolyLogger
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(2, 0, 2, 0)
+                Margin = new Thickness(1, 0, 1, 0)
             };
             modeIndicator.Children.Add(modeText);
             modeIndicator.Children.Add(checkBox);
@@ -4785,9 +4798,9 @@ namespace HolyLogger
             };
             clusterActiveBandIndicatorText = activeBandIndicator;
 
-            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(1, 0, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
-            var btnPreSelected = new Button { Content = "Marked", HorizontalAlignment = HorizontalAlignment.Left, Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
-            var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
+            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(2, 0, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
+            var btnPreSelected = new Button { Content = "Selected", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(1, 0, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
+            var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 1, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
 
             clusterBandFilterAllBtn = btnAllBands;
             clusterBandFilterPreSelectedBtn = btnPreSelected;
@@ -4850,7 +4863,7 @@ namespace HolyLogger
                 Width = ClusterLastMinutesDropdownWidth,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, -5)
+                Margin = new Thickness(0, 0, 0, -3)
             };
 
             var lastMinutesCombo = new ComboBox
@@ -6543,13 +6556,7 @@ namespace HolyLogger
                             .Where(v => !string.IsNullOrWhiteSpace(v));
 
             var set = new HashSet<string>(values, StringComparer.OrdinalIgnoreCase);
-            if (set.Count == 0)
-            {
-                foreach (string mode in ClusterModeOptions)
-                {
-                    set.Add(mode);
-                }
-            }
+            // Don't auto-fill here - let the save function handle empty sets
             return set;
         }
 
