@@ -4294,6 +4294,19 @@ namespace HolyLogger
             commentHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             var commentColumn = new DataGridTextColumn { Header = "Comment", HeaderStyle = commentHeaderStyle, Binding = new System.Windows.Data.Binding("Comment"), MinWidth = 60, Width = new DataGridLength(1, DataGridLengthUnitType.Star) };
 
+            // Flag column
+            var flagHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
+            flagHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            var flagTemplate = new DataTemplate();
+            var flagImageFactory = new FrameworkElementFactory(typeof(System.Windows.Controls.Image));
+            flagImageFactory.SetBinding(System.Windows.Controls.Image.SourceProperty, new System.Windows.Data.Binding("FlagPath"));
+            flagImageFactory.SetValue(System.Windows.Controls.Image.WidthProperty, 24.0);
+            flagImageFactory.SetValue(System.Windows.Controls.Image.HeightProperty, 16.0);
+            flagImageFactory.SetValue(System.Windows.Controls.Image.StretchProperty, System.Windows.Media.Stretch.Uniform);
+            flagImageFactory.SetValue(System.Windows.Controls.Image.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            flagTemplate.VisualTree = flagImageFactory;
+            var flagColumn = new DataGridTemplateColumn { Header = "Flag", HeaderStyle = flagHeaderStyle, CellTemplate = flagTemplate, Width = new DataGridLength(40), CanUserResize = false };
+
             // Store references needed by other methods
             clusterDxColumn = dxColumn;
             clusterSpotterColumn = spotterColumn;
@@ -4306,6 +4319,7 @@ namespace HolyLogger
             utcColumn.SortDirection = ListSortDirection.Descending;
 
             spotsGrid.Columns.Add(dxColumn);
+            spotsGrid.Columns.Add(flagColumn);
             spotsGrid.Columns.Add(spotterColumn);
             spotsGrid.Columns.Add(countryColumn);
             spotsGrid.Columns.Add(freqColumn);
@@ -5784,6 +5798,19 @@ namespace HolyLogger
             }
         }
 
+        private string GetFlagPathFromCountryName(string countryName)
+        {
+            if (string.IsNullOrWhiteSpace(countryName))
+            {
+                return null;
+            }
+            if (DxccNameToIso.TryGetValue(countryName, out string isoCode))
+            {
+                return string.Format("pack://application:,,,/Images/flags/{0}.png", isoCode);
+            }
+            return null;
+        }
+
         private void ApplyClusterPayload(string payload, ObservableCollection<ClusterSpotViewItem> spots)
         {
             try
@@ -5861,6 +5888,8 @@ namespace HolyLogger
                     }
 
                     var dxccInfo = rem.GetDXCC(dx.Trim());
+                    string countryName = dxccInfo != null ? dxccInfo.Name : string.Empty;
+                    string flagPath = GetFlagPathFromCountryName(countryName);
                     var item = new ClusterSpotViewItem
                     {
                         UnixTime = unixTime,
@@ -5879,7 +5908,8 @@ namespace HolyLogger
                         DxLon = dxLon,
                         SpotterLat = spotterLat,
                         SpotterLon = spotterLon,
-                        Country = dxccInfo != null ? dxccInfo.Name : string.Empty,
+                        Country = countryName,
+                        FlagPath = flagPath,
                         IsInLog = IsClusterCallsignInLog(dx),
                         IsMyCallsign = IsMyStationCallsign(dx),
                         IsNeededCountry = IsNeededCountry(dx, workedCountries),
@@ -5974,6 +6004,7 @@ namespace HolyLogger
             public double? SpotterLat { get; set; }
             public double? SpotterLon { get; set; }
             public string Country { get; set; }
+            public string FlagPath { get; set; }
             public bool IsInLog { get; set; }
             public string SpotKey { get; set; }
 
