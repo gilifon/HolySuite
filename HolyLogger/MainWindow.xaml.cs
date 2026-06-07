@@ -260,6 +260,7 @@ namespace HolyLogger
         ScrollViewer clusterSpotsScrollViewer = null;
         bool clusterTableMarginInitialized = false;
         StackPanel clusterLastMinutesFilterPanel = null;
+        StackPanel clusterBandSelectorPanel = null;
         ComboBox clusterLastMinutesComboBox = null;
         int clusterLastMinutesFilterValue = 60;
         DispatcherTimer clusterSingleClickOpenQrzTimer = null;
@@ -4024,6 +4025,7 @@ namespace HolyLogger
             clusterCommentColumn = null;
             clusterSpotsScrollViewer = null;
             clusterLastMinutesFilterPanel = null;
+            clusterBandSelectorPanel = null;
             clusterLastMinutesComboBox = null;
             clusterBandFilterAllBtn = null;
             clusterBandFilterPreSelectedBtn = null;
@@ -4393,6 +4395,7 @@ namespace HolyLogger
             bandSelectorPanel.Margin = new Thickness(0, -12, 0, 0);
             bandSelectorPanel.HorizontalAlignment = HorizontalAlignment.Right;
             bandSelectorPanel.VerticalAlignment = VerticalAlignment.Center;
+            clusterBandSelectorPanel = bandSelectorPanel;
 
             // Add mode selector panel below band selector
             var modeSelectorPanel = BuildClusterModeSelectorPanel();
@@ -4685,10 +4688,18 @@ namespace HolyLogger
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(2, 0, 2, 0)
+                Margin = new Thickness(2, 0, 2, 0),
+                Tag = band  // Store band name for right-click handler
             };
             bandIndicator.Children.Add(bandText);
             bandIndicator.Children.Add(checkBox);
+
+            // Add right-click handler for color editing
+            bandIndicator.MouseRightButtonDown += (s, e) =>
+            {
+                e.Handled = true;
+                EditBandColor(band);
+            };
 
             return bandIndicator;
         }
@@ -4839,7 +4850,7 @@ namespace HolyLogger
                 Width = ClusterLastMinutesDropdownWidth,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 1)
+                Margin = new Thickness(0, 0, 0, -5)
             };
 
             var lastMinutesCombo = new ComboBox
@@ -6323,7 +6334,7 @@ namespace HolyLogger
         private static readonly Dictionary<string, string> DefaultBandColors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             { "160", "#156184" }, { "80", "#903727" }, { "60", "#152F47" }, { "40", "#18A018" },
-            { "30", "#FAFA00" }, { "20", "#DC2828" }, { "17", "#751F6B" }, { "15", "#1515CB" },
+            { "30", "#F1E00A" }, { "20", "#DC2828" }, { "17", "#751F6B" }, { "15", "#1515CB" },
             { "12", "#47DFF0" }, { "10", "#E87421" }, { "6",  "#FF61EA" },
             { "VHF", "#5EFFA0" }, { "UHF", "#5ECFFF" }, { "SHF", "#A07CFF" }
         };
@@ -6365,6 +6376,72 @@ namespace HolyLogger
             }
             catch { }
             _bandColorCache = null;
+        }
+
+        private void EditBandColor(string band)
+        {
+            if (string.IsNullOrWhiteSpace(band)) return;
+
+            var colors = GetBandColors();
+            string currentColorHex = colors.ContainsKey(band) ? colors[band] : "#FF6600";
+
+            // Show color picker dialog
+            string newColorHex = PickColorHex(currentColorHex);
+            if (string.IsNullOrWhiteSpace(newColorHex)) return; // User cancelled
+
+            // Update the color
+            colors[band] = newColorHex;
+            SaveBandColors(colors);
+
+            // Rebuild the band selector panel to show the new color
+            RebuildClusterBandSelector();
+        }
+
+        private static string PickColorHex(string currentHex)
+        {
+            Color current;
+            try { current = (Color)ColorConverter.ConvertFromString(currentHex); }
+            catch { current = Colors.OrangeRed; }
+
+            using (var dlg = new System.Windows.Forms.ColorDialog())
+            {
+                dlg.AllowFullOpen = true;
+                dlg.FullOpen = true;
+                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
+
+                if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK)
+                {
+                    return null;
+                }
+
+                return string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
+            }
+        }
+
+        private void RebuildClusterBandSelector()
+        {
+            if (clusterWindow == null || clusterBandSelectorPanel == null) return;
+
+            // Find the parent container
+            var parent = clusterBandSelectorPanel.Parent as Panel;
+            if (parent == null) return;
+
+            int index = parent.Children.IndexOf(clusterBandSelectorPanel);
+            if (index < 0) return;
+
+            // Remove old panel
+            parent.Children.RemoveAt(index);
+
+            // Create new panel with updated colors
+            var newPanel = BuildClusterBandSelectorPanel();
+            newPanel.Margin = clusterBandSelectorPanel.Margin;
+            newPanel.HorizontalAlignment = clusterBandSelectorPanel.HorizontalAlignment;
+
+            // Insert at same position
+            parent.Children.Insert(index, newPanel);
+
+            // Update reference
+            clusterBandSelectorPanel = newPanel;
         }
 
         private HashSet<string> GetEnabledClusterBands()
