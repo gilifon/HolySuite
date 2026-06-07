@@ -3915,18 +3915,6 @@ namespace HolyLogger
             clusterLastMinutesFilterValue = LoadClusterLastMinutesFilterSetting();
 
             var undoButton = BuildClusterUndoButton();
-            var settingsButton = new Button
-            {
-                Content = "⚙",
-                Width = 28,
-                Height = 28,
-                FontSize = 16,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = "Cluster settings",
-                Margin = new Thickness(0, 0, 0, 8),
-                Style = MakeClusterBandFilterBtnStyle(false)
-            };
 
             var statusText = new TextBlock
             {
@@ -3940,7 +3928,7 @@ namespace HolyLogger
             };
 
             var spotsGrid = BuildClusterSpotsGrid();
-            var headerGrid = BuildClusterHeaderPanel(undoButton, settingsButton);
+            var headerGrid = BuildClusterHeaderPanel(undoButton);
             var showBandsPanel = BuildClusterBandFilterPanel();
             var lastMinutesFilterPanel = BuildClusterLastMinutesPanel();
 
@@ -3985,7 +3973,6 @@ namespace HolyLogger
             clusterUndoStates.Clear();
             UpdateClusterUndoButtonState();
 
-            settingsButton.Click += (s, e) => OpenClusterSettingsWindow();
             undoButton.Click += ClusterUndoButton_Click;
 
             clusterWindow.LocationChanged += ClusterWindow_LocationChanged;
@@ -4104,7 +4091,7 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
                 ToolTip = "Undo last spot tune",
-                Margin = new Thickness(0, 0, 12, 8),
+                Margin = new Thickness(0, 0, 0, 8),
                 IsEnabled = false,
                 Opacity = 0.35,
                 Content = undoContentGrid
@@ -4356,7 +4343,7 @@ namespace HolyLogger
             return spotsGrid;
         }
 
-        private Grid BuildClusterHeaderPanel(Button undoButton, Button settingsButton)
+        private Grid BuildClusterHeaderPanel(Button undoButton)
         {
             var legendPanel = new StackPanel
             {
@@ -4369,7 +4356,7 @@ namespace HolyLogger
             legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before", false, new Thickness(0, 7, 0, 0)));
             legendPanel.Children.Add(BuildClusterLegendItem(Brushes.Black, "Worked Country", false, new Thickness(0, 7, 0, 0)));
 
-            var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Frequency", true, new Thickness(0, 7, 0, 0));
+            var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Freq", true, new Thickness(0, 7, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
             onMyFreqLegend.VerticalAlignment = VerticalAlignment.Top;
             clusterOnMyFreqLegendItem = onMyFreqLegend;
@@ -4389,9 +4376,15 @@ namespace HolyLogger
 
             // Add band selector panel
             var bandSelectorPanel = BuildClusterBandSelectorPanel();
-            bandSelectorPanel.Margin = new Thickness(0, -12, 8, 0);
+            bandSelectorPanel.Margin = new Thickness(0, -12, 0, 0);
             bandSelectorPanel.HorizontalAlignment = HorizontalAlignment.Right;
             bandSelectorPanel.VerticalAlignment = VerticalAlignment.Center;
+
+            // Add mode selector panel below band selector
+            var modeSelectorPanel = BuildClusterModeSelectorPanel();
+            modeSelectorPanel.Margin = new Thickness(0, -9, 34, 0);
+            modeSelectorPanel.HorizontalAlignment = HorizontalAlignment.Right;
+            modeSelectorPanel.VerticalAlignment = VerticalAlignment.Center;
 
             var actionsPanel = new StackPanel
             {
@@ -4402,15 +4395,16 @@ namespace HolyLogger
             };
             actionsPanel.Children.Add(bandSelectorPanel);
             actionsPanel.Children.Add(undoButton);
-            actionsPanel.Children.Add(settingsButton);
 
             var rightColumnPanel = new StackPanel
             {
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Top
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 0, -12, 0)
             };
             rightColumnPanel.Children.Add(actionsPanel);
+            rightColumnPanel.Children.Add(modeSelectorPanel);
 
             var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
@@ -4480,8 +4474,8 @@ namespace HolyLogger
                 Margin = new Thickness(0, 0, 0, 0)
             };
 
-            // All bands in order, with 160 at the end (far right)
-            string[] allBands = { "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF", "160" };
+            // All bands in order from left to right: SHF, UHF, VHF, 6, 10, 12, 15, 17, 20, 30, 40, 60, 80, 160
+            string[] allBands = { "SHF", "UHF", "VHF", "6", "10", "12", "15", "17", "20", "30", "40", "60", "80", "160" };
 
             foreach (string band in allBands)
             {
@@ -4495,6 +4489,95 @@ namespace HolyLogger
             }
 
             return row;
+        }
+
+        private StackPanel BuildClusterModeSelectorPanel()
+        {
+            var enabledModes = GetEnabledClusterModes();
+
+            var row = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+
+            // Mode list in order: SSB, CW, FT8, DIGI, RTTY, FM
+            string[] allModes = { "SSB", "CW", "FT8", "DIGI", "RTTY", "FM" };
+
+            foreach (string mode in allModes)
+            {
+                var modeCheckBox = BuildModeCheckBox(mode, enabledModes.Contains(mode));
+                row.Children.Add(modeCheckBox);
+            }
+
+            return row;
+        }
+
+        private StackPanel BuildModeCheckBox(string mode, bool isChecked)
+        {
+            var modeText = new TextBlock
+            {
+                Text = mode,
+                FontSize = 9,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 1)
+            };
+
+            var checkBox = new CheckBox
+            {
+                Width = 12,
+                Height = 12,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsChecked = isChecked,
+                Tag = mode
+            };
+
+            checkBox.Checked += (s, e) =>
+            {
+                var enabledModes = GetEnabledClusterModes();
+                if (!enabledModes.Contains(mode))
+                {
+                    enabledModes.Add(mode);
+                    SaveEnabledClusterModes(enabledModes);
+                    RefreshClusterVisibleSpots();
+                }
+            };
+
+            checkBox.Unchecked += (s, e) =>
+            {
+                var enabledModes = GetEnabledClusterModes();
+                if (enabledModes.Contains(mode))
+                {
+                    // Prevent unchecking the last selected mode
+                    if (enabledModes.Count <= 1)
+                    {
+                        checkBox.IsChecked = true;
+                        return;
+                    }
+                    enabledModes.Remove(mode);
+                    SaveEnabledClusterModes(enabledModes);
+                    RefreshClusterVisibleSpots();
+                }
+            };
+
+            var modeIndicator = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0, 2, 0)
+            };
+            modeIndicator.Children.Add(modeText);
+            modeIndicator.Children.Add(checkBox);
+
+            return modeIndicator;
         }
 
         private StackPanel BuildBandCheckBox(string band, Color color, bool isChecked)
@@ -4571,6 +4654,12 @@ namespace HolyLogger
                 var enabledBands = GetEnabledClusterBands();
                 if (enabledBands.Contains(band))
                 {
+                    // Prevent unchecking the last selected band
+                    if (enabledBands.Count <= 1)
+                    {
+                        checkBox.IsChecked = true;
+                        return;
+                    }
                     enabledBands.Remove(band);
                     SaveEnabledClusterBands(enabledBands);
                     RefreshClusterVisibleSpots();
@@ -5257,455 +5346,8 @@ namespace HolyLogger
             try { Properties.Settings.Default.Save(); } catch { }
         }
 
-        private void OpenClusterSettingsWindow()
-        {
-            if (clusterSettingsWindow != null)
-            {
-                var existing = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == clusterSettingsWindow);
-                if (existing != null)
-                {
-                    existing.Activate();
-                    return;
-                }
-            }
-
-            var enabledBands = GetEnabledClusterBands();
-            var enabledModes = GetEnabledClusterModes();
-
-            var bandsPanel = new StackPanel
-            {
-                Margin = new Thickness(10),
-                Orientation = Orientation.Vertical
-            };
-            var bandCheckBoxes = new List<CheckBox>();
-
-            foreach (string band in ClusterBandOptions)
-            {
-                string label = Regex.IsMatch(band, "^\\d+$") ? band + "m" : band;
-                var cb = new CheckBox
-                {
-                    Content = label,
-                    Margin = new Thickness(6, 3, 6, 3),
-                    IsChecked = enabledBands.Contains(band)
-                };
-
-                cb.Checked += (s, e) =>
-                {
-                    enabledBands.Add(band);
-                    SaveEnabledClusterBands(enabledBands);
-                    RefreshClusterVisibleSpots();
-                };
-                cb.Unchecked += (s, e) =>
-                {
-                    enabledBands.Remove(band);
-                    SaveEnabledClusterBands(enabledBands);
-                    RefreshClusterVisibleSpots();
-                };
-
-                bandCheckBoxes.Add(cb);
-                bandsPanel.Children.Add(cb);
-            }
-
-            var modesPanel = new StackPanel
-            {
-                Margin = new Thickness(10),
-                Orientation = Orientation.Vertical
-            };
-            var modeCheckBoxes = new List<CheckBox>();
-
-            foreach (string modeName in ClusterModeOptions)
-            {
-                var cbMode = new CheckBox
-                {
-                    Content = modeName,
-                    Margin = new Thickness(6, 3, 6, 3),
-                    IsChecked = enabledModes.Contains(modeName)
-                };
-
-                cbMode.Checked += (s, e) =>
-                {
-                    enabledModes.Add(modeName);
-                    SaveEnabledClusterModes(enabledModes);
-                    RefreshClusterVisibleSpots();
-                };
-                cbMode.Unchecked += (s, e) =>
-                {
-                    enabledModes.Remove(modeName);
-                    SaveEnabledClusterModes(enabledModes);
-                    RefreshClusterVisibleSpots();
-                };
-
-                modeCheckBoxes.Add(cbMode);
-                modesPanel.Children.Add(cbMode);
-            }
-
-            var settingsLayout = new Grid();
-            settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            settingsLayout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            settingsLayout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            settingsLayout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1.2, GridUnitType.Star) });
-
-            var popupToggleCheckBox = new CheckBox
-            {
-                Content = "Turn On PopUp",
-                IsChecked = clusterHoverPopupEnabled,
-                Margin = new Thickness(12, 4, 12, 4),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            popupToggleCheckBox.Checked += (s, e) =>
-            {
-                clusterHoverPopupEnabled = true;
-                SaveClusterHoverPopupSetting(clusterHoverPopupEnabled);
-            };
-            popupToggleCheckBox.Unchecked += (s, e) =>
-            {
-                clusterHoverPopupEnabled = false;
-                SaveClusterHoverPopupSetting(clusterHoverPopupEnabled);
-                if (clusterHoverToolTip != null)
-                {
-                    clusterHoverToolTip.IsOpen = false;
-                }
-                if (clusterSpotsDataGrid != null)
-                {
-                    clusterSpotsDataGrid.Cursor = Cursors.Arrow;
-                }
-                clusterLastHoverToolTipColumn = null;
-            };
-
-            var mapToggleCheckBox = new CheckBox
-            {
-                Content = "Plot spots on map",
-                IsChecked = Properties.Settings.Default.ClusterMapEnabled,
-                Margin = new Thickness(0, 4, 12, 4),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            mapToggleCheckBox.Checked += (s, e) =>
-            {
-                Properties.Settings.Default.ClusterMapEnabled = true;
-                try { Properties.Settings.Default.Save(); } catch { }
-                UpdateClusterSpotsOnMap();
-            };
-            mapToggleCheckBox.Unchecked += (s, e) =>
-            {
-                Properties.Settings.Default.ClusterMapEnabled = false;
-                try { Properties.Settings.Default.Save(); } catch { }
-                if (MapControl != null)
-                    MapControl.ShowClusterSpots(new System.Collections.Generic.List<HolyLogger.ToolsUserControls.ClusterSpotInfo>(),
-                        0, 0, GetMapRadiusKm());
-            };
-
-            // Band colors section
-            var bandColorsHeader = new TextBlock
-            {
-                Text = "Band colors",
-                Margin = new Thickness(12, 12, 12, 0),
-                FontSize = 15,
-                FontWeight = FontWeights.SemiBold,
-                VerticalAlignment = VerticalAlignment.Bottom
-            };
-
-            var bandColorsPanel = new StackPanel { Margin = new Thickness(8, 0, 8, 4), Orientation = Orientation.Vertical };
-            var currentColors = new Dictionary<string, string>(GetBandColors(), StringComparer.OrdinalIgnoreCase);
-
-            foreach (string band in ClusterBandOptions)
-            {
-                string label = Regex.IsMatch(band, "^\\d+$") ? band + "m" : band;
-                string hex = currentColors.ContainsKey(band) ? currentColors[band] : "#FF6600";
-
-                var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 2, 0, 2) };
-
-                var swatch = new Border
-                {
-                    Width = 22, Height = 22,
-                    CornerRadius = new CornerRadius(3),
-                    Margin = new Thickness(0, 0, 6, 0),
-                    Cursor = Cursors.Hand,
-                    ToolTip = "Click to change color"
-                };
-                try { swatch.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex)); }
-                catch { swatch.Background = new SolidColorBrush(Colors.OrangeRed); }
-
-                var bandLabel = new TextBlock
-                {
-                    Text = label,
-                    Width = 40,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    FontWeight = FontWeights.SemiBold
-                };
-
-                string capturedBand = band;
-                swatch.MouseLeftButtonUp += (s, e) =>
-                {
-                    var dlg = new System.Windows.Forms.ColorDialog
-                    {
-                        FullOpen = true
-                    };
-                    try
-                    {
-                        var cur = (Color)ColorConverter.ConvertFromString(currentColors.ContainsKey(capturedBand) ? currentColors[capturedBand] : "#FF6600");
-                        dlg.Color = System.Drawing.Color.FromArgb(cur.R, cur.G, cur.B);
-                    }
-                    catch { }
-
-                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                    {
-                        string newHex = string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
-                        currentColors[capturedBand] = newHex;
-                        try { swatch.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(newHex)); }
-                        catch { }
-                        SaveBandColors(currentColors);
-                        UpdateClusterSpotsOnMap();
-                    }
-                };
-
-                row.Children.Add(swatch);
-                row.Children.Add(bandLabel);
-                bandColorsPanel.Children.Add(row);
-            }
-
-            var bandColorsScroll = new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Content = bandColorsPanel,
-                Margin = new Thickness(0, 0, 0, 4)
-            };
-
-            var resetColorsBtn = new Button
-            {
-                Content = "Reset to defaults",
-                Margin = new Thickness(12, 0, 12, 6),
-                Padding = new Thickness(8, 3, 8, 3),
-                HorizontalAlignment = HorizontalAlignment.Left
-            };
-            resetColorsBtn.Click += (s, e) =>
-            {
-                currentColors.Clear();
-                foreach (var kv in DefaultBandColors) currentColors[kv.Key] = kv.Value;
-                SaveBandColors(currentColors);
-                // Rebuild the swatch visuals
-                foreach (StackPanel row2 in bandColorsPanel.Children.OfType<StackPanel>())
-                {
-                    var sw = row2.Children.OfType<Border>().FirstOrDefault();
-                    var bl = row2.Children.OfType<TextBlock>().FirstOrDefault();
-                    if (sw != null && bl != null)
-                    {
-                        string bName = Regex.IsMatch(bl.Text, "^\\d+m$") ? bl.Text.TrimEnd('m') : bl.Text;
-                        if (DefaultBandColors.TryGetValue(bName, out string defHex))
-                        {
-                            try { sw.Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString(defHex)); } catch { }
-                        }
-                    }
-                }
-                UpdateClusterSpotsOnMap();
-            };
-
-            var header = new TextBlock
-            {
-                Text = "Pre Selected Bands",
-                Margin = new Thickness(12, 12, 12, 0),
-                FontSize = 15,
-                FontWeight = FontWeights.SemiBold
-            };
-            var bandsScroll = new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Content = bandsPanel,
-                Margin = new Thickness(0, 2, 0, 4),
-                IsEnabled = true,
-                Opacity = 1.0
-            };
-
-
-
-            var modesHeader = new TextBlock
-            {
-                Text = "Visible modes",
-                Margin = new Thickness(12, 12, 12, 0),
-                FontSize = 15,
-                FontWeight = FontWeights.SemiBold,
-                VerticalAlignment = VerticalAlignment.Bottom
-            };
-
-            var modesScroll = new ScrollViewer
-            {
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-                Content = modesPanel,
-                Margin = new Thickness(0, 0, 0, 4)
-            };
-
-            var showAllModesButton = new Button
-            {
-                Content = "show all modes",
-                Margin = new Thickness(0, 0, 0, 6),
-                Padding = new Thickness(8, 3, 8, 3),
-                HorizontalAlignment = HorizontalAlignment.Left,
-                MinWidth = 120
-            };
-            showAllModesButton.Click += (s, e) =>
-            {
-                enabledModes.Clear();
-                foreach (string m in ClusterModeOptions)
-                {
-                    enabledModes.Add(m);
-                }
-
-                SaveEnabledClusterModes(enabledModes);
-
-                foreach (var cb in modeCheckBoxes)
-                {
-                    cb.IsChecked = true;
-                }
-
-                RefreshClusterVisibleSpots();
-            };
-            modesPanel.Children.Insert(0, showAllModesButton);
-
-
-            Grid.SetRow(header, 0);
-            Grid.SetColumn(header, 0);
-
-            Grid.SetRow(modesHeader, 0);
-            Grid.SetColumn(modesHeader, 1);
-
-            Grid.SetRow(bandColorsHeader, 0);
-            Grid.SetColumn(bandColorsHeader, 2);
-
-
-
-            Grid.SetRow(bandColorsScroll, 2);
-            Grid.SetColumn(bandColorsScroll, 2);
-
-            // Checkboxes docked to the bottom of the bands+modes columns (row 2, cols 0-1)
-            // so they visually align with the last color row (SHF)
-            var checkboxPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(6, 0, 0, 6)
-            };
-            checkboxPanel.Children.Add(popupToggleCheckBox);
-            checkboxPanel.Children.Add(mapToggleCheckBox);
-
-            var bandsModesBottom = new DockPanel { LastChildFill = true };
-            DockPanel.SetDock(checkboxPanel, Dock.Bottom);
-            bandsModesBottom.Children.Add(checkboxPanel);
-
-            // Inner grid to hold bands and modes side by side
-            var bandsModesSplit = new Grid();
-            bandsModesSplit.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            bandsModesSplit.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            Grid.SetColumn(bandsScroll, 0);
-            Grid.SetColumn(modesScroll, 1);
-            bandsModesSplit.Children.Add(bandsScroll);
-            bandsModesSplit.Children.Add(modesScroll);
-            bandsModesBottom.Children.Add(bandsModesSplit);
-
-            Grid.SetRow(bandsModesBottom, 1);
-            Grid.SetRowSpan(bandsModesBottom, 2);
-            Grid.SetColumn(bandsModesBottom, 0);
-            Grid.SetColumnSpan(bandsModesBottom, 2);
-
-            // Reset: plain Image icon + TextBlock side by side, no button frame, no template padding.
-            // bandColorsPanel has Margin.Left=8, swatch has no extra left margin ? swatch left edge at 8px.
-            // So resetPanel.Margin.Left = 8 aligns the icon's left edge exactly with the 160m square.
-            var resetIconBmp = new BitmapImage();
-            resetIconBmp.BeginInit();
-            resetIconBmp.UriSource = new Uri("pack://application:,,,/Images/UNDO_Icon.png");
-            resetIconBmp.DecodePixelHeight = 22;
-            resetIconBmp.EndInit();
-            var resetIconImg = new Image
-            {
-                Source = resetIconBmp,
-                Width = 22,
-                Height = 22,
-                VerticalAlignment = VerticalAlignment.Center,
-                Cursor = Cursors.Hand,
-                ToolTip = "Reset band colors to defaults"
-            };
-            RenderOptions.SetBitmapScalingMode(resetIconImg, BitmapScalingMode.HighQuality);
-            resetIconImg.MouseLeftButtonUp += (s, e) => resetColorsBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-
-            var resetTextBlock = new TextBlock
-            {
-                Text = "Reset to Default Colors",
-                FontSize = 11,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(6, 0, 0, 0),
-                Cursor = Cursors.Hand
-            };
-            resetTextBlock.MouseLeftButtonUp += (s, e) => resetColorsBtn.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
-
-            // Hide the original button ק it stays in the tree to keep Click logic working
-            resetColorsBtn.Visibility = Visibility.Collapsed;
-
-            var resetPanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(8, 4, 4, 4)   // matches bandColorsPanel.Margin.Left = 8
-            };
-            resetPanel.Children.Add(resetIconImg);
-            resetPanel.Children.Add(resetTextBlock);
-            resetPanel.Children.Add(resetColorsBtn);  // hidden, keeps click handler in tree
-
-            Grid.SetRow(resetPanel, 1);
-            Grid.SetColumn(resetPanel, 2);
-
-            settingsLayout.Children.Add(header);
-            settingsLayout.Children.Add(modesHeader);
-            settingsLayout.Children.Add(bandColorsHeader);
-
-            settingsLayout.Children.Add(bandsModesBottom);
-            settingsLayout.Children.Add(bandColorsScroll);
-            settingsLayout.Children.Add(resetPanel);
-
-            // Let the window grow to fit its content at any DPI/screen resolution so the
-            // column headers can never be clipped. MinWidth keeps it at least as wide as the
-            // original default even if a previously-clamped width was saved.
-            const double clusterSettingsMinWidth = 560;
-
-            clusterSettingsWindow = new Window
-            {
-                Title = "Cluster Settings",
-                SizeToContent = SizeToContent.WidthAndHeight,
-                MinWidth = clusterSettingsMinWidth,
-                ResizeMode = ResizeMode.NoResize,
-                Left = Properties.Settings.Default.ClusterSettingsWindowLeft,
-                Top = Properties.Settings.Default.ClusterSettingsWindowTop,
-                Content = settingsLayout
-            };
-
-            if (clusterWindow != null && clusterWindow.IsVisible)
-            {
-                clusterSettingsWindow.Owner = clusterWindow;
-            }
-
-            clusterSettingsWindow.LocationChanged += (s, e) =>
-            {
-                if (clusterSettingsWindow == null) return;
-                Properties.Settings.Default.ClusterSettingsWindowLeft = clusterSettingsWindow.Left;
-                Properties.Settings.Default.ClusterSettingsWindowTop = clusterSettingsWindow.Top;
-            };
-
-            clusterSettingsWindow.SizeChanged += (s, e) =>
-            {
-                if (clusterSettingsWindow == null) return;
-                if (clusterSettingsWindow.Width > 0) Properties.Settings.Default.ClusterSettingsWindowWidth = clusterSettingsWindow.Width;
-                if (clusterSettingsWindow.Height > 0) Properties.Settings.Default.ClusterSettingsWindowHeight = clusterSettingsWindow.Height;
-            };
-
-            clusterSettingsWindow.Closed += (s, e) => clusterSettingsWindow = null;
-            clusterSettingsWindow.PreviewKeyDown += ForwardGlobalFunctionKeys;
-            clusterSettingsWindow.Show();
-        }
+        // Cluster settings window removed - settings now in cluster header and main User Interface settings
+        // private void OpenClusterSettingsWindow() { ... }
 
         private bool LoadClusterHoverPopupSetting()
         {
@@ -6930,6 +6572,43 @@ namespace HolyLogger
 
             int count = clusterVisibleSpots != null ? clusterVisibleSpots.Count : 0;
             clusterSpotCountText.Text = count.ToString(CultureInfo.InvariantCulture);
+        }
+
+        public bool GetClusterHoverPopupEnabled()
+        {
+            return clusterHoverPopupEnabled;
+        }
+
+        public void SetClusterHoverPopupEnabled(bool enabled)
+        {
+            clusterHoverPopupEnabled = enabled;
+            SaveClusterHoverPopupSetting(enabled);
+            if (!enabled)
+            {
+                if (clusterHoverToolTip != null)
+                {
+                    clusterHoverToolTip.IsOpen = false;
+                }
+                if (clusterSpotsDataGrid != null)
+                {
+                    clusterSpotsDataGrid.Cursor = Cursors.Arrow;
+                }
+                clusterLastHoverToolTipColumn = null;
+            }
+        }
+
+        public void UpdateClusterMapFromSettings()
+        {
+            if (Properties.Settings.Default.ClusterMapEnabled)
+            {
+                UpdateClusterSpotsOnMap();
+            }
+            else
+            {
+                if (MapControl != null)
+                    MapControl.ShowClusterSpots(new System.Collections.Generic.List<HolyLogger.ToolsUserControls.ClusterSpotInfo>(),
+                        0, 0, GetMapRadiusKm());
+            }
         }
 
         private void ClusterSpotsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
