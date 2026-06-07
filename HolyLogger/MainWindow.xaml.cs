@@ -4387,73 +4387,11 @@ namespace HolyLogger
             };
             clusterSpotCountText = spotCountText;
 
-            // 160m band indicator - text and colored square
-            var band160Text = new TextBlock
-            {
-                Text = "160",
-                FontSize = 11,
-                FontWeight = FontWeights.Bold,
-                Foreground = Brushes.Black,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 2, 0, 2)
-            };
-
-            // Create CheckBox with custom template for 160m band indicator
-            var band160CheckBox = new CheckBox
-            {
-                Width = 12,
-                Height = 12,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                IsChecked = false,
-                Cursor = Cursors.Hand,
-                ToolTip = "Toggle 160m band filter"
-            };
-
-            // Custom template for the checkbox
-            var checkBoxTemplate = new ControlTemplate(typeof(CheckBox));
-            var templateFactory = new FrameworkElementFactory(typeof(Border));
-            templateFactory.SetValue(Border.WidthProperty, 14.0);
-            templateFactory.SetValue(Border.HeightProperty, 14.0);
-            templateFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromRgb(0x15, 0x61, 0x84)));
-            templateFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(2));
-            templateFactory.SetValue(Border.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            templateFactory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
-            templateFactory.SetValue(Border.MarginProperty, new Thickness(0, -2, 0, 0));
-
-            // Add checkmark (white text "✓")
-            var checkMarkFactory = new FrameworkElementFactory(typeof(TextBlock));
-            checkMarkFactory.SetValue(TextBlock.TextProperty, "✓");
-            checkMarkFactory.SetValue(TextBlock.ForegroundProperty, Brushes.White);
-            checkMarkFactory.SetValue(TextBlock.FontSizeProperty, 10.0);
-            checkMarkFactory.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
-            checkMarkFactory.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
-            checkMarkFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
-            checkMarkFactory.SetValue(TextBlock.MarginProperty, new Thickness(0, -1, 0, 0));
-            checkMarkFactory.SetValue(TextBlock.VisibilityProperty, Visibility.Collapsed);
-            checkMarkFactory.Name = "CheckMark";
-
-            templateFactory.AppendChild(checkMarkFactory);
-            checkBoxTemplate.VisualTree = templateFactory;
-
-            // Add trigger to show checkmark when checked
-            var trigger = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
-            trigger.Setters.Add(new Setter(TextBlock.VisibilityProperty, Visibility.Visible, "CheckMark"));
-            checkBoxTemplate.Triggers.Add(trigger);
-
-            band160CheckBox.Template = checkBoxTemplate;
-
-            var band160Indicator = new StackPanel
-            {
-                Orientation = Orientation.Vertical,
-                HorizontalAlignment = HorizontalAlignment.Center,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, -12, 8, 0)
-            };
-            band160Indicator.Children.Add(band160Text);
-            band160Indicator.Children.Add(band160CheckBox);
+            // Add band selector panel
+            var bandSelectorPanel = BuildClusterBandSelectorPanel();
+            bandSelectorPanel.Margin = new Thickness(0, -12, 8, 0);
+            bandSelectorPanel.HorizontalAlignment = HorizontalAlignment.Right;
+            bandSelectorPanel.VerticalAlignment = VerticalAlignment.Center;
 
             var actionsPanel = new StackPanel
             {
@@ -4462,7 +4400,7 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, -8, 0, 0)
             };
-            actionsPanel.Children.Add(band160Indicator);
+            actionsPanel.Children.Add(bandSelectorPanel);
             actionsPanel.Children.Add(undoButton);
             actionsPanel.Children.Add(settingsButton);
 
@@ -4503,28 +4441,20 @@ namespace HolyLogger
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 Margin = itemMargin ?? new Thickness(0, 0, 0, 1)
             };
-
-            if (!useTextBackground)
-            {
-                itemPanel.Children.Add(new Border
-                {
-                    Width = 20,
-                    Height = 3,
-                    Background = color,
-                    VerticalAlignment = VerticalAlignment.Center,
-                    Margin = new Thickness(0, 0, 3, 0)
-                });
-            }
 
             var itemText = new TextBlock
             {
                 Text = text,
                 FontSize = 12,
+                FontWeight = FontWeights.Bold,
+                Foreground = useTextBackground ? Brushes.Black : color,
                 Background = useTextBackground ? color : Brushes.Transparent,
                 Padding = useTextBackground ? new Thickness(3, 0, 3, 0) : new Thickness(0),
-                VerticalAlignment = VerticalAlignment.Center
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Left
             };
             itemPanel.Children.Add(itemText);
 
@@ -4534,6 +4464,130 @@ namespace HolyLogger
             }
 
             return itemPanel;
+        }
+
+        private StackPanel BuildClusterBandSelectorPanel()
+        {
+            var enabledBands = GetEnabledClusterBands();
+            var bandColors = GetBandColors();
+
+            // Single horizontal row with ALL bands
+            var row = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 0)
+            };
+
+            // All bands in order, with 160 at the end (far right)
+            string[] allBands = { "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF", "160" };
+
+            foreach (string band in allBands)
+            {
+                string colorHex = bandColors.ContainsKey(band) ? bandColors[band] : "#FF6600";
+                Color color;
+                try { color = (Color)ColorConverter.ConvertFromString(colorHex); }
+                catch { color = Colors.OrangeRed; }
+
+                var bandCheckBox = BuildBandCheckBox(band, color, enabledBands.Contains(band));
+                row.Children.Add(bandCheckBox);
+            }
+
+            return row;
+        }
+
+        private StackPanel BuildBandCheckBox(string band, Color color, bool isChecked)
+        {
+            var bandText = new TextBlock
+            {
+                Text = band,
+                FontSize = 9,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.Black,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center,
+                Margin = new Thickness(0, 0, 0, 1)
+            };
+
+            var checkBox = new CheckBox
+            {
+                Width = 12,
+                Height = 12,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsChecked = isChecked,
+                Tag = band
+            };
+
+            // Custom template for the checkbox
+            var checkBoxTemplate = new ControlTemplate(typeof(CheckBox));
+            var templateFactory = new FrameworkElementFactory(typeof(Border));
+            templateFactory.SetValue(Border.WidthProperty, 14.0);
+            templateFactory.SetValue(Border.HeightProperty, 14.0);
+            templateFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(color));
+            templateFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(2));
+            templateFactory.SetValue(Border.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            templateFactory.SetValue(Border.VerticalAlignmentProperty, VerticalAlignment.Top);
+            templateFactory.SetValue(Border.MarginProperty, new Thickness(0, -2, 0, 0));
+
+            // Add checkmark (white text "✓")
+            var checkMarkFactory = new FrameworkElementFactory(typeof(TextBlock));
+            checkMarkFactory.SetValue(TextBlock.TextProperty, "✓");
+            checkMarkFactory.SetValue(TextBlock.ForegroundProperty, Brushes.White);
+            checkMarkFactory.SetValue(TextBlock.FontSizeProperty, 10.0);
+            checkMarkFactory.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+            checkMarkFactory.SetValue(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            checkMarkFactory.SetValue(TextBlock.VerticalAlignmentProperty, VerticalAlignment.Center);
+            checkMarkFactory.SetValue(TextBlock.MarginProperty, new Thickness(0, -1, 0, 0));
+            checkMarkFactory.SetValue(TextBlock.VisibilityProperty, Visibility.Collapsed);
+            checkMarkFactory.Name = "CheckMark";
+
+            templateFactory.AppendChild(checkMarkFactory);
+            checkBoxTemplate.VisualTree = templateFactory;
+
+            // Add trigger to show checkmark when checked
+            var trigger = new Trigger { Property = ToggleButton.IsCheckedProperty, Value = true };
+            trigger.Setters.Add(new Setter(TextBlock.VisibilityProperty, Visibility.Visible, "CheckMark"));
+            checkBoxTemplate.Triggers.Add(trigger);
+
+            checkBox.Template = checkBoxTemplate;
+
+            // Handle checkbox changes
+            checkBox.Checked += (s, e) =>
+            {
+                var enabledBands = GetEnabledClusterBands();
+                if (!enabledBands.Contains(band))
+                {
+                    enabledBands.Add(band);
+                    SaveEnabledClusterBands(enabledBands);
+                    RefreshClusterVisibleSpots();
+                }
+            };
+
+            checkBox.Unchecked += (s, e) =>
+            {
+                var enabledBands = GetEnabledClusterBands();
+                if (enabledBands.Contains(band))
+                {
+                    enabledBands.Remove(band);
+                    SaveEnabledClusterBands(enabledBands);
+                    RefreshClusterVisibleSpots();
+                }
+            };
+
+            var bandIndicator = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0, 2, 0)
+            };
+            bandIndicator.Children.Add(bandText);
+            bandIndicator.Children.Add(checkBox);
+
+            return bandIndicator;
         }
 
         private Style MakeClusterBandFilterBtnStyle(bool highlighted)
@@ -4617,19 +4671,8 @@ namespace HolyLogger
             };
             clusterActiveBandIndicatorText = activeBandIndicator;
 
-            var showBandsLabel = new TextBlock
-            {
-                Text = "Show Bands",
-                FontSize = 13,
-                FontWeight = FontWeights.Bold,
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, -2, 0, 2)
-            };
-            clusterShowBandsLabelText = showBandsLabel;
-
-            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
-            var btnPreSelected = new Button { Content = "Pre Selected", HorizontalAlignment = HorizontalAlignment.Stretch, Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
+            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(1, 0, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
+            var btnPreSelected = new Button { Content = "Marked", HorizontalAlignment = HorizontalAlignment.Left, Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
             var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
 
             clusterBandFilterAllBtn = btnAllBands;
@@ -4640,15 +4683,17 @@ namespace HolyLogger
             activeBandRow.Children.Add(btnActiveBand);
             activeBandRow.Children.Add(activeBandIndicator);
 
+            var topButtonsRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            topButtonsRow.Children.Add(btnPreSelected);
+            topButtonsRow.Children.Add(btnAllBands);
+
             var showBandsPanel = new StackPanel
             {
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top
             };
-            showBandsPanel.Children.Add(showBandsLabel);
-            showBandsPanel.Children.Add(btnAllBands);
-            showBandsPanel.Children.Add(btnPreSelected);
+            showBandsPanel.Children.Add(topButtonsRow);
             showBandsPanel.Children.Add(activeBandRow);
             clusterShowBandsPanel = showBandsPanel;
 
@@ -4727,15 +4772,6 @@ namespace HolyLogger
                 Margin = new Thickness(4, 0, 0, 0)
             };
 
-            var lastMinutesValuePanel = new StackPanel
-            {
-                Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Left,
-                VerticalAlignment = VerticalAlignment.Center
-            };
-            lastMinutesValuePanel.Children.Add(lastMinutesCombo);
-            lastMinutesValuePanel.Children.Add(minutesUnitLabel);
-
             var spotCountBadge = new Border
             {
                 Width = 34,
@@ -4744,11 +4780,21 @@ namespace HolyLogger
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)),
                 BorderThickness = new Thickness(2),
                 Background = Brushes.Transparent,
-                Margin = new Thickness((ClusterLastMinutesDropdownWidth - 34) / 2, 0, 0, 2),
+                Margin = new Thickness(4, -6, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
                 Child = clusterSpotCountText
             };
+
+            var lastMinutesValuePanel = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            lastMinutesValuePanel.Children.Add(lastMinutesCombo);
+            lastMinutesValuePanel.Children.Add(minutesUnitLabel);
+            lastMinutesValuePanel.Children.Add(spotCountBadge);
 
             var lastMinutesFilterPanel = new StackPanel
             {
@@ -4756,7 +4802,6 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top
             };
-            lastMinutesFilterPanel.Children.Add(spotCountBadge);
             lastMinutesFilterPanel.Children.Add(lastMinutesLabel);
             lastMinutesFilterPanel.Children.Add(lastMinutesValuePanel);
             clusterLastMinutesFilterPanel = lastMinutesFilterPanel;
