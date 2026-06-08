@@ -568,7 +568,19 @@ namespace HolyLogger
                 CB_Mode.SelectedIndex = 0;
             }
             CB_Mode.Text = Properties.Settings.Default.Mode;
-            
+
+            // Initialize RST fields based on the selected mode
+            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
+            {
+                TB_RSTSent.Text = "59";
+                TB_RSTRcvd.Text = "59";
+            }
+            else
+            {
+                TB_RSTSent.Text = "599";
+                TB_RSTRcvd.Text = "599";
+            }
+
             TB_MyCallsign.Focus();
 
             Left = Properties.Settings.Default.MainWindowLeft < 0 ? 0 : Properties.Settings.Default.MainWindowLeft;
@@ -1000,6 +1012,18 @@ namespace HolyLogger
             MapControl.RadiusChanged += OnMapRadiusChanged;
             MapControl.SpotTuneRequested += OnMapSpotTuneRequested;
             ShowHomeMap();
+
+            // Initialize RST fields based on the selected mode after window is fully loaded
+            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
+            {
+                TB_RSTSent.Text = "59";
+                TB_RSTRcvd.Text = "59";
+            }
+            else
+            {
+                TB_RSTSent.Text = "599";
+                TB_RSTRcvd.Text = "599";
+            }
         }
 
         private void Window_SourceInitialized(object sender, EventArgs e)
@@ -7787,7 +7811,30 @@ namespace HolyLogger
         {
             try
             {
-                string val = CB_Mode.Text;
+                // Ensure TextBoxes are initialized before trying to update them
+                if (TB_RSTSent == null || TB_RSTRcvd == null || CB_Mode == null)
+                    return;
+
+                // Inside SelectionChanged the CB_Mode.Text property can still hold the
+                // previous value (it lags one event because Text is data-bound), which
+                // caused the RST fields to update only on the next QSO. Read the newly
+                // selected item directly so the RST fields update immediately.
+                string val;
+                if (e.AddedItems != null && e.AddedItems.Count > 0 && e.AddedItems[0] is ComboBoxItem addedItem)
+                {
+                    val = addedItem.Content as string;
+                }
+                else if (CB_Mode.SelectedItem is ComboBoxItem selectedItem)
+                {
+                    val = selectedItem.Content as string;
+                }
+                else
+                {
+                    val = CB_Mode.Text;
+                }
+
+                val = (val ?? string.Empty).Trim().ToUpperInvariant();
+
                 if (val == "SSB" || val == "FM")
                 {
                     TB_RSTSent.Text = "59";
@@ -7800,9 +7847,9 @@ namespace HolyLogger
                 }
                 UpdateDup();
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-
+                System.Diagnostics.Debug.WriteLine($"CB_Mode_SelectionChanged error: {ex.Message}");
                 //throw;
             }
 
