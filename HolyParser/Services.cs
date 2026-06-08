@@ -88,12 +88,11 @@ namespace HolyParser
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             StringBuilder adif = new StringBuilder(200);
-            adif.AppendLine("<ADIF_VERS:3>3.1 ");
-            adif.AppendLine("<PROGRAMID:10>HolyLogger ");
-            //adif.AppendLine("<PROGRAMVERSION:15>Version 1.0.0.0 ");
-            adif.AppendFormat("<PROGRAMVERSION:{0}>{1} ", version.Length, version);
+            adif.AppendLine("<adif_ver:5>3.1.4");
+            adif.AppendLine("<programid:10>HolyLogger");
+            adif.AppendFormat("<programversion:{0}>{1}", version.Length, version);
             adif.AppendLine();
-            adif.AppendLine("<EOH>");
+            adif.AppendLine("<eoh>");
             adif.AppendLine();
 
             foreach (QSO qso in qso_list)
@@ -105,33 +104,33 @@ namespace HolyParser
                     qso.Time = datetime[1];
                 }
 
-                if (qso.MyCall != null) adif.AppendFormat("<station_callsign:{0}>{1} ", qso.MyCall.Length, qso.MyCall);
-                if (qso.DXCall != null) adif.AppendFormat("<call:{0}>{1} ", qso.DXCall.Length, qso.DXCall);
-                if (qso.Name != null) adif.AppendFormat("<name:{0}>{1} ", qso.Name.Length, qso.Name);
-                if (qso.Country != null) adif.AppendFormat("<country:{0}>{1} ", qso.Country.Length, qso.Country);
-                if (qso.Freq != null) adif.AppendFormat("<freq:{0}>{1} ", qso.Freq.Length, qso.Freq);
-                if (qso.Band != null) adif.AppendFormat("<band:{0}>{1} ", qso.Band.Length + 1, qso.Band);
-                if (qso.Mode != null) adif.AppendFormat("<mode:{0}>{1} ", qso.Mode.Length, qso.Mode);
-                if (qso.SUBMode != null) adif.AppendFormat("<submode:{0}>{1} ", qso.SUBMode.Length, qso.SUBMode);
-                if (qso.RST_RCVD != null) adif.AppendFormat("<rst_rcvd:{0}>{1} ", qso.RST_RCVD.Length, qso.RST_RCVD);
-                if (qso.RST_SENT != null) adif.AppendFormat("<rst_sent:{0}>{1} ", qso.RST_SENT.Length, qso.RST_SENT);
-                if (qso.Date != null) adif.AppendFormat("<qso_date:{0}>{1} ", qso.Date.Length, qso.Date);
-                if (qso.Time != null) adif.AppendFormat("<time_on:{0}>{1} ", qso.Time.Length, qso.Time);
-                if (qso.Time != null) adif.AppendFormat("<time_off:{0}>{1} ", qso.Time.Length, qso.Time);
-                if (qso.Comment != null) adif.AppendFormat("<comment:{0}>{1} ", qso.Comment.Length, qso.Comment);
-                if (qso.MyLocator != null) adif.AppendFormat("<my_gridsquare:{0}>{1} ", qso.MyLocator.Length, qso.MyLocator);
-                if (qso.DXLocator != null) adif.AppendFormat("<gridsquare:{0}>{1} ", qso.DXLocator.Length, qso.DXLocator);
-                if (qso.Operator != null) adif.AppendFormat("<operator:{0}>{1} ", qso.Operator.Length, qso.Operator);
-                if (qso.SRX != null) adif.AppendFormat("<srx_string:{0}>{1} ", qso.SRX.Length, qso.SRX);
-                if (qso.STX != null) adif.AppendFormat("<stx_string:{0}>{1} ", qso.STX.Length, qso.STX);
-                if (qso.SRX != null) adif.AppendFormat("<sig:{0}>{1} ", qso.SRX.Length, qso.SRX);
-                if (qso.STX != null) adif.AppendFormat("<my_sig:{0}>{1} ", qso.STX.Length, qso.STX);
-                if (qso.PROP_MODE != null) adif.AppendFormat("<prop_mode:{0}>{1} ", qso.PROP_MODE.Length, qso.PROP_MODE);
-                else if (qso.Band == "13CM") adif.AppendFormat("<prop_mode:{0}>{1} ", 3, "SAT");
-                if (qso.SAT_NAME != null) adif.AppendFormat("<sat_name:{0}>{1} ", qso.SAT_NAME.Length, qso.SAT_NAME);
-                else if (qso.Band == "13CM") adif.AppendFormat("<sat_name:{0}>{1} ", 6, "QO-100");
-                if (qso.SOAPBOX != null) adif.AppendFormat("<soapbox:{0}>{1} ", qso.SOAPBOX.Length, qso.SOAPBOX);
-                adif.AppendLine("<EOR>");
+                if (!string.IsNullOrWhiteSpace(qso.MyCall)) adif.AppendFormat("<station_callsign:{0}>{1}", qso.MyCall.Length, qso.MyCall);
+                if (!string.IsNullOrWhiteSpace(qso.DXCall)) adif.AppendFormat("<call:{0}>{1}", qso.DXCall.Length, qso.DXCall);
+                if (!string.IsNullOrWhiteSpace(qso.Name)) adif.AppendFormat("<name:{0}>{1}", qso.Name.Length, qso.Name);
+                if (!string.IsNullOrWhiteSpace(qso.Country)) adif.AppendFormat("<country:{0}>{1}", qso.Country.Length, qso.Country);
+                if (!string.IsNullOrWhiteSpace(qso.Freq)) adif.AppendFormat("<freq:{0}>{1}", qso.Freq.Length, qso.Freq);
+                if (!string.IsNullOrWhiteSpace(qso.Band)) adif.AppendFormat("<band:{0}>{1}", qso.Band.Length, qso.Band);
+                if (!string.IsNullOrWhiteSpace(qso.Mode)) adif.AppendFormat("<mode:{0}>{1}", qso.Mode.Length, qso.Mode);
+                if (!string.IsNullOrWhiteSpace(qso.SUBMode)) adif.AppendFormat("<submode:{0}>{1}", qso.SUBMode.Length, qso.SUBMode);
+                if (!string.IsNullOrWhiteSpace(qso.RST_RCVD)) adif.AppendFormat("<rst_rcvd:{0}>{1}", qso.RST_RCVD.Length, qso.RST_RCVD);
+                if (!string.IsNullOrWhiteSpace(qso.RST_SENT)) adif.AppendFormat("<rst_sent:{0}>{1}", qso.RST_SENT.Length, qso.RST_SENT);
+                if (!string.IsNullOrWhiteSpace(qso.Date)) adif.AppendFormat("<qso_date:{0}>{1}", qso.Date.Length, qso.Date);
+                if (!string.IsNullOrWhiteSpace(qso.Time)) adif.AppendFormat("<time_on:{0}>{1}", qso.Time.Length, qso.Time);
+                if (!string.IsNullOrWhiteSpace(qso.Time)) adif.AppendFormat("<time_off:{0}>{1}", qso.Time.Length, qso.Time);
+                if (!string.IsNullOrWhiteSpace(qso.Comment)) adif.AppendFormat("<comment:{0}>{1}", qso.Comment.Length, qso.Comment);
+                if (!string.IsNullOrWhiteSpace(qso.MyLocator)) adif.AppendFormat("<my_gridsquare:{0}>{1}", qso.MyLocator.Length, qso.MyLocator);
+                if (!string.IsNullOrWhiteSpace(qso.DXLocator)) adif.AppendFormat("<gridsquare:{0}>{1}", qso.DXLocator.Length, qso.DXLocator);
+                if (!string.IsNullOrWhiteSpace(qso.Operator)) adif.AppendFormat("<operator:{0}>{1}", qso.Operator.Length, qso.Operator);
+                if (!string.IsNullOrWhiteSpace(qso.SRX)) adif.AppendFormat("<srx_string:{0}>{1}", qso.SRX.Length, qso.SRX);
+                if (!string.IsNullOrWhiteSpace(qso.STX)) adif.AppendFormat("<stx_string:{0}>{1}", qso.STX.Length, qso.STX);
+                if (!string.IsNullOrWhiteSpace(qso.SRX)) adif.AppendFormat("<sig:{0}>{1}", qso.SRX.Length, qso.SRX);
+                if (!string.IsNullOrWhiteSpace(qso.STX)) adif.AppendFormat("<my_sig:{0}>{1}", qso.STX.Length, qso.STX);
+                if (!string.IsNullOrWhiteSpace(qso.PROP_MODE)) adif.AppendFormat("<prop_mode:{0}>{1}", qso.PROP_MODE.Length, qso.PROP_MODE);
+                else if (qso.Band == "13CM") adif.AppendFormat("<prop_mode:{0}>{1}", 3, "SAT");
+                if (!string.IsNullOrWhiteSpace(qso.SAT_NAME)) adif.AppendFormat("<sat_name:{0}>{1}", qso.SAT_NAME.Length, qso.SAT_NAME);
+                else if (qso.Band == "13CM") adif.AppendFormat("<sat_name:{0}>{1}", 6, "QO-100");
+                if (!string.IsNullOrWhiteSpace(qso.SOAPBOX)) adif.AppendFormat("<soapbox:{0}>{1}", qso.SOAPBOX.Length, qso.SOAPBOX);
+                adif.AppendLine("<eor>");
             }
 
             return adif.ToString();
