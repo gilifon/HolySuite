@@ -6805,6 +6805,9 @@ namespace HolyLogger
                 // Load filter settings even if window is not shown
                 clusterLastMinutesFilterValue = LoadClusterLastMinutesFilterSetting();
 
+                // Refresh visible spots and map with any existing data
+                RefreshClusterVisibleSpots();
+
                 // Start WebSocket connection for cluster activity
                 StartClusterConnectionAsync();
 
