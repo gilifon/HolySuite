@@ -1011,6 +1011,8 @@ window.addEventListener('resize', function() {
         {
             // Check if we should show compass instead of map
             bool showCompass = Properties.Settings.Default.MapAreaDisplayMode == 1;
+            // Always show compass overlay if azimuth is provided
+            bool hasAzimuth = azimuthDeg.HasValue;
 
             string latStr = lat.ToString(System.Globalization.CultureInfo.InvariantCulture);
             string lonStr = lon.ToString(System.Globalization.CultureInfo.InvariantCulture);
@@ -1052,7 +1054,7 @@ window.addEventListener('resize', function() {
     left:" + (showCompass ? "50%" : "0") + @"; 
     " + (showCompass ? "transform: translate(-50%, -50%);" : "") + @"
     z-index:1000;
-    display:" + (showCompass ? "flex" : "none") + @"; 
+    display:" + (showCompass || hasAzimuth ? "flex" : "none") + @"; 
     flex-direction:column; 
     align-items:center;
     background:transparent;

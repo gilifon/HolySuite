@@ -39,6 +39,7 @@ namespace HolyLogger.OptionsUserControls
             RefreshMainFormBackgroundPreview();
             RefreshQsoTableHeaderBackgroundPreview();
             LoadMapDisplayModeSettings();
+            LoadClusterMapSettings();
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)
@@ -478,6 +479,34 @@ namespace HolyLogger.OptionsUserControls
 
             TB_CustomImagePath.Text = Properties.Settings.Default.CustomMapImagePath ?? string.Empty;
             UpdateMapDisplayModeUI();
+        }
+
+        private void LoadClusterMapSettings()
+        {
+            var mainWindow = Application.Current.MainWindow as MainWindow;
+            if (mainWindow != null)
+            {
+                CBX_ClusterPopup.IsChecked = mainWindow.GetClusterHoverPopupEnabled();
+                CBX_ClusterPlotMap.IsChecked = Properties.Settings.Default.ClusterMapEnabled;
+            }
+        }
+
+        private void ClusterMapSetting_Changed(object sender, RoutedEventArgs e)
+        {
+            var mainWindow = Application.Current.MainWindow as MainWindow;
+            if (mainWindow != null)
+            {
+                if (sender == CBX_ClusterPopup)
+                {
+                    mainWindow.SetClusterHoverPopupEnabled(CBX_ClusterPopup.IsChecked == true);
+                }
+                else if (sender == CBX_ClusterPlotMap)
+                {
+                    Properties.Settings.Default.ClusterMapEnabled = CBX_ClusterPlotMap.IsChecked == true;
+                    try { Properties.Settings.Default.Save(); } catch { }
+                    mainWindow.UpdateClusterMapFromSettings();
+                }
+            }
         }
 
     }
