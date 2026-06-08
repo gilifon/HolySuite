@@ -4802,9 +4802,9 @@ namespace HolyLogger
             };
             clusterActiveBandIndicatorText = activeBandIndicator;
 
-            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(2, 0, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
-            var btnPreSelected = new Button { Content = "Selected", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(1, 0, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
-            var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 1, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
+            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
+            var btnPreSelected = new Button { Content = "Selected", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
+            var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
 
             clusterBandFilterAllBtn = btnAllBands;
             clusterBandFilterPreSelectedBtn = btnPreSelected;
