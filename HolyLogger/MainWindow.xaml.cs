@@ -4538,7 +4538,7 @@ namespace HolyLogger
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 0)
+                Margin = new Thickness(3, 3, 3, 3)
             };
 
             // Mode list in order: SSB, CW, FT8, DIGI, RTTY, FM, AM
@@ -4564,15 +4564,17 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 1)
+                Margin = new Thickness(1,1,1,1)
             };
 
             var checkBox = new CheckBox
             {
-                Width = 12,
-                Height = 12,
+                Width = 15,
+                Height = 15,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 2, 2, 2),
+                Padding = new Thickness(4),
                 IsChecked = isChecked,
                 Tag = mode
             };
@@ -4635,15 +4637,17 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 1)
+                Margin = new Thickness(1, 1, 1, 1)
             };
 
             var checkBox = new CheckBox
             {
-                Width = 12,
-                Height = 12,
+                Width = 15,
+                Height = 15,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 2, 2, 2),
+                Padding = new Thickness(4),
                 IsChecked = isChecked,
                 Tag = band
             };
@@ -4812,9 +4816,9 @@ namespace HolyLogger
             };
             clusterActiveBandIndicatorText = activeBandIndicator;
 
-            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(2, 0, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
-            var btnPreSelected = new Button { Content = "Selected", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(1, 0, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
-            var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 1, 0, 0), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
+            var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
+            var btnPreSelected = new Button { Content = "Selected", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
+            var btnActiveBand = new Button { Content = "Active Band", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase)) };
 
             clusterBandFilterAllBtn = btnAllBands;
             clusterBandFilterPreSelectedBtn = btnPreSelected;
