@@ -3907,6 +3907,14 @@ namespace HolyLogger
                 }
             }
 
+            // Update the Visible setting when user opens cluster from View menu
+            Properties.Settings.Default.ShowClusterWindowOption = true;
+            try { Properties.Settings.Default.Save(); } catch { }
+
+            // Refresh the settings dialog if it's open
+            var optionsWindow = Application.Current.Windows.OfType<OptionsWindow>().FirstOrDefault();
+            optionsWindow?.RefreshClusterSettings();
+
             GenerateNewClusterWindow();
         }
 
@@ -4262,7 +4270,7 @@ namespace HolyLogger
             var spotterColumn = new DataGridTextColumn { Header = "Spotter", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
             var countryColumn = new DataGridTextColumn { Header = "Country", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(Math.Max(40, LoadClusterCountryColumnWidthSetting())) };
 
-            // Freq column
+            // Freq column with band color
             var freqHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             freqHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
             freqHeaderStyle.Setters.Add(new Setter(Control.VerticalContentAlignmentProperty, VerticalAlignment.Center));
@@ -4279,7 +4287,15 @@ namespace HolyLogger
             freqHeaderText.Inlines.Add(new Run("Freq") { FontSize = 12, FontWeight = FontWeights.Normal });
             freqHeaderText.Inlines.Add(new LineBreak());
             freqHeaderText.Inlines.Add(new Run("MHz") { FontSize = 8, FontWeight = FontWeights.Bold });
-            var freqColumn = new DataGridTextColumn { Header = freqHeaderText, HeaderStyle = freqHeaderStyle, Binding = new System.Windows.Data.Binding("FreqDisplayText"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
+
+            var freqColumnTemplate = new DataTemplate();
+            var freqTextBlockFactory = new FrameworkElementFactory(typeof(TextBlock));
+            freqTextBlockFactory.SetBinding(TextBlock.TextProperty, new System.Windows.Data.Binding("FreqDisplayText"));
+            freqTextBlockFactory.SetBinding(TextBlock.ForegroundProperty, new System.Windows.Data.Binding("FreqForeground"));
+            freqTextBlockFactory.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
+            freqColumnTemplate.VisualTree = freqTextBlockFactory;
+
+            var freqColumn = new DataGridTemplateColumn { Header = freqHeaderText, HeaderStyle = freqHeaderStyle, CellTemplate = freqColumnTemplate, SortMemberPath = "FreqDisplayText", Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthFreq)) };
 
             // UTC column
             var utcHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
@@ -4637,7 +4653,7 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(1, 1, 1, 1)
+                Margin = new Thickness(1, 4, 1, 1)
             };
 
             var checkBox = new CheckBox
@@ -6092,6 +6108,39 @@ namespace HolyLogger
                     }
 
                     return FontWeights.Normal;
+                }
+            }
+
+            public Brush FreqForeground
+            {
+                get
+                {
+                    try
+                    {
+                        string bandText = (BandText ?? string.Empty).Trim();
+                        if (string.IsNullOrWhiteSpace(bandText))
+                            return Brushes.Black;
+
+                        // Use the same band color logic as the map
+                        var colors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+                        {
+                            { "160", "#156184" }, { "80", "#903727" }, { "60", "#152F47" }, { "40", "#18A018" },
+                            { "30", "#F1E00A" }, { "20", "#DC2828" }, { "17", "#751F6B" }, { "15", "#1515CB" },
+                            { "12", "#47DFF0" }, { "10", "#E87421" }, { "6",  "#FF61EA" },
+                            { "VHF", "#5EFFA0" }, { "UHF", "#5ECFFF" }, { "SHF", "#A07CFF" }
+                        };
+
+                        if (colors.TryGetValue(bandText, out string colorHex))
+                        {
+                            return (Brush)new BrushConverter().ConvertFromString(colorHex);
+                        }
+
+                        return Brushes.Black;
+                    }
+                    catch
+                    {
+                        return Brushes.Black;
+                    }
                 }
             }
 

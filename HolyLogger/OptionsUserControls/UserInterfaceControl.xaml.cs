@@ -582,5 +582,14 @@ namespace HolyLogger.OptionsUserControls
             }
         }
 
+        /// <summary>
+        /// Refreshes cluster settings checkboxes from current settings values.
+        /// Call this when settings are changed externally (e.g., from View menu).
+        /// </summary>
+        public void RefreshClusterSettings()
+        {
+            LoadClusterSettings();
+        }
+
     }
 }

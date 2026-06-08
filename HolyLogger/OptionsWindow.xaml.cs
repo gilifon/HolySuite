@@ -82,5 +82,14 @@ namespace HolyLogger
             ImportControlInstance.Visibility = Visibility.Hidden;
             SatelliteControlInstance.Visibility = Visibility.Hidden;
         }
+
+        /// <summary>
+        /// Refreshes the cluster settings display in the User Interface tab.
+        /// Call this when cluster settings are changed externally.
+        /// </summary>
+        public void RefreshClusterSettings()
+        {
+            UserInterfaceControlInstance?.RefreshClusterSettings();
+        }
     }
 }
