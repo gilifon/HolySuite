@@ -9116,6 +9116,17 @@ namespace HolyLogger
             }
         }
 
+        public void UpdateMapDayNightOverlay()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (MapControl != null)
+                {
+                    MapControl.RefreshMap();
+                }
+            }), DispatcherPriority.Background);
+        }
+
         private Color ParseMainFormBackgroundColor(string colorText)
         {
             try

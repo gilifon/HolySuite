@@ -353,11 +353,127 @@ window.onerror = function() { return true; };
 var homeLat = " + homeLatJs + @", homeLon = " + homeLonJs + @";
 var radiusMeters = " + radiusMeters.ToString(ic) + @";
 var useMiles = " + useMilesJs + @";
+var showDayNight = " + (Properties.Settings.Default.MapShowDayNight ? "true" : "false") + @";
 var clusterSpots = " + spotsJs.ToString() + @";
 var map = L.map('map', { zoomControl:false, attributionControl:false, zoomSnap:0 }).setView([homeLat, homeLon], 4);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:18 }).addTo(map);
 // Equator
 L.polyline([[0,-180],[0,-90],[0,0],[0,90],[0,180]], { color:'#000000', weight:1.2, opacity:0.5, interactive:false }).addTo(map);
+
+// Day/Night overlay
+var dayNightLayer = null;
+var sunMarker = null;
+
+function getSolarPosition() {
+    var now = new Date();
+    var year = now.getUTCFullYear();
+    var month = now.getUTCMonth() + 1;
+    var day = now.getUTCDate();
+    var hour = now.getUTCHours();
+    var minute = now.getUTCMinutes();
+    var second = now.getUTCSeconds();
+    var a = Math.floor((14 - month) / 12);
+    var y = year + 4800 - a;
+    var m = month + 12 * a - 3;
+    var jdn = day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+    var jd = jdn + (hour - 12) / 24 + minute / 1440 + second / 86400;
+    var n = jd - 2451545.0;
+    var L = (280.460 + 0.9856474 * n) % 360;
+    if (L < 0) L += 360;
+    var g = (357.528 + 0.9856003 * n) % 360;
+    if (g < 0) g += 360;
+    var gRad = g * Math.PI / 180;
+    var lambda = (L + 1.915 * Math.sin(gRad) + 0.020 * Math.sin(2 * gRad)) % 360;
+    if (lambda < 0) lambda += 360;
+    var lambdaRad = lambda * Math.PI / 180;
+    var epsilon = 23.439 - 0.0000004 * n;
+    var epsilonRad = epsilon * Math.PI / 180;
+    var dec = Math.asin(Math.sin(epsilonRad) * Math.sin(lambdaRad)) * 180 / Math.PI;
+    var ra = Math.atan2(Math.cos(epsilonRad) * Math.sin(lambdaRad), Math.cos(lambdaRad)) * 180 / Math.PI;
+    if (ra < 0) ra += 360;
+    var t = (jd - 2451545.0) / 36525.0;
+    var gmst0 = (6.697374558 + 2400.051336 * t + 0.000025862 * t * t) % 24;
+    if (gmst0 < 0) gmst0 += 24;
+    var utHours = hour + minute / 60 + second / 3600;
+    var gmst = (gmst0 + utHours * 1.00273790935) % 24;
+    if (gmst < 0) gmst += 24;
+    var gha = (gmst * 15 - ra) % 360;
+    if (gha > 180) gha -= 360;
+    if (gha < -180) gha += 360;
+    var sunLon = -gha;
+    if (sunLon > 180) sunLon -= 360;
+    if (sunLon < -180) sunLon += 360;
+    return { lat: dec, lon: sunLon };
+}
+
+function drawDayNight() {
+    if (dayNightLayer) map.removeLayer(dayNightLayer);
+    if (sunMarker) map.removeLayer(sunMarker);
+    if (!showDayNight) return;
+    try {
+        var sunPos = getSolarPosition();
+        var nightCoords = [];
+        for (var lat = 90; lat >= -90; lat -= 2) {
+            var latRad = lat * Math.PI / 180;
+            var sunLatRad = sunPos.lat * Math.PI / 180;
+            var cosH = -Math.tan(latRad) * Math.tan(sunLatRad);
+            if (cosH >= -1 && cosH <= 1) {
+                var hourAngle = Math.acos(cosH) * 180 / Math.PI;
+                var lon = sunPos.lon - hourAngle;
+                if (lon > 180) lon -= 360;
+                if (lon < -180) lon += 360;
+                nightCoords.push([lat, lon]);
+            } else if (cosH > 1) {
+                nightCoords.push([lat, sunPos.lon]);
+            } else {
+                var lon = sunPos.lon + 180;
+                if (lon > 180) lon -= 360;
+                nightCoords.push([lat, lon]);
+            }
+        }
+        var antiSunLon = sunPos.lon + 180;
+        if (antiSunLon > 180) antiSunLon -= 360;
+        nightCoords.push([-90, antiSunLon]);
+        nightCoords.push([90, antiSunLon]);
+        for (var lat = -90; lat <= 90; lat += 2) {
+            var latRad = lat * Math.PI / 180;
+            var sunLatRad = sunPos.lat * Math.PI / 180;
+            var cosH = -Math.tan(latRad) * Math.tan(sunLatRad);
+            if (cosH >= -1 && cosH <= 1) {
+                var hourAngle = Math.acos(cosH) * 180 / Math.PI;
+                var lon = sunPos.lon + hourAngle;
+                if (lon > 180) lon -= 360;
+                if (lon < -180) lon += 360;
+                nightCoords.push([lat, lon]);
+            } else if (cosH > 1) {
+                nightCoords.push([lat, sunPos.lon]);
+            } else {
+                var lon = sunPos.lon + 180;
+                if (lon > 180) lon -= 360;
+                nightCoords.push([lat, lon]);
+            }
+        }
+        dayNightLayer = L.polygon(nightCoords, {
+            color: 'rgba(255,255,100,0.5)',
+            weight: 1.5,
+            dashArray: '3,2',
+            fillColor: '#00001e',
+            fillOpacity: 0.4,
+            interactive: false
+        }).addTo(map);
+        var sunIcon = L.divIcon({
+            className: '',
+            html: '<div style=""width:10px;height:10px;position:relative""><div style=""position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7px;height:7px;background:#FFD700;border:1px solid #FFA500;border-radius:50%;box-shadow:0 0 6px rgba(255,220,0,0.5)""></div></div>',
+            iconSize: [10, 10],
+            iconAnchor: [5, 5]
+        });
+        sunMarker = L.marker([sunPos.lat, sunPos.lon], { icon: sunIcon, interactive: false }).addTo(map);
+    } catch(e) {}
+}
+
+drawDayNight();
+setInterval(drawDayNight, 60000);
+
 var homeIcon = L.divIcon({ className:'', html:'<div style=""width:10px;height:10px;background:#1565C0;border:2px solid #fff;border-radius:50%;box-shadow:0 0 2px rgba(0,0,0,0.5)""></div>', iconAnchor:[5,5] });
 L.marker([homeLat, homeLon], { icon:homeIcon }).addTo(map);
 var radiusCircle = L.circle([homeLat, homeLon], { radius:radiusMeters, color:'#E53935', fill:false, weight:2 }).addTo(map);
@@ -426,9 +542,13 @@ function onRadiusChange(km) {
     radiusMeters = km * 1000;
     radiusCircle.setRadius(radiusMeters);
     map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] });
+    drawDayNight();
     try { window.external.SetRadius(km); } catch(e) {}
 }
-function recenter() { map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] }); }
+function recenter() { 
+    map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] }); 
+    drawDayNight();
+}
 function centerOnDx() { map.setView([homeLat, homeLon], map.getZoom()); }
 function toggleProjection() { try { window.external.ToggleProjection(); } catch(e) {} }
 window.addEventListener('resize', function() { if (map) { map.invalidateSize(); } });
@@ -614,6 +734,7 @@ var centerLon = " + homeLonJs + @";
 var radiusKm = " + radiusKm.ToString() + @";
 var marginMultiplier = " + marginJs + @";
 var useMiles = " + useMilesJs + @";
+var showDayNight = " + (Properties.Settings.Default.MapShowDayNight ? "true" : "false") + @";
 var clusterSpots = " + spotsJs.ToString() + @"; // [[lon,lat],...]
 var autoZoomInitActive = " + (Properties.Settings.Default.MapAutoZoom ? "true" : "false") + @";
 var EARTH_KM = 6371;
@@ -692,6 +813,141 @@ function drawRadiusRing(km) {
     }
 }
 drawRadiusRing(radiusKm);
+
+// Solar position and day/night overlay
+var dayNightG = svg.append('g');
+
+function getSolarPosition() {
+    var now = new Date();
+    var year = now.getUTCFullYear();
+    var month = now.getUTCMonth() + 1;
+    var day = now.getUTCDate();
+    var hour = now.getUTCHours();
+    var minute = now.getUTCMinutes();
+    var second = now.getUTCSeconds();
+    var a = Math.floor((14 - month) / 12);
+    var y = year + 4800 - a;
+    var m = month + 12 * a - 3;
+    var jdn = day + Math.floor((153 * m + 2) / 5) + 365 * y + Math.floor(y / 4) - Math.floor(y / 100) + Math.floor(y / 400) - 32045;
+    var jd = jdn + (hour - 12) / 24 + minute / 1440 + second / 86400;
+    var n = jd - 2451545.0;
+    var L = (280.460 + 0.9856474 * n) % 360;
+    if (L < 0) L += 360;
+    var g = (357.528 + 0.9856003 * n) % 360;
+    if (g < 0) g += 360;
+    var gRad = g * Math.PI / 180;
+    var lambda = (L + 1.915 * Math.sin(gRad) + 0.020 * Math.sin(2 * gRad)) % 360;
+    if (lambda < 0) lambda += 360;
+    var lambdaRad = lambda * Math.PI / 180;
+    var epsilon = 23.439 - 0.0000004 * n;
+    var epsilonRad = epsilon * Math.PI / 180;
+    var dec = Math.asin(Math.sin(epsilonRad) * Math.sin(lambdaRad)) * 180 / Math.PI;
+    var ra = Math.atan2(Math.cos(epsilonRad) * Math.sin(lambdaRad), Math.cos(lambdaRad)) * 180 / Math.PI;
+    if (ra < 0) ra += 360;
+    var t = (jd - 2451545.0) / 36525.0;
+    var gmst0 = (6.697374558 + 2400.051336 * t + 0.000025862 * t * t) % 24;
+    if (gmst0 < 0) gmst0 += 24;
+    var utHours = hour + minute / 60 + second / 3600;
+    var gmst = (gmst0 + utHours * 1.00273790935) % 24;
+    if (gmst < 0) gmst += 24;
+    var gha = (gmst * 15 - ra) % 360;
+    if (gha > 180) gha -= 360;
+    if (gha < -180) gha += 360;
+    var sunLon = -gha;
+    if (sunLon > 180) sunLon -= 360;
+    if (sunLon < -180) sunLon += 360;
+    return { lat: dec, lon: sunLon };
+}
+
+function drawDayNight() {
+    dayNightG.selectAll('*').remove();
+    if (!showDayNight) return;
+    try {
+        var sunPos = getSolarPosition();
+        var nightCoords = [];
+        for (var lat = -90; lat <= 90; lat += 1) {
+            var latRad = lat * Math.PI / 180;
+            var sunLatRad = sunPos.lat * Math.PI / 180;
+            var cosH = -Math.tan(latRad) * Math.tan(sunLatRad);
+            if (cosH >= -1 && cosH <= 1) {
+                var hourAngle = Math.acos(cosH) * 180 / Math.PI;
+                var lon = sunPos.lon - hourAngle;
+                if (lon > 180) lon -= 360;
+                if (lon < -180) lon += 360;
+                nightCoords.push([lon, lat]);
+            } else if (cosH > 1) {
+                nightCoords.push([sunPos.lon, lat]);
+            } else {
+                var lon = sunPos.lon + 180;
+                if (lon > 180) lon -= 360;
+                nightCoords.push([lon, lat]);
+            }
+        }
+        var antiSunLon = sunPos.lon + 180;
+        if (antiSunLon > 180) antiSunLon -= 360;
+        nightCoords.push([antiSunLon, 90]);
+        nightCoords.push([antiSunLon, -90]);
+        for (var lat = 90; lat >= -90; lat -= 1) {
+            var latRad = lat * Math.PI / 180;
+            var sunLatRad = sunPos.lat * Math.PI / 180;
+            var cosH = -Math.tan(latRad) * Math.tan(sunLatRad);
+            if (cosH >= -1 && cosH <= 1) {
+                var hourAngle = Math.acos(cosH) * 180 / Math.PI;
+                var lon = sunPos.lon + hourAngle;
+                if (lon > 180) lon -= 360;
+                if (lon < -180) lon += 360;
+                nightCoords.push([lon, lat]);
+            } else if (cosH > 1) {
+                nightCoords.push([sunPos.lon, lat]);
+            } else {
+                var lon = sunPos.lon + 180;
+                if (lon > 180) lon -= 360;
+                nightCoords.push([lon, lat]);
+            }
+        }
+        nightCoords.push(nightCoords[0]);
+        nightCoords.reverse();
+        dayNightG.append('path')
+            .datum({type: 'Polygon', coordinates: [nightCoords]})
+            .attr('d', path)
+            .attr('fill', 'rgba(0,0,30,0.4)')
+            .attr('stroke', 'rgba(255,255,100,0.5)')
+            .attr('stroke-width', 1.5)
+            .attr('stroke-dasharray', '3,2');
+        var sunPt = projection([sunPos.lon, sunPos.lat]);
+        if (sunPt && isFinite(sunPt[0]) && isFinite(sunPt[1])) {
+            dayNightG.append('circle')
+                .attr('cx', sunPt[0])
+                .attr('cy', sunPt[1])
+                .attr('r', 6)
+                .attr('fill', 'rgba(255,220,0,0.3)')
+                .attr('stroke', 'none');
+            dayNightG.append('circle')
+                .attr('cx', sunPt[0])
+                .attr('cy', sunPt[1])
+                .attr('r', 3.5)
+                .attr('fill', '#FFD700')
+                .attr('stroke', '#FFA500')
+                .attr('stroke-width', 1);
+            for (var a = 0; a < 360; a += 45) {
+                var rad = a * Math.PI / 180;
+                var x1 = sunPt[0] + Math.cos(rad) * 5;
+                var y1 = sunPt[1] + Math.sin(rad) * 5;
+                var x2 = sunPt[0] + Math.cos(rad) * 7;
+                var y2 = sunPt[1] + Math.sin(rad) * 7;
+                dayNightG.append('line')
+                    .attr('x1', x1).attr('y1', y1)
+                    .attr('x2', x2).attr('y2', y2)
+                    .attr('stroke', '#FFA500')
+                    .attr('stroke-width', 1);
+            }
+        }
+    } catch(e) {}
+}
+
+drawDayNight();
+setInterval(drawDayNight, 60000);
+
 var overlaysG = svg.append('g');
 var tooltip = d3.select('body').append('div')
     .style('position','absolute').style('pointer-events','none')
@@ -799,12 +1055,12 @@ function recenter() {
     applyViewCenter(); scaleToRadius();
     countriesG.selectAll('path').attr('d', path);
     svg.selectAll('.graticule-path').attr('d', path);
-    drawRings(); drawRadiusRing(radiusKm); drawOverlays();
+    drawRings(); drawRadiusRing(radiusKm); drawOverlays(); drawDayNight();
 }
 function toggleProjection() { try { window.external.ToggleProjection(); } catch(e) {} }
 function updateClusterSpots(json) {
     try { clusterSpots = JSON.parse(json); } catch(e) { return; }
-    drawOverlays();
+    drawOverlays(); drawDayNight();
     if (autoZoomActive) applyAutoZoom();
 }
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -874,7 +1130,7 @@ function applyAutoZoom() {
         scaleToRadius();
         countriesG.selectAll('path').attr('d', path);
         svg.selectAll('.graticule-path').attr('d', path);
-        drawRings(); drawRadiusRing(radiusKm); drawOverlays();
+        drawRings(); drawRadiusRing(radiusKm); drawOverlays(); drawDayNight();
         // Do NOT notify C# — auto zoom radius is visual only, not persisted
     }
 }
@@ -890,7 +1146,7 @@ function restoreRadius(km) {
     scaleToRadius();
     countriesG.selectAll('path').attr('d', path);
     svg.selectAll('.graticule-path').attr('d', path);
-    drawRings(); drawRadiusRing(radiusKm); drawOverlays();
+    drawRings(); drawRadiusRing(radiusKm); drawOverlays(); drawDayNight();
     try { window.external.SetRadius(km); } catch(e) {}  // restore persisted radius
 }
 function toggleAutoZoom() {
@@ -922,7 +1178,7 @@ svg.call(d3.drag()
         projection.rotate([newLon, -newLat]);
         countriesG.selectAll('path').attr('d', path);
         svg.selectAll('.graticule-path').attr('d', path);
-        drawRings(); drawRadiusRing(radiusKm); drawOverlays();
+        drawRings(); drawRadiusRing(radiusKm); drawOverlays(); drawDayNight();
     })
 );
 window.addEventListener('resize', function() {
@@ -936,7 +1192,7 @@ window.addEventListener('resize', function() {
     scaleToRadius();
     countriesG.selectAll('path').attr('d', path);
     svg.selectAll('.graticule-path').attr('d', path);
-    drawRings(); drawRadiusRing(radiusKm); drawOverlays();
+    drawRings(); drawRadiusRing(radiusKm); drawOverlays(); drawDayNight();
 });
 </script>
 </body>

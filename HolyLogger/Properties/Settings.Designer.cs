@@ -935,7 +935,19 @@ namespace HolyLogger.Properties {
                 this["MapAutoZoom"] = value;
             }
         }
-        
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool MapShowDayNight {
+            get {
+                return ((bool)(this["MapShowDayNight"]));
+            }
+            set {
+                this["MapShowDayNight"] = value;
+            }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
