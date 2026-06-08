@@ -3984,7 +3984,11 @@ namespace HolyLogger
             clusterWorkedCountries = GetWorkedCountriesFromLog();
             clusterWindow.Show();
 
-            await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
+            // Only start WebSocket if not already connected
+            if (clusterWebSocketCts == null || clusterWebSocketCts.IsCancellationRequested)
+            {
+                await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
+            }
         }
 
         private void ClusterWindow_Closed(object sender, EventArgs e)
@@ -4007,11 +4011,18 @@ namespace HolyLogger
                 clusterSettingsWindow.Close();
                 clusterSettingsWindow = null;
             }
-            CloseClusterWebSocket();
+
+            // Only close WebSocket and clear map if cluster is being deactivated, not just hidden
+            if (!Properties.Settings.Default.ClusterActive)
+            {
+                CloseClusterWebSocket();
+                ClearClusterSpotsFromMap();
+                clusterVisibleSpots = null;
+                clusterWorkedCountries = null;
+            }
+
             try { _clusterWidthHandlerCleanup?.Invoke(); } catch { }
             _clusterWidthHandlerCleanup = null;
-            clusterVisibleSpots = null;
-            clusterWorkedCountries = null;
             clusterUndoButton = null;
             clusterUndoCountText = null;
             clusterSpotCountText = null;
@@ -4335,7 +4346,10 @@ namespace HolyLogger
                 countryColumn.DisplayIndex = countryDisplayIndex;
             }
 
-            clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
+            if (clusterVisibleSpots == null)
+            {
+                clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
+            }
             spotsGrid.ItemsSource = clusterVisibleSpots;
             spotsGrid.PreviewMouseLeftButtonDown += ClusterSpotsGrid_MouseLeftButtonDown;
             spotsGrid.MouseMove += ClusterSpotsGrid_MouseMove;
@@ -5638,11 +5652,14 @@ namespace HolyLogger
                     AppendClusterLog("Connected successfully.");
                     attempt = 0;
 
-                    statusText.Dispatcher.BeginInvoke(new Action(() =>
+                    if (statusText != null)
                     {
-                        statusText.Text = "(connected)";
-                        statusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0));
-                    }));
+                        statusText.Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            statusText.Text = "(connected)";
+                            statusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0));
+                        }));
+                    }
 
                     string initJson = clusterLastSpotTime > 0
                         ? "{\"last_time\":" + clusterLastSpotTime.ToString(CultureInfo.InvariantCulture) + "}"
@@ -5669,11 +5686,14 @@ namespace HolyLogger
                     break;
 
                 AppendClusterLog("Waiting 10 seconds before reconnecting...");
-                statusText.Dispatcher.BeginInvoke(new Action(() =>
+                if (statusText != null)
                 {
-                    statusText.Text = "(reconnecting...)";
-                    statusText.Foreground = Brushes.Orange;
-                }));
+                    statusText.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        statusText.Text = "(reconnecting...)";
+                        statusText.Foreground = Brushes.Orange;
+                    }));
+                }
 
                 try
                 {
@@ -5686,11 +5706,14 @@ namespace HolyLogger
                 }
             }
 
-            statusText.Dispatcher.BeginInvoke(new Action(() =>
+            if (statusText != null)
             {
-                statusText.Text = "(disconnected)";
-                statusText.Foreground = Brushes.Red;
-            }));
+                statusText.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    statusText.Text = "(disconnected)";
+                    statusText.Foreground = Brushes.Red;
+                }));
+            }
         }
 
         private async Task ReceiveClusterMessagesAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots, CancellationToken cancellationToken)
@@ -5708,11 +5731,14 @@ namespace HolyLogger
                         if (result.MessageType == WebSocketMessageType.Close)
                         {
                             await clusterWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed", CancellationToken.None);
-                            statusText.Dispatcher.BeginInvoke(new Action(() =>
+                            if (statusText != null)
                             {
-                                statusText.Text = "(disconnected)";
-                                statusText.Foreground = Brushes.Red;
-                            }));
+                                statusText.Dispatcher.BeginInvoke(new Action(() =>
+                                {
+                                    statusText.Text = "(disconnected)";
+                                    statusText.Foreground = Brushes.Red;
+                                }));
+                            }
                             return;
                         }
 
@@ -6678,6 +6704,25 @@ namespace HolyLogger
             }
         }
 
+        private void ClearClusterSpotsFromMap()
+        {
+            if (MapControl == null)
+                return;
+
+            try
+            {
+                var emptySpots = new System.Collections.Generic.List<HolyLogger.ToolsUserControls.ClusterSpotInfo>();
+                if (!string.IsNullOrWhiteSpace(TB_MyLocator.Text))
+                {
+                    var homell = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
+                    MapControl.ShowClusterSpots(emptySpots, homell.Lat, homell.Long, GetMapRadiusKm());
+                }
+            }
+            catch
+            {
+            }
+        }
+
         private void UpdateClusterSpotCountIndicator()
         {
             if (clusterSpotCountText == null)
@@ -6723,6 +6768,80 @@ namespace HolyLogger
                 if (MapControl != null)
                     MapControl.ShowClusterSpots(new System.Collections.Generic.List<HolyLogger.ToolsUserControls.ClusterSpotInfo>(),
                         0, 0, GetMapRadiusKm());
+            }
+        }
+
+        public void HandleClusterActiveChanged(bool isActive)
+        {
+            if (!isActive)
+            {
+                if (clusterWindow != null)
+                {
+                    clusterWindow.Close();
+                }
+                CloseClusterWebSocket();
+                ClearClusterSpotsFromMap();
+                if (clusterVisibleSpots != null)
+                {
+                    clusterVisibleSpots.Clear();
+                }
+            }
+            else
+            {
+                // Initialize cluster data structures if needed
+                if (clusterVisibleSpots == null)
+                {
+                    clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
+                }
+                if (clusterWorkedCountries == null)
+                {
+                    clusterWorkedCountries = GetWorkedCountriesFromLog();
+                }
+
+                // Load filter settings even if window is not shown
+                clusterLastMinutesFilterValue = LoadClusterLastMinutesFilterSetting();
+
+                // Start WebSocket connection for cluster activity
+                StartClusterConnectionAsync();
+
+                // Open window only if Visible is checked
+                if (Properties.Settings.Default.ShowClusterWindowOption && clusterWindow == null)
+                {
+                    GenerateNewClusterWindow();
+                }
+            }
+        }
+
+        private async void StartClusterConnectionAsync()
+        {
+            if (clusterVisibleSpots == null)
+            {
+                clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
+            }
+
+            await ConnectClusterWebSocketAsync(null, clusterVisibleSpots);
+        }
+
+        public void HandleClusterVisibilityChanged(bool isVisible)
+        {
+            if (!Properties.Settings.Default.ClusterActive)
+            {
+                return; // Don't show window if cluster is not active
+            }
+
+            if (isVisible)
+            {
+                if (clusterWindow == null)
+                {
+                    GenerateNewClusterWindow();
+                }
+            }
+            else
+            {
+                if (clusterWindow != null)
+                {
+                    clusterWindow.Close();
+                }
             }
         }
 
@@ -8875,6 +8994,26 @@ namespace HolyLogger
                     }
                 }), DispatcherPriority.Background);
             }
+
+            if (e.PropertyName == nameof(Properties.Settings.Default.ClusterMapEnabled))
+            {
+                if (!Properties.Settings.Default.ClusterMapEnabled)
+                {
+                    Dispatcher.BeginInvoke(new Action(ClearClusterSpotsFromMap), DispatcherPriority.Background);
+                }
+                else
+                {
+                    Dispatcher.BeginInvoke(new Action(UpdateClusterSpotsOnMap), DispatcherPriority.Background);
+                }
+            }
+
+            if (e.PropertyName == nameof(Properties.Settings.Default.ClusterActive))
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    HandleClusterActiveChanged(Properties.Settings.Default.ClusterActive);
+                }), DispatcherPriority.Background);
+            }
         }
 
         public void RefreshMapAfterUnitChange()
@@ -8904,15 +9043,15 @@ namespace HolyLogger
 
         private void ApplyClusterWindowSetting()
         {
-            if (Properties.Settings.Default.ShowClusterWindowOption)
+            // Start cluster connection if Active, regardless of visibility
+            if (Properties.Settings.Default.ClusterActive)
             {
-                if (clusterWindow == null)
-                {
-                    GenerateNewClusterWindow();
-                }
+                // Initialize cluster structures and start WebSocket
+                HandleClusterActiveChanged(true);
             }
             else
             {
+                // Clean up cluster if not active
                 if (clusterWindow != null)
                 {
                     clusterWindow.Close();

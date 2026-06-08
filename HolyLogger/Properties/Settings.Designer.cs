@@ -1478,6 +1478,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ClusterActive {
+            get {
+                return ((bool)(this["ClusterActive"]));
+            }
+            set {
+                this["ClusterActive"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ DE K")]
         public string CwMsgText1 {
             get {

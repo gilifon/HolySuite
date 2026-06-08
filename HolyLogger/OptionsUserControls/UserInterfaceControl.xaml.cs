@@ -24,6 +24,8 @@ namespace HolyLogger.OptionsUserControls
         private const string DefaultMainFormBackgroundColor = "#BDDFFF";
         private const string DefaultQsoTableHeaderBackgroundColor = "#DEB887";
 
+        private bool _isLoadingClusterSettings = false;
+
         public bool HasChanged { get; set; }
 
         // Event to notify main window of graphics box mode changes
@@ -40,6 +42,7 @@ namespace HolyLogger.OptionsUserControls
             RefreshQsoTableHeaderBackgroundPreview();
             LoadMapDisplayModeSettings();
             LoadClusterMapSettings();
+            LoadClusterSettings();
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)
@@ -506,6 +509,76 @@ namespace HolyLogger.OptionsUserControls
                     try { Properties.Settings.Default.Save(); } catch { }
                     mainWindow.UpdateClusterMapFromSettings();
                 }
+            }
+        }
+
+        private void LoadClusterSettings()
+        {
+            if (CBX_ClusterActive == null || CBX_ClusterVisible == null)
+                return;
+
+            _isLoadingClusterSettings = true;
+            try
+            {
+                CBX_ClusterActive.IsChecked = Properties.Settings.Default.ClusterActive;
+                CBX_ClusterVisible.IsChecked = Properties.Settings.Default.ShowClusterWindowOption;
+                UpdateClusterVisibleState();
+            }
+            finally
+            {
+                _isLoadingClusterSettings = false;
+            }
+        }
+
+        private void ClusterActive_Changed(object sender, RoutedEventArgs e)
+        {
+            if (CBX_ClusterActive == null || _isLoadingClusterSettings)
+                return;
+
+            bool isActive = CBX_ClusterActive.IsChecked == true;
+            Properties.Settings.Default.ClusterActive = isActive;
+            try { Properties.Settings.Default.Save(); } catch { }
+
+            UpdateClusterVisibleState();
+
+            var mainWindow = Application.Current.MainWindow as MainWindow;
+            if (mainWindow != null)
+            {
+                mainWindow.HandleClusterActiveChanged(isActive);
+            }
+        }
+
+        private void ClusterVisible_Changed(object sender, RoutedEventArgs e)
+        {
+            if (CBX_ClusterVisible == null || _isLoadingClusterSettings)
+                return;
+
+            bool isVisible = CBX_ClusterVisible.IsChecked == true;
+            Properties.Settings.Default.ShowClusterWindowOption = isVisible;
+            try { Properties.Settings.Default.Save(); } catch { }
+
+            var mainWindow = Application.Current.MainWindow as MainWindow;
+            if (mainWindow != null)
+            {
+                mainWindow.HandleClusterVisibilityChanged(isVisible);
+            }
+        }
+
+        private void UpdateClusterVisibleState()
+        {
+            if (CBX_ClusterActive == null || CBX_ClusterVisible == null)
+                return;
+
+            bool isActive = CBX_ClusterActive.IsChecked == true;
+            CBX_ClusterVisible.IsEnabled = isActive;
+
+            if (!isActive)
+            {
+                CBX_ClusterVisible.Opacity = 0.5;
+            }
+            else
+            {
+                CBX_ClusterVisible.Opacity = 1.0;
             }
         }
 
