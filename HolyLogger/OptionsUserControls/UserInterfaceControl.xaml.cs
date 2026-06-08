@@ -489,14 +489,25 @@ namespace HolyLogger.OptionsUserControls
             var mainWindow = Application.Current.MainWindow as MainWindow;
             if (mainWindow != null)
             {
-                CBX_ClusterPopup.IsChecked = mainWindow.GetClusterHoverPopupEnabled();
-                CBX_ClusterPlotMap.IsChecked = Properties.Settings.Default.ClusterMapEnabled;
-                CBX_MapShowDayNight.IsChecked = Properties.Settings.Default.MapShowDayNight;
+                _isLoadingClusterSettings = true;
+                try
+                {
+                    CBX_ClusterPopup.IsChecked = mainWindow.GetClusterHoverPopupEnabled();
+                    CBX_ClusterPlotMap.IsChecked = Properties.Settings.Default.ClusterMapEnabled;
+                    CBX_MapShowDayNight.IsChecked = Properties.Settings.Default.MapShowDayNight;
+                }
+                finally
+                {
+                    _isLoadingClusterSettings = false;
+                }
             }
         }
 
         private void ClusterMapSetting_Changed(object sender, RoutedEventArgs e)
         {
+            if (_isLoadingClusterSettings)
+                return;
+
             var mainWindow = Application.Current.MainWindow as MainWindow;
             if (mainWindow != null)
             {
@@ -515,6 +526,9 @@ namespace HolyLogger.OptionsUserControls
 
         private void MapShowDayNight_Changed(object sender, RoutedEventArgs e)
         {
+            if (_isLoadingClusterSettings)
+                return;
+
             Properties.Settings.Default.MapShowDayNight = CBX_MapShowDayNight.IsChecked == true;
             try { Properties.Settings.Default.Save(); } catch { }
 

@@ -406,61 +406,79 @@ function getSolarPosition() {
     return { lat: dec, lon: sunLon };
 }
 
+function ensureDayNightCanvas() {
+    if (dayNightLayer) return dayNightLayer;
+    var pane = map.getPanes().tilePane;
+    dayNightLayer = L.DomUtil.create('canvas', '', pane);
+    dayNightLayer.style.position = 'absolute';
+    dayNightLayer.style.pointerEvents = 'none';
+    dayNightLayer.style.zIndex = '250';
+    return dayNightLayer;
+}
+
 function drawDayNight() {
-    if (dayNightLayer) map.removeLayer(dayNightLayer);
-    if (sunMarker) map.removeLayer(sunMarker);
-    if (!showDayNight) return;
+    if (sunMarker) {
+        map.removeLayer(sunMarker);
+        sunMarker = null;
+    }
+
+    if (!showDayNight) {
+        if (dayNightLayer && dayNightLayer.parentNode) {
+            dayNightLayer.parentNode.removeChild(dayNightLayer);
+            dayNightLayer = null;
+        }
+        return;
+    }
+
+    var canvas = ensureDayNightCanvas();
+    var size = map.getSize();
+    canvas.width = size.x;
+    canvas.height = size.y;
+    canvas.style.width = size.x + 'px';
+    canvas.style.height = size.y + 'px';
+    var topLeft = map.containerPointToLayerPoint([0, 0]);
+    L.DomUtil.setPosition(canvas, topLeft);
+
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
     try {
         var sunPos = getSolarPosition();
-        var nightCoords = [];
-        for (var lat = 90; lat >= -90; lat -= 2) {
-            var latRad = lat * Math.PI / 180;
-            var sunLatRad = sunPos.lat * Math.PI / 180;
-            var cosH = -Math.tan(latRad) * Math.tan(sunLatRad);
-            if (cosH >= -1 && cosH <= 1) {
-                var hourAngle = Math.acos(cosH) * 180 / Math.PI;
-                var lon = sunPos.lon - hourAngle;
-                if (lon > 180) lon -= 360;
-                if (lon < -180) lon += 360;
-                nightCoords.push([lat, lon]);
-            } else if (cosH > 1) {
-                nightCoords.push([lat, sunPos.lon]);
-            } else {
-                var lon = sunPos.lon + 180;
-                if (lon > 180) lon -= 360;
-                nightCoords.push([lat, lon]);
+        var sunLatRad = sunPos.lat * Math.PI / 180;
+        var sunLonRad = sunPos.lon * Math.PI / 180;
+        var sinSunLat = Math.sin(sunLatRad);
+        var cosSunLat = Math.cos(sunLatRad);
+
+        var width = size.x;
+        var height = size.y;
+        var twilightBand = 0.02;
+        var maxAlpha = 0.4;
+        var image = ctx.createImageData(width, height);
+        var data = image.data;
+
+        for (var y = 0; y < height; y++) {
+            for (var x = 0; x < width; x++) {
+                var ll = map.containerPointToLatLng([x + 0.5, y + 0.5]);
+                var latRad = ll.lat * Math.PI / 180;
+                var lonRad = ll.lng * Math.PI / 180;
+                var cosZenith = Math.sin(latRad) * sinSunLat + Math.cos(latRad) * cosSunLat * Math.cos(lonRad - sunLonRad);
+                if (cosZenith >= twilightBand) continue;
+
+                var alpha = maxAlpha;
+                if (cosZenith > -twilightBand) {
+                    alpha = maxAlpha * ((twilightBand - cosZenith) / (2 * twilightBand));
+                }
+
+                var idx = (y * width + x) * 4;
+                data[idx] = 0;
+                data[idx + 1] = 0;
+                data[idx + 2] = 30;
+                data[idx + 3] = Math.round(alpha * 255);
             }
         }
-        var antiSunLon = sunPos.lon + 180;
-        if (antiSunLon > 180) antiSunLon -= 360;
-        nightCoords.push([-90, antiSunLon]);
-        nightCoords.push([90, antiSunLon]);
-        for (var lat = -90; lat <= 90; lat += 2) {
-            var latRad = lat * Math.PI / 180;
-            var sunLatRad = sunPos.lat * Math.PI / 180;
-            var cosH = -Math.tan(latRad) * Math.tan(sunLatRad);
-            if (cosH >= -1 && cosH <= 1) {
-                var hourAngle = Math.acos(cosH) * 180 / Math.PI;
-                var lon = sunPos.lon + hourAngle;
-                if (lon > 180) lon -= 360;
-                if (lon < -180) lon += 360;
-                nightCoords.push([lat, lon]);
-            } else if (cosH > 1) {
-                nightCoords.push([lat, sunPos.lon]);
-            } else {
-                var lon = sunPos.lon + 180;
-                if (lon > 180) lon -= 360;
-                nightCoords.push([lat, lon]);
-            }
-        }
-        dayNightLayer = L.polygon(nightCoords, {
-            color: 'rgba(255,255,100,0.5)',
-            weight: 1.5,
-            dashArray: '3,2',
-            fillColor: '#00001e',
-            fillOpacity: 0.4,
-            interactive: false
-        }).addTo(map);
+
+        ctx.putImageData(image, 0, 0);
+
         var sunIcon = L.divIcon({
             className: '',
             html: '<div style=""width:10px;height:10px;position:relative""><div style=""position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:7px;height:7px;background:#FFD700;border:1px solid #FFA500;border-radius:50%;box-shadow:0 0 6px rgba(255,220,0,0.5)""></div></div>',
@@ -537,6 +555,7 @@ map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] });
 function updateClusterSpots(json) {
     try { clusterSpots = JSON.parse(json); } catch(e) { return; }
     renderSpots();
+    drawDayNight();
 }
 function onRadiusChange(km) {
     radiusMeters = km * 1000;
@@ -551,7 +570,8 @@ function recenter() {
 }
 function centerOnDx() { map.setView([homeLat, homeLon], map.getZoom()); }
 function toggleProjection() { try { window.external.ToggleProjection(); } catch(e) {} }
-window.addEventListener('resize', function() { if (map) { map.invalidateSize(); } });
+map.on('move zoom resize', drawDayNight);
+window.addEventListener('resize', function() { if (map) { map.invalidateSize(); drawDayNight(); } });
 </script>
 </body>
 </html>";
@@ -861,7 +881,10 @@ function getSolarPosition() {
 
 function drawDayNight() {
     dayNightG.selectAll('*').remove();
-    if (!showDayNight) return;
+    if (!showDayNight) {
+        if (typeof overlaysG !== 'undefined' && overlaysG) drawOverlays();
+        return;
+    }
     try {
         var sunPos = getSolarPosition();
         var nightCoords = [];
@@ -911,9 +934,7 @@ function drawDayNight() {
             .datum({type: 'Polygon', coordinates: [nightCoords]})
             .attr('d', path)
             .attr('fill', 'rgba(0,0,30,0.4)')
-            .attr('stroke', 'rgba(255,255,100,0.5)')
-            .attr('stroke-width', 1.5)
-            .attr('stroke-dasharray', '3,2');
+            .attr('stroke', 'none');
         var sunPt = projection([sunPos.lon, sunPos.lat]);
         if (sunPt && isFinite(sunPt[0]) && isFinite(sunPt[1])) {
             dayNightG.append('circle')
@@ -943,6 +964,7 @@ function drawDayNight() {
             }
         }
     } catch(e) {}
+    if (typeof overlaysG !== 'undefined' && overlaysG) drawOverlays();
 }
 
 drawDayNight();
@@ -1021,6 +1043,7 @@ function drawOverlays() {
         .attr('fill', 'none').attr('stroke', '#2a607a').attr('stroke-width', 2);
 }
 drawOverlays();
+drawDayNight();
 if (autoZoomActive) applyAutoZoom();
 
 var xhr = new XMLHttpRequest();
@@ -1036,6 +1059,7 @@ xhr.onreadystatechange = function() {
         } catch(e) {}
     }
     drawOverlays();
+    drawDayNight();
     drawRadiusRing(radiusKm);
     if (autoZoomActive) applyAutoZoom();
 };
@@ -1222,7 +1246,10 @@ window.addEventListener('resize', function() {
           {
             if (MapBrowser.Visibility == System.Windows.Visibility.Visible)
             {
-              RenderMap();
+              if (_isClusterMode)
+                RenderClusterMap();
+              else
+                RenderMap();
             }
           }
 

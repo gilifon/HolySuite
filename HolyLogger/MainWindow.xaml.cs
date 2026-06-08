@@ -6818,9 +6818,7 @@ namespace HolyLogger
             }
             else
             {
-                if (MapControl != null)
-                    MapControl.ShowClusterSpots(new System.Collections.Generic.List<HolyLogger.ToolsUserControls.ClusterSpotInfo>(),
-                        0, 0, GetMapRadiusKm());
+                ClearClusterSpotsFromMap();
             }
         }
 
