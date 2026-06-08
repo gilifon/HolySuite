@@ -1097,6 +1097,23 @@ namespace HolyLogger
                 // Rebuild worked countries list after deletion
                 RebuildWorkedCountriesAndRefreshCluster();
             }
+            else if (e.Action == NotifyCollectionChangedAction.Reset)
+            {
+                // The whole log table was cleared/replaced (e.g. "Clean log" or
+                // Remove Duplicates). Rebuild the worked-countries cache so the
+                // cluster spot colors (needed country = red) refresh immediately.
+                RebuildWorkedCountriesAndRefreshCluster();
+            }
+            else if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null)
+            {
+                // Keep the worked-countries cache in sync when QSOs are added in
+                // bulk (e.g. re-add after Remove Duplicates). Uses the cheap
+                // incremental update so normal single-QSO adds stay fast.
+                foreach (QSO qso in e.NewItems)
+                {
+                    AddWorkedCountryAndRefreshCluster(qso.DXCall);
+                }
+            }
 
             if (clusterVisibleSpots != null)
             {
