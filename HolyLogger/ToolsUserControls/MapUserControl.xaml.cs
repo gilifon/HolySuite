@@ -452,7 +452,7 @@ function drawDayNight() {
         var width = size.x;
         var height = size.y;
         var twilightBand = 0.02;
-        var maxAlpha = 0.4;
+        var maxAlpha = 0.25;
         var image = ctx.createImageData(width, height);
         var data = image.data;
 
@@ -933,7 +933,7 @@ function drawDayNight() {
         dayNightG.append('path')
             .datum({type: 'Polygon', coordinates: [nightCoords]})
             .attr('d', path)
-            .attr('fill', 'rgba(0,0,30,0.4)')
+            .attr('fill', 'rgba(0,0,30,0.25)')
             .attr('stroke', 'none');
         var sunPt = projection([sunPos.lon, sunPos.lat]);
         if (sunPt && isFinite(sunPt[0]) && isFinite(sunPt[1])) {
