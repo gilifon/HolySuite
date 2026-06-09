@@ -3210,6 +3210,7 @@ namespace HolyLogger
         {
             state = newState;
             UpdateAddBtnLabel();
+            UpdateEditModeBackground();
         }
 
         private void UpdateAddBtnLabel()
@@ -3224,6 +3225,26 @@ namespace HolyLogger
                 AddBtn.Content = "Add (F1)";
                 ClearBtn.Content = "Clear (F9)";
             }
+        }
+
+        private void UpdateEditModeBackground()
+        {
+            var editModeColor = new SolidColorBrush(Colors.Yellow);
+            var normalColor = new SolidColorBrush(Colors.White);
+
+            var backgroundColor = (state == State.Edit) ? editModeColor : normalColor;
+
+            // Only highlight QSO-specific fields, not user station information
+            TB_Frequency.Background = backgroundColor;
+            TB_DXCallsign.Background = backgroundColor;
+            TB_Exchange.Background = backgroundColor;
+            TB_RSTSent.Background = backgroundColor;
+            TB_RSTRcvd.Background = backgroundColor;
+            TB_DX_Name.Background = backgroundColor;
+            TB_State.Background = backgroundColor;
+            TB_DXLocator.Background = backgroundColor;
+            TB_Comment.Background = backgroundColor;
+            CB_Mode.Background = backgroundColor;
         }
         
         private bool Validate()
@@ -4009,8 +4030,8 @@ namespace HolyLogger
             clusterWindow = new Window
             {
                 Title = "Cluster",
-                Width = Properties.Settings.Default.ClusterWindowWidth,
-                Height = Properties.Settings.Default.ClusterWindowHeight,
+                Width = Properties.Settings.Default.ClusterWindowWidth > 0 ? Properties.Settings.Default.ClusterWindowWidth : 600,
+                Height = Properties.Settings.Default.ClusterWindowHeight > 0 ? Properties.Settings.Default.ClusterWindowHeight : 400,
                 MinWidth = 200,
                 MinHeight = 260,
                 Left = Properties.Settings.Default.ClusterWindowLeft,
@@ -4018,6 +4039,9 @@ namespace HolyLogger
                 Content = layoutGrid
             };
             clusterWindow.Owner = this;
+
+            // Ensure window is visible on screen
+            EnsureClusterWindowOnScreen();
 
             clusterUndoButton = undoButton;
             clusterUndoStates.Clear();
@@ -4102,6 +4126,37 @@ namespace HolyLogger
             clusterHoverToolTip = null;
             clusterUndoStates.Clear();
             clusterWindow = null;
+        }
+
+        private void EnsureClusterWindowOnScreen()
+        {
+            if (clusterWindow == null)
+                return;
+
+            // Check if window position is valid (not off-screen or at invalid coordinates)
+            bool needsRepositioning = false;
+
+            // Get screen bounds
+            var screenWidth = SystemParameters.VirtualScreenWidth;
+            var screenHeight = SystemParameters.VirtualScreenHeight;
+            var screenLeft = SystemParameters.VirtualScreenLeft;
+            var screenTop = SystemParameters.VirtualScreenTop;
+
+            // Check if window is completely off-screen or at invalid position
+            if (clusterWindow.Left < screenLeft - clusterWindow.Width + 50 ||
+                clusterWindow.Left > screenLeft + screenWidth - 50 ||
+                clusterWindow.Top < screenTop - clusterWindow.Height + 50 ||
+                clusterWindow.Top > screenTop + screenHeight - 50)
+            {
+                needsRepositioning = true;
+            }
+
+            // If invalid, position relative to main window
+            if (needsRepositioning && this.IsLoaded)
+            {
+                clusterWindow.Left = this.Left + 50;
+                clusterWindow.Top = this.Top + 50;
+            }
         }
 
         private Button BuildClusterUndoButton()
@@ -7028,6 +7083,12 @@ namespace HolyLogger
             if (spot == null)
             {
                 return;
+            }
+
+            // If in edit mode, exit to new mode first before applying cluster spot
+            if (state == State.Edit)
+            {
+                ClearBtn_Click(null, null);
             }
 
             string freqText = (spot.FreqText ?? string.Empty).Trim();
