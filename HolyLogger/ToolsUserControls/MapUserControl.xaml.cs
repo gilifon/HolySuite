@@ -107,6 +107,37 @@ namespace HolyLogger.ToolsUserControls
                 if (_isClusterMode)
                     _clusterMapLoaded = true;
             };
+            this.SizeChanged += MapUserControl_SizeChanged;
+        }
+
+        private void MapUserControl_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
+        {
+            // Trigger map redraw after resize with a small delay to ensure browser layout is updated
+            var timer = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromMilliseconds(100)
+            };
+            timer.Tick += (s, args) =>
+            {
+                timer.Stop();
+                try
+                {
+                    // Force the browser to recalculate and trigger resize by dispatching event
+                    // and then explicitly forcing a layout recalculation
+                    MapBrowser.InvokeScript("eval", new object[] { 
+                        @"
+                        (function() {
+                            window.dispatchEvent(new Event('resize'));
+                            if (typeof svg !== 'undefined') {
+                                setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 50);
+                            }
+                        })();
+                        " 
+                    });
+                }
+                catch { }
+            };
+            timer.Start();
         }
 
         // Updates only spot markers on the already-loaded map via JS — no page reload
@@ -794,7 +825,7 @@ function scaleToRadius() {
 }
 function applyViewCenter() { projection.rotate([-viewCenterLon, -viewCenterLat]); }
 
-svg.append('circle').attr('cx', cx).attr('cy', cy).attr('r', mapR)
+var oceanFill = svg.append('circle').attr('class', 'ocean-fill').attr('cx', cx).attr('cy', cy).attr('r', mapR)
     .attr('fill', '#4a90c4').attr('stroke', '#1a4060').attr('stroke-width', 2);
 var countriesG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 svg.append('path').datum(d3.geoGraticule().step([30, 30])())
@@ -1210,6 +1241,7 @@ window.addEventListener('resize', function() {
     mapR = Math.floor((Math.min(W, H) / 2) - 4);
     cx = W / 2; cy = H / 2;
     svg.attr('width', W).attr('height', H);
+    oceanFill.attr('cx', cx).attr('cy', cy).attr('r', mapR);
     defs.select('clipPath circle').attr('cx', cx).attr('cy', cy).attr('r', mapR - 1);
     projection.translate([cx, cy]);
     baseScale = mapR / Math.PI;
@@ -1854,7 +1886,7 @@ function scaleToRadius() {
 }
 
 // Ocean fill
-svg.append('circle').attr('class', 'ocean-fill')
+var oceanFill = svg.append('circle').attr('class', 'ocean-fill')
     .attr('cx', cx).attr('cy', cy).attr('r', mapR)
     .attr('fill', '#4a90c4').attr('stroke', '#1a4060').attr('stroke-width', 2);
 
@@ -2060,20 +2092,20 @@ window.addEventListener('resize', function() {
     W = window.innerWidth;
     H = window.innerHeight;
     if (W === oldW && H === oldH) return; // No size change
-    
+
     mapR = Math.floor((Math.min(W, H) / 2) - 4);
     cx = W / 2;
     cy = H / 2;
     baseScale = mapR / Math.PI;
-    
+
     svg.attr('width', W).attr('height', H);
-    
-    // Update ocean fill background
-    svg.select('.ocean-fill').attr('cx', cx).attr('cy', cy).attr('r', mapR);
-    
+
+    // Update ocean fill background using direct reference
+    oceanFill.attr('cx', cx).attr('cy', cy).attr('r', mapR);
+
     // Update clip path circle
     svg.select('#globe-clip circle').attr('cx', cx).attr('cy', cy).attr('r', mapR - 1);
-    
+
     projection.translate([cx, cy]);
     applyViewCenter();
     scaleToRadius();
