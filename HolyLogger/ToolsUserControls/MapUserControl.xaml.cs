@@ -179,6 +179,9 @@ namespace HolyLogger.ToolsUserControls
 
         public void ShowClusterSpots(System.Collections.Generic.IList<ClusterSpotInfo> spots, double homeLat, double homeLon, int radiusKm)
         {
+            // Switching to cluster mode navigates independently of RenderMap; invalidate its dedupe
+            // cache so a later identical home/DX render is never skipped over a cluster view.
+            _lastRenderedHtml = null;
             var newSpots = new System.Collections.Generic.List<ClusterSpotInfo>(spots);
 
             bool homeChanged = !_isClusterMode
@@ -1285,12 +1288,10 @@ window.addEventListener('resize', function() {
             }
           }
 
-        // Reloading the IE-based map control is expensive and runs on the UI thread. These guard the
-        // navigation: _lastRenderedHtml skips redundant reloads, and the coalesced background dispatch
-        // keeps the callsign box responsive while the map updates.
+        // Tracks the last HTML navigated to via RenderMap so we can skip redundant reloads (e.g. the
+        // two SetAzimuth calls per lookup that resolve to the same spot). Navigation itself stays
+        // synchronous so the render order is preserved (e.g. ClearAzimuth renders home then cluster).
         private string _lastRenderedHtml;
-        private string _pendingHtml;
-        private bool _navigateScheduled;
 
         private void RenderMap()
         {
@@ -1310,40 +1311,26 @@ window.addEventListener('resize', function() {
                 ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier)
                 : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier);
 
-            // Identical map (e.g. the two SetAzimuth calls per lookup that resolve to the same spot):
-            // nothing to do, skip the costly reload.
+            // Identical map: nothing changed, skip the costly IE reload.
             if (html == _lastRenderedHtml) return;
-            _pendingHtml = html;
+            _lastRenderedHtml = html;
 
-            // Defer the navigation to Background priority and coalesce bursts into one load, so any
-            // queued keystrokes/mouse clicks are handled before the map control churns.
-            if (_navigateScheduled) return;
-            _navigateScheduled = true;
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _navigateScheduled = false;
-                string toRender = _pendingHtml;
-                if (string.IsNullOrEmpty(toRender) || toRender == _lastRenderedHtml) return;
-                _lastRenderedHtml = toRender;
-                try
-                {
-                    File.WriteAllText(_tempMapFile, toRender, System.Text.Encoding.UTF8);
-                    var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
-                    uriBuilder.Query = "v=" + DateTime.UtcNow.Ticks.ToString();
-                    MapBrowser.Navigate(uriBuilder.Uri);
-                }
-                catch { }
-            }), System.Windows.Threading.DispatcherPriority.Background);
+            File.WriteAllText(_tempMapFile, html, System.Text.Encoding.UTF8);
+            var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
+            uriBuilder.Query = "v=" + DateTime.UtcNow.Ticks.ToString();
+            MapBrowser.Navigate(uriBuilder.Uri);
         }
 
         public void ClearMap()
         {
+            _lastRenderedHtml = null;
             MapBrowser.Visibility = System.Windows.Visibility.Collapsed;
             PlaceholderPanel.Visibility = System.Windows.Visibility.Visible;
         }
 
         public void ShowPlaceholder(string message)
         {
+            _lastRenderedHtml = null;
             PlaceholderText.Text = System.Net.WebUtility.HtmlDecode(message);
             MapBrowser.Visibility = System.Windows.Visibility.Collapsed;
             PlaceholderPanel.Visibility = System.Windows.Visibility.Visible;

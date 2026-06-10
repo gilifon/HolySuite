@@ -8168,7 +8168,10 @@ namespace HolyLogger
                     TB_DX_Name.Text = "";
                     TB_State.Text = "";
                     UpdateCountryFlag(null);
-                    ClearAzimuthForTyping();
+                    // Use ClearAzimuth (not ClearAzimuthForTyping) so emptying the DX callsign removes
+                    // the azimuth line to the deleted station and immediately restores the cluster-spots
+                    // map view, instead of leaving the stale arc until the next spot batch arrives.
+                    ClearAzimuth();
                     ClearMatrix();
                     L_Duplicate.Visibility = Visibility.Hidden;
                     L_Legal.Visibility = Visibility.Hidden;
