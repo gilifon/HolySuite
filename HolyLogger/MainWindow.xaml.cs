@@ -3291,6 +3291,10 @@ namespace HolyLogger
 
         private void GridRow_DoubleClick(object sender, MouseButtonEventArgs e)
         {
+            // Only enter edit mode when the double-click lands on an actual data row - not the column
+            // header (sort/resize area) or the empty space below the rows.
+            if (FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject) == null) return;
+
             if (QSODataGrid.SelectedItem == null) return;
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || System.Windows.Forms.MessageBox.Show("Do you want to override current QSO?", "Edit QSO", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
             {
