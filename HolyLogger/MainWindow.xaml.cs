@@ -10410,7 +10410,7 @@ namespace HolyLogger
             string raw = value as string;
             if (!string.IsNullOrWhiteSpace(raw) && raw.Length == 6 && DateTime.TryParseExact(raw, "HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
             {
-                return dt.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+                return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
             }
 
             return value;
