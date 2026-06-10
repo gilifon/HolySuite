@@ -1285,6 +1285,13 @@ window.addEventListener('resize', function() {
             }
           }
 
+        // Reloading the IE-based map control is expensive and runs on the UI thread. These guard the
+        // navigation: _lastRenderedHtml skips redundant reloads, and the coalesced background dispatch
+        // keeps the callsign box responsive while the map updates.
+        private string _lastRenderedHtml;
+        private string _pendingHtml;
+        private bool _navigateScheduled;
+
         private void RenderMap()
         {
             double marginMultiplier = 1.15; // default
@@ -1302,10 +1309,31 @@ window.addEventListener('resize', function() {
             string html = _isPolar
                 ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier)
                 : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier);
-            File.WriteAllText(_tempMapFile, html, System.Text.Encoding.UTF8);
-            var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
-            uriBuilder.Query = "v=" + DateTime.UtcNow.Ticks.ToString();
-            MapBrowser.Navigate(uriBuilder.Uri);
+
+            // Identical map (e.g. the two SetAzimuth calls per lookup that resolve to the same spot):
+            // nothing to do, skip the costly reload.
+            if (html == _lastRenderedHtml) return;
+            _pendingHtml = html;
+
+            // Defer the navigation to Background priority and coalesce bursts into one load, so any
+            // queued keystrokes/mouse clicks are handled before the map control churns.
+            if (_navigateScheduled) return;
+            _navigateScheduled = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                _navigateScheduled = false;
+                string toRender = _pendingHtml;
+                if (string.IsNullOrEmpty(toRender) || toRender == _lastRenderedHtml) return;
+                _lastRenderedHtml = toRender;
+                try
+                {
+                    File.WriteAllText(_tempMapFile, toRender, System.Text.Encoding.UTF8);
+                    var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
+                    uriBuilder.Query = "v=" + DateTime.UtcNow.Ticks.ToString();
+                    MapBrowser.Navigate(uriBuilder.Uri);
+                }
+                catch { }
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         public void ClearMap()

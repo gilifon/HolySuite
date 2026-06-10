@@ -643,7 +643,7 @@
 
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="354,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="The DX Station Callsign"/>
-        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="150" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" FontSize="16" MaxLength="15" TabIndex="8"/>
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="150" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
         <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,101,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="12" Foreground="#555555" Visibility="Collapsed"/>
         <Popup x:Name="CallsignSuggestionsPopup" PlacementTarget="{Binding ElementName=TB_DXCallsign}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
             <Border BorderBrush="Gray" BorderThickness="1" Background="White">

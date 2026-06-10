@@ -306,8 +306,10 @@ namespace HolyLogger
         double? qrzPhotoWidth = null;
         double? qrzPhotoHeight = null;
         string currentQrzImageUrl = null; // Track current QRZ photo URL for graphics box display
+        bool qrzPhotoClearQueued = false;
 
         BackgroundWorker AdifHandlerWorker;
+        private bool _isShutdownCleanupDone = false;
         // UNUSED: BackgroundWorker for entire log QRZ processing was disabled.
         // Left commented for future reference if batch QRZ processing is needed:
         // BackgroundWorker EntireLogQrzWorker;
@@ -327,6 +329,9 @@ namespace HolyLogger
         private const int MaxCallsignSuggestionRows = 30;
         private const double CallsignSuggestionRowHeight = 22;
         private const int CallsignLookupDebounceMs = 280;
+        // How long the DX callsign must stay unchanged (after name/locator are shown) before the QRZ
+        // photo is fetched. Quick typing/corrections bump callsignLookupRevision and skip the download.
+        private const int QrzPhotoDelayMs = 1200;
         // The visible-rows setting only controls how many rows are shown at once; the list can hold
         // up to this many matches so the user can scroll through the full set (often hundreds).
         private const int MaxCallsignSuggestionResults = 500;
@@ -339,10 +344,11 @@ namespace HolyLogger
         private HashSet<string> newCallsignsSet = new HashSet<string>(StringComparer.Ordinal);
         private CallsignUploader _callsignUploader;
         private int callsignListVersion = 0;
+        private int callsignLookupRevision = 0;
 
         DispatcherTimer UTCTimer = new DispatcherTimer();
         DispatcherTimer HeartbeatTimer = new DispatcherTimer();
-        DispatcherTimer CallsignLookupDebounceTimer = new DispatcherTimer();
+        DispatcherTimer CallsignLookupDebounceTimer = new DispatcherTimer(DispatcherPriority.Background);
         DispatcherTimer VoiceMessageAvailabilityTimer = new DispatcherTimer();
         System.Windows.Forms.Timer NewDXCCTimer = new System.Windows.Forms.Timer();
 
@@ -445,6 +451,7 @@ namespace HolyLogger
 
             TB_Frequency.GotFocus += TB_Frequency_GotFocus;
             TB_Frequency.LostFocus += TB_Frequency_LostFocus;
+            TB_DXCallsign.PreviewMouseLeftButtonDown += TB_DXCallsign_PreviewMouseLeftButtonDown;
             UpdateFrequencyDisplay();
 
             ApplyMainFormBackgroundFromSettings();
@@ -607,7 +614,15 @@ namespace HolyLogger
 
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
-            if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
+            // Log in to QRZ entirely on a background thread so NOTHING about the request — not even
+            // the synchronous DNS/proxy resolution that GetResponseAsync does on the calling thread —
+            // can stall the UI thread during startup. The key is stored when it arrives.
+            if (isNetworkAvailable)
+                _ = Task.Run(async () =>
+                {
+                    string key = await Helper.LoginToQRZAsync().ConfigureAwait(false);
+                    if (!string.IsNullOrEmpty(key)) _SessionKey = key;
+                });
 
             if (Properties.Settings.Default.MatrixWindowIsOpen)
             {
@@ -820,10 +835,10 @@ namespace HolyLogger
             }
         }
 
-        private void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
+        private async void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
         {
             isNetworkAvailable = e.IsAvailable;
-            if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
+            if (isNetworkAvailable) _SessionKey = await Helper.LoginToQRZAsync();
             this.Dispatcher.Invoke(() =>
             {
                 NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
@@ -924,9 +939,10 @@ namespace HolyLogger
             }
         }
 
-        private void LoadCurrentQRZPhotoToGraphicsBox()
+        private async void LoadCurrentQRZPhotoToGraphicsBox()
         {
-            if (string.IsNullOrWhiteSpace(currentQrzImageUrl))
+            string urlAtCall = currentQrzImageUrl;
+            if (string.IsNullOrWhiteSpace(urlAtCall))
             {
                 // No QRZ photo available - clear the image but background stays white
                 Img_QRZGraphics.Source = null;
@@ -935,18 +951,31 @@ namespace HolyLogger
 
             try
             {
-                string normalized = currentQrzImageUrl.Trim();
+                string normalized = urlAtCall.Trim();
                 if (normalized.StartsWith("//"))
                 {
                     normalized = "https:" + normalized;
                 }
 
+                // Download off the UI thread; decoding from memory afterwards is cheap. This keeps
+                // the callsign box responsive instead of freezing for the whole photo download.
+                byte[] data = await Helper.DownloadImageBytesAsync(normalized);
+
+                // Discard if the photo was cleared or a newer callsign was looked up meanwhile.
+                if (currentQrzImageUrl != urlAtCall) return;
+
+                if (data == null || data.Length == 0)
+                {
+                    Img_QRZGraphics.Source = null;
+                    return;
+                }
+
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-                bitmap.UriSource = new Uri(normalized, UriKind.Absolute);
+                bitmap.StreamSource = new MemoryStream(data);
                 bitmap.EndInit();
+                bitmap.Freeze();
                 Img_QRZGraphics.Source = bitmap;
             }
             catch
@@ -3517,10 +3546,10 @@ namespace HolyLogger
             Properties.Settings.Default.RecentQSOCounter = 0;
         }        
 
-        private void PropertiesWindow_Closed(object sender, EventArgs e)
+        private async void PropertiesWindow_Closed(object sender, EventArgs e)
         {
             if (String.IsNullOrWhiteSpace(SessionKey))
-                if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
+                if (isNetworkAvailable) _SessionKey = await Helper.LoginToQRZAsync();
         }
 
         private void parseAdif()
@@ -3546,6 +3575,11 @@ namespace HolyLogger
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
+            if (_isShutdownCleanupDone)
+                return;
+
+            _isShutdownCleanupDone = true;
+
             // Stop all timers before shutdown to prevent pending async operations
             try { if (HeartbeatTimer != null && HeartbeatTimer.IsEnabled) HeartbeatTimer.Stop(); } catch { }
             try { if (UTCTimer != null && UTCTimer.IsEnabled) UTCTimer.Stop(); } catch { }
@@ -3589,20 +3623,15 @@ namespace HolyLogger
             // Unsubscribe from MapControl events
             try { MapControl.RadiusChanged -= OnMapRadiusChanged; } catch { }
             try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch { }
-
-            // Save settings with error handling
-            try 
-            { 
-                Properties.Settings.Default.Save(); 
-            } 
-            catch (Exception ex) 
-            { 
-                System.Diagnostics.Debug.WriteLine($"Failed to save settings on close: {ex.Message}");
-            }
         }
 
         private void Window_Closed(object sender, EventArgs e)
         {
+            if (!_isShutdownCleanupDone)
+            {
+                Window_Closing(this, new System.ComponentModel.CancelEventArgs());
+            }
+
             // Unsubscribe from event handlers to prevent memory leaks
             try { this.Loaded -= MainWindow_Loaded; } catch { }
             try { Properties.Settings.Default.PropertyChanged -= Settings_PropertyChanged; } catch { }
@@ -3625,12 +3654,9 @@ namespace HolyLogger
             NewDXCCTimer.Tick -= NewDXCCTimer_Tick;
             NewDXCCTimer.Stop();
             NewDXCCTimer.Dispose();
-            try { Client?.Close(); } catch { }
-            try { N1MMClient?.Close(); } catch { }
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
-            CloseClusterWebSocket();
             try { Properties.Settings.Default.Save(); } catch { }
             if (dal != null) dal.Close();
         }
@@ -3836,12 +3862,12 @@ namespace HolyLogger
             UpdateGraphicsBoxDisplay();
         }
 
-        private void Options_Closed(object sender, EventArgs e)
+        private async void Options_Closed(object sender, EventArgs e)
         {
             OptionsWindow optionWindow = (OptionsWindow)sender;
             if(optionWindow.QRZServiceControlInstance.HasChanged)
             {
-                if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
+                if (isNetworkAvailable) _SessionKey = await Helper.LoginToQRZAsync();
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
@@ -6120,8 +6146,13 @@ namespace HolyLogger
                     return;
                 }
 
-                // Compute worked countries once for the whole payload instead of per-spot
-                var workedCountries = GetWorkedCountriesFromLog();
+                // Use the cached worked-countries set (rebuilt only when the log changes) instead of
+                // rescanning all ~11k QSOs on every payload. Also build an O(1) lookup of logged DX
+                // callsigns ONCE per payload, so the per-spot "in log?" test is a hash lookup instead
+                // of a linear scan of the entire log for every single spot. With a big log this is the
+                // difference between the UI thread freezing on each spot batch and staying responsive.
+                var workedCountries = clusterWorkedCountries ?? GetWorkedCountriesFromLog();
+                var loggedDxCalls = BuildLoggedDxCallSet();
 
                 var newItems = new System.Collections.Generic.List<ClusterSpotViewItem>();
 
@@ -6208,7 +6239,7 @@ namespace HolyLogger
                         SpotterLon = spotterLon,
                         Country = countryName,
                         FlagPath = flagPath,
-                        IsInLog = IsClusterCallsignInLog(dx),
+                        IsInLog = !string.IsNullOrWhiteSpace(dx) && loggedDxCalls.Contains(dx.Trim()),
                         IsMyCallsign = IsMyStationCallsign(dx),
                         IsNeededCountry = IsNeededCountry(dx, workedCountries),
                         SpotKey = key
@@ -6474,6 +6505,25 @@ namespace HolyLogger
             }
 
             return Qsos.Any(q => string.Equals((q.DXCall ?? string.Empty).Trim(), target, StringComparison.OrdinalIgnoreCase));
+        }
+
+        // Builds a case-insensitive set of all DX callsigns currently in the log, so cluster spot
+        // processing can test "is this call already logged?" in O(1) instead of scanning the whole
+        // log per spot. Built once per cluster payload on the UI thread (a single ~11k pass is cheap).
+        private HashSet<string> BuildLoggedDxCallSet()
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var qsos = Qsos;
+            if (qsos != null)
+            {
+                foreach (var q in qsos)
+                {
+                    string c = (q.DXCall ?? string.Empty).Trim();
+                    if (c.Length > 0)
+                        set.Add(c);
+                }
+            }
+            return set;
         }
 
         private bool IsMyStationCallsign(string dxCallsign)
@@ -7713,6 +7763,13 @@ namespace HolyLogger
             }
         }
 
+        private void TB_DXCallsign_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            // Do NOT set e.Handled here. Swallowing the mouse-down cancels the TextBox's built-in
+            // caret positioning, which is why the cursor did not land where the user clicked (and
+            // appeared only after a delay). Let WPF handle focus + caret placement normally.
+        }
+
         private void ApplyHighlightedCallsignSuggestionToTextBox()
         {
             // When a '?' search pattern is active, do not feed the highlighted callsign into the
@@ -7874,6 +7931,21 @@ namespace HolyLogger
                 qrzPhotoWindow.Close();
                 qrzPhotoWindow = null;
             }
+        }
+
+        private void QueueClearQrzPhoto()
+        {
+            if (qrzPhotoClearQueued)
+            {
+                return;
+            }
+
+            qrzPhotoClearQueued = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                qrzPhotoClearQueued = false;
+                ClearQrzPhoto();
+            }), DispatcherPriority.Background);
         }
 
         private void SaveQrzPhotoWindowBounds(Window window)
@@ -8067,47 +8139,59 @@ namespace HolyLogger
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (!isApplyingSuggestion)
-            {
-                UpdateCallsignSuggestions();
-            }
-
+            callsignLookupRevision++;
             string dxCallText = (TB_DXCallsign.Text ?? string.Empty).Trim();
-
-            // Clear stale values from the previously highlighted callsign until new data is loaded.
-            FName = string.Empty;
-            ClearDXLocator();
 
             // A pattern containing '?' is a search filter, not a real callsign: only drive the
             // suggestions dropdown and skip DXCC / QRZ / azimuth / matrix lookups.
             if (dxCallText.IndexOf('?') >= 0)
             {
-                CallsignLookupDebounceTimer.Stop();
-                ClearQrzPhoto();
+                QueueClearQrzPhoto();
+                RestartCallsignLookupDebounce();
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(dxCallText))
             {
                 CallsignLookupDebounceTimer.Stop();
-                ClearQrzPhoto();
-                TB_DXCC.Text = "";
-                TB_DX_Name.Text = "";
-                TB_State.Text = "";
-                UpdateCountryFlag(null);
-                ClearAzimuth();
-                ClearMatrix();
-                L_Duplicate.Visibility = Visibility.Hidden;
-                L_Legal.Visibility = Visibility.Hidden;
-                RestoreDataContext();
+                CallsignSuggestionsPopup.IsOpen = false;
+                LB_DXCallsignSuggestions.ItemsSource = null;
+                TB_DXCallsign.ToolTip = null;
+                QueueClearQrzPhoto();
+
+                // Defer ALL UI updates to allow immediate textbox response during fast deletion
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    FName = string.Empty;
+                    ClearDXLocator();
+                    TB_DXCC.Text = "";
+                    TB_DX_Name.Text = "";
+                    TB_State.Text = "";
+                    UpdateCountryFlag(null);
+                    ClearAzimuthForTyping();
+                    ClearMatrix();
+                    L_Duplicate.Visibility = Visibility.Hidden;
+                    L_Legal.Visibility = Visibility.Hidden;
+                    RestoreDataContext();
+                }), DispatcherPriority.Background);
             }
             else
             {
+                // Defer stale value clearing to avoid blocking keyboard
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    FName = string.Empty;
+                    ClearDXLocator();
+                }), DispatcherPriority.Send);
+
                 // Keep typing snappy: skip heavy DXCC/matrix/filter work until at least 2 chars.
                 if (dxCallText.Length < 2)
                 {
                     CallsignLookupDebounceTimer.Stop();
-                    ClearQrzPhoto();
+                    CallsignSuggestionsPopup.IsOpen = false;
+                    LB_DXCallsignSuggestions.ItemsSource = null;
+                    TB_DXCallsign.ToolTip = null;
+                    QueueClearQrzPhoto();
                     Prefix = dxCallText.ToUpperInvariant();
                     return;
                 }
@@ -8116,21 +8200,10 @@ namespace HolyLogger
                 if (dxCallText.Length < 3)
                 {
                     CallsignLookupDebounceTimer.Stop();
-                    ClearQrzPhoto();
+                    QueueClearQrzPhoto();
                 }
 
-                if (!Properties.Settings.Default.isManualMode && state == State.New)
-                    RefreshDateTime_Btn_MouseUp(null, null);
-
-                // Perform immediate lightweight DXCC lookup (cached by EntityResolver)
-                DXCC dXCC = rem.GetDXCC(dxCallText);
-                Country = dXCC.Name;
-                UpdateCountryFlag(dXCC.Name);
-                Continent = dXCC.Continent;
-                QRZGrid = dXCC.Locator;
-                Prefix = dxCallText.Length >= 2 ? dxCallText.Substring(0, 2) : "";
-
-                // Defer heavy operations (Matrix update and QSO filtering) to debounce timer for smoother typing
+                // Defer all heavy operations to debounce timer for instant keyboard response
                 RestartCallsignLookupDebounce();
             }
         }
@@ -8144,30 +8217,132 @@ namespace HolyLogger
         private void CallsignLookupDebounceTimer_Tick(object sender, EventArgs e)
         {
             CallsignLookupDebounceTimer.Stop();
+            int revisionAtTick = callsignLookupRevision;
 
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 ClearQrzPhoto();
-                ClearAzimuth();
+                ClearAzimuthForTyping();
                 return;
             }
 
             string dxCallText = TB_DXCallsign.Text.Trim();
 
-            // Perform heavy operations after debounce delay
-            UpdateMatrix();
-            if (Properties.Settings.Default.IsFilterQSOs)
+             if (!isApplyingSuggestion)
             {
-                FilteredQsos = new ObservableCollection<QSO>(Qsos.Where(p => p.DXCall.Contains(dxCallText)));
-                if (LastQSO != null && state != State.Edit && Properties.Settings.Default.DisplayLastQSOinGrid) FilteredQsos.Insert(0, LastQSO);
-                DataContext = FilteredQsos;
+                UpdateCallsignSuggestions();
             }
 
-            SetAzimuth();
-            if (state == State.New)
+            if (revisionAtTick != callsignLookupRevision)
             {
-                GetQrzData();
+                return;
             }
+
+            if (dxCallText.IndexOf('?') >= 0)
+            {
+                ClearQrzPhoto();
+                ClearAzimuthForTyping();
+                return;
+            }
+
+            if (dxCallText.Length < 3)
+            {
+                ClearAzimuthForTyping();
+                return;
+            }
+
+            // Refresh date/time if in automatic mode
+            if (!Properties.Settings.Default.isManualMode && state == State.New)
+                RefreshDateTime_Btn_MouseUp(null, null);
+
+            // Perform DXCC lookup (cached by EntityResolver)
+            DXCC dXCC = rem.GetDXCC(dxCallText);
+            Country = dXCC.Name;
+            UpdateCountryFlag(dXCC.Name);
+            Continent = dXCC.Continent;
+            QRZGrid = dXCC.Locator;
+            Prefix = dxCallText.Length >= 2 ? dxCallText.Substring(0, 2) : "";
+
+            // Capture all UI-thread values needed for background computation.
+            int capturedRevision = revisionAtTick;
+            string capturedDxCall = dxCallText;
+            string capturedMyCall = TB_MyCallsign.Text;
+            string capturedBand = TB_Band.Text;
+            string capturedMode = CB_Mode.Text;
+            State capturedState = state;
+            int capturedEditId = (state == State.Edit && QsoToUpdate != null) ? QsoToUpdate.id : -1;
+            bool isFilterQSOs = Properties.Settings.Default.IsFilterQSOs;
+            QSO capturedLastQSO = LastQSO;
+            bool showLastQso = capturedLastQSO != null && capturedState != State.Edit
+                               && Properties.Settings.Default.DisplayLastQSOinGrid;
+            // Snapshot so background thread never touches ObservableCollection directly.
+            var qsosSnapshot = Qsos.ToList();
+
+            // Run all LINQ over 11k QSOs on a thread-pool thread so the UI thread
+            // stays free for keystrokes while the queries execute.
+            Task.Run(() =>
+            {
+                if (capturedRevision != callsignLookupRevision) return;
+
+                // Matrix query
+                var qsoList = qsosSnapshot
+                    .Where(qso => qso.MyCall == capturedMyCall && qso.DXCall == capturedDxCall)
+                    .ToList();
+
+                // Dup / legal check
+                var dupQuery = qsosSnapshot.Where(qso =>
+                    qso.MyCall == capturedMyCall && qso.DXCall == capturedDxCall &&
+                    qso.Band == capturedBand && qso.Mode == capturedMode);
+                if (capturedEditId >= 0)
+                    dupQuery = dupQuery.Where(p => p.id != capturedEditId);
+                bool hasDups = dupQuery.Any();
+                bool hasLegal = !hasDups && qsosSnapshot.Any(qso =>
+                    qso.MyCall == capturedMyCall && qso.DXCall == capturedDxCall);
+
+                // QSO list filter
+                List<QSO> matchingQsos = null;
+                if (isFilterQSOs)
+                {
+                    matchingQsos = qsosSnapshot
+                        .Where(p => p.DXCall != null && p.DXCall.Contains(capturedDxCall))
+                        .Take(1000)
+                        .ToList();
+                    if (showLastQso)
+                        matchingQsos.Insert(0, capturedLastQSO);
+                }
+
+                // Return to UI thread for the actual UI updates (fast — no more LINQ here).
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (capturedRevision != callsignLookupRevision) return;
+
+                    UpdateMatrixWithData(qsoList, skipDupUpdate: true);
+
+                    if (hasDups)
+                    {
+                        L_Duplicate.Visibility = Visibility.Visible;
+                        L_Legal.Visibility = Visibility.Hidden;
+                        matrix?.SetDup();
+                    }
+                    else
+                    {
+                        L_Duplicate.Visibility = Visibility.Hidden;
+                        L_Legal.Visibility = hasLegal ? Visibility.Visible : Visibility.Hidden;
+                        matrix?.ClearDup();
+                    }
+
+                    if (matchingQsos != null)
+                    {
+                        FilteredQsos = new ObservableCollection<QSO>(matchingQsos);
+                        DataContext = FilteredQsos;
+                    }
+
+                    SetAzimuth();
+                    if (capturedState == State.New)
+                        GetQrzData();
+
+                }), DispatcherPriority.Background);
+            });
         }
         
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
@@ -8656,9 +8831,9 @@ namespace HolyLogger
                     // Past the literal-prefix block: nothing else can match.
                     if (!call.StartsWith(literalPrefix, StringComparison.Ordinal)) break;
                 }
-                else if (matches.Count >= maxCallsignSuggestions)
+                else if (matches.Count >= maxCallsignSuggestions && slashMatches.Count >= maxCallsignSuggestions)
                 {
-                    // No literal prefix to bound the scan (e.g. "?E"): stop once the list is full.
+                    // No literal prefix to bound the scan (e.g. "?E"): stop once both lists are full.
                     break;
                 }
 
@@ -8666,9 +8841,16 @@ namespace HolyLogger
 
                 int matchLength = hasWildcard ? pattern.Length : literalPrefix.Length;
                 if (call.Contains('/'))
-                    slashMatches.Add(BuildSuggestionItem(call, pattern, hasWildcard, matchLength));
+                {
+                    if (slashMatches.Count < maxCallsignSuggestions)
+                        slashMatches.Add(BuildSuggestionItem(call, pattern, hasWildcard, matchLength));
+                }
                 else if (matches.Count < maxCallsignSuggestions)
                     matches.Add(BuildSuggestionItem(call, pattern, hasWildcard, matchLength));
+
+                // Early exit if we have enough matches
+                if (literalPrefix.Length > 0 && matches.Count >= maxCallsignSuggestions)
+                    break;
             }
 
             // Fill remaining slots with slash matches (non-slash callsigns are shown first).
@@ -9010,7 +9192,11 @@ namespace HolyLogger
             ClearMatrix();
 
             if (Qsos == null) return;
-            var qso_list = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
+
+            // Optimize: materialize the filtered list once with ToList() to avoid multiple enumerations
+            string myCall = TB_MyCallsign.Text;
+            string dxCall = TB_DXCallsign.Text;
+            var qso_list = Qsos.Where(qso => qso.MyCall == myCall && qso.DXCall == dxCall).ToList();
             HolyLogger.Mode qsoMode;
 
             foreach (var item in qso_list)
@@ -9033,15 +9219,52 @@ namespace HolyLogger
             UpdateDup();
         }
 
+        private void UpdateMatrixWithData(List<QSO> qso_list, bool skipDupUpdate = false)
+        {
+            if (!isInitializeComponentsComplete) return;
+            ClearMatrix();
+
+            if (qso_list == null || qso_list.Count == 0) return;
+
+            HolyLogger.Mode qsoMode;
+
+            foreach (var item in qso_list)
+            {
+                try
+                {
+                    Enum.TryParse(item.Mode, out qsoMode);
+                    MatrixC.SetMatrix(qsoMode, item.Band);
+                    if (matrix != null)
+                    {
+                        matrix.SetMatrix(qsoMode, item.Band);
+                    }
+                }
+                catch (Exception)
+                {
+
+                }
+            }
+
+            if (!skipDupUpdate)
+                UpdateDup();
+        }
+
         private void UpdateDup()
         {
-            var dups = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text && qso.Band == TB_Band.Text && qso.Mode == CB_Mode.Text select qso;
-            var legal = from qso in Qsos where qso.MyCall == TB_MyCallsign.Text && qso.DXCall == TB_DXCallsign.Text select qso;
+            // Optimize: cache values and materialize queries to avoid repeated enumeration
+            string myCall = TB_MyCallsign.Text;
+            string dxCall = TB_DXCallsign.Text;
+            string band = TB_Band.Text;
+            string mode = CB_Mode.Text;
+
+            var dups = Qsos.Where(qso => qso.MyCall == myCall && qso.DXCall == dxCall && qso.Band == band && qso.Mode == mode);
+            var legal = Qsos.Where(qso => qso.MyCall == myCall && qso.DXCall == dxCall);
 
             if (state == State.Edit)
                 dups = dups.Where(p => p.id != QsoToUpdate.id);
 
-            if (dups.Count() > 0)
+            // Use Any() instead of Count() > 0 for better performance (stops at first match)
+            if (dups.Any())
             {
                 L_Duplicate.Visibility = Visibility.Visible;
                 L_Legal.Visibility = Visibility.Hidden;
@@ -9054,7 +9277,7 @@ namespace HolyLogger
             {
                 L_Duplicate.Visibility = Visibility.Hidden;
                 L_Legal.Visibility = Visibility.Hidden;
-                if (legal.Count() > 0)
+                if (legal.Any())
                 {
                     L_Legal.Visibility = Visibility.Visible;
                 }
@@ -9158,12 +9381,17 @@ namespace HolyLogger
             TB_DXLocator.Clear();            
         }
 
+        private void ClearAzimuthForTyping()
+        {
+            Azimuth = 0;
+            _dxQsoInProgress = false;
+        }
+
 
 
         private void ClearAzimuth()
         {
-            Azimuth = 0;
-            _dxQsoInProgress = false;
+            ClearAzimuthForTyping();
             // Always reset to home first to clear any DX arc, then repaint cluster spots on top if needed.
             ShowHomeMap();
             if (MapControl != null && MapControl.Visibility == Visibility.Visible
@@ -9465,7 +9693,8 @@ namespace HolyLogger
         {
             if (string.IsNullOrWhiteSpace(SessionKey) && isNetworkAvailable)
             {
-                Helper.LoginToQRZ(out _SessionKey);
+                // Await the login instead of blocking the UI thread on a synchronous web request.
+                _SessionKey = await Helper.LoginToQRZAsync();
             }
             if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && TB_DXCallsign.Text.Trim().Length >=3)
             {
@@ -9474,7 +9703,7 @@ namespace HolyLogger
 
                 try
                 {
-                    string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
+                    string baseRequest = "https://xmldata.qrz.com/xml/current/?s=";
                     var response = await _sharedHttpClient.GetAsync(baseRequest + SessionKey + ";callsign=" + bare_dxcall);
                     var responseFromServer = await response.Content.ReadAsStringAsync();
                     XDocument xDoc = XDocument.Parse(responseFromServer);
@@ -9520,27 +9749,36 @@ namespace HolyLogger
 
                             AddNewCallsignIfMissing(bare_dxcall);
 
-                            try
+                            // Defer the QRZ photo: only fetch it once the operator has stayed on this
+                            // callsign for a short predefined time. If they keep typing/correcting,
+                            // callsignLookupRevision changes and the image download is skipped entirely.
+                            int photoRevision = callsignLookupRevision;
+                            await Task.Delay(QrzPhotoDelayMs);
+                            if (photoRevision == callsignLookupRevision
+                                && dxcall == (TB_DXCallsign.Text ?? string.Empty).Trim())
                             {
-                                IEnumerable<XElement> image = xDoc.Root.Descendants(ns + "image");
-                                string xmlImageUrl = image.Select(i => i.Value).FirstOrDefault();
-                                if (!string.IsNullOrWhiteSpace(xmlImageUrl))
+                                try
                                 {
-                                    SetQrzPhoto(xmlImageUrl);
+                                    IEnumerable<XElement> image = xDoc.Root.Descendants(ns + "image");
+                                    string xmlImageUrl = image.Select(i => i.Value).FirstOrDefault();
+                                    if (!string.IsNullOrWhiteSpace(xmlImageUrl))
+                                    {
+                                        SetQrzPhoto(xmlImageUrl);
+                                    }
+                                    else
+                                    {
+                                        await LoadQrzPhotoFromWebAsync(bare_dxcall);
+                                    }
                                 }
-                                else
+                                catch
                                 {
-                                    await LoadQrzPhotoFromWebAsync(bare_dxcall);
+                                    ClearQrzPhoto();
                                 }
-                            }
-                            catch
-                            {
-                                ClearQrzPhoto();
                             }
 
                             string key = xDoc.Root.Descendants(ns + "Key").FirstOrDefault().Value;
                             if (SessionKey != key)
-                                if (isNetworkAvailable) Helper.LoginToQRZ(out _SessionKey);
+                                if (isNetworkAvailable) _SessionKey = await Helper.LoginToQRZAsync();
                         }
                         else if (error.Count() > 0)
                         {
@@ -9679,7 +9917,7 @@ namespace HolyLogger
                             name += " " + lname.FirstOrDefault().Value;
 
                         string key = xDoc.Root.Descendants(ns + "Key").FirstOrDefault().Value;
-                        if (SessionKey != key) Helper.LoginToQRZ(out _SessionKey);
+                        if (SessionKey != key) _SessionKey = await Helper.LoginToQRZAsync();
 
                         return name;
                     }

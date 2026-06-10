@@ -1,5 +1,6 @@
 
 using System;
+using System.IO;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media.Imaging;
@@ -30,36 +31,56 @@ namespace HolyLogger
             StatusText.Visibility = Visibility.Collapsed;
         }
 
-        public void SetPhoto(string imageUrl)
+        // Tracks the most recent requested URL so a slow download can't overwrite a newer photo.
+        private string _pendingPhotoUrl;
+
+        public async void SetPhoto(string imageUrl)
         {
             StatusText.Visibility = Visibility.Collapsed;
 
             if (string.IsNullOrWhiteSpace(imageUrl))
             {
+                _pendingPhotoUrl = null;
                 StatusText.Text = "QRZ photo not available";
                 StatusText.Visibility = Visibility.Visible;
                 PhotoImage.Source = null;
                 return;
             }
 
+            string normalized = imageUrl.Trim();
+            if (normalized.StartsWith("//"))
+            {
+                normalized = "https:" + normalized;
+            }
+            _pendingPhotoUrl = normalized;
+
             try
             {
-                string normalized = imageUrl.Trim();
-                if (normalized.StartsWith("//"))
+                // Download off the UI thread so typing in the callsign box never freezes.
+                byte[] data = await Helper.DownloadImageBytesAsync(normalized);
+
+                // A newer callsign was looked up while this was downloading - discard the stale result.
+                if (_pendingPhotoUrl != normalized) return;
+
+                if (data == null || data.Length == 0)
                 {
-                    normalized = "https:" + normalized;
+                    StatusText.Text = "QRZ photo could not be loaded";
+                    StatusText.Visibility = Visibility.Visible;
+                    PhotoImage.Source = null;
+                    return;
                 }
 
                 var bitmap = new BitmapImage();
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
-                bitmap.CreateOptions = BitmapCreateOptions.IgnoreImageCache;
-                bitmap.UriSource = new Uri(normalized, UriKind.Absolute);
+                bitmap.StreamSource = new MemoryStream(data);
                 bitmap.EndInit();
+                bitmap.Freeze();
                 PhotoImage.Source = bitmap;
             }
-            catch (Exception ex)
+            catch (Exception)
             {
+                if (_pendingPhotoUrl != normalized) return;
                 StatusText.Text = "QRZ photo could not be loaded";
                 StatusText.Visibility = Visibility.Visible;
                 PhotoImage.Source = null;

@@ -90,3 +90,4 @@ AI: [makes changes]
 - **Never use the terminal in this workspace.** The terminal frequently times out and wastes time. Always use file tools (`get_file`, `replace_string_in_file`, `code_search`, `find_symbol`, `get_files_in_project`, etc.) instead. Git operations are the only allowed exception and must be kept minimal.
 - Avoid using the terminal in the HolySuite workspace when possible because it frequently times out; prefer direct file/code tools instead.
 - In this workspace, avoid using terminal commands because they time out quickly; use file/code tools instead.
+- **Expect corrections to be followed exactly** and provide root-cause reasoning tied to actual runtime behavior, not speculative features that are not active yet.
