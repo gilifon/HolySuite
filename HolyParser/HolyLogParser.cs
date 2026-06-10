@@ -116,13 +116,20 @@ namespace HolyParser
             m_qsoList = new List<QSO>();
         }
 
-        public void Parse()
+        public void Parse(Action<int> progressCallback = null)
         {
-            PopulateQSOList();
+            progressCallback?.Invoke(0);
+            PopulateQSOList(progress =>
+            {
+                int mapped = (int)Math.Floor(progress * 0.9);
+                progressCallback?.Invoke(mapped);
+            });
+            progressCallback?.Invoke(95);
             CalculateResult();
+            progressCallback?.Invoke(100);
         }
 
-        private void PopulateQSOList()
+        private void PopulateQSOList(Action<int> progressCallback = null)
         {
             m_qsoList.Clear();
             //Remove Line breakers
@@ -140,6 +147,9 @@ namespace HolyParser
             string[] rows = Regex.Split(body, "<EOR>", RegexOptions.IgnoreCase);
 
             int debugCounter = 0;
+            int totalRows = rows.Count(row => !string.IsNullOrWhiteSpace(row));
+            int parsedRows = 0;
+            int lastReportedProgress = -1;
 
             foreach (string row in rows)
             {
@@ -161,6 +171,17 @@ namespace HolyParser
                 catch (Exception)
                 {
                     debugCounter++;
+                }
+
+                parsedRows++;
+                if (totalRows > 0)
+                {
+                    int progress = (int)Math.Floor((double)parsedRows * 100 / totalRows);
+                    if (progress > lastReportedProgress)
+                    {
+                        lastReportedProgress = progress;
+                        progressCallback?.Invoke(progress);
+                    }
                 }
             }
             if (!IsParseDuplicates)

@@ -155,6 +155,93 @@ namespace HolyLogger
             }
             return false;
         }
+
+        public int InsertBatch(IEnumerable<QSO> qsos, Action<int> progressCallback = null)
+        {
+            if (con == null || con.State != System.Data.ConnectionState.Open)
+                throw new InvalidOperationException("Database connection is not open.");
+
+            int faultyQso = 0;
+            int processedQso = 0;
+
+            using (SQLiteTransaction transaction = con.BeginTransaction())
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con, transaction))
+            {
+                insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
+                insertSQL.Parameters.Add(new SQLiteParameter("operator"));
+                insertSQL.Parameters.Add(new SQLiteParameter("my_square"));
+                insertSQL.Parameters.Add(new SQLiteParameter("my_locator"));
+                insertSQL.Parameters.Add(new SQLiteParameter("dx_locator"));
+                insertSQL.Parameters.Add(new SQLiteParameter("frequency"));
+                insertSQL.Parameters.Add(new SQLiteParameter("band"));
+                insertSQL.Parameters.Add(new SQLiteParameter("dx_callsign"));
+                insertSQL.Parameters.Add(new SQLiteParameter("rst_rcvd"));
+                insertSQL.Parameters.Add(new SQLiteParameter("rst_sent"));
+                insertSQL.Parameters.Add(new SQLiteParameter("date"));
+                insertSQL.Parameters.Add(new SQLiteParameter("time"));
+                insertSQL.Parameters.Add(new SQLiteParameter("mode"));
+                insertSQL.Parameters.Add(new SQLiteParameter("submode"));
+                insertSQL.Parameters.Add(new SQLiteParameter("exchange"));
+                insertSQL.Parameters.Add(new SQLiteParameter("comment"));
+                insertSQL.Parameters.Add(new SQLiteParameter("name"));
+                insertSQL.Parameters.Add(new SQLiteParameter("country"));
+                insertSQL.Parameters.Add(new SQLiteParameter("continent"));
+                insertSQL.Parameters.Add(new SQLiteParameter("prop_mode"));
+                insertSQL.Parameters.Add(new SQLiteParameter("sat_name"));
+                insertSQL.Parameters.Add(new SQLiteParameter("soapbox"));
+
+                foreach (var qso in qsos)
+                {
+                    insertSQL.Parameters[0].Value = (object)qso.MyCall ?? DBNull.Value;
+                    insertSQL.Parameters[1].Value = (object)qso.Operator ?? DBNull.Value;
+                    insertSQL.Parameters[2].Value = (object)qso.STX ?? DBNull.Value;
+                    insertSQL.Parameters[3].Value = (object)qso.MyLocator ?? DBNull.Value;
+                    insertSQL.Parameters[4].Value = (object)qso.DXLocator ?? DBNull.Value;
+                    insertSQL.Parameters[5].Value = (object)qso.Freq ?? DBNull.Value;
+                    insertSQL.Parameters[6].Value = (object)qso.Band ?? DBNull.Value;
+                    insertSQL.Parameters[7].Value = (object)qso.DXCall ?? DBNull.Value;
+                    insertSQL.Parameters[8].Value = (object)qso.RST_RCVD ?? DBNull.Value;
+                    insertSQL.Parameters[9].Value = (object)qso.RST_SENT ?? DBNull.Value;
+                    insertSQL.Parameters[10].Value = (object)qso.Date ?? DBNull.Value;
+                    insertSQL.Parameters[11].Value = (object)qso.Time ?? DBNull.Value;
+                    insertSQL.Parameters[12].Value = (object)qso.Mode ?? DBNull.Value;
+                    insertSQL.Parameters[13].Value = (object)qso.SUBMode ?? DBNull.Value;
+                    insertSQL.Parameters[14].Value = (object)qso.SRX ?? DBNull.Value;
+                    insertSQL.Parameters[15].Value = (object)qso.Comment ?? DBNull.Value;
+                    insertSQL.Parameters[16].Value = (object)qso.Name ?? DBNull.Value;
+                    insertSQL.Parameters[17].Value = (object)qso.Country ?? DBNull.Value;
+                    insertSQL.Parameters[18].Value = (object)qso.Continent ?? DBNull.Value;
+                    insertSQL.Parameters[19].Value = (object)qso.PROP_MODE ?? DBNull.Value;
+                    insertSQL.Parameters[20].Value = (object)qso.SAT_NAME ?? DBNull.Value;
+                    insertSQL.Parameters[21].Value = (object)qso.SOAPBOX ?? DBNull.Value;
+
+                    try
+                    {
+                        insertSQL.ExecuteNonQuery();
+                    }
+                    catch (Exception ex)
+                    {
+                        faultyQso++;
+                        System.Diagnostics.Debug.WriteLine($"Failed to insert QSO in batch: {ex.Message}");
+                    }
+
+                    processedQso++;
+                    progressCallback?.Invoke(processedQso);
+                }
+
+                try
+                {
+                    transaction.Commit();
+                }
+                catch
+                {
+                    transaction.Rollback();
+                    throw;
+                }
+            }
+
+            return faultyQso;
+        }
         public void Update(QSO qso)
         {
             if (con != null && con.State == System.Data.ConnectionState.Open)
@@ -225,10 +312,13 @@ namespace HolyLogger
                 }
             }
         }
-        public ObservableCollection<QSO> GetAllQSOs()
+        public ObservableCollection<QSO> GetAllQSOs(Action<int> progressCallback = null)
         {
             CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
+            int totalCount = GetQsoCount();
+            int processedCount = 0;
+            int lastReportedProgress = -1;
             string stm = "SELECT * FROM qso ORDER BY date DESC, time DESC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             {
@@ -262,6 +352,17 @@ namespace HolyLogger
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         q.StandartizeQSO();
                         qso_list.Add(q);
+
+                        processedCount++;
+                        if (totalCount > 0)
+                        {
+                            int progress = (int)Math.Floor((double)processedCount * 100 / totalCount);
+                            if (progress > lastReportedProgress)
+                            {
+                                lastReportedProgress = progress;
+                                progressCallback?.Invoke(progress);
+                            }
+                        }
                     }
                 }
             }

@@ -66,6 +66,8 @@ AI: [makes changes]
 - When adjusting HolyLogger cluster window layout, change only the explicitly requested element(s) and avoid moving unrelated controls.
 - For the Spot feature, send directly to a DX cluster Telnet server; on success show a simple success message, and if the cluster does not confirm, keep the dialog open with a closable error/message.
 - When adjusting the Spot button arcs, keep left and right arcs independently controllable; do not move the right arc unless explicitly asked, and keep vertical symmetry by slightly lifting the arcs when needed.
+- **Provide precise, user-visible behavior descriptions** for requested UX outcomes, focusing on the exact requested changes rather than implementation details.
+- **Show clear, real-time dynamic progress** for long-running operations so the user always understands what process is currently running.
 
 ## Stability Review Findings
 ### High Risk

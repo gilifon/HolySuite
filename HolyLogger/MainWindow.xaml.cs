@@ -136,6 +136,13 @@ namespace HolyLogger
             }
         }
 
+        private sealed class AdifImportResult
+        {
+            public int FaultyQso { get; set; }
+            public int ImportedQsoCount { get; set; }
+            public ObservableCollection<QSO> RefreshedQsos { get; set; }
+        }
+
         private string _Version;
         public string Version
         {
@@ -2608,26 +2615,58 @@ namespace HolyLogger
             if (openFileDialog.ShowDialog() == true)
             {
                 ImportFileQ.Add(openFileDialog.FileName);
-                if (!AdifHandlerWorker.IsBusy)
-                    AdifHandlerWorker.RunWorkerAsync();
+                StartAdifImportWorker();
             }
+        }
+
+        private void StartAdifImportWorker()
+        {
+            if (AdifHandlerWorker == null || AdifHandlerWorker.IsBusy)
+                return;
+
+            UploadProgress = "Starting import 0%";
+            ToggleUploadProgress(Visibility.Visible);
+            AdifHandlerWorker.RunWorkerAsync();
         }
         
         private void AdifHandlerWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
-            int faultyQso = (int)e.Result;
+            if (e.Error != null)
+            {
+                ToggleUploadProgress(Visibility.Hidden);
+                System.Windows.Forms.MessageBox.Show($"Import failed.\n\n{e.Error.Message}", "Import Error",
+                    System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error);
+                return;
+            }
+
+            var result = e.Result as AdifImportResult ?? new AdifImportResult();
+
+            if (Qsos != null)
+            {
+                Qsos.CollectionChanged -= Qsos_CollectionChanged;
+            }
+
+            Qsos = result.RefreshedQsos ?? new ObservableCollection<QSO>();
+            Qsos.CollectionChanged += Qsos_CollectionChanged;
+            DataContext = Qsos;
+            LastQSO = Qsos.FirstOrDefault();
+
             ToggleUploadProgress(Visibility.Hidden);
             UpdateNumOfQSOs();
 
-            Qsos.Clear();
-            foreach (var item in dal.GetAllQSOs())
+            if (result.FaultyQso > 0)
             {
-                Qsos.Add(item);
+                System.Windows.Forms.MessageBox.Show($"{result.FaultyQso} QSO(s) failed to import. Check the file format and try again.", 
+                    "Import Complete with Errors", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
             }
-
-            if (faultyQso > 0)
+            else
             {
-                System.Windows.Forms.MessageBox.Show(faultyQso + " Failed to load! check the files.");
+                if (result.ImportedQsoCount > 0)
+                {
+                    int totalQsos = result.RefreshedQsos != null ? result.RefreshedQsos.Count : dal.GetQsoCount();
+                    System.Windows.Forms.MessageBox.Show($"Import completed successfully!\nImported QSOs: {result.ImportedQsoCount}\nTotal QSOs in log: {totalQsos}", 
+                        "Import Complete", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
+                }
             }
             TB_Comment.Text = "";
             UpdateNumOfQSOs();
@@ -2636,7 +2675,7 @@ namespace HolyLogger
         private void AdifHandlerWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
             ToggleUploadProgress(Visibility.Visible);
-            UploadProgress = e.ProgressPercentage.ToString() + "%";
+            UploadProgress = e.UserState as string ?? (e.ProgressPercentage.ToString() + "%");
         }
 
         private void ToggleUploadProgress(Visibility visibility)
@@ -2656,47 +2695,141 @@ namespace HolyLogger
             List<string> files = this.Dispatcher.Invoke(() => ImportFileQ.ToList());
 
             int faultyQSO = 0;
+            int importedQsoCount = 0;
+            const int importBatchSize = 500;
+            int lastReportedPercent = 0;
+            const int readPhasePercent = 3;
+            const int parsePhaseEndPercent = 78;
+            const int savePhaseStartPercent = 79;
+            const int savePhaseEndPercent = 95;
+            const int refreshPhaseStartPercent = 96;
+            const int refreshPhaseEndPercent = 100;
+
             foreach (var filename in files)
             {
-                string RawAdif = File.ReadAllText(filename, Encoding.UTF8);
-                var parser = new HolyLogParser(RawAdif,
-                    HolyLogParser.IsIsraeliStation(myCallsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign,
-                    isParseDuplicates, isParseWARC);
                 try
                 {
-                    parser.Parse();
+                    lastReportedPercent = 1;
+                    AdifHandlerWorker.ReportProgress(lastReportedPercent, "Preparing import 1%");
+
+                    if (!File.Exists(filename))
+                    {
+                        this.Dispatcher.Invoke(() =>
+                            System.Windows.Forms.MessageBox.Show($"File not found:\n{filename}", "Import Error", 
+                                System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error));
+                        continue;
+                    }
+
+                    lastReportedPercent = readPhasePercent;
+                    AdifHandlerWorker.ReportProgress(lastReportedPercent, "Reading file 3%");
+                    string RawAdif = File.ReadAllText(filename, Encoding.UTF8);
+
+                    if (string.IsNullOrWhiteSpace(RawAdif))
+                    {
+                        this.Dispatcher.Invoke(() =>
+                            System.Windows.Forms.MessageBox.Show($"File is empty:\n{filename}", "Import Error", 
+                                System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning));
+                        continue;
+                    }
+
+                    var parser = new HolyLogParser(RawAdif,
+                        HolyLogParser.IsIsraeliStation(myCallsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign,
+                        isParseDuplicates, isParseWARC);
+
+                    parser.Parse(parseProgress =>
+                    {
+                        int percent = readPhasePercent + (int)Math.Floor((parseProgress * (parsePhaseEndPercent - readPhasePercent)) / 100.0);
+                        if (percent > lastReportedPercent)
+                        {
+                            lastReportedPercent = percent;
+                            AdifHandlerWorker.ReportProgress(percent, $"Parsing ADIF {parseProgress}%");
+                        }
+                    });
                     List<QSO> rawQSOList = parser.GetRawQSO();
                     int count = rawQSOList.Count;
-                    int c = 1;
+
+                    if (count == 0)
+                    {
+                        this.Dispatcher.Invoke(() =>
+                            System.Windows.Forms.MessageBox.Show($"No QSOs found in file:\n{filename}\n\nThe file may be in an unsupported format or empty.", 
+                                "Import Warning", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning));
+                        continue;
+                    }
+
                     foreach (var rq in rawQSOList)
                     {
                         if (isOverride)
                         {
                             rq.Operator = overrideOperator;
                         }
-                        try
+                    }
+
+                    for (int i = 0; i < count; i += importBatchSize)
+                    {
+                        List<QSO> batch = rawQSOList.Skip(i).Take(importBatchSize).ToList();
+                        int batchFaulty;
+                        int batchStartIndex = i;
+                        lock (this)
                         {
-                            lock (this)
+                            batchFaulty = dal.InsertBatch(batch, processedInBatch =>
                             {
-                                dal.Insert(rq);
-                            }
-                            float p = (float)(c++) * 100 / count;
-                            AdifHandlerWorker.ReportProgress((int)(Math.Ceiling(p)));
+                                int processedOverall = batchStartIndex + processedInBatch;
+                                int savePercent = (int)Math.Ceiling((float)processedOverall * 100 / count);
+                                int percent = savePhaseStartPercent + (int)Math.Floor((savePercent * (savePhaseEndPercent - savePhaseStartPercent)) / 100.0);
+                                if (percent > lastReportedPercent)
+                                {
+                                    lastReportedPercent = percent;
+                                    AdifHandlerWorker.ReportProgress(percent, $"Saving to log {savePercent}%");
+                                }
+                            });
                         }
-                        catch (Exception)
-                        {
-                            faultyQSO++;
-                        }
+
+                        faultyQSO += batchFaulty;
+                        importedQsoCount += batch.Count - batchFaulty;
                     }
                 }
-                catch (Exception)
+                catch (Exception ex)
                 {
                     string failedFile = filename;
+                    string errorMsg = $"Failed to load file:\n{failedFile}\n\nError: {ex.Message}";
+                    if (ex.InnerException != null)
+                    {
+                        errorMsg += $"\n\nDetails: {ex.InnerException.Message}";
+                    }
                     this.Dispatcher.Invoke(() =>
-                        System.Windows.Forms.MessageBox.Show(failedFile + " Failed to load! check the file."));
+                        System.Windows.Forms.MessageBox.Show(errorMsg, "Import Error", 
+                            System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error));
                 }
             }
-            e.Result = faultyQSO;
+
+            if (lastReportedPercent < savePhaseEndPercent)
+            {
+                lastReportedPercent = savePhaseEndPercent;
+                AdifHandlerWorker.ReportProgress(lastReportedPercent, $"Saving to log {savePhaseEndPercent}%");
+            }
+
+            ObservableCollection<QSO> refreshedQsos;
+            lock (this)
+            {
+                refreshedQsos = dal.GetAllQSOs(refreshProgress =>
+                {
+                    int percent = refreshPhaseStartPercent + (int)Math.Floor((refreshProgress * (refreshPhaseEndPercent - refreshPhaseStartPercent)) / 100.0);
+                    if (percent > lastReportedPercent)
+                    {
+                        lastReportedPercent = percent;
+                        AdifHandlerWorker.ReportProgress(percent, $"Refreshing log table {refreshProgress}%");
+                    }
+                });
+            }
+
+            AdifHandlerWorker.ReportProgress(100, "Import complete 100%");
+
+            e.Result = new AdifImportResult
+            {
+                FaultyQso = faultyQSO,
+                ImportedQsoCount = importedQsoCount,
+                RefreshedQsos = refreshedQsos
+            };
             this.Dispatcher.Invoke(() => ImportFileQ.Clear());
         }
         
@@ -2714,8 +2847,7 @@ namespace HolyLogger
                     //HandleAdifFileImport(file);
                 }
                 //run async handler
-                if (!AdifHandlerWorker.IsBusy)
-                    AdifHandlerWorker.RunWorkerAsync();
+                StartAdifImportWorker();
             }
         }
 
