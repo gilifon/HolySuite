@@ -1135,6 +1135,10 @@ namespace HolyLogger
                 }
                 UpdateNumOfQSOs();
 
+                // The deleted QSO may have been the last one; refresh LastQSO to the
+                // current top of the log so the Spot button uses the correct QSO.
+                LastQSO = Qsos.FirstOrDefault();
+
                 // Rebuild worked countries list after deletion
                 RebuildWorkedCountriesAndRefreshCluster();
             }
@@ -1143,6 +1147,7 @@ namespace HolyLogger
                 // The whole log table was cleared/replaced (e.g. "Clean log" or
                 // Remove Duplicates). Rebuild the worked-countries cache so the
                 // cluster spot colors (needed country = red) refresh immediately.
+                LastQSO = Qsos.FirstOrDefault();
                 RebuildWorkedCountriesAndRefreshCluster();
             }
             else if (e.Action == NotifyCollectionChangedAction.Add && e.NewItems != null)
