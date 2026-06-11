@@ -745,6 +745,16 @@
                 <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
+        <!-- Undo icon for log-row "Set Radio to Freq" (independent of the cluster undo). Hidden when nothing to undo. -->
+        <!-- Centered vertically between the Exchange (y=141) and Name (y=185) labels; horizontally centered to the Name label. -->
+        <Grid x:Name="MainUndoIconGrid" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,164,0,0" Width="26" Height="26" Visibility="Collapsed" Panel.ZIndex="30">
+            <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" ToolTip="Undo radio frequency/mode change">
+                <Grid>
+                    <Image Source="Images/UNDO_Icon.png" Width="22" Height="22" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock x:Name="MainUndoCountText" FontSize="10" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                </Grid>
+            </Button>
+        </Grid>
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="101,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="270" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" TextChanged="TB_DX_Name_TextChanged" />
         <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="378,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
@@ -766,6 +776,12 @@
         <Rectangle Grid.Row="1" Fill="Gainsboro" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="53" Margin="0,272,0,0" />
         <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,272,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
         <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" FontSize="16" MouseDoubleClick="GridRow_DoubleClick" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="#888888" HorizontalGridLinesBrush="#888888" Padding="0,0,0,0">
+            <DataGrid.Resources>
+                <!-- Keep the selected row blue even when the grid loses focus (e.g. while the right-click
+                     context menu is open), so the user clearly sees which row the menu refers to. -->
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="{x:Static SystemColors.HighlightColor}"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="{x:Static SystemColors.HighlightTextColor}"/>
+            </DataGrid.Resources>
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
                     <Setter Property="BorderBrush" Value="#1565C0"/>

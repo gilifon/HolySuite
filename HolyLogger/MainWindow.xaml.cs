@@ -279,6 +279,8 @@ namespace HolyLogger
         TextBlock clusterUndoCountText = null;
         TextBlock clusterSpotCountText = null;
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
+        // Independent undo stack for the log-row "Set Radio to Freq" action — kept separate from the cluster undo.
+        Stack<(string FrequencyText, string ModeText, string DxCallsignText)> logRadioUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
         bool clusterHeaderAlignmentRefreshPending = false;
         Action _clusterWidthHandlerCleanup = null;
 
@@ -2141,18 +2143,102 @@ namespace HolyLogger
             }
 
             double freqMhz = freqValue >= 1000 ? (freqValue / 1000.0) : freqValue;
+            string normalizedMode = NormalizeClusterModeForLogger(qso.Mode);
+
+            // Capture the current freq/mode onto the LOG-ROW undo stack (independent of the cluster undo),
+            // so the log undo icon's counter increments and the user can step back to the original.
+            CaptureLogRadioUndoState();
+
+            // Reflect the QSO's freq/mode in the logger fields (mirrors cluster-spot behavior so undo restores them).
+            TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+            SelectLoggerMode(normalizedMode);
 
             if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
-                System.Windows.MessageBox.Show("OmniRig CAT is not available.", "Set Radio to Freq", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
-            string normalizedMode = NormalizeClusterModeForLogger(qso.Mode);
             int? rigMode = MapClusterModeToRigMode(normalizedMode, freqMhz);
             var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
             await TryTuneRigFrequencyAsync(freqHz, modeToSend);
+        }
+
+        // ---- Log-row "Set Radio to Freq" undo (independent of the cluster undo) ----
+
+        private void CaptureLogRadioUndoState()
+        {
+            string frequencyText = (TB_Frequency.Text ?? string.Empty).Trim();
+            string modeText = (CB_Mode.Text ?? string.Empty).Trim().ToUpperInvariant();
+            string dxCallsignText = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(frequencyText) || string.IsNullOrWhiteSpace(modeText))
+            {
+                return;
+            }
+
+            if (logRadioUndoStates.Count > 0)
+            {
+                var last = logRadioUndoStates.Peek();
+                if (string.Equals(last.FrequencyText, frequencyText, StringComparison.Ordinal)
+                    && string.Equals(last.ModeText, modeText, StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(last.DxCallsignText, dxCallsignText, StringComparison.OrdinalIgnoreCase))
+                {
+                    return;
+                }
+            }
+
+            logRadioUndoStates.Push((frequencyText, modeText, dxCallsignText));
+            UpdateLogRadioUndoButtonState();
+        }
+
+        private async void LogRadioUndoButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (logRadioUndoStates.Count == 0)
+            {
+                return;
+            }
+
+            var undoState = logRadioUndoStates.Pop();
+            UpdateLogRadioUndoButtonState();
+
+            // Clear the log-row blue highlight once an undo step is taken.
+            if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
+                QSODataGrid.UnselectAll();
+
+            string freqText = undoState.FrequencyText;
+            string modeText = undoState.ModeText;
+            string dxCallsignText = undoState.DxCallsignText;
+
+            if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqMhz) || freqMhz <= 0)
+            {
+                return;
+            }
+
+            TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+            SelectLoggerMode(modeText);
+            TB_DXCallsign.Text = dxCallsignText;
+
+            if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
+            {
+                int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
+                int? rigMode = MapClusterModeToRigMode(modeText, freqMhz);
+                var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
+                await TryTuneRigFrequencyAsync(freqHz, modeToSend);
+            }
+        }
+
+        private void UpdateLogRadioUndoButtonState()
+        {
+            bool hasUndo = logRadioUndoStates.Count > 0;
+
+            if (MainUndoIconGrid != null)
+            {
+                MainUndoIconGrid.Visibility = hasUndo ? Visibility.Visible : Visibility.Collapsed;
+            }
+            if (MainUndoCountText != null)
+            {
+                MainUndoCountText.Text = hasUndo ? logRadioUndoStates.Count.ToString(CultureInfo.InvariantCulture) : string.Empty;
+            }
         }
 
         private Window BuildSpotDialog(string presetCallsign = null, string presetFrequency = null)
@@ -8529,6 +8615,10 @@ namespace HolyLogger
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // Starting a new callsign clears the log-row blue highlight left by a right-click menu.
+            if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
+                QSODataGrid.UnselectAll();
+
             callsignLookupRevision++;
             string dxCallText = (TB_DXCallsign.Text ?? string.Empty).Trim();
 
