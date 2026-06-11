@@ -1851,8 +1851,313 @@ namespace HolyLogger
             dialog.ShowDialog();
         }
 
-        private Window BuildSpotDialog()
+        // Right-click on a log row: select that row and show a context menu of actions.
+        private void QSODataGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
+            var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            if (row == null)
+            {
+                // Not on a data row (header / empty area) — suppress any menu.
+                e.Handled = true;
+                return;
+            }
+
+            row.IsSelected = true;
+            QSODataGrid.SelectedItem = row.Item;
+
+            QSO qso = row.Item as QSO;
+            if (qso == null)
+            {
+                e.Handled = true;
+                return;
+            }
+
+            // Build a fresh menu bound to the right-clicked QSO and let WPF open it on mouse-up.
+            QSODataGrid.ContextMenu = BuildQsoRowContextMenu(qso);
+        }
+
+        // Parsed-once styles for the log-row context menu (rounded card, hover highlights, icons).
+        private ResourceDictionary _qsoCtxMenuResources;
+
+        private ResourceDictionary QsoCtxMenuResources
+        {
+            get
+            {
+                if (_qsoCtxMenuResources == null)
+                {
+                    const string xaml =
+@"<ResourceDictionary xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+                     xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
+  <Style x:Key='CtxMenu' TargetType='ContextMenu'>
+    <Setter Property='Background' Value='Transparent'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='ContextMenu'>
+          <Border Background='#FFFFFF' BorderBrush='#1565C0' BorderThickness='1.5' CornerRadius='10' Padding='6' SnapsToDevicePixels='True'>
+            <Border.Effect>
+              <DropShadowEffect BlurRadius='14' ShadowDepth='2' Opacity='0.35' Color='#666666'/>
+            </Border.Effect>
+            <StackPanel IsItemsHost='True' KeyboardNavigation.DirectionalNavigation='Cycle'/>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <ControlTemplate x:Key='CtxItemTemplate' TargetType='MenuItem'>
+    <Border x:Name='bd' Background='Transparent' CornerRadius='6' Padding='{TemplateBinding Padding}'>
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width='24'/>
+          <ColumnDefinition Width='*'/>
+        </Grid.ColumnDefinitions>
+        <ContentPresenter Grid.Column='0' ContentSource='Icon' VerticalAlignment='Center' HorizontalAlignment='Center'/>
+        <ContentPresenter Grid.Column='1' ContentSource='Header' VerticalAlignment='Center' Margin='8,0,0,0'/>
+      </Grid>
+    </Border>
+    <ControlTemplate.Triggers>
+      <Trigger Property='IsHighlighted' Value='True'>
+        <Setter TargetName='bd' Property='Background' Value='#1565C0'/>
+        <Setter Property='Foreground' Value='White'/>
+      </Trigger>
+      <Trigger Property='IsEnabled' Value='False'>
+        <Setter Property='Foreground' Value='#AAAAAA'/>
+      </Trigger>
+    </ControlTemplate.Triggers>
+  </ControlTemplate>
+
+  <ControlTemplate x:Key='CtxItemDangerTemplate' TargetType='MenuItem'>
+    <Border x:Name='bd' Background='Transparent' CornerRadius='6' Padding='{TemplateBinding Padding}'>
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width='24'/>
+          <ColumnDefinition Width='*'/>
+        </Grid.ColumnDefinitions>
+        <ContentPresenter Grid.Column='0' ContentSource='Icon' VerticalAlignment='Center' HorizontalAlignment='Center'/>
+        <ContentPresenter Grid.Column='1' ContentSource='Header' VerticalAlignment='Center' Margin='8,0,0,0'/>
+      </Grid>
+    </Border>
+    <ControlTemplate.Triggers>
+      <Trigger Property='IsHighlighted' Value='True'>
+        <Setter TargetName='bd' Property='Background' Value='#D32F2F'/>
+        <Setter Property='Foreground' Value='White'/>
+      </Trigger>
+    </ControlTemplate.Triggers>
+  </ControlTemplate>
+
+  <Style x:Key='CtxItem' TargetType='MenuItem'>
+    <Setter Property='FontSize' Value='15'/>
+    <Setter Property='Foreground' Value='#1A1A1A'/>
+    <Setter Property='Padding' Value='12,7'/>
+    <Setter Property='Margin' Value='2,1'/>
+    <Setter Property='Cursor' Value='Hand'/>
+    <Setter Property='Template' Value='{StaticResource CtxItemTemplate}'/>
+  </Style>
+
+  <Style x:Key='CtxItemDanger' TargetType='MenuItem' BasedOn='{StaticResource CtxItem}'>
+    <Setter Property='Foreground' Value='#C62828'/>
+    <Setter Property='Template' Value='{StaticResource CtxItemDangerTemplate}'/>
+  </Style>
+
+  <Style x:Key='CtxSep' TargetType='Separator'>
+    <Setter Property='Margin' Value='8,5'/>
+    <Setter Property='Background' Value='#E3E3E3'/>
+    <Setter Property='Height' Value='1'/>
+  </Style>
+</ResourceDictionary>";
+                    _qsoCtxMenuResources = (ResourceDictionary)System.Windows.Markup.XamlReader.Parse(xaml);
+                }
+                return _qsoCtxMenuResources;
+            }
+        }
+
+        private static TextBlock MakeMenuGlyph(string glyph, Brush color)
+        {
+            return new TextBlock
+            {
+                Text = glyph,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 15,
+                Foreground = color,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+        }
+
+        private ContextMenu BuildQsoRowContextMenu(QSO qso)
+        {
+            var res = QsoCtxMenuResources;
+            var itemStyle = (Style)res["CtxItem"];
+            var dangerStyle = (Style)res["CtxItemDanger"];
+            var sepStyle = (Style)res["CtxSep"];
+            var blue = (Brush)new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+            var red = (Brush)new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+
+            var menu = new ContextMenu { Style = (Style)res["CtxMenu"] };
+
+            var spotItem = new MenuItem { Header = "Spot", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            spotItem.Click += (s, e) =>
+            {
+                Window dialog = BuildSpotDialog(qso.DXCall, qso.Freq);
+                dialog.Owner = this;
+                dialog.ShowDialog();
+            };
+            menu.Items.Add(spotItem);
+
+            var setFreqItem = new MenuItem { Header = "Set Radio to Freq", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            setFreqItem.Click += (s, e) => SetRadioToQsoFreq(qso);
+            menu.Items.Add(setFreqItem);
+
+            var qrzItem = new MenuItem { Header = "Open QRZ Page", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            qrzItem.Click += (s, e) => OpenQrzPage(qso.DXCall);
+            menu.Items.Add(qrzItem);
+
+            var copyItem = new MenuItem { Header = "Copy QSO Info", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            copyItem.Click += (s, e) =>
+            {
+                try { Clipboard.SetText(BuildQsoClipboardText(qso)); } catch { }
+            };
+            menu.Items.Add(copyItem);
+
+            menu.Items.Add(new Separator { Style = sepStyle });
+
+            var editItem = new MenuItem { Header = "Edit", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            editItem.Click += (s, e) => EditQsoFromContextMenu(qso);
+            menu.Items.Add(editItem);
+
+            var deleteItem = new MenuItem { Header = "Delete", Style = dangerStyle, Icon = MakeMenuGlyph("", red) };
+            deleteItem.Click += (s, e) => DeleteQsoFromContextMenu(qso);
+            menu.Items.Add(deleteItem);
+
+            return menu;
+        }
+
+        private void OpenQrzPage(string callsign)
+        {
+            string call = (callsign ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(call))
+                return;
+            try { Process.Start("https://www.qrz.com/db/" + call); } catch { }
+        }
+
+        // Builds an aligned, label-friendly text block of the full QSO record for the clipboard.
+        private static string BuildQsoClipboardText(QSO qso)
+        {
+            if (qso == null) return string.Empty;
+
+            var sb = new StringBuilder();
+            void Add(string label, string value)
+            {
+                if (!string.IsNullOrWhiteSpace(value))
+                    sb.AppendLine(label.PadRight(11) + ": " + value.Trim());
+            }
+
+            string freq = (qso.Freq ?? string.Empty).Trim();
+            if (!string.IsNullOrWhiteSpace(freq)) freq += " MHz";
+
+            Add("Callsign", qso.DXCall);
+            Add("Name", qso.Name);
+            Add("Country", qso.Country);
+            Add("Date", FormatQsoDate(qso.Date));
+            Add("Time", string.IsNullOrWhiteSpace(qso.Time) ? null : FormatQsoTime(qso.Time) + " UTC");
+            Add("Band", qso.Band);
+            Add("Frequency", freq);
+            Add("Mode", qso.Mode);
+            Add("RST Sent", qso.RST_SENT);
+            Add("RST Rcvd", qso.RST_RCVD);
+            Add("DX Locator", qso.DXLocator);
+            Add("Exchange", qso.SRX);
+            Add("My Call", qso.MyCall);
+            Add("Operator", qso.Operator);
+            Add("My Locator", qso.MyLocator);
+            Add("Comment", qso.Comment);
+
+            return sb.ToString().TrimEnd();
+        }
+
+        private static string FormatQsoDate(string raw)
+        {
+            string d = (raw ?? string.Empty).Trim();
+            if (d.Length == 8 && d.All(char.IsDigit))
+                return d.Substring(0, 4) + "-" + d.Substring(4, 2) + "-" + d.Substring(6, 2);
+            return d;
+        }
+
+        private static string FormatQsoTime(string raw)
+        {
+            string t = (raw ?? string.Empty).Trim();
+            if ((t.Length == 6 || t.Length == 4) && t.All(char.IsDigit))
+                return t.Substring(0, 2) + ":" + t.Substring(2, 2);
+            return t;
+        }
+
+        private void EditQsoFromContextMenu(QSO qso)
+        {
+            if (qso == null) return;
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || System.Windows.Forms.MessageBox.Show("Do you want to override current QSO?", "Edit QSO", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
+            {
+                QsoToUpdate = qso;
+                try
+                {
+                    if (state == State.New)
+                    {
+                        QsoPreUpdate = new QSO();
+                        HoldPreEditUserData();
+                    }
+                    LoadQsoForUpdate();
+                    ShowRigParams();
+                }
+                catch (Exception ex)
+                {
+                    System.Windows.Forms.MessageBox.Show("Error! " + ex.Message);
+                }
+                UpdateMatrix();
+            }
+        }
+
+        private void DeleteQsoFromContextMenu(QSO qso)
+        {
+            if (qso == null) return;
+            if (System.Windows.MessageBox.Show("Are you sure you want to delete this QSO?\n\n" + (qso.DXCall ?? string.Empty), "Delete Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            // Remove from the filtered view (if present) so the grid updates immediately,
+            // then from the master collection which performs the DB delete and refreshes LastQSO.
+            if (FilteredQsos != null && FilteredQsos.Contains(qso))
+                FilteredQsos.Remove(qso);
+            if (Qsos != null && Qsos.Contains(qso))
+                Qsos.Remove(qso);
+        }
+
+        private async void SetRadioToQsoFreq(QSO qso)
+        {
+            if (qso == null) return;
+
+            string freqText = (qso.Freq ?? string.Empty).Trim();
+            if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqValue) || freqValue <= 0)
+            {
+                System.Windows.MessageBox.Show("This QSO has no valid frequency.", "Set Radio to Freq", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            double freqMhz = freqValue >= 1000 ? (freqValue / 1000.0) : freqValue;
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                System.Windows.MessageBox.Show("OmniRig CAT is not available.", "Set Radio to Freq", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
+            string normalizedMode = NormalizeClusterModeForLogger(qso.Mode);
+            int? rigMode = MapClusterModeToRigMode(normalizedMode, freqMhz);
+            var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
+            await TryTuneRigFrequencyAsync(freqHz, modeToSend);
+        }
+
+        private Window BuildSpotDialog(string presetCallsign = null, string presetFrequency = null)
+        {
+            bool hasPreset = !string.IsNullOrWhiteSpace(presetCallsign);
             Window dialog = new Window
             {
                 Title = "Spot",
@@ -1885,16 +2190,20 @@ namespace HolyLogger
             myCallsignTextBox.IsTabStop = false;
             myCallsignTextBox.Focusable = false;
 
-            string defaultSpottedCallsign = string.IsNullOrWhiteSpace(TB_DXCallsign.Text)
-                ? (LastQSO != null ? LastQSO.DXCall : string.Empty)
-                : TB_DXCallsign.Text;
+            string defaultSpottedCallsign = hasPreset
+                ? presetCallsign
+                : (string.IsNullOrWhiteSpace(TB_DXCallsign.Text)
+                    ? (LastQSO != null ? LastQSO.DXCall : string.Empty)
+                    : TB_DXCallsign.Text);
 
             AddSpotDialogLabel(grid, "Spotted Callsign", 1, new Thickness(0, 8, 0, 0));
             TextBox spottedCallsignTextBox = AddSpotDialogTextBox(grid, defaultSpottedCallsign, 1, false, new Thickness(0, 8, 0, 0));
 
-            string defaultFrequency = string.IsNullOrWhiteSpace(TB_DXCallsign.Text)
-                ? (LastQSO != null ? LastQSO.Freq : string.Empty)
-                : TB_Frequency.Text;
+            string defaultFrequency = hasPreset
+                ? (presetFrequency ?? string.Empty)
+                : (string.IsNullOrWhiteSpace(TB_DXCallsign.Text)
+                    ? (LastQSO != null ? LastQSO.Freq : string.Empty)
+                    : TB_Frequency.Text);
 
             AddSpotDialogLabel(grid, "Frequency", 2, new Thickness(0, 8, 0, 0));
             TextBox frequencyTextBox = AddSpotDialogTextBox(grid, defaultFrequency, 2, false, new Thickness(0, 8, 0, 0));
