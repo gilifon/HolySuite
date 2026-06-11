@@ -3696,32 +3696,22 @@ namespace HolyLogger
             }
         }
 
-        private void GridRow_DoubleClick(object sender, MouseButtonEventArgs e)
+        private void QSODataGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            // Only enter edit mode when the double-click lands on an actual data row - not the column
-            // header (sort/resize area) or the empty space below the rows.
-            if (FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject) == null) return;
+            // Enter edit mode on a double-click. Handling it here (Preview, which tunnels from the
+            // window before focus logic can swallow the first click) makes it work on the FIRST
+            // double-click even when focus was elsewhere or the grid was just rebound after F1/Add.
+            if (e.ClickCount != 2) return;
 
-            if (QSODataGrid.SelectedItem == null) return;
-            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || System.Windows.Forms.MessageBox.Show("Do you want to override current QSO?", "Edit QSO", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
-            {
-                QsoToUpdate = QSODataGrid.SelectedItem as QSO;
-                try
-                {
-                    if (state == State.New)
-                    {
-                        QsoPreUpdate = new QSO();
-                        HoldPreEditUserData();
-                    }                    
-                    LoadQsoForUpdate();
-                    ShowRigParams();
-                }
-                catch (Exception ex)
-                {
-                    System.Windows.Forms.MessageBox.Show("Error! " + ex.Message);
-                }                
-                UpdateMatrix();
-            }
+            var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            if (row == null) return; // not on a data row (header / empty area)
+
+            QSO qso = row.Item as QSO;
+            if (qso == null) return;
+
+            QSODataGrid.SelectedItem = qso;
+            e.Handled = true;
+            EditQsoFromContextMenu(qso);
         }
 
         private void HoldPreEditUserData()
