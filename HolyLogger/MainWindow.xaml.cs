@@ -336,7 +336,7 @@ namespace HolyLogger
         private const int CallsignLookupDebounceMs = 280;
         // How long the DX callsign must stay unchanged (after name/locator are shown) before the QRZ
         // photo is fetched. Quick typing/corrections bump callsignLookupRevision and skip the download.
-        private const int QrzPhotoDelayMs = 1200;
+        private const int QrzPhotoDelayMs = 0;
         // The visible-rows setting only controls how many rows are shown at once; the list can hold
         // up to this many matches so the user can scroll through the full set (often hundreds).
         private const int MaxCallsignSuggestionResults = 500;
@@ -5134,30 +5134,27 @@ namespace HolyLogger
             wrapper.Children.Add(grid);
             clusterShowBandsPanel = wrapper;
 
-            btnAllBands.Click += (s, e) => ApplyClusterBandFilterMode("All");
-            btnPreSelected.Click += (s, e) => ApplyClusterBandFilterMode("PreSelected");
-            btnActiveBand.Click += (s, e) => ApplyClusterBandFilterMode("Active");
+            // User-initiated clicks record the preferred mode (persisted across restarts)
+            btnAllBands.Click += (s, e) => ApplyClusterBandFilterMode("All", true);
+            btnPreSelected.Click += (s, e) => ApplyClusterBandFilterMode("PreSelected", true);
+            btnActiveBand.Click += (s, e) => ApplyClusterBandFilterMode("Active", true);
 
-            // Apply initial visibility for Active Band if band is unknown at startup
-            string initialBand = TB_Band != null ? TB_Band.Text : string.Empty;
-            if (string.IsNullOrWhiteSpace(initialBand))
-            {
-                btnActiveBand.Visibility = Visibility.Hidden;
-                activeBandIndicator.Visibility = Visibility.Hidden;
-                if (string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase))
-                {
-                    string fallback = GetEnabledClusterBands().Count > 0 ? "PreSelected" : "All";
-                    ApplyClusterBandFilterMode(fallback);
-                }
-            }
+            // Apply initial state: sets button visibility, falls back if out of band, and
+            // restores the user's preferred Active mode if a legal band is already present.
+            UpdateActiveBandButtonVisibility();
 
             return wrapper;
         }
 
-        private void ApplyClusterBandFilterMode(string newMode)
+        private void ApplyClusterBandFilterMode(string newMode, bool userInitiated = false)
         {
             Properties.Settings.Default.ClusterBandFilterMode = newMode;
             Properties.Settings.Default.ClusterUseActiveBand = string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase);
+            // Only an explicit user click records the *preferred* mode. Automatic fallbacks
+            // (e.g. when the radio leaves a legal band) must not overwrite the user's intent,
+            // so that Active mode is restored — even across program restarts — when a legal band returns.
+            if (userInitiated)
+                Properties.Settings.Default.ClusterPreferredBandMode = newMode;
             try { Properties.Settings.Default.Save(); } catch { }
             if (clusterBandFilterAllBtn != null)
                 clusterBandFilterAllBtn.Style = MakeClusterBandFilterBtnStyle(string.Equals(newMode, "All", StringComparison.OrdinalIgnoreCase));
@@ -5190,11 +5187,28 @@ namespace HolyLogger
             if (clusterActiveBandIndicatorText != null)
                 clusterActiveBandIndicatorText.Visibility = vis;
 
-            // If the band just became invalid and we were in Active mode, switch away
-            if (!bandIsValid && string.Equals(Properties.Settings.Default.ClusterBandFilterMode, "Active", StringComparison.OrdinalIgnoreCase))
+            string preferred = Properties.Settings.Default.ClusterPreferredBandMode ?? "PreSelected";
+            string current = Properties.Settings.Default.ClusterBandFilterMode ?? "PreSelected";
+
+            if (!bandIsValid)
             {
-                string fallback = GetEnabledClusterBands().Count > 0 ? "PreSelected" : "All";
-                ApplyClusterBandFilterMode(fallback);
+                // Band invalid: if currently in Active mode, fall back. The user's preferred
+                // mode (persisted) is left untouched so Active can be restored later.
+                if (string.Equals(current, "Active", StringComparison.OrdinalIgnoreCase))
+                {
+                    string fallback = GetEnabledClusterBands().Count > 0 ? "PreSelected" : "All";
+                    ApplyClusterBandFilterMode(fallback);
+                }
+            }
+            else
+            {
+                // Band valid: restore Active if it is the user's persisted preference.
+                // This also covers the case where the program was restarted while out of band.
+                if (string.Equals(preferred, "Active", StringComparison.OrdinalIgnoreCase) &&
+                    !string.Equals(current, "Active", StringComparison.OrdinalIgnoreCase))
+                {
+                    ApplyClusterBandFilterMode("Active");
+                }
             }
         }
 
