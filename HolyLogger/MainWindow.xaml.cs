@@ -331,6 +331,8 @@ namespace HolyLogger
 
         private List<string> callsignIndex = new List<string>();
         private bool isApplyingSuggestion = false;
+        // Set when a callsign is pulled from the cluster/map (not typed) so the suggestions dropdown stays closed.
+        private bool suppressNextCallsignSuggestions = false;
         private const int DefaultCallsignSuggestionRows = 20;
         private const int MinCallsignSuggestionRows = 10;
         private const int MaxCallsignSuggestionRows = 30;
@@ -7757,6 +7759,8 @@ namespace HolyLogger
             CaptureClusterUndoState();
 
             TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+            // Callsign is pulled from the cluster/map, not typed — don't open the suggestions dropdown.
+            suppressNextCallsignSuggestions = true;
             TB_DXCallsign.Text = (spot.DXCallsign ?? string.Empty).Trim().ToUpperInvariant();
 
             string normalizedMode = NormalizeClusterModeForLogger(spot.Mode);
@@ -8702,6 +8706,10 @@ namespace HolyLogger
             CallsignLookupDebounceTimer.Stop();
             int revisionAtTick = callsignLookupRevision;
 
+            // Consume the suppress flag (set when the callsign came from the cluster/map, not typing).
+            bool suppressSuggestions = suppressNextCallsignSuggestions;
+            suppressNextCallsignSuggestions = false;
+
             if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 ClearQrzPhoto();
@@ -8711,9 +8719,13 @@ namespace HolyLogger
 
             string dxCallText = TB_DXCallsign.Text.Trim();
 
-             if (!isApplyingSuggestion)
+             if (!isApplyingSuggestion && !suppressSuggestions)
             {
                 UpdateCallsignSuggestions();
+            }
+            else if (suppressSuggestions)
+            {
+                CallsignSuggestionsPopup.IsOpen = false;
             }
 
             if (revisionAtTick != callsignLookupRevision)
