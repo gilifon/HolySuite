@@ -287,6 +287,11 @@ namespace HolyLogger
         const double ClusterHeaderCanvasHeight = 92;
         const double ClusterTableTopGap = 10;
         const double ClusterShowBandsPanelWidth = 115;
+        // Fixed half-width used to center the active-band indicator under the Freq column.
+        // Using a constant (instead of the indicator's live ActualWidth) keeps the Selected/
+        // All Bands buttons at the same horizontal position whether the band is legal, illegal,
+        // or a different band name (which would otherwise have a different text width).
+        const double ClusterBandIndicatorHalfWidth = 15.0;
         const double ClusterBaseSharedVerticalShift = -45.0;
         const double ClusterLastMinutesDropdownTop = -45.0;
         const double ClusterLastMinutesDropdownWidth = 44;
@@ -5098,29 +5103,55 @@ namespace HolyLogger
             clusterBandFilterPreSelectedBtn = btnPreSelected;
             clusterBandFilterActiveBtn = btnActiveBand;
 
-            var activeBandRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
-            activeBandRow.Children.Add(btnActiveBand);
-            activeBandRow.Children.Add(activeBandIndicator);
+            // Use a Grid with two fixed-height rows so the buttons are completely independent —
+            // hiding Active Band never shifts Selected or All Bands regardless of when it happens.
+            var grid = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(30) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(30) });
 
             var topButtonsRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             topButtonsRow.Children.Add(btnPreSelected);
             topButtonsRow.Children.Add(btnAllBands);
+            Grid.SetRow(topButtonsRow, 0);
+            grid.Children.Add(topButtonsRow);
 
-            var showBandsPanel = new StackPanel
+            var activeBandRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
+            activeBandRow.Children.Add(btnActiveBand);
+            activeBandRow.Children.Add(activeBandIndicator);
+            Grid.SetRow(activeBandRow, 1);
+            grid.Children.Add(activeBandRow);
+
+            var wrapper = new StackPanel
             {
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top
             };
-            showBandsPanel.Children.Add(topButtonsRow);
-            showBandsPanel.Children.Add(activeBandRow);
-            clusterShowBandsPanel = showBandsPanel;
+            wrapper.Children.Add(grid);
+            clusterShowBandsPanel = wrapper;
 
             btnAllBands.Click += (s, e) => ApplyClusterBandFilterMode("All");
             btnPreSelected.Click += (s, e) => ApplyClusterBandFilterMode("PreSelected");
             btnActiveBand.Click += (s, e) => ApplyClusterBandFilterMode("Active");
 
-            return showBandsPanel;
+            // Apply initial visibility for Active Band if band is unknown at startup
+            string initialBand = TB_Band != null ? TB_Band.Text : string.Empty;
+            if (string.IsNullOrWhiteSpace(initialBand))
+            {
+                btnActiveBand.Visibility = Visibility.Hidden;
+                activeBandIndicator.Visibility = Visibility.Hidden;
+                if (string.Equals(currentFilterMode, "Active", StringComparison.OrdinalIgnoreCase))
+                {
+                    string fallback = GetEnabledClusterBands().Count > 0 ? "PreSelected" : "All";
+                    ApplyClusterBandFilterMode(fallback);
+                }
+            }
+
+            return wrapper;
         }
 
         private void ApplyClusterBandFilterMode(string newMode)
@@ -5143,6 +5174,28 @@ namespace HolyLogger
                 clusterActiveBandIndicatorText.Visibility = Visibility.Visible;
             }
             RefreshClusterVisibleSpots();
+        }
+
+        private void UpdateActiveBandButtonVisibility()
+        {
+            if (clusterBandFilterActiveBtn == null)
+                return;
+
+            string activeBand = TB_Band != null ? TB_Band.Text : string.Empty;
+            bool bandIsValid = !string.IsNullOrWhiteSpace(activeBand);
+
+            // Hide only the button and label — never the row itself, so layout never shifts
+            var vis = bandIsValid ? Visibility.Visible : Visibility.Hidden;
+            clusterBandFilterActiveBtn.Visibility = vis;
+            if (clusterActiveBandIndicatorText != null)
+                clusterActiveBandIndicatorText.Visibility = vis;
+
+            // If the band just became invalid and we were in Active mode, switch away
+            if (!bandIsValid && string.Equals(Properties.Settings.Default.ClusterBandFilterMode, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                string fallback = GetEnabledClusterBands().Count > 0 ? "PreSelected" : "All";
+                ApplyClusterBandFilterMode(fallback);
+            }
         }
 
         private StackPanel BuildClusterLastMinutesPanel()
@@ -5301,8 +5354,11 @@ namespace HolyLogger
                 {
                     try
                     {
+                        // Use the indicator's stable X-within-panel plus a FIXED half-width, so the
+                        // panel's horizontal position never depends on the band text width (or its
+                        // absence when the band is illegal). This keeps Selected/All Bands fixed.
                         Point indicatorTopInShow = clusterActiveBandIndicatorText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
-                        indicatorCenterOffset = indicatorTopInShow.X + (clusterActiveBandIndicatorText.ActualWidth / 2.0);
+                        indicatorCenterOffset = indicatorTopInShow.X + ClusterBandIndicatorHalfWidth;
                     }
                     catch
                     {
@@ -7845,6 +7901,8 @@ namespace HolyLogger
                 clusterActiveBandIndicatorText.Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty);
                 UpdateClusterActiveBandIndicatorPosition();
             }
+
+            UpdateActiveBandButtonVisibility();
 
             if (string.Equals(Properties.Settings.Default.ClusterBandFilterMode, "Active", StringComparison.OrdinalIgnoreCase))
             {
