@@ -11,8 +11,8 @@
             <Grid Margin="10">
                 <!-- Arrow tip at Y=20 in this grid = Y=30 from MapControl top = My Locator textbox center -->
                 <Canvas HorizontalAlignment="Stretch" VerticalAlignment="Stretch"
-                        IsHitTestVisible="False" Panel.ZIndex="2" Margin="-10">
-                    <Polygon Points="0,30  16,22  16,28  85,28  85,32  16,32  16,38"
+                        IsHitTestVisible="False" ClipToBounds="False" Panel.ZIndex="2" Margin="-10">
+                    <Polygon Points="-325,30  -307,19  -307,28  85,28  85,32  -307,32  -307,41"
                              Fill="#D7263D" Stroke="#8F1422" StrokeThickness="1.5"/>
                 </Canvas>
 
