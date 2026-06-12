@@ -1058,6 +1058,10 @@ namespace HolyLogger
             MapControl.SpotTuneRequested += OnMapSpotTuneRequested;
             ShowHomeMap();
 
+            // Reflect the persisted suggestions on/off state on the Suggest (F4) toggle button.
+            if (BtnSuggestToggle != null)
+                BtnSuggestToggle.IsChecked = Properties.Settings.Default.CallsignSuggestionsEnabled;
+
             // Initialize RST fields based on the selected mode after window is fully loaded
             if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
             {
@@ -8166,6 +8170,17 @@ namespace HolyLogger
                 ClearBtn_Click(null, null);
                 return true;
             }
+            if (key == Key.F4)
+            {
+                // Toggle the callsign suggestions dropdown on/off. The state is sticky (persisted)
+                // and only changes when F4 is pressed again. Ignore auto-repeat so holding the key
+                // doesn't flicker the state.
+                if (!isRepeat)
+                {
+                    ToggleCallsignSuggestionsEnabled();
+                }
+                return true;
+            }
             if (key >= Key.F5 && key <= Key.F8)
             {
                 if (!isRepeat)
@@ -8176,6 +8191,47 @@ namespace HolyLogger
             }
 
             return false;
+        }
+
+        // Flips the persisted callsign-suggestions on/off state (bound to F4).
+        private void ToggleCallsignSuggestionsEnabled()
+        {
+            ApplyCallsignSuggestionsEnabled(!Properties.Settings.Default.CallsignSuggestionsEnabled);
+        }
+
+        // Single entry point for setting the suggestions on/off state, used by both F4 and the
+        // Suggest (F4) toggle button. Persists the state, keeps the button's pressed/raised look in
+        // sync, and applies it immediately: closing the dropdown when off, or re-showing it for the
+        // current callsign text when turning back on.
+        private void ApplyCallsignSuggestionsEnabled(bool enabled)
+        {
+            Properties.Settings.Default.CallsignSuggestionsEnabled = enabled;
+            Properties.Settings.Default.Save();
+
+            // Reflect on the toggle button (no-op / no recursion: Click isn't raised by code).
+            if (BtnSuggestToggle != null && (BtnSuggestToggle.IsChecked == true) != enabled)
+                BtnSuggestToggle.IsChecked = enabled;
+
+            if (!enabled)
+            {
+                if (CallsignSuggestionsPopup != null)
+                    CallsignSuggestionsPopup.IsOpen = false;
+                if (LB_DXCallsignSuggestions != null)
+                    LB_DXCallsignSuggestions.ItemsSource = null;
+            }
+            else if (TB_DXCallsign != null && TB_DXCallsign.IsKeyboardFocusWithin
+                     && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            {
+                UpdateCallsignSuggestions();
+            }
+
+            Status = enabled ? "Callsign suggestions: On (F4)" : "Callsign suggestions: Off (F4)";
+        }
+
+        private void BtnSuggestToggle_Click(object sender, RoutedEventArgs e)
+        {
+            // The ToggleButton has already flipped IsChecked by the time Click fires.
+            ApplyCallsignSuggestionsEnabled(BtnSuggestToggle.IsChecked == true);
         }
 
         // Forwards function keys pressed while a secondary window (e.g. the Cluster window or the
@@ -9286,6 +9342,15 @@ namespace HolyLogger
 
         private void UpdateCallsignSuggestions()
         {
+            // The user can switch the suggestions dropdown off/on with F4 (state persists). When it's
+            // off, keep the popup closed regardless of typing.
+            if (!Properties.Settings.Default.CallsignSuggestionsEnabled)
+            {
+                CallsignSuggestionsPopup.IsOpen = false;
+                LB_DXCallsignSuggestions.ItemsSource = null;
+                return;
+            }
+
             string pattern = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
 
             // Rule: no search until at least 2 characters are typed.

@@ -1514,6 +1514,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool CallsignSuggestionsEnabled {
+            get {
+                return ((bool)(this["CallsignSuggestionsEnabled"]));
+            }
+            set {
+                this["CallsignSuggestionsEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ DE K")]
         public string CwMsgText1 {
             get {

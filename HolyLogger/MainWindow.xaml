@@ -644,6 +644,42 @@
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="354,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="The DX Station Callsign"/>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="150" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
+
+        <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
+             Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
+        <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
+                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,124,0,0"
+                      Width="78" Height="20" FontSize="11" FontWeight="Bold" Foreground="#1E2A36"
+                      Focusable="False" Click="BtnSuggestToggle_Click"
+                      ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
+            <ToggleButton.Template>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Border x:Name="outer" CornerRadius="3" Background="#ECECEC" BorderBrush="#8A929B" BorderThickness="1">
+                        <Border x:Name="inner" CornerRadius="2" BorderThickness="1,1,0,0" BorderBrush="#FFFFFF">
+                            <!-- Margin 0,1,0,0 nudges the text down ~1px so it reads optically centered
+                                 (single-line text otherwise looks high due to descender space). -->
+                            <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0"/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="outer" Property="Background" Value="#E1ECF7"/>
+                        </Trigger>
+                        <!-- ON: pressed-in / sunken look (dark top-left edge, active color) -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="outer" Property="Background" Value="#9FCBF5"/>
+                            <Setter TargetName="outer" Property="BorderBrush" Value="#4B6276"/>
+                            <Setter TargetName="inner" Property="BorderBrush" Value="#5E7488"/>
+                        </Trigger>
+                        <!-- momentary press feedback (transient, while the mouse button is down) -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="inner" Property="BorderBrush" Value="#5E7488"/>
+                            <Setter TargetName="cp" Property="Margin" Value="1,2,0,0"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </ToggleButton.Template>
+        </ToggleButton>
         <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,101,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="12" Foreground="#555555" Visibility="Collapsed"/>
         <Popup x:Name="CallsignSuggestionsPopup" PlacementTarget="{Binding ElementName=TB_DXCallsign}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
             <Border BorderBrush="Gray" BorderThickness="1" Background="White">
