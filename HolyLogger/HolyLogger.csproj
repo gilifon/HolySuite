@@ -206,6 +206,9 @@
     <Compile Include="OptionsUserControls\QRZServiceControl.xaml.cs">
       <DependentUpon>QRZServiceControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OptionsUserControls\EqslServiceControl.xaml.cs">
+      <DependentUpon>EqslServiceControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="OptionsUserControls\UserInterfaceControl.xaml.cs">
       <DependentUpon>UserInterfaceControl.xaml</DependentUpon>
     </Compile>
@@ -282,6 +285,10 @@
       <SubType>Designer</SubType>
     </Page>
     <Page Include="OptionsUserControls\QRZServiceControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OptionsUserControls\EqslServiceControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

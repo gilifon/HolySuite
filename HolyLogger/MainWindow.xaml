@@ -859,56 +859,56 @@
                 <DataGridTemplateColumn Header="Id" IsReadOnly="True" Visibility="Hidden">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding id}"  HorizontalAlignment="Center" Padding="5,2,5,2"  />
+                            <TextBlock Text="{Binding id}"  HorizontalAlignment="Center" Padding="5,0,5,0"  />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Date" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Date, Converter={StaticResource QsoDateDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding Date, Converter={StaticResource QsoDateDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Time" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Time, Converter={StaticResource QsoTimeDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding Time, Converter={StaticResource QsoTimeDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Callsign" IsReadOnly="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,2,5,2" FontWeight="Bold" />
+                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,0,5,0" FontWeight="Bold" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Name" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Country" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Frequency" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Freq}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding Freq}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Band" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Band}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding Band}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -916,7 +916,7 @@
                 <DataGridTemplateColumn Header="RST-R" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding RST_RCVD}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding RST_RCVD}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -924,7 +924,7 @@
                 <DataGridTemplateColumn Header="RST-S" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding RST_SENT}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding RST_SENT}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -932,7 +932,7 @@
                 <DataGridTemplateColumn Header="Mode" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Mode}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding Mode}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -940,7 +940,7 @@
                 <DataGridTemplateColumn Header="Exchange" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding SRX}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding SRX}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -948,7 +948,7 @@
                 <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,2,5,2" />
+                            <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

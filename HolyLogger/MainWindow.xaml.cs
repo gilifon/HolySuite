@@ -1275,6 +1275,10 @@ namespace HolyLogger
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
 
                     AddWorkedCountryAndRefreshCluster(qso.DXCall);
+
+                    // Auto-upload this QSO to eQSL.cc (fire-and-forget; no effect unless enabled
+                    // and credentials are configured in Options).
+                    UploadQsoToEqsl(qso);
                 }
                 catch (Exception ex)
                 {
@@ -1969,8 +1973,13 @@ namespace HolyLogger
 
   <Style x:Key='CtxSep' TargetType='Separator'>
     <Setter Property='Margin' Value='8,5'/>
-    <Setter Property='Background' Value='#E3E3E3'/>
-    <Setter Property='Height' Value='1'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='Separator'>
+          <Border Height='1' Background='#BDBDBD' SnapsToDevicePixels='True'/>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
   </Style>
 </ResourceDictionary>";
                     _qsoCtxMenuResources = (ResourceDictionary)System.Windows.Markup.XamlReader.Parse(xaml);
@@ -2046,6 +2055,52 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(call))
                 return;
             try { Process.Start("https://www.qrz.com/db/" + call); } catch { }
+        }
+
+        // Shared client for eQSL uploads (a single long-lived HttpClient avoids socket exhaustion).
+        private static readonly System.Net.Http.HttpClient _eqslHttp =
+            new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+
+        // Fire-and-forget upload of a single QSO to the user's eQSL.cc account, hooked into the QSO
+        // save flow. Enabled by the EqslAutoUpload setting + eQSL credentials (set in Options).
+        // Per the chosen behavior, failures are intentionally swallowed: the QSO is always saved
+        // locally regardless of whether eQSL is reachable.
+        private void UploadQsoToEqsl(QSO qso)
+        {
+            if (qso == null) return;
+            if (!Properties.Settings.Default.EqslAutoUpload) return;
+
+            string user = (Properties.Settings.Default.EqslUsername ?? string.Empty).Trim();
+            string pwd = Properties.Settings.Default.EqslPassword ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pwd)) return;
+
+            string nickname = (Properties.Settings.Default.EqslQthNickname ?? string.Empty).Trim();
+            string adif = BuildEqslAdif(qso, nickname);
+
+            string url = "https://www.eQSL.cc/qslcard/ImportADIF.cfm"
+                + "?EQSL_USER=" + Uri.EscapeDataString(user)
+                + "&EQSL_PSWD=" + Uri.EscapeDataString(pwd)
+                + "&ADIFData=" + Uri.EscapeDataString(adif);
+
+            System.Threading.Tasks.Task.Run(async () =>
+            {
+                try { await _eqslHttp.GetStringAsync(url).ConfigureAwait(false); }
+                catch { /* fire-and-forget */ }
+            });
+        }
+
+        // Builds a one-record ADIF for eQSL by reusing the app's ADIF generator and (optionally)
+        // injecting the QTH nickname tag so eQSL matches the upload to the right QTH profile.
+        private static string BuildEqslAdif(QSO qso, string qthNickname)
+        {
+            string adif = Services.GenerateAdif(new System.Collections.Generic.List<QSO> { qso });
+            if (!string.IsNullOrWhiteSpace(qthNickname))
+            {
+                string tag = string.Format("<app_eqsl_qth_nickname:{0}>{1}", qthNickname.Length, qthNickname);
+                int idx = adif.LastIndexOf("<eor>", StringComparison.OrdinalIgnoreCase);
+                if (idx >= 0) adif = adif.Insert(idx, tag);
+            }
+            return adif;
         }
 
         // Builds an aligned, label-friendly text block of the full QSO record for the clipboard.

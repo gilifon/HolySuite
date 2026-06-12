@@ -1526,6 +1526,54 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EqslAutoUpload {
+            get {
+                return ((bool)(this["EqslAutoUpload"]));
+            }
+            set {
+                this["EqslAutoUpload"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EqslUsername {
+            get {
+                return ((string)(this["EqslUsername"]));
+            }
+            set {
+                this["EqslUsername"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EqslPassword {
+            get {
+                return ((string)(this["EqslPassword"]));
+            }
+            set {
+                this["EqslPassword"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EqslQthNickname {
+            get {
+                return ((string)(this["EqslQthNickname"]));
+            }
+            set {
+                this["EqslQthNickname"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("CQ CQ DE K")]
         public string CwMsgText1 {
             get {
