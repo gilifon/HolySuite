@@ -3799,40 +3799,55 @@ namespace HolyLogger
 
         private void LoadQsoForUpdate()
         {
-            ClearBtn_Click(null, null);
-            UpdateState(State.Edit);
-            CB_Mode.Text = QsoToUpdate.Mode;
-            TB_Comment.Text = QsoToUpdate.Comment;
-            // Set the callsign with the lookup suppressed so it doesn't wipe the fields we load below.
+            // Suppress the DX-callsign typing lookup for the entire load — including the ClearBtn_Click
+            // reset below, which also clears the callsign. Otherwise the lookup's deferred field-clearing
+            // and QRZ re-query run after we set the fields and wipe the QSO's saved Name/Locator/Country.
             _suppressCallsignLookupForEdit = true;
-            TB_DXCallsign.Text = QsoToUpdate.DXCall;
-            _suppressCallsignLookupForEdit = false;
-            TB_Exchange.Text = QsoToUpdate.SRX;
-            TB_Frequency.Text = QsoToUpdate.Freq;
-            TB_MyCallsign.Text = QsoToUpdate.MyCall;
-            TB_Operator.Text = QsoToUpdate.Operator;
-            TB_MyHolyland.Text = QsoToUpdate.STX;
-            TB_MyLocator.Text = QsoToUpdate.MyLocator;
-            TB_DXLocator.Text = QsoToUpdate.DXLocator;
-            TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
-            TB_RSTSent.Text = QsoToUpdate.RST_SENT;
-            TB_DX_Name.Text = QsoToUpdate.Name;
-            
-
             try
             {
-                string date = QsoToUpdate.Date.Insert(4, "/").Insert(7, "/");
-                string time = QsoToUpdate.Time.Insert(2, ":").Insert(5, ":");
-                if (time.Length < 7) time = time.Insert(time.Length, "00");
+                CallsignLookupDebounceTimer.Stop();
+                ClearBtn_Click(null, null);
+                UpdateState(State.Edit);
+                CB_Mode.Text = QsoToUpdate.Mode;
+                TB_Comment.Text = QsoToUpdate.Comment;
+                TB_DXCallsign.Text = QsoToUpdate.DXCall;
+                TB_Exchange.Text = QsoToUpdate.SRX;
+                TB_Frequency.Text = QsoToUpdate.Freq;
+                TB_MyCallsign.Text = QsoToUpdate.MyCall;
+                TB_Operator.Text = QsoToUpdate.Operator;
+                TB_MyHolyland.Text = QsoToUpdate.STX;
+                TB_MyLocator.Text = QsoToUpdate.MyLocator;
+                TB_DXLocator.Text = QsoToUpdate.DXLocator;
+                TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
+                TB_RSTSent.Text = QsoToUpdate.RST_SENT;
+                TB_DX_Name.Text = QsoToUpdate.Name;
+                // Country/Continent are normally filled by the (now-suppressed) callsign lookup, so
+                // load the QSO's saved values directly into the bound properties, and show the
+                // country flag the same way the lookup does (falls back to the text label if there
+                // is no flag for that country).
+                Country = QsoToUpdate.Country;
+                Continent = QsoToUpdate.Continent;
+                UpdateCountryFlag(QsoToUpdate.Country);
 
-                TP_Date.Value = DateTime.Parse(date);
-                TP_Time.Value = DateTime.Parse(time);
+                try
+                {
+                    string date = QsoToUpdate.Date.Insert(4, "/").Insert(7, "/");
+                    string time = QsoToUpdate.Time.Insert(2, ":").Insert(5, ":");
+                    if (time.Length < 7) time = time.Insert(time.Length, "00");
+
+                    TP_Date.Value = DateTime.Parse(date);
+                    TP_Time.Value = DateTime.Parse(time);
+                }
+                catch (Exception e)
+                {
+                    TP_Date.Value = DateTime.UtcNow;
+                    TP_Time.Value = DateTime.UtcNow;
+                    throw new Exception("Failed to parse QSO date. Value set to NOW");
+                }
             }
-            catch (Exception e)
+            finally
             {
-                TP_Date.Value = DateTime.UtcNow;
-                TP_Time.Value = DateTime.UtcNow;
-                throw new Exception("Failed to parse QSO date. Value set to NOW");
+                _suppressCallsignLookupForEdit = false;
             }
             
         }
