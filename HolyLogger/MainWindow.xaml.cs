@@ -3157,6 +3157,13 @@ namespace HolyLogger
             DataContext = Qsos;
             LastQSO = Qsos.FirstOrDefault();
 
+            // Replacing the whole collection does NOT raise CollectionChanged, so the cluster
+            // colors aren't refreshed automatically. Rebuild the worked-countries cache (needed =
+            // red) and re-evaluate the in-log status (worked before = blue) against the new log.
+            RebuildWorkedCountriesAndRefreshCluster();
+            if (clusterVisibleSpots != null)
+                RefreshClusterVisibleSpots();
+
             ToggleUploadProgress(Visibility.Hidden);
             UpdateNumOfQSOs();
 
