@@ -654,27 +654,41 @@
                       ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
             <ToggleButton.Template>
                 <ControlTemplate TargetType="ToggleButton">
-                    <Border x:Name="outer" CornerRadius="3" Background="#ECECEC" BorderBrush="#8A929B" BorderThickness="1">
-                        <Border x:Name="inner" CornerRadius="2" BorderThickness="1,1,0,0" BorderBrush="#FFFFFF">
-                            <!-- Margin 0,1,0,0 nudges the text down ~1px so it reads optically centered
-                                 (single-line text otherwise looks high due to descender space). -->
-                            <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,0,0"/>
+                    <!-- Two-tone bevel for a real 3D look:
+                         brBR carries the BOTTOM-RIGHT edge + a drop shadow (raised = pops OUT);
+                         brTL carries the TOP-LEFT highlight edge.
+                         When ON the two edge colors swap and the shadow is removed, so it reads as
+                         pressed INTO the screen. -->
+                    <Border x:Name="brBR" CornerRadius="3" BorderThickness="0,0,1,1" BorderBrush="#9AA1A8" Background="#E8EBEF">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000" Direction="315" ShadowDepth="1" BlurRadius="2.5" Opacity="0.28"/>
+                        </Border.Effect>
+                        <Border x:Name="brTL" CornerRadius="3" BorderThickness="1,1,0,0" BorderBrush="#FCFCFC">
+                            <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <ContentPresenter.RenderTransform>
+                                    <TranslateTransform Y="-1"/>
+                                </ContentPresenter.RenderTransform>
+                            </ContentPresenter>
                         </Border>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="outer" Property="Background" Value="#E1ECF7"/>
+                            <Setter TargetName="brBR" Property="Background" Value="#EDF1F5"/>
                         </Trigger>
-                        <!-- ON: pressed-in / sunken look (dark top-left edge, active color) -->
+                        <!-- ON: pressed INTO the screen — inverted bevel (dark top-left, light
+                             bottom-right), green fill, no drop shadow, content nudged in (down-right). -->
                         <Trigger Property="IsChecked" Value="True">
-                            <Setter TargetName="outer" Property="Background" Value="#9FCBF5"/>
-                            <Setter TargetName="outer" Property="BorderBrush" Value="#4B6276"/>
-                            <Setter TargetName="inner" Property="BorderBrush" Value="#5E7488"/>
+                            <Setter TargetName="brBR" Property="Background" Value="#7FC988"/>
+                            <Setter TargetName="brBR" Property="BorderBrush" Value="#CFEAD0"/>
+                            <Setter TargetName="brTL" Property="BorderBrush" Value="#54915E"/>
+                            <Setter TargetName="brBR" Property="Effect" Value="{x:Null}"/>
+                            <Setter TargetName="cp" Property="Margin" Value="1,1,0,0"/>
                         </Trigger>
-                        <!-- momentary press feedback (transient, while the mouse button is down) -->
+                        <!-- momentary press feedback while the mouse button is held down -->
                         <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="inner" Property="BorderBrush" Value="#5E7488"/>
-                            <Setter TargetName="cp" Property="Margin" Value="1,2,0,0"/>
+                            <Setter TargetName="brBR" Property="Effect" Value="{x:Null}"/>
+                            <Setter TargetName="brTL" Property="BorderBrush" Value="#9AA1A8"/>
+                            <Setter TargetName="cp" Property="Margin" Value="1,1,0,0"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
