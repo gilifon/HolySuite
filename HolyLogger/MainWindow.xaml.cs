@@ -1393,6 +1393,8 @@ namespace HolyLogger
             if (!string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 GetQrzData();
+                // Also open the QRZ.com web page for this callsign (in the default browser).
+                OpenQrzPage(TB_DXCallsign.Text);
             }
         }
 
