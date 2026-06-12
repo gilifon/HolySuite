@@ -759,8 +759,8 @@
                 </ListBox>
             </Border>
         </Popup>
-        <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="7,121,0,0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
-        <Label x:Name="L_Legal" Content="Legal QSO Before" HorizontalAlignment="Left" Margin="7,121,0,0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Green" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
+        <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
+        <Label x:Name="L_Legal" Content="Legal QSO Before" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Green" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
         <Border HorizontalAlignment="Left" Margin="264,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
                 <ToolTip>

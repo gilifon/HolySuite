@@ -335,6 +335,9 @@ namespace HolyLogger
         private bool isApplyingSuggestion = false;
         // Set when a callsign is pulled from the cluster/map (not typed) so the suggestions dropdown stays closed.
         private bool suppressNextCallsignSuggestions = false;
+        // Set while loading a logged QSO into the form for editing, so setting the DX callsign does not
+        // trigger the lookup that would clear/overwrite the QSO's saved Name/Locator/Country/etc.
+        private bool _suppressCallsignLookupForEdit = false;
         private const int DefaultCallsignSuggestionRows = 20;
         private const int MinCallsignSuggestionRows = 10;
         private const int MaxCallsignSuggestionRows = 30;
@@ -3800,7 +3803,10 @@ namespace HolyLogger
             UpdateState(State.Edit);
             CB_Mode.Text = QsoToUpdate.Mode;
             TB_Comment.Text = QsoToUpdate.Comment;
+            // Set the callsign with the lookup suppressed so it doesn't wipe the fields we load below.
+            _suppressCallsignLookupForEdit = true;
             TB_DXCallsign.Text = QsoToUpdate.DXCall;
+            _suppressCallsignLookupForEdit = false;
             TB_Exchange.Text = QsoToUpdate.SRX;
             TB_Frequency.Text = QsoToUpdate.Freq;
             TB_MyCallsign.Text = QsoToUpdate.MyCall;
@@ -8810,6 +8816,11 @@ namespace HolyLogger
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // While loading a QSO into the form for editing, the callsign is set programmatically and
+            // we must NOT run the typing lookup (it would clear/overwrite the QSO's saved fields).
+            if (_suppressCallsignLookupForEdit)
+                return;
+
             // Starting a new callsign clears the log-row blue highlight left by a right-click menu.
             if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
                 QSODataGrid.UnselectAll();
