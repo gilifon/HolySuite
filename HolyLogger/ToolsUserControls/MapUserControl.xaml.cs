@@ -617,6 +617,7 @@ function renderSpots() {
         (function(freq, mode, cs) {
             m.on('click', function() {
                 try { window.external.TuneToSpot(freq, mode); } catch(e) {}
+                try { window.external.SpotHoverEnd(); } catch(e) {}
             });
             m.on('mouseover', function() { try { window.external.SpotHovered(cs); } catch(e) {} });
             m.on('mouseout', function() { try { window.external.SpotHoverEnd(); } catch(e) {} });
@@ -1112,6 +1113,7 @@ function drawOverlays() {
                         .on('mouseout', function() { tooltip.style('display','none'); try { window.external.SpotHoverEnd(); } catch(e4) {} })
                         .on('click', function() {
                             try { window.external.TuneToSpot(spot.f, spot.m); } catch(e2) {}
+                            try { window.external.SpotHoverEnd(); } catch(e5) {}
                         });
                 })(sp, pt[0], pt[1]);
             }

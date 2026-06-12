@@ -1401,6 +1401,8 @@ namespace HolyLogger
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
         {
             //TB_Frequency.Text = string.Empty;
+            // Drop any stuck map-hover blue highlight on the cluster rows.
+            SetClusterRowMapHighlight(null);
             TB_DXCallsign.Clear();
             TB_Exchange.Clear();
             TB_DXLocator.Clear();
@@ -8841,6 +8843,8 @@ namespace HolyLogger
             // Starting a new callsign clears the log-row blue highlight left by a right-click menu.
             if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
                 QSODataGrid.UnselectAll();
+            // Also drop any stuck map-hover blue highlight on the cluster rows.
+            SetClusterRowMapHighlight(null);
 
             callsignLookupRevision++;
             string dxCallText = (TB_DXCallsign.Text ?? string.Empty).Trim();
