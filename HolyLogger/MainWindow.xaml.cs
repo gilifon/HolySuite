@@ -275,6 +275,8 @@ namespace HolyLogger
         DataGridColumn clusterLastHoverToolTipColumn = null;
         ToolTip clusterHoverToolTip = null;
         bool clusterHoverPopupEnabled = true;
+        // DX callsign of the cluster-list row currently hovered, whose map dot is enlarged.
+        string _lastHoveredSpotCall = null;
         Button clusterUndoButton = null;
         TextBlock clusterUndoCountText = null;
         TextBlock clusterSpotCountText = null;
@@ -1056,6 +1058,8 @@ namespace HolyLogger
 
             MapControl.RadiusChanged += OnMapRadiusChanged;
             MapControl.SpotTuneRequested += OnMapSpotTuneRequested;
+            MapControl.SpotHovered += OnMapSpotHovered;
+            MapControl.SpotHoverEnded += OnMapSpotHoverEnded;
             ShowHomeMap();
 
             // Reflect the persisted suggestions on/off state on the Suggest (F4) toggle button.
@@ -4083,6 +4087,8 @@ namespace HolyLogger
             // Unsubscribe from MapControl events
             try { MapControl.RadiusChanged -= OnMapRadiusChanged; } catch { }
             try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch { }
+            try { MapControl.SpotHovered -= OnMapSpotHovered; } catch { }
+            try { MapControl.SpotHoverEnded -= OnMapSpotHoverEnded; } catch { }
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -6011,7 +6017,31 @@ namespace HolyLogger
                     clusterHoverToolTip.IsOpen = false;
                 }
                 clusterLastHoverToolTipColumn = null;
+                ClearClusterMapHover();
                 return;
+            }
+
+            // Enlarge the hovered DX station's dot on the map — only while hovering the DX callsign
+            // column (not the other columns of the row). Only refresh when the callsign changes.
+            if (cell.Column == clusterDxColumn)
+            {
+                string hoveredCall = (cell.DataContext as ClusterSpotViewItem)?.DXCallsign;
+                if (!string.IsNullOrEmpty(hoveredCall))
+                {
+                    if (hoveredCall != _lastHoveredSpotCall)
+                    {
+                        _lastHoveredSpotCall = hoveredCall;
+                        try { MapControl?.HighlightSpot(hoveredCall); } catch { }
+                    }
+                }
+                else
+                {
+                    ClearClusterMapHover();
+                }
+            }
+            else
+            {
+                ClearClusterMapHover();
             }
 
             bool isInteractiveColumn = cell.Column == clusterDxColumn || cell.Column == clusterSpotterColumn || cell.Column == clusterFreqColumn;
@@ -6046,6 +6076,17 @@ namespace HolyLogger
                     clusterHoverToolTip.IsOpen = false;
                 }
                 clusterLastHoverToolTipColumn = null;
+            }
+            ClearClusterMapHover();
+        }
+
+        // Restores all map spot dots to normal size once the hover leaves a row / the cluster grid.
+        private void ClearClusterMapHover()
+        {
+            if (_lastHoveredSpotCall != null)
+            {
+                _lastHoveredSpotCall = null;
+                try { MapControl?.ClearSpotHighlight(); } catch { }
             }
         }
 
@@ -6993,10 +7034,31 @@ namespace HolyLogger
                 }
             }
 
+            private bool _isMapHovered;
+            // Set true while the user hovers this station's dot on the map, so the row is shown
+            // with a blue background.
+            public bool IsMapHovered
+            {
+                get => _isMapHovered;
+                set
+                {
+                    if (_isMapHovered != value)
+                    {
+                        _isMapHovered = value;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsMapHovered)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowBackground)));
+                    }
+                }
+            }
+
             public Brush RowBackground
             {
                 get
                 {
+                    if (IsMapHovered)
+                    {
+                        return new SolidColorBrush(Color.FromRgb(0x90, 0xCA, 0xF9)); // Blue highlight (map hover)
+                    }
                     if (IsOnFrequency)
                     {
                         return new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)); // LightGreen
@@ -10097,6 +10159,28 @@ namespace HolyLogger
                         SetAzimuth();
                 }
             }), DispatcherPriority.Background);
+        }
+
+        // The map reports which station dot the mouse is over (its popup is showing); highlight the
+        // matching cluster-list row(s) blue. A null/empty callsign clears the highlight.
+        private void OnMapSpotHovered(string callsign)
+        {
+            Dispatcher.BeginInvoke(new Action(() => SetClusterRowMapHighlight(callsign)));
+        }
+
+        private void OnMapSpotHoverEnded()
+        {
+            Dispatcher.BeginInvoke(new Action(() => SetClusterRowMapHighlight(null)));
+        }
+
+        private void SetClusterRowMapHighlight(string callsign)
+        {
+            if (clusterVisibleSpots == null) return;
+            bool any = !string.IsNullOrEmpty(callsign);
+            foreach (var s in clusterVisibleSpots)
+            {
+                s.IsMapHovered = any && string.Equals(s.DXCallsign, callsign, StringComparison.OrdinalIgnoreCase);
+            }
         }
 
         private void OnMapSpotTuneRequested(string freq, string mode)

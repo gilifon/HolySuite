@@ -51,6 +51,18 @@ namespace HolyLogger.ToolsUserControls
         {
             _owner.RaiseSpotTuneRequested(freq, mode);
         }
+
+        // Called from JS when the mouse enters/leaves a station's dot on the map, so the matching
+        // cluster-list row can be highlighted.
+        public void SpotHovered(string callsign)
+        {
+            _owner.RaiseSpotHovered(callsign);
+        }
+
+        public void SpotHoverEnd()
+        {
+            _owner.RaiseSpotHoverEnded();
+        }
     }
 
     public partial class MapUserControl : UserControl
@@ -69,9 +81,13 @@ namespace HolyLogger.ToolsUserControls
 
         public event Action<int> RadiusChanged;
         public event Action<string, string> SpotTuneRequested;
+        public event Action<string> SpotHovered;
+        public event Action SpotHoverEnded;
 
         internal void RaiseRadiusChanged(int km) => RadiusChanged?.Invoke(km);
         internal void RaiseSpotTuneRequested(string freq, string mode) => SpotTuneRequested?.Invoke(freq, mode);
+        internal void RaiseSpotHovered(string callsign) => SpotHovered?.Invoke(callsign);
+        internal void RaiseSpotHoverEnded() => SpotHoverEnded?.Invoke();
 
         public bool IsPolarProjection => _isPolar;
 
@@ -174,6 +190,24 @@ namespace HolyLogger.ToolsUserControls
             {
                 MapBrowser.InvokeScript("updateClusterSpots", new object[] { sb.ToString() });
             }
+            catch { }
+        }
+
+        // Enlarges the map dot(s) for the given DX callsign — called while the user hovers a row in
+        // the cluster list — so they can see where in the world that station is. No-op unless a
+        // cluster map is currently loaded.
+        public void HighlightSpot(string callsign)
+        {
+            if (!_isClusterMode || !_clusterMapLoaded || string.IsNullOrEmpty(callsign)) return;
+            try { MapBrowser.InvokeScript("highlightSpot", new object[] { callsign, "" }); }
+            catch { }
+        }
+
+        // Restores all spot dots to their normal size (called when the hover leaves the row/grid).
+        public void ClearSpotHighlight()
+        {
+            if (!_isClusterMode || !_clusterMapLoaded) return;
+            try { MapBrowser.InvokeScript("clearSpotHighlight", new object[] { }); }
             catch { }
         }
 
@@ -547,6 +581,7 @@ function gcArcPoints(lat1, lon1, lat2, lon2, n) {
     }
     return pts;
 }
+var hlCs = null, hlF = null;  // cluster-list hover highlight (callsign + freq)
 function renderSpots() {
     spotsLayer.clearLayers();
     for (var i = 0; i < clusterSpots.length; i++) {
@@ -566,21 +601,26 @@ function renderSpots() {
                 weight: 0, interactive: false
             }).addTo(spotsLayer);
         }
-        // Band-colored DX dot with tooltip and click
+        // Band-colored DX dot with tooltip and click. When this spot's row is hovered in the
+        // cluster list, draw an enlarged dot with a white ring so it stands out on the map.
         var dotColor = sp.k || '#FF6600';
+        var isHl = (hlCs !== null && sp.cs === hlCs);
         var m = L.circleMarker(sp.c, {
-            radius: 5, color: dotColor, fillColor: dotColor, fillOpacity: 1,
-            weight: 0, interactive: true
+            radius: isHl ? 12 : 5, color: isHl ? '#FFFFFF' : dotColor,
+            fillColor: dotColor, fillOpacity: 1,
+            weight: isHl ? 2 : 0, interactive: true
         });
         m.bindTooltip('<b>' + sp.cs + '</b><br/>' + sp.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + sp.m, {
             permanent: false, sticky: true, direction: 'top',
             className: 'spot-tip'
         });
-        (function(freq, mode) {
+        (function(freq, mode, cs) {
             m.on('click', function() {
                 try { window.external.TuneToSpot(freq, mode); } catch(e) {}
             });
-        })(sp.f, sp.m);
+            m.on('mouseover', function() { try { window.external.SpotHovered(cs); } catch(e) {} });
+            m.on('mouseout', function() { try { window.external.SpotHoverEnd(); } catch(e) {} });
+        })(sp.f, sp.m, sp.cs);
         m.addTo(spotsLayer);
     }
 }
@@ -591,6 +631,8 @@ function updateClusterSpots(json) {
     renderSpots();
     drawDayNight();
 }
+function highlightSpot(cs, f) { hlCs = cs; hlF = f; renderSpots(); }
+function clearSpotHighlight() { hlCs = null; hlF = null; renderSpots(); }
 function onRadiusChange(km) {
     radiusMeters = km * 1000;
     radiusCircle.setRadius(radiusMeters);
@@ -1011,6 +1053,7 @@ var tooltip = d3.select('body').append('div')
     .style('border-radius','4px').style('padding','3px 7px')
     .style('font-size','12px').style('font-family','sans-serif')
     .style('color','#222').style('display','none').style('z-index','9999');
+var hlCs = null, hlF = null;  // cluster-list hover highlight (callsign + freq)
 function drawOverlays() {
     overlaysG.selectAll('*').remove();
     // Home dot
@@ -1051,20 +1094,22 @@ function drawOverlays() {
             if (pt && isFinite(pt[0]) && isFinite(pt[1])) {
                 (function(spot, px, py) {
                     var dotColor = spot.k || '#FF6600';
+                    var isHl = (hlCs !== null && spot.cs === hlCs);
                     overlaysG.append('circle')
-                        .attr('cx', px).attr('cy', py).attr('r', 4)
-                        .attr('fill', dotColor).attr('stroke', 'none')
+                        .attr('cx', px).attr('cy', py).attr('r', isHl ? 9 : 4)
+                        .attr('fill', dotColor).attr('stroke', isHl ? '#FFFFFF' : 'none').attr('stroke-width', isHl ? 2 : 0)
                         .attr('clip-path', 'url(#globe-clip)')
                         .style('cursor', 'pointer')
                         .on('mouseover', function() {
                             tooltip.style('display','block')
                                 .html('<b>' + spot.cs + '</b><br/>' + spot.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + spot.m);
+                            try { window.external.SpotHovered(spot.cs); } catch(e3) {}
                         })
                         .on('mousemove', function() {
                             tooltip.style('left', (d3.event.pageX + 10) + 'px')
                                    .style('top',  (d3.event.pageY - 28) + 'px');
                         })
-                        .on('mouseout', function() { tooltip.style('display','none'); })
+                        .on('mouseout', function() { tooltip.style('display','none'); try { window.external.SpotHoverEnd(); } catch(e4) {} })
                         .on('click', function() {
                             try { window.external.TuneToSpot(spot.f, spot.m); } catch(e2) {}
                         });
@@ -1121,6 +1166,8 @@ function updateClusterSpots(json) {
     drawOverlays(); drawDayNight();
     if (autoZoomActive) applyAutoZoom();
 }
+function highlightSpot(cs, f) { hlCs = cs; hlF = f; drawOverlays(); }
+function clearSpotHighlight() { hlCs = null; hlF = null; drawOverlays(); }
 function haversineKm(lat1, lon1, lat2, lon2) {
     var R = 6371, toR = Math.PI/180;
     var dLat = (lat2-lat1)*toR, dLon = (lon2-lon1)*toR;
