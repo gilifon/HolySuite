@@ -8144,6 +8144,24 @@ namespace HolyLogger
             }
         }
 
+        protected override void OnPreviewMouseLeftButtonDown(MouseButtonEventArgs e)
+        {
+            base.OnPreviewMouseLeftButtonDown(e);
+
+            // When a log row is selected (highlighted blue) and the user left-clicks somewhere
+            // that is not inside the log grid (e.g. the DX Callsign box), drop the selection so the
+            // row no longer stays blue. Right-click / context-menu keeps the row highlighted via the
+            // grid's InactiveSelection resource, which is a separate path and unaffected here.
+            if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
+            {
+                var grid = FindVisualParent<DataGrid>(e.OriginalSource as DependencyObject);
+                if (grid != QSODataGrid)
+                {
+                    QSODataGrid.UnselectAll();
+                }
+            }
+        }
+
         // Central handler for the application-wide function keys. Returns true if the key was handled.
         // Shared by the main window preview and the cluster window so the keys keep responding even
         // when a secondary window (e.g. the Cluster window) has keyboard focus.
