@@ -52,6 +52,27 @@ namespace HolyParser
         }
 
         /// <summary>
+        /// Returns true if the supplied string is a valid Maidenhead locator
+        /// (i.e. LocatorToLatLng would parse it without throwing).
+        /// </summary>
+        /// <param name="locator">Locator string to validate</param>
+        /// <returns>True if the locator is well-formed, otherwise false</returns>
+        public static bool IsValidLocator(string locator)
+        {
+            if (string.IsNullOrWhiteSpace(locator))
+                return false;
+            try
+            {
+                LocatorToLatLng(locator);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
         /// Convert latitude and longitude in degrees to a locator
         /// </summary>
         /// <param name="ll">LatLng structure to convert</param>

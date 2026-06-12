@@ -8286,10 +8286,13 @@ namespace HolyLogger
             if (string.IsNullOrEmpty(locator))
                 return;
 
-            if (!Regex.IsMatch(locator, "^[A-Z]{2}[0-9]{2}[A-Z]{2}$"))
+            // Validate against the same rules the map parser uses, so valid 4-char grids
+            // (e.g. KM72) are accepted and malformed ones (e.g. KM720R, a zero where the
+            // 5th-position letter belongs) are caught here rather than silently breaking the map.
+            if (!MaidenheadLocator.IsValidLocator(locator))
             {
                 e.Handled = true;
-                MessageBox.Show("Wrong locator format", "HolyLogger", MessageBoxButton.OK, MessageBoxImage.Warning);
+                MessageBox.Show("\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72), optionally followed by 2 letters (e.g. KM72OR). Note: the 5th/6th characters are letters (O), not zeros (0).", "Invalid My Locator", MessageBoxButton.OK, MessageBoxImage.Warning);
                 TB_MyLocator.Focus();
                 TB_MyLocator.SelectAll();
             }
@@ -9877,13 +9880,9 @@ namespace HolyLogger
         private void ClearAzimuth()
         {
             ClearAzimuthForTyping();
-            // Always reset to home first to clear any DX arc, then repaint cluster spots on top if needed.
+            // Reset to home, clearing any DX arc. ShowHomeMap now repaints the cluster spots
+            // itself when the cluster map is enabled, so no separate overlay call is needed.
             ShowHomeMap();
-            if (MapControl != null && MapControl.Visibility == Visibility.Visible
-                && Properties.Settings.Default.ClusterMapEnabled)
-            {
-                DoUpdateClusterSpotsOnMap();
-            }
         }
 
         private void ShowHomeMap()
@@ -9900,8 +9899,24 @@ namespace HolyLogger
                 {
                     var ll = MaidenheadLocator.LocatorToLatLng(TB_MyLocator.Text);
                     MapControl.ShowMap(ll.Lat, ll.Long, GetMapRadiusKm());
+
+                    // The home map is now visible. If the cluster map is enabled, immediately
+                    // overlay the spots we already hold instead of leaving the map empty until
+                    // the next spot arrives from the cluster. Covers every path that brings the
+                    // map into view from a hidden/placeholder state (locator fixed, startup,
+                    // ClearAzimuth, switching back to Map mode, etc.).
+                    if (Properties.Settings.Default.ClusterMapEnabled)
+                    {
+                        DoUpdateClusterSpotsOnMap();
+                    }
                 }
-                catch { }
+                catch
+                {
+                    // Locator is present but not a valid Maidenhead grid (e.g. a digit where a
+                    // letter belongs, like the easily-confused 'O' vs '0'). Tell the user instead
+                    // of leaving a silently blank map.
+                    MapControl.ShowPlaceholder("Invalid My Locator: \"" + TB_MyLocator.Text.Trim() + "\"&#x0a;Enter a valid grid square (e.g. KM72 or KM72OR)");
+                }
             }
             else
             {
