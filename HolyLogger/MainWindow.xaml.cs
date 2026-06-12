@@ -6846,21 +6846,11 @@ namespace HolyLogger
                         if (string.IsNullOrWhiteSpace(bandText))
                             return Brushes.Black;
 
-                        // Use the same band color logic as the map
-                        var colors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-                        {
-                            { "160", "#156184" }, { "80", "#903727" }, { "60", "#152F47" }, { "40", "#18A018" },
-                            { "30", "#F1E00A" }, { "20", "#DC2828" }, { "17", "#751F6B" }, { "15", "#1515CB" },
-                            { "12", "#47DFF0" }, { "10", "#E87421" }, { "6",  "#FF61EA" },
-                            { "VHF", "#5EFFA0" }, { "UHF", "#5ECFFF" }, { "SHF", "#A07CFF" }
-                        };
-
-                        if (colors.TryGetValue(bandText, out string colorHex))
-                        {
-                            return (Brush)new BrushConverter().ConvertFromString(colorHex);
-                        }
-
-                        return Brushes.Black;
+                        // Resolve through the same band-color source as the band checkboxes and the
+                        // map spot dots (defaults + user customizations, normalized band key) so the
+                        // Freq color always matches the band selection checkbox exactly.
+                        string colorHex = GetBandColor(bandText);
+                        return (Brush)new BrushConverter().ConvertFromString(colorHex);
                     }
                     catch
                     {
@@ -7175,9 +7165,13 @@ namespace HolyLogger
             { "VHF", "#5EFFA0" }, { "UHF", "#5ECFFF" }, { "SHF", "#A07CFF" }
         };
 
-        private Dictionary<string, string> _bandColorCache = null;
+        private static Dictionary<string, string> _bandColorCache = null;
 
-        private Dictionary<string, string> GetBandColors()
+        // Single source of truth for band colors: built-in defaults overridden by any colors the
+        // user customised via the band-selection checkboxes (stored in ClusterBandColors). The band
+        // checkboxes, the cluster list Freq color, and the map spot dots all resolve through here so
+        // they always show the exact same color per band.
+        private static Dictionary<string, string> GetBandColors()
         {
             if (_bandColorCache != null) return _bandColorCache;
             var colors = new Dictionary<string, string>(DefaultBandColors, StringComparer.OrdinalIgnoreCase);
@@ -7196,10 +7190,13 @@ namespace HolyLogger
             return colors;
         }
 
-        private string GetBandColor(string band)
+        // Resolves a raw band string (e.g. "40", "40M", "70CM") to its color, normalizing it to the
+        // same key the band checkboxes use so the colors match exactly.
+        private static string GetBandColor(string band)
         {
             var colors = GetBandColors();
-            if (!string.IsNullOrEmpty(band) && colors.TryGetValue(band, out string c)) return c;
+            string key = NormalizeClusterBandKey(band);
+            if (!string.IsNullOrEmpty(key) && colors.TryGetValue(key, out string c)) return c;
             return "#FF6600";
         }
 
@@ -7231,6 +7228,16 @@ namespace HolyLogger
 
             // Rebuild the band selector panel to show the new color
             RebuildClusterBandSelector();
+
+            // Repaint everything already on screen with the new color instead of waiting for the
+            // next spot to arrive: the cluster list's Freq color (FreqForeground is re-evaluated on
+            // refresh) and the map spot dots.
+            try { clusterSpotsDataGrid?.Items.Refresh(); } catch { }
+            if (Properties.Settings.Default.ClusterMapEnabled
+                && MapControl != null && MapControl.Visibility == Visibility.Visible)
+            {
+                DoUpdateClusterSpotsOnMap();
+            }
         }
 
         private static string PickColorHex(string currentHex)
@@ -7310,7 +7317,7 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
-        private string NormalizeClusterBandKey(string bandText)
+        private static string NormalizeClusterBandKey(string bandText)
         {
             string b = (bandText ?? string.Empty).Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(b))
@@ -7489,7 +7496,7 @@ namespace HolyLogger
                             Freq = freqMhz > 0 ? freqMhz.ToString("0.###", CultureInfo.InvariantCulture) : (spot.FreqText ?? string.Empty),
                             Mode = spot.Mode ?? string.Empty,
                             Color = GetBandColor(spot.BandText ?? string.Empty),
-                            Band = spot.BandText ?? string.Empty
+                            Band = NormalizeClusterBandKey(spot.BandText)
                         });
                     }
                 }
