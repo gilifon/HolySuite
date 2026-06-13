@@ -117,7 +117,7 @@ namespace HolyLogger
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
@@ -165,7 +165,7 @@ namespace HolyLogger
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -350,6 +350,7 @@ namespace HolyLogger
                         if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                         if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                        if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
 
@@ -403,6 +404,7 @@ namespace HolyLogger
                         if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                         if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                        if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
                     }
@@ -515,6 +517,214 @@ namespace HolyLogger
 
         }
 
+        // Adds the eqsl_status column to an existing qso table the first time the user runs a build
+        // that has the eQSL queue feature. Existing rows are back-filled to 1 ("already handled") so
+        // that upgrading does NOT suddenly queue the user's entire historical log for eQSL upload.
+        // Only QSOs logged after the upgrade (inserted with the default 0) become pending.
+        private void AddEqslStatusColumn()
+        {
+            string check = "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'eqsl_status'";
+            using (var cmd = new SQLiteCommand(check, con))
+            {
+                int colCount = Convert.ToInt32(cmd.ExecuteScalar());
+                if (colCount == 0)
+                {
+                    using (var alter = new SQLiteCommand("ALTER TABLE qso ADD COLUMN [eqsl_status] INTEGER NOT NULL DEFAULT 0", con))
+                        alter.ExecuteNonQuery();
+                    using (var backfill = new SQLiteCommand("UPDATE qso SET eqsl_status = 1", con))
+                        backfill.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+        }
+
+        // Returns the QSOs still waiting to be uploaded to eQSL (status 0), oldest first so they
+        // are sent in the order they were logged.
+        public List<QSO> GetPendingEqslQsos()
+        {
+            var list = new List<QSO>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            // Only QSOs whose station callsign has a configured eQSL account (username + password
+            // filled in) are "waiting to be sent" — others can't be routed anywhere yet.
+            string stm = "SELECT * FROM qso WHERE eqsl_status = 0 AND my_callsign IN (" + SendableCallsignsSubquery + ") ORDER BY date ASC, time ASC, Id ASC";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    QSO q = new QSO();
+                    if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                    if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
+                    if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
+                    if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                    if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
+                    if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
+                    if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
+                    if (rdr["band"] != null) q.Band = rdr["band"].ToString();
+                    if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
+                    if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
+                    if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
+                    if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
+                    if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
+                    if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
+                    if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
+                    if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                    if (rdr["country"] != null) q.Country = rdr["country"].ToString();
+                    if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
+                    if (rdr["time"] != null) q.Time = rdr["time"].ToString();
+                    if (rdr["date"] != null) q.Date = rdr["date"].ToString();
+                    if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
+                    if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
+                    if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    q.EqslStatus = 0;
+                    list.Add(q);
+                }
+            }
+            return list;
+        }
+
+        // Number of QSOs still waiting to be uploaded to eQSL.
+        public int GetPendingEqslCount()
+        {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE eqsl_status = 0 AND my_callsign IN (" + SendableCallsignsSubquery + ")", con))
+                return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        // Updates the eQSL upload state of a single QSO (0 pending, 1 sent, 2 rejected).
+        public void SetEqslStatus(int id, int status)
+        {
+            if (con == null || con.State != ConnectionState.Open) return;
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET eqsl_status = @s WHERE Id = @id", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@s", status));
+                cmd.Parameters.Add(new SQLiteParameter("@id", id));
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        // ---- eQSL accounts (one per station callsign) -------------------------------------------
+
+        // The set of callsigns that have a usable eQSL account (username AND password filled in).
+        private const string SendableCallsignsSubquery =
+            "SELECT callsign FROM eqsl_accounts WHERE TRIM(IFNULL(username,'')) <> '' AND TRIM(IFNULL(password,'')) <> ''";
+
+        // Creates the eqsl_accounts table the first time. Rows are NOT seeded from anywhere — they are
+        // added only for the callsign typed in the main screen (via EnsureEqslAccountRow), so the
+        // table only ever lists callsigns the operator actually used.
+        private void EnsureEqslAccountsTable()
+        {
+            if (TableExists("eqsl_accounts")) return;
+
+            string sql = @"
+            CREATE TABLE [eqsl_accounts] (
+                [Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL
+            , [callsign] nvarchar(100) NOT NULL UNIQUE COLLATE NOCASE
+            , [username] nvarchar(100) NULL COLLATE NOCASE
+            , [password] nvarchar(255) NULL
+            );";
+            using (var cmd = new SQLiteCommand(sql, con))
+                cmd.ExecuteNonQuery();
+        }
+
+        // Returns all eQSL accounts (one row per station callsign), callsign ascending.
+        public List<EqslAccount> GetEqslAccounts()
+        {
+            var list = new List<EqslAccount>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            using (var cmd = new SQLiteCommand("SELECT callsign, username, password FROM eqsl_accounts ORDER BY callsign ASC", con))
+            using (var rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    list.Add(new EqslAccount
+                    {
+                        Callsign = rdr["callsign"] == DBNull.Value ? string.Empty : rdr["callsign"].ToString(),
+                        Username = rdr["username"] == DBNull.Value ? string.Empty : rdr["username"].ToString(),
+                        Password = rdr["password"] == DBNull.Value ? string.Empty : rdr["password"].ToString()
+                    });
+                }
+            }
+            return list;
+        }
+
+        // Returns the eQSL account for a station callsign, or null if there is no row for it.
+        public EqslAccount GetEqslAccount(string callsign)
+        {
+            if (string.IsNullOrWhiteSpace(callsign) || con == null || con.State != ConnectionState.Open) return null;
+            using (var cmd = new SQLiteCommand("SELECT callsign, username, password FROM eqsl_accounts WHERE callsign = @c COLLATE NOCASE LIMIT 1", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@c", callsign.Trim()));
+                using (var rdr = cmd.ExecuteReader())
+                {
+                    if (rdr.Read())
+                    {
+                        return new EqslAccount
+                        {
+                            Callsign = rdr["callsign"] == DBNull.Value ? string.Empty : rdr["callsign"].ToString(),
+                            Username = rdr["username"] == DBNull.Value ? string.Empty : rdr["username"].ToString(),
+                            Password = rdr["password"] == DBNull.Value ? string.Empty : rdr["password"].ToString()
+                        };
+                    }
+                }
+            }
+            return null;
+        }
+
+        // Makes sure there's a row for this station callsign (blank credentials if new), so it shows
+        // up in the eQSL accounts table for the user to fill in.
+        public void EnsureEqslAccountRow(string callsign)
+        {
+            if (string.IsNullOrWhiteSpace(callsign) || con == null || con.State != ConnectionState.Open) return;
+            using (var cmd = new SQLiteCommand("INSERT OR IGNORE INTO eqsl_accounts (callsign, username, password) VALUES (@c,'','')", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@c", callsign.Trim()));
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        // Removes accounts rows that have NO credentials filled in (empty username and password),
+        // except the one for keepCallsign (the current main-screen callsign, which we keep so the
+        // user has a line to fill in). This keeps the table to exactly: accounts you configured +
+        // your current callsign — and cleans out any blank rows left over from earlier seeding.
+        public void PruneEmptyEqslAccounts(string keepCallsign)
+        {
+            if (con == null || con.State != ConnectionState.Open) return;
+            string sql = "DELETE FROM eqsl_accounts WHERE TRIM(IFNULL(username,'')) = '' AND TRIM(IFNULL(password,'')) = ''";
+            bool keep = !string.IsNullOrWhiteSpace(keepCallsign);
+            if (keep) sql += " AND callsign <> @keep COLLATE NOCASE";
+            using (var cmd = new SQLiteCommand(sql, con))
+            {
+                if (keep) cmd.Parameters.Add(new SQLiteParameter("@keep", keepCallsign.Trim()));
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        // Removes the eQSL account for a station callsign entirely (used by the "Remove" button).
+        public void DeleteEqslAccount(string callsign)
+        {
+            if (string.IsNullOrWhiteSpace(callsign) || con == null || con.State != ConnectionState.Open) return;
+            using (var cmd = new SQLiteCommand("DELETE FROM eqsl_accounts WHERE callsign = @c COLLATE NOCASE", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@c", callsign.Trim()));
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        // Saves the eQSL username + password the user typed for a station callsign.
+        public void SaveEqslAccountCredentials(string callsign, string username, string password)
+        {
+            if (string.IsNullOrWhiteSpace(callsign) || con == null || con.State != ConnectionState.Open) return;
+            EnsureEqslAccountRow(callsign);
+            using (var cmd = new SQLiteCommand("UPDATE eqsl_accounts SET username = @u, password = @p WHERE callsign = @c COLLATE NOCASE", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@u", (object)(username ?? string.Empty)));
+                cmd.Parameters.Add(new SQLiteParameter("@p", (object)(password ?? string.Empty)));
+                cmd.Parameters.Add(new SQLiteParameter("@c", callsign.Trim()));
+                cmd.ExecuteNonQuery();
+            }
+        }
+
         // Function to check if a table exists in the database
         bool TableExists(string tableName)
         {
@@ -554,6 +764,7 @@ namespace HolyLogger
             , [prop_mode] nvarchar(100) NULL COLLATE NOCASE
             , [sat_name] nvarchar(100) NULL COLLATE NOCASE
             , [soapbox] nvarchar(100) NULL COLLATE NOCASE
+            , [eqsl_status] INTEGER NOT NULL DEFAULT 0
             );";
 
             string createTable_categories = @"
@@ -681,6 +892,8 @@ namespace HolyLogger
                 AddColToTable("qso", "sat_name", "nvarchar(100) NULL");
                 AddColToTable("qso", "soapbox", "nvarchar(100) NULL");
             }
+            AddEqslStatusColumn();
+            EnsureEqslAccountsTable();
             using (var command = new SQLiteCommand(createTable_categories, con))
             {
                 command.ExecuteNonQuery();
@@ -706,5 +919,14 @@ namespace HolyLogger
                 command.ExecuteNonQuery();
             }
         }
+    }
+
+    // One eQSL account, keyed by the station callsign it is used for. The username is the eQSL
+    // login (normally the callsign itself, but kept separate so it can differ).
+    public class EqslAccount
+    {
+        public string Callsign { get; set; }
+        public string Username { get; set; }
+        public string Password { get; set; }
     }
 }

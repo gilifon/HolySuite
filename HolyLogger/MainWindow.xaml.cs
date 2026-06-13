@@ -1072,6 +1072,17 @@ namespace HolyLogger
             // Reflect the persisted Contest Mode state in its Tools-menu header (YES/NO).
             UpdateContestModeMenuHeader();
 
+            // eQSL queue: make sure the current main-screen callsign has a row in the eQSL accounts
+            // table so it appears in Options, then show how many QSOs are waiting. Nothing is sent
+            // automatically here — the user reviews and sends the queue manually from the queue window.
+            if (dal != null)
+            {
+                string myCall = (TB_MyCallsign.Text ?? string.Empty).Trim();
+                if (!string.IsNullOrWhiteSpace(myCall)) dal.EnsureEqslAccountRow(myCall);
+                dal.PruneEmptyEqslAccounts(myCall);
+            }
+            UpdateEqslQueueIndicator();
+
             // Initialize RST fields based on the selected mode after window is fully loaded
             if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
             {
@@ -1152,6 +1163,10 @@ namespace HolyLogger
                     dal.Delete(qso.id);
                 }
                 UpdateNumOfQSOs();
+
+                // A deleted QSO is gone from the DB, so it drops out of the eQSL waiting list —
+                // refresh the "!" badge / menu count (and any open queue window) right away.
+                UpdateEqslQueueIndicator();
 
                 // The deleted QSO may have been the last one; refresh LastQSO to the
                 // current top of the log so the Spot button uses the correct QSO.
@@ -1286,9 +1301,14 @@ namespace HolyLogger
 
                     AddWorkedCountryAndRefreshCluster(qso.DXCall);
 
-                    // Auto-upload this QSO to eQSL.cc (fire-and-forget; no effect unless enabled
-                    // and credentials are configured in Options).
-                    UploadQsoToEqsl(qso);
+                    // Make sure this station callsign has a row in the eQSL accounts table (so it
+                    // shows up in Options for the user to add credentials), then try to auto-upload
+                    // THIS QSO to its account (only if the option is on, the account has credentials,
+                    // and we have internet). If it can't be sent it simply stays queued; the backlog
+                    // is never flushed automatically — the user sends it manually from the queue window.
+                    dal.EnsureEqslAccountRow(qso.MyCall);
+                    UpdateEqslQueueIndicator();
+                    _ = SendOneQsoToEqsl(qso);
                 }
                 catch (Exception ex)
                 {
@@ -2075,32 +2095,152 @@ namespace HolyLogger
         private static readonly System.Net.Http.HttpClient _eqslHttp =
             new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(25) };
 
-        // Fire-and-forget upload of a single QSO to the user's eQSL.cc account, hooked into the QSO
-        // save flow. Enabled by the EqslAutoUpload setting + eQSL credentials (set in Options).
-        // Per the chosen behavior, failures are intentionally swallowed: the QSO is always saved
-        // locally regardless of whether eQSL is reachable.
-        private void UploadQsoToEqsl(QSO qso)
+        // Guarantees only one upload operation runs at a time, so the on-save auto-upload and the
+        // manual "Send" pass can never double-send the same QSO.
+        private readonly System.Threading.SemaphoreSlim _eqslPumpLock = new System.Threading.SemaphoreSlim(1, 1);
+
+        // Builds the eQSL ImportADIF upload URL for a single QSO.
+        private static string BuildEqslUrl(QSO qso, string user, string pwd, string nickname)
         {
-            if (qso == null) return;
-            if (!Properties.Settings.Default.EqslAutoUpload) return;
-
-            string user = (Properties.Settings.Default.EqslUsername ?? string.Empty).Trim();
-            string pwd = Properties.Settings.Default.EqslPassword ?? string.Empty;
-            if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pwd)) return;
-
-            string nickname = (Properties.Settings.Default.EqslQthNickname ?? string.Empty).Trim();
             string adif = BuildEqslAdif(qso, nickname);
-
-            string url = "https://www.eQSL.cc/qslcard/ImportADIF.cfm"
+            return "https://www.eQSL.cc/qslcard/ImportADIF.cfm"
                 + "?EQSL_USER=" + Uri.EscapeDataString(user)
                 + "&EQSL_PSWD=" + Uri.EscapeDataString(pwd)
                 + "&ADIFData=" + Uri.EscapeDataString(adif);
+        }
 
-            System.Threading.Tasks.Task.Run(async () =>
+        // Auto-uploads a single just-logged QSO to the eQSL account that belongs to the callsign it
+        // was logged under. On success it is marked sent; if it can't be confirmed (offline / auth /
+        // error) it stays pending and the "!" badge appears so the user can send it manually later.
+        // Does nothing unless "Automatically upload each QSO" is on AND that callsign has an account
+        // with credentials. The backlog is NEVER flushed here.
+        private async System.Threading.Tasks.Task SendOneQsoToEqsl(QSO qso)
+        {
+            if (qso == null || dal == null) return;
+            if (!Properties.Settings.Default.EqslAutoUpload) return;
+
+            EqslAccount acct = dal.GetEqslAccount(qso.MyCall);
+            if (acct == null || string.IsNullOrWhiteSpace(acct.Username) || string.IsNullOrWhiteSpace(acct.Password))
+                return; // no eQSL account configured for this callsign -> leave it pending
+
+            // If a send pass is already running, leave this QSO pending; it will be picked up later.
+            if (!await _eqslPumpLock.WaitAsync(0)) return;
+            try
             {
-                try { await _eqslHttp.GetStringAsync(url).ConfigureAwait(false); }
-                catch { /* fire-and-forget */ }
-            });
+                string url = BuildEqslUrl(qso, acct.Username, acct.Password, null);
+
+                int outcome;
+                try
+                {
+                    string body = await _eqslHttp.GetStringAsync(url);
+                    outcome = ClassifyEqslResponse(body);
+                }
+                catch
+                {
+                    outcome = 0; // offline / timeout -> leave pending
+                }
+
+                if (outcome == 1) dal.SetEqslStatus(qso.id, 1);
+                else if (outcome == 2) dal.SetEqslStatus(qso.id, 2);
+                // outcome 0 -> leave pending
+
+                UpdateEqslQueueIndicator();
+            }
+            finally
+            {
+                _eqslPumpLock.Release();
+            }
+        }
+
+        // Manually uploads every pending QSO that has a configured account, routing each to the eQSL
+        // account of the callsign it was logged under. Marks each sent or rejected from eQSL's reply,
+        // and leaves anything that can't be confirmed sent as pending so nothing is ever lost. Called
+        // only from the queue window's "Send" button. Returns the number of QSOs successfully uploaded
+        // in this pass. Must run on the UI thread (touches DB + UI).
+        private async System.Threading.Tasks.Task<int> PumpEqslQueue()
+        {
+            if (dal == null) return 0;
+
+            if (!await _eqslPumpLock.WaitAsync(0)) return 0;
+            try
+            {
+                // Only QSOs whose callsign has an account come back here.
+                System.Collections.Generic.List<QSO> pending = dal.GetPendingEqslQsos();
+                int sentCount = 0;
+
+                foreach (var qso in pending)
+                {
+                    EqslAccount acct = dal.GetEqslAccount(qso.MyCall);
+                    if (acct == null || string.IsNullOrWhiteSpace(acct.Username) || string.IsNullOrWhiteSpace(acct.Password))
+                        continue; // shouldn't happen (filtered), but skip defensively
+
+                    string url = BuildEqslUrl(qso, acct.Username, acct.Password, null);
+                    int outcome;
+                    bool networkError = false;
+                    try
+                    {
+                        // No ConfigureAwait(false): resume on the UI thread so DB/UI stay single-threaded.
+                        string body = await _eqslHttp.GetStringAsync(url);
+                        outcome = ClassifyEqslResponse(body);
+                    }
+                    catch
+                    {
+                        networkError = true; // offline / timeout
+                        outcome = 0;
+                    }
+
+                    if (networkError)
+                        break; // no internet -> stop; everything else stays pending for next time
+
+                    if (outcome == 1)        // accepted by eQSL
+                    {
+                        dal.SetEqslStatus(qso.id, 1);
+                        sentCount++;
+                    }
+                    else if (outcome == 2)   // permanently rejected (bad record) - skip so it can't block the queue
+                    {
+                        dal.SetEqslStatus(qso.id, 2);
+                    }
+                    // outcome 0 (unrecognized reply, e.g. one account's auth failed) -> leave this QSO
+                    // pending and move on to the next, so one bad account can't block the others.
+
+                    UpdateEqslQueueIndicator();
+                }
+
+                UpdateEqslQueueIndicator();
+                return sentCount;
+            }
+            finally
+            {
+                _eqslPumpLock.Release();
+            }
+        }
+
+        // Interprets eQSL's ImportADIF reply. Deliberately conservative: only an explicit success is
+        // treated as "sent"; an explicit bad-record is treated as "rejected"; anything else (auth
+        // failure, maintenance page, unrecognized text) leaves the QSO pending so it is never lost.
+        // Returns 1 = sent, 2 = rejected, 0 = unknown (keep pending). May need tuning once we have a
+        // real eQSL response sample to look at.
+        private static int ClassifyEqslResponse(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return 0;
+            string text = body.ToLowerInvariant();
+
+            // eQSL reports e.g. "Result: 1 out of 1 records added".
+            var m = System.Text.RegularExpressions.Regex.Match(text, @"(\d+)\s+out\s+of\s+(\d+)\s+record");
+            if (m.Success)
+            {
+                int added = 0;
+                int.TryParse(m.Groups[1].Value, out added);
+                if (added >= 1) return 1;
+                // 0 added: a duplicate already on eQSL counts as done; a real bad record is rejected.
+                if (text.Contains("duplicate") || text.Contains("already")) return 1;
+                if (text.Contains("bad record") || text.Contains("rejected") || text.Contains("error")) return 2;
+                return 0;
+            }
+
+            if (text.Contains("bad record") || text.Contains("rejected")) return 2;
+            return 0;
         }
 
         // Builds a one-record ADIF for eQSL by reusing the app's ADIF generator and (optionally)
@@ -2115,6 +2255,91 @@ namespace HolyLogger
                 if (idx >= 0) adif = adif.Insert(idx, tag);
             }
             return adif;
+        }
+
+        // Refreshes everything that reflects the eQSL queue size: the "!" badge on the log grid and
+        // the Tools-menu item (grayed when empty, with the count in its header). Safe to call often.
+        private void UpdateEqslQueueIndicator()
+        {
+            int pending = 0;
+            // GetPendingEqslCount only counts QSOs whose callsign has a configured eQSL account, so
+            // the badge stays hidden for users (or callsigns) with no eQSL set up.
+            try { if (dal != null) pending = dal.GetPendingEqslCount(); }
+            catch { pending = 0; }
+
+            bool any = pending > 0;
+
+            if (EqslQueueBadge != null)
+            {
+                EqslQueueBadge.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
+                EqslQueueBadge.ToolTip = pending + (pending == 1 ? " QSO" : " QSOs") + " waiting for eQSL — click to review";
+            }
+
+            if (SendQueueToEqslMenuItem != null)
+            {
+                SendQueueToEqslMenuItem.IsEnabled = any;
+
+                // Build the header with just the word "eQSL" in bold; append the count when there's a queue.
+                var header = new System.Windows.Controls.TextBlock();
+                header.Inlines.Add(new System.Windows.Documents.Run("Send Queue To "));
+                header.Inlines.Add(new System.Windows.Documents.Run("eQSL") { FontWeight = System.Windows.FontWeights.Bold });
+                if (any) header.Inlines.Add(new System.Windows.Documents.Run(" (" + pending + ")"));
+                SendQueueToEqslMenuItem.Header = header;
+            }
+
+            // The "!" badge is red when QSOs are waiting, gray when the queue is empty (a custom
+            // colored Border doesn't dim on its own when the menu item is disabled).
+            if (SendQueueBadgeIcon != null)
+                SendQueueBadgeIcon.Background = new SolidColorBrush(
+                    any ? (Color)ColorConverter.ConvertFromString("#D32F2F")
+                        : (Color)ColorConverter.ConvertFromString("#9E9E9E"));
+
+            // Keep an open queue window in sync too (e.g. a QSO was deleted from the log behind it).
+            if (_eqslQueueWindow != null)
+                _eqslQueueWindow.RefreshList();
+        }
+
+        // Recompute the queue size whenever the Tools menu is opened, so the menu item's gray state
+        // and count are always current.
+        private void ToolsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
+        {
+            UpdateEqslQueueIndicator();
+        }
+
+        private void SendQueueToEqslMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            ShowEqslQueueWindow();
+        }
+
+        // Click on the "!" badge in the log grid's header corner opens the same queue window.
+        private void EqslQueueBadge_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            ShowEqslQueueWindow();
+        }
+
+        private EqslQueueWindow _eqslQueueWindow;
+
+        // Opens (or focuses) a small window listing the QSOs still waiting for eQSL, with a Send
+        // button that runs the same upload pass and refreshes the list as each one goes out.
+        private void ShowEqslQueueWindow()
+        {
+            if (dal == null) return;
+
+            if (_eqslQueueWindow != null)
+            {
+                _eqslQueueWindow.Activate();
+                _eqslQueueWindow.RefreshList();
+                return;
+            }
+
+            _eqslQueueWindow = new EqslQueueWindow(
+                () => dal.GetPendingEqslQsos(),
+                () => PumpEqslQueue())
+            {
+                Owner = this
+            };
+            _eqslQueueWindow.Closed += (s, ev) => { _eqslQueueWindow = null; UpdateEqslQueueIndicator(); };
+            _eqslQueueWindow.Show();
         }
 
         // Builds an aligned, label-friendly text block of the full QSO record for the clipboard.
@@ -4304,6 +4529,7 @@ namespace HolyLogger
                     dal.DeleteAll();
                     ClearBtn_Click(null, null);
                     UpdateNumOfQSOs();
+                    UpdateEqslQueueIndicator();
                 }
             }
             else
@@ -4344,6 +4570,17 @@ namespace HolyLogger
 
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            // Make sure the current main-screen callsign has a row in the eQSL accounts table so it
+            // appears (as a new empty line to fill in) when the user opens the eQSL Service page, and
+            // clear out any blank rows for other callsigns so the table shows only configured accounts
+            // plus the current callsign.
+            if (dal != null)
+            {
+                string myCall = (TB_MyCallsign.Text ?? string.Empty).Trim();
+                if (!string.IsNullOrWhiteSpace(myCall)) dal.EnsureEqslAccountRow(myCall);
+                dal.PruneEmptyEqslAccounts(myCall);
+            }
+
             if (options != null)
             {
                 var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == options /* return "true" if 'w' is the window your are about to open */);
@@ -4365,6 +4602,10 @@ namespace HolyLogger
             options.GeneralSettingsControlControlInstance.OmniRigEngine_Changed += GeneralSettingsControlControlInstance_OmniRigEngine_Changed;
             options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
             options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
+
+            // Tell the eQSL page which callsign is active so it can protect that row from deletion.
+            if (options.EqslServiceControlInstance != null)
+                options.EqslServiceControlInstance.CurrentCallsign = (TB_MyCallsign.Text ?? string.Empty).Trim();
         }
 
         private void GeneralSettingsControlControlInstance_OmniRigEngine_Changed()

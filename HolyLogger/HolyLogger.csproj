@@ -181,6 +181,7 @@
     <Compile Include="CallsignUploader.cs" />
     <Compile Include="CountDownTimer.cs" />
     <Compile Include="DataAccess.cs" />
+    <Compile Include="EqslQueueWindow.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="LogInfoWindow.xaml.cs">
       <DependentUpon>LogInfoWindow.xaml</DependentUpon>

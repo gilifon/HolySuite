@@ -24,6 +24,13 @@ namespace HolyLogger
             InitializeComponent();
             GeneralItem.IsSelected = true;
         }
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            // Make sure any eQSL account edit still in progress (typed but not yet committed) is saved.
+            if (EqslServiceControlInstance != null) EqslServiceControlInstance.SaveAll();
+            base.OnClosing(e);
+        }
+
         protected override void OnLocationChanged(EventArgs e)
         {
             if (this.Left >= 0)
@@ -64,6 +71,8 @@ namespace HolyLogger
         private void EqslServiceItem_Selected(object sender, RoutedEventArgs e)
         {
             HideAllControls();
+            // Reload so any callsign logged since the window opened shows up in the accounts table.
+            EqslServiceControlInstance.LoadAccounts();
             EqslServiceControlInstance.Visibility = Visibility.Visible;
         }
         private void ImportItem_Selected(object sender, RoutedEventArgs e)

@@ -4,16 +4,40 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
-             mc:Ignorable="d" Height="210" Width="390">
+             mc:Ignorable="d" Height="520" Width="660">
     <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
-        <CheckBox x:Name="CB_AutoUpload" Content="Automatically upload each QSO to eQSL" HorizontalAlignment="Left" Margin="2,6,0,0" VerticalAlignment="Top" FontSize="15" Checked="CB_AutoUpload_Changed" Unchecked="CB_AutoUpload_Changed"/>
-        <Label Content="User Name" HorizontalAlignment="Left" Margin="0,36,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_UserName" HorizontalAlignment="Left" Height="24" Margin="125,40,0,0" VerticalAlignment="Top" Width="255" FontSize="16" TextChanged="TB_UserName_TextChanged"/>
-        <Label Content="Password" HorizontalAlignment="Left" Margin="0,68,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <PasswordBox x:Name="TB_Password" HorizontalAlignment="Left" Margin="125,72,0,0" VerticalAlignment="Top" Width="255" FontSize="16" PasswordChanged="TB_Password_PasswordChanged"/>
-        <Label Content="QTH Nickname" HorizontalAlignment="Left" Margin="0,100,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="TB_Nickname" HorizontalAlignment="Left" Height="24" Margin="125,104,0,0" VerticalAlignment="Top" Width="255" FontSize="16" TextChanged="TB_Nickname_TextChanged"/>
-        <TextBlock Text="(optional — only if your eQSL account has more than one QTH profile)" TextWrapping="Wrap" HorizontalAlignment="Left" Margin="2,134,0,0" VerticalAlignment="Top" Width="378" FontSize="11" Foreground="#666666"/>
-        <Button x:Name="TestConnectionBtn" Content="Test Connection" HorizontalAlignment="Left" Margin="245,170,0,0" VerticalAlignment="Top" Width="135" FontSize="16" Click="TestConnectionBtn_Click"/>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <CheckBox x:Name="CB_AutoUpload" Grid.Row="0" Content="Automatically upload each QSO to eQSL"
+                  HorizontalAlignment="Left" Margin="2,6,0,0" VerticalAlignment="Top" FontSize="15"
+                  Checked="CB_AutoUpload_Changed" Unchecked="CB_AutoUpload_Changed"/>
+
+        <TextBlock Grid.Row="1" Margin="2,12,0,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                   Text="One eQSL account per station callsign. The Station Callsign column is filled in automatically from the callsigns you log under (set on the main screen). Enter the eQSL user name and password for each callsign you want to upload. A QSO is only sent to the account of the callsign it was logged under."/>
+
+        <DataGrid x:Name="DG_Accounts" Grid.Row="2" Margin="2,0,2,0"
+                  AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
+                  HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
+                  SelectionUnit="FullRow" FontSize="14"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  CellEditEnding="DG_Accounts_CellEditEnding">
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Station Callsign" Binding="{Binding Callsign}" IsReadOnly="True" Width="*"/>
+                <DataGridTextColumn Header="eQSL User Name" Binding="{Binding Username}" Width="*"/>
+                <DataGridTextColumn Header="Password" Binding="{Binding Password}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,2,4">
+            <Button x:Name="RemoveBtn" Content="Remove selected" Width="150" FontSize="15"
+                    Margin="0,0,10,0" Click="RemoveBtn_Click"/>
+            <Button x:Name="TestConnectionBtn" Content="Test Connection (selected)" Width="200"
+                    FontSize="15" Click="TestConnectionBtn_Click"/>
+        </StackPanel>
     </Grid>
 </UserControl>

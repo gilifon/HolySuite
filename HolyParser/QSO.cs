@@ -88,6 +88,10 @@ namespace HolyParser
         [JsonProperty("soapbox")]
         public string SOAPBOX { get; set; }
 
+        // eQSL upload state: 0 = pending (waiting to be sent), 1 = sent/handled (won't be auto-sent),
+        // 2 = permanently rejected by eQSL. Not serialized to the contest server.
+        public int EqslStatus { get; set; }
+
         public QSO()
         {
             IsAllowWARC = false;

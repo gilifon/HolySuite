@@ -369,7 +369,7 @@
                                 </MenuItem.Icon>
                             </MenuItem>-->
                 </MenuItem>
-                <MenuItem Header="Tools" FontSize="16">
+                <MenuItem Header="Tools" FontSize="16" SubmenuOpened="ToolsMenu_SubmenuOpened">
                     <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
                                 <MenuItem.Icon>
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -412,6 +412,15 @@
                     <MenuItem x:Name="RemoveDuplicatesMenuItem" Header="Remove Duplicates" ToolTip="Remove duplicates from the log" Click="RemoveDuplicatesMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="SendQueueToEqslMenuItem" Header="Send Queue To eQSL" ToolTip="Upload the QSOs that are still waiting to be sent to eQSL.cc" Click="SendQueueToEqslMenuItem_Click" IsEnabled="False">
+                        <MenuItem.Icon>
+                            <!-- Same red "!" badge as the one on the log table, so the user instantly
+                                 links this menu item to the alert they saw there. -->
+                            <Border x:Name="SendQueueBadgeIcon" Width="16" Height="16" CornerRadius="8" Background="#9E9E9E" BorderBrush="White" BorderThickness="1">
+                                <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
@@ -977,6 +986,17 @@
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
+
+        <!-- eQSL queue alert: a red "!" badge overlaid on the log table's top-left header corner.
+             Hidden unless there are QSOs waiting to be sent to eQSL; click opens the queue window. -->
+        <Border x:Name="EqslQueueBadge" Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Margin="5,5,0,0" Width="22" Height="22" CornerRadius="11" Background="#D32F2F"
+                BorderBrush="White" BorderThickness="1.5" Panel.ZIndex="30" Cursor="Hand"
+                Visibility="Collapsed" MouseLeftButtonUp="EqslQueueBadge_MouseLeftButtonUp"
+                ToolTip="QSOs waiting for eQSL — click to review">
+            <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="15"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
 
         <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
         <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
