@@ -830,7 +830,7 @@
         <!-- Undo icon for log-row "Set Radio to Freq" (independent of the cluster undo). Hidden when nothing to undo. -->
         <!-- Centered vertically between the Exchange (y=141) and Name (y=185) labels; horizontally centered to the Name label. -->
         <Grid x:Name="MainUndoIconGrid" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,164,0,0" Width="26" Height="26" Visibility="Collapsed" Panel.ZIndex="30">
-            <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" ToolTip="Undo radio frequency/mode change">
+            <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" PreviewMouseLeftButtonDown="MainUndoButton_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MainUndoButton_PreviewMouseLeftButtonUp" MouseLeave="MainUndoButton_MouseLeave" ToolTip="Click to undo radio frequency/mode change • Hold to clear all">
                 <Grid>
                     <Image Source="Images/UNDO_Icon.png" Width="22" Height="22" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock x:Name="MainUndoCountText" FontSize="10" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>

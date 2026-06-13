@@ -2491,8 +2491,62 @@ namespace HolyLogger
             UpdateLogRadioUndoButtonState();
         }
 
+        // Long-press support for the undo icon: holding the button for ~700 ms clears the whole undo
+        // stack at once, instead of stepping back one entry per click.
+        private System.Windows.Threading.DispatcherTimer _undoResetTimer;
+        private bool _undoResetFired;
+
+        private void MainUndoButton_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            _undoResetFired = false;
+            if (logRadioUndoStates.Count == 0) return;
+
+            if (_undoResetTimer == null)
+            {
+                _undoResetTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(700)
+                };
+                _undoResetTimer.Tick += (s, ev) =>
+                {
+                    _undoResetTimer.Stop();
+                    _undoResetFired = true;   // suppress the upcoming Click (single undo)
+                    ResetLogRadioUndo();
+                };
+            }
+            _undoResetTimer.Start();
+        }
+
+        private void MainUndoButton_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            _undoResetTimer?.Stop();
+        }
+
+        private void MainUndoButton_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            // Moved off the button before the hold completed - cancel the reset.
+            _undoResetTimer?.Stop();
+        }
+
+        // Clears the entire log-radio undo stack (the "reset" action triggered by a long press).
+        private void ResetLogRadioUndo()
+        {
+            if (logRadioUndoStates.Count == 0) return;
+            logRadioUndoStates.Clear();
+            UpdateLogRadioUndoButtonState();
+            if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
+                QSODataGrid.UnselectAll();
+        }
+
         private async void LogRadioUndoButton_Click(object sender, RoutedEventArgs e)
         {
+            // If a long press just cleared the stack, swallow this click so it doesn't also undo.
+            if (_undoResetFired)
+            {
+                _undoResetFired = false;
+                return;
+            }
+
             if (logRadioUndoStates.Count == 0)
             {
                 return;
@@ -4989,6 +5043,10 @@ namespace HolyLogger
             UpdateClusterUndoButtonState();
 
             undoButton.Click += ClusterUndoButton_Click;
+            // Long press (hold) clears the whole cluster undo stack, same as the log undo icon.
+            undoButton.PreviewMouseLeftButtonDown += ClusterUndoButton_PreviewMouseLeftButtonDown;
+            undoButton.PreviewMouseLeftButtonUp += ClusterUndoButton_PreviewMouseLeftButtonUp;
+            undoButton.MouseLeave += ClusterUndoButton_MouseLeave;
 
             clusterWindow.LocationChanged += ClusterWindow_LocationChanged;
             clusterWindow.SizeChanged += ClusterWindow_SizeChanged;
@@ -5148,7 +5206,7 @@ namespace HolyLogger
                 BorderThickness = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = "Undo last spot tune",
+                ToolTip = "Click to undo last spot tune • Hold to clear all",
                 Margin = new Thickness(0, 0, 0, 8),
                 IsEnabled = false,
                 Opacity = 0.35,
@@ -8299,8 +8357,59 @@ namespace HolyLogger
             UpdateClusterUndoButtonState();
         }
 
+        // Long-press support for the cluster undo button: holding it ~700 ms clears the whole cluster
+        // undo stack at once (mirrors the log-radio undo icon).
+        private System.Windows.Threading.DispatcherTimer _clusterUndoResetTimer;
+        private bool _clusterUndoResetFired;
+
+        private void ClusterUndoButton_PreviewMouseLeftButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            _clusterUndoResetFired = false;
+            if (clusterUndoStates.Count == 0) return;
+
+            if (_clusterUndoResetTimer == null)
+            {
+                _clusterUndoResetTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(700)
+                };
+                _clusterUndoResetTimer.Tick += (s, ev) =>
+                {
+                    _clusterUndoResetTimer.Stop();
+                    _clusterUndoResetFired = true;   // suppress the upcoming Click (single undo)
+                    ResetClusterUndo();
+                };
+            }
+            _clusterUndoResetTimer.Start();
+        }
+
+        private void ClusterUndoButton_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            _clusterUndoResetTimer?.Stop();
+        }
+
+        private void ClusterUndoButton_MouseLeave(object sender, System.Windows.Input.MouseEventArgs e)
+        {
+            _clusterUndoResetTimer?.Stop();
+        }
+
+        // Clears the entire cluster undo stack (the "reset" action triggered by a long press).
+        private void ResetClusterUndo()
+        {
+            if (clusterUndoStates.Count == 0) return;
+            clusterUndoStates.Clear();
+            UpdateClusterUndoButtonState();
+        }
+
         private async void ClusterUndoButton_Click(object sender, RoutedEventArgs e)
         {
+            // If a long press just cleared the stack, swallow this click so it doesn't also undo.
+            if (_clusterUndoResetFired)
+            {
+                _clusterUndoResetFired = false;
+                return;
+            }
+
             if (clusterUndoStates.Count == 0)
             {
                 return;
