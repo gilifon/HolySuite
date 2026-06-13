@@ -385,6 +385,20 @@
                             <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="ContestModeMenuItem" Header="Contest Mode - OFF" Click="ContestModeMenuItem_Click" ToolTip="When ON, a same band+mode QSO is flagged as a Duplicate. When OFF, the program only shows how many times the station was worked before.">
+                        <MenuItem.Icon>
+                            <!-- The negative margin lets the blue tile grow beyond the fixed icon slot
+                                 symmetrically, so it gets bigger without moving from its aligned spot. -->
+                            <Border x:Name="ContestTrophyBg" Width="22" Height="22" CornerRadius="4" Background="Transparent"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" Margin="-3">
+                                <Viewbox Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Path x:Name="ContestTrophyPath" Stretch="Uniform" Width="24" Height="24"
+                                          Data="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"
+                                          Fill="#9E9E9E"/>
+                                </Viewbox>
+                            </Border>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -760,7 +774,7 @@
             </Border>
         </Popup>
         <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
-        <Label x:Name="L_Legal" Content="Legal QSO Before" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Green" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
+        <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" FontWeight="Bold" FontStyle="Italic" FontSize="14" Visibility="Hidden"><Run Text="Legal " Foreground="Green"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="Green"/></TextBlock>
         <Border HorizontalAlignment="Left" Margin="264,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
                 <ToolTip>
@@ -782,8 +796,17 @@
         <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="360,143,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
         <TextBlock HorizontalAlignment="Left" Margin="369,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="403,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
-        <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="317,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
-        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="362,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" />
+        <!-- Contest Mode state indicator (display only, not clickable): gold trophy on a blue tile
+             when Contest Mode is ON, gray trophy when OFF. -->
+        <Border x:Name="ContestIndicator" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="321,101,0,0" Width="26" Height="24" CornerRadius="4" Background="Transparent" ToolTip="Contest Mode state" ToolTipService.InitialShowDelay="0">
+            <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Path x:Name="ContestIndicatorPath" Stretch="Uniform" Width="24" Height="24"
+                      Data="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"
+                      Fill="#9E9E9E"/>
+            </Viewbox>
+        </Border>
+        <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="353,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
+        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="398,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" />
         <Label Content="Time" HorizontalAlignment="Left" Margin="516,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
         <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="561,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" />
 

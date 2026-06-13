@@ -552,7 +552,7 @@ namespace HolyLogger
             this.Loaded += MainWindow_Loaded;
                 Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
 
-            ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - ON" : "Manual Mode - OFF";
+            ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
             L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
 
             AdifHandlerWorker = new BackgroundWorker();
@@ -1068,9 +1068,6 @@ namespace HolyLogger
             // Reflect the persisted suggestions on/off state on the Suggest (F4) toggle button.
             if (BtnSuggestToggle != null)
                 BtnSuggestToggle.IsChecked = Properties.Settings.Default.CallsignSuggestionsEnabled;
-
-            // Reflect the persisted Contest Mode state in its Tools-menu header (YES/NO).
-            UpdateContestModeMenuHeader();
 
             // Initialize RST fields based on the selected mode after window is fully loaded
             if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
@@ -4035,7 +4032,7 @@ namespace HolyLogger
         private void ManualModeMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.isManualMode = !Properties.Settings.Default.isManualMode;
-            ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - ON" : "Manual Mode - OFF";
+            ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - On" : "Manual Mode - Off";
             L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
             ShowRigParams();
         }
@@ -4043,48 +4040,7 @@ namespace HolyLogger
         private void ResetRecentQSOCounterMenuItem_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.RecentQSOCounter = 0;
-        }
-
-        // Contest Mode on/off (Tools menu). When on, exact-match QSOs (same callsigns + band + mode)
-        // are flagged as "Duplicate"; when off, the program never reports a duplicate and instead
-        // shows how many times the station was worked before.
-        private void ContestModeMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            Properties.Settings.Default.ContestMode = !Properties.Settings.Default.ContestMode;
-            Properties.Settings.Default.Save();
-            UpdateContestModeMenuHeader();
-            // Re-evaluate the duplicate / worked-before indicator for the current callsign.
-            UpdateDup();
-        }
-
-        private void UpdateContestModeMenuHeader()
-        {
-            bool on = Properties.Settings.Default.ContestMode;
-            var gold = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07));
-            var gray = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
-            Brush blue = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
-
-            if (ContestModeMenuItem != null)
-                ContestModeMenuItem.Header = on ? "Contest Mode - ON" : "Contest Mode - OFF";
-
-            // Tools-menu icon: gold trophy on a blue tile when contesting, plain gray when not.
-            if (ContestTrophyPath != null)
-                ContestTrophyPath.Fill = on ? gold : gray;
-            if (ContestTrophyBg != null)
-                ContestTrophyBg.Background = on ? blue : Brushes.Transparent;
-
-            // Main-screen state indicator (display only) mirrors the same look, and its tooltip
-            // explains the current mode on hover.
-            if (ContestIndicatorPath != null)
-                ContestIndicatorPath.Fill = on ? gold : gray;
-            if (ContestIndicator != null)
-            {
-                ContestIndicator.Background = on ? blue : Brushes.Transparent;
-                ContestIndicator.ToolTip = on
-                    ? "Contest Mode: ON\nDuplicate QSOs (same callsign, band and mode) are flagged.\nChange it from the Tools menu."
-                    : "Contest Mode: OFF\nDuplicates are not flagged — the log just shows how many times each station was worked before.\nChange it from the Tools menu.";
-            }
-        }
+        }        
 
         private async void PropertiesWindow_Closed(object sender, EventArgs e)
         {
@@ -9065,9 +9021,7 @@ namespace HolyLogger
                 if (capturedEditId >= 0)
                     dupQuery = dupQuery.Where(p => p.id != capturedEditId);
                 bool hasDups = dupQuery.Any();
-                // Count all prior QSOs with this station (any band/mode) — used for the
-                // "worked before" indicator, including when it is also an exact duplicate.
-                int legalCount = qsosSnapshot.Count(qso =>
+                bool hasLegal = !hasDups && qsosSnapshot.Any(qso =>
                     qso.MyCall == capturedMyCall && qso.DXCall == capturedDxCall);
 
                 // QSO list filter
@@ -9089,7 +9043,7 @@ namespace HolyLogger
 
                     UpdateMatrixWithData(qsoList, skipDupUpdate: true);
 
-                    if (Properties.Settings.Default.ContestMode && hasDups)
+                    if (hasDups)
                     {
                         L_Duplicate.Visibility = Visibility.Visible;
                         L_Legal.Visibility = Visibility.Hidden;
@@ -9098,10 +9052,7 @@ namespace HolyLogger
                     else
                     {
                         L_Duplicate.Visibility = Visibility.Hidden;
-                        if (legalCount > 0)
-                            ShowLegalQsoBefore(legalCount);
-                        else
-                            L_Legal.Visibility = Visibility.Hidden;
+                        L_Legal.Visibility = hasLegal ? Visibility.Visible : Visibility.Hidden;
                         matrix?.ClearDup();
                     }
 
@@ -10032,15 +9983,6 @@ namespace HolyLogger
                 UpdateDup();
         }
 
-        // Shows the green "Legal ... QSO(s) Before" indicator with the count of prior QSOs with this
-        // DX station. The count is drawn in black; the word is "QSO" for 1 and "QSOs" for more.
-        private void ShowLegalQsoBefore(int count)
-        {
-            L_LegalCount.Text = count.ToString(CultureInfo.InvariantCulture);
-            L_LegalSuffix.Text = count == 1 ? " QSO Before" : " QSOs Before";
-            L_Legal.Visibility = Visibility.Visible;
-        }
-
         private void UpdateDup()
         {
             // Optimize: cache values and materialize queries to avoid repeated enumeration
@@ -10055,9 +9997,8 @@ namespace HolyLogger
             if (state == State.Edit)
                 dups = dups.Where(p => p.id != QsoToUpdate.id);
 
-            // "Duplicate" is only meaningful in Contest Mode. Outside a contest we never report a
-            // duplicate; we just show how many times the station was worked before.
-            if (Properties.Settings.Default.ContestMode && dups.Any())
+            // Use Any() instead of Count() > 0 for better performance (stops at first match)
+            if (dups.Any())
             {
                 L_Duplicate.Visibility = Visibility.Visible;
                 L_Legal.Visibility = Visibility.Hidden;
