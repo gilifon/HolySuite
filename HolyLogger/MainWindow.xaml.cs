@@ -368,6 +368,9 @@ namespace HolyLogger
 
         // High-Priority Stability Improvements
         private static readonly HttpClient _sharedHttpClient = new HttpClient(new WebRequestHandler { CachePolicy = new HttpRequestCachePolicy(HttpRequestCacheLevel.BypassCache) }) { Timeout = TimeSpan.FromSeconds(20) };
+        // Serializes access to the shared database (inserts, batch import, full refresh) across the
+        // UI thread and background threads (UDP loggers, ADIF import worker). Use this instead of
+        // lock(this), which external code could also lock on and deadlock.
         private readonly object _syncLock = new object();
 
         private string title = "HolyLogger   V" + System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString(3) + "   ";
@@ -1283,7 +1286,7 @@ namespace HolyLogger
                 }
                 try
                 {
-                    lock (this)
+                    lock (_syncLock)
                     {
                         LastQSO = dal.Insert(qso);
                         Qsos.Insert(0, LastQSO);
@@ -3594,7 +3597,7 @@ namespace HolyLogger
                         List<QSO> batch = rawQSOList.Skip(i).Take(importBatchSize).ToList();
                         int batchFaulty;
                         int batchStartIndex = i;
-                        lock (this)
+                        lock (_syncLock)
                         {
                             batchFaulty = dal.InsertBatch(batch, processedInBatch =>
                             {
@@ -3634,7 +3637,7 @@ namespace HolyLogger
             }
 
             ObservableCollection<QSO> refreshedQsos;
-            lock (this)
+            lock (_syncLock)
             {
                 refreshedQsos = dal.GetAllQSOs(refreshProgress =>
                 {
@@ -11174,7 +11177,7 @@ namespace HolyLogger
                     progress.Report((++i) * 100 / count);
                     try
                     {
-                        lock (this)
+                        lock (_syncLock)
                         {
                             QSO q = dal.Insert(rq);
                         }
