@@ -3475,7 +3475,7 @@ namespace HolyLogger
 
             var root = new StackPanel { Margin = new Thickness(18) };
 
-            var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+            var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
             headerRow.Children.Add(new TextBlock
             {
                 Text = "⚠",                       // warning sign
@@ -3500,13 +3500,13 @@ namespace HolyLogger
                 TextWrapping = TextWrapping.Wrap,
                 MaxWidth = 430,
                 FontSize = 14,
-                Margin = new Thickness(0, 0, 0, 18)
+                Margin = new Thickness(0, 0, 0, 26)
             });
 
-            var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
             Button MakeButton(string text)
             {
-                return new Button { Content = text, MinWidth = 90, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 14 };
+                return new Button { Content = text, MinWidth = 90, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 14 };
             }
             var mergeBtn = MakeButton("Merge");
             var replaceBtn = MakeButton("Replace");
