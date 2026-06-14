@@ -21,7 +21,7 @@
       <Value Profile="(Default)" />
     </Setting>
     <Setting Name="isLocked" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="isManualMode" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
@@ -63,7 +63,7 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="SignBoardWindowIsOpen" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="UpdateSettings" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
@@ -213,7 +213,7 @@
       <Value Profile="(Default)">200</Value>
     </Setting>
     <Setting Name="TimerWindowIsOpen" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">True</Value>
+      <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="DisplayLastQSOinGrid" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
@@ -225,10 +225,10 @@
       <Value Profile="(Default)">3500</Value>
     </Setting>
     <Setting Name="MapUsePolar" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="MapAutoZoom" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="MapShowDayNight" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
@@ -252,7 +252,7 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="Frequency" Type="System.String" Scope="User">
-      <Value Profile="(Default)">7.130</Value>
+      <Value Profile="(Default)">7.140</Value>
     </Setting>
     <Setting Name="Comment" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
@@ -372,7 +372,7 @@
       <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="ClusterActive" Type="System.Boolean" Scope="User">
-      <Value Profile="(Default)">False</Value>
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="CallsignSuggestionsEnabled" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
