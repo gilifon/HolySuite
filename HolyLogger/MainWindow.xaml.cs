@@ -3435,6 +3435,26 @@ namespace HolyLogger
 
             if (openFileDialog.ShowDialog() == true)
             {
+                // Make it explicit that importing ADDS the file's QSOs to the existing log — it never
+                // replaces it. Only ask when there is already a log, since an empty log is unambiguous.
+                int existing = 0;
+                try { if (dal != null) existing = dal.GetQsoCount(); }
+                catch { existing = 0; }
+
+                if (existing > 0)
+                {
+                    MessageBoxResult result = System.Windows.MessageBox.Show(this,
+                        "The QSOs from the selected ADIF file will be ADDED to your existing log of " +
+                        existing + " QSO" + (existing == 1 ? "" : "s") + ".\n\n" +
+                        "Your current log will NOT be replaced.\n\n" +
+                        "Do you want to continue?",
+                        "Import ADIF — adds to your existing log",
+                        MessageBoxButton.OKCancel, MessageBoxImage.Information);
+
+                    if (result != MessageBoxResult.OK)
+                        return;
+                }
+
                 ImportFileQ.Add(openFileDialog.FileName);
                 StartAdifImportWorker();
             }
