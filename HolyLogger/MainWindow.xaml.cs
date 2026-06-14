@@ -249,6 +249,9 @@ namespace HolyLogger
         HashSet<string> clusterSpotKeys = new HashSet<string>(StringComparer.Ordinal);
         List<ClusterSpotViewItem> clusterAllSpots = new List<ClusterSpotViewItem>();
         ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
+        // While the mouse hovers a band checkbox, the cluster temporarily shows ONLY that band's
+        // spots (table + map), as if it were the active band; cleared when the mouse leaves.
+        string _clusterHoverBandOverride = null;
         HashSet<string> clusterWorkedCountries = null;
         TextBlock clusterActiveBandIndicatorText = null;
         Button clusterBandFilterAllBtn = null;
@@ -6089,8 +6092,54 @@ namespace HolyLogger
                 Margin = new Thickness(2, 0, 2, 0),
                 Tag = band  // Store band name for right-click handler
             };
+            // Wrap the checkbox in a cell so a circle can appear around it on hover.
+            var checkBoxCell = new Grid
+            {
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+            };
+            var hoverCircle = new System.Windows.Shapes.Ellipse
+            {
+                Width = 23,
+                Height = 23,
+                Stroke = new SolidColorBrush(color),
+                StrokeThickness = 2.5,
+                Fill = Brushes.Transparent,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                // Nudge the circle up so it's centered on the checkbox (whose colored square sits
+                // toward the top of its cell), instead of sitting slightly below it.
+                Margin = new Thickness(0, -4, 0, 0),
+                IsHitTestVisible = false,
+                Visibility = Visibility.Hidden
+            };
+            checkBoxCell.Children.Add(hoverCircle);
+            checkBoxCell.Children.Add(checkBox);
+
             bandIndicator.Children.Add(bandText);
-            bandIndicator.Children.Add(checkBox);
+            bandIndicator.Children.Add(checkBoxCell);
+
+            // A transparent background makes the whole cell a reliable hover target.
+            bandIndicator.Background = Brushes.Transparent;
+
+            // Hovering a band momentarily previews it: a circle appears around the checkbox and the
+            // cluster table + map show ONLY this band's spots while the mouse is over it; leaving the
+            // cell hides the circle and restores whatever was showing before.
+            bandIndicator.MouseEnter += (s, e) =>
+            {
+                hoverCircle.Visibility = Visibility.Visible;
+                _clusterHoverBandOverride = band;
+                RefreshClusterVisibleSpots();
+            };
+            bandIndicator.MouseLeave += (s, e) =>
+            {
+                hoverCircle.Visibility = Visibility.Hidden;
+                if (string.Equals(_clusterHoverBandOverride, band, StringComparison.OrdinalIgnoreCase))
+                {
+                    _clusterHoverBandOverride = null;
+                    RefreshClusterVisibleSpots();
+                }
+            };
 
             // Add right-click handler for color editing
             bandIndicator.MouseRightButtonDown += (s, e) =>
@@ -8112,6 +8161,11 @@ namespace HolyLogger
             string normalized = NormalizeClusterBandKey(bandText);
             if (string.IsNullOrWhiteSpace(normalized))
                 return true;
+
+            // While the mouse is hovering a band checkbox, momentarily show ONLY that band's spots,
+            // overriding whatever filter mode/selection is normally in effect.
+            if (!string.IsNullOrEmpty(_clusterHoverBandOverride))
+                return string.Equals(NormalizeClusterBandKey(_clusterHoverBandOverride), normalized, StringComparison.OrdinalIgnoreCase);
 
             string mode = Properties.Settings.Default.ClusterBandFilterMode ?? "PreSelected";
 
