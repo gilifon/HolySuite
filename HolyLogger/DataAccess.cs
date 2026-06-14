@@ -619,6 +619,19 @@ namespace HolyLogger
             }
         }
 
+        // Creates the index that backs the eQSL queue lookups. The badge/queue queries filter on
+        // eqsl_status (and my_callsign), so without this they scan the whole qso table on every
+        // refresh. Idempotent (IF NOT EXISTS), so it is effectively a one-time cost.
+        private void EnsureEqslIndexes()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_eqsl_status ON qso(eqsl_status, my_callsign)", con))
+                    cmd.ExecuteNonQuery();
+            }
+            catch { /* an index is an optimization only; never block startup on it */ }
+        }
+
         // Creates the eqsl_accounts table the first time. The table is managed entirely by hand in
         // Options -> eQSL Service; nothing is ever added automatically.
         private void EnsureEqslAccountsTable()
@@ -907,6 +920,7 @@ namespace HolyLogger
             }
             AddEqslStatusColumn();
             EnsureEqslAccountsTable();
+            EnsureEqslIndexes();
             using (var command = new SQLiteCommand(createTable_categories, con))
             {
                 command.ExecuteNonQuery();
