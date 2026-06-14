@@ -3475,7 +3475,7 @@ namespace HolyLogger
 
             var root = new StackPanel { Margin = new Thickness(18) };
 
-            var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 2) };
+            var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 14) };
             headerRow.Children.Add(new TextBlock
             {
                 Text = "⚠",                       // warning sign
