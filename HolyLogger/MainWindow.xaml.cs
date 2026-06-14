@@ -1072,15 +1072,8 @@ namespace HolyLogger
             // Reflect the persisted Contest Mode state in its Tools-menu header (YES/NO).
             UpdateContestModeMenuHeader();
 
-            // eQSL queue: make sure the current main-screen callsign has a row in the eQSL accounts
-            // table so it appears in Options, then show how many QSOs are waiting. Nothing is sent
-            // automatically here — the user reviews and sends the queue manually from the queue window.
-            if (dal != null)
-            {
-                string myCall = (TB_MyCallsign.Text ?? string.Empty).Trim();
-                if (!string.IsNullOrWhiteSpace(myCall)) dal.EnsureEqslAccountRow(myCall);
-                dal.PruneEmptyEqslAccounts(myCall);
-            }
+            // eQSL queue: show how many QSOs are waiting (only for callsigns the user added to the
+            // eQSL table). Nothing is sent automatically here.
             UpdateEqslQueueIndicator();
 
             // Initialize RST fields based on the selected mode after window is fully loaded
@@ -1295,19 +1288,31 @@ namespace HolyLogger
                         LastQSO = dal.Insert(qso);
                         Qsos.Insert(0, LastQSO);
                         Properties.Settings.Default.RecentQSOCounter++;
-                    }                    
+                    }
+
+                    // dal.Insert returns a fresh object (LastQSO) carrying the new database Id; copy it
+                    // back onto qso so the eQSL auto-upload can mark THIS row as sent (without it,
+                    // SetEqslStatus would target Id 0 and the QSO would stay "pending" forever).
+                    if (LastQSO != null) qso.id = LastQSO.id;
+
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
 
                     AddWorkedCountryAndRefreshCluster(qso.DXCall);
 
-                    // Make sure this station callsign has a row in the eQSL accounts table (so it
-                    // shows up in Options for the user to add credentials), then try to auto-upload
-                    // THIS QSO to its account (only if the option is on, the account has credentials,
-                    // and we have internet). If it can't be sent it simply stays queued; the backlog
-                    // is never flushed automatically — the user sends it manually from the queue window.
-                    dal.EnsureEqslAccountRow(qso.MyCall);
-                    UpdateEqslQueueIndicator();
+                    // Auto-upload THIS QSO to the eQSL account of the callsign it was logged under.
+                    // If it WILL be auto-uploaded (auto-upload on + callsign in the table + user name
+                    // and password present), don't show the "!" now — let SendOneQsoToEqsl update the
+                    // badge AFTER the attempt, so a successful upload never flashes a "!". Otherwise
+                    // (manual mode, no credentials, or a callsign not set up to send) update the badge
+                    // now so the QSO is shown as queued.
+                    EqslAccount eqslAcct = dal.GetEqslAccount(qso.MyCall);
+                    bool willAutoUpload = Properties.Settings.Default.EqslAutoUpload
+                                          && eqslAcct != null
+                                          && !string.IsNullOrWhiteSpace(eqslAcct.Username)
+                                          && !string.IsNullOrWhiteSpace(eqslAcct.Password);
+                    if (!willAutoUpload)
+                        UpdateEqslQueueIndicator();
                     _ = SendOneQsoToEqsl(qso);
                 }
                 catch (Exception ex)
@@ -2262,10 +2267,10 @@ namespace HolyLogger
         private void UpdateEqslQueueIndicator()
         {
             int pending = 0;
-            // Show the "!" for every not-yet-sent QSO (including ones under a callsign that has no
-            // account yet, so the user is alerted) — but only if they use eQSL at all, so users who
-            // never configured eQSL don't see it.
-            try { if (dal != null && dal.HasAnyEqslAccount()) pending = dal.GetPendingEqslCount(); }
+            // Counts not-yet-sent QSOs whose callsign is in the eQSL table (the opt-in list). A
+            // callsign that isn't in the table is ignored, so the "!" never shows for callsigns the
+            // user chose not to upload.
+            try { if (dal != null) pending = dal.GetPendingEqslCount(); }
             catch { pending = 0; }
 
             bool any = pending > 0;
@@ -4625,17 +4630,6 @@ namespace HolyLogger
 
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // Make sure the current main-screen callsign has a row in the eQSL accounts table so it
-            // appears (as a new empty line to fill in) when the user opens the eQSL Service page, and
-            // clear out any blank rows for other callsigns so the table shows only configured accounts
-            // plus the current callsign.
-            if (dal != null)
-            {
-                string myCall = (TB_MyCallsign.Text ?? string.Empty).Trim();
-                if (!string.IsNullOrWhiteSpace(myCall)) dal.EnsureEqslAccountRow(myCall);
-                dal.PruneEmptyEqslAccounts(myCall);
-            }
-
             if (options != null)
             {
                 var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == options /* return "true" if 'w' is the window your are about to open */);
@@ -4657,10 +4651,6 @@ namespace HolyLogger
             options.GeneralSettingsControlControlInstance.OmniRigEngine_Changed += GeneralSettingsControlControlInstance_OmniRigEngine_Changed;
             options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
             options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
-
-            // Tell the eQSL page which callsign is active so it can protect that row from deletion.
-            if (options.EqslServiceControlInstance != null)
-                options.EqslServiceControlInstance.CurrentCallsign = (TB_MyCallsign.Text ?? string.Empty).Trim();
         }
 
         private void GeneralSettingsControlControlInstance_OmniRigEngine_Changed()
@@ -4784,6 +4774,11 @@ namespace HolyLogger
             TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
             TB_Operator.IsEnabled = !Properties.Settings.Default.isLocked;
             setLockBtnState();
+
+            // The eQSL accounts table may have changed (a callsign added/removed). Re-evaluate the "!"
+            // badge so QSOs whose callsign just became listed show up (or removed ones disappear)
+            // immediately, without waiting for the next refresh.
+            UpdateEqslQueueIndicator();
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
