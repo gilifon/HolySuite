@@ -2121,39 +2121,49 @@ namespace HolyLogger
         // with credentials. The backlog is NEVER flushed here.
         private async System.Threading.Tasks.Task SendOneQsoToEqsl(QSO qso)
         {
-            if (qso == null || dal == null) return;
-            if (!Properties.Settings.Default.EqslAutoUpload) return;
-
-            EqslAccount acct = dal.GetEqslAccount(qso.MyCall);
-            if (acct == null || string.IsNullOrWhiteSpace(acct.Username) || string.IsNullOrWhiteSpace(acct.Password))
-                return; // no eQSL account configured for this callsign -> leave it pending
-
-            // If a send pass is already running, leave this QSO pending; it will be picked up later.
-            if (!await _eqslPumpLock.WaitAsync(0)) return;
+            // This runs as fire-and-forget (_ = SendOneQsoToEqsl(...)). Any exception here (e.g. a DB
+            // error from GetEqslAccount/SetEqslStatus) would otherwise be an unobserved task exception,
+            // so the whole body is guarded. The QSO simply stays pending if anything goes wrong.
             try
             {
-                string url = BuildEqslUrl(qso, acct.Username, acct.Password, null);
+                if (qso == null || dal == null) return;
+                if (!Properties.Settings.Default.EqslAutoUpload) return;
 
-                int outcome;
+                EqslAccount acct = dal.GetEqslAccount(qso.MyCall);
+                if (acct == null || string.IsNullOrWhiteSpace(acct.Username) || string.IsNullOrWhiteSpace(acct.Password))
+                    return; // no eQSL account configured for this callsign -> leave it pending
+
+                // If a send pass is already running, leave this QSO pending; it will be picked up later.
+                if (!await _eqslPumpLock.WaitAsync(0)) return;
                 try
                 {
-                    string body = await _eqslHttp.GetStringAsync(url);
-                    outcome = ClassifyEqslResponse(body);
+                    string url = BuildEqslUrl(qso, acct.Username, acct.Password, null);
+
+                    int outcome;
+                    try
+                    {
+                        string body = await _eqslHttp.GetStringAsync(url);
+                        outcome = ClassifyEqslResponse(body);
+                    }
+                    catch
+                    {
+                        outcome = 0; // offline / timeout -> leave pending
+                    }
+
+                    if (outcome == 1) dal.SetEqslStatus(qso.id, 1);
+                    else if (outcome == 2) dal.SetEqslStatus(qso.id, 2);
+                    // outcome 0 -> leave pending
+
+                    UpdateEqslQueueIndicator();
                 }
-                catch
+                finally
                 {
-                    outcome = 0; // offline / timeout -> leave pending
+                    _eqslPumpLock.Release();
                 }
-
-                if (outcome == 1) dal.SetEqslStatus(qso.id, 1);
-                else if (outcome == 2) dal.SetEqslStatus(qso.id, 2);
-                // outcome 0 -> leave pending
-
-                UpdateEqslQueueIndicator();
             }
-            finally
+            catch
             {
-                _eqslPumpLock.Release();
+                // Auto-upload must never crash the app; the QSO remains pending for a later retry.
             }
         }
 
