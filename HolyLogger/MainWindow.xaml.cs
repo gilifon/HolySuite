@@ -3473,7 +3473,7 @@ namespace HolyLogger
                 ShowInTaskbar = false
             };
 
-            var root = new StackPanel { Margin = new Thickness(18) };
+            var root = new StackPanel { Margin = new Thickness(18, 10, 18, 18) };
 
             var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 14) };
             headerRow.Children.Add(new TextBlock
@@ -3509,7 +3509,7 @@ namespace HolyLogger
             }
 
             root.Children.Add(MakeOption("Merge", "add the file's QSOs to your existing log.", new Thickness(0, 0, 0, 12)));
-            root.Children.Add(MakeOption("Replace", "first save a backup of your current log to a file you choose, then clear the log and import the file.", new Thickness(0, 0, 0, 26)));
+            root.Children.Add(MakeOption("Replace", "first save a backup of your current log to a file you choose, then clear the log and import the file.", new Thickness(0, 0, 0, 34)));
 
             var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
             Button MakeButton(string text)
