@@ -19,6 +19,14 @@ namespace HolyLogger
         private SQLiteConnection con = null;
         string dbPath = "";
 
+        // Serializes every access to the single SQLite connection. The connection is not safe for
+        // concurrent use, and it is touched from the UI thread, the UDP logging threads and the ADIF
+        // import worker. Every public method takes this lock; it is re-entrant, so a public method
+        // that calls another (e.g. Insert -> GetTopQSOs) is fine. The lock is only ever taken inside
+        // DataAccess, so it cannot deadlock against outer locks held by callers.
+        private readonly object _dbLock = new object();
+        private static readonly object _instanceLock = new object();
+
         public bool SchemaHasChanged { get; set; }
 
         private DataAccess()
@@ -55,23 +63,33 @@ namespace HolyLogger
         // Public static method to get the single instance of the class.
         public static DataAccess GetInstance()
         {
-            // If instance is null, create a new instance.
+            // Double-checked locking so the singleton is created exactly once even if two threads
+            // race here at startup.
             if (instance == null)
             {
-                instance = new DataAccess();
+                lock (_instanceLock)
+                {
+                    if (instance == null)
+                        instance = new DataAccess();
+                }
             }
             return instance;
         }
 
         public void Close()
         {
-            con.Close();
-            con.Dispose();
-            instance = null;
+            lock (_dbLock)
+            {
+                con.Close();
+                con.Dispose();
+                instance = null;
+            }
         }
 
         public QSO Insert(QSO qso)
         {
+            lock (_dbLock)
+            {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
                 SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
@@ -109,9 +127,12 @@ namespace HolyLogger
                 }
             }
             return null;
+            }
         }
         public bool Insert(IEnumerable<QSO> qsos)
         {
+            lock (_dbLock)
+            {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
                 SQLiteTransaction T = con.BeginTransaction();
@@ -154,10 +175,13 @@ namespace HolyLogger
                 }
             }
             return false;
+            }
         }
 
         public int InsertBatch(IEnumerable<QSO> qsos, Action<int> progressCallback = null)
         {
+            lock (_dbLock)
+            {
             if (con == null || con.State != System.Data.ConnectionState.Open)
                 throw new InvalidOperationException("Database connection is not open.");
 
@@ -241,9 +265,12 @@ namespace HolyLogger
             }
 
             return faultyQso;
+            }
         }
         public void Update(QSO qso)
         {
+            lock (_dbLock)
+            {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
                 SQLiteCommand insertSQL = new SQLiteCommand("UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox WHERE id = @id", con);
@@ -280,9 +307,12 @@ namespace HolyLogger
                     throw new Exception(ex.Message);
                 }
             }
+            }
         }
         public void Delete(int Id)
         {
+            lock (_dbLock)
+            {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
                 SQLiteCommand deleteSQL = new SQLiteCommand("DELETE FROM qso WHERE Id = ?", con);
@@ -296,9 +326,12 @@ namespace HolyLogger
                     throw new Exception(ex.Message);
                 }
             }
+            }
         }
         public void DeleteAll()
         {
+            lock (_dbLock)
+            {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
                 SQLiteCommand deleteSQL = new SQLiteCommand("DELETE FROM qso", con);
@@ -311,9 +344,12 @@ namespace HolyLogger
                     throw new Exception(ex.Message);
                 }
             }
+            }
         }
         public ObservableCollection<QSO> GetAllQSOs(Action<int> progressCallback = null)
         {
+            lock (_dbLock)
+            {
             CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
             int totalCount = GetQsoCount();
@@ -368,9 +404,12 @@ namespace HolyLogger
                 }
             }
             return qso_list;
+            }
         }
         public ObservableCollection<QSO> GetTopQSOs(int i)
         {
+            lock (_dbLock)
+            {
             CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
             string stm = "SELECT * FROM qso ORDER BY Id DESC LIMIT " + i;
@@ -411,37 +450,49 @@ namespace HolyLogger
                 }
             }
             return qso_list;
+            }
         }
         public int GetQsoCount()
         {
+            lock (_dbLock)
+            {
             string stm = "SELECT count(Id) FROM qso";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             {
                 cmd.CommandType = CommandType.Text;
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
+            }
         }
         public int GetGridCount()
         {
+            lock (_dbLock)
+            {
             string stm = "SELECT count(distinct exchange) FROM qso where dx_callsign like '4X%' or dx_callsign like '4Z%'";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             {
                 cmd.CommandType = CommandType.Text;
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
+            }
         }
         public int GetDXCCCount()
         {
+            lock (_dbLock)
+            {
             string stm = "SELECT count(distinct country) FROM qso";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             {
                 cmd.CommandType = CommandType.Text;
                 return Convert.ToInt32(cmd.ExecuteScalar());
             }
+            }
         }
 
         public ObservableCollection<RadioEvent> GetRadioEvents()
         {
+            lock (_dbLock)
+            {
             CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<RadioEvent> radioEvent_list = new ObservableCollection<RadioEvent>();
             string stm = "SELECT * FROM radio_events ORDER BY Id ASC";
@@ -461,10 +512,13 @@ namespace HolyLogger
                 }
             }
             return radioEvent_list;
+            }
         }
 
         public ObservableCollection<GenericItem> GetTableData(string tableName, int eventId=1)
         {
+            lock (_dbLock)
+            {
             CultureInfo enUS = new CultureInfo("en-US");
             ObservableCollection<GenericItem> category_list = new ObservableCollection<GenericItem>();
             string stm = "SELECT * FROM " + tableName + " WHERE event_id = @eventId ORDER BY Id ASC";
@@ -485,6 +539,7 @@ namespace HolyLogger
                 }
             }
             return category_list;
+            }
         }
 
         private void AddColToTable(string tableName, string colName, string definition)
@@ -542,6 +597,8 @@ namespace HolyLogger
         // are sent in the order they were logged.
         public List<QSO> GetPendingEqslQsos()
         {
+            lock (_dbLock)
+            {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
             // Not-yet-sent QSOs whose station callsign is in the eQSL accounts table (the opt-in list).
@@ -582,25 +639,32 @@ namespace HolyLogger
                 }
             }
             return list;
+            }
         }
 
         // Number of QSOs still waiting to be uploaded to eQSL.
         public int GetPendingEqslCount()
         {
+            lock (_dbLock)
+            {
             if (con == null || con.State != ConnectionState.Open) return 0;
             using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE eqsl_status = 0 AND my_callsign IN (SELECT callsign FROM eqsl_accounts)", con))
                 return Convert.ToInt32(cmd.ExecuteScalar());
+            }
         }
 
         // Updates the eQSL upload state of a single QSO (0 pending, 1 sent, 2 rejected).
         public void SetEqslStatus(int id, int status)
         {
+            lock (_dbLock)
+            {
             if (con == null || con.State != ConnectionState.Open) return;
             using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET eqsl_status = @s WHERE Id = @id", con))
             {
                 cmd.Parameters.Add(new SQLiteParameter("@s", status));
                 cmd.Parameters.Add(new SQLiteParameter("@id", id));
                 cmd.ExecuteNonQuery();
+            }
             }
         }
 
@@ -611,11 +675,14 @@ namespace HolyLogger
         // under this callsign to eQSL" (so no "!" badge, no upload).
         public bool IsCallsignInEqslTable(string callsign)
         {
+            lock (_dbLock)
+            {
             if (string.IsNullOrWhiteSpace(callsign) || con == null || con.State != ConnectionState.Open) return false;
             using (var cmd = new SQLiteCommand("SELECT count(*) FROM eqsl_accounts WHERE callsign = @c COLLATE NOCASE", con))
             {
                 cmd.Parameters.Add(new SQLiteParameter("@c", callsign.Trim()));
                 return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+            }
             }
         }
 
@@ -663,6 +730,8 @@ namespace HolyLogger
         // Returns all eQSL accounts (one row per station callsign), callsign ascending.
         public List<EqslAccount> GetEqslAccounts()
         {
+            lock (_dbLock)
+            {
             var list = new List<EqslAccount>();
             if (con == null || con.State != ConnectionState.Open) return list;
             using (var cmd = new SQLiteCommand("SELECT Id, callsign, username, password FROM eqsl_accounts ORDER BY callsign ASC", con))
@@ -672,11 +741,14 @@ namespace HolyLogger
                     list.Add(ReadEqslAccount(rdr));
             }
             return list;
+            }
         }
 
         // Returns the eQSL account for a station callsign, or null if there is no row for it.
         public EqslAccount GetEqslAccount(string callsign)
         {
+            lock (_dbLock)
+            {
             if (string.IsNullOrWhiteSpace(callsign) || con == null || con.State != ConnectionState.Open) return null;
             using (var cmd = new SQLiteCommand("SELECT Id, callsign, username, password FROM eqsl_accounts WHERE callsign = @c COLLATE NOCASE LIMIT 1", con))
             {
@@ -687,6 +759,7 @@ namespace HolyLogger
                 }
             }
             return null;
+            }
         }
 
         // Inserts (Id == 0) or updates (by Id) an eQSL account row. The row is keyed by its Id so the
@@ -694,6 +767,8 @@ namespace HolyLogger
         // blank or already used by a different row. On a successful insert, account.Id is filled in.
         public bool SaveEqslAccount(EqslAccount account, out string error)
         {
+            lock (_dbLock)
+            {
             error = null;
             if (account == null) { error = "No account."; return false; }
             if (con == null || con.State != ConnectionState.Open) { error = "Database not available."; return false; }
@@ -738,16 +813,20 @@ namespace HolyLogger
             }
             account.Callsign = callsign;
             return true;
+            }
         }
 
         // Removes an eQSL account row by its Id (used by the "Remove" button).
         public void DeleteEqslAccount(int id)
         {
+            lock (_dbLock)
+            {
             if (id <= 0 || con == null || con.State != ConnectionState.Open) return;
             using (var cmd = new SQLiteCommand("DELETE FROM eqsl_accounts WHERE Id = @id", con))
             {
                 cmd.Parameters.Add(new SQLiteParameter("@id", id));
                 cmd.ExecuteNonQuery();
+            }
             }
         }
 
