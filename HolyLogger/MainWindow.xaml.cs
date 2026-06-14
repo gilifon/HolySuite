@@ -3493,15 +3493,23 @@ namespace HolyLogger
             });
             root.Children.Add(headerRow);
 
-            root.Children.Add(new TextBlock
+            // Each option is a bold label with a hanging-indented description: when the description
+            // wraps, the continuation lines align under the first word of the description (i.e. under
+            // "first" for Replace), not back at the left edge.
+            DockPanel MakeOption(string label, string desc, Thickness margin)
             {
-                Text = "Merge — add the file's QSOs to your existing log.\n\n" +
-                       "Replace — first save a backup of your current log to a file you choose, then clear the log and import the file.",
-                TextWrapping = TextWrapping.Wrap,
-                MaxWidth = 430,
-                FontSize = 14,
-                Margin = new Thickness(0, 0, 0, 26)
-            });
+                var row = new DockPanel { MaxWidth = 430, Margin = margin };
+                var lbl = new TextBlock { FontSize = 14, VerticalAlignment = VerticalAlignment.Top };
+                lbl.Inlines.Add(new System.Windows.Documents.Run(label) { FontWeight = FontWeights.Bold });
+                lbl.Inlines.Add(new System.Windows.Documents.Run(" — "));
+                DockPanel.SetDock(lbl, Dock.Left);
+                row.Children.Add(lbl);
+                row.Children.Add(new TextBlock { Text = desc, TextWrapping = TextWrapping.Wrap, FontSize = 14 });
+                return row;
+            }
+
+            root.Children.Add(MakeOption("Merge", "add the file's QSOs to your existing log.", new Thickness(0, 0, 0, 12)));
+            root.Children.Add(MakeOption("Replace", "first save a backup of your current log to a file you choose, then clear the log and import the file.", new Thickness(0, 0, 0, 26)));
 
             var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
             Button MakeButton(string text)
