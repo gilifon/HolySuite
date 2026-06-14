@@ -3435,29 +3435,131 @@ namespace HolyLogger
 
             if (openFileDialog.ShowDialog() == true)
             {
-                // Make it explicit that importing ADDS the file's QSOs to the existing log — it never
-                // replaces it. Only ask when there is already a log, since an empty log is unambiguous.
+                // A log already exists: let the user choose to MERGE (add to it) or REPLACE it. An
+                // empty log is unambiguous, so no prompt is needed.
                 int existing = 0;
                 try { if (dal != null) existing = dal.GetQsoCount(); }
                 catch { existing = 0; }
 
                 if (existing > 0)
                 {
-                    MessageBoxResult result = System.Windows.MessageBox.Show(this,
-                        "The QSOs from the selected ADIF file will be ADDED to your existing log of " +
-                        existing + " QSO" + (existing == 1 ? "" : "s") + ".\n\n" +
-                        "Your current log will NOT be replaced.\n\n" +
-                        "Do you want to continue?",
-                        "Import ADIF — adds to your existing log",
-                        MessageBoxButton.OKCancel, MessageBoxImage.Information);
-
-                    if (result != MessageBoxResult.OK)
+                    ImportLogChoice choice = AskImportMergeOrReplace(existing);
+                    if (choice == ImportLogChoice.Cancel)
                         return;
+                    if (choice == ImportLogChoice.Replace && !BackupAndClearLogForReplace())
+                        return; // backup cancelled or failed -> abort; the log is left untouched
                 }
 
                 ImportFileQ.Add(openFileDialog.FileName);
                 StartAdifImportWorker();
             }
+        }
+
+        private enum ImportLogChoice { Cancel, Merge, Replace }
+
+        // Warns that a log already exists and asks the user to Merge (append) or Replace it. Built as
+        // a small custom dialog because a standard MessageBox can't have "Merge"/"Replace" buttons.
+        private ImportLogChoice AskImportMergeOrReplace(int existingCount)
+        {
+            ImportLogChoice result = ImportLogChoice.Cancel;
+
+            var dialog = new Window
+            {
+                Title = "Import ADIF",
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ShowInTaskbar = false
+            };
+
+            var root = new StackPanel { Margin = new Thickness(18) };
+
+            var headerRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 10) };
+            headerRow.Children.Add(new TextBlock
+            {
+                Text = "⚠",                       // warning sign
+                FontSize = 26,
+                Foreground = System.Windows.Media.Brushes.DarkOrange,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 10, 0)
+            });
+            headerRow.Children.Add(new TextBlock
+            {
+                Text = "Your log already contains " + existingCount + " QSO" + (existingCount == 1 ? "" : "s") + ".",
+                FontSize = 15,
+                FontWeight = FontWeights.Bold,
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            root.Children.Add(headerRow);
+
+            root.Children.Add(new TextBlock
+            {
+                Text = "Merge — add the file's QSOs to your existing log.\n\n" +
+                       "Replace — first save a backup of your current log to a file you choose, then clear the log and import the file.",
+                TextWrapping = TextWrapping.Wrap,
+                MaxWidth = 430,
+                FontSize = 14,
+                Margin = new Thickness(0, 0, 0, 18)
+            });
+
+            var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            Button MakeButton(string text)
+            {
+                return new Button { Content = text, MinWidth = 90, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 14 };
+            }
+            var mergeBtn = MakeButton("Merge");
+            var replaceBtn = MakeButton("Replace");
+            var cancelBtn = MakeButton("Cancel");
+            cancelBtn.IsCancel = true;
+            mergeBtn.Click += (s, e) => { result = ImportLogChoice.Merge; dialog.Close(); };
+            replaceBtn.Click += (s, e) => { result = ImportLogChoice.Replace; dialog.Close(); };
+            cancelBtn.Click += (s, e) => { result = ImportLogChoice.Cancel; dialog.Close(); };
+            buttonRow.Children.Add(mergeBtn);
+            buttonRow.Children.Add(replaceBtn);
+            buttonRow.Children.Add(cancelBtn);
+            root.Children.Add(buttonRow);
+
+            dialog.Content = root;
+            dialog.ShowDialog();
+            return result;
+        }
+
+        // For "Replace": let the user save a backup of the current log to a file they choose, then
+        // clear the log. Returns false (log left untouched) if the user cancels the save dialog or the
+        // backup fails — we never destroy the log without a successful backup.
+        private bool BackupAndClearLogForReplace()
+        {
+            var saveDialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Filter = "ADIF files (*.adi)|*.adi",
+                FileName = "HolyLogger_backup_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi",
+                Title = "Save a backup of your current log before replacing it"
+            };
+            if (saveDialog.ShowDialog() != true)
+                return false; // user cancelled -> abort the replace
+
+            try
+            {
+                string adif = Services.GenerateAdif(dal.GetAllQSOs());
+                System.IO.File.WriteAllText(saveDialog.FileName, adif);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show(this,
+                    "Failed to save the backup:\n" + ex.Message + "\n\nReplace cancelled — your log was not changed.",
+                    "Backup failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            // Backup succeeded -> safe to clear the current log before importing the new file.
+            Properties.Settings.Default.RecentQSOCounter = 0;
+            Qsos.Clear();
+            dal.DeleteAll();
+            ClearBtn_Click(null, null);
+            UpdateNumOfQSOs();
+            UpdateEqslQueueIndicator();
+            return true;
         }
 
         private void StartAdifImportWorker()
