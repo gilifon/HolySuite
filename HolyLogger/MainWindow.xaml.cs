@@ -2183,9 +2183,17 @@ namespace HolyLogger
                 System.Collections.Generic.List<QSO> pending = dal.GetPendingEqslQsos();
                 int sentCount = 0;
 
+                // Load the accounts once into a callsign-keyed map (case-insensitive, matching the DB
+                // NOCASE collation) instead of querying GetEqslAccount per QSO.
+                var accounts = new System.Collections.Generic.Dictionary<string, EqslAccount>(StringComparer.OrdinalIgnoreCase);
+                foreach (var a in dal.GetEqslAccounts())
+                    if (!string.IsNullOrWhiteSpace(a.Callsign)) accounts[a.Callsign.Trim()] = a;
+
                 foreach (var qso in pending)
                 {
-                    EqslAccount acct = dal.GetEqslAccount(qso.MyCall);
+                    EqslAccount acct = null;
+                    string myCall = (qso.MyCall ?? string.Empty).Trim();
+                    if (myCall.Length > 0) accounts.TryGetValue(myCall, out acct);
                     if (acct == null || string.IsNullOrWhiteSpace(acct.Username) || string.IsNullOrWhiteSpace(acct.Password))
                         continue; // shouldn't happen (filtered), but skip defensively
 
