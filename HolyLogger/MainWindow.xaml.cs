@@ -2556,45 +2556,51 @@ namespace HolyLogger
 
         private async void LogRadioUndoButton_Click(object sender, RoutedEventArgs e)
         {
-            // If a long press just cleared the stack, swallow this click so it doesn't also undo.
-            if (_undoResetFired)
+            // async void: an exception here would be unhandled and crash the app, so the whole body
+            // is guarded.
+            try
             {
-                _undoResetFired = false;
-                return;
+                // If a long press just cleared the stack, swallow this click so it doesn't also undo.
+                if (_undoResetFired)
+                {
+                    _undoResetFired = false;
+                    return;
+                }
+
+                if (logRadioUndoStates.Count == 0)
+                {
+                    return;
+                }
+
+                var undoState = logRadioUndoStates.Pop();
+                UpdateLogRadioUndoButtonState();
+
+                // Clear the log-row blue highlight once an undo step is taken.
+                if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
+                    QSODataGrid.UnselectAll();
+
+                string freqText = undoState.FrequencyText;
+                string modeText = undoState.ModeText;
+                string dxCallsignText = undoState.DxCallsignText;
+
+                if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqMhz) || freqMhz <= 0)
+                {
+                    return;
+                }
+
+                TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+                SelectLoggerMode(modeText);
+                TB_DXCallsign.Text = dxCallsignText;
+
+                if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
+                {
+                    int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
+                    int? rigMode = MapClusterModeToRigMode(modeText, freqMhz);
+                    var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
+                    await TryTuneRigFrequencyAsync(freqHz, modeToSend);
+                }
             }
-
-            if (logRadioUndoStates.Count == 0)
-            {
-                return;
-            }
-
-            var undoState = logRadioUndoStates.Pop();
-            UpdateLogRadioUndoButtonState();
-
-            // Clear the log-row blue highlight once an undo step is taken.
-            if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
-                QSODataGrid.UnselectAll();
-
-            string freqText = undoState.FrequencyText;
-            string modeText = undoState.ModeText;
-            string dxCallsignText = undoState.DxCallsignText;
-
-            if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqMhz) || freqMhz <= 0)
-            {
-                return;
-            }
-
-            TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
-            SelectLoggerMode(modeText);
-            TB_DXCallsign.Text = dxCallsignText;
-
-            if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
-            {
-                int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
-                int? rigMode = MapClusterModeToRigMode(modeText, freqMhz);
-                var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
-                await TryTuneRigFrequencyAsync(freqHz, modeToSend);
-            }
+            catch { /* never crash the app from the undo button */ }
         }
 
         private void UpdateLogRadioUndoButtonState()
@@ -8409,41 +8415,46 @@ namespace HolyLogger
 
         private async void ClusterUndoButton_Click(object sender, RoutedEventArgs e)
         {
-            // If a long press just cleared the stack, swallow this click so it doesn't also undo.
-            if (_clusterUndoResetFired)
+            // async void: guard the whole body so an exception can't crash the app.
+            try
             {
-                _clusterUndoResetFired = false;
-                return;
+                // If a long press just cleared the stack, swallow this click so it doesn't also undo.
+                if (_clusterUndoResetFired)
+                {
+                    _clusterUndoResetFired = false;
+                    return;
+                }
+
+                if (clusterUndoStates.Count == 0)
+                {
+                    return;
+                }
+
+                var undoState = clusterUndoStates.Pop();
+                UpdateClusterUndoButtonState();
+
+                string freqText = undoState.FrequencyText;
+                string modeText = undoState.ModeText;
+                string dxCallsignText = undoState.DxCallsignText;
+
+                if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqMhz) || freqMhz <= 0)
+                {
+                    return;
+                }
+
+                TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+                SelectLoggerMode(modeText);
+                TB_DXCallsign.Text = dxCallsignText;
+
+                if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
+                {
+                    int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
+                    int? rigMode = MapClusterModeToRigMode(modeText, freqMhz);
+                    var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
+                    await TryTuneRigFrequencyAsync(freqHz, modeToSend);
+                }
             }
-
-            if (clusterUndoStates.Count == 0)
-            {
-                return;
-            }
-
-            var undoState = clusterUndoStates.Pop();
-            UpdateClusterUndoButtonState();
-
-            string freqText = undoState.FrequencyText;
-            string modeText = undoState.ModeText;
-            string dxCallsignText = undoState.DxCallsignText;
-
-            if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqMhz) || freqMhz <= 0)
-            {
-                return;
-            }
-
-            TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
-            SelectLoggerMode(modeText);
-            TB_DXCallsign.Text = dxCallsignText;
-
-            if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
-            {
-                int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
-                int? rigMode = MapClusterModeToRigMode(modeText, freqMhz);
-                var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
-                await TryTuneRigFrequencyAsync(freqHz, modeToSend);
-            }
+            catch { /* never crash the app from the undo button */ }
         }
 
         private void UpdateClusterUndoButtonState()
