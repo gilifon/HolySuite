@@ -17,6 +17,11 @@ namespace HolyLogger.OptionsUserControls
         private bool _loading;
         public bool HasChanged { get; set; }
 
+        // One long-lived client for the credential test, instead of a new HttpClient per click
+        // (creating one per call can exhaust sockets).
+        private static readonly System.Net.Http.HttpClient _testHttp =
+            new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(25) };
+
         private ObservableCollection<EqslAccount> _accounts;
 
         public EqslServiceControl()
@@ -219,11 +224,7 @@ namespace HolyLogger.OptionsUserControls
                 string url = "https://www.eQSL.cc/qslcard/DownloadInBox.cfm"
                     + "?UserName=" + Uri.EscapeDataString(user)
                     + "&Password=" + Uri.EscapeDataString(pwd);
-                string resp;
-                using (var http = new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(25) })
-                {
-                    resp = await http.GetStringAsync(url);
-                }
+                string resp = await _testHttp.GetStringAsync(url);
 
                 if (string.IsNullOrWhiteSpace(resp))
                     System.Windows.Forms.MessageBox.Show("Could not verify the connection to eQSL. Please try again.");
