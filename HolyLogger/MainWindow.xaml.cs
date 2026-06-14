@@ -3584,6 +3584,39 @@ namespace HolyLogger
                         continue;
                     }
 
+                    // If the file's station callsign(s) differ from the current station callsign, warn
+                    // the user with a clear prompt centered on the program window and let them approve
+                    // or cancel importing this file.
+                    if (!string.IsNullOrWhiteSpace(myCallsign))
+                    {
+                        List<string> fileCalls = rawQSOList
+                            .Select(q => (q.MyCall ?? string.Empty).Trim())
+                            .Where(s => s.Length > 0)
+                            .Distinct(StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+
+                        bool differentCall = fileCalls.Any(c => !string.Equals(c, myCallsign.Trim(), StringComparison.OrdinalIgnoreCase));
+                        if (differentCall)
+                        {
+                            string fileName = System.IO.Path.GetFileName(filename);
+                            string callsInFile = fileCalls.Count > 0 ? string.Join(", ", fileCalls) : "(none)";
+                            bool approved = this.Dispatcher.Invoke(() =>
+                                System.Windows.MessageBox.Show(this,
+                                    "The ADIF file \"" + fileName + "\" contains QSOs logged under a different callsign than your current station callsign.\n\n" +
+                                    "Callsign(s) in the file:  " + callsInFile + "\n" +
+                                    "Your current station callsign:  " + myCallsign.Trim() + "\n\n" +
+                                    "Do you want to import these QSOs into your log anyway?",
+                                    "Different callsign in ADIF file",
+                                    MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes);
+
+                            if (!approved)
+                            {
+                                // User declined importing this file's QSOs.
+                                continue;
+                            }
+                        }
+                    }
+
                     foreach (var rq in rawQSOList)
                     {
                         if (isOverride)
