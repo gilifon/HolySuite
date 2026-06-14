@@ -174,10 +174,15 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
+                if (!IsLoaded) return;
                 _status.Text = "Upload error: " + ex.Message;
                 _sendButton.IsEnabled = true;
                 return;
             }
+
+            // The user may have closed this window while the upload was in progress; if so, don't
+            // touch its controls.
+            if (!IsLoaded) return;
 
             RefreshList();
 
