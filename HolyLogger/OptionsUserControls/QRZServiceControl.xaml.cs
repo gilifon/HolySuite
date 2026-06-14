@@ -24,6 +24,10 @@ namespace HolyLogger.OptionsUserControls
         public string password { get; set; }
         public bool HasChanged{ get; set; }
 
+        // Raised after the user presses "Test Connection", carrying the result and the QRZ session
+        // key obtained (empty on failure), so the main window can refresh the QRZ icon right away.
+        public event Action<bool, string> ConnectionTested;
+
         public QRZServiceControl()
         {
             InitializeComponent();
@@ -42,7 +46,8 @@ namespace HolyLogger.OptionsUserControls
             Properties.Settings.Default.qrz_password = TB_Password.Password;
             Properties.Settings.Default.qrz_username = TB_UserName.Text;
             string x;
-            if (Helper.LoginToQRZ(out x))
+            bool ok = Helper.LoginToQRZ(out x);
+            if (ok)
             {
                 System.Windows.Forms.MessageBox.Show("Connected!");
             }
@@ -50,6 +55,8 @@ namespace HolyLogger.OptionsUserControls
             {
                 System.Windows.Forms.MessageBox.Show("Connection failed!");
             }
+            // Let the main window update the QRZ icon to match the test result immediately.
+            ConnectionTested?.Invoke(ok, x);
         }
 
         private void TB_UserName_TextChanged(object sender, TextChangedEventArgs e)

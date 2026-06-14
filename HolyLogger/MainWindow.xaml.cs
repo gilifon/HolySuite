@@ -424,9 +424,11 @@ namespace HolyLogger
         private DateTime cwMonitorStartUtc;
         private double cwLearnedWpm = 20.0;
 
-        // UNUSED: qrz_path was declared but never used. The image is referenced directly in XAML instead.
-        // If you need programmatic access to the QRZ icon, uncomment this:
-        // BitmapImage qrz_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
+        // The two states of the main-window QRZ icon: the normal blue globe when QRZ.com is
+        // reachable/logged in, and the grayed globe when there is no connection to QRZ.com.
+        // Swapped by SetQrzConnected().
+        BitmapImage qrz_on_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
+        BitmapImage qrz_off_path = new BitmapImage(new Uri("Images/qrz_off.png", UriKind.Relative));
         BitmapImage lock_path = new BitmapImage(new Uri("Images/lock.png", UriKind.Relative));
         BitmapImage unlock_path = new BitmapImage(new Uri("Images/unlock.png", UriKind.Relative));
 
@@ -639,7 +641,12 @@ namespace HolyLogger
                 {
                     string key = await Helper.LoginToQRZAsync().ConfigureAwait(false);
                     if (!string.IsNullOrEmpty(key)) _SessionKey = key;
+                    // Reflect QRZ.com connectivity on the main-window icon: gray it if QRZ.com could
+                    // not be reached / logged in, normal blue if the session was established.
+                    SetQrzConnected(!string.IsNullOrEmpty(key));
                 });
+            else
+                SetQrzConnected(false); // no network at startup -> QRZ.com is unreachable
 
             if (Properties.Settings.Default.MatrixWindowIsOpen)
             {
@@ -855,12 +862,46 @@ namespace HolyLogger
         private async void NetworkChange_NetworkAvailabilityChanged(object sender, NetworkAvailabilityEventArgs e)
         {
             isNetworkAvailable = e.IsAvailable;
-            if (isNetworkAvailable) _SessionKey = await Helper.LoginToQRZAsync();
+            // Update the bottom-bar network dot immediately and coordinate the QRZ icon with it: the
+            // instant the dot goes red (no network) the QRZ icon drops to its disconnected "!" state,
+            // without waiting for any QRZ round-trip.
             this.Dispatcher.Invoke(() =>
             {
                 NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
                 UpdateShareIconVisibility();
+                if (!isNetworkAvailable) SetQrzConnected(false);
             });
+
+            // When the network is back, re-establish the QRZ session and light the icon if it works.
+            if (isNetworkAvailable)
+            {
+                string key = await Helper.LoginToQRZAsync();
+                _SessionKey = key;
+                SetQrzConnected(!string.IsNullOrEmpty(key));
+            }
+        }
+
+        // Tracks the last known QRZ.com connection state, so the QRZ icon's click can branch:
+        // connected -> normal QRZ lookup; not connected -> open the QRZ Service options page.
+        private bool _qrzConnected = true;
+
+        // Reflects QRZ.com connectivity on the main-window QRZ icon: the normal blue globe
+        // (Images/qrz.png) when we have a working QRZ session, or the grayed globe + red "!" badge
+        // (Images/qrz_off.png) when there is no connection to QRZ.com. Safe to call from any thread.
+        private void SetQrzConnected(bool connected)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action(() => SetQrzConnected(connected)));
+                return;
+            }
+            _qrzConnected = connected;
+            QRZBtn.Source = connected ? qrz_on_path : qrz_off_path;
+            QRZBtn.ToolTip = connected
+                ? "Get Data from QRZ.com and open the callsign's QRZ.com page"
+                : "No connection to QRZ.com — QRZ lookups are unavailable";
+            // The red "!" badge appears over the icon only when there is no QRZ.com connection.
+            QrzNoConnBadge.Visibility = connected ? Visibility.Collapsed : Visibility.Visible;
         }
 
         private void ToggleMatrixControl()
@@ -1421,12 +1462,28 @@ namespace HolyLogger
 
         private void QRZBtn_Click(object sender, MouseButtonEventArgs e)
         {
+            // When there is no QRZ.com connection (the icon shows the red "!" badge), the icon acts as
+            // a shortcut to the QRZ Service options page so the user can fix their QRZ login.
+            if (!_qrzConnected)
+            {
+                OpenQrzServiceOptions();
+                return;
+            }
+
             if (!string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
             {
                 GetQrzData();
                 // Also open the QRZ.com web page for this callsign (in the default browser).
                 OpenQrzPage(TB_DXCallsign.Text);
             }
+        }
+
+        // Opens (or focuses) the Options window and jumps straight to the QRZ Service page.
+        private void OpenQrzServiceOptions()
+        {
+            OptionsMenuItemMenuItem_Click(null, null);
+            if (options != null)
+                options.QRZItem.IsSelected = true;
         }
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
@@ -4870,6 +4927,8 @@ namespace HolyLogger
 
             // Subscribe to graphics box mode changes for immediate refresh
             options.UserInterfaceControlInstance.GraphicsBoxModeChanged += UserInterfaceControl_GraphicsBoxModeChanged;
+            // Refresh the QRZ icon as soon as the user tests the connection in QRZ Service options.
+            options.QRZServiceControlInstance.ConnectionTested += QRZServiceControl_ConnectionTested;
 
             options.Show();
         }
@@ -4880,12 +4939,23 @@ namespace HolyLogger
             UpdateGraphicsBoxDisplay();
         }
 
+        // Fired when the user presses "Test Connection" in QRZ Service options: light or gray the QRZ
+        // icon to match the result, and reuse the freshly obtained session key.
+        private void QRZServiceControl_ConnectionTested(bool success, string sessionKey)
+        {
+            if (success && !string.IsNullOrWhiteSpace(sessionKey))
+                _SessionKey = sessionKey;
+            SetQrzConnected(success);
+        }
+
         private async void Options_Closed(object sender, EventArgs e)
         {
             OptionsWindow optionWindow = (OptionsWindow)sender;
             if(optionWindow.QRZServiceControlInstance.HasChanged)
             {
-                if (isNetworkAvailable) _SessionKey = await Helper.LoginToQRZAsync();
+                _SessionKey = isNetworkAvailable ? await Helper.LoginToQRZAsync() : "";
+                // Refresh the QRZ icon to reflect the (possibly corrected) credentials.
+                SetQrzConnected(isNetworkAvailable && !string.IsNullOrWhiteSpace(_SessionKey));
             }
             ToggleMatrixControl();
             ToggleAzimuthControl();
