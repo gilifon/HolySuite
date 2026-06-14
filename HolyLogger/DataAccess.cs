@@ -544,9 +544,9 @@ namespace HolyLogger
         {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            // Only QSOs whose station callsign has a configured eQSL account (username + password
-            // filled in) are "waiting to be sent" — others can't be routed anywhere yet.
-            string stm = "SELECT * FROM qso WHERE eqsl_status = 0 AND my_callsign IN (" + SendableCallsignsSubquery + ") ORDER BY date ASC, time ASC, Id ASC";
+            // All not-yet-sent QSOs. Some may be under a callsign that has no eQSL account yet; those
+            // are shown so the user is alerted, but can only be sent once that callsign has credentials.
+            string stm = "SELECT * FROM qso WHERE eqsl_status = 0 ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -587,7 +587,7 @@ namespace HolyLogger
         public int GetPendingEqslCount()
         {
             if (con == null || con.State != ConnectionState.Open) return 0;
-            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE eqsl_status = 0 AND my_callsign IN (" + SendableCallsignsSubquery + ")", con))
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE eqsl_status = 0", con))
                 return Convert.ToInt32(cmd.ExecuteScalar());
         }
 
@@ -605,9 +605,16 @@ namespace HolyLogger
 
         // ---- eQSL accounts (one per station callsign) -------------------------------------------
 
-        // The set of callsigns that have a usable eQSL account (username AND password filled in).
-        private const string SendableCallsignsSubquery =
-            "SELECT callsign FROM eqsl_accounts WHERE TRIM(IFNULL(username,'')) <> '' AND TRIM(IFNULL(password,'')) <> ''";
+        // True if the user uses eQSL at all, i.e. at least one account has a username AND password.
+        // Used to decide whether the "!" queue badge should appear (it stays hidden for users who
+        // never configured eQSL, even though their QSOs are technically "pending").
+        public bool HasAnyEqslAccount()
+        {
+            if (con == null || con.State != ConnectionState.Open) return false;
+            using (var cmd = new SQLiteCommand(
+                "SELECT count(*) FROM eqsl_accounts WHERE TRIM(IFNULL(username,'')) <> '' AND TRIM(IFNULL(password,'')) <> ''", con))
+                return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+        }
 
         // Creates the eqsl_accounts table the first time. Rows are NOT seeded from anywhere — they are
         // added only for the callsign typed in the main screen (via EnsureEqslAccountRow), so the

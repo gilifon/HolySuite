@@ -185,7 +185,8 @@ namespace HolyLogger
             if (remaining == 0)
                 _status.Text = "All QSOs have been uploaded to eQSL. ✓";
             else
-                _status.Text = sent + " uploaded, " + remaining + " still waiting — eQSL may be unreachable. Try again when you're online.";
+                _status.Text = sent + " uploaded, " + remaining + " still waiting. A callsign with no eQSL account " +
+                    "won't send until you add its user name/password in Options → eQSL Service; otherwise eQSL may be offline.";
         }
     }
 }

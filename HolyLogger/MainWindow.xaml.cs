@@ -2262,9 +2262,10 @@ namespace HolyLogger
         private void UpdateEqslQueueIndicator()
         {
             int pending = 0;
-            // GetPendingEqslCount only counts QSOs whose callsign has a configured eQSL account, so
-            // the badge stays hidden for users (or callsigns) with no eQSL set up.
-            try { if (dal != null) pending = dal.GetPendingEqslCount(); }
+            // Show the "!" for every not-yet-sent QSO (including ones under a callsign that has no
+            // account yet, so the user is alerted) — but only if they use eQSL at all, so users who
+            // never configured eQSL don't see it.
+            try { if (dal != null && dal.HasAnyEqslAccount()) pending = dal.GetPendingEqslCount(); }
             catch { pending = 0; }
 
             bool any = pending > 0;
