@@ -1578,6 +1578,15 @@ namespace HolyLogger
             }
         }
 
+        private void MessageButton_PreviewLeftDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            // With no radio to send to, swallow the left-press so the button doesn't animate or fire
+            // (it would do nothing anyway), making its inactive state obvious. Right-click — the CW text
+            // editor — uses a separate event and still works.
+            if (!_messageSendAvailable)
+                e.Handled = true;
+        }
+
         private void MessageButton_RightClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             if (sender is Button button && int.TryParse(button.Tag?.ToString(), out int messageNumber))
