@@ -4632,8 +4632,8 @@ namespace HolyLogger
             {
                 ContestIndicator.Background = on ? blue : Brushes.Transparent;
                 ContestIndicator.ToolTip = on
-                    ? "Contest Mode: ON\nDuplicate QSOs (same callsign, band and mode) are flagged.\nChange it from the Tools menu."
-                    : "Contest Mode: OFF\nDuplicates are not flagged — the log just shows how many times each station was worked before.\nChange it from the Tools menu.";
+                    ? "Contest Mode: ON — duplicates are flagged.\nA QSO with the same callsign, band and mode\ncounts as a dupe. Change it in the Tools menu."
+                    : "Contest Mode: OFF — duplicates aren't flagged.\nThe log shows how many times each station\nwas worked. Change it in the Tools menu.";
             }
         }
 
