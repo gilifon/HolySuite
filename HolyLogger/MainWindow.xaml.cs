@@ -1583,7 +1583,10 @@ namespace HolyLogger
             if (sender is Button button && int.TryParse(button.Tag?.ToString(), out int messageNumber))
             {
                 e.Handled = true;
-                ShowCwMessageEditDialog(messageNumber);
+                // Right-click edits the CW text only while the buttons are in their CW ("Txt") look. In
+                // voice ("Msg") mode the buttons play radio audio files, so there's no CW text to edit.
+                if (IsCwModeActive())
+                    ShowCwMessageEditDialog(messageNumber);
             }
         }
 
@@ -1971,7 +1974,24 @@ namespace HolyLogger
 
         private bool IsCwModeActive()
         {
-            return string.Equals(GetNormalizedRigMode(), "CW", StringComparison.OrdinalIgnoreCase);
+            string mode = null;
+            // Trust the radio's reported mode ONLY when it's actually online. A disconnected/off radio
+            // (Rig may still be non-null) reports a meaningless default mode, so in that case fall back
+            // to the mode chosen in the UI Mode dropdown.
+            bool rigOnline = Properties.Settings.Default.EnableOmniRigCAT
+                             && OmniRigEngine != null && Rig != null
+                             && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+            if (rigOnline)
+                mode = GetNormalizedRigMode();
+
+            if (string.IsNullOrEmpty(mode))
+            {
+                if (CB_Mode != null && CB_Mode.SelectedItem is ComboBoxItem item)
+                    mode = item.Content as string;
+                else if (CB_Mode != null)
+                    mode = CB_Mode.Text;
+            }
+            return string.Equals((mode ?? string.Empty).Trim(), "CW", StringComparison.OrdinalIgnoreCase);
         }
 
         private void SpotButton_Click(object sender, RoutedEventArgs e)
@@ -3178,6 +3198,13 @@ namespace HolyLogger
                 return;
             }
 
+            // Sending needs the radio/CAT. The buttons stay enabled only so they can be right-clicked to
+            // edit the CW text, so a left-click / F-key send is simply ignored when sending isn't possible.
+            if (!_messageSendAvailable)
+            {
+                return;
+            }
+
             if (IsCwModeActive())
             {
                 TriggerCwTextMessage(messageNumber);
@@ -3389,6 +3416,11 @@ namespace HolyLogger
             UpdateVoiceMessageAvailabilityState();
         }
 
+        // True when sending CW/voice messages to the radio is actually possible (CAT online). The Msg
+        // buttons stay ENABLED regardless, so they can always be right-clicked to edit the CW text;
+        // this flag gates only the left-click / F-key SEND action.
+        private bool _messageSendAvailable = false;
+
         private void UpdateVoiceMessageAvailabilityState()
         {
             if (PlayCommandsBorder == null)
@@ -3400,12 +3432,19 @@ namespace HolyLogger
             bool isVoiceAvailable = TryGetVoiceMessageAvailability(out _, out string errorMessage);
             bool isAvailable = isVoiceAvailable || (isCw && Properties.Settings.Default.EnableOmniRigCAT && OmniRigEngine != null && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE);
 
-            PlayCommandsBorder.IsEnabled = isAvailable;
-            SetVoiceMessageButtonsEnabled(isAvailable);
+            _messageSendAvailable = isAvailable;
+            // Keep the row ENABLED at all times so the buttons can always be right-clicked to edit the
+            // CW text (a disabled button ignores right-clicks too). When sending isn't available the row
+            // is just dimmed, and a left-click / F-key send is ignored.
+            PlayCommandsBorder.IsEnabled = true;
+            SetVoiceMessageButtonsEnabled(true);
+            PlayCommandsBorder.Opacity = isAvailable ? 1.0 : 0.5;
 
             if (isCw)
             {
-                PlayCommandsBorder.ToolTip = isAvailable ? "Send CW text to radio (F5-F8) — right-click to edit" : (errorMessage ?? "OmniRig CAT is not available.");
+                PlayCommandsBorder.ToolTip = isAvailable
+                    ? "Send CW text to radio (F5-F8) — right-click to edit"
+                    : "Radio off — sending is disabled. Right-click a button to edit its CW text.";
             }
             else
             {
@@ -9557,6 +9596,9 @@ namespace HolyLogger
                     TB_RSTRcvd.Text = "599";
                 }
                 UpdateDup();
+                // Refresh the Msg buttons so they switch to/from the CW look immediately on a mode
+                // change (matters when the radio is off, where the mode comes from this dropdown).
+                UpdateMessageButtonLabels();
             }
             catch (Exception ex)
             {
