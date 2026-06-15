@@ -528,8 +528,8 @@ namespace HolyLogger
             checkForAutoUpload();
             
 
-            if (Properties.Settings.Default.ShowTitleClock)
-                this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
+            this.Title = title;
+            UpdateTitleClock();
 
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             UpdateShareIconVisibility();
@@ -1163,11 +1163,27 @@ namespace HolyLogger
                 UTCTimer.Stop();
         }
 
+        // Updates the big centered UTC clock in the menu row (HH:mm:ss UTC). The window title itself
+        // no longer carries the clock. Honors the ShowTitleClock setting.
+        private void UpdateTitleClock()
+        {
+            if (L_TitleClock == null) return;
+            if (Properties.Settings.Default.ShowTitleClock)
+            {
+                L_TitleClock.Text = DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
+                L_TitleClock.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                L_TitleClock.Visibility = Visibility.Collapsed;
+            }
+        }
+
         private void UTCTimer_Elapsed(object sender, EventArgs e)
         {
             this.Dispatcher.Invoke(() =>
             {
-                this.Title = title + DateTime.UtcNow.Hour.ToString("D2") + ":" + DateTime.UtcNow.Minute.ToString("D2") + ":" + DateTime.UtcNow.Second.ToString("D2") + " UTC";
+                UpdateTitleClock();
             });
             
         }
@@ -4976,8 +4992,9 @@ namespace HolyLogger
                 else
                 {
                     StopUTCTimer();
-                    this.Title = title;
                 }
+                this.Title = title;
+                UpdateTitleClock();
 
                 ApplyCallsignSuggestionRowsSetting();
             }

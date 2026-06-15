@@ -296,7 +296,8 @@
             <RowDefinition Height="40" />
         </Grid.RowDefinitions>
         <DockPanel x:Name="MainScreen" Grid.Row="0">
-            <Menu DockPanel.Dock="Top">
+            <Grid DockPanel.Dock="Top">
+            <Menu HorizontalAlignment="Stretch">
                 <MenuItem Header="File" FontSize="16">
                     <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
                         <MenuItem.Icon>
@@ -465,6 +466,9 @@
                     </MenuItem>
                 </MenuItem>
             </Menu>
+                <TextBlock x:Name="L_TitleClock" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           FontWeight="Bold" Foreground="Black" FontSize="20" IsHitTestVisible="False" Visibility="Collapsed"/>
+            </Grid>
         </DockPanel>
         <DockPanel Grid.Row="4">
             <StatusBar DockPanel.Dock="Bottom" MouseDoubleClick="StatusBar_MouseDoubleClick">
