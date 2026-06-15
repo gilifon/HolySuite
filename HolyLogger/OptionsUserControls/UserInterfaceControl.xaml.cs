@@ -573,6 +573,16 @@ namespace HolyLogger.OptionsUserControls
             {
                 mainWindow.HandleClusterActiveChanged(isActive);
             }
+
+            // The cluster window opening (or closing) causes WPF to shuffle z-order and focus via
+            // queued dispatcher messages. Defer Activate() so it runs after all those messages have
+            // been processed and the Options window is guaranteed to end up on top.
+            var optionsWindow = Window.GetWindow(this);
+            if (optionsWindow != null)
+            {
+                Dispatcher.BeginInvoke(new Action(() => optionsWindow.Activate()),
+                    System.Windows.Threading.DispatcherPriority.Input);
+            }
         }
 
         private void ClusterVisible_Changed(object sender, RoutedEventArgs e)
@@ -597,15 +607,15 @@ namespace HolyLogger.OptionsUserControls
                 return;
 
             bool isActive = CBX_ClusterActive.IsChecked == true;
-            CBX_ClusterVisible.IsEnabled = isActive;
 
-            if (!isActive)
+            CBX_ClusterVisible.IsEnabled = isActive;
+            CBX_ClusterVisible.Opacity = isActive ? 1.0 : 0.5;
+
+            // The hover/map popup only makes sense while the cluster is active, so gray it out too.
+            if (CBX_ClusterPopup != null)
             {
-                CBX_ClusterVisible.Opacity = 0.5;
-            }
-            else
-            {
-                CBX_ClusterVisible.Opacity = 1.0;
+                CBX_ClusterPopup.IsEnabled = isActive;
+                CBX_ClusterPopup.Opacity = isActive ? 1.0 : 0.5;
             }
         }
 
