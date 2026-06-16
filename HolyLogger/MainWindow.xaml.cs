@@ -1125,6 +1125,10 @@ namespace HolyLogger
             // eQSL table). Nothing is sent automatically here.
             UpdateEqslQueueIndicator();
 
+            // QRZ Logbook: silently retry any QSOs that could not be pushed earlier (e.g. logged while
+            // offline). No-op unless the feature is enabled and an API key is configured.
+            _ = PumpQrzQueue();
+
             // Initialize RST fields based on the selected mode after window is fully loaded
             if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
             {
@@ -1379,6 +1383,11 @@ namespace HolyLogger
                     if (!willAutoUpload)
                         UpdateEqslQueueIndicator();
                     _ = SendOneQsoToEqsl(qso);
+
+                    // Real-time push of THIS just-logged QSO to the QRZ.com online logbook (fire and
+                    // forget). Does nothing unless the feature is enabled and an API key is configured;
+                    // a failed/offline push simply leaves the QSO pending for a later silent retry.
+                    _ = SendOneQsoToQrz(qso);
                 }
                 catch (Exception ex)
                 {
@@ -2488,6 +2497,109 @@ namespace HolyLogger
                 if (idx >= 0) adif = adif.Insert(idx, tag);
             }
             return adif;
+        }
+
+        // ---- QRZ.com Logbook real-time upload --------------------------------------------------------
+
+        // Serializes one QSO Plus terminates it with a single <EOR>. Reuses the app's canonical ADIF
+        // generator and strips the file header (<adif_ver>...<eoh>) so only the record block remains,
+        // which is what the QRZ Logbook API's ADIF parameter expects.
+        private static string BuildQrzAdif(QSO qso)
+        {
+            string adif = Services.GenerateAdif(new System.Collections.Generic.List<QSO> { qso });
+            int idx = adif.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase);
+            if (idx >= 0) adif = adif.Substring(idx + "<eoh>".Length);
+            return adif.Trim();
+        }
+
+        // Only one QRZ upload runs at a time so the on-save push and the silent retry pass can never
+        // double-send the same QSO.
+        private readonly System.Threading.SemaphoreSlim _qrzPumpLock = new System.Threading.SemaphoreSlim(1, 1);
+
+        // True when the QRZ Logbook real-time push is switched on and an API key is present.
+        private static bool QrzPushEnabled
+        {
+            get
+            {
+                return Properties.Settings.Default.qrz_logbook_auto_push
+                       && !string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_api_key);
+            }
+        }
+
+        // Pushes a single just-logged QSO to the QRZ.com online logbook. On success the QSO is marked
+        // uploaded and QRZ's LOGID transaction id is stored next to it. A definitive rejection from QRZ
+        // (bad key / no subscription / bad record) marks it rejected so it is not retried forever; an
+        // offline/timeout leaves it pending for the next silent retry. Never throws (fire and forget).
+        private async System.Threading.Tasks.Task SendOneQsoToQrz(QSO qso)
+        {
+            try
+            {
+                if (qso == null || dal == null) return;
+                if (!QrzPushEnabled) return;
+
+                // If a push pass is already running, leave this QSO pending; it gets picked up later.
+                if (!await _qrzPumpLock.WaitAsync(0)) return;
+                try
+                {
+                    string key = Properties.Settings.Default.qrz_api_key.Trim();
+                    QrzLogbookResult r = await QrzLogbookService.InsertAsync(key, BuildQrzAdif(qso));
+
+                    if (r.Ok)
+                        dal.SetQrzStatus(qso.id, 1, r.LogId);
+                    else if (r.IsPermanentFailure)
+                        dal.SetQrzStatus(qso.id, 2, null);
+                    // network error -> leave pending (status stays 0)
+                }
+                finally
+                {
+                    _qrzPumpLock.Release();
+                }
+            }
+            catch
+            {
+                // Auto-upload must never crash the app; the QSO remains pending for a later retry.
+            }
+        }
+
+        // Silently uploads every QSO still pending for QRZ (status 0), oldest first. Runs at startup so
+        // anything that could not be pushed while offline is retried automatically. Stops on the first
+        // network error (everything else stays pending); a per-record rejection is marked and skipped so
+        // one bad record can't block the queue. Never throws.
+        private async System.Threading.Tasks.Task PumpQrzQueue()
+        {
+            try
+            {
+                if (dal == null) return;
+                if (!QrzPushEnabled) return;
+
+                if (!await _qrzPumpLock.WaitAsync(0)) return;
+                try
+                {
+                    string key = Properties.Settings.Default.qrz_api_key.Trim();
+                    System.Collections.Generic.List<QSO> pending = dal.GetPendingQrzQsos();
+
+                    foreach (var qso in pending)
+                    {
+                        QrzLogbookResult r = await QrzLogbookService.InsertAsync(key, BuildQrzAdif(qso));
+
+                        if (r.NetworkError)
+                            break;   // offline -> stop; the rest stays pending for next time
+
+                        if (r.Ok)
+                            dal.SetQrzStatus(qso.id, 1, r.LogId);
+                        else if (r.IsPermanentFailure)
+                            dal.SetQrzStatus(qso.id, 2, null);
+                    }
+                }
+                finally
+                {
+                    _qrzPumpLock.Release();
+                }
+            }
+            catch
+            {
+                // Best effort; anything not confirmed sent simply stays pending.
+            }
         }
 
         // Refreshes everything that reflects the eQSL queue size: the "!" badge on the log grid and

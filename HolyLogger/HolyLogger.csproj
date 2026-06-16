@@ -182,6 +182,7 @@
     <Compile Include="CountDownTimer.cs" />
     <Compile Include="DataAccess.cs" />
     <Compile Include="EqslQueueWindow.cs" />
+    <Compile Include="QrzLogbookService.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="LogInfoWindow.xaml.cs">
       <DependentUpon>LogInfoWindow.xaml</DependentUpon>
@@ -209,6 +210,9 @@
     </Compile>
     <Compile Include="OptionsUserControls\EqslServiceControl.xaml.cs">
       <DependentUpon>EqslServiceControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OptionsUserControls\QRZLogbookControl.xaml.cs">
+      <DependentUpon>QRZLogbookControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="OptionsUserControls\UserInterfaceControl.xaml.cs">
       <DependentUpon>UserInterfaceControl.xaml</DependentUpon>
@@ -293,6 +297,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="OptionsUserControls\EqslServiceControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OptionsUserControls\QRZLogbookControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

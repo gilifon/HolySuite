@@ -138,7 +138,7 @@ namespace HolyLogger
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status,qrz_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
@@ -189,7 +189,7 @@ namespace HolyLogger
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1)", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status,qrz_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -593,6 +593,105 @@ namespace HolyLogger
             }
         }
 
+        // Adds the qrz_status and qrz_logid columns to an existing qso table the first time the user
+        // runs a build that has the QRZ Logbook real-time push feature. Existing rows are back-filled
+        // to qrz_status = 1 ("already handled") so upgrading does NOT suddenly queue the user's whole
+        // historical log for upload to QRZ. Only QSOs logged after the upgrade (inserted with the
+        // default 0) become pending.
+        private void AddQrzColumns()
+        {
+            string check = "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'qrz_status'";
+            using (var cmd = new SQLiteCommand(check, con))
+            {
+                int colCount = Convert.ToInt32(cmd.ExecuteScalar());
+                if (colCount == 0)
+                {
+                    using (var alter = new SQLiteCommand("ALTER TABLE qso ADD COLUMN [qrz_status] INTEGER NOT NULL DEFAULT 0", con))
+                        alter.ExecuteNonQuery();
+                    using (var alter2 = new SQLiteCommand("ALTER TABLE qso ADD COLUMN [qrz_logid] nvarchar(50) NULL", con))
+                        alter2.ExecuteNonQuery();
+                    using (var backfill = new SQLiteCommand("UPDATE qso SET qrz_status = 1", con))
+                        backfill.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+        }
+
+        // Returns the QSOs still waiting to be uploaded to QRZ Logbook (status 0), oldest first so they
+        // are pushed in the order they were logged. Unlike eQSL there is no per-callsign opt-in table:
+        // the single account API key plus the feature toggle govern whether these are actually sent.
+        public List<QSO> GetPendingQrzQsos()
+        {
+            lock (_dbLock)
+            {
+            var list = new List<QSO>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            string stm = "SELECT * FROM qso WHERE qrz_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    QSO q = new QSO();
+                    if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                    if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
+                    if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
+                    if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                    if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
+                    if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
+                    if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
+                    if (rdr["band"] != null) q.Band = rdr["band"].ToString();
+                    if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
+                    if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
+                    if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
+                    if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
+                    if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
+                    if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
+                    if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
+                    if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                    if (rdr["country"] != null) q.Country = rdr["country"].ToString();
+                    if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
+                    if (rdr["time"] != null) q.Time = rdr["time"].ToString();
+                    if (rdr["date"] != null) q.Date = rdr["date"].ToString();
+                    if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
+                    if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
+                    if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    q.QrzStatus = 0;
+                    list.Add(q);
+                }
+            }
+            return list;
+            }
+        }
+
+        // Number of QSOs still waiting to be uploaded to QRZ Logbook.
+        public int GetPendingQrzCount()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE qrz_status = 0", con))
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        // Updates the QRZ Logbook upload state of a single QSO (0 pending, 1 uploaded, 2 rejected) and,
+        // on success, stores the LOGID transaction id QRZ returned next to the record.
+        public void SetQrzStatus(int id, int status, string logId = null)
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return;
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET qrz_status = @s, qrz_logid = @logid WHERE Id = @id", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@s", status));
+                cmd.Parameters.Add(new SQLiteParameter("@logid", (object)logId ?? DBNull.Value));
+                cmd.Parameters.Add(new SQLiteParameter("@id", id));
+                cmd.ExecuteNonQuery();
+            }
+            }
+        }
+
         // Returns the QSOs still waiting to be uploaded to eQSL (status 0), oldest first so they
         // are sent in the order they were logged.
         public List<QSO> GetPendingEqslQsos()
@@ -694,6 +793,17 @@ namespace HolyLogger
             try
             {
                 using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_eqsl_status ON qso(eqsl_status, my_callsign)", con))
+                    cmd.ExecuteNonQuery();
+            }
+            catch { /* an index is an optimization only; never block startup on it */ }
+        }
+
+        // Index that backs the QRZ Logbook pending-queue lookups (filter on qrz_status). Idempotent.
+        private void EnsureQrzIndexes()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_qrz_status ON qso(qrz_status)", con))
                     cmd.ExecuteNonQuery();
             }
             catch { /* an index is an optimization only; never block startup on it */ }
@@ -870,6 +980,8 @@ namespace HolyLogger
             , [sat_name] nvarchar(100) NULL COLLATE NOCASE
             , [soapbox] nvarchar(100) NULL COLLATE NOCASE
             , [eqsl_status] INTEGER NOT NULL DEFAULT 0
+            , [qrz_status] INTEGER NOT NULL DEFAULT 0
+            , [qrz_logid] nvarchar(50) NULL
             );";
 
             string createTable_categories = @"
@@ -998,8 +1110,10 @@ namespace HolyLogger
                 AddColToTable("qso", "soapbox", "nvarchar(100) NULL");
             }
             AddEqslStatusColumn();
+            AddQrzColumns();
             EnsureEqslAccountsTable();
             EnsureEqslIndexes();
+            EnsureQrzIndexes();
             using (var command = new SQLiteCommand(createTable_categories, con))
             {
                 command.ExecuteNonQuery();

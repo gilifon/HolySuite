@@ -68,6 +68,11 @@ namespace HolyLogger
             HideAllControls();
             QRZServiceControlInstance.Visibility = Visibility.Visible;
         }
+        private void QRZLogbookItem_Selected(object sender, RoutedEventArgs e)
+        {
+            HideAllControls();
+            QRZLogbookControlInstance.Visibility = Visibility.Visible;
+        }
         private void EqslServiceItem_Selected(object sender, RoutedEventArgs e)
         {
             HideAllControls();
@@ -91,6 +96,7 @@ namespace HolyLogger
         private void HideAllControls()
         {
             QRZServiceControlInstance.Visibility = Visibility.Hidden;
+            QRZLogbookControlInstance.Visibility = Visibility.Hidden;
             EqslServiceControlInstance.Visibility = Visibility.Hidden;
             UserInterfaceControlInstance.Visibility = Visibility.Hidden;
             GeneralSettingsControlControlInstance.Visibility = Visibility.Hidden;

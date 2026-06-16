@@ -1715,5 +1715,41 @@ namespace HolyLogger.Properties {
                 this["SearchWindowHeight"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string qrz_api_key {
+            get {
+                return ((string)(this["qrz_api_key"]));
+            }
+            set {
+                this["qrz_api_key"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool qrz_logbook_auto_push {
+            get {
+                return ((bool)(this["qrz_logbook_auto_push"]));
+            }
+            set {
+                this["qrz_logbook_auto_push"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool qrz_logbook_key_valid {
+            get {
+                return ((bool)(this["qrz_logbook_key_valid"]));
+            }
+            set {
+                this["qrz_logbook_key_valid"] = value;
+            }
+        }
     }
 }

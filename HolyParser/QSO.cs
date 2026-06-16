@@ -92,6 +92,14 @@ namespace HolyParser
         // 2 = permanently rejected by eQSL. Not serialized to the contest server.
         public int EqslStatus { get; set; }
 
+        // QRZ.com Logbook real-time upload state: 0 = pending (waiting to be pushed), 1 = uploaded,
+        // 2 = permanently rejected by QRZ (auth/subscription/bad record). Not serialized to the server.
+        public int QrzStatus { get; set; }
+
+        // The transaction id QRZ returns (LOGID) after a successful Logbook insert, kept locally next
+        // to the QSO for cross-referencing or a future deletion routine.
+        public string QrzLogId { get; set; }
+
         public QSO()
         {
             IsAllowWARC = false;

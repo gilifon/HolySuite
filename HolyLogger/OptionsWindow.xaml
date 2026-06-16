@@ -18,12 +18,14 @@
                 <TreeViewItem x:Name="GeneralItem" Header="General" Selected="GeneralItem_Selected" />
                 <TreeViewItem x:Name="UlItem" Header="User Interface" Selected="UserInterfaceItem_Selected" />
                 <TreeViewItem x:Name="QRZItem" Header="QRZ Service" Selected="QRZServiceItem_Selected" />
+                <TreeViewItem x:Name="QRZLogbookItem" Header="QRZ Logbook" Selected="QRZLogbookItem_Selected" />
                 <TreeViewItem x:Name="EqslItem" Header="eQSL Service" Selected="EqslServiceItem_Selected" />
                 <TreeViewItem x:Name="ImportItem" Header="Import Settings" Selected="ImportItem_Selected"/>
                 <TreeViewItem x:Name="SatelliteItem" Header="Satellite Mode" Selected="SatelliteItem_Selected"/>
             </TreeView>
         </DockPanel>
         <OptionsUserControls:QRZServiceControl x:Name="QRZServiceControlInstance" Grid.Column="1" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
+        <OptionsUserControls:QRZLogbookControl x:Name="QRZLogbookControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
         <OptionsUserControls:EqslServiceControl x:Name="EqslServiceControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
         <OptionsUserControls:UserInterfaceControl x:Name="UserInterfaceControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
         <OptionsUserControls:GeneralSettingsControl x:Name="GeneralSettingsControlControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
