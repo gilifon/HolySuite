@@ -490,7 +490,12 @@
                     <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock Text="Grids: " Margin="20,0,0,0" FontSize="16"/>
+                    <!-- Two-line "Holyland Squares" label. Width 56 + left margin 4 = the same 60px
+                         footprint as the old "Grids: " (40.1px + 20px), so the number does not move.
+                         Left-aligned (both lines share the same left edge) + vertically centered so it
+                         is symmetric with the number, leaving room for up to a 3-digit count. -->
+                    <TextBlock Margin="4,0,0,0" FontSize="14" Width="56" TextAlignment="Left"
+                               VerticalAlignment="Center" LineHeight="15" LineStackingStrategy="BlockLineHeight"><Run Text="Holyland"/><LineBreak/><Run Text="Squares"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
                     <TextBlock x:Name="L_numOfGrids" Text="{Binding NumOfGrids, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
