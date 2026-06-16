@@ -568,21 +568,23 @@ namespace HolyLogger.OptionsUserControls
 
             UpdateClusterVisibleState();
 
-            var mainWindow = Application.Current.MainWindow as MainWindow;
-            if (mainWindow != null)
-            {
-                mainWindow.HandleClusterActiveChanged(isActive);
-            }
-
-            // The cluster window opening (or closing) causes WPF to shuffle z-order and focus via
-            // queued dispatcher messages. Defer Activate() so it runs after all those messages have
-            // been processed and the Options window is guaranteed to end up on top.
             var optionsWindow = Window.GetWindow(this);
-            if (optionsWindow != null)
+
+            // Building the cluster window and starting its WebSocket is heavy work. Running it inline
+            // here freezes the checkbox and lets the new cluster window steal focus, so the Options
+            // window appears to "close". Defer the whole thing to a background dispatcher pass: the
+            // checkbox updates instantly, and we re-activate the Options window afterwards so it stays
+            // on top until the user closes it themselves.
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                Dispatcher.BeginInvoke(new Action(() => optionsWindow.Activate()),
-                    System.Windows.Threading.DispatcherPriority.Input);
-            }
+                var mainWindow = Application.Current.MainWindow as MainWindow;
+                if (mainWindow != null)
+                {
+                    mainWindow.HandleClusterActiveChanged(isActive);
+                }
+
+                optionsWindow?.Activate();
+            }), System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void ClusterVisible_Changed(object sender, RoutedEventArgs e)
