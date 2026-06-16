@@ -1553,6 +1553,7 @@ namespace HolyLogger
         {
             if (Properties.Settings.Default.IsFilterQSOs)
             {
+                FilteredQsos = null;
                 DataContext = Qsos;
             }
         }
@@ -1596,6 +1597,27 @@ namespace HolyLogger
         {
             // Let WPF perform the sort first; it updates the column's SortDirection afterwards.
             Dispatcher.BeginInvoke(new Action(UpdateSortArrows), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        private void QSODataGrid_LoadingRow(object sender, DataGridRowEventArgs e)
+        {
+            bool isAlternate = e.Row.GetIndex() % 2 != 0;
+            bool isLastQso = LastQSO != null && e.Row.Item == LastQSO;
+
+            if (FilteredQsos != null && !isLastQso)
+            {
+                // Filter active: green rows for matching QSOs.
+                e.Row.Background = isAlternate
+                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xA8, 0xD8, 0xB4))
+                    : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC8, 0xF0, 0xD0));
+            }
+            else
+            {
+                // Normal state (or pinned last-QSO row): standard white/gainsboro alternation.
+                e.Row.Background = isAlternate
+                    ? System.Windows.Media.Brushes.Gainsboro
+                    : System.Windows.Media.Brushes.White;
+            }
         }
 
         private void UpdateSortArrows()
