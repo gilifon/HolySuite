@@ -633,6 +633,7 @@ namespace HolyLogger
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
             LastQSO = Qsos.FirstOrDefault();
+            ApplyDefaultLogSort();
 
             UpdateNumOfQSOs();
             TB_Frequency_TextChanged(null, null);
@@ -1554,6 +1555,80 @@ namespace HolyLogger
             {
                 DataContext = Qsos;
             }
+        }
+
+        // Default log ordering on load: newest QSO first (Date desc, then Time desc) so the operator
+        // immediately sees the last QSO he made at the top, with the sort arrow marking the Date column.
+        private void ApplyDefaultLogSort()
+        {
+            if (Qsos == null)
+                return;
+
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(Qsos);
+            if (view != null)
+            {
+                using (view.DeferRefresh())
+                {
+                    view.SortDescriptions.Clear();
+                    view.SortDescriptions.Add(new System.ComponentModel.SortDescription("Date", System.ComponentModel.ListSortDirection.Descending));
+                    view.SortDescriptions.Add(new System.ComponentModel.SortDescription("Time", System.ComponentModel.ListSortDirection.Descending));
+                }
+            }
+
+            // Mark the Date column as the active descending sort (the primary key), then paint the arrows.
+            if (QSODataGrid != null)
+            {
+                foreach (var col in QSODataGrid.Columns)
+                {
+                    if (col.SortMemberPath == "Date")
+                        col.SortDirection = System.ComponentModel.ListSortDirection.Descending;
+                    else
+                        col.SortDirection = null;
+                }
+                UpdateSortArrows();
+            }
+        }
+
+        // The DataGridColumnHeader.SortDirection that a header ControlTemplate's triggers read does not
+        // sync reliably in this app, so the arrow glyph is painted directly into the header text instead,
+        // driven by the column's own SortDirection (which IS set correctly when sorting).
+        private void QSODataGrid_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            // Let WPF perform the sort first; it updates the column's SortDirection afterwards.
+            Dispatcher.BeginInvoke(new Action(UpdateSortArrows), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        private void UpdateSortArrows()
+        {
+            if (QSODataGrid == null)
+                return;
+
+            foreach (var col in QSODataGrid.Columns)
+            {
+                string baseHeader = GetBaseColumnHeader(col);
+                if (string.IsNullOrEmpty(baseHeader))
+                    continue;
+
+                if (col.SortDirection == System.ComponentModel.ListSortDirection.Ascending)
+                    col.Header = baseHeader + "  ▲";   // ▲
+                else if (col.SortDirection == System.ComponentModel.ListSortDirection.Descending)
+                    col.Header = baseHeader + "  ▼";   // ▼
+                else
+                    col.Header = baseHeader;
+            }
+        }
+
+        // Returns the column header text without any sort-arrow suffix.
+        private string GetBaseColumnHeader(DataGridColumn col)
+        {
+            string header = col.Header as string;
+            if (string.IsNullOrEmpty(header))
+                return header;
+
+            int idx = header.IndexOfAny(new[] { '▲', '▼' });
+            if (idx >= 0)
+                header = header.Substring(0, idx).TrimEnd();
+            return header;
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -3725,6 +3800,7 @@ namespace HolyLogger
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
             LastQSO = Qsos.FirstOrDefault();
+            ApplyDefaultLogSort();
 
             // Replacing the whole collection does NOT raise CollectionChanged, so the cluster
             // colors aren't refreshed automatically. Rebuild the worked-countries cache (needed =
