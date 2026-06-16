@@ -312,6 +312,7 @@ namespace HolyLogger
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
+        SearchWindow searchWindow = null;
         QRZPhotoWindow qrzPhotoWindow = null;
         double? qrzPhotoLeft = null;
         double? qrzPhotoTop = null;
@@ -5038,6 +5039,18 @@ namespace HolyLogger
             logupload.Top = Properties.Settings.Default.LogUploadWindowTop < 0 ? 0 : Properties.Settings.Default.LogUploadWindowTop;
             logupload.SendLog += L_SendLog;
             logupload.Show();
+        }
+
+        private void SearchMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (searchWindow != null && searchWindow.IsLoaded)
+            {
+                searchWindow.Activate();
+                return;
+            }
+            searchWindow = new SearchWindow(Qsos);
+            searchWindow.Closed += (s, _) => searchWindow = null;
+            searchWindow.Show();
         }
 
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)

@@ -1667,5 +1667,53 @@ namespace HolyLogger.Properties {
                 this["CustomMapImagePath"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public double SearchWindowLeft {
+            get {
+                return ((double)(this["SearchWindowLeft"]));
+            }
+            set {
+                this["SearchWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public double SearchWindowTop {
+            get {
+                return ((double)(this["SearchWindowTop"]));
+            }
+            set {
+                this["SearchWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("900")]
+        public double SearchWindowWidth {
+            get {
+                return ((double)(this["SearchWindowWidth"]));
+            }
+            set {
+                this["SearchWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("500")]
+        public double SearchWindowHeight {
+            get {
+                return ((double)(this["SearchWindowHeight"]));
+            }
+            set {
+                this["SearchWindowHeight"] = value;
+            }
+        }
     }
 }
