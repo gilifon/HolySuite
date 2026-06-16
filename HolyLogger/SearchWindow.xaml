@@ -24,25 +24,35 @@
 
         <!-- Search bar -->
         <Border Grid.Row="0" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,0,0,2" Padding="10,8">
-            <WrapPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBox x:Name="TB_Callsign" Width="140" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
-                         TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
-                <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                <TextBox x:Name="TB_Country" Width="200" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
-                         TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
-                <Button x:Name="Btn_Search" FontSize="14" Padding="16,4" IsEnabled="False"
-                        Click="Btn_Search_Click" Background="#1565C0" Foreground="White"
-                        BorderBrush="#0D47A1" Cursor="Hand">
-                    <StackPanel Orientation="Horizontal">
-                        <Viewbox Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center">
-                            <Path Stretch="Uniform" Fill="White"
-                                  Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                        </Viewbox>
-                        <TextBlock Text="Search" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </Button>
-            </WrapPanel>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox x:Name="TB_Callsign" Width="140" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
+                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox x:Name="TB_Country" Width="200" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
+                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    <Button x:Name="Btn_Search" FontSize="14" Padding="16,4" IsEnabled="False"
+                            Click="Btn_Search_Click" Background="#1565C0" Foreground="White"
+                            BorderBrush="#0D47A1" Cursor="Hand">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="16" Height="16" Margin="0,0,6,0" VerticalAlignment="Center">
+                                <Path Stretch="Uniform" Fill="White"
+                                      Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                            </Viewbox>
+                            <TextBlock Text="Search" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </WrapPanel>
+                <!-- QSO count, right-justified so it tracks the right edge on resize -->
+                <TextBlock x:Name="TB_Count" Grid.Column="1" VerticalAlignment="Center"
+                           HorizontalAlignment="Right" FontSize="16" FontWeight="Bold"
+                           Foreground="#1565C0" Margin="20,0,6,0"/>
+            </Grid>
         </Border>
 
         <!-- Results grid -->

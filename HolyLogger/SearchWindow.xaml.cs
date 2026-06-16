@@ -29,6 +29,15 @@ namespace HolyLogger
                 Height = s.SearchWindowHeight;
         }
 
+        // Pre-fills the Callsign box (used when opened from a log-row right-click). Setting the
+        // text fires TextChanged, which enables the Search button.
+        public void SetCallsign(string call)
+        {
+            TB_Callsign.Text = (call ?? string.Empty).Trim().ToUpperInvariant();
+            TB_Callsign.CaretIndex = TB_Callsign.Text.Length;
+            TB_Callsign.Focus();
+        }
+
         private void SearchField_TextChanged(object sender, TextChangedEventArgs e)
         {
             Btn_Search.IsEnabled =
@@ -64,6 +73,8 @@ namespace HolyLogger
 
             var found = new ObservableCollection<QSO>(results);
             ResultsGrid.DataContext = found;
+
+            TB_Count.Text = found.Count == 1 ? "1 QSO" : $"{found.Count} QSOs";
 
             TB_Status.Text = found.Count == 0
                 ? "No QSOs found."

@@ -2274,6 +2274,10 @@ namespace HolyLogger
             qrzItem.Click += (s, e) => OpenQrzPage(qso.DXCall);
             menu.Items.Add(qrzItem);
 
+            var searchItem = new MenuItem { Header = "Search", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            searchItem.Click += (s, e) => OpenSearchWindow(qso.DXCall);
+            menu.Items.Add(searchItem);
+
             var copyItem = new MenuItem { Header = "Copy QSO Info", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
             copyItem.Click += (s, e) =>
             {
@@ -5043,14 +5047,26 @@ namespace HolyLogger
 
         private void SearchMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            OpenSearchWindow();
+        }
+
+        // Opens the Search window (or re-activates the existing one). If a callsign is supplied
+        // (e.g. from a log-row right-click), the Callsign box is pre-filled so the user only has
+        // to press Search.
+        private void OpenSearchWindow(string presetCallsign = null)
+        {
             if (searchWindow != null && searchWindow.IsLoaded)
             {
+                if (!string.IsNullOrWhiteSpace(presetCallsign))
+                    searchWindow.SetCallsign(presetCallsign);
                 searchWindow.Activate();
                 return;
             }
             searchWindow = new SearchWindow(Qsos);
             searchWindow.Closed += (s, _) => searchWindow = null;
             searchWindow.Show();
+            if (!string.IsNullOrWhiteSpace(presetCallsign))
+                searchWindow.SetCallsign(presetCallsign);
         }
 
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
