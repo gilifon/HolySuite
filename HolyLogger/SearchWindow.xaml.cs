@@ -30,12 +30,15 @@ namespace HolyLogger
         }
 
         // Pre-fills the Callsign box (used when opened from a log-row right-click). Setting the
-        // text fires TextChanged, which enables the Search button.
-        public void SetCallsign(string call)
+        // text fires TextChanged, which enables the Search button. When runSearch is true the
+        // search runs immediately (right-click case); otherwise the user presses Search (Tools menu).
+        public void SetCallsign(string call, bool runSearch = false)
         {
             TB_Callsign.Text = (call ?? string.Empty).Trim().ToUpperInvariant();
             TB_Callsign.CaretIndex = TB_Callsign.Text.Length;
             TB_Callsign.Focus();
+            if (runSearch && Btn_Search.IsEnabled)
+                RunSearch();
         }
 
         private void SearchField_TextChanged(object sender, TextChangedEventArgs e)

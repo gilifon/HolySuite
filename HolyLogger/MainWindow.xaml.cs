@@ -5058,7 +5058,7 @@ namespace HolyLogger
             if (searchWindow != null && searchWindow.IsLoaded)
             {
                 if (!string.IsNullOrWhiteSpace(presetCallsign))
-                    searchWindow.SetCallsign(presetCallsign);
+                    searchWindow.SetCallsign(presetCallsign, runSearch: true);
                 searchWindow.Activate();
                 return;
             }
@@ -5066,7 +5066,7 @@ namespace HolyLogger
             searchWindow.Closed += (s, _) => searchWindow = null;
             searchWindow.Show();
             if (!string.IsNullOrWhiteSpace(presetCallsign))
-                searchWindow.SetCallsign(presetCallsign);
+                searchWindow.SetCallsign(presetCallsign, runSearch: true);
         }
 
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
