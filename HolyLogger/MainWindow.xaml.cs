@@ -316,6 +316,7 @@ namespace HolyLogger
         AboutWindow about = null;
         OptionsWindow options = null;
         SearchWindow searchWindow = null;
+        StatisticsWindow statisticsWindow = null;
         QRZPhotoWindow qrzPhotoWindow = null;
         double? qrzPhotoLeft = null;
         double? qrzPhotoTop = null;
@@ -5191,6 +5192,25 @@ namespace HolyLogger
             searchWindow.Show();
             if (!string.IsNullOrWhiteSpace(presetCallsign))
                 searchWindow.SetCallsign(presetCallsign, runSearch: true);
+        }
+
+        private void StatisticsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            OpenStatisticsWindow();
+        }
+
+        // Opens the Statistics window (or re-activates the existing one). Single-instance like the
+        // Search window; it gets the full QSO collection to compute stats from.
+        private void OpenStatisticsWindow()
+        {
+            if (statisticsWindow != null && statisticsWindow.IsLoaded)
+            {
+                statisticsWindow.Activate();
+                return;
+            }
+            statisticsWindow = new StatisticsWindow(Qsos);
+            statisticsWindow.Closed += (s, _) => statisticsWindow = null;
+            statisticsWindow.Show();
         }
 
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
@@ -10669,7 +10689,7 @@ namespace HolyLogger
             return true;
         }
 
-        private static readonly Dictionary<string, string> DxccNameToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        internal static readonly Dictionary<string, string> DxccNameToIso = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
         {
             {"Afghanistan","af"},{"Agalega & St. Brandon","mu"},{"Aland Is.","fi"},{"Alaska","us"},
             {"Albania","al"},{"Algeria","dz"},{"Andaman & Nicobar Is.","in"},
@@ -12170,7 +12190,16 @@ namespace HolyLogger
         private void ShowRigParams()
         {
             ShowRigStatus();
-            if (OmniRigEngine == null || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE || !Properties.Settings.Default.EnableOmniRigCAT)
+
+            bool rigOnline = OmniRigEngine != null && Rig != null
+                             && Rig.Status == OmniRig.RigStatusX.ST_ONLINE
+                             && Properties.Settings.Default.EnableOmniRigCAT;
+
+            // When the radio is online it controls the mode — block user interaction with the combo.
+            // When offline the operator must be able to pick the mode manually.
+            if (CB_Mode != null) CB_Mode.IsHitTestVisible = !rigOnline;
+
+            if (!rigOnline)
             {
                 ClearVoiceMessageState();
                 return;

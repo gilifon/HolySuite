@@ -326,11 +326,6 @@
                             <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show QSO Statistics" Visibility="Collapsed">
-                        <MenuItem.Icon>
-                            <Image Source="Images/statistics.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
                     <Separator />
                     <!--<MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
                                 <MenuItem.Icon>
@@ -429,6 +424,14 @@
                             <Viewbox Width="16" Height="16">
                                 <Path Stretch="Uniform" Fill="#444444"
                                       Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show statistics about the log" Click="StatisticsMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#1565C0"
+                                      Data="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/>
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>

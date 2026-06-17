@@ -425,6 +425,18 @@
     <Setting Name="SearchWindowHeight" Type="System.Double" Scope="User">
       <Value Profile="(Default)">500</Value>
     </Setting>
+    <Setting Name="StatisticsWindowLeft" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">120</Value>
+    </Setting>
+    <Setting Name="StatisticsWindowTop" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">120</Value>
+    </Setting>
+    <Setting Name="StatisticsWindowWidth" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">700</Value>
+    </Setting>
+    <Setting Name="StatisticsWindowHeight" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">500</Value>
+    </Setting>
     <Setting Name="qrz_api_key" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>

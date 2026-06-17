@@ -440,6 +440,16 @@ namespace DXCCManager
             }
             return "";
         }
-        
+
+        public IReadOnlyList<string> GetAllEntityNames()
+        {
+            return FinalDXCCs
+                .Select(d => d.Name)
+                .Where(n => !string.IsNullOrEmpty(n) && n != "Unknown")
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
     }
 }

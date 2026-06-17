@@ -1718,6 +1718,54 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("120")]
+        public double StatisticsWindowLeft {
+            get {
+                return ((double)(this["StatisticsWindowLeft"]));
+            }
+            set {
+                this["StatisticsWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("120")]
+        public double StatisticsWindowTop {
+            get {
+                return ((double)(this["StatisticsWindowTop"]));
+            }
+            set {
+                this["StatisticsWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("700")]
+        public double StatisticsWindowWidth {
+            get {
+                return ((double)(this["StatisticsWindowWidth"]));
+            }
+            set {
+                this["StatisticsWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("500")]
+        public double StatisticsWindowHeight {
+            get {
+                return ((double)(this["StatisticsWindowHeight"]));
+            }
+            set {
+                this["StatisticsWindowHeight"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string qrz_api_key {
             get {
