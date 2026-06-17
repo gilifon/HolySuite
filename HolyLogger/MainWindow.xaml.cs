@@ -65,6 +65,9 @@ namespace HolyLogger
 
         DataAccess dal;
         EntityResolver rem;
+        // Read-only overlay that renders the frequency as ##.### (3 decimals) when the field is
+        // not being edited. The underlying TB_Frequency keeps the full-precision source value,
+        // so logging, heartbeat, and ADIF are unaffected — only the on-screen display is shortened.
         TextBlock TB_FrequencyDisplay;
 
         public ObservableCollection<QSO> Qsos;
@@ -456,12 +459,15 @@ namespace HolyLogger
             rem = new EntityResolver();
             InitializeComponent();
 
+            // Overlay that shows the 3-decimal display while the box is not focused. Positioned to
+            // sit exactly over TB_Frequency's text (its margin + border + left padding), at the same
+            // font size, so switching between display and edit causes no visible jump.
             TB_FrequencyDisplay = new TextBlock
             {
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(228, 57, 0, 0),
-                Width = 79,
+                Margin = new Thickness(222, 57, 0, 0),
+                Width = 52,
                 Height = 22,
                 FontSize = 16,
                 Foreground = System.Windows.Media.Brushes.Black,
@@ -475,7 +481,9 @@ namespace HolyLogger
             TB_Frequency.GotFocus += TB_Frequency_GotFocus;
             TB_Frequency.LostFocus += TB_Frequency_LostFocus;
             TB_DXCallsign.PreviewMouseLeftButtonDown += TB_DXCallsign_PreviewMouseLeftButtonDown;
-            UpdateFrequencyDisplay();
+            // Bindings populate after the constructor, so defer the first overlay refresh to Loaded
+            // priority — by then the bound value is present and we can render its 3-decimal form.
+            Dispatcher.BeginInvoke(new Action(UpdateFrequencyDisplay), System.Windows.Threading.DispatcherPriority.Loaded);
 
             ApplyMainFormBackgroundFromSettings();
             ApplyQsoTableHeaderBackgroundFromSettings();
@@ -624,7 +632,7 @@ namespace HolyLogger
             Top = Properties.Settings.Default.MainWindowTop < 0 ? 0 : Properties.Settings.Default.MainWindowTop;
             Width = Properties.Settings.Default.MainWindowWidth;
             Height = Properties.Settings.Default.MainWindowHeight;
-            
+
             //WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
 
             TP_Date.Value = DateTime.UtcNow;
@@ -931,8 +939,11 @@ namespace HolyLogger
             {
                 // Show the map area - now controlled by MapAreaDisplayMode setting
                 UpdateGraphicsBoxDisplay();
-                this.MinWidth = 1120;
                 UpdateClusterSpotsOnMap();
+                // Cap how far the window can be narrowed so the map can shrink only down to a
+                // square. Deferred to Loaded priority because the map can't be measured until the
+                // layout pass has run.
+                Dispatcher.BeginInvoke(new Action(EnforceMapSquareMinWidth), System.Windows.Threading.DispatcherPriority.Loaded);
             }
             else
             {
@@ -5039,6 +5050,7 @@ namespace HolyLogger
 
         private void TB_Frequency_GotFocus(object sender, RoutedEventArgs e)
         {
+            // Editing: hide the 3-decimal overlay and reveal the real, full-precision value.
             if (TB_FrequencyDisplay != null)
                 TB_FrequencyDisplay.Visibility = Visibility.Collapsed;
             TB_Frequency.Foreground = System.Windows.Media.Brushes.Black;
@@ -5049,25 +5061,25 @@ namespace HolyLogger
             UpdateFrequencyDisplay();
         }
 
+        // Refresh the read-only overlay. The TextBox keeps its full-precision text (used everywhere
+        // the value is consumed — logging, heartbeat, ADIF); this only changes what is shown. When
+        // the box is not focused we hide the real text and paint the ##.### form on top instead.
         private void UpdateFrequencyDisplay()
         {
             if (TB_FrequencyDisplay == null) return;
 
-            string raw = TB_Frequency.Text.Trim();
+            string raw = (TB_Frequency.Text ?? string.Empty).Trim();
             if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double mhz) || mhz <= 0)
             {
                 TB_FrequencyDisplay.Visibility = Visibility.Collapsed;
                 return;
             }
 
-            // Format as MHz with two dot separators: 14.312.000
-            // Convert to Hz integer, then format as ##,###,### using dots
+            // MHz . kHz with three decimals, e.g. 7.140, 14.250, 1296.280 (sub-kHz not shown).
             long hz = (long)Math.Round(mhz * 1000000.0);
-            // Build groups: MHz . kHz . Hz
             long mhzPart = hz / 1000000;
             long khzPart = (hz % 1000000) / 1000;
-            long hzPart = hz % 1000;
-            string formatted = $"{mhzPart}.{khzPart:D3}.{hzPart:D3}";
+            string formatted = $"{mhzPart}.{khzPart:D3}";
 
             TB_FrequencyDisplay.Text = formatted;
             bool showOverlay = !TB_Frequency.IsFocused;
@@ -11064,7 +11076,29 @@ namespace HolyLogger
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
+            EnforceMapSquareMinWidth();
             SaveMainWindowBounds();
+        }
+
+        // The azimuth map stretches horizontally but is a fixed 325px tall, so without a floor the
+        // window could be narrowed until the map became a portrait rectangle. Everything to the left
+        // of the map (the blue panel + gaps) plus the window border is a constant overhead equal to
+        // (WindowWidth - MapWidth); the width at which the map is exactly square is therefore
+        // overhead + mapHeight. Measuring it live keeps it correct across DPI / chrome differences.
+        private void EnforceMapSquareMinWidth()
+        {
+            if (!Properties.Settings.Default.IsShowAzimuthControl) return;
+            if (MapControl == null) return;
+
+            double mapWidth = MapControl.ActualWidth;
+            double mapHeight = MapControl.ActualHeight > 0 ? MapControl.ActualHeight : MapControl.Height;
+            if (mapWidth <= 0 || this.ActualWidth <= 0 || double.IsNaN(mapHeight) || mapHeight <= 0)
+                return;
+
+            double overhead = this.ActualWidth - mapWidth;   // blue panel + gaps + window chrome (constant)
+            double squareMinWidth = Math.Ceiling(overhead + mapHeight);
+            if (Math.Abs(this.MinWidth - squareMinWidth) > 0.5)
+                this.MinWidth = squareMinWidth;
         }
 
         private void SaveMainWindowBounds()

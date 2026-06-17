@@ -594,15 +594,15 @@
         </DockPanel>
 
 
-        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="272" />
-        <TextBlock HorizontalAlignment="Left" Margin="12,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="272" />
+        <TextBlock HorizontalAlignment="Left" Margin="11,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
         <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="186,15,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
-        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="634,12,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,12,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid Width="95">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -613,7 +613,7 @@
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M81,3 C88,8 88,24 81,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </Grid>
         </Button>
-        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="525,50,0,0" Width="205" Height="38" BorderThickness="1" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
+        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="462,50,0,0" Width="205" Height="38" BorderThickness="1" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="BorderBrush" Value="#9966CC"/>
@@ -665,22 +665,63 @@
                 </Button>
             </Grid>
         </Border>
-        <Label Content="My Locator" HorizontalAlignment="Left" Margin="219,9,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
-        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="312,12,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="90" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" MaxLength="8" TabIndex="2"/>
-        <Label Content="Holyland Square" HorizontalAlignment="Left" Margin="407,11,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your Holyland square" />
-        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="534,13,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="58" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="5" TabIndex="3"/>
-        <Label Content="Mode" HorizontalAlignment="Left" Margin="407,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="459,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="58" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged">
+        <TextBlock HorizontalAlignment="Left" Margin="212,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Your grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="My" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Locator" />
+        </TextBlock>
+        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="267,12,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="68" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" MaxLength="6" TabIndex="2"/>
+        <TextBlock HorizontalAlignment="Left" Margin="346,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="15" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="Holyland" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Square" />
+        </TextBlock>
+        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="415,13,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="58" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" MaxLength="5" TabIndex="3"/>
+        <Label Content="Mode" HorizontalAlignment="Left" Margin="369,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="416,54,0,0" Grid.Row="1" VerticalAlignment="Top" Width="40" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3">
+            <ComboBox.Template>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                      BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}"
+                                      Cursor="Hand">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="#CCE4FF"/>
+                                            <Setter TargetName="bd" Property="BorderBrush" Value="#0078D7"/>
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="#B0D4F5"/>
+                                            <Setter TargetName="bd" Property="BorderBrush" Value="#0078D7"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0"/>
+                        <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom">
+                            <Border BorderBrush="#0078D7" BorderThickness="1" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{TemplateBinding ActualWidth}">
+                                <ScrollViewer>
+                                    <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </ComboBox.Template>
             <ComboBoxItem x:Name="op_cw" Content="CW"/>
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
             <ComboBoxItem x:Name="op_ssb" Content="SSB"/>
             <ComboBoxItem x:Name="op_fm" Content="FM"/>
         </ComboBox>
         <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
-        <Label Content="Freq" HorizontalAlignment="Left" Margin="184,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
+        <Label Content="Freq" HorizontalAlignment="Left" Margin="175,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
         <!--<xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="348,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="9" />-->
-        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="225,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="84" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
-        <Label Content="Band" HorizontalAlignment="Left" Margin="307,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="216,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
+        <Label Content="Band" HorizontalAlignment="Left" Margin="274,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
@@ -692,9 +733,9 @@
         </Border>
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
 
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="354,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="321,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="The DX Station Callsign"/>
-        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="150" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
         <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
@@ -812,7 +853,7 @@
         </Popup>
         <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
         <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" FontWeight="Bold" FontStyle="Italic" FontSize="14" Visibility="Hidden"><Run Text="Legal " Foreground="Green"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="Green"/></TextBlock>
-        <Border HorizontalAlignment="Left" Margin="264,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="15000">
+        <Border HorizontalAlignment="Left" Margin="237,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
                 <ToolTip>
                     <StackPanel>
@@ -824,12 +865,12 @@
             </Border.ToolTip>
             <TextBlock Text="i" Foreground="White" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" FontStyle="Italic"/>
         </Border>
-        <Image x:Name="QRZBtn" ToolTip="Get Data from QRZ.com and open the callsign's QRZ.com page" HorizontalAlignment="Left" Height="24" Margin="288,103,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
+        <Image x:Name="QRZBtn" ToolTip="Get Data from QRZ.com and open the callsign's QRZ.com page" HorizontalAlignment="Left" Height="24" Margin="261,103,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
         <!-- "No QRZ.com connection" alert: a red "!" badge on the QRZ icon's top-right corner, shown
              only when no QRZ session could be established (toggled by SetQrzConnected). Not hit-testable
              so clicks pass through to the QRZ icon underneath. -->
         <Border x:Name="QrzNoConnBadge" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Margin="302,99,0,0" Width="14" Height="14" CornerRadius="7" Background="#D32F2F"
+                Margin="275,99,0,0" Width="14" Height="14" CornerRadius="7" Background="#D32F2F"
                 BorderBrush="White" BorderThickness="1.5" Panel.ZIndex="40" IsHitTestVisible="False"
                 Visibility="Collapsed" ToolTip="No connection to QRZ.com">
             <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="10"
@@ -837,21 +878,21 @@
         </Border>
 
         <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The Exchange sent by the DX station" />
-        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="150" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
-        <TextBlock HorizontalAlignment="Left" Margin="263,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
-        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="297,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
-        <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="360,143,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
-        <TextBlock HorizontalAlignment="Left" Margin="369,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
-        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="403,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
-        <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="353,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
-        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="398,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" />
-        <Label Content="Time" HorizontalAlignment="Left" Margin="516,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
-        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="561,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" />
+        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
+        <TextBlock HorizontalAlignment="Left" Margin="228,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
+        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
+        <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,143,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
+        <TextBlock HorizontalAlignment="Left" Margin="349,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
+        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="383,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
+        <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="288,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
+        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" />
+        <Label Content="Time" HorizontalAlignment="Left" Margin="451,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
+        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="496,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" />
 
 
-        <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="707" Grid.Row="1" />
-        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="634,143,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
-        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="634,98,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+        <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
+        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,143,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
+        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,98,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>
@@ -867,12 +908,12 @@
             </Button>
         </Grid>
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="101,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="270" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" TextChanged="TB_DX_Name_TextChanged" />
-        <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="378,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
-        <Image x:Name="Img_CountryFlag" HorizontalAlignment="Left" Margin="414,193,0,0" VerticalAlignment="Top" Grid.Row="1" Width="30" Height="20" Stretch="Uniform" Visibility="Collapsed" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
-        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="449,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="188" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" IsReadOnly="True" FontSize="16" TabIndex="16" />
-        <Label Content="State" HorizontalAlignment="Left" Margin="642,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="689,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" CharacterCasing="Upper" MaxLength="3" Grid.Row="1" FontSize="16" TabIndex="17" TextChanged="TB_State_TextChanged" />
+        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="69,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="264" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" TextChanged="TB_DX_Name_TextChanged" />
+        <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="340,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
+        <Image x:Name="Img_CountryFlag" HorizontalAlignment="Left" Margin="376,193,0,0" VerticalAlignment="Top" Grid.Row="1" Width="30" Height="20" Stretch="Uniform" Visibility="Collapsed" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
+        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="411,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="169" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" IsReadOnly="True" FontSize="16" TabIndex="16" />
+        <Label Content="State" HorizontalAlignment="Left" Margin="580,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="627,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" CharacterCasing="Upper" MaxLength="3" Grid.Row="1" FontSize="16" TabIndex="17" TextChanged="TB_State_TextChanged" />
         <!-- Orphaned QRZ-photo frame: never populated by any code (Img_QRZPhoto is unreferenced),
              but its opaque #F5F7FA background at ZIndex 20 painted a white box over the map
              placeholder whenever the WebBrowser was hidden. Collapsed so it cannot bleed through. -->
@@ -880,14 +921,18 @@
             <Image x:Name="Img_QRZPhoto" Stretch="UniformToFill" Visibility="Collapsed" ToolTip="QRZ callsign image" />
         </Border>
 
-        <Label Content="DX Locator" HorizontalAlignment="Left" Margin="6,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Your grid locator" />
-        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="101,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
-        <Label Content="Comment" HorizontalAlignment="Left" Margin="210,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
-        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="295,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="400" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
-        <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="704,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <TextBlock HorizontalAlignment="Left" Margin="11,227,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="The DX station grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="DX" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Locator" />
+        </TextBlock>
+        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
+        <Label Content="Comment" HorizontalAlignment="Left" Margin="165,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="248,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="390" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
+        <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
-        <Rectangle Grid.Row="1" Fill="Gainsboro" HorizontalAlignment="Left" VerticalAlignment="Top" Width="736" Height="53" Margin="0,272,0,0" />
+        <Rectangle Grid.Row="1" Fill="Gainsboro" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="53" Margin="0,272,0,0" />
         <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,272,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
         <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="#888888" HorizontalGridLinesBrush="#888888" Padding="0,0,0,0">
             <DataGrid.Resources>
@@ -1027,15 +1072,15 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
 
-        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
-        <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
-        <Border HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
+        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
+        <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
             <Image x:Name="Img_CustomGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
         </Border>
-        <Border HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="QRZGraphicsBorder">
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="QRZGraphicsBorder">
             <Image x:Name="Img_QRZGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
         </Border>
-        <Border HorizontalAlignment="Stretch" Height="325" Margin="736,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="#4A90E2" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CompassBorder">
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="#4A90E2" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CompassBorder">
             <Grid>
                 <Viewbox Width="280" Height="280" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Canvas Width="100" Height="100">
@@ -1113,12 +1158,12 @@
             </Grid>
         </Border>
 
-        <TextBlock HorizontalAlignment="Left" Margin="12,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="11,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Operator" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="4"/>
+        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="90" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="4"/>
     </Grid>
 
 </Window>

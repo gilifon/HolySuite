@@ -206,7 +206,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("760")]
+        [global::System.Configuration.DefaultSettingValueAttribute("1243")]
         public double MainWindowWidth {
             get {
                 return ((double)(this["MainWindowWidth"]));
@@ -218,7 +218,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("660")]
+        [global::System.Configuration.DefaultSettingValueAttribute("808")]
         public double MainWindowHeight {
             get {
                 return ((double)(this["MainWindowHeight"]));
@@ -227,7 +227,7 @@ namespace HolyLogger.Properties {
                 this["MainWindowHeight"] = value;
             }
         }
-        
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("280")]
@@ -590,7 +590,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("580")]
+        [global::System.Configuration.DefaultSettingValueAttribute("900")]
         public double OptionsWindowWidth {
             get {
                 return ((double)(this["OptionsWindowWidth"]));
@@ -602,7 +602,7 @@ namespace HolyLogger.Properties {
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("700")]
+        [global::System.Configuration.DefaultSettingValueAttribute("630")]
         public double OptionsWindowHeight {
             get {
                 return ((double)(this["OptionsWindowHeight"]));
@@ -914,7 +914,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool MapUsePolar {
             get {
                 return ((bool)(this["MapUsePolar"]));
@@ -926,7 +926,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool MapAutoZoom {
             get {
                 return ((bool)(this["MapAutoZoom"]));
@@ -1274,7 +1274,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("700")]
+        [global::System.Configuration.DefaultSettingValueAttribute("563")]
         public double ClusterWindowWidth {
             get {
                 return ((double)(this["ClusterWindowWidth"]));
@@ -1286,7 +1286,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("420")]
+        [global::System.Configuration.DefaultSettingValueAttribute("809")]
         public double ClusterWindowHeight {
             get {
                 return ((double)(this["ClusterWindowHeight"]));
@@ -1298,7 +1298,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("110")]
+        [global::System.Configuration.DefaultSettingValueAttribute("83.546666666666667")]
         public double ClusterColWidthDX {
             get {
                 return ((double)(this["ClusterColWidthDX"]));
@@ -1310,7 +1310,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("110")]
+        [global::System.Configuration.DefaultSettingValueAttribute("56.783333333333339")]
         public double ClusterColWidthSpotter {
             get {
                 return ((double)(this["ClusterColWidthSpotter"]));
@@ -1322,7 +1322,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("85")]
+        [global::System.Configuration.DefaultSettingValueAttribute("58.860000000000007")]
         public double ClusterColWidthFreq {
             get {
                 return ((double)(this["ClusterColWidthFreq"]));
@@ -1334,7 +1334,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("70")]
+        [global::System.Configuration.DefaultSettingValueAttribute("44")]
         public double ClusterColWidthUtc {
             get {
                 return ((double)(this["ClusterColWidthUtc"]));
@@ -1346,7 +1346,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("220")]
+        [global::System.Configuration.DefaultSettingValueAttribute("95.496666666666329")]
         public double ClusterColWidthComment {
             get {
                 return ((double)(this["ClusterColWidthComment"]));
@@ -1358,7 +1358,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("60")]
+        [global::System.Configuration.DefaultSettingValueAttribute("44.74666666666667")]
         public double ClusterColWidthMode {
             get {
                 return ((double)(this["ClusterColWidthMode"]));
@@ -1502,7 +1502,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool ClusterActive {
             get {
                 return ((bool)(this["ClusterActive"]));
@@ -1694,7 +1694,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("900")]
+        [global::System.Configuration.DefaultSettingValueAttribute("1133")]
         public double SearchWindowWidth {
             get {
                 return ((double)(this["SearchWindowWidth"]));
@@ -1706,7 +1706,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("500")]
+        [global::System.Configuration.DefaultSettingValueAttribute("644")]
         public double SearchWindowHeight {
             get {
                 return ((double)(this["SearchWindowHeight"]));
