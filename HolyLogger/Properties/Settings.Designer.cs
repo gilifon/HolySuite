@@ -1799,5 +1799,41 @@ namespace HolyLogger.Properties {
                 this["qrz_logbook_key_valid"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("C:\\Program Files (x86)\\Trusted QSL\\tqsl.exe")]
+        public string LotwTqslPath {
+            get {
+                return ((string)(this["LotwTqslPath"]));
+            }
+            set {
+                this["LotwTqslPath"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwStationLocation {
+            get {
+                return ((string)(this["LotwStationLocation"]));
+            }
+            set {
+                this["LotwStationLocation"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwTqslPassword {
+            get {
+                return ((string)(this["LotwTqslPassword"]));
+            }
+            set {
+                this["LotwTqslPassword"] = value;
+            }
+        }
     }
 }

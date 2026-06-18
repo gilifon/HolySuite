@@ -182,6 +182,7 @@
     <Compile Include="CountDownTimer.cs" />
     <Compile Include="DataAccess.cs" />
     <Compile Include="EqslQueueWindow.cs" />
+    <Compile Include="LotwUploader.cs" />
     <Compile Include="QrzLogbookService.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="LogInfoWindow.xaml.cs">
@@ -211,6 +212,9 @@
     <Compile Include="OptionsUserControls\EqslServiceControl.xaml.cs">
       <DependentUpon>EqslServiceControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="OptionsUserControls\LotwControl.xaml.cs">
+      <DependentUpon>LotwControl.xaml</DependentUpon>
+    </Compile>
     <Compile Include="OptionsUserControls\QRZLogbookControl.xaml.cs">
       <DependentUpon>QRZLogbookControl.xaml</DependentUpon>
     </Compile>
@@ -224,6 +228,9 @@
     <Compile Include="Settings.cs" />
     <Compile Include="SearchWindow.xaml.cs">
       <DependentUpon>SearchWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="BadQsoEditorWindow.xaml.cs">
+      <DependentUpon>BadQsoEditorWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="StatisticsWindow.xaml.cs">
       <DependentUpon>StatisticsWindow.xaml</DependentUpon>
@@ -303,6 +310,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
+    <Page Include="OptionsUserControls\LotwControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="OptionsUserControls\QRZLogbookControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
@@ -316,6 +327,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="SearchWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="BadQsoEditorWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

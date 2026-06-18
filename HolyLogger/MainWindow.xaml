@@ -419,6 +419,14 @@
                             </Border>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="SendQueueToLotwMenuItem" Header="Upload Queue to LoTW" ToolTip="Sign and upload pending QSOs to ARRL Logbook of the World via TQSL." Click="SendQueueToLotwMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <MenuItem x:Name="SearchMenuItem" Header="Search" ToolTip="Search the log" Click="SearchMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
@@ -728,10 +736,13 @@
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
-        <Border Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Visibility, ElementName=UploadProgressSpinner}" Panel.ZIndex="50" IsHitTestVisible="False" Background="#F2FFFFFF" BorderBrush="#1565C0" BorderThickness="2" CornerRadius="8" Padding="14,12,14,10">
+        <Border Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Visibility, ElementName=UploadProgressSpinner}" Panel.ZIndex="50" IsHitTestVisible="False" Background="#F2FFFFFF" BorderBrush="#1565C0" BorderThickness="2" CornerRadius="8" Padding="20,14,20,14">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center" Source="Images/spinner2.gif" Height="72" Width="72" Visibility="Hidden" IsHitTestVisible="False"/>
-                <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Center" Margin="0,8,0,0" MinWidth="220" Height="34" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="#0E3F6E" Background="Transparent" Visibility="Hidden" IsHitTestVisible="False"/>
+                <TextBlock Text="{Binding UploadProgressTitle, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"
+                           HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="#0E3F6E"
+                           Margin="0,0,0,8" IsHitTestVisible="False"/>
+                <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center" Source="Images/spinner2.gif" Height="44" Width="44" Visibility="Hidden" IsHitTestVisible="False"/>
+                <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Center" Margin="0,8,0,0" MinWidth="180" Height="34" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="#0E3F6E" Background="Transparent" Visibility="Hidden" IsHitTestVisible="False"/>
             </StackPanel>
         </Border>
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>

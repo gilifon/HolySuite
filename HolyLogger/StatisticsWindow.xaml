@@ -102,6 +102,9 @@
                             <TextBlock x:Name="TB_DataQuality"
                                        Margin="0,8,0,0" FontSize="13" Foreground="#BB3300"
                                        FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"/>
+                            <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
+                                    Margin="0,6,0,0" Padding="10,4" FontSize="13"
+                                    Visibility="Collapsed" Click="BTN_EditProblems_Click"/>
                         </StackPanel>
 
                         <!-- Country tables section -->

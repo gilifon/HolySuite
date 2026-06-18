@@ -16,6 +16,8 @@ namespace HolyLogger
     {
         private readonly ObservableCollection<QSO> _allQsos;
 
+        public DataAccess Dal { get; set; }
+
         // Ordered band list (after stripping the "M" suffix)
         private static readonly string[] PivotBands =
             { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "2", "70cm", "13cm" };
@@ -102,9 +104,16 @@ namespace HolyLogger
             BuildCountryTables();
 
             int needsEdit = _allQsos.Count(q => string.IsNullOrEmpty(q.Band) || string.IsNullOrEmpty(q.Mode));
-            TB_DataQuality.Text = needsEdit > 0
-                ? $"⚠  {needsEdit} QSO{(needsEdit == 1 ? "" : "s")} have missing band or mode — consider reviewing them in the log."
-                : "";
+            if (needsEdit > 0)
+            {
+                TB_DataQuality.Text = $"⚠  {needsEdit} QSO{(needsEdit == 1 ? "" : "s")} have missing band or mode.";
+                BTN_EditProblems.Visibility = Visibility.Visible;
+            }
+            else
+            {
+                TB_DataQuality.Text = "";
+                BTN_EditProblems.Visibility = Visibility.Collapsed;
+            }
 
             TB_Status.Text = $"Statistics computed for {total} QSO{(total == 1 ? "" : "s")}.";
         }
@@ -455,6 +464,25 @@ namespace HolyLogger
         {
             if (string.IsNullOrEmpty(adif) || adif.Length < 8) return adif;
             return $"{adif.Substring(0, 4)}-{adif.Substring(4, 2)}-{adif.Substring(6, 2)}";
+        }
+
+        // ── problem QSO editor ────────────────────────────────────────────
+
+        private void BTN_EditProblems_Click(object sender, RoutedEventArgs e)
+        {
+            var badQsos = _allQsos
+                .Where(q => string.IsNullOrEmpty(q.Band) || string.IsNullOrEmpty(q.Mode))
+                .ToList();
+
+            var editor = new BadQsoEditorWindow(badQsos, Dal)
+            {
+                Owner = this
+            };
+            editor.ShowDialog();
+
+            // Refresh stats if any QSOs were saved.
+            if (editor.AnySaved)
+                ComputeStats();
         }
 
         // ── window position / size persistence ───────────────────────────

@@ -139,6 +139,17 @@ namespace HolyLogger
             }
         }
 
+        private string _UploadProgressTitle;
+        public string UploadProgressTitle
+        {
+            get { return _UploadProgressTitle; }
+            set
+            {
+                _UploadProgressTitle = value;
+                OnPropertyChanged("UploadProgressTitle");
+            }
+        }
+
         private sealed class AdifImportResult
         {
             public int FaultyQso { get; set; }
@@ -738,11 +749,14 @@ namespace HolyLogger
 
             // Perform QRZ lookup outside Dispatcher to avoid blocking UI and ensure proper exception handling
             string qrzName = string.Empty;
+            string qrzGrid = string.Empty;
             if (string.IsNullOrWhiteSpace(qso.Name) && isNetworkAvailable)
             {
                 try
                 {
-                    qrzName = await GetQrzForCall(qso.DXCall);
+                    var result = await GetQrzForCall(qso.DXCall);
+                    qrzName = result.Name;
+                    qrzGrid = result.Grid;
                 }
                 catch (Exception ex)
                 {
@@ -758,6 +772,10 @@ namespace HolyLogger
                     if (!string.IsNullOrWhiteSpace(qrzName))
                     {
                         qso.Name = qrzName;
+                    }
+                    if (!string.IsNullOrWhiteSpace(qrzGrid))
+                    {
+                        qso.DXLocator = qrzGrid;
                     }
                     qso.MyCall = string.IsNullOrWhiteSpace(qso.MyCall) ? TB_MyCallsign.Text : qso.MyCall;
                     qso.Operator = string.IsNullOrWhiteSpace(qso.Operator) ? TB_Operator.Text : qso.Operator;
@@ -898,6 +916,9 @@ namespace HolyLogger
         // Tracks the last known QRZ.com connection state, so the QRZ icon's click can branch:
         // connected -> normal QRZ lookup; not connected -> open the QRZ Service options page.
         private bool _qrzConnected = true;
+
+        // Callsigns that QRZ returned no data for — skip them on subsequent service runs this session.
+        private readonly HashSet<string> _qrzNoData = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // Reflects QRZ.com connectivity on the main-window QRZ icon: the normal blue globe
         // (Images/qrz.png) when we have a working QRZ session, or the grayed globe + red "!" badge
@@ -2667,6 +2688,74 @@ namespace HolyLogger
         private void SendQueueToEqslMenuItem_Click(object sender, RoutedEventArgs e)
         {
             ShowEqslQueueWindow();
+        }
+
+        private async void SendQueueToLotwMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
+            string location = Properties.Settings.Default.LotwStationLocation?.Trim();
+            string password = Properties.Settings.Default.LotwTqslPassword;
+
+            if (string.IsNullOrWhiteSpace(tqslPath) || !System.IO.File.Exists(tqslPath))
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    "TQSL executable not found.\nPlease set the correct path in Options → LoTW Upload.",
+                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Warning);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(location))
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    "Station location is not configured.\nPlease set it in Options → LoTW Upload.",
+                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Warning);
+                return;
+            }
+
+            var pending = dal.GetPendingLotwQsos();
+            if (pending.Count == 0)
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    "No pending QSOs to upload to LoTW.",
+                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Information);
+                return;
+            }
+
+            var confirm = System.Windows.Forms.MessageBox.Show(
+                $"Upload {pending.Count} pending QSO(s) to LoTW?\n\nStation location: {location}",
+                "LoTW Upload", System.Windows.Forms.MessageBoxButtons.YesNo,
+                System.Windows.Forms.MessageBoxIcon.Question);
+            if (confirm != System.Windows.Forms.DialogResult.Yes) return;
+
+            SendQueueToLotwMenuItem.IsEnabled = false;
+            string adiPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "holylogger_lotw.adi");
+            string tq8Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "holylogger_lotw.tq8");
+            try
+            {
+                LotwUploader.WriteAdif(pending, adiPath);
+                await LotwUploader.SignAndUploadAsync(tqslPath, location, password, adiPath, tq8Path);
+                foreach (var q in pending)
+                    dal.SetLotwStatus(q.id, 1);
+                System.Windows.Forms.MessageBox.Show(
+                    $"Successfully uploaded {pending.Count} QSO(s) to LoTW.",
+                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Information);
+            }
+            catch (Exception ex)
+            {
+                System.Windows.Forms.MessageBox.Show(
+                    "LoTW upload failed:\n" + ex.Message,
+                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Error);
+            }
+            finally
+            {
+                SendQueueToLotwMenuItem.IsEnabled = true;
+                try { if (System.IO.File.Exists(adiPath)) System.IO.File.Delete(adiPath); } catch { }
+                try { if (System.IO.File.Exists(tq8Path)) System.IO.File.Delete(tq8Path); } catch { }
+            }
         }
 
         // Click on the "!" badge in the log grid's header corner opens the same queue window.
@@ -5209,6 +5298,7 @@ namespace HolyLogger
                 return;
             }
             statisticsWindow = new StatisticsWindow(Qsos);
+            statisticsWindow.Dal = dal;
             statisticsWindow.Closed += (s, _) => statisticsWindow = null;
             statisticsWindow.Show();
         }
@@ -5267,6 +5357,8 @@ namespace HolyLogger
             options.UserInterfaceControlInstance.GraphicsBoxModeChanged += UserInterfaceControl_GraphicsBoxModeChanged;
             // Refresh the QRZ icon as soon as the user tests the connection in QRZ Service options.
             options.QRZServiceControlInstance.ConnectionTested += QRZServiceControl_ConnectionTested;
+            // Give the LoTW control access to the database so it can reset the upload queue.
+            options.LotwControlInstance.Dal = dal;
 
             options.Show();
         }
@@ -11716,28 +11808,83 @@ namespace HolyLogger
 
         private async void EntireLogQrzServiseMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            bool anyNeedLookup = Qsos.Any(q => !_qrzNoData.Contains(q.DXCall) &&
+                                               (string.IsNullOrWhiteSpace(q.Name) ||
+                                                string.IsNullOrWhiteSpace(q.DXLocator)));
+            if (!anyNeedLookup)
+            {
+                var dlg = new Window
+                {
+                    Title = "QRZ Lookup",
+                    SizeToContent = SizeToContent.WidthAndHeight,
+                    WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                    Owner = this,
+                    ResizeMode = ResizeMode.NoResize
+                };
+                var btn = new System.Windows.Controls.Button
+                {
+                    Content = "OK", Width = 90, Height = 34, FontSize = 16,
+                    Margin = new Thickness(0, 16, 0, 0),
+                    IsDefault = true
+                };
+                btn.Click += (s2, e2) => dlg.Close();
+                dlg.Content = new System.Windows.Controls.StackPanel
+                {
+                    Margin = new Thickness(30, 24, 30, 20),
+                    Children =
+                    {
+                        new System.Windows.Controls.TextBlock
+                        {
+                            Text = "Log file is fully populated —\nall QSOs already have Name and Locator.",
+                            FontSize = 18, TextAlignment = TextAlignment.Center
+                        },
+                        btn
+                    }
+                };
+                dlg.ShowDialog();
+                return;
+            }
+
+            UploadProgressTitle = "QRZ Lookup";
             ToggleUploadProgress(Visibility.Visible);
-            await GetQrzForEntireLogAsync(new Progress<int>(percent => UploadProgress = percent.ToString()));
+            await GetQrzForEntireLogAsync(new Progress<string>(msg => UploadProgress = msg));
             ToggleUploadProgress(Visibility.Hidden);
+            UploadProgressTitle = "";
         }
 
-        private async Task<bool> GetQrzForEntireLogAsync(IProgress<int> progress)
+        private async Task<bool> GetQrzForEntireLogAsync(IProgress<string> progress)
         {
-            for (int i = 0; i < Qsos.Count; i++)
+            if (!isNetworkAvailable) return false;
+
+            var needsLookup = Qsos.Where(q => !_qrzNoData.Contains(q.DXCall) &&
+                                              (string.IsNullOrWhiteSpace(q.Name) ||
+                                               string.IsNullOrWhiteSpace(q.DXLocator))).ToList();
+            if (needsLookup.Count == 0) return true;
+
+            int updated = 0;
+            for (int i = 0; i < needsLookup.Count; i++)
             {
-                progress.Report((i+1) * 100 / Qsos.Count);
+                progress.Report($"{i + 1} / {needsLookup.Count}");
                 try
                 {
-                    QSO qso = Qsos[i];
-                    if (string.IsNullOrWhiteSpace(qso.Name) && isNetworkAvailable)
-                    {
-                        qso.Name = await GetQrzForCall(qso.DXCall);
-                        dal.Update(qso);
-                        this.Dispatcher.Invoke(() =>
-                        {
-                            QSODataGrid.Items.Refresh();
-                        });
-                    }
+                    // Small delay between requests to avoid QRZ rate-limiting
+                    // and to keep the UI message loop free between iterations.
+                    await Task.Delay(150);
+                    QSO qso = needsLookup[i];
+                    var (name, grid) = await GetQrzForCall(qso.DXCall);
+                    if (!string.IsNullOrWhiteSpace(name)) qso.Name = name;
+                    else if (string.IsNullOrWhiteSpace(qso.Name)) qso.Name = "N/A";
+                    if (!string.IsNullOrWhiteSpace(grid)) qso.DXLocator = grid;
+                    else if (string.IsNullOrWhiteSpace(qso.DXLocator)) qso.DXLocator = "AA00JJ";
+                    if (string.IsNullOrWhiteSpace(name) && string.IsNullOrWhiteSpace(grid))
+                        _qrzNoData.Add(qso.DXCall);
+                    dal.Update(qso);
+                    updated++;
+
+                    // Refresh the grid every 25 updates so the user sees progress
+                    // without paying the cost of a full refresh on every single QSO.
+                    if (updated % 25 == 0)
+                        QSODataGrid.Items.Refresh();
                 }
                 catch (Exception ex)
                 {
@@ -11745,10 +11892,11 @@ namespace HolyLogger
                     break;
                 }
             }
+            QSODataGrid.Items.Refresh();
             return true;
         }
         
-        private async Task<string> GetQrzForCall(string callsign)
+        private async Task<(string Name, string Grid)> GetQrzForCall(string callsign)
         {
             try
             {
@@ -11773,22 +11921,24 @@ namespace HolyLogger
                         if (lname.Count() > 0)
                             name += " " + lname.FirstOrDefault().Value;
 
+                        string grid = xDoc.Root.Descendants(ns + "grid").FirstOrDefault()?.Value ?? "";
+
                         string key = xDoc.Root.Descendants(ns + "Key").FirstOrDefault().Value;
                         if (SessionKey != key) _SessionKey = await Helper.LoginToQRZAsync();
 
-                        return name;
+                        return (name, grid);
                     }
                     else
                     {
-                        return "";
+                        return ("", "");
                     }
                 }
             }
             catch (Exception)
             {
-                return "";
+                return ("", "");
             }
-            return "";
+            return ("", "");
         }
 
         private async void RemoveDuplicatesMenuItem_Click(object sender, RoutedEventArgs e)
