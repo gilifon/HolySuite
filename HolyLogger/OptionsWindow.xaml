@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:HolyLogger"
         xmlns:OptionsUserControls="clr-namespace:HolyLogger.OptionsUserControls" x:Class="HolyLogger.OptionsWindow"
         mc:Ignorable="d"
-        Title="Properties" Height="630" MinHeight="630" MaxHeight="630" Width="900" MinWidth="900" MaxWidth="900" ResizeMode="NoResize" Icon="Images/properties.png" SizeChanged="Window_SizeChanged" KeyDown="Window_KeyDown">
+        Title="Properties" Height="750" MinHeight="750" MaxHeight="750" Width="900" MinWidth="900" MaxWidth="900" ResizeMode="NoResize" Icon="Images/properties.png" SizeChanged="Window_SizeChanged" KeyDown="Window_KeyDown">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="180" />

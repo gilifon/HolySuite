@@ -4,9 +4,14 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
-             mc:Ignorable="d" Height="600" Width="660">
+             mc:Ignorable="d" Height="700" Width="660">
     <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -71,7 +76,7 @@
         <TextBlock Grid.Row="8" Text="LoTW Web Login" FontSize="14" FontWeight="SemiBold"
                    Margin="2,10,0,4"/>
         <TextBlock Grid.Row="9" Margin="2,0,8,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
-                   Text="Required for downloading confirmed QSOs from LoTW (e.g. to fill missing Band / Mode in your log). This is your LoTW website login — not the TQSL certificate password."/>
+                   Text="Required for downloading confirmed QSOs from LoTW (e.g. to fill missing Band / Mode in your log). This is your LoTW website login — not the TQSL certificate password. Uploading does not use this login; TQSL uploads with your callsign certificate."/>
 
         <Label Grid.Row="10" Content="LoTW Username" HorizontalAlignment="Left" Margin="0,4,0,0"
                VerticalAlignment="Top" FontSize="14"/>
@@ -103,11 +108,31 @@
                     Margin="12,0,0,0" Padding="8,4,8,4" Click="ResetFromDateBtn_Click"/>
             <Button x:Name="TestBtn" Content="Test TQSL" Width="100" FontSize="13"
                     Margin="20,0,0,0" Padding="8,4,8,4" Click="TestBtn_Click"/>
-            <Border x:Name="StatusBadge" Background="#E6F4EA" BorderBrush="#34A853"
-                    BorderThickness="1" CornerRadius="3" Padding="8,4,8,4"
-                    Margin="16,0,0,0" Visibility="Collapsed">
-                <TextBlock x:Name="StatusText" Foreground="#1E7E34" FontSize="13" FontWeight="SemiBold"/>
-            </Border>
+        </StackPanel>
+
+        <Border x:Name="StatusBadge" Grid.Row="16" Background="#E6F4EA" BorderBrush="#34A853"
+                BorderThickness="1" CornerRadius="3" Padding="8,4,8,4"
+                Margin="2,10,8,0" HorizontalAlignment="Left" Visibility="Collapsed">
+            <TextBlock x:Name="StatusText" Foreground="#1E7E34" FontSize="13" FontWeight="SemiBold"
+                       TextWrapping="Wrap"/>
+        </Border>
+
+        <!-- Separator -->
+        <Border Grid.Row="17" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,16,0,0"/>
+
+        <!-- Upload-on-exit section -->
+        <TextBlock Grid.Row="18" Text="Upload Queue on Exit" FontSize="14" FontWeight="SemiBold"
+                   Margin="2,10,0,4"/>
+        <TextBlock Grid.Row="19" Margin="2,0,8,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                   Text="When you close HolyLogger, the pending LoTW queue can be signed and uploaded automatically — only when an internet connection is available. Choose how this should behave."/>
+        <StackPanel Grid.Row="20" Orientation="Horizontal" Margin="2,2,0,8" VerticalAlignment="Center">
+            <TextBlock Text="On exit:" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <ComboBox x:Name="CB_UploadOnExit" Width="320" FontSize="13"
+                      SelectionChanged="CB_UploadOnExit_SelectionChanged">
+                <ComboBoxItem Content="Do not upload on exit"/>
+                <ComboBoxItem Content="Ask me before uploading on exit"/>
+                <ComboBoxItem Content="Always upload on exit (no prompt)"/>
+            </ComboBox>
         </StackPanel>
     </Grid>
 </UserControl>

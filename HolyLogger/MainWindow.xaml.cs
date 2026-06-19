@@ -338,6 +338,7 @@ namespace HolyLogger
 
         BackgroundWorker AdifHandlerWorker;
         private bool _isShutdownCleanupDone = false;
+        private bool _lotwExitHandled = false;   // guards the upload-on-exit pass in Window_Closing
         // UNUSED: BackgroundWorker for entire log QRZ processing was disabled.
         // Left commented for future reference if batch QRZ processing is needed:
         // BackgroundWorker EntireLogQrzWorker;
@@ -496,6 +497,7 @@ namespace HolyLogger
             // Bindings populate after the constructor, so defer the first overlay refresh to Loaded
             // priority — by then the bound value is present and we can render its 3-decimal form.
             Dispatcher.BeginInvoke(new Action(UpdateFrequencyDisplay), System.Windows.Threading.DispatcherPriority.Loaded);
+            Dispatcher.BeginInvoke(new Action(UpdateRigLabel), System.Windows.Threading.DispatcherPriority.Loaded);
 
             ApplyMainFormBackgroundFromSettings();
             ApplyQsoTableHeaderBackgroundFromSettings();
@@ -653,6 +655,7 @@ namespace HolyLogger
             Qsos = dal.GetAllQSOs();
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
+            UpdateLotwMenuCount();
             LastQSO = Qsos.FirstOrDefault();
             ApplyDefaultLogSort();
 
@@ -1258,6 +1261,7 @@ namespace HolyLogger
                     dal.Delete(qso.id);
                 }
                 UpdateNumOfQSOs();
+                UpdateLotwMenuCount();
 
                 // A deleted QSO is gone from the DB, so it drops out of the eQSL waiting list —
                 // refresh the "!" badge / menu count (and any open queue window) right away.
@@ -1287,6 +1291,7 @@ namespace HolyLogger
                 {
                     AddWorkedCountryAndRefreshCluster(qso.DXCall);
                 }
+                UpdateLotwMenuCount();
             }
 
             if (clusterVisibleSpots != null)
@@ -2658,11 +2663,12 @@ namespace HolyLogger
             {
                 SendQueueToEqslMenuItem.IsEnabled = any;
 
-                // Build the header with just the word "eQSL" in bold; append the count when there's a queue.
+                // Build the header with just the word "eQSL" in bold; always append the count
+                // (including (0)) so the queue state is never ambiguous.
                 var header = new System.Windows.Controls.TextBlock();
                 header.Inlines.Add(new System.Windows.Documents.Run("Send Queue To "));
                 header.Inlines.Add(new System.Windows.Documents.Run("eQSL") { FontWeight = System.Windows.FontWeights.Bold });
-                if (any) header.Inlines.Add(new System.Windows.Documents.Run(" (" + pending + ")"));
+                header.Inlines.Add(new System.Windows.Documents.Run(" (" + pending + ")"));
                 SendQueueToEqslMenuItem.Header = header;
             }
 
@@ -2688,6 +2694,17 @@ namespace HolyLogger
         private void SendQueueToEqslMenuItem_Click(object sender, RoutedEventArgs e)
         {
             ShowEqslQueueWindow();
+        }
+
+        private void UpdateLotwMenuCount()
+        {
+            try
+            {
+                int count = dal?.GetPendingLotwQsos()?.Count ?? 0;
+                // Always show the count — including (0) — so the queue state is never ambiguous.
+                SendQueueToLotwMenuItem.Header = $"Upload Queue to LoTW  ({count})";
+            }
+            catch { }
         }
 
         private async void SendQueueToLotwMenuItem_Click(object sender, RoutedEventArgs e)
@@ -2730,31 +2747,104 @@ namespace HolyLogger
             if (confirm != System.Windows.Forms.DialogResult.Yes) return;
 
             SendQueueToLotwMenuItem.IsEnabled = false;
+            try { await UploadLotwQueueCoreAsync(pending, tqslPath, location, password); }
+            finally { SendQueueToLotwMenuItem.IsEnabled = true; }
+        }
+
+        // Core LoTW queue upload — writes the ADIF, signs+uploads via TQSL, clears the queue on
+        // success and reports the result. Shared by the "Upload Queue to LoTW" menu command and the
+        // upload-on-exit feature.
+        private async Task UploadLotwQueueCoreAsync(List<QSO> pending, string tqslPath, string location, string password)
+        {
             string adiPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "holylogger_lotw.adi");
-            string tq8Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "holylogger_lotw.tq8");
+            UploadProgressTitle = "LoTW Upload";
+            UploadProgress = $"Preparing QSO 0 / {pending.Count:N0}";
+            ToggleUploadProgress(Visibility.Visible);
+            var lotwProgress = new Progress<string>(msg => UploadProgress = msg);
             try
             {
-                LotwUploader.WriteAdif(pending, adiPath);
-                await LotwUploader.SignAndUploadAsync(tqslPath, location, password, adiPath, tq8Path);
-                foreach (var q in pending)
-                    dal.SetLotwStatus(q.id, 1);
-                System.Windows.Forms.MessageBox.Show(
-                    $"Successfully uploaded {pending.Count} QSO(s) to LoTW.",
-                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
-                    System.Windows.Forms.MessageBoxIcon.Information);
+                int skippedNoBand = 0;
+                await Task.Run(() => { skippedNoBand = LotwUploader.WriteAdif(pending, adiPath, lotwProgress); });
+                int toSign = pending.Count - skippedNoBand;
+                UploadProgress = $"Signing QSO 0 / {toSign:N0}";
+                var result = await LotwUploader.SignAndUploadAsync(
+                    tqslPath, location, password, adiPath, lotwProgress, toSign);
+                ToggleUploadProgress(Visibility.Hidden);
+
+                // Always save TQSL's full report so the actual outcome can be inspected.
+                string reportPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    "lotw_last_upload.txt");
+                try
+                {
+                    string detail = result.Detail ?? "";
+                    if (detail.Length > 500000) detail = detail.Substring(0, 500000) + "\r\n…(truncated)";
+                    System.IO.File.WriteAllText(reportPath,
+                        $"LoTW upload report — {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n" +
+                        $"TQSL exit code: {result.ExitCode}\r\n" +
+                        $"QSOs sent to TQSL: {toSign}\r\n\r\n" +
+                        detail, System.Text.Encoding.UTF8);
+                }
+                catch { }
+
+                if (result.ExitCode == 8)
+                {
+                    // TQSL found no QSOs to process — something is off; leave the queue untouched.
+                    UpdateLotwMenuCount();
+                    System.Windows.MessageBox.Show(
+                        "TQSL did not process any QSOs.\n\n" +
+                        "The queue was left unchanged. The full TQSL report was saved to " +
+                        "lotw_last_upload.txt on your Desktop.",
+                        "LoTW Upload", MessageBoxButton.OK, MessageBoxImage.Warning);
+                }
+                else
+                {
+                    // exit 0 = uploaded, exit 9 = already in LoTW (duplicates).
+                    // Either way the QSOs are now in LoTW, so clear them from the queue.
+                    foreach (var q in pending)
+                    {
+                        if (!string.IsNullOrWhiteSpace(q.Band) || !string.IsNullOrWhiteSpace(q.Freq))
+                            dal.SetLotwStatus(q.id, 1);
+                    }
+                    UpdateLotwMenuCount();
+                    int handled = pending.Count - skippedNoBand;
+                    var sb = new System.Text.StringBuilder();
+                    if (result.NothingUploaded)
+                        sb.AppendLine($"All {handled:N0} QSO(s) are already in LoTW (detected as duplicates).\n\nThey have been cleared from the upload queue.");
+                    else
+                        sb.AppendLine($"Successfully uploaded {handled:N0} QSO(s) to LoTW.");
+                    if (skippedNoBand > 0)
+                        sb.AppendLine($"\n{skippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
+                    sb.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
+                    System.Windows.MessageBox.Show(
+                        sb.ToString().TrimEnd(),
+                        "LoTW Upload", MessageBoxButton.OK, MessageBoxImage.Information);
+                }
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show(
-                    "LoTW upload failed:\n" + ex.Message,
-                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
-                    System.Windows.Forms.MessageBoxIcon.Error);
+                ToggleUploadProgress(Visibility.Hidden);
+                try
+                {
+                    string logPath = System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        "lotw_upload_error.txt");
+                    System.IO.File.WriteAllText(logPath,
+                        $"LoTW upload error — {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n" +
+                        $"Message: {ex.Message}\r\n",
+                        System.Text.Encoding.UTF8);
+                }
+                catch { }
+                System.Windows.MessageBox.Show(
+                    "LoTW upload failed:\n\n" + ex.Message +
+                    "\n\nDetails written to lotw_upload_error.txt on your Desktop.",
+                    "LoTW Upload Failed", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
-                SendQueueToLotwMenuItem.IsEnabled = true;
+                UploadProgressTitle = "";
+                UploadProgress = "";
                 try { if (System.IO.File.Exists(adiPath)) System.IO.File.Delete(adiPath); } catch { }
-                try { if (System.IO.File.Exists(tq8Path)) System.IO.File.Delete(tq8Path); } catch { }
             }
         }
 
@@ -4051,6 +4141,7 @@ namespace HolyLogger
 
             ToggleUploadProgress(Visibility.Hidden);
             UpdateNumOfQSOs();
+            UpdateLotwMenuCount();
 
             if (result.FaultyQso > 0)
             {
@@ -5033,6 +5124,19 @@ namespace HolyLogger
             if (_isShutdownCleanupDone)
                 return;
 
+            // Upload-on-exit: when enabled and the LoTW queue is not empty, handle the upload
+            // before the normal shutdown. It is async, so cancel this close, run it, then close
+            // again (by then _lotwExitHandled is set so we fall through to the real shutdown).
+            if (!_lotwExitHandled)
+            {
+                _lotwExitHandled = true;
+                if (TryStartLotwUploadOnExit())
+                {
+                    e.Cancel = true;
+                    return;
+                }
+            }
+
             _isShutdownCleanupDone = true;
 
             // Stop all timers before shutdown to prevent pending async operations
@@ -5080,6 +5184,72 @@ namespace HolyLogger
             try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch { }
             try { MapControl.SpotHovered -= OnMapSpotHovered; } catch { }
             try { MapControl.SpotHoverEnded -= OnMapSpotHoverEnded; } catch { }
+        }
+
+        // Returns true if an upload-on-exit pass was started (caller should cancel the close;
+        // the async handler will close the window when it finishes). Returns false if there is
+        // nothing to do, so the normal shutdown can proceed immediately.
+        private bool TryStartLotwUploadOnExit()
+        {
+            int mode = Properties.Settings.Default.LotwUploadOnExitMode;
+            if (mode == 0) return false;   // feature off
+
+            List<QSO> pending = null;
+            try { pending = dal?.GetPendingLotwQsos(); } catch { }
+            if (pending == null || pending.Count == 0) return false;   // nothing queued
+
+            HandleLotwUploadOnExitAsync(pending, mode);
+            return true;
+        }
+
+        private async void HandleLotwUploadOnExitAsync(List<QSO> pending, int mode)
+        {
+            string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
+            string location = Properties.Settings.Default.LotwStationLocation?.Trim();
+            string password = Properties.Settings.Default.LotwTqslPassword;
+
+            // Ask mode: confirm first. Cancel keeps the program open; No exits without uploading.
+            if (mode == 1)
+            {
+                var r = System.Windows.MessageBox.Show(
+                    $"You have {pending.Count:N0} QSO(s) waiting to be uploaded to LoTW.\n\nUpload them now before exiting?",
+                    "LoTW Upload on Exit", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
+                if (r == MessageBoxResult.Cancel)
+                {
+                    _lotwExitHandled = false;   // user aborted the exit — re-ask next time
+                    return;                     // leave the window open
+                }
+                if (r == MessageBoxResult.No)
+                {
+                    this.Close();               // exit without uploading
+                    return;
+                }
+                // Yes -> fall through and upload
+            }
+
+            // We intend to upload (always mode, or ask -> Yes). Both internet and a configured
+            // TQSL are required; otherwise inform the user and leave the queue for next time.
+            bool tqslConfigured = !string.IsNullOrWhiteSpace(tqslPath) && System.IO.File.Exists(tqslPath)
+                                  && !string.IsNullOrWhiteSpace(location);
+            bool online = false;
+            try { online = Helper.CheckForInternetConnection(); } catch { }
+
+            if (!online || !tqslConfigured)
+            {
+                string why = !online
+                    ? "there is no internet connection"
+                    : "LoTW/TQSL is not fully configured (set the TQSL path and station location in Options → LoTW)";
+                System.Windows.MessageBox.Show(
+                    $"{pending.Count:N0} QSO(s) are still waiting for LoTW, but they were not uploaded because {why}.\n\n" +
+                    "They remain in the queue and will be uploaded next time.",
+                    "LoTW Upload Skipped", MessageBoxButton.OK, MessageBoxImage.Information);
+                this.Close();
+                return;
+            }
+
+            try { await UploadLotwQueueCoreAsync(pending, tqslPath, location, password); }
+            catch { }
+            this.Close();
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -5151,30 +5321,147 @@ namespace HolyLogger
             UpdateFrequencyDisplay();
         }
 
-        // Refresh the read-only overlay. The TextBox keeps its full-precision text (used everywhere
-        // the value is consumed — logging, heartbeat, ADIF); this only changes what is shown. When
-        // the box is not focused we hide the real text and paint the ##.### form on top instead.
+        // The old in-form overlay is superseded by the LED readout next to the Help menu. Keep it
+        // permanently hidden and route updates to the LED instead.
         private void UpdateFrequencyDisplay()
         {
-            if (TB_FrequencyDisplay == null) return;
+            if (TB_FrequencyDisplay != null)
+                TB_FrequencyDisplay.Visibility = Visibility.Collapsed;
+            UpdateFreqLed();
+        }
+
+        // Amber for the kHz integer part, soft white for the Hz (last three) — matching the reference
+        // rig display. Cached + frozen so we don't rebuild brushes on every update.
+        private static readonly System.Windows.Media.Brush LedAmberBrush =
+            FreezeBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xB0, 0x00));
+        private static readonly System.Windows.Media.Brush LedWhiteBrush =
+            FreezeBrush(System.Windows.Media.Color.FromRgb(0xF0, 0xF0, 0xF0));
+
+        private static System.Windows.Media.Brush FreezeBrush(System.Windows.Media.Color c)
+        {
+            var b = new System.Windows.Media.SolidColorBrush(c);
+            b.Freeze();
+            return b;
+        }
+
+        // Renders TB_Frequency (stored in MHz) onto the 7-segment LED as kHz with 3 decimals, e.g.
+        // 21.278520 MHz -> "21278.520". Display only — TB_Frequency keeps its MHz value untouched.
+        private void UpdateFreqLed()
+        {
+            if (FreqLedLive == null || FreqLedGhost == null) return;
+            // While the user is typing in the inline editor, leave the display alone.
+            if (TB_FreqLedEdit != null && TB_FreqLedEdit.Visibility == Visibility.Visible) return;
+
+            // In CAT (non-manual) mode the frequency must come live from the selected rig. If that
+            // rig is not online (e.g. RIG2 selected but not present), there is no fresh value — show
+            // a blanked "------.---" display instead of the previous rig's stale frequency.
+            bool catEnabled = Properties.Settings.Default.EnableOmniRigCAT;
+            bool manualMode = Properties.Settings.Default.isManualMode;
+            bool rigOnline = catEnabled && OmniRigEngine != null && Rig != null
+                             && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+            if (catEnabled && !manualMode && !rigOnline)
+            {
+                ShowLedBlank();
+                return;
+            }
 
             string raw = (TB_Frequency.Text ?? string.Empty).Trim();
             if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double mhz) || mhz <= 0)
             {
-                TB_FrequencyDisplay.Visibility = Visibility.Collapsed;
+                ShowLedBlank();
                 return;
             }
 
-            // MHz . kHz with three decimals, e.g. 7.140, 14.250, 1296.280 (sub-kHz not shown).
             long hz = (long)Math.Round(mhz * 1000000.0);
-            long mhzPart = hz / 1000000;
-            long khzPart = (hz % 1000000) / 1000;
-            string formatted = $"{mhzPart}.{khzPart:D3}";
+            string intPart = (hz / 1000).ToString(CultureInfo.InvariantCulture);  // kHz
+            string fracPart = (hz % 1000).ToString("D3", CultureInfo.InvariantCulture); // Hz
+            string full = intPart + "." + fracPart;
 
-            TB_FrequencyDisplay.Text = formatted;
-            bool showOverlay = !TB_Frequency.IsFocused;
-            TB_FrequencyDisplay.Visibility = showOverlay ? Visibility.Visible : Visibility.Collapsed;
-            TB_Frequency.Foreground = showOverlay ? System.Windows.Media.Brushes.Transparent : System.Windows.Media.Brushes.Black;
+            // Ghost layer: every digit forced to 8 (all segments lit), dots kept in place.
+            var ghost = new StringBuilder(full.Length);
+            foreach (char c in full) ghost.Append(c == '.' ? '.' : '8');
+            FreqLedGhost.Text = ghost.ToString();
+
+            FreqLedLive.Inlines.Clear();
+            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run(intPart + ".") { Foreground = LedAmberBrush });
+            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run(fracPart) { Foreground = LedWhiteBrush });
+        }
+
+        // "No live frequency" state — dashes on the LED, with the dim all-segments ghost behind.
+        private void ShowLedBlank()
+        {
+            if (FreqLedLive == null || FreqLedGhost == null) return;
+            FreqLedGhost.Text = "888888.888";
+            FreqLedLive.Inlines.Clear();
+            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run("------.---") { Foreground = LedAmberBrush });
+        }
+
+        // Click the LED to edit. Show an inline TextBox pre-filled with the current kHz value.
+        private void FreqLed_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            string raw = (TB_Frequency.Text ?? string.Empty).Trim();
+            string editVal = string.Empty;
+            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double mhz) && mhz > 0)
+            {
+                long hz = (long)Math.Round(mhz * 1000000.0);
+                editVal = (hz / 1000).ToString(CultureInfo.InvariantCulture) + "." + (hz % 1000).ToString("D3", CultureInfo.InvariantCulture);
+            }
+
+            FreqLedGhost.Visibility = Visibility.Collapsed;
+            FreqLedLive.Visibility = Visibility.Collapsed;
+            TB_FreqLedEdit.Text = editVal;
+            TB_FreqLedEdit.Visibility = Visibility.Visible;
+            TB_FreqLedEdit.Focus();
+            TB_FreqLedEdit.SelectAll();
+        }
+
+        // Commit the inline edit: the editor is in kHz; convert back to MHz for TB_Frequency so the
+        // stored format (and every consumer of it) stays exactly as before.
+        private void CommitFreqLedEdit()
+        {
+            TB_FreqLedEdit.Visibility = Visibility.Collapsed;
+            FreqLedGhost.Visibility = Visibility.Visible;
+            FreqLedLive.Visibility = Visibility.Visible;
+
+            string txt = (TB_FreqLedEdit.Text ?? string.Empty).Trim();
+            if (double.TryParse(txt, NumberStyles.Float, CultureInfo.InvariantCulture, out double kHz) && kHz > 0)
+            {
+                double mhz = kHz / 1000.0;
+                TB_Frequency.Text = mhz.ToString("0.0#####", CultureInfo.InvariantCulture);
+            }
+            UpdateFreqLed();
+        }
+
+        private void TB_FreqLedEdit_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter)
+            {
+                CommitFreqLedEdit();
+                e.Handled = true;
+                return;
+            }
+            if (e.Key == Key.Escape)
+            {
+                TB_FreqLedEdit.Visibility = Visibility.Collapsed;
+                FreqLedGhost.Visibility = Visibility.Visible;
+                FreqLedLive.Visibility = Visibility.Visible;
+                UpdateFreqLed();
+                e.Handled = true;
+                return;
+            }
+            // Allow only digits and a single decimal point.
+            bool isDigit = (e.Key >= Key.D0 && e.Key <= Key.D9) || (e.Key >= Key.NumPad0 && e.Key <= Key.NumPad9);
+            bool isDot = e.Key == Key.OemPeriod || e.Key == Key.Decimal;
+            if (isDot && TB_FreqLedEdit.Text.IndexOf('.') > -1) { e.Handled = true; return; }
+            if (!isDigit && !isDot && e.Key != Key.Back && e.Key != Key.Delete &&
+                e.Key != Key.Left && e.Key != Key.Right && e.Key != Key.Tab)
+                e.Handled = true;
+        }
+
+        private void TB_FreqLedEdit_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (TB_FreqLedEdit.Visibility == Visibility.Visible)
+                CommitFreqLedEdit();
         }
 
         private void TB_Frequency_KeyDown(object sender, KeyEventArgs e)
@@ -12287,11 +12574,20 @@ namespace HolyLogger
         }
         private void SelectRig()
         {
-            if (OmniRigEngine == null) return;
+            UpdateRigLabel();
+            if (OmniRigEngine == null) { UpdateFreqLed(); return; }
             if (Properties.Settings.Default.SelectedOmniRig1)
                 Rig = OmniRigEngine.Rig1;
             else if (Properties.Settings.Default.SelectedOmniRig2)
                 Rig = OmniRigEngine.Rig2;
+            UpdateFreqLed();   // reflect the newly-selected rig (or blank if it isn't online)
+        }
+
+        // Shows "RIG1" or "RIG2" next to the LED, reflecting the rig chosen in Options → General.
+        private void UpdateRigLabel()
+        {
+            if (RigLabel == null) return;
+            RigLabel.Text = Properties.Settings.Default.SelectedOmniRig2 ? "RIG2" : "RIG1";
         }
 
         //OmniRig ParamsChange events
@@ -12390,6 +12686,7 @@ namespace HolyLogger
             if (!rigOnline)
             {
                 ClearVoiceMessageState();
+                UpdateFreqLed();   // no live rig -> blank the LED instead of showing a stale value
                 return;
             }
 

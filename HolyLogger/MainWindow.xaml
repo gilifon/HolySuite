@@ -290,14 +290,14 @@
 
     <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
         <Grid.RowDefinitions>
-            <RowDefinition Height="30" />
+            <RowDefinition Height="38" />
             <RowDefinition x:Name="MainForm" Height="325" />
             <RowDefinition Height="*" />
             <RowDefinition Height="40" />
         </Grid.RowDefinitions>
         <DockPanel x:Name="MainScreen" Grid.Row="0">
             <Grid DockPanel.Dock="Top">
-            <Menu HorizontalAlignment="Stretch">
+            <Menu VerticalAlignment="Center" HorizontalAlignment="Left" Background="Transparent">
                 <MenuItem Header="File" FontSize="16">
                     <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
                         <MenuItem.Icon>
@@ -485,7 +485,44 @@
                     </MenuItem>
                 </MenuItem>
             </Menu>
-                <TextBlock x:Name="L_TitleClock" HorizontalAlignment="Center" VerticalAlignment="Center"
+
+            <!-- "RIG1"/"RIG2" indicator, just to the left of the LED. Reflects the rig selected in
+                 Tools → Options → General. Right-aligned so it ends just before the bezel at x=267. -->
+            <TextBlock x:Name="RigLabel" Text="RIG1" FontWeight="Normal" FontSize="14" Foreground="#333333"
+                       HorizontalAlignment="Left" VerticalAlignment="Center" TextAlignment="Right"
+                       Width="50" Margin="213,0,0,0"/>
+
+            <!-- 7-segment LED frequency readout. Left edge aligned to the "My Locator" box below
+                 (x=267). Display only: it reformats the existing TB_Frequency value as kHz
+                 (e.g. 21278.520). Click it to edit. -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="267,0,0,0">
+            <Border x:Name="FreqLedBezel" VerticalAlignment="Center" Margin="0,1,2,1"
+                    Background="#080808" CornerRadius="4" BorderBrush="#3A3A3A" BorderThickness="1"
+                    Cursor="Hand" MouseLeftButtonUp="FreqLed_MouseLeftButtonUp"
+                    ToolTip="Working frequency in kHz — click to edit">
+                <Grid Margin="10,1,10,2">
+                    <!-- Dim "all segments on" ghost layer, like a real LED panel. -->
+                    <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
+                               FontSize="20" VerticalAlignment="Center" Foreground="#1E1500"/>
+                    <!-- Live value; the two-tone colouring is applied in code. -->
+                    <TextBlock x:Name="FreqLedLive" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
+                               FontSize="20" VerticalAlignment="Center"/>
+                    <!-- Inline editor, shown on click. -->
+                    <TextBox x:Name="TB_FreqLedEdit" Visibility="Collapsed" MinWidth="135"
+                             FontFamily="Consolas" FontSize="17" FontWeight="Bold"
+                             Background="#080808" Foreground="#FFB000" BorderThickness="0" Padding="0"
+                             CaretBrush="#FFB000" SelectionBrush="#664400"
+                             VerticalContentAlignment="Center"
+                             KeyDown="TB_FreqLedEdit_KeyDown" LostFocus="TB_FreqLedEdit_LostFocus"/>
+                </Grid>
+            </Border>
+            <!-- Unit legend, bold and small, hugging the LED and aligned to the box's bottom edge. -->
+            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="#444444"
+                       VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
+            </StackPanel>
+                <!-- UTC clock, centred over the map (the map spans x=677..right-6 in the row below). -->
+                <TextBlock x:Name="L_TitleClock" HorizontalAlignment="Stretch" TextAlignment="Center"
+                           Margin="677,0,6,0" VerticalAlignment="Center"
                            FontWeight="Bold" Foreground="Black" FontSize="20" IsHitTestVisible="False" Visibility="Collapsed"/>
             </Grid>
         </DockPanel>
@@ -729,10 +766,13 @@
             <ComboBoxItem x:Name="op_fm" Content="FM"/>
         </ComboBox>
         <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
-        <Label Content="Freq" HorizontalAlignment="Left" Margin="175,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
+        <!-- Old "Freq" label hidden: the frequency is now shown on the LED readout in the menu bar. -->
+        <Label Content="Freq" Visibility="Collapsed" HorizontalAlignment="Left" Margin="175,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
         <!--<xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="348,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="9" />-->
-        <TextBox x:Name="TB_Frequency" HorizontalAlignment="Left" Margin="216,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
-        <Label Content="Band" HorizontalAlignment="Left" Margin="274,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <!-- Kept (hidden) as the data source: it still drives band calculation and is bound to
+             Settings.Frequency. The new LED readout reads/writes this same value. -->
+        <TextBox x:Name="TB_Frequency" Visibility="Collapsed" HorizontalAlignment="Left" Margin="216,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
+        <Label Content="Band" HorizontalAlignment="Left" Margin="220,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
@@ -747,7 +787,7 @@
         </Border>
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
 
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="321,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="267,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
         <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="The DX Station Callsign"/>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
@@ -1177,7 +1217,7 @@
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="90" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="4"/>
+        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" TabIndex="4"/>
     </Grid>
 
 </Window>

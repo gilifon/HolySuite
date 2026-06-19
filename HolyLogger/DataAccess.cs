@@ -191,7 +191,7 @@ namespace HolyLogger
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1)", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?)", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -215,6 +215,7 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("prop_mode"));
                 insertSQL.Parameters.Add(new SQLiteParameter("sat_name"));
                 insertSQL.Parameters.Add(new SQLiteParameter("soapbox"));
+                insertSQL.Parameters.Add(new SQLiteParameter("lotw_status"));
 
                 foreach (var qso in qsos)
                 {
@@ -240,6 +241,7 @@ namespace HolyLogger
                     insertSQL.Parameters[19].Value = (object)qso.PROP_MODE ?? DBNull.Value;
                     insertSQL.Parameters[20].Value = (object)qso.SAT_NAME ?? DBNull.Value;
                     insertSQL.Parameters[21].Value = (object)qso.SOAPBOX ?? DBNull.Value;
+                    insertSQL.Parameters[22].Value = qso.LotwStatus;
 
                     try
                     {

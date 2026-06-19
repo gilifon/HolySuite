@@ -22,7 +22,16 @@ namespace HolyLogger.OptionsUserControls
             TB_WebUser.Text = Properties.Settings.Default.LotwWebUser ?? string.Empty;
             PB_WebPassword.Password = Properties.Settings.Default.LotwWebPassword ?? string.Empty;
             DP_FromDate.SelectedDate = DateTime.Today;
+            int mode = Properties.Settings.Default.LotwUploadOnExitMode;
+            CB_UploadOnExit.SelectedIndex = (mode >= 0 && mode <= 2) ? mode : 0;
             _loading = false;
+        }
+
+        private void CB_UploadOnExit_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading) return;
+            Properties.Settings.Default.LotwUploadOnExitMode = CB_UploadOnExit.SelectedIndex;
+            Properties.Settings.Default.Save();
         }
 
         private void TB_TqslPath_TextChanged(object sender, TextChangedEventArgs e)

@@ -164,6 +164,11 @@
     <Resource Include="Images\UNDO_Icon.png" />
   </ItemGroup>
   <ItemGroup>
+    <!-- DSEG 7-segment LED font (SIL Open Font License) used by the frequency readout. -->
+    <Resource Include="Fonts\DSEG7Classic-Bold.ttf" />
+    <Resource Include="Fonts\DSEG7Classic-Regular.ttf" />
+  </ItemGroup>
+  <ItemGroup>
     <ApplicationDefinition Include="App.xaml">
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>

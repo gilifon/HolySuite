@@ -779,7 +779,20 @@ namespace HolyLogger.Properties {
                 this["SelectedOmniRig2"] = value;
             }
         }
-        
+
+        // LoTW upload-on-exit mode: 0 = off (never), 1 = ask before uploading, 2 = always upload.
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int LotwUploadOnExitMode {
+            get {
+                return ((int)(this["LotwUploadOnExitMode"]));
+            }
+            set {
+                this["LotwUploadOnExitMode"] = value;
+            }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]

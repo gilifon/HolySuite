@@ -130,6 +130,8 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.SAT_NAME)) adif.AppendFormat("<sat_name:{0}>{1}", qso.SAT_NAME.Length, qso.SAT_NAME);
                 else if (qso.Band == "13CM") adif.AppendFormat("<sat_name:{0}>{1}", 6, "QO-100");
                 if (!string.IsNullOrWhiteSpace(qso.SOAPBOX)) adif.AppendFormat("<soapbox:{0}>{1}", qso.SOAPBOX.Length, qso.SOAPBOX);
+                // LoTW sent status, so the upload queue survives an export/re-import round trip.
+                adif.AppendFormat("<lotw_qsl_sent:1>{0}", qso.LotwStatus == 1 ? "Y" : "N");
                 adif.AppendLine("<eor>");
             }
 

@@ -99,6 +99,7 @@ namespace HolyParser
         private string prop_mode_pattern = @"<prop_mode:(\d{1,4})(?::[a-z]{1})?>";
         private string sat_name_pattern = @"<sat_name:(\d{1,4})(?::[a-z]{1})?>";
         private string soapbox_pattern = @"<soapbox:(\d{1,4})(?::[a-z]{1})?>";
+        private string lotw_qsl_sent_pattern = @"<lotw_qsl_sent:(\d{1,4})(?::[a-z]{1})?>";
 
         public HolyLogParser() : this("", Operator.Israeli)
         {
@@ -439,9 +440,22 @@ namespace HolyParser
                 }
                 catch
                 {
-                    
+
                 }
             }
+
+            // LoTW sent status. Default to "already sent" (1) so that importing a log from
+            // another program (which lacks this field) does not flood the upload queue.
+            // When the field IS present (e.g. a HolyLogger export), honour it: Y = sent, N = pending.
+            qso_row.LotwStatus = 1;
+            regex = new Regex(lotw_qsl_sent_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                string val = Regex.Split(row, lotw_qsl_sent_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                qso_row.LotwStatus = val.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            }
+
             qso_row.StandartizeQSO();
             return qso_row;
         }
