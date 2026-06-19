@@ -191,6 +191,9 @@
     <Setting Name="SelectedOmniRig2" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="LotwUploadOnExitMode" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
     <Setting Name="EnableUDPClient" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
@@ -425,6 +428,18 @@
     <Setting Name="SearchWindowHeight" Type="System.Double" Scope="User">
       <Value Profile="(Default)">500</Value>
     </Setting>
+    <Setting Name="StatisticsWindowLeft" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">120</Value>
+    </Setting>
+    <Setting Name="StatisticsWindowTop" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">120</Value>
+    </Setting>
+    <Setting Name="StatisticsWindowWidth" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">700</Value>
+    </Setting>
+    <Setting Name="StatisticsWindowHeight" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">500</Value>
+    </Setting>
     <Setting Name="qrz_api_key" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>
@@ -433,6 +448,21 @@
     </Setting>
     <Setting Name="qrz_logbook_key_valid" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="LotwTqslPath" Type="System.String" Scope="User">
+      <Value Profile="(Default)">C:\Program Files (x86)\Trusted QSL\tqsl.exe</Value>
+    </Setting>
+    <Setting Name="LotwStationLocation" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="LotwTqslPassword" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="LotwWebUser" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="LotwWebPassword" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
     </Setting>
   </Settings>
 </SettingsFile>

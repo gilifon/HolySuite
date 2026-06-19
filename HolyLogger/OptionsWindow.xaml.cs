@@ -80,6 +80,11 @@ namespace HolyLogger
             EqslServiceControlInstance.LoadAccounts();
             EqslServiceControlInstance.Visibility = Visibility.Visible;
         }
+        private void LotwItem_Selected(object sender, RoutedEventArgs e)
+        {
+            HideAllControls();
+            LotwControlInstance.Visibility = Visibility.Visible;
+        }
         private void ImportItem_Selected(object sender, RoutedEventArgs e)
         {
             HideAllControls();
@@ -98,6 +103,7 @@ namespace HolyLogger
             QRZServiceControlInstance.Visibility = Visibility.Hidden;
             QRZLogbookControlInstance.Visibility = Visibility.Hidden;
             EqslServiceControlInstance.Visibility = Visibility.Hidden;
+            LotwControlInstance.Visibility = Visibility.Hidden;
             UserInterfaceControlInstance.Visibility = Visibility.Hidden;
             GeneralSettingsControlControlInstance.Visibility = Visibility.Hidden;
             ImportControlInstance.Visibility = Visibility.Hidden;

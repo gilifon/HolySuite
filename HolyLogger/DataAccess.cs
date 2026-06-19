@@ -48,6 +48,8 @@ namespace HolyLogger
 
                 SchemaHasChanged = false;
 
+                Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
+
                 con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
                 con.Open();
                 UpdateSchema();
@@ -138,7 +140,7 @@ namespace HolyLogger
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status,qrz_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1)", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
@@ -189,7 +191,7 @@ namespace HolyLogger
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status,qrz_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1)", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?)", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -213,6 +215,7 @@ namespace HolyLogger
                 insertSQL.Parameters.Add(new SQLiteParameter("prop_mode"));
                 insertSQL.Parameters.Add(new SQLiteParameter("sat_name"));
                 insertSQL.Parameters.Add(new SQLiteParameter("soapbox"));
+                insertSQL.Parameters.Add(new SQLiteParameter("lotw_status"));
 
                 foreach (var qso in qsos)
                 {
@@ -238,6 +241,7 @@ namespace HolyLogger
                     insertSQL.Parameters[19].Value = (object)qso.PROP_MODE ?? DBNull.Value;
                     insertSQL.Parameters[20].Value = (object)qso.SAT_NAME ?? DBNull.Value;
                     insertSQL.Parameters[21].Value = (object)qso.SOAPBOX ?? DBNull.Value;
+                    insertSQL.Parameters[22].Value = qso.LotwStatus;
 
                     try
                     {
@@ -387,6 +391,7 @@ namespace HolyLogger
                         if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
+                        if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
 
@@ -444,6 +449,7 @@ namespace HolyLogger
                         if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
+                        if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
                     }
@@ -809,6 +815,123 @@ namespace HolyLogger
             catch { /* an index is an optimization only; never block startup on it */ }
         }
 
+        // Adds the lotw_status column the first time the user runs a build that has the LoTW upload
+        // feature. Existing rows are back-filled to 1 ("already handled") so upgrading does NOT
+        // suddenly queue the user's whole historical log for upload to LoTW.
+        private void AddLotwColumns()
+        {
+            string check = "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'lotw_status'";
+            using (var cmd = new SQLiteCommand(check, con))
+            {
+                int colCount = Convert.ToInt32(cmd.ExecuteScalar());
+                if (colCount == 0)
+                {
+                    using (var alter = new SQLiteCommand("ALTER TABLE qso ADD COLUMN [lotw_status] INTEGER NOT NULL DEFAULT 0", con))
+                        alter.ExecuteNonQuery();
+                    using (var backfill = new SQLiteCommand("UPDATE qso SET lotw_status = 1", con))
+                        backfill.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+        }
+
+        // Index that backs the LoTW pending-queue lookups (filter on lotw_status). Idempotent.
+        private void EnsureLotwIndex()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_lotw_status ON qso(lotw_status)", con))
+                    cmd.ExecuteNonQuery();
+            }
+            catch { /* optimization only */ }
+        }
+
+        // Returns the QSOs still waiting to be uploaded to LoTW (status 0), oldest first.
+        public List<QSO> GetPendingLotwQsos()
+        {
+            lock (_dbLock)
+            {
+            var list = new List<QSO>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            string stm = "SELECT * FROM qso WHERE lotw_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    QSO q = new QSO();
+                    if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                    if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
+                    if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
+                    if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                    if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
+                    if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
+                    if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
+                    if (rdr["band"] != null) q.Band = rdr["band"].ToString();
+                    if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
+                    if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
+                    if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
+                    if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
+                    if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
+                    if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
+                    if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
+                    if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                    if (rdr["country"] != null) q.Country = rdr["country"].ToString();
+                    if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
+                    if (rdr["time"] != null) q.Time = rdr["time"].ToString();
+                    if (rdr["date"] != null) q.Date = rdr["date"].ToString();
+                    if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
+                    if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
+                    if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    q.LotwStatus = 0;
+                    list.Add(q);
+                }
+            }
+            return list;
+            }
+        }
+
+        // Number of QSOs still waiting to be uploaded to LoTW.
+        public int GetPendingLotwCount()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE lotw_status = 0", con))
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        // Updates the LoTW upload state of a single QSO (0 pending, 1 uploaded, 2 rejected).
+        public void SetLotwStatus(int id, int status)
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return;
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET lotw_status = @s WHERE Id = @id", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@s", status));
+                cmd.Parameters.Add(new SQLiteParameter("@id", id));
+                cmd.ExecuteNonQuery();
+            }
+            }
+        }
+
+        // Resets lotw_status to 0 (pending) for all QSOs on or after the given date string
+        // (format "YYYY-MM-DD"). Returns the number of rows affected.
+        public int ResetLotwStatusFromDate(string fromDate)
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 0 WHERE date >= @d", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@d", fromDate));
+                return cmd.ExecuteNonQuery();
+            }
+            }
+        }
+
         // Creates the eqsl_accounts table the first time. The table is managed entirely by hand in
         // Options -> eQSL Service; nothing is ever added automatically.
         private void EnsureEqslAccountsTable()
@@ -982,6 +1105,7 @@ namespace HolyLogger
             , [eqsl_status] INTEGER NOT NULL DEFAULT 0
             , [qrz_status] INTEGER NOT NULL DEFAULT 0
             , [qrz_logid] nvarchar(50) NULL
+            , [lotw_status] INTEGER NOT NULL DEFAULT 0
             );";
 
             string createTable_categories = @"
@@ -1111,9 +1235,11 @@ namespace HolyLogger
             }
             AddEqslStatusColumn();
             AddQrzColumns();
+            AddLotwColumns();
             EnsureEqslAccountsTable();
             EnsureEqslIndexes();
             EnsureQrzIndexes();
+            EnsureLotwIndex();
             using (var command = new SQLiteCommand(createTable_categories, con))
             {
                 command.ExecuteNonQuery();

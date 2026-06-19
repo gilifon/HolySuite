@@ -779,7 +779,20 @@ namespace HolyLogger.Properties {
                 this["SelectedOmniRig2"] = value;
             }
         }
-        
+
+        // LoTW upload-on-exit mode: 0 = off (never), 1 = ask before uploading, 2 = always upload.
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int LotwUploadOnExitMode {
+            get {
+                return ((int)(this["LotwUploadOnExitMode"]));
+            }
+            set {
+                this["LotwUploadOnExitMode"] = value;
+            }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
@@ -1718,6 +1731,54 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("120")]
+        public double StatisticsWindowLeft {
+            get {
+                return ((double)(this["StatisticsWindowLeft"]));
+            }
+            set {
+                this["StatisticsWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("120")]
+        public double StatisticsWindowTop {
+            get {
+                return ((double)(this["StatisticsWindowTop"]));
+            }
+            set {
+                this["StatisticsWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("700")]
+        public double StatisticsWindowWidth {
+            get {
+                return ((double)(this["StatisticsWindowWidth"]));
+            }
+            set {
+                this["StatisticsWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("500")]
+        public double StatisticsWindowHeight {
+            get {
+                return ((double)(this["StatisticsWindowHeight"]));
+            }
+            set {
+                this["StatisticsWindowHeight"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string qrz_api_key {
             get {
@@ -1749,6 +1810,66 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["qrz_logbook_key_valid"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("C:\\Program Files (x86)\\Trusted QSL\\tqsl.exe")]
+        public string LotwTqslPath {
+            get {
+                return ((string)(this["LotwTqslPath"]));
+            }
+            set {
+                this["LotwTqslPath"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwStationLocation {
+            get {
+                return ((string)(this["LotwStationLocation"]));
+            }
+            set {
+                this["LotwStationLocation"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwTqslPassword {
+            get {
+                return ((string)(this["LotwTqslPassword"]));
+            }
+            set {
+                this["LotwTqslPassword"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwWebUser {
+            get {
+                return ((string)(this["LotwWebUser"]));
+            }
+            set {
+                this["LotwWebUser"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwWebPassword {
+            get {
+                return ((string)(this["LotwWebPassword"]));
+            }
+            set {
+                this["LotwWebPassword"] = value;
             }
         }
     }

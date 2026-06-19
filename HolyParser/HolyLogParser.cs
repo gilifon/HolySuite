@@ -75,30 +75,31 @@ namespace HolyParser
         public int qsoDIGI { get { return _qsoDIGI; } }
         
         //patterns
-        private string mycall_pattern = @"<station_callsign:(\d{1,2})(?::[a-z]{1})?>";
-        private string operator_call_pattern = @"<operator:(\d{1,2})(?::[a-z]{1})?>";
-        private string rst_rcvd_pattern = @"<rst_rcvd:(\d{1,2})(?::[a-z]{1})?>";
-        private string rst_sent_pattern = @"<rst_sent:(\d{1,2})(?::[a-z]{1})?>";
-        private string dxcall_pattern = @"<call:(\d{1,2})(?::[a-z]{1})?>";
-        private string date_pattern = @"<qso_date:(\d{1,2})(?::[a-z]{1})?>";
-        private string time_pattern = @"<time_on:(\d{1,2})(?::[a-z]{1})?>";
-        private string band_pattern = @"<band:(\d{1,2})(?::[a-z]{1})?>";
-        private string mode_pattern = @"<mode:(\d{1,2})(?::[a-z]{1})?>";
-        private string submode_pattern = @"<submode:(\d{1,2})(?::[a-z]{1})?>";
-        private string commant_pattern = @"<comment:(\d{1,2})(?::[a-z]{1})?>";
-        private string dxcc_pattern = @"<dxcc:(\d{1,2})(?::[a-z]{1})?>";
-        private string freq_pattern = @"<freq:(\d{1,2})(?::[a-z]{1})?>";
-        private string srx_pattern = @"<srx_string:(\d{1,2})(?::[a-z]{1})?>";
-        private string stx_pattern = @"<stx_string:(\d{1,2})(?::[a-z]{1})?>";
-        private string srx_short_pattern = @"<srx:(\d{1,2})(?::[a-z]{1})?>";
-        private string stx_short_pattern = @"<stx:(\d{1,2})(?::[a-z]{1})?>";
-        private string name_pattern = @"<name:(\d{1,2})(?::[a-z]{1})?>";
-        private string country_pattern = @"<country:(\d{1,2})(?::[a-z]{1})?>";
-        private string dxlocator_pattern = @"<gridsquare:(\d{1,2})(?::[a-z]{1})?>";
-        private string mylocator_pattern = @"<my_gridsquare:(\d{1,2})(?::[a-z]{1})?>";
-        private string prop_mode_pattern = @"<prop_mode:(\d{1,2})(?::[a-z]{1})?>";
-        private string sat_name_pattern = @"<sat_name:(\d{1,2})(?::[a-z]{1})?>";
-        private string soapbox_pattern = @"<soapbox:(\d{1,2})(?::[a-z]{1})?>";
+        private string mycall_pattern = @"<station_callsign:(\d{1,4})(?::[a-z]{1})?>";
+        private string operator_call_pattern = @"<operator:(\d{1,4})(?::[a-z]{1})?>";
+        private string rst_rcvd_pattern = @"<rst_rcvd:(\d{1,4})(?::[a-z]{1})?>";
+        private string rst_sent_pattern = @"<rst_sent:(\d{1,4})(?::[a-z]{1})?>";
+        private string dxcall_pattern = @"<call:(\d{1,4})(?::[a-z]{1})?>";
+        private string date_pattern = @"<qso_date:(\d{1,4})(?::[a-z]{1})?>";
+        private string time_pattern = @"<time_on:(\d{1,4})(?::[a-z]{1})?>";
+        private string band_pattern = @"<band:(\d{1,4})(?::[a-z]{1})?>";
+        private string mode_pattern = @"<mode:(\d{1,4})(?::[a-z]{1})?>";
+        private string submode_pattern = @"<submode:(\d{1,4})(?::[a-z]{1})?>";
+        private string commant_pattern = @"<comment:(\d{1,4})(?::[a-z]{1})?>";
+        private string dxcc_pattern = @"<dxcc:(\d{1,4})(?::[a-z]{1})?>";
+        private string freq_pattern = @"<freq:(\d{1,4})(?::[a-z]{1})?>";
+        private string srx_pattern = @"<srx_string:(\d{1,4})(?::[a-z]{1})?>";
+        private string stx_pattern = @"<stx_string:(\d{1,4})(?::[a-z]{1})?>";
+        private string srx_short_pattern = @"<srx:(\d{1,4})(?::[a-z]{1})?>";
+        private string stx_short_pattern = @"<stx:(\d{1,4})(?::[a-z]{1})?>";
+        private string name_pattern = @"<name:(\d{1,4})(?::[a-z]{1})?>";
+        private string country_pattern = @"<country:(\d{1,4})(?::[a-z]{1})?>";
+        private string dxlocator_pattern = @"<gridsquare:(\d{1,4})(?::[a-z]{1})?>";
+        private string mylocator_pattern = @"<my_gridsquare:(\d{1,4})(?::[a-z]{1})?>";
+        private string prop_mode_pattern = @"<prop_mode:(\d{1,4})(?::[a-z]{1})?>";
+        private string sat_name_pattern = @"<sat_name:(\d{1,4})(?::[a-z]{1})?>";
+        private string soapbox_pattern = @"<soapbox:(\d{1,4})(?::[a-z]{1})?>";
+        private string lotw_qsl_sent_pattern = @"<lotw_qsl_sent:(\d{1,4})(?::[a-z]{1})?>";
 
         public HolyLogParser() : this("", Operator.Israeli)
         {
@@ -439,9 +440,22 @@ namespace HolyParser
                 }
                 catch
                 {
-                    
+
                 }
             }
+
+            // LoTW sent status. Default to "already sent" (1) so that importing a log from
+            // another program (which lacks this field) does not flood the upload queue.
+            // When the field IS present (e.g. a HolyLogger export), honour it: Y = sent, N = pending.
+            qso_row.LotwStatus = 1;
+            regex = new Regex(lotw_qsl_sent_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+            {
+                string val = Regex.Split(row, lotw_qsl_sent_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                qso_row.LotwStatus = val.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+            }
+
             qso_row.StandartizeQSO();
             return qso_row;
         }

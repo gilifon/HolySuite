@@ -1,0 +1,222 @@
+<Window x:Class="HolyLogger.StatisticsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Log Statistics"
+        Height="680" Width="950"
+        MinHeight="480" MinWidth="940"
+        ResizeMode="CanResize"
+        WindowStartupLocation="Manual"
+        LocationChanged="Window_LocationChanged"
+        SizeChanged="Window_SizeChanged">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,0,0,2" Padding="10,8">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <Viewbox Width="22" Height="22" Margin="0,0,8,0" VerticalAlignment="Center">
+                    <Path Stretch="Uniform" Fill="#1565C0"
+                          Data="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/>
+                </Viewbox>
+                <TextBlock Text="Log Statistics" FontSize="18" FontWeight="Bold"
+                           Foreground="#1565C0" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+
+        <!-- Body -->
+        <Border Grid.Row="1" Background="#F8FAFB">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <!-- Summary strip -->
+                <Border Grid.Row="0" Background="#EEF2F7" BorderBrush="#BBCDE8" BorderThickness="0,0,0,1" Padding="14,12">
+                    <StackPanel Orientation="Horizontal">
+
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="Total QSOs" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_TotalQSOs" FontSize="34" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="Unique Calls" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_UniqueCalls" FontSize="34" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="Countries / DXCC" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_UniqueCountries" FontSize="34" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Date Range — dates stacked with Start / End labels -->
+                        <Border Padding="14,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="Date Range" FontSize="15" Foreground="#666666" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Start " FontSize="14" Foreground="#888888" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TB_DateStart" FontSize="14" FontWeight="Bold" Foreground="#1565C0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                    <TextBlock Text="End   " FontSize="14" Foreground="#888888" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TB_DateEnd" FontSize="14" FontWeight="Bold" Foreground="#1565C0" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- Scrollable content -->
+                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <StackPanel Orientation="Horizontal" Margin="12,10,12,10" VerticalAlignment="Top">
+
+                        <!-- Pivot table section -->
+                        <StackPanel VerticalAlignment="Top">
+                            <TextBlock Text="QSOs by Band × Mode" FontSize="16" FontWeight="Bold"
+                                       Foreground="#1565C0" Margin="0,0,0,6"/>
+                            <!--
+                                Inner PivotBorder: left+top edge in blue (1px).
+                                Outer PivotOuterBorder: right+bottom edge in black (2px).
+                                Cell grid is built entirely in code-behind (BuildPivot).
+                                PivotOuterBorder.ActualHeight drives the country-table scroll heights.
+                            -->
+                            <Border x:Name="PivotOuterBorder" HorizontalAlignment="Left"
+                                    BorderBrush="Black" BorderThickness="2">
+                                <Border x:Name="PivotBorder"
+                                        BorderBrush="Transparent"
+                                        BorderThickness="0"/>
+                            </Border>
+                            <TextBlock x:Name="TB_DataQuality"
+                                       Margin="0,8,0,0" FontSize="13" Foreground="#BB3300"
+                                       FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"/>
+                            <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
+                                    Margin="0,6,0,0" Padding="10,4" FontSize="13"
+                                    Visibility="Collapsed" Click="BTN_EditProblems_Click"/>
+                        </StackPanel>
+
+                        <!-- Country tables section -->
+                        <StackPanel Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Top">
+
+                            <!-- Worked Countries -->
+                            <StackPanel Margin="0,0,10,0" VerticalAlignment="Top">
+                                <TextBlock x:Name="TB_WorkedHeader" Text="Worked Countries"
+                                           FontSize="16" FontWeight="Bold" Foreground="#1565C0" Margin="0,0,0,6"/>
+                                <Border BorderBrush="Black" BorderThickness="0,0,2,2">
+                                    <Border BorderBrush="#1565C0" BorderThickness="1,1,0,0">
+                                        <DockPanel>
+                                        <Border DockPanel.Dock="Top" Background="#DEB887"
+                                                BorderBrush="#AAAAAA" BorderThickness="0,0,0,1">
+                                            <StackPanel Orientation="Horizontal" Margin="4,3">
+                                                <TextBlock Width="30"/>
+                                                <TextBlock x:Name="TB_SortWorkedName" Text="Country ▲"
+                                                           Width="160" FontSize="13" FontWeight="Bold"
+                                                           Cursor="Hand" Foreground="#333333"/>
+                                                <TextBlock x:Name="TB_SortWorkedCount" Text="Count ▼"
+                                                           FontSize="13" FontWeight="Bold"
+                                                           Cursor="Hand" TextAlignment="Right" Foreground="#333333"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ScrollViewer x:Name="SV_WorkedCountries"
+                                                      VerticalScrollBarVisibility="Auto"
+                                                      MaxHeight="500">
+                                            <ItemsControl x:Name="IC_WorkedCountries">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                                                                Background="{Binding RowBg}">
+                                                            <StackPanel Orientation="Horizontal" Margin="4,1,4,1">
+                                                                <Image Source="{Binding FlagImage}"
+                                                                       Width="24" Height="16"
+                                                                       Margin="0,0,6,0" VerticalAlignment="Center"
+                                                                       Stretch="Fill"/>
+                                                                <TextBlock Text="{Binding Name}" FontSize="13"
+                                                                           VerticalAlignment="Center"
+                                                                           Width="160"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock Text="{Binding CountStr}" FontSize="13"
+                                                                           FontWeight="Bold"
+                                                                           VerticalAlignment="Center"
+                                                                           TextAlignment="Right" Width="40"
+                                                                           Foreground="#1565C0"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        </DockPanel>
+                                    </Border>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Missing Countries -->
+                            <StackPanel VerticalAlignment="Top">
+                                <TextBlock x:Name="TB_MissingHeader" Text="Missing Countries"
+                                           FontSize="16" FontWeight="Bold" Foreground="#BB3300" Margin="0,0,0,6"/>
+                                <Border BorderBrush="Black" BorderThickness="0,0,2,2">
+                                    <Border BorderBrush="#1565C0" BorderThickness="1,1,0,0">
+                                        <DockPanel>
+                                        <Border DockPanel.Dock="Top" Background="#DEB887"
+                                                BorderBrush="#AAAAAA" BorderThickness="0,0,0,1">
+                                            <StackPanel Orientation="Horizontal" Margin="4,3">
+                                                <TextBlock Width="30"/>
+                                                <TextBlock x:Name="TB_SortMissingName" Text="Country ▲"
+                                                           Width="175" FontSize="13" FontWeight="Bold"
+                                                           Cursor="Hand" Foreground="#333333"/>
+                                            </StackPanel>
+                                        </Border>
+                                        <ScrollViewer x:Name="SV_MissingCountries"
+                                                      VerticalScrollBarVisibility="Auto"
+                                                      MaxHeight="500">
+                                            <ItemsControl x:Name="IC_MissingCountries">
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate>
+                                                        <Border BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                                                                Background="{Binding RowBg}">
+                                                            <StackPanel Orientation="Horizontal" Margin="4,1,4,1">
+                                                                <Image Source="{Binding FlagImage}"
+                                                                       Width="24" Height="16"
+                                                                       Margin="0,0,6,0" VerticalAlignment="Center"
+                                                                       Stretch="Fill"/>
+                                                                <TextBlock Text="{Binding Name}" FontSize="13"
+                                                                           VerticalAlignment="Center"
+                                                                           Width="175"
+                                                                           TextTrimming="CharacterEllipsis"/>
+                                                            </StackPanel>
+                                                        </Border>
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </ScrollViewer>
+                                        </DockPanel>
+                                    </Border>
+                                </Border>
+                            </StackPanel>
+
+                        </StackPanel>
+
+                    </StackPanel>
+                </ScrollViewer>
+
+            </Grid>
+        </Border>
+
+        <!-- Status bar -->
+        <Border Grid.Row="2" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,2,0,0" Padding="10,6">
+            <TextBlock x:Name="TB_Status" FontSize="14" Foreground="#333333" Text="Ready."/>
+        </Border>
+    </Grid>
+</Window>

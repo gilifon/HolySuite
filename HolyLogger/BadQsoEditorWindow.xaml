@@ -1,0 +1,170 @@
+<Window x:Class="HolyLogger.BadQsoEditorWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edit Problem QSOs"
+        Height="500" Width="900"
+        MinHeight="300" MinWidth="600"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <Border Grid.Row="0" Background="#FFF3E0" BorderBrush="#BB3300" BorderThickness="0,0,0,2" Padding="10,8">
+            <StackPanel>
+                <TextBlock Text="Problem QSOs — Missing Band or Mode" FontSize="15" FontWeight="Bold"
+                           Foreground="#BB3300"/>
+                <TextBlock x:Name="TB_Hint" FontSize="12" Foreground="#555555" Margin="0,3,0,0"
+                           Text="The first shaded row shows the expected format (read-only). Red cells need a value — click to pick from the list. Use Save to File / Load from File to edit in Excel. Save All writes changes to the database."/>
+            </StackPanel>
+        </Border>
+
+        <!-- DataGrid -->
+        <DataGrid Grid.Row="1" x:Name="DG_BadQsos"
+                  AutoGenerateColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False"
+                  SelectionMode="Single" SelectionUnit="Cell"
+                  HeadersVisibility="Column" GridLinesVisibility="All"
+                  FontSize="13" Margin="0"
+                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  CellEditEnding="DG_CellEditEnding"
+                  BeginningEdit="DG_BeginningEdit">
+
+            <DataGrid.Columns>
+                <!-- Read-only identification columns -->
+                <DataGridTextColumn Header="ID" Binding="{Binding id}" Width="45" IsReadOnly="True">
+                    <DataGridTextColumn.HeaderStyle>
+                        <Style TargetType="DataGridColumnHeader">
+                            <Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
+                            <Setter Property="ToolTip" Value="Internal database record number — not a ham radio field"/>
+                        </Style>
+                    </DataGridTextColumn.HeaderStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Date"     Binding="{Binding Date}"   Width="90"  IsReadOnly="True"/>
+                <DataGridTextColumn Header="Time"     Binding="{Binding Time}"   Width="60"  IsReadOnly="True"/>
+                <DataGridTextColumn Header="DX Call"  Binding="{Binding DXCall}" Width="90"  IsReadOnly="True"/>
+                <DataGridTextColumn Header="Country"   Binding="{Binding Country}" Width="120" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Freq (MHz)" Binding="{Binding Freq}"   Width="85"  IsReadOnly="True"/>
+
+                <!-- Editable Band column — ComboBox with known bands -->
+                <DataGridComboBoxColumn Header="Band" SelectedItemBinding="{Binding Band, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="80">
+                    <DataGridComboBoxColumn.CellStyle>
+                        <Style TargetType="DataGridCell">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasBandProblem}" Value="True">
+                                    <Setter Property="Background" Value="#FFCCCC"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGridComboBoxColumn.CellStyle>
+                    <DataGridComboBoxColumn.ItemsSource>
+                        <x:Array Type="sys:String" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                            <sys:String>160M</sys:String>
+                            <sys:String>80M</sys:String>
+                            <sys:String>60M</sys:String>
+                            <sys:String>40M</sys:String>
+                            <sys:String>30M</sys:String>
+                            <sys:String>20M</sys:String>
+                            <sys:String>17M</sys:String>
+                            <sys:String>15M</sys:String>
+                            <sys:String>12M</sys:String>
+                            <sys:String>10M</sys:String>
+                            <sys:String>6M</sys:String>
+                            <sys:String>2M</sys:String>
+                            <sys:String>70CM</sys:String>
+                            <sys:String>13CM</sys:String>
+                        </x:Array>
+                    </DataGridComboBoxColumn.ItemsSource>
+                </DataGridComboBoxColumn>
+
+                <!-- Editable Mode column — ComboBox -->
+                <DataGridComboBoxColumn Header="Mode" SelectedItemBinding="{Binding Mode, UpdateSourceTrigger=PropertyChanged}"
+                                        Width="80">
+                    <DataGridComboBoxColumn.CellStyle>
+                        <Style TargetType="DataGridCell">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding HasModeProblem}" Value="True">
+                                    <Setter Property="Background" Value="#FFCCCC"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </DataGridComboBoxColumn.CellStyle>
+                    <DataGridComboBoxColumn.ItemsSource>
+                        <x:Array Type="sys:String" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                            <sys:String>SSB</sys:String>
+                            <sys:String>USB</sys:String>
+                            <sys:String>LSB</sys:String>
+                            <sys:String>CW</sys:String>
+                            <sys:String>FM</sys:String>
+                            <sys:String>RTTY</sys:String>
+                            <sys:String>FT8</sys:String>
+                            <sys:String>FT4</sys:String>
+                            <sys:String>PSK31</sys:String>
+                            <sys:String>DIGI</sys:String>
+                        </x:Array>
+                    </DataGridComboBoxColumn.ItemsSource>
+                </DataGridComboBoxColumn>
+
+                <!-- Comment — editable text -->
+                <DataGridTextColumn Header="Comment" Binding="{Binding Comment, UpdateSourceTrigger=PropertyChanged}"
+                                    Width="*"/>
+            </DataGrid.Columns>
+
+            <!-- Highlight rows that still have missing band or mode in red -->
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasProblem}" Value="True">
+                            <Setter Property="Background" Value="#FFF0F0"/>
+                        </DataTrigger>
+                        <DataTrigger Binding="{Binding HasProblem}" Value="False">
+                            <Setter Property="Background" Value="#F0FFF0"/>
+                        </DataTrigger>
+                        <!-- IsHintRow last so it overrides the red/green triggers above -->
+                        <DataTrigger Binding="{Binding IsHintRow}" Value="True">
+                            <Setter Property="Background" Value="#DDEEFF"/>
+                            <Setter Property="FontStyle" Value="Italic"/>
+                            <Setter Property="Foreground" Value="#336699"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
+        </DataGrid>
+
+        <!-- Footer buttons -->
+        <Border Grid.Row="2" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,2,0,0" Padding="8,8">
+            <DockPanel>
+                <!-- File export/import on the left -->
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Button x:Name="BTN_ExportCsv" Content="Save to File…" Width="125" FontSize="13"
+                            Padding="8,4" Margin="0,0,5,0" Click="BTN_ExportCsv_Click"
+                            ToolTip="Export all problem QSOs to ADIF, CSV or TXT for external editing"/>
+                    <Button x:Name="BTN_CheckLotw" Content="Check in LoTW" Width="130" FontSize="13"
+                            Padding="8,4" Click="BTN_CheckLotw_Click">
+                        <Button.ToolTip>
+                            <ToolTip>
+                                <TextBlock>Downloads your confirmed QSOs from LoTW and fills<LineBreak/>missing Band / Mode for any matching problem QSO.<LineBreak/>Requires LoTW Web Login credentials in Options → LoTW.</TextBlock>
+                            </ToolTip>
+                        </Button.ToolTip>
+                    </Button>
+                </StackPanel>
+                <!-- Save / Close on the right -->
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <TextBlock x:Name="TB_SaveStatus" VerticalAlignment="Center" FontSize="13"
+                               Foreground="#1E7E34" Margin="0,0,16,0" Visibility="Collapsed"/>
+                    <Button x:Name="BTN_SaveAll" Content="Update My Log" Width="130" FontSize="14"
+                            Padding="12,4" Margin="0,0,10,0" Click="BTN_SaveAll_Click"/>
+                    <Button Content="Close" Width="90" FontSize="14"
+                            Padding="12,4" IsCancel="True"/>
+                </StackPanel>
+            </DockPanel>
+        </Border>
+    </Grid>
+</Window>

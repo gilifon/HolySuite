@@ -1,0 +1,383 @@
+using DXCCManager;
+using HolyParser;
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+
+namespace HolyLogger
+{
+    public partial class StatisticsWindow : Window
+    {
+        private readonly ObservableCollection<QSO> _allQsos;
+
+        // Ordered band list (after stripping the "M" suffix)
+        private static readonly string[] PivotBands =
+            { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "2", "70cm", "13cm" };
+
+        // ── column widths (pixels) ────────────────────────────────────────
+        // Band[m] | SSB | CW | DIGI | FM | Total-% | Total-Num
+        private static readonly double[] ColW = { 70, 50, 50, 50, 50, 55, 58 };
+
+        // Shared across all StatisticsWindow instances — built once per process
+        private static readonly EntityResolver _masterResolver = new EntityResolver();
+        private static readonly Dictionary<string, BitmapImage> _flagCache = new Dictionary<string, BitmapImage>();
+
+        public StatisticsWindow(ObservableCollection<QSO> qsos)
+        {
+            InitializeComponent();
+            _allQsos = qsos;
+
+            var s = Properties.Settings.Default;
+            if (s.StatisticsWindowLeft > 0 || s.StatisticsWindowTop > 0)
+            {
+                Left = s.StatisticsWindowLeft;
+                Top  = s.StatisticsWindowTop;
+            }
+            if (s.StatisticsWindowWidth  > MinWidth)  Width  = s.StatisticsWindowWidth;
+            if (s.StatisticsWindowHeight > MinHeight) Height = s.StatisticsWindowHeight;
+
+            ComputeStats();
+
+            // Match country-table scroll heights to the pivot table height whenever the pivot resizes.
+            PivotOuterBorder.SizeChanged += (sender, e) =>
+            {
+                if (e.NewSize.Height > 0)
+                {
+                    SV_WorkedCountries.Height  = e.NewSize.Height;
+                    SV_MissingCountries.Height = e.NewSize.Height;
+                }
+            };
+        }
+
+        // ── top-level entry point ─────────────────────────────────────────
+
+        private void ComputeStats()
+        {
+            int total = _allQsos != null ? _allQsos.Count : 0;
+            TB_TotalQSOs.Text = total.ToString();
+
+            if (total == 0)
+            {
+                TB_UniqueCalls.Text     = "0";
+                TB_UniqueCountries.Text = "0";
+                TB_DateStart.Text = "—";
+                TB_DateEnd.Text   = "—";
+                TB_Status.Text          = "No QSOs to analyze.";
+                return;
+            }
+
+            TB_UniqueCalls.Text = _allQsos
+                .Select(q => q.DXCall)
+                .Where(c => !string.IsNullOrEmpty(c))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count().ToString();
+
+            TB_UniqueCountries.Text = _allQsos
+                .Select(q => !string.IsNullOrEmpty(q.DXCC) ? q.DXCC : q.Country)
+                .Where(c => !string.IsNullOrEmpty(c))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count().ToString();
+
+            var dates = _allQsos
+                .Where(q => !string.IsNullOrEmpty(q.Date))
+                .Select(q => q.Date).OrderBy(d => d).ToList();
+            TB_DateStart.Text = dates.Count > 0 ? FormatAdifDate(dates.First()) : "—";
+            TB_DateEnd.Text   = dates.Count > 0 ? FormatAdifDate(dates.Last())  : "—";
+
+            BuildPivot();
+            BuildCountryTables();
+
+            int needsEdit = _allQsos.Count(q => string.IsNullOrEmpty(q.Band) || string.IsNullOrEmpty(q.Mode));
+            TB_DataQuality.Text = needsEdit > 0
+                ? $"⚠  {needsEdit} QSO{(needsEdit == 1 ? "" : "s")} have missing band or mode — consider reviewing them in the log."
+                : "";
+
+            TB_Status.Text = $"Statistics computed for {total} QSO{(total == 1 ? "" : "s")}.";
+        }
+
+        // ── pivot table builder ───────────────────────────────────────────
+
+        private void BuildPivot()
+        {
+            // 1. Accumulate counts
+            var counts = new Dictionary<string, Dictionary<string, int>>();
+            foreach (var b in PivotBands)
+                counts[b] = new Dictionary<string, int>
+                    { { "SSB", 0 }, { "CW", 0 }, { "DIGI", 0 }, { "FM", 0 } };
+
+            // Bucket for QSOs whose band is missing or not in PivotBands
+            var other = new Dictionary<string, int>
+                    { { "SSB", 0 }, { "CW", 0 }, { "DIGI", 0 }, { "FM", 0 } };
+
+            foreach (var q in _allQsos)
+            {
+                string b = NormalizeBand(q.Band);
+                string m = NormalizeMode(q.Mode); // always SSB/CW/DIGI/FM — never null
+                if (b != null && counts.ContainsKey(b))
+                    counts[b][m]++;
+                else
+                    other[m]++;
+            }
+
+            int totSSB = 0, totCW = 0, totDIGI = 0, totFM = 0;
+            foreach (var b in PivotBands)
+            {
+                totSSB  += counts[b]["SSB"];  totCW   += counts[b]["CW"];
+                totDIGI += counts[b]["DIGI"]; totFM   += counts[b]["FM"];
+            }
+            // Include the "Other" bucket so grand == _allQsos.Count
+            totSSB  += other["SSB"];  totCW   += other["CW"];
+            totDIGI += other["DIGI"]; totFM   += other["FM"];
+            int grand    = totSSB + totCW + totDIGI + totFM;
+            int otherTot = other["SSB"] + other["CW"] + other["DIGI"] + other["FM"];
+            bool hasOther = otherTot > 0;
+
+            // 2. Build Grid
+            //    rows: 2 header rows + N band rows + optional Other row + 2 total rows
+            int numBands = PivotBands.Length;
+            int numRows  = 2 + numBands + (hasOther ? 1 : 0) + 2;
+
+            var tbl = new Grid();
+            foreach (var w in ColW)
+                tbl.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
+            for (int i = 0; i < numRows; i++)
+                tbl.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            // Shared brushes
+            var headerBg = Br(0xDE, 0xB8, 0x87);   // #DEB887 (tan header)
+            var totalBg  = Br(0xEE, 0xF2, 0xF7);   // #EEF2F7 (light blue-grey)
+            var yellowBg = Br(0xFF, 0xFF, 0x00);   // yellow  (grand total)
+            var evenBg   = Brushes.White;
+            var oddBg    = Br(0xDC, 0xDC, 0xDC);   // Gainsboro
+            var gridLine = Br(0xAA, 0xAA, 0xAA);   // grey grid lines
+
+            // Cell shorthand
+            Border H(string t, int r, int c, int rs = 1, int cs = 1) =>
+                Put(tbl, r, c, rs, cs, MkCell(t, headerBg, gridLine, bold: true));
+
+            Border D(string t, Brush bg, int r, int c, bool bold = false,
+                     TextAlignment ta = TextAlignment.Center) =>
+                Put(tbl, r, c, 1, 1, MkCell(t, bg, gridLine, bold: bold, align: ta));
+
+            // ── row 0: Band[m] │ "mode" (span 4) │ "Total" (span 2) ──────
+            H("Band [m]", 0, 0);
+            H("mode",     0, 1, cs: 4);
+            H("Total",    0, 5, cs: 2);
+
+            // ── row 1: sub-headers ────────────────────────────────────────
+            H("",       1, 0);
+            H("SSB",    1, 1); H("CW",     1, 2);
+            H("DIGI",   1, 3); H("FM",     1, 4);
+            H("%",      1, 5); H("number", 1, 6);
+
+            // ── band rows ─────────────────────────────────────────────────
+            string Pct(int n) => grand > 0 && n > 0 ? $"{100.0 * n / grand:F1}%" : "";
+
+            for (int i = 0; i < numBands; i++)
+            {
+                string b   = PivotBands[i];
+                int    r   = 2 + i;
+                var    bg  = (Brush)(i % 2 == 0 ? evenBg : oddBg);
+                int ssb = counts[b]["SSB"], cw = counts[b]["CW"],
+                    digi = counts[b]["DIGI"], fm = counts[b]["FM"];
+                int rowTot = ssb + cw + digi + fm;
+
+                D(b,             bg, r, 0, ta: TextAlignment.Left);
+                D(N(ssb),        bg, r, 1);
+                D(N(cw),         bg, r, 2);
+                D(N(digi),       bg, r, 3);
+                D(N(fm),         bg, r, 4);
+                D(Pct(rowTot),   bg, r, 5, ta: TextAlignment.Right);
+                D(N(rowTot),     bg, r, 6, bold: rowTot > 0);
+            }
+
+            // ── "Other" row (bands not in PivotBands) ────────────────────
+            if (hasOther)
+            {
+                int r  = 2 + numBands;
+                var bg = (Brush)(numBands % 2 == 0 ? evenBg : oddBg);
+                D("Other",           bg, r, 0, ta: TextAlignment.Left);
+                D(N(other["SSB"]),   bg, r, 1);
+                D(N(other["CW"]),    bg, r, 2);
+                D(N(other["DIGI"]),  bg, r, 3);
+                D(N(other["FM"]),    bg, r, 4);
+                D(Pct(otherTot),     bg, r, 5, ta: TextAlignment.Right);
+                D(N(otherTot),       bg, r, 6, bold: true);
+            }
+
+            // ── total footer (2 rows) ─────────────────────────────────────
+            int tr1 = 2 + numBands + (hasOther ? 1 : 0);
+            int tr2 = tr1 + 1;
+
+            // "Total" label spans both sub-rows
+            Put(tbl, tr1, 0, 2, 1, MkCell("Total", headerBg, gridLine, bold: true, align: TextAlignment.Left));
+
+            // sub-row 1: mode percentages + "100%"
+            D(Pct(totSSB),  totalBg, tr1, 1, bold: true);
+            D(Pct(totCW),   totalBg, tr1, 2, bold: true);
+            D(Pct(totDIGI), totalBg, tr1, 3, bold: true);
+            D(Pct(totFM),   totalBg, tr1, 4, bold: true);
+            D("100%",       totalBg, tr1, 5, bold: true);
+            D("",           headerBg, tr1, 6);
+
+            // sub-row 2: mode counts + grand total (yellow)
+            D(N(totSSB),  totalBg, tr2, 1, bold: true);
+            D(N(totCW),   totalBg, tr2, 2, bold: true);
+            D(N(totDIGI), totalBg, tr2, 3, bold: true);
+            D(N(totFM),   totalBg, tr2, 4, bold: true);
+            D("",         headerBg, tr2, 5);
+            D(grand > 0 ? grand.ToString() : "", yellowBg, tr2, 6, bold: true);
+
+            PivotBorder.Child = tbl;
+        }
+
+        // ── country tables ────────────────────────────────────────────────
+
+        private void BuildCountryTables()
+        {
+            var workedCounts = _allQsos
+                .Where(q => !string.IsNullOrEmpty(q.Country))
+                .GroupBy(q => q.Country, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+
+            var workedNames = new HashSet<string>(workedCounts.Keys, StringComparer.OrdinalIgnoreCase);
+
+            var worked = workedCounts.Keys
+                .OrderByDescending(n => workedCounts[n]).ThenBy(n => n)
+                .Select((name, i) => new CountryItem
+                {
+                    Name      = name,
+                    Count     = workedCounts[name],
+                    FlagImage = GetFlagImage(name),
+                    RowBg     = i % 2 == 0 ? (Brush)Brushes.White : Br(0xDC, 0xDC, 0xDC)
+                }).ToList();
+
+            IC_WorkedCountries.ItemsSource = worked;
+            TB_WorkedHeader.Text = $"Worked Countries ({worked.Count})";
+
+            var missing = _masterResolver.GetAllEntityNames()
+                .Where(n => !workedNames.Contains(n))
+                .Select((name, i) => new CountryItem
+                {
+                    Name      = name,
+                    FlagImage = GetFlagImage(name),
+                    RowBg     = i % 2 == 0 ? (Brush)Brushes.White : Br(0xDC, 0xDC, 0xDC)
+                }).ToList();
+
+            IC_MissingCountries.ItemsSource = missing;
+            TB_MissingHeader.Text = $"Missing Countries ({missing.Count})";
+        }
+
+        private static BitmapImage GetFlagImage(string countryName)
+        {
+            if (!MainWindow.DxccNameToIso.TryGetValue(countryName, out string iso)) return null;
+            if (_flagCache.TryGetValue(iso, out BitmapImage cached)) return cached;
+            try
+            {
+                var bm = new BitmapImage(new Uri($"pack://application:,,,/Images/flags/{iso}.png"));
+                _flagCache[iso] = bm;
+                return bm;
+            }
+            catch { return null; }
+        }
+
+        // ── cell factory ──────────────────────────────────────────────────
+
+        private static Border MkCell(string text, Brush bg, Brush gridLine,
+            bool bold = false, TextAlignment align = TextAlignment.Center)
+        {
+            return new Border
+            {
+                Background      = bg,
+                BorderBrush     = gridLine,
+                BorderThickness = new Thickness(0, 0, 1, 1),
+                Child = new TextBlock
+                {
+                    Text                = text ?? "",
+                    FontSize            = 14,
+                    FontWeight          = bold ? FontWeights.Bold : FontWeights.Normal,
+                    TextAlignment       = align,
+                    HorizontalAlignment = HorizontalAlignment.Stretch,
+                    VerticalAlignment   = VerticalAlignment.Center,
+                    Padding             = new Thickness(align == TextAlignment.Left ? 4 : 2, 2, 2, 2),
+                    Foreground          = Brushes.Black
+                },
+                MinHeight = 20
+            };
+        }
+
+        private static Border Put(Grid g, int row, int col, int rowSpan, int colSpan, Border cell)
+        {
+            Grid.SetRow(cell, row);    Grid.SetColumn(cell, col);
+            if (rowSpan > 1) Grid.SetRowSpan(cell, rowSpan);
+            if (colSpan > 1) Grid.SetColumnSpan(cell, colSpan);
+            g.Children.Add(cell);
+            return cell;
+        }
+
+        // ── helpers ───────────────────────────────────────────────────────
+
+        private static SolidColorBrush Br(byte r, byte g, byte b) =>
+            new SolidColorBrush(Color.FromRgb(r, g, b));
+
+        // n=0 → empty string (blank cell like the mockup)
+        private static string N(int n) => n > 0 ? n.ToString() : "";
+
+        // "160M" → "160", "70CM" → "70cm"
+        private static string NormalizeBand(string band)
+        {
+            if (string.IsNullOrEmpty(band)) return null;
+            string b = band.ToUpper().Trim();
+            if (b.EndsWith("CM")) return b.ToLower();
+            if (b.EndsWith("M"))  return b.Substring(0, b.Length - 1);
+            return b;
+        }
+
+        // USB/LSB/PH/AM → SSB; blank/unknown → DIGI (never returns null)
+        private static string NormalizeMode(string mode)
+        {
+            if (string.IsNullOrEmpty(mode)) return "DIGI";
+            string m = mode.ToUpper().Trim();
+            if (m == "SSB" || m == "USB" || m == "LSB" || m == "PH" || m == "AM") return "SSB";
+            if (m == "CW") return "CW";
+            if (m == "FM") return "FM";
+            return "DIGI";
+        }
+
+        private static string FormatAdifDate(string adif)
+        {
+            if (string.IsNullOrEmpty(adif) || adif.Length < 8) return adif;
+            return $"{adif.Substring(0, 4)}-{adif.Substring(4, 2)}-{adif.Substring(6, 2)}";
+        }
+
+        // ── window position / size persistence ───────────────────────────
+
+        private void Window_LocationChanged(object sender, EventArgs e)
+        {
+            if (Left >= 0) Properties.Settings.Default.StatisticsWindowLeft = Left;
+            if (Top  >= 0) Properties.Settings.Default.StatisticsWindowTop  = Top;
+            Properties.Settings.Default.Save();
+        }
+
+        private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            if (Width  > 0) Properties.Settings.Default.StatisticsWindowWidth  = Width;
+            if (Height > 0) Properties.Settings.Default.StatisticsWindowHeight = Height;
+            Properties.Settings.Default.Save();
+        }
+    }
+
+    internal class CountryItem
+    {
+        public string Name { get; set; }
+        public BitmapImage FlagImage { get; set; }
+        public int Count { get; set; }
+        public string CountStr => Count > 0 ? Count.ToString() : "";
+        public Brush RowBg { get; set; }
+    }
+}

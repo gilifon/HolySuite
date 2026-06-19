@@ -100,6 +100,11 @@ namespace HolyParser
         // to the QSO for cross-referencing or a future deletion routine.
         public string QrzLogId { get; set; }
 
+        // LoTW (ARRL Logbook of the World) upload state: 0 = pending (waiting to be signed and
+        // uploaded), 1 = uploaded (accepted by ARRL gateway), 2 = permanently rejected.
+        // Not serialized to the contest server.
+        public int LotwStatus { get; set; }
+
         public QSO()
         {
             IsAllowWARC = false;
