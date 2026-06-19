@@ -11861,6 +11861,26 @@ namespace HolyLogger
                                                string.IsNullOrWhiteSpace(q.DXLocator))).ToList();
             if (needsLookup.Count == 0) return true;
 
+            // Debug: dump every QSO that will be re-queried so we can see what fields are missing
+            try
+            {
+                string debugPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    "qrz_missing_debug.txt");
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"QRZ re-query candidates — {DateTime.Now:yyyy-MM-dd HH:mm:ss}  ({needsLookup.Count} QSOs)");
+                sb.AppendLine(new string('-', 100));
+                sb.AppendLine($"{"ID",-8} {"DXCall",-12} {"Date",-10} {"Time",-8} {"Band",-6} {"Mode",-6} {"Name",-20} {"DXLocator",-12} {"Country",-20} {"Freq",-10}");
+                sb.AppendLine(new string('-', 100));
+                foreach (var q in needsLookup)
+                    sb.AppendLine($"{q.id,-8} {q.DXCall,-12} {q.Date,-10} {q.Time,-8} {q.Band,-6} {q.Mode,-6} {(q.Name ?? ""),-20} {(q.DXLocator ?? ""),-12} {(q.Country ?? ""),-20} {(q.Freq ?? ""),-10}");
+                System.IO.File.WriteAllText(debugPath, sb.ToString(), System.Text.Encoding.UTF8);
+            }
+            catch { /* debug write failure must never break the main flow */ }
+
+            // Collect per-QSO QRZ results for the debug log written after the loop.
+            var debugResults = new System.Collections.Generic.List<string>();
+
             int updated = 0;
             for (int i = 0; i < needsLookup.Count; i++)
             {
@@ -11872,7 +11892,8 @@ namespace HolyLogger
                     await Task.Delay(150);
                     QSO qso = needsLookup[i];
                     var (name, grid) = await GetQrzForCall(qso.DXCall);
-                    if (!string.IsNullOrWhiteSpace(name)) qso.Name = name;
+                    if (!string.IsNullOrWhiteSpace(name))
+                        qso.Name = name.Length > 15 ? name.Substring(0, 15) + "..." : name;
                     else if (string.IsNullOrWhiteSpace(qso.Name)) qso.Name = "N/A";
                     if (!string.IsNullOrWhiteSpace(grid)) qso.DXLocator = grid;
                     else if (string.IsNullOrWhiteSpace(qso.DXLocator)) qso.DXLocator = "AA00JJ";
@@ -11880,6 +11901,7 @@ namespace HolyLogger
                         _qrzNoData.Add(qso.DXCall);
                     dal.Update(qso);
                     updated++;
+                    debugResults.Add($"  ID={qso.id,-6} {qso.DXCall,-12}  qrz_name=[{name}] ({name.Length} chars)  saved_name=[{qso.Name}]  saved_locator=[{qso.DXLocator}]");
 
                     // Refresh the grid every 25 updates so the user sees progress
                     // without paying the cost of a full refresh on every single QSO.
@@ -11893,9 +11915,25 @@ namespace HolyLogger
                 }
             }
             QSODataGrid.Items.Refresh();
+
+            // Append what QRZ returned and what was saved, so we can diagnose round-trip losses.
+            try
+            {
+                string debugPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    "qrz_missing_debug.txt");
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine();
+                sb.AppendLine($"QRZ results — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                sb.AppendLine(new string('-', 100));
+                foreach (var line in debugResults) sb.AppendLine(line);
+                System.IO.File.AppendAllText(debugPath, sb.ToString(), System.Text.Encoding.UTF8);
+            }
+            catch { }
+
             return true;
         }
-        
+
         private async Task<(string Name, string Grid)> GetQrzForCall(string callsign)
         {
             try

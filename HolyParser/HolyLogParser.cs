@@ -75,30 +75,30 @@ namespace HolyParser
         public int qsoDIGI { get { return _qsoDIGI; } }
         
         //patterns
-        private string mycall_pattern = @"<station_callsign:(\d{1,2})(?::[a-z]{1})?>";
-        private string operator_call_pattern = @"<operator:(\d{1,2})(?::[a-z]{1})?>";
-        private string rst_rcvd_pattern = @"<rst_rcvd:(\d{1,2})(?::[a-z]{1})?>";
-        private string rst_sent_pattern = @"<rst_sent:(\d{1,2})(?::[a-z]{1})?>";
-        private string dxcall_pattern = @"<call:(\d{1,2})(?::[a-z]{1})?>";
-        private string date_pattern = @"<qso_date:(\d{1,2})(?::[a-z]{1})?>";
-        private string time_pattern = @"<time_on:(\d{1,2})(?::[a-z]{1})?>";
-        private string band_pattern = @"<band:(\d{1,2})(?::[a-z]{1})?>";
-        private string mode_pattern = @"<mode:(\d{1,2})(?::[a-z]{1})?>";
-        private string submode_pattern = @"<submode:(\d{1,2})(?::[a-z]{1})?>";
-        private string commant_pattern = @"<comment:(\d{1,2})(?::[a-z]{1})?>";
-        private string dxcc_pattern = @"<dxcc:(\d{1,2})(?::[a-z]{1})?>";
-        private string freq_pattern = @"<freq:(\d{1,2})(?::[a-z]{1})?>";
-        private string srx_pattern = @"<srx_string:(\d{1,2})(?::[a-z]{1})?>";
-        private string stx_pattern = @"<stx_string:(\d{1,2})(?::[a-z]{1})?>";
-        private string srx_short_pattern = @"<srx:(\d{1,2})(?::[a-z]{1})?>";
-        private string stx_short_pattern = @"<stx:(\d{1,2})(?::[a-z]{1})?>";
-        private string name_pattern = @"<name:(\d{1,2})(?::[a-z]{1})?>";
-        private string country_pattern = @"<country:(\d{1,2})(?::[a-z]{1})?>";
-        private string dxlocator_pattern = @"<gridsquare:(\d{1,2})(?::[a-z]{1})?>";
-        private string mylocator_pattern = @"<my_gridsquare:(\d{1,2})(?::[a-z]{1})?>";
-        private string prop_mode_pattern = @"<prop_mode:(\d{1,2})(?::[a-z]{1})?>";
-        private string sat_name_pattern = @"<sat_name:(\d{1,2})(?::[a-z]{1})?>";
-        private string soapbox_pattern = @"<soapbox:(\d{1,2})(?::[a-z]{1})?>";
+        private string mycall_pattern = @"<station_callsign:(\d{1,4})(?::[a-z]{1})?>";
+        private string operator_call_pattern = @"<operator:(\d{1,4})(?::[a-z]{1})?>";
+        private string rst_rcvd_pattern = @"<rst_rcvd:(\d{1,4})(?::[a-z]{1})?>";
+        private string rst_sent_pattern = @"<rst_sent:(\d{1,4})(?::[a-z]{1})?>";
+        private string dxcall_pattern = @"<call:(\d{1,4})(?::[a-z]{1})?>";
+        private string date_pattern = @"<qso_date:(\d{1,4})(?::[a-z]{1})?>";
+        private string time_pattern = @"<time_on:(\d{1,4})(?::[a-z]{1})?>";
+        private string band_pattern = @"<band:(\d{1,4})(?::[a-z]{1})?>";
+        private string mode_pattern = @"<mode:(\d{1,4})(?::[a-z]{1})?>";
+        private string submode_pattern = @"<submode:(\d{1,4})(?::[a-z]{1})?>";
+        private string commant_pattern = @"<comment:(\d{1,4})(?::[a-z]{1})?>";
+        private string dxcc_pattern = @"<dxcc:(\d{1,4})(?::[a-z]{1})?>";
+        private string freq_pattern = @"<freq:(\d{1,4})(?::[a-z]{1})?>";
+        private string srx_pattern = @"<srx_string:(\d{1,4})(?::[a-z]{1})?>";
+        private string stx_pattern = @"<stx_string:(\d{1,4})(?::[a-z]{1})?>";
+        private string srx_short_pattern = @"<srx:(\d{1,4})(?::[a-z]{1})?>";
+        private string stx_short_pattern = @"<stx:(\d{1,4})(?::[a-z]{1})?>";
+        private string name_pattern = @"<name:(\d{1,4})(?::[a-z]{1})?>";
+        private string country_pattern = @"<country:(\d{1,4})(?::[a-z]{1})?>";
+        private string dxlocator_pattern = @"<gridsquare:(\d{1,4})(?::[a-z]{1})?>";
+        private string mylocator_pattern = @"<my_gridsquare:(\d{1,4})(?::[a-z]{1})?>";
+        private string prop_mode_pattern = @"<prop_mode:(\d{1,4})(?::[a-z]{1})?>";
+        private string sat_name_pattern = @"<sat_name:(\d{1,4})(?::[a-z]{1})?>";
+        private string soapbox_pattern = @"<soapbox:(\d{1,4})(?::[a-z]{1})?>";
 
         public HolyLogParser() : this("", Operator.Israeli)
         {

@@ -742,7 +742,7 @@
                            HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="#0E3F6E"
                            Margin="0,0,0,8" IsHitTestVisible="False"/>
                 <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center" Source="Images/spinner2.gif" Height="44" Width="44" Visibility="Hidden" IsHitTestVisible="False"/>
-                <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Center" Margin="0,8,0,0" MinWidth="180" Height="34" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="#0E3F6E" Background="Transparent" Visibility="Hidden" IsHitTestVisible="False"/>
+                <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Center" Margin="0,8,0,0" MinWidth="180" Padding="4,4,4,6" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="#0E3F6E" Background="Transparent" Visibility="Hidden" IsHitTestVisible="False"/>
             </StackPanel>
         </Border>
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>

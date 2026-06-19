@@ -19,6 +19,8 @@ namespace HolyLogger.OptionsUserControls
             TB_TqslPath.Text = Properties.Settings.Default.LotwTqslPath ?? string.Empty;
             TB_StationLocation.Text = Properties.Settings.Default.LotwStationLocation ?? string.Empty;
             PB_Password.Password = Properties.Settings.Default.LotwTqslPassword ?? string.Empty;
+            TB_WebUser.Text = Properties.Settings.Default.LotwWebUser ?? string.Empty;
+            PB_WebPassword.Password = Properties.Settings.Default.LotwWebPassword ?? string.Empty;
             DP_FromDate.SelectedDate = DateTime.Today;
             _loading = false;
         }
@@ -42,6 +44,20 @@ namespace HolyLogger.OptionsUserControls
         {
             if (_loading) return;
             Properties.Settings.Default.LotwTqslPassword = PB_Password.Password;
+            Properties.Settings.Default.Save();
+        }
+
+        private void TB_WebUser_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_loading) return;
+            Properties.Settings.Default.LotwWebUser = TB_WebUser.Text.Trim();
+            Properties.Settings.Default.Save();
+        }
+
+        private void PB_WebPassword_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_loading) return;
+            Properties.Settings.Default.LotwWebPassword = PB_WebPassword.Password;
             Properties.Settings.Default.Save();
         }
 

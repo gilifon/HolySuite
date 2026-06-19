@@ -6,7 +6,9 @@ using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 
@@ -367,6 +369,153 @@ namespace HolyLogger
                 MessageBox.Show($"eQSL fill failed: {ex.Message}", "Error",
                                 MessageBoxButton.OK, MessageBoxImage.Warning);
             }
+        }
+
+        // ── LoTW fill ──────────────────────────────────────────────────────────
+
+        private async void BTN_CheckLotw_Click(object sender, RoutedEventArgs e)
+        {
+            string user = Properties.Settings.Default.LotwWebUser?.Trim();
+            string pass = Properties.Settings.Default.LotwWebPassword;
+
+            if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
+            {
+                var result = MessageBox.Show(
+                    "LoTW web login credentials are not set.\n\nClick OK to open Options → LoTW and enter them now.",
+                    "LoTW Login Missing", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
+                if (result == MessageBoxResult.OK)
+                {
+                    var opts = new OptionsWindow();
+                    opts.LotwControlInstance.Dal = _dal;
+                    opts.Owner = this;
+                    opts.LotwItem.IsSelected = true;
+                    opts.ShowDialog();
+                }
+                return;
+            }
+
+            BTN_CheckLotw.IsEnabled = false;
+            TB_SaveStatus.Text = "Downloading from LoTW…";
+            TB_SaveStatus.Foreground = System.Windows.Media.Brushes.DarkBlue;
+            TB_SaveStatus.Visibility = Visibility.Visible;
+
+            try
+            {
+                string url = $"https://lotw.arrl.org/lotwuser/lotwreport.adi" +
+                             $"?login={Uri.EscapeDataString(user)}" +
+                             $"&password={Uri.EscapeDataString(pass)}" +
+                             $"&qso_query=1&qso_qsl=yes";
+
+                string adif;
+                using (var http = new System.Net.Http.HttpClient())
+                {
+                    http.Timeout = TimeSpan.FromSeconds(60);
+                    adif = await http.GetStringAsync(url);
+                }
+
+                if (adif.Contains("Invalid password") || adif.Contains("login incorrect") ||
+                    adif.Contains("<Error>"))
+                {
+                    TB_SaveStatus.Text = "LoTW rejected the login — check your username and password.";
+                    TB_SaveStatus.Foreground = System.Windows.Media.Brushes.DarkRed;
+                    return;
+                }
+
+                var lotwRecords = ParseAdifString(adif);
+
+                // Build lookup: "CALL_UPPER|YYYYMMDD" → list of (time HHMM, band, mode)
+                var lookup = new Dictionary<string, List<(string Time, string Band, string Mode)>>(StringComparer.OrdinalIgnoreCase);
+                foreach (var rec in lotwRecords)
+                {
+                    if (!rec.TryGetValue("CALL", out string call) || string.IsNullOrEmpty(call)) continue;
+                    if (!rec.TryGetValue("QSO_DATE", out string date) || string.IsNullOrEmpty(date)) continue;
+                    rec.TryGetValue("TIME_ON", out string time);
+                    rec.TryGetValue("BAND", out string band);
+                    rec.TryGetValue("MODE", out string mode);
+
+                    string key = call.ToUpper() + "|" + date;
+                    if (!lookup.ContainsKey(key))
+                        lookup[key] = new List<(string, string, string)>();
+                    lookup[key].Add((time ?? "", band ?? "", mode ?? ""));
+                }
+
+                int filled = 0;
+                foreach (var row in _rows.Where(r => !r.IsHintRow && r.HasProblem))
+                {
+                    string key = row.DXCall.ToUpper() + "|" + row.Date;
+                    if (!lookup.TryGetValue(key, out var candidates)) continue;
+
+                    (string Time, string Band, string Mode)? match = null;
+                    foreach (var c in candidates)
+                    {
+                        if (EqslTimesMatch(row.Time, c.Time)) { match = c; break; }
+                    }
+                    if (match == null) continue;
+
+                    if (row.HasBandProblem && !string.IsNullOrEmpty(match.Value.Band))
+                        row.Band = match.Value.Band.ToUpper();
+                    if (row.HasModeProblem && !string.IsNullOrEmpty(match.Value.Mode))
+                        row.Mode = match.Value.Mode.ToUpper();
+
+                    filled++;
+                }
+
+                TB_SaveStatus.Text = filled > 0
+                    ? $"{filled} QSO{(filled == 1 ? "" : "s")} filled from LoTW — review then click Update My Log."
+                    : "No matching LoTW records found for the problem QSOs.";
+                TB_SaveStatus.Foreground = filled > 0
+                    ? System.Windows.Media.Brushes.DarkGreen
+                    : System.Windows.Media.Brushes.DarkOrange;
+            }
+            catch (Exception ex)
+            {
+                TB_SaveStatus.Text = $"LoTW download failed: {ex.Message}";
+                TB_SaveStatus.Foreground = System.Windows.Media.Brushes.DarkRed;
+            }
+            finally
+            {
+                BTN_CheckLotw.IsEnabled = true;
+            }
+        }
+
+        // Parses an ADIF string (already loaded into memory) instead of a file.
+        private static List<Dictionary<string, string>> ParseAdifString(string text)
+        {
+            var records = new List<Dictionary<string, string>>();
+
+            int eoh = text.IndexOf("<EOH>", StringComparison.OrdinalIgnoreCase);
+            if (eoh >= 0) text = text.Substring(eoh + 5);
+
+            int pos = 0;
+            while (pos < text.Length)
+            {
+                var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                while (pos < text.Length)
+                {
+                    int lt = text.IndexOf('<', pos);
+                    if (lt < 0) { pos = text.Length; break; }
+                    int gt = text.IndexOf('>', lt + 1);
+                    if (gt < 0) { pos = text.Length; break; }
+
+                    string tag = text.Substring(lt + 1, gt - lt - 1);
+                    string[] parts = tag.Split(':');
+                    string fieldName = parts[0].Trim().ToUpper();
+
+                    if (fieldName == "EOR") { pos = gt + 1; break; }
+                    if (fieldName == "EOH") { pos = gt + 1; continue; }
+
+                    if (parts.Length >= 2 && int.TryParse(parts[1], out int len) && len >= 0)
+                    {
+                        int start = gt + 1;
+                        int end = Math.Min(start + len, text.Length);
+                        dict[fieldName] = text.Substring(start, end - start).Trim();
+                        pos = end;
+                    }
+                    else { pos = gt + 1; }
+                }
+                if (dict.Count > 0) records.Add(dict);
+            }
+            return records;
         }
 
         // Parses an ADIF file and returns each record as a case-insensitive field dictionary.

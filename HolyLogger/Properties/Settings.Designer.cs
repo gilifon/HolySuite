@@ -1835,5 +1835,29 @@ namespace HolyLogger.Properties {
                 this["LotwTqslPassword"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwWebUser {
+            get {
+                return ((string)(this["LotwWebUser"]));
+            }
+            set {
+                this["LotwWebUser"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwWebPassword {
+            get {
+                return ((string)(this["LotwWebPassword"]));
+            }
+            set {
+                this["LotwWebPassword"] = value;
+            }
+        }
     }
 }

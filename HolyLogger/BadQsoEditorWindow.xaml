@@ -145,7 +145,15 @@
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
                     <Button x:Name="BTN_ExportCsv" Content="Save to File…" Width="125" FontSize="13"
                             Padding="8,4" Margin="0,0,5,0" Click="BTN_ExportCsv_Click"
-                            ToolTip="Export all problem QSOs to a CSV file for editing in Excel"/>
+                            ToolTip="Export all problem QSOs to ADIF, CSV or TXT for external editing"/>
+                    <Button x:Name="BTN_CheckLotw" Content="Check in LoTW" Width="130" FontSize="13"
+                            Padding="8,4" Click="BTN_CheckLotw_Click">
+                        <Button.ToolTip>
+                            <ToolTip>
+                                <TextBlock>Downloads your confirmed QSOs from LoTW and fills<LineBreak/>missing Band / Mode for any matching problem QSO.<LineBreak/>Requires LoTW Web Login credentials in Options → LoTW.</TextBlock>
+                            </ToolTip>
+                        </Button.ToolTip>
+                    </Button>
                 </StackPanel>
                 <!-- Save / Close on the right -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
