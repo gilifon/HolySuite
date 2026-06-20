@@ -338,7 +338,7 @@ namespace HolyLogger
 
         BackgroundWorker AdifHandlerWorker;
         private bool _isShutdownCleanupDone = false;
-        private bool _lotwExitHandled = false;   // guards the upload-on-exit pass in Window_Closing
+        private bool _uploadOnExitHandled = false; // guards the single upload-on-exit pass in Window_Closing
         // UNUSED: BackgroundWorker for entire log QRZ processing was disabled.
         // Left commented for future reference if batch QRZ processing is needed:
         // BackgroundWorker EntireLogQrzWorker;
@@ -656,6 +656,7 @@ namespace HolyLogger
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
             UpdateLotwMenuCount();
+            UpdateQrzMenuCount();
             LastQSO = Qsos.FirstOrDefault();
             ApplyDefaultLogSort();
 
@@ -1161,8 +1162,9 @@ namespace HolyLogger
             // eQSL table). Nothing is sent automatically here.
             UpdateEqslQueueIndicator();
 
-            // QRZ Logbook: silently retry any QSOs that could not be pushed earlier (e.g. logged while
-            // offline). No-op unless the feature is enabled and an API key is configured.
+            // QRZ Logbook: show pending count and silently retry any QSOs that could not be pushed
+            // earlier (e.g. logged while offline).
+            UpdateQrzMenuCount();
             _ = PumpQrzQueue();
 
             // Initialize RST fields based on the selected mode after window is fully loaded
@@ -1248,6 +1250,7 @@ namespace HolyLogger
             {
                 Helper.SendHeartbeat(MachineName, TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), TB_Frequency.Text.Trim(), CB_Mode.Text.Trim(), Properties.Settings.Default.ShowOnTheAir); //1000->seconds 60->minute 5->minutes
             }
+
         }
 
 
@@ -1262,6 +1265,7 @@ namespace HolyLogger
                 }
                 UpdateNumOfQSOs();
                 UpdateLotwMenuCount();
+                UpdateQrzMenuCount();
 
                 // A deleted QSO is gone from the DB, so it drops out of the eQSL waiting list —
                 // refresh the "!" badge / menu count (and any open queue window) right away.
@@ -1292,6 +1296,7 @@ namespace HolyLogger
                     AddWorkedCountryAndRefreshCluster(qso.DXCall);
                 }
                 UpdateLotwMenuCount();
+                UpdateQrzMenuCount();
             }
 
             if (clusterVisibleSpots != null)
@@ -2429,16 +2434,22 @@ namespace HolyLogger
         // and leaves anything that can't be confirmed sent as pending so nothing is ever lost. Called
         // only from the queue window's "Send" button. Returns the number of QSOs successfully uploaded
         // in this pass. Must run on the UI thread (touches DB + UI).
-        private async System.Threading.Tasks.Task<int> PumpEqslQueue()
+        private async System.Threading.Tasks.Task<int> PumpEqslQueue(bool force = false, UploadProgressWindow progressWindow = null)
         {
             if (dal == null) return 0;
 
-            if (!await _eqslPumpLock.WaitAsync(0)) return 0;
+            // On a forced exit-upload, wait up to 30 s for any concurrent pump to finish rather
+            // than silently skipping. For normal fire-and-forget calls, give up immediately.
+            var timeout = force ? TimeSpan.FromSeconds(30) : TimeSpan.Zero;
+            if (!await _eqslPumpLock.WaitAsync(timeout)) return 0;
             try
             {
                 // Only QSOs whose callsign has an account come back here.
                 System.Collections.Generic.List<QSO> pending = dal.GetPendingEqslQsos();
                 int sentCount = 0;
+
+                if (progressWindow != null && pending.Count > 0)
+                    progressWindow.StartService("eQSL", pending.Count);
 
                 // Load the accounts once into a callsign-keyed map (case-insensitive, matching the DB
                 // NOCASE collation) instead of querying GetEqslAccount per QSO.
@@ -2476,10 +2487,12 @@ namespace HolyLogger
                     {
                         dal.SetEqslStatus(qso.id, 1);
                         sentCount++;
+                        progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, true);
                     }
                     else if (outcome == 2)   // permanently rejected (bad record) - skip so it can't block the queue
                     {
                         dal.SetEqslStatus(qso.id, 2);
+                        progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
                     }
                     // outcome 0 (unrecognized reply, e.g. one account's auth failed) -> leave this QSO
                     // pending and move on to the next, so one bad account can't block the others.
@@ -2575,8 +2588,10 @@ namespace HolyLogger
                 if (qso == null || dal == null) return;
                 if (!QrzPushEnabled) return;
 
-                // If a push pass is already running, leave this QSO pending; it gets picked up later.
-                if (!await _qrzPumpLock.WaitAsync(0)) return;
+                // Wait for any concurrent pump to finish (e.g. the startup retry pass).
+                // Using a timeout instead of WaitAsync(0) so a just-saved QSO is not silently
+                // skipped when the startup pump is still holding the lock.
+                if (!await _qrzPumpLock.WaitAsync(TimeSpan.FromSeconds(30))) return;
                 try
                 {
                     string key = Properties.Settings.Default.qrz_api_key.Trim();
@@ -2592,6 +2607,7 @@ namespace HolyLogger
                 {
                     _qrzPumpLock.Release();
                 }
+                UpdateQrzMenuCount();
             }
             catch
             {
@@ -2603,18 +2619,26 @@ namespace HolyLogger
         // anything that could not be pushed while offline is retried automatically. Stops on the first
         // network error (everything else stays pending); a per-record rejection is marked and skipped so
         // one bad record can't block the queue. Never throws.
-        private async System.Threading.Tasks.Task PumpQrzQueue()
+        // force=true bypasses the QrzPushEnabled guard — used by the on-exit upload when the user
+        // explicitly confirmed the upload even though real-time auto-push is turned off.
+        private async System.Threading.Tasks.Task PumpQrzQueue(bool force = false, UploadProgressWindow progressWindow = null)
         {
             try
             {
                 if (dal == null) return;
-                if (!QrzPushEnabled) return;
+                if (!force && !QrzPushEnabled) return;
 
-                if (!await _qrzPumpLock.WaitAsync(0)) return;
+                // When forced (exit-upload), wait up to 30 s for a concurrent pump to finish.
+                // For regular fire-and-forget calls give up immediately so the caller is not blocked.
+                var lockTimeout = force ? TimeSpan.FromSeconds(30) : TimeSpan.Zero;
+                if (!await _qrzPumpLock.WaitAsync(lockTimeout)) return;
                 try
                 {
                     string key = Properties.Settings.Default.qrz_api_key.Trim();
                     System.Collections.Generic.List<QSO> pending = dal.GetPendingQrzQsos();
+
+                    if (progressWindow != null && pending.Count > 0)
+                        progressWindow.StartService("QRZ Logbook", pending.Count);
 
                     foreach (var qso in pending)
                     {
@@ -2624,15 +2648,22 @@ namespace HolyLogger
                             break;   // offline -> stop; the rest stays pending for next time
 
                         if (r.Ok)
+                        {
                             dal.SetQrzStatus(qso.id, 1, r.LogId);
+                            progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, true);
+                        }
                         else if (r.IsPermanentFailure)
+                        {
                             dal.SetQrzStatus(qso.id, 2, null);
+                            progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
+                        }
                     }
                 }
                 finally
                 {
                     _qrzPumpLock.Release();
                 }
+                UpdateQrzMenuCount();
             }
             catch
             {
@@ -2661,14 +2692,12 @@ namespace HolyLogger
 
             if (SendQueueToEqslMenuItem != null)
             {
-                SendQueueToEqslMenuItem.IsEnabled = any;
-
                 // Build the header with just the word "eQSL" in bold; always append the count
                 // (including (0)) so the queue state is never ambiguous.
                 var header = new System.Windows.Controls.TextBlock();
-                header.Inlines.Add(new System.Windows.Documents.Run("Send Queue To "));
+                header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
                 header.Inlines.Add(new System.Windows.Documents.Run("eQSL") { FontWeight = System.Windows.FontWeights.Bold });
-                header.Inlines.Add(new System.Windows.Documents.Run(" (" + pending + ")"));
+                header.Inlines.Add(new System.Windows.Documents.Run("  (" + pending + ")"));
                 SendQueueToEqslMenuItem.Header = header;
             }
 
@@ -2701,10 +2730,124 @@ namespace HolyLogger
             try
             {
                 int count = dal?.GetPendingLotwQsos()?.Count ?? 0;
-                // Always show the count — including (0) — so the queue state is never ambiguous.
-                SendQueueToLotwMenuItem.Header = $"Upload Queue to LoTW  ({count})";
+                var header = new System.Windows.Controls.TextBlock();
+                header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
+                header.Inlines.Add(new System.Windows.Documents.Run("LoTW") { FontWeight = System.Windows.FontWeights.Bold });
+                header.Inlines.Add(new System.Windows.Documents.Run("  (" + count + ")"));
+                SendQueueToLotwMenuItem.Header = header;
             }
             catch { }
+        }
+
+        private void UpdateQrzMenuCount()
+        {
+            try
+            {
+                int count = dal?.GetPendingQrzCount() ?? 0;
+                var header = new System.Windows.Controls.TextBlock();
+                header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
+                header.Inlines.Add(new System.Windows.Documents.Run("QRZ") { FontWeight = System.Windows.FontWeights.Bold });
+                header.Inlines.Add(new System.Windows.Documents.Run(" Logbook  (" + count + ")"));
+                UploadQueueToQrzMenuItem.Header = header;
+            }
+            catch { }
+        }
+
+        private async void UploadQueueToQrzMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string key = (Properties.Settings.Default.qrz_api_key ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                HolyMessageBox.ShowWarning(
+                    "QRZ Logbook API key is not configured.\nPlease enter your API key in Options → QRZ Services.",
+                    "QRZ Logbook", this);
+                return;
+            }
+
+            int before = dal?.GetPendingQrzCount() ?? 0;
+            if (before == 0)
+            {
+                HolyMessageBox.Show("The QRZ Logbook queue is empty. Nothing to upload.",
+                    "QRZ Logbook", HolyMsgType.Info, this);
+                return;
+            }
+
+            UploadQueueToQrzMenuItem.IsEnabled = false;
+            try
+            {
+                await PumpQrzQueue();
+                int after = dal?.GetPendingQrzCount() ?? 0;
+                int uploaded = before - after;
+                UpdateQrzMenuCount();
+
+                if (uploaded > 0)
+                    HolyMessageBox.ShowSuccess(
+                        $"{uploaded} QSO{(uploaded == 1 ? "" : "s")} uploaded to QRZ Logbook successfully." +
+                        (after > 0 ? $"\n{after} QSO{(after == 1 ? "" : "s")} could not be uploaded (network error or rejected)." : ""),
+                        "QRZ Logbook", this);
+                else
+                    HolyMessageBox.ShowWarning(
+                        "No QSOs were uploaded.\nCheck your internet connection and API key.",
+                        "QRZ Logbook", this);
+            }
+            finally
+            {
+                UploadQueueToQrzMenuItem.IsEnabled = true;
+            }
+        }
+
+        private void ClearLotwQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            int pending = dal?.GetPendingLotwCount() ?? 0;
+            if (pending == 0)
+            {
+                HolyMessageBox.Show("The LoTW queue is already empty.", "Clear LoTW Queue", HolyMsgType.Info, this);
+                return;
+            }
+
+            bool confirmed = HolyMessageBox.ShowConfirm(
+                $"Remove all {pending:N0} QSO(s) from the LoTW upload queue?\n\nThey will no longer be included in the next upload.",
+                "Clear LoTW Queue", HolyMsgType.Warning, this);
+            if (!confirmed) return;
+
+            dal.ClearLotwQueue();
+            UpdateLotwMenuCount();
+        }
+
+        private void ClearEqslQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            int pending = dal?.GetPendingEqslCount() ?? 0;
+            if (pending == 0)
+            {
+                HolyMessageBox.Show("The eQSL queue is already empty.", "Clear eQSL Queue", HolyMsgType.Info, this);
+                return;
+            }
+
+            bool confirmed = HolyMessageBox.ShowConfirm(
+                $"Remove all {pending:N0} QSO(s) from the eQSL upload queue?\n\nThey will no longer be included in the next upload.",
+                "Clear eQSL Queue", HolyMsgType.Warning, this);
+            if (!confirmed) return;
+
+            dal.ClearEqslQueue();
+            UpdateEqslQueueIndicator();
+        }
+
+        private void ClearQrzQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            int pending = dal?.GetPendingQrzCount() ?? 0;
+            if (pending == 0)
+            {
+                HolyMessageBox.Show("The QRZ Logbook queue is already empty.", "Clear QRZ Queue", HolyMsgType.Info, this);
+                return;
+            }
+
+            bool confirmed = HolyMessageBox.ShowConfirm(
+                $"Remove all {pending:N0} QSO(s) from the QRZ Logbook upload queue?\n\nThey will no longer be included in the next upload.",
+                "Clear QRZ Queue", HolyMsgType.Warning, this);
+            if (!confirmed) return;
+
+            dal.ClearQrzQueue();
+            UpdateQrzMenuCount();
         }
 
         private async void SendQueueToLotwMenuItem_Click(object sender, RoutedEventArgs e)
@@ -2754,12 +2897,13 @@ namespace HolyLogger
         // Core LoTW queue upload — writes the ADIF, signs+uploads via TQSL, clears the queue on
         // success and reports the result. Shared by the "Upload Queue to LoTW" menu command and the
         // upload-on-exit feature.
-        private async Task UploadLotwQueueCoreAsync(List<QSO> pending, string tqslPath, string location, string password)
+        private async Task UploadLotwQueueCoreAsync(List<QSO> pending, string tqslPath, string location, string password, UploadProgressWindow progressWindow = null)
         {
             string adiPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "holylogger_lotw.adi");
             UploadProgressTitle = "LoTW Upload";
             UploadProgress = $"Preparing QSO 0 / {pending.Count:N0}";
-            ToggleUploadProgress(Visibility.Visible);
+            if (progressWindow == null) ToggleUploadProgress(Visibility.Visible);
+            else progressWindow.StartService("LoTW", pending.Count);
             var lotwProgress = new Progress<string>(msg => UploadProgress = msg);
             try
             {
@@ -2769,7 +2913,7 @@ namespace HolyLogger
                 UploadProgress = $"Signing QSO 0 / {toSign:N0}";
                 var result = await LotwUploader.SignAndUploadAsync(
                     tqslPath, location, password, adiPath, lotwProgress, toSign);
-                ToggleUploadProgress(Visibility.Hidden);
+                if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
 
                 // Always save TQSL's full report so the actual outcome can be inspected.
                 string reportPath = System.IO.Path.Combine(
@@ -2791,11 +2935,14 @@ namespace HolyLogger
                 {
                     // TQSL found no QSOs to process — something is off; leave the queue untouched.
                     UpdateLotwMenuCount();
-                    System.Windows.MessageBox.Show(
-                        "TQSL did not process any QSOs.\n\n" +
-                        "The queue was left unchanged. The full TQSL report was saved to " +
-                        "lotw_last_upload.txt on your Desktop.",
-                        "LoTW Upload", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    if (progressWindow != null)
+                        progressWindow.ReportBatchResult("TQSL found no QSOs to process — queue unchanged", false);
+                    else
+                        HolyMessageBox.ShowWarning(
+                            "TQSL did not process any QSOs.\n\n" +
+                            "The queue was left unchanged. The full TQSL report was saved to " +
+                            "lotw_last_upload.txt on your Desktop.",
+                            "LoTW Upload", this);
                 }
                 else
                 {
@@ -2808,22 +2955,34 @@ namespace HolyLogger
                     }
                     UpdateLotwMenuCount();
                     int handled = pending.Count - skippedNoBand;
-                    var sb = new System.Text.StringBuilder();
-                    if (result.NothingUploaded)
-                        sb.AppendLine($"All {handled:N0} QSO(s) are already in LoTW (detected as duplicates).\n\nThey have been cleared from the upload queue.");
+                    if (progressWindow != null)
+                    {
+                        string resultLine = result.NothingUploaded
+                            ? $"All {handled:N0} QSO(s) already in LoTW (duplicates — queue cleared)"
+                            : $"{handled:N0} QSO(s) uploaded to LoTW";
+                        if (skippedNoBand > 0)
+                            resultLine += $" ({skippedNoBand:N0} skipped — no band/frequency)";
+                        progressWindow.ReportBatchResult(resultLine, true);
+                    }
                     else
-                        sb.AppendLine($"Successfully uploaded {handled:N0} QSO(s) to LoTW.");
-                    if (skippedNoBand > 0)
-                        sb.AppendLine($"\n{skippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
-                    sb.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
-                    System.Windows.MessageBox.Show(
-                        sb.ToString().TrimEnd(),
-                        "LoTW Upload", MessageBoxButton.OK, MessageBoxImage.Information);
+                    {
+                        var sb = new System.Text.StringBuilder();
+                        if (result.NothingUploaded)
+                            sb.AppendLine($"All {handled:N0} QSO(s) are already in LoTW (detected as duplicates).\n\nThey have been cleared from the upload queue.");
+                        else
+                            sb.AppendLine($"Successfully uploaded {handled:N0} QSO(s) to LoTW.");
+                        if (skippedNoBand > 0)
+                            sb.AppendLine($"\n{skippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
+                        sb.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
+                        HolyMessageBox.ShowSuccess(
+                            sb.ToString().TrimEnd(),
+                            "LoTW Upload", this);
+                    }
                 }
             }
             catch (Exception ex)
             {
-                ToggleUploadProgress(Visibility.Hidden);
+                if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
                 try
                 {
                     string logPath = System.IO.Path.Combine(
@@ -2835,10 +2994,13 @@ namespace HolyLogger
                         System.Text.Encoding.UTF8);
                 }
                 catch { }
-                System.Windows.MessageBox.Show(
-                    "LoTW upload failed:\n\n" + ex.Message +
-                    "\n\nDetails written to lotw_upload_error.txt on your Desktop.",
-                    "LoTW Upload Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+                if (progressWindow != null)
+                    progressWindow.ReportBatchResult($"Upload failed: {ex.Message}", false);
+                else
+                    HolyMessageBox.ShowError(
+                        "LoTW upload failed:\n\n" + ex.Message +
+                        "\n\nDetails written to lotw_upload_error.txt on your Desktop.",
+                        "LoTW Upload Failed", this);
             }
             finally
             {
@@ -2957,7 +3119,7 @@ namespace HolyLogger
         private void DeleteQsoFromContextMenu(QSO qso)
         {
             if (qso == null) return;
-            if (System.Windows.MessageBox.Show("Are you sure you want to delete this QSO?\n\n" + (qso.DXCall ?? string.Empty), "Delete Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            if (!HolyMessageBox.ShowConfirm("Are you sure you want to delete this QSO?\n\n" + (qso.DXCall ?? string.Empty), "Delete Confirmation", HolyMsgType.Warning, this))
                 return;
 
             // Remove from the filtered view (if present) so the grid updates immediately,
@@ -4096,6 +4258,7 @@ namespace HolyLogger
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
             UpdateEqslQueueIndicator();
+            UpdateQrzMenuCount();
             return true;
         }
 
@@ -4142,6 +4305,7 @@ namespace HolyLogger
             ToggleUploadProgress(Visibility.Hidden);
             UpdateNumOfQSOs();
             UpdateLotwMenuCount();
+            UpdateQrzMenuCount();
 
             if (result.FaultyQso > 0)
             {
@@ -5124,15 +5288,97 @@ namespace HolyLogger
             if (_isShutdownCleanupDone)
                 return;
 
-            // Upload-on-exit: when enabled and the LoTW queue is not empty, handle the upload
-            // before the normal shutdown. It is async, so cancel this close, run it, then close
-            // again (by then _lotwExitHandled is set so we fall through to the real shutdown).
-            if (!_lotwExitHandled)
+            // Upload-on-exit: show ALL service dialogs in one pass before any uploading starts,
+            // so we never call Close() from inside an async upload (which caused freezes when the
+            // second/third dialog tried to show while the main window was already half-destroyed).
+            // A single UploadAllAndCloseAsync call does all uploads, then calls Close() exactly once.
+            if (!_uploadOnExitHandled)
             {
-                _lotwExitHandled = true;
-                if (TryStartLotwUploadOnExit())
+                _uploadOnExitHandled = true;
+
+                List<QSO> lotwToUpload = null;
+                bool uploadEqsl = false;
+                bool uploadQrz = false;
+
+                // ── LoTW ─────────────────────────────────────────────────────────────────────
+                int lotwMode = Properties.Settings.Default.LotwUploadOnExitMode;
+                if (lotwMode != 0)
+                {
+                    List<QSO> lotwPending = null;
+                    try { lotwPending = dal?.GetPendingLotwQsos(); } catch { }
+                    if (lotwPending != null && lotwPending.Count > 0)
+                    {
+                        bool doUpload = lotwMode == 2;
+                        if (lotwMode == 1)
+                        {
+                            var dlg = new LotwUploadOnExitDialog(lotwPending.Count) { Owner = this };
+                            dlg.ShowDialog();
+                            if (dlg.Choice == LotwExitChoice.Cancel)
+                            {
+                                _uploadOnExitHandled = false;
+                                e.Cancel = true;
+                                return;
+                            }
+                            doUpload = dlg.Choice == LotwExitChoice.Upload;
+                        }
+                        if (doUpload) lotwToUpload = lotwPending;
+                    }
+                }
+
+                // ── eQSL ─────────────────────────────────────────────────────────────────────
+                int eqslMode = Properties.Settings.Default.EqslUploadOnExitMode;
+                if (eqslMode != 0)
+                {
+                    int eqslPending = 0;
+                    try { eqslPending = dal?.GetPendingEqslCount() ?? 0; } catch { }
+                    if (eqslPending > 0)
+                    {
+                        bool doUpload = eqslMode == 2;
+                        if (eqslMode == 1)
+                        {
+                            var dlg = new ServiceUploadOnExitDialog("eQSL", eqslPending) { Owner = this };
+                            dlg.ShowDialog();
+                            if (dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Cancel)
+                            {
+                                _uploadOnExitHandled = false;
+                                e.Cancel = true;
+                                return;
+                            }
+                            doUpload = dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Yes;
+                        }
+                        uploadEqsl = doUpload;
+                    }
+                }
+
+                // ── QRZ ──────────────────────────────────────────────────────────────────────
+                int qrzMode = Properties.Settings.Default.QrzUploadOnExitMode;
+                if (qrzMode != 0)
+                {
+                    int qrzPending = 0;
+                    try { qrzPending = dal?.GetPendingQrzCount() ?? 0; } catch { }
+                    if (qrzPending > 0)
+                    {
+                        bool doUpload = qrzMode == 2;
+                        if (qrzMode == 1)
+                        {
+                            var dlg = new ServiceUploadOnExitDialog("QRZ Logbook", qrzPending) { Owner = this };
+                            dlg.ShowDialog();
+                            if (dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Cancel)
+                            {
+                                _uploadOnExitHandled = false;
+                                e.Cancel = true;
+                                return;
+                            }
+                            doUpload = dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Yes;
+                        }
+                        uploadQrz = doUpload;
+                    }
+                }
+
+                if (lotwToUpload != null || uploadEqsl || uploadQrz)
                 {
                     e.Cancel = true;
+                    UploadAllAndCloseAsync(lotwToUpload, uploadEqsl, uploadQrz);
                     return;
                 }
             }
@@ -5186,69 +5432,62 @@ namespace HolyLogger
             try { MapControl.SpotHoverEnded -= OnMapSpotHoverEnded; } catch { }
         }
 
-        // Returns true if an upload-on-exit pass was started (caller should cancel the close;
-        // the async handler will close the window when it finishes). Returns false if there is
-        // nothing to do, so the normal shutdown can proceed immediately.
-        private bool TryStartLotwUploadOnExit()
+        // Uploads any confirmed services in sequence, showing per-QSO progress, then closes exactly once.
+        // All confirmation dialogs were already shown in Window_Closing before this is called.
+        private async void UploadAllAndCloseAsync(List<QSO> lotwPending, bool uploadEqsl, bool uploadQrz)
         {
-            int mode = Properties.Settings.Default.LotwUploadOnExitMode;
-            if (mode == 0) return false;   // feature off
+            this.IsEnabled = false;
 
-            List<QSO> pending = null;
-            try { pending = dal?.GetPendingLotwQsos(); } catch { }
-            if (pending == null || pending.Count == 0) return false;   // nothing queued
+            var progressWindow = new UploadProgressWindow { Owner = this };
+            progressWindow.Show();
 
-            HandleLotwUploadOnExitAsync(pending, mode);
-            return true;
-        }
-
-        private async void HandleLotwUploadOnExitAsync(List<QSO> pending, int mode)
-        {
-            string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
-            string location = Properties.Settings.Default.LotwStationLocation?.Trim();
-            string password = Properties.Settings.Default.LotwTqslPassword;
-
-            // Ask mode: confirm first. Cancel keeps the program open; No exits without uploading.
-            if (mode == 1)
-            {
-                var r = System.Windows.MessageBox.Show(
-                    $"You have {pending.Count:N0} QSO(s) waiting to be uploaded to LoTW.\n\nUpload them now before exiting?",
-                    "LoTW Upload on Exit", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-                if (r == MessageBoxResult.Cancel)
-                {
-                    _lotwExitHandled = false;   // user aborted the exit — re-ask next time
-                    return;                     // leave the window open
-                }
-                if (r == MessageBoxResult.No)
-                {
-                    this.Close();               // exit without uploading
-                    return;
-                }
-                // Yes -> fall through and upload
-            }
-
-            // We intend to upload (always mode, or ask -> Yes). Both internet and a configured
-            // TQSL are required; otherwise inform the user and leave the queue for next time.
-            bool tqslConfigured = !string.IsNullOrWhiteSpace(tqslPath) && System.IO.File.Exists(tqslPath)
-                                  && !string.IsNullOrWhiteSpace(location);
             bool online = false;
             try { online = Helper.CheckForInternetConnection(); } catch { }
 
-            if (!online || !tqslConfigured)
+            if (lotwPending != null)
             {
-                string why = !online
-                    ? "there is no internet connection"
-                    : "LoTW/TQSL is not fully configured (set the TQSL path and station location in Options → LoTW)";
-                System.Windows.MessageBox.Show(
-                    $"{pending.Count:N0} QSO(s) are still waiting for LoTW, but they were not uploaded because {why}.\n\n" +
-                    "They remain in the queue and will be uploaded next time.",
-                    "LoTW Upload Skipped", MessageBoxButton.OK, MessageBoxImage.Information);
-                this.Close();
-                return;
+                string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
+                string location = Properties.Settings.Default.LotwStationLocation?.Trim();
+                string password = Properties.Settings.Default.LotwTqslPassword;
+                bool tqslConfigured = !string.IsNullOrWhiteSpace(tqslPath) && System.IO.File.Exists(tqslPath)
+                                      && !string.IsNullOrWhiteSpace(location);
+                if (!online || !tqslConfigured)
+                {
+                    string why = !online ? "no internet connection"
+                        : "TQSL not configured (set path and location in Options → LoTW)";
+                    progressWindow.SkipService("LoTW", $"{lotwPending.Count:N0} QSO(s) — {why}");
+                }
+                else
+                {
+                    try { await UploadLotwQueueCoreAsync(lotwPending, tqslPath, location, password, progressWindow); } catch { }
+                }
             }
 
-            try { await UploadLotwQueueCoreAsync(pending, tqslPath, location, password); }
-            catch { }
+            if (uploadEqsl)
+            {
+                if (!online)
+                    progressWindow.SkipService("eQSL", "no internet connection — QSOs remain in queue");
+                else
+                    try { await PumpEqslQueue(force: true, progressWindow); } catch { }
+            }
+
+            if (uploadQrz)
+            {
+                bool qrzConfigured = Properties.Settings.Default.qrz_logbook_key_valid
+                                     && !string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_api_key);
+                if (!online || !qrzConfigured)
+                {
+                    string why = !online ? "no internet connection"
+                        : "API key not configured (set it in Options → QRZ)";
+                    progressWindow.SkipService("QRZ Logbook", $"{why} — QSOs remain in queue");
+                }
+                else
+                    try { await PumpQrzQueue(force: true, progressWindow); } catch { }
+            }
+
+            progressWindow.ShowComplete();
+            await progressWindow.WaitForOkAsync();
+
             this.Close();
         }
 
@@ -5508,6 +5747,7 @@ namespace HolyLogger
                     ClearBtn_Click(null, null);
                     UpdateNumOfQSOs();
                     UpdateEqslQueueIndicator();
+                    UpdateQrzMenuCount();
                 }
             }
             else
@@ -5635,17 +5875,33 @@ namespace HolyLogger
         {
             options = new OptionsWindow();
             options.Closed += Options_Closed;
-            options.Left = Properties.Settings.Default.OptionsWindowLeft < 0 ? 0 : Properties.Settings.Default.OptionsWindowLeft;
-            options.Top = Properties.Settings.Default.OptionsWindowTop < 0 ? 0 : Properties.Settings.Default.OptionsWindowTop;
-            options.Width = Properties.Settings.Default.OptionsWindowWidth;
-            options.Height = Properties.Settings.Default.OptionsWindowHeight;
+
+            double savedLeft = Properties.Settings.Default.OptionsWindowLeft;
+            double savedTop  = Properties.Settings.Default.OptionsWindowTop;
+
+            if (savedLeft <= 0 && savedTop <= 0)
+            {
+                options.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            }
+            else
+            {
+                // Use the screen that contains the saved position (multi-monitor aware).
+                var screen = System.Windows.Forms.Screen.FromPoint(
+                    new System.Drawing.Point((int)savedLeft, (int)savedTop));
+                var wa = screen.WorkingArea;
+                options.Left = Math.Max(wa.Left, Math.Min(savedLeft, wa.Right  - options.Width));
+                options.Top  = Math.Max(wa.Top,  Math.Min(savedTop,  wa.Bottom - options.Height));
+            }
 
             // Subscribe to graphics box mode changes for immediate refresh
             options.UserInterfaceControlInstance.GraphicsBoxModeChanged += UserInterfaceControl_GraphicsBoxModeChanged;
             // Refresh the QRZ icon as soon as the user tests the connection in QRZ Service options.
-            options.QRZServiceControlInstance.ConnectionTested += QRZServiceControl_ConnectionTested;
+            options.QRZServicesControlInstance.ConnectionTested += QRZServiceControl_ConnectionTested;
             // Give the LoTW control access to the database so it can reset the upload queue.
             options.LotwControlInstance.Dal = dal;
+            options.LotwControlInstance.LotwQueueChanged += UpdateLotwMenuCount;
+            options.EqslServiceControlInstance.EqslQueueChanged += UpdateEqslQueueIndicator;
+            options.QRZServicesControlInstance.QrzQueueChanged += UpdateQrzMenuCount;
 
             options.Show();
         }
@@ -5668,7 +5924,7 @@ namespace HolyLogger
         private async void Options_Closed(object sender, EventArgs e)
         {
             OptionsWindow optionWindow = (OptionsWindow)sender;
-            if(optionWindow.QRZServiceControlInstance.HasChanged)
+            if(optionWindow.QRZServicesControlInstance.HasChanged)
             {
                 _SessionKey = isNetworkAvailable ? await Helper.LoginToQRZAsync() : "";
                 // Refresh the QRZ icon to reflect the (possibly corrected) credentials.
@@ -5757,6 +6013,12 @@ namespace HolyLogger
             // badge so QSOs whose callsign just became listed show up (or removed ones disappear)
             // immediately, without waiting for the next refresh.
             UpdateEqslQueueIndicator();
+            UpdateQrzMenuCount();
+
+            // Save the window position so it reopens in the same place next time.
+            Properties.Settings.Default.OptionsWindowLeft = (int)optionWindow.Left;
+            Properties.Settings.Default.OptionsWindowTop  = (int)optionWindow.Top;
+            Properties.Settings.Default.Save();
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)

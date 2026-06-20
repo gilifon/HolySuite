@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
-             mc:Ignorable="d" Height="520" Width="660">
+             mc:Ignorable="d" Height="680" Width="660">
     <UserControl.Resources>
         <local:PasswordMaskConverter x:Key="PwMask"/>
     </UserControl.Resources>
@@ -13,7 +13,11 @@
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -42,7 +46,7 @@
         <DataGrid x:Name="DG_Accounts" Grid.Row="3" Margin="2,0,2,0"
                   AutoGenerateColumns="False" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
-                  SelectionUnit="FullRow" FontSize="14"
+                  SelectionUnit="FullRow" FontSize="14" Height="148"
                   ScrollViewer.VerticalScrollBarVisibility="Auto"
                   CellEditEnding="DG_Accounts_CellEditEnding">
             <DataGrid.Columns>
@@ -74,10 +78,30 @@
         </DataGrid>
 
         <StackPanel Grid.Row="4" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,2,4">
+            <Button x:Name="ClearQueueBtn" Content="Clear Queue" Width="130" FontSize="15"
+                    Margin="0,0,10,0" Click="ClearQueueBtn_Click"/>
             <Button x:Name="RemoveBtn" Content="Remove selected" Width="150" FontSize="15"
                     Margin="0,0,10,0" Click="RemoveBtn_Click"/>
             <Button x:Name="TestConnectionBtn" Content="Test Connection (selected)" Width="200"
                     FontSize="15" Click="TestConnectionBtn_Click"/>
+        </StackPanel>
+
+        <!-- Separator -->
+        <Border Grid.Row="5" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,14,0,0"/>
+
+        <!-- Upload-on-exit section -->
+        <TextBlock Grid.Row="6" Text="Upload Queue on Exit" FontSize="14" FontWeight="SemiBold"
+                   Margin="2,10,0,4"/>
+        <TextBlock Grid.Row="7" Margin="2,0,8,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                   Text="When you close HolyLogger, the pending eQSL queue can be uploaded automatically — only when an internet connection is available. Choose how this should behave."/>
+        <StackPanel Grid.Row="8" Orientation="Horizontal" Margin="2,2,0,8" VerticalAlignment="Center">
+            <TextBlock Text="On exit:" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <ComboBox x:Name="CB_OnExit" Width="320" FontSize="13"
+                      SelectionChanged="CB_OnExit_Changed">
+                <ComboBoxItem Content="Do not upload on exit"/>
+                <ComboBoxItem Content="Ask me before uploading on exit"/>
+                <ComboBoxItem Content="Always upload on exit (no prompt)"/>
+            </ComboBox>
         </StackPanel>
     </Grid>
 </UserControl>

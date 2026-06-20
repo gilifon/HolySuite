@@ -891,6 +891,20 @@ namespace HolyLogger
             }
         }
 
+        // Number of QSOs with date >= fromDate (yyyyMMdd). Used to preview queue size before reset.
+        public int GetQsoCountFromDate(string fromDate)
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (var cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE date >= @d", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@d", fromDate));
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            }
+        }
+
         // Number of QSOs still waiting to be uploaded to LoTW.
         public int GetPendingLotwCount()
         {
@@ -929,6 +943,45 @@ namespace HolyLogger
                 cmd.Parameters.Add(new SQLiteParameter("@d", fromDate));
                 return cmd.ExecuteNonQuery();
             }
+            }
+        }
+
+        // Dismisses all pending QSOs from the LoTW upload queue (lotw_status 0→2). Uses status 2
+        // ("dismissed / will not upload") rather than 1 ("confirmed sent") so cleared QSOs are never
+        // falsely counted as having been uploaded. Returns the number dismissed.
+        public int ClearLotwQueue()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 2 WHERE lotw_status = 0", con))
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
+        // Removes all pending eQSL QSOs from the upload queue (only those whose callsign has an eQSL
+        // account configured, matching the count shown in the Tools menu). Uses status 2 ("dismissed")
+        // rather than 1 ("confirmed sent"). Returns how many were cleared.
+        public int ClearEqslQueue()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand(
+                "UPDATE qso SET eqsl_status = 2 WHERE eqsl_status = 0 AND my_callsign IN (SELECT callsign FROM eqsl_accounts)", con))
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
+        // Removes all pending QRZ Logbook QSOs from the upload queue. Uses status 2 ("dismissed")
+        // rather than 1 ("confirmed sent"). Returns how many were cleared.
+        public int ClearQrzQueue()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET qrz_status = 2 WHERE qrz_status = 0", con))
+                return cmd.ExecuteNonQuery();
             }
         }
 

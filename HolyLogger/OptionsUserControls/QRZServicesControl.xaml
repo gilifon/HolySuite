@@ -1,0 +1,115 @@
+<UserControl x:Class="HolyLogger.OptionsUserControls.QRZServicesControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
+             mc:Ignorable="d" Height="680" Width="660">
+    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- ── Section 1: Callsign Lookup ─────────────────────────────── -->
+        <TextBlock Grid.Row="0" Text="QRZ Callsign Lookup" FontSize="17" FontWeight="Bold"
+                   Margin="2,4,0,4"/>
+        <TextBlock Grid.Row="1" Margin="2,0,8,10" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                   Text="Used to automatically look up callsign information (name, country, location) when logging a QSO. Requires a free QRZ.com account."/>
+
+        <Label Grid.Row="2" Content="User Name" HorizontalAlignment="Left" Margin="0,4,0,0"
+               VerticalAlignment="Top" FontSize="14"/>
+        <TextBox Grid.Row="2" x:Name="TB_UserName" HorizontalAlignment="Left" Height="26"
+                 Margin="160,6,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="280"
+                 FontSize="14" VerticalContentAlignment="Center"
+                 TextChanged="TB_UserName_TextChanged"/>
+
+        <Label Grid.Row="3" Content="Password" HorizontalAlignment="Left" Margin="0,8,0,0"
+               VerticalAlignment="Top" FontSize="14"/>
+        <PasswordBox Grid.Row="3" x:Name="TB_Password" HorizontalAlignment="Left" Height="26"
+                     Margin="160,10,0,0" VerticalAlignment="Top" Width="280" FontSize="14"
+                     VerticalContentAlignment="Center"
+                     PasswordChanged="TB_Password_PasswordChanged"/>
+
+        <Button Grid.Row="4" x:Name="TestConnectionBtn" Content="Test Connection"
+                HorizontalAlignment="Left" Margin="160,12,0,0" Width="150" FontSize="14"
+                Padding="8,4,8,4" Click="TestConnectionBtn_Click"/>
+
+        <!-- ── Separator ──────────────────────────────────────────────── -->
+        <Border Grid.Row="5" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,18,0,0"/>
+
+        <!-- ── Section 2: QRZ.com Logbook ─────────────────────────────── -->
+        <TextBlock Grid.Row="6" Text="QRZ.com Logbook" FontSize="17" FontWeight="Bold"
+                   Margin="2,14,0,4"/>
+        <TextBlock Grid.Row="7" Margin="2,0,8,10" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                   Text="Each QSO you log is uploaded to your QRZ.com online logbook the moment you save it. Requires an active QRZ XML Logbook Data Subscription and your Logbook API Key (found on your QRZ.com logbook settings page)."/>
+
+        <Label Grid.Row="8" Content="Logbook API Key" HorizontalAlignment="Left" Margin="0,4,0,0"
+               VerticalAlignment="Top" FontSize="14"/>
+        <TextBox Grid.Row="8" x:Name="TB_ApiKey" HorizontalAlignment="Left" Height="26"
+                 Margin="160,6,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="300"
+                 FontSize="14" VerticalContentAlignment="Center"
+                 TextChanged="TB_ApiKey_TextChanged"/>
+
+        <StackPanel Grid.Row="9" Orientation="Horizontal" Margin="2,10,0,0">
+            <Button x:Name="GetKeyBtn" Content="Get My QRZ API Key Automatically" FontSize="13"
+                    Padding="10,4,10,4" Click="GetKeyBtn_Click"/>
+            <Button x:Name="TestBtn" Content="Test" Width="100" FontSize="13" Margin="12,0,0,0"
+                    Padding="10,4,10,4" Click="TestBtn_Click"/>
+        </StackPanel>
+
+        <Border Grid.Row="10" x:Name="StatusBadge" Background="#E6F4EA" BorderBrush="#34A853"
+                BorderThickness="1" CornerRadius="3" Padding="8,4,8,4" HorizontalAlignment="Left"
+                Margin="2,10,0,0" Visibility="Collapsed">
+            <TextBlock x:Name="StatusText" Foreground="#1E7E34" FontSize="13" FontWeight="SemiBold"
+                       TextWrapping="Wrap"/>
+        </Border>
+
+        <CheckBox Grid.Row="11" x:Name="CB_AutoPush"
+                  Content="Automatically upload each QSO to QRZ Logbook in real time"
+                  HorizontalAlignment="Left" Margin="2,16,0,0" VerticalAlignment="Top" FontSize="15"
+                  IsEnabled="False" Checked="CB_AutoPush_Changed" Unchecked="CB_AutoPush_Changed"/>
+
+        <TextBlock Grid.Row="12" x:Name="HintText" Margin="22,4,8,0" TextWrapping="Wrap" FontSize="11"
+                   Foreground="#888888"
+                   Text="Test your API key first — this option stays disabled until a valid key passes validation."/>
+
+        <Button Grid.Row="13" x:Name="ClearQueueBtn" Content="Clear QRZ Queue"
+                HorizontalAlignment="Left" Margin="2,20,0,0" Width="160" FontSize="14"
+                Padding="8,4,8,4" Click="ClearQueueBtn_Click"/>
+
+        <!-- Separator -->
+        <Border Grid.Row="14" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,18,0,0"/>
+
+        <!-- Upload-on-exit section -->
+        <TextBlock Grid.Row="15" Text="Upload Queue on Exit" FontSize="14" FontWeight="SemiBold"
+                   Margin="2,10,0,4"/>
+        <TextBlock Grid.Row="16" Margin="2,0,8,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                   Text="When you close HolyLogger, the pending QRZ Logbook queue can be uploaded automatically — only when an internet connection is available. Choose how this should behave."/>
+        <StackPanel Grid.Row="17" Orientation="Horizontal" Margin="2,2,0,8" VerticalAlignment="Center">
+            <TextBlock Text="On exit:" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+            <ComboBox x:Name="CB_OnExit" Width="320" FontSize="13"
+                      SelectionChanged="CB_OnExit_Changed">
+                <ComboBoxItem Content="Do not upload on exit"/>
+                <ComboBoxItem Content="Ask me before uploading on exit"/>
+                <ComboBoxItem Content="Always upload on exit (no prompt)"/>
+            </ComboBox>
+        </StackPanel>
+    </Grid>
+</UserControl>

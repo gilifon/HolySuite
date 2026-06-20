@@ -211,17 +211,14 @@
     <Compile Include="OptionsUserControls\SatelliteControl.xaml.cs">
       <DependentUpon>SatelliteControl.xaml</DependentUpon>
     </Compile>
-    <Compile Include="OptionsUserControls\QRZServiceControl.xaml.cs">
-      <DependentUpon>QRZServiceControl.xaml</DependentUpon>
+    <Compile Include="OptionsUserControls\QRZServicesControl.xaml.cs">
+      <DependentUpon>QRZServicesControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="OptionsUserControls\EqslServiceControl.xaml.cs">
       <DependentUpon>EqslServiceControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="OptionsUserControls\LotwControl.xaml.cs">
       <DependentUpon>LotwControl.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="OptionsUserControls\QRZLogbookControl.xaml.cs">
-      <DependentUpon>QRZLogbookControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="OptionsUserControls\UserInterfaceControl.xaml.cs">
       <DependentUpon>UserInterfaceControl.xaml</DependentUpon>
@@ -236,6 +233,21 @@
     </Compile>
     <Compile Include="BadQsoEditorWindow.xaml.cs">
       <DependentUpon>BadQsoEditorWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="HolyMessageBox.xaml.cs">
+      <DependentUpon>HolyMessageBox.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="UploadProgressWindow.xaml.cs">
+      <DependentUpon>UploadProgressWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="LotwConfirmQueueDialog.xaml.cs">
+      <DependentUpon>LotwConfirmQueueDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="LotwUploadOnExitDialog.xaml.cs">
+      <DependentUpon>LotwUploadOnExitDialog.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ServiceUploadOnExitDialog.xaml.cs">
+      <DependentUpon>ServiceUploadOnExitDialog.xaml</DependentUpon>
     </Compile>
     <Compile Include="StatisticsWindow.xaml.cs">
       <DependentUpon>StatisticsWindow.xaml</DependentUpon>
@@ -307,7 +319,7 @@
       <Generator>MSBuild:Compile</Generator>
       <SubType>Designer</SubType>
     </Page>
-    <Page Include="OptionsUserControls\QRZServiceControl.xaml">
+    <Page Include="OptionsUserControls\QRZServicesControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -316,10 +328,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="OptionsUserControls\LotwControl.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="OptionsUserControls\QRZLogbookControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -336,6 +344,26 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="BadQsoEditorWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="HolyMessageBox.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="UploadProgressWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="LotwConfirmQueueDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="LotwUploadOnExitDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ServiceUploadOnExitDialog.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -106,6 +106,8 @@
             <DatePicker x:Name="DP_FromDate" FontSize="13" Width="140" VerticalAlignment="Center"/>
             <Button x:Name="ResetFromDateBtn" Content="Mark as Pending" Width="140" FontSize="13"
                     Margin="12,0,0,0" Padding="8,4,8,4" Click="ResetFromDateBtn_Click"/>
+            <Button x:Name="ClearQueueBtn" Content="Clear Queue" Width="120" FontSize="13"
+                    Margin="12,0,0,0" Padding="8,4,8,4" Click="ClearQueueBtn_Click"/>
             <Button x:Name="TestBtn" Content="Test TQSL" Width="100" FontSize="13"
                     Margin="20,0,0,0" Padding="8,4,8,4" Click="TestBtn_Click"/>
         </StackPanel>

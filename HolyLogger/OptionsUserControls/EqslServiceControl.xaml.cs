@@ -17,6 +17,8 @@ namespace HolyLogger.OptionsUserControls
         private bool _loading;
         public bool HasChanged { get; set; }
 
+        public event Action EqslQueueChanged;
+
         // One long-lived client for the credential test, instead of a new HttpClient per click
         // (creating one per call can exhaust sockets).
         private static readonly System.Net.Http.HttpClient _testHttp =
@@ -30,6 +32,7 @@ namespace HolyLogger.OptionsUserControls
 
             _loading = true;
             CB_AutoUpload.IsChecked = Properties.Settings.Default.EqslAutoUpload;
+            CB_OnExit.SelectedIndex = Properties.Settings.Default.EqslUploadOnExitMode;
             PasswordMaskConverter.Reveal = false;   // passwords masked by default each time the page loads
             CB_ShowPasswords.IsChecked = false;
             LoadAccounts();
@@ -58,6 +61,13 @@ namespace HolyLogger.OptionsUserControls
             Properties.Settings.Default.EqslAutoUpload = CB_AutoUpload.IsChecked == true;
             Properties.Settings.Default.Save();
             HasChanged = true;
+        }
+
+        private void CB_OnExit_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading) return;
+            Properties.Settings.Default.EqslUploadOnExitMode = CB_OnExit.SelectedIndex;
+            Properties.Settings.Default.Save();
         }
 
         private void CB_ShowPasswords_Changed(object sender, RoutedEventArgs e)
@@ -241,6 +251,29 @@ namespace HolyLogger.OptionsUserControls
             {
                 TestConnectionBtn.IsEnabled = true;
             }
+        }
+
+        private void ClearQueueBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var dal = DataAccess.GetInstance();
+            int pending = dal.GetPendingEqslCount();
+            if (pending == 0)
+            {
+                HolyMessageBox.Show("The eQSL queue is already empty.", "Clear eQSL Queue",
+                    HolyMsgType.Info, Window.GetWindow(this));
+                return;
+            }
+
+            bool confirmed = HolyMessageBox.ShowConfirm(
+                $"Remove all {pending} QSO(s) from the eQSL upload queue?\n\n" +
+                "They will no longer be included in the next upload.",
+                "Clear eQSL Queue", HolyMsgType.Warning, Window.GetWindow(this));
+            if (!confirmed) return;
+
+            int count = dal.ClearEqslQueue();
+            HolyMessageBox.ShowSuccess($"{count} QSO(s) removed from the eQSL queue.",
+                "Clear eQSL Queue", Window.GetWindow(this));
+            EqslQueueChanged?.Invoke();
         }
     }
 

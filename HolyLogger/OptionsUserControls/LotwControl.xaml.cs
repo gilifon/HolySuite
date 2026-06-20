@@ -11,6 +11,8 @@ namespace HolyLogger.OptionsUserControls
 
         public DataAccess Dal { get; set; }
 
+        public event Action LotwQueueChanged;
+
         public LotwControl()
         {
             InitializeComponent();
@@ -87,6 +89,33 @@ namespace HolyLogger.OptionsUserControls
                 TB_TqslPath.Text = dlg.FileName;
         }
 
+        private void ClearQueueBtn_Click(object sender, RoutedEventArgs e)
+        {
+            if (Dal == null)
+            {
+                ShowError("Database not available.");
+                return;
+            }
+
+            int pending = Dal.GetPendingLotwCount();
+            if (pending == 0)
+            {
+                ShowOk("The LoTW queue is already empty.");
+                return;
+            }
+
+            bool confirmed = HolyMessageBox.ShowConfirm(
+                $"Remove all {pending} QSO(s) from the LoTW upload queue?\n\n" +
+                "They will no longer be included in the next upload.",
+                "Clear LoTW Queue", HolyMsgType.Warning, System.Windows.Window.GetWindow(this));
+
+            if (!confirmed) return;
+
+            int count = Dal.ClearLotwQueue();
+            ShowOk($"{count} QSO(s) removed from the LoTW queue.");
+            LotwQueueChanged?.Invoke();
+        }
+
         private void TestBtn_Click(object sender, RoutedEventArgs e)
         {
             string path = TB_TqslPath.Text.Trim();
@@ -116,19 +145,21 @@ namespace HolyLogger.OptionsUserControls
                 return;
             }
 
-            string fromDate = DP_FromDate.SelectedDate.Value.ToString("yyyy-MM-dd");
+            DateTime selectedDate = DP_FromDate.SelectedDate.Value;
+            string fromDate = selectedDate.ToString("yyyyMMdd");
+            string displayDate = selectedDate.ToString("dd-MM-yyyy");
 
-            var confirm = System.Windows.Forms.MessageBox.Show(
-                $"Mark all QSOs from {fromDate} onwards as pending for LoTW upload?\n\n" +
-                "They will be included in the next upload. LoTW will skip any that are already in the system.",
-                "Reset LoTW Queue",
-                System.Windows.Forms.MessageBoxButtons.YesNo,
-                System.Windows.Forms.MessageBoxIcon.Question);
-
-            if (confirm != System.Windows.Forms.DialogResult.Yes) return;
+            int qsoCount = Dal.GetQsoCountFromDate(fromDate);
+            var dlg = new LotwConfirmQueueDialog(displayDate, qsoCount)
+            {
+                Owner = System.Windows.Window.GetWindow(this)
+            };
+            dlg.ShowDialog();
+            if (!dlg.Confirmed) return;
 
             int count = Dal.ResetLotwStatusFromDate(fromDate);
-            ShowOk($"{count} QSO(s) marked as pending from {fromDate} onwards.");
+            ShowOk($"{count} QSO(s) marked as pending from {displayDate} onwards.");
+            LotwQueueChanged?.Invoke();
         }
 
         private void ShowOk(string text)

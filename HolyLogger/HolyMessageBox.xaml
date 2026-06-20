@@ -1,0 +1,59 @@
+<Window x:Class="HolyLogger.HolyMessageBox"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="HolyLogger" Width="460" SizeToContent="Height"
+        ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False">
+    <Grid Margin="24,20,24,20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="16"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="56"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- Icon circle -->
+        <Ellipse Grid.Row="0" Grid.Column="0"
+                 x:Name="IconCircle"
+                 Width="44" Height="44"
+                 VerticalAlignment="Top" HorizontalAlignment="Left"/>
+        <Viewbox Grid.Row="0" Grid.Column="0"
+                 x:Name="IconViewbox"
+                 Width="26" Height="26"
+                 VerticalAlignment="Top" HorizontalAlignment="Left"
+                 Margin="9,9,0,0">
+            <Path x:Name="IconPath" Stretch="Uniform"/>
+        </Viewbox>
+
+        <!-- Message text -->
+        <TextBlock Grid.Row="0" Grid.Column="1"
+                   x:Name="MessageText"
+                   FontSize="18" TextWrapping="Wrap"
+                   VerticalAlignment="Center"/>
+
+        <!-- OK button (info/success/warning/error mode) -->
+        <Button Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                x:Name="OkBtn" Content="OK"
+                Width="110" Height="38" FontSize="17"
+                HorizontalAlignment="Right" IsDefault="True"
+                Click="OkBtn_Click"/>
+
+        <!-- Yes / No buttons (confirm mode) -->
+        <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
+                    x:Name="ConfirmPanel"
+                    Orientation="Horizontal" HorizontalAlignment="Right"
+                    Visibility="Collapsed">
+            <Button x:Name="YesBtn" Content="Yes"
+                    Width="110" Height="38" FontSize="17"
+                    IsDefault="True" Margin="0,0,10,0"
+                    Click="YesBtn_Click"/>
+            <Button x:Name="NoBtn" Content="No"
+                    Width="110" Height="38" FontSize="17"
+                    IsCancel="True"
+                    Click="NoBtn_Click"/>
+        </StackPanel>
+    </Grid>
+</Window>

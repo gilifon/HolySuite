@@ -795,6 +795,30 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int EqslUploadOnExitMode {
+            get {
+                return ((int)(this["EqslUploadOnExitMode"]));
+            }
+            set {
+                this["EqslUploadOnExitMode"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int QrzUploadOnExitMode {
+            get {
+                return ((int)(this["QrzUploadOnExitMode"]));
+            }
+            set {
+                this["QrzUploadOnExitMode"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("False")]
         public bool EnableUDPClient {
             get {
