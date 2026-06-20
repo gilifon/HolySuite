@@ -5799,20 +5799,25 @@ namespace HolyLogger
             int existing = 0;
             try { if (dal != null) existing = dal.GetQsoCount(); } catch { }
 
-            if (!HolyMessageBox.ShowConfirm(
-                $"This will REPLACE your current log ({existing} QSO(s)) with the selected autosave file.\n\nAre you sure?",
-                "Import Autosaved Log", HolyMsgType.Warning, this))
-                return;
+            if (existing > 0)
+            {
+                ImportLogChoice choice = AskImportMergeOrReplace(existing);
+                if (choice == ImportLogChoice.Cancel) return;
 
-            Properties.Settings.Default.RecentQSOCounter = 0;
-            Qsos.CollectionChanged -= Qsos_CollectionChanged;
-            Qsos.Clear();
-            Qsos.CollectionChanged += Qsos_CollectionChanged;
-            dal.DeleteAll();
-            ClearBtn_Click(null, null);
-            UpdateNumOfQSOs();
-            UpdateEqslQueueIndicator();
-            UpdateQrzMenuCount();
+                if (choice == ImportLogChoice.Replace)
+                {
+                    // This is already a restore from backup, so no second backup is needed.
+                    Properties.Settings.Default.RecentQSOCounter = 0;
+                    Qsos.CollectionChanged -= Qsos_CollectionChanged;
+                    Qsos.Clear();
+                    Qsos.CollectionChanged += Qsos_CollectionChanged;
+                    dal.DeleteAll();
+                    ClearBtn_Click(null, null);
+                    UpdateNumOfQSOs();
+                    UpdateEqslQueueIndicator();
+                    UpdateQrzMenuCount();
+                }
+            }
 
             ImportFileQ.Clear();
             ImportFileQ.Add(dlg.FileName);
