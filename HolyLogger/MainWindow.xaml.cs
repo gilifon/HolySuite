@@ -5364,6 +5364,7 @@ namespace HolyLogger
                 }
             }
 
+            SaveAutosnapshot();
             _isShutdownCleanupDone = true;
 
             // Stop all timers before shutdown to prevent pending async operations
@@ -5736,6 +5737,86 @@ namespace HolyLogger
             {
                 e.Handled = true;
             }            
+        }
+
+        // ── Autosave ──────────────────────────────────────────────────────────────
+
+        private static readonly string AutosaveDir =
+            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "autosave");
+
+        private void SaveAutosnapshot()
+        {
+            try
+            {
+                if (dal == null) return;
+                var qsos = dal.GetAllQSOs();
+                if (qsos == null || qsos.Count == 0) return;
+
+                Directory.CreateDirectory(AutosaveDir);
+                string filename = Path.Combine(AutosaveDir,
+                    "autosave_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi");
+                File.WriteAllText(filename, Services.GenerateAdif(qsos), Encoding.UTF8);
+
+                PruneAutosaves(AutosaveDir);
+            }
+            catch { }
+        }
+
+        private static void PruneAutosaves(string dir)
+        {
+            try
+            {
+                var files = Directory.GetFiles(dir, "autosave_*.adi")
+                    .Select(f => new FileInfo(f))
+                    .OrderByDescending(f => f.LastWriteTime)
+                    .ToList();
+
+                if (files.Count <= 5) return;
+
+                var cutoff = DateTime.Now.AddDays(-10);
+                foreach (var f in files.Skip(5))
+                {
+                    if (f.LastWriteTime < cutoff)
+                        try { f.Delete(); } catch { }
+                }
+            }
+            catch { }
+        }
+
+        private void ImportAutosaveMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new OpenFileDialog
+            {
+                Title = "Import Autosaved Log",
+                Filter = "ADIF files (*.adi;*.adif)|*.adi;*.adif|All files (*.*)|*.*",
+                FilterIndex = 1
+            };
+            if (Directory.Exists(AutosaveDir))
+                dlg.InitialDirectory = AutosaveDir;
+
+            if (dlg.ShowDialog() != true) return;
+
+            int existing = 0;
+            try { if (dal != null) existing = dal.GetQsoCount(); } catch { }
+
+            if (!HolyMessageBox.ShowConfirm(
+                $"This will REPLACE your current log ({existing} QSO(s)) with the selected autosave file.\n\nAre you sure?",
+                "Import Autosaved Log", HolyMsgType.Warning, this))
+                return;
+
+            Properties.Settings.Default.RecentQSOCounter = 0;
+            Qsos.CollectionChanged -= Qsos_CollectionChanged;
+            Qsos.Clear();
+            Qsos.CollectionChanged += Qsos_CollectionChanged;
+            dal.DeleteAll();
+            ClearBtn_Click(null, null);
+            UpdateNumOfQSOs();
+            UpdateEqslQueueIndicator();
+            UpdateQrzMenuCount();
+
+            ImportFileQ.Clear();
+            ImportFileQ.Add(dlg.FileName);
+            StartAdifImportWorker();
         }
 
         private void UploadMenuItem_Click(object sender, RoutedEventArgs e)
