@@ -156,7 +156,7 @@ namespace HolyLogger
                     {
                         try
                         {
-                            MessageBox.Show(line, "Callsign Upload", MessageBoxButton.OK, MessageBoxImage.Information);
+                            HolyMessageBox.Show(line, "Callsign Upload");
                         }
                         catch
                         {

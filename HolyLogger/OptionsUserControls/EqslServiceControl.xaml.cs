@@ -51,7 +51,7 @@ namespace HolyLogger.OptionsUserControls
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show("Failed to load eQSL accounts: " + ex.Message);
+                HolyMessageBox.ShowError("Failed to load eQSL accounts: " + ex.Message, "eQSL Accounts", Window.GetWindow(this));
             }
         }
 
@@ -110,7 +110,7 @@ namespace HolyLogger.OptionsUserControls
             }
             else if (!string.IsNullOrEmpty(error))
             {
-                System.Windows.Forms.MessageBox.Show(error);
+                HolyMessageBox.ShowError(error, "eQSL Accounts", Window.GetWindow(this));
                 // Discard the invalid edit (e.g. a duplicate callsign) by reloading from the database.
                 Dispatcher.BeginInvoke(new Action(LoadAccounts), System.Windows.Threading.DispatcherPriority.Background);
             }
@@ -166,13 +166,12 @@ namespace HolyLogger.OptionsUserControls
             EqslAccount acct = DG_Accounts.SelectedItem as EqslAccount;
             if (acct == null)
             {
-                System.Windows.Forms.MessageBox.Show("Select a row first, then press Remove.");
+                HolyMessageBox.ShowWarning("Select a row first, then press Remove.", "eQSL Accounts", Window.GetWindow(this));
                 return;
             }
 
             string label = string.IsNullOrWhiteSpace(acct.Callsign) ? "this row" : ("the eQSL account for " + acct.Callsign);
-            if (System.Windows.MessageBox.Show("Remove " + label + "?", "Remove eQSL account",
-                    MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
+            if (!HolyMessageBox.ShowConfirm("Remove " + label + "?", "Remove eQSL Account", HolyMsgType.Warning, Window.GetWindow(this)))
                 return;
 
             try
@@ -183,7 +182,7 @@ namespace HolyLogger.OptionsUserControls
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show("Failed to remove eQSL account: " + ex.Message);
+                HolyMessageBox.ShowError("Failed to remove eQSL account: " + ex.Message, "eQSL Accounts", Window.GetWindow(this));
             }
         }
 
@@ -213,7 +212,7 @@ namespace HolyLogger.OptionsUserControls
             EqslAccount acct = DG_Accounts.SelectedItem as EqslAccount;
             if (acct == null)
             {
-                System.Windows.Forms.MessageBox.Show("Select a callsign row first, then press Test Connection.");
+                HolyMessageBox.ShowWarning("Select a callsign row first, then press Test Connection.", "eQSL Test", Window.GetWindow(this));
                 return;
             }
 
@@ -221,8 +220,8 @@ namespace HolyLogger.OptionsUserControls
             string pwd = acct.Password ?? string.Empty;
             if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pwd))
             {
-                System.Windows.Forms.MessageBox.Show("Enter the eQSL user name and password for " +
-                    (string.IsNullOrWhiteSpace(acct.Callsign) ? "this row" : acct.Callsign) + " first.");
+                HolyMessageBox.ShowWarning("Enter the eQSL user name and password for " +
+                    (string.IsNullOrWhiteSpace(acct.Callsign) ? "this row" : acct.Callsign) + " first.", "eQSL Test", Window.GetWindow(this));
                 return;
             }
 
@@ -237,15 +236,15 @@ namespace HolyLogger.OptionsUserControls
                 string resp = await _testHttp.GetStringAsync(url);
 
                 if (string.IsNullOrWhiteSpace(resp))
-                    System.Windows.Forms.MessageBox.Show("Could not verify the connection to eQSL. Please try again.");
+                    HolyMessageBox.ShowError("Could not verify the connection to eQSL. Please try again.", "eQSL Test", Window.GetWindow(this));
                 else if (resp.IndexOf("No such", StringComparison.OrdinalIgnoreCase) >= 0)
-                    System.Windows.Forms.MessageBox.Show("eQSL rejected the user name / password.");
+                    HolyMessageBox.ShowError("eQSL rejected the user name / password.", "eQSL Test", Window.GetWindow(this));
                 else
-                    System.Windows.Forms.MessageBox.Show("Connected to eQSL successfully!");
+                    HolyMessageBox.ShowSuccess("Connected to eQSL successfully!", "eQSL Test", Window.GetWindow(this));
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show("Connection failed: " + ex.Message);
+                HolyMessageBox.ShowError("Connection failed: " + ex.Message, "eQSL Test", Window.GetWindow(this));
             }
             finally
             {

@@ -44,7 +44,7 @@ namespace HolyLogger
             myMutex = new Mutex(true, "HolyLoggerApplication", out aIsNewInstance);
             if (!aIsNewInstance)
             {
-                MessageBox.Show("Holyland logger is already open...");
+                HolyMessageBox.ShowWarning("Holyland logger is already open.", "HolyLogger");
                 App.Current.Shutdown();
                 return;
             }

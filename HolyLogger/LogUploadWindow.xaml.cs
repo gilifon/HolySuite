@@ -74,7 +74,7 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
-                MessageBox.Show("Failed to connect to DB: " + e.Message);
+                HolyMessageBox.ShowError("Failed to connect to DB: " + e.Message, "HolyLogger");
                 throw;
             }
 
@@ -200,12 +200,12 @@ namespace HolyLogger
                 }
                 else
                 {
-                    System.Windows.Forms.MessageBox.Show("Please confirm your Email address");
+                    HolyMessageBox.ShowWarning("Please confirm your Email address.", "Log Upload", this);
                 }
             }
             else
             {
-                System.Windows.Forms.MessageBox.Show("Please fill in the form. All fields are required.");
+                HolyMessageBox.ShowWarning("Please fill in the form. All fields are required.", "Log Upload", this);
             }
             
         }

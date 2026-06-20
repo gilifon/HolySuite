@@ -121,7 +121,7 @@ namespace HolyLogger.OptionsUserControls
             string path = TB_TqslPath.Text.Trim();
             if (string.IsNullOrWhiteSpace(path))
             {
-                System.Windows.Forms.MessageBox.Show("Enter the path to your TQSL executable first.");
+                ShowError("Enter the path to your TQSL executable first.");
                 return;
             }
             if (!File.Exists(path))
@@ -141,7 +141,7 @@ namespace HolyLogger.OptionsUserControls
             }
             if (DP_FromDate.SelectedDate == null)
             {
-                System.Windows.Forms.MessageBox.Show("Please select a date first.");
+                ShowError("Please select a date first.");
                 return;
             }
 

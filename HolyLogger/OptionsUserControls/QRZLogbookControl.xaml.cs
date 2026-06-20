@@ -57,7 +57,7 @@ namespace HolyLogger.OptionsUserControls
             }
             catch (Exception ex)
             {
-                System.Windows.Forms.MessageBox.Show("Could not open the browser: " + ex.Message);
+                HolyMessageBox.ShowError("Could not open the browser: " + ex.Message, "QRZ Logbook", Window.GetWindow(this));
             }
         }
 
@@ -66,7 +66,7 @@ namespace HolyLogger.OptionsUserControls
             string key = (TB_ApiKey.Text ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(key))
             {
-                System.Windows.Forms.MessageBox.Show("Enter your QRZ Logbook API Key first.");
+                HolyMessageBox.ShowWarning("Enter your QRZ Logbook API Key first.", "QRZ Logbook", Window.GetWindow(this));
                 return;
             }
 
@@ -81,7 +81,7 @@ namespace HolyLogger.OptionsUserControls
                 if (r.NetworkError)
                 {
                     SetValid(false);
-                    System.Windows.Forms.MessageBox.Show("Could not reach QRZ.com. Please check your internet connection and try again.");
+                    HolyMessageBox.ShowError("Could not reach QRZ.com. Please check your internet connection and try again.", "QRZ Logbook", Window.GetWindow(this));
                     return;
                 }
 
@@ -96,18 +96,18 @@ namespace HolyLogger.OptionsUserControls
                     SetValid(false);
                     string reason = (r.Reason ?? string.Empty).ToLowerInvariant();
                     if (reason.Contains("auth") || reason.Contains("invalid") || reason.Contains("key"))
-                        System.Windows.Forms.MessageBox.Show("Authentication failed. Invalid API Key.");
+                        HolyMessageBox.ShowError("Authentication failed. Invalid API Key.", "QRZ Logbook", Window.GetWindow(this));
                     else if (reason.Contains("subscription"))
-                        System.Windows.Forms.MessageBox.Show("An active QRZ XML Logbook Data Subscription is required to use automated API logging.");
+                        HolyMessageBox.ShowError("An active QRZ XML Logbook Data Subscription is required to use automated API logging.", "QRZ Logbook", Window.GetWindow(this));
                     else
-                        System.Windows.Forms.MessageBox.Show("QRZ rejected the API key" +
-                            (string.IsNullOrWhiteSpace(r.Reason) ? "." : (": " + r.Reason)));
+                        HolyMessageBox.ShowError("QRZ rejected the API key" +
+                            (string.IsNullOrWhiteSpace(r.Reason) ? "." : (": " + r.Reason)), "QRZ Logbook", Window.GetWindow(this));
                 }
             }
             catch (Exception ex)
             {
                 SetValid(false);
-                System.Windows.Forms.MessageBox.Show("Test failed: " + ex.Message);
+                HolyMessageBox.ShowError("Test failed: " + ex.Message, "QRZ Logbook", Window.GetWindow(this));
             }
             finally
             {

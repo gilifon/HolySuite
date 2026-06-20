@@ -48,13 +48,9 @@ namespace HolyLogger.OptionsUserControls
             string x;
             bool ok = Helper.LoginToQRZ(out x);
             if (ok)
-            {
-                System.Windows.Forms.MessageBox.Show("Connected!");
-            }
+                HolyMessageBox.ShowSuccess("Connected to QRZ.com successfully!", "QRZ Connection", Window.GetWindow(this));
             else
-            {
-                System.Windows.Forms.MessageBox.Show("Connection failed!");
-            }
+                HolyMessageBox.ShowError("Connection failed. Check your username and password.", "QRZ Connection", Window.GetWindow(this));
             // Let the main window update the QRZ icon to match the test result immediately.
             ConnectionTested?.Invoke(ok, x);
         }

@@ -168,8 +168,7 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"Error saving QSO {row.id}: {ex.Message}",
-                                    "Save Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    HolyMessageBox.ShowError($"Error saving QSO {row.id}: {ex.Message}", "Save Error", this);
                 }
             }
 
@@ -225,8 +224,7 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Export failed: {ex.Message}", "Export Error",
-                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                HolyMessageBox.ShowError($"Export failed: {ex.Message}", "Export Error", this);
             }
         }
 
@@ -254,8 +252,7 @@ namespace HolyLogger
 
                 if (iId < 0 || iBand < 0 || iMode < 0)
                 {
-                    MessageBox.Show("The CSV must contain at least ID, Band and Mode columns.",
-                                    "Import Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+                    HolyMessageBox.ShowError("The CSV must contain at least ID, Band and Mode columns.", "Import Error", this);
                     return;
                 }
 
@@ -288,8 +285,7 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Import failed: {ex.Message}", "Import Error",
-                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                HolyMessageBox.ShowError($"Import failed: {ex.Message}", "Import Error", this);
             }
         }
 
@@ -366,8 +362,7 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"eQSL fill failed: {ex.Message}", "Error",
-                                MessageBoxButton.OK, MessageBoxImage.Warning);
+                HolyMessageBox.ShowError($"eQSL fill failed: {ex.Message}", "eQSL Fill", this);
             }
         }
 
@@ -380,10 +375,10 @@ namespace HolyLogger
 
             if (string.IsNullOrEmpty(user) || string.IsNullOrEmpty(pass))
             {
-                var result = MessageBox.Show(
-                    "LoTW web login credentials are not set.\n\nClick OK to open Options → LoTW and enter them now.",
-                    "LoTW Login Missing", MessageBoxButton.OKCancel, MessageBoxImage.Warning);
-                if (result == MessageBoxResult.OK)
+                bool result = HolyMessageBox.ShowConfirm(
+                    "LoTW web login credentials are not set.\n\nClick Yes to open Options → LoTW and enter them now.",
+                    "LoTW Login Missing", HolyMsgType.Warning, this);
+                if (result)
                 {
                     var opts = new OptionsWindow();
                     opts.LotwControlInstance.Dal = _dal;
