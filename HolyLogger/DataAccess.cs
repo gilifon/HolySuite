@@ -985,6 +985,122 @@ namespace HolyLogger
             }
         }
 
+        // Returns QSOs dismissed from the LoTW queue (lotw_status = 2) — sent to the queue at some
+        // point but explicitly cleared without being uploaded.
+        public List<QSO> GetDismissedLotwQsos()
+        {
+            lock (_dbLock)
+            {
+            var list = new List<QSO>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency FROM qso WHERE lotw_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            using (var cmd = new SQLiteCommand(stm, con))
+            using (var rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    var q = new QSO();
+                    q.id = Convert.ToInt32(rdr["Id"]);
+                    q.Date = rdr["date"]?.ToString() ?? string.Empty;
+                    q.Time = rdr["time"]?.ToString() ?? string.Empty;
+                    q.DXCall = rdr["dx_callsign"]?.ToString() ?? string.Empty;
+                    q.Band = rdr["band"]?.ToString() ?? string.Empty;
+                    q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
+                    q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
+                    q.LotwStatus = 2;
+                    list.Add(q);
+                }
+            }
+            return list;
+            }
+        }
+
+        public int RequeueAllLotwDismissed()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (var cmd = new SQLiteCommand("UPDATE qso SET lotw_status = 0 WHERE lotw_status = 2", con))
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
+        public List<QSO> GetDismissedEqslQsos()
+        {
+            lock (_dbLock)
+            {
+            var list = new List<QSO>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency FROM qso WHERE eqsl_status = 2 AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date DESC, time DESC, Id DESC";
+            using (var cmd = new SQLiteCommand(stm, con))
+            using (var rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    var q = new QSO();
+                    q.id = Convert.ToInt32(rdr["Id"]);
+                    q.Date = rdr["date"]?.ToString() ?? string.Empty;
+                    q.Time = rdr["time"]?.ToString() ?? string.Empty;
+                    q.DXCall = rdr["dx_callsign"]?.ToString() ?? string.Empty;
+                    q.Band = rdr["band"]?.ToString() ?? string.Empty;
+                    q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
+                    q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
+                    q.EqslStatus = 2;
+                    list.Add(q);
+                }
+            }
+            return list;
+            }
+        }
+
+        public int RequeueAllEqslDismissed()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (var cmd = new SQLiteCommand("UPDATE qso SET eqsl_status = 0 WHERE eqsl_status = 2", con))
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
+        public List<QSO> GetDismissedQrzQsos()
+        {
+            lock (_dbLock)
+            {
+            var list = new List<QSO>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency FROM qso WHERE qrz_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            using (var cmd = new SQLiteCommand(stm, con))
+            using (var rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    var q = new QSO();
+                    q.id = Convert.ToInt32(rdr["Id"]);
+                    q.Date = rdr["date"]?.ToString() ?? string.Empty;
+                    q.Time = rdr["time"]?.ToString() ?? string.Empty;
+                    q.DXCall = rdr["dx_callsign"]?.ToString() ?? string.Empty;
+                    q.Band = rdr["band"]?.ToString() ?? string.Empty;
+                    q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
+                    q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
+                    q.LotwStatus = 2;
+                    list.Add(q);
+                }
+            }
+            return list;
+            }
+        }
+
+        public int RequeueAllQrzDismissed()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (var cmd = new SQLiteCommand("UPDATE qso SET qrz_status = 0 WHERE qrz_status = 2", con))
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
         // Creates the eqsl_accounts table the first time. The table is managed entirely by hand in
         // Options -> eQSL Service; nothing is ever added automatically.
         private void EnsureEqslAccountsTable()

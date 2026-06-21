@@ -10,82 +10,172 @@ using System.Windows.Media;
 
 namespace HolyLogger
 {
-    // Window that lists the QSOs still waiting to be uploaded to eQSL and lets the user send them on
-    // demand. Nothing is uploaded automatically: the QSOs sit here until the user presses "Send".
-    // It owns no data of its own — it asks the caller for the current pending list (getPending) and
-    // delegates the upload to the caller (sendAll, which runs MainWindow.PumpEqslQueue and returns the
-    // number actually uploaded), then re-reads the list to reflect what went out.
+    // Window that lists the QSOs waiting to be uploaded to a service and lets the user send them
+    // on demand. Reused for eQSL, LoTW, and QRZ via constructor callbacks.
+    //
+    // Optional dismissed section: when getDismissed + requeueDismissed are provided, a second
+    // panel below the pending list shows QSOs that were cleared from the queue without being
+    // uploaded (status=2), with a "Re-queue All" button to move them back to pending.
     public class EqslQueueWindow : Window
     {
+        private readonly string _serviceName;
         private readonly Func<List<QSO>> _getPending;
         private readonly Func<Task<int>> _sendAll;
+        private readonly Func<List<QSO>> _getDismissed;   // null = no dismissed section
+        private readonly Action _requeueDismissed;
 
-        private readonly TextBlock _header;
-        private readonly TextBlock _callsignHeader;
-        private readonly DataGrid _grid;
-        private readonly Button _sendButton;
-        private readonly TextBlock _status;
+        private readonly TextBlock _pendingCountLabel;
+        private readonly TextBlock _callsignLabel;
+        private readonly DataGrid _pendingGrid;
+        private readonly Button _uploadButton;
+        private readonly TextBlock _statusText;
 
-        public EqslQueueWindow(Func<List<QSO>> getPending, Func<Task<int>> sendAll)
+        private readonly Border _dismissedSection;
+        private readonly TextBlock _dismissedCountLabel;
+        private readonly Button _requeueButton;
+        private readonly DataGrid _dismissedGrid;
+
+        public EqslQueueWindow(
+            Func<List<QSO>> getPending,
+            Func<Task<int>> sendAll,
+            string serviceName = "eQSL",
+            Func<List<QSO>> getDismissed = null,
+            Action requeueDismissed = null)
         {
+            _serviceName = serviceName;
             _getPending = getPending;
             _sendAll = sendAll;
+            _getDismissed = getDismissed;
+            _requeueDismissed = requeueDismissed;
 
-            Title = "QSOs waiting for eQSL";
-            Width = 420;
-            Height = 460;
+            bool hasDismissed = getDismissed != null;
+
+            Title = $"QSOs waiting for {serviceName}";
+            Width = 540;
+            Height = hasDismissed ? 580 : 460;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.CanResize;
 
             var root = new Grid { Margin = new Thickness(10) };
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });          // 0: pending header
+            root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star) }); // 1: pending grid
+            root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });          // 2: status text
+            if (hasDismissed)
+                root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) }); // 3: dismissed section
 
-            // Header row: "N QSOs" on the left, the station callsign in bold in the middle, and the
-            // Send button on the right.
-            var headerPanel = new Grid { Margin = new Thickness(0, 0, 0, 8) };
+            // ── Pending header ──────────────────────────────────────────────
+            var headerPanel = new Grid { Margin = new Thickness(0, 0, 0, 6) };
             headerPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             headerPanel.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
-            _header = new TextBlock
+            _pendingCountLabel = new TextBlock
             {
                 FontSize = 18,
                 FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            Grid.SetColumn(_header, 0);
-            headerPanel.Children.Add(_header);
+            Grid.SetColumn(_pendingCountLabel, 0);
+            headerPanel.Children.Add(_pendingCountLabel);
 
-            _callsignHeader = new TextBlock
+            _callsignLabel = new TextBlock
             {
                 FontSize = 18,
                 FontWeight = FontWeights.Bold,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            Grid.SetColumn(_callsignHeader, 1);
-            headerPanel.Children.Add(_callsignHeader);
+            Grid.SetColumn(_callsignLabel, 1);
+            headerPanel.Children.Add(_callsignLabel);
 
-            _sendButton = new Button
+            _uploadButton = new Button
             {
-                Content = "Send",
+                Content = "Upload",
                 MinWidth = 100,
                 Padding = new Thickness(12, 4, 12, 4),
                 FontSize = 14,
                 FontWeight = FontWeights.Bold
             };
-            _sendButton.Click += SendButton_Click;
-            Grid.SetColumn(_sendButton, 2);
-            headerPanel.Children.Add(_sendButton);
+            _uploadButton.Click += UploadButton_Click;
+            Grid.SetColumn(_uploadButton, 2);
+            headerPanel.Children.Add(_uploadButton);
 
             Grid.SetRow(headerPanel, 0);
             root.Children.Add(headerPanel);
 
-            // The waiting QSOs, with a vertical scrollbar that appears automatically when the list is
-            // longer than the window.
-            _grid = new DataGrid
+            // ── Pending DataGrid ─────────────────────────────────────────────
+            _pendingGrid = MakeGrid();
+            Grid.SetRow(_pendingGrid, 1);
+            root.Children.Add(_pendingGrid);
+
+            // ── Status text ──────────────────────────────────────────────────
+            _statusText = new TextBlock
+            {
+                Margin = new Thickness(0, 6, 0, hasDismissed ? 6 : 0),
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap
+            };
+            Grid.SetRow(_statusText, 2);
+            root.Children.Add(_statusText);
+
+            // ── Dismissed section (optional) ─────────────────────────────────
+            if (hasDismissed)
+            {
+                var dismissedContent = new Grid();
+                dismissedContent.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                dismissedContent.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+                var dismissedHeader = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+                dismissedHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                dismissedHeader.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+                _dismissedCountLabel = new TextBlock
+                {
+                    FontSize = 14,
+                    FontWeight = FontWeights.Bold,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0x40, 0x40)),
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                Grid.SetColumn(_dismissedCountLabel, 0);
+                dismissedHeader.Children.Add(_dismissedCountLabel);
+
+                _requeueButton = new Button
+                {
+                    Content = "Re-queue All",
+                    Padding = new Thickness(10, 3, 10, 3),
+                    FontSize = 13,
+                    Visibility = Visibility.Collapsed
+                };
+                _requeueButton.Click += RequeueButton_Click;
+                Grid.SetColumn(_requeueButton, 1);
+                dismissedHeader.Children.Add(_requeueButton);
+
+                Grid.SetRow(dismissedHeader, 0);
+                dismissedContent.Children.Add(dismissedHeader);
+
+                _dismissedGrid = MakeGrid();
+                Grid.SetRow(_dismissedGrid, 1);
+                dismissedContent.Children.Add(_dismissedGrid);
+
+                _dismissedSection = new Border
+                {
+                    BorderBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0xCC, 0xCC)),
+                    BorderThickness = new Thickness(0, 1, 0, 0),
+                    Padding = new Thickness(0, 8, 0, 0),
+                    Child = dismissedContent
+                };
+
+                Grid.SetRow(_dismissedSection, 3);
+                root.Children.Add(_dismissedSection);
+            }
+
+            Content = root;
+            RefreshList();
+        }
+
+        private static DataGrid MakeGrid()
+        {
+            var grid = new DataGrid
             {
                 AutoGenerateColumns = false,
                 IsReadOnly = true,
@@ -96,21 +186,14 @@ namespace HolyLogger
                 SelectionMode = DataGridSelectionMode.Single,
                 FontSize = 14
             };
-            ScrollViewer.SetVerticalScrollBarVisibility(_grid, ScrollBarVisibility.Auto);
-            _grid.Columns.Add(MakeColumn("Date", "Date", 1.2));
-            _grid.Columns.Add(MakeColumn("Time", "Time", 1.0));
-            _grid.Columns.Add(MakeColumn("Call sign", "DXCall", 1.4));
-            _grid.Columns.Add(MakeFreqColumn(1.3));
-            Grid.SetRow(_grid, 1);
-            root.Children.Add(_grid);
-
-            _status = new TextBlock { Margin = new Thickness(0, 8, 0, 0), FontSize = 13, TextWrapping = TextWrapping.Wrap };
-            Grid.SetRow(_status, 2);
-            root.Children.Add(_status);
-
-            Content = root;
-
-            RefreshList();
+            ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+            grid.Columns.Add(MakeColumn("Date", "Date", 1.2));
+            grid.Columns.Add(MakeColumn("Time", "Time", 1.0));
+            grid.Columns.Add(MakeColumn("Callsign", "DXCall", 1.4));
+            grid.Columns.Add(MakeColumn("Band", "Band", 0.8));
+            grid.Columns.Add(MakeColumn("Mode", "Mode", 0.8));
+            grid.Columns.Add(MakeFreqColumn(1.1));
+            return grid;
         }
 
         private static DataGridTextColumn MakeColumn(string header, string path, double starWidth)
@@ -123,14 +206,11 @@ namespace HolyLogger
             };
         }
 
-        // Freq column: plain frequency value in the cells, with the unit shown only in the header as
-        // "Freq" followed by a smaller, bold "MHz".
         private static DataGridTextColumn MakeFreqColumn(double starWidth)
         {
             var header = new TextBlock();
             header.Inlines.Add(new System.Windows.Documents.Run("Freq "));
             header.Inlines.Add(new System.Windows.Documents.Run("MHz") { FontSize = 10, FontWeight = FontWeights.Bold });
-
             return new DataGridTextColumn
             {
                 Header = header,
@@ -139,59 +219,71 @@ namespace HolyLogger
             };
         }
 
-        // Re-reads the pending list and updates the header count and Send button state.
         public void RefreshList()
         {
+            // Pending
             List<QSO> pending;
             try { pending = _getPending() ?? new List<QSO>(); }
             catch { pending = new List<QSO>(); }
 
-            _grid.ItemsSource = pending;
-
+            _pendingGrid.ItemsSource = pending;
             int n = pending.Count;
-            _header.Text = n + (n == 1 ? " QSO" : " QSOs");
-            _sendButton.IsEnabled = n > 0;
+            _pendingCountLabel.Text = n + (n == 1 ? " QSO pending" : " QSOs pending");
+            _uploadButton.IsEnabled = n > 0;
 
-            // Show the station callsign(s) of the waiting QSOs in bold at the top (usually just one;
-            // if QSOs from several callsigns are queued, list them).
             var calls = pending
                 .Select(q => (q.MyCall ?? string.Empty).Trim())
                 .Where(s => s.Length > 0)
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            _callsignHeader.Text = string.Join(", ", calls);
+            _callsignLabel.Text = string.Join(", ", calls);
+
+            // Dismissed
+            if (_getDismissed != null)
+            {
+                List<QSO> dismissed;
+                try { dismissed = _getDismissed() ?? new List<QSO>(); }
+                catch { dismissed = new List<QSO>(); }
+
+                _dismissedGrid.ItemsSource = dismissed;
+                int d = dismissed.Count;
+                _dismissedCountLabel.Text = d == 0
+                    ? $"No dismissed QSOs — all cleared QSOs have been re-queued or uploaded."
+                    : $"{d} QSO{(d == 1 ? "" : "s")} dismissed — cleared without being uploaded to {_serviceName}";
+                _requeueButton.Visibility = d > 0 ? Visibility.Visible : Visibility.Collapsed;
+            }
         }
 
-        private async void SendButton_Click(object sender, RoutedEventArgs e)
+        private async void UploadButton_Click(object sender, RoutedEventArgs e)
         {
-            _sendButton.IsEnabled = false;
-            _status.Text = "Sending to eQSL…";
+            _uploadButton.IsEnabled = false;
+            _statusText.Text = $"Uploading to {_serviceName}…";
 
             int sent;
-            try
-            {
-                sent = await _sendAll();
-            }
+            try { sent = await _sendAll(); }
             catch (Exception ex)
             {
                 if (!IsLoaded) return;
-                _status.Text = "Upload error: " + ex.Message;
-                _sendButton.IsEnabled = true;
+                _statusText.Text = "Upload error: " + ex.Message;
+                _uploadButton.IsEnabled = true;
                 return;
             }
 
-            // The user may have closed this window while the upload was in progress; if so, don't
-            // touch its controls.
             if (!IsLoaded) return;
-
             RefreshList();
 
-            int remaining = _grid.Items.Count;
-            if (remaining == 0)
-                _status.Text = "All QSOs have been uploaded to eQSL. ✓";
-            else
-                _status.Text = sent + " uploaded, " + remaining + " still waiting. A callsign with no eQSL account " +
-                    "won't send until you add its user name/password in Options → eQSL Service; otherwise eQSL may be offline.";
+            int remaining = _pendingGrid.Items.Count;
+            _statusText.Text = remaining == 0
+                ? $"All QSOs uploaded to {_serviceName}. ✓"
+                : $"{sent} uploaded, {remaining} still waiting.";
+        }
+
+        private void RequeueButton_Click(object sender, RoutedEventArgs e)
+        {
+            try { _requeueDismissed?.Invoke(); }
+            catch { }
+            _statusText.Text = "Dismissed QSOs moved back to the upload queue.";
+            RefreshList();
         }
     }
 }

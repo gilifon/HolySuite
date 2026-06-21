@@ -413,6 +413,7 @@
                     <MenuItem x:Name="SendQueueToEqslMenuItem" Header="Upload Queue to eQSL" ToolTip="Upload the QSOs that are still waiting to be sent to eQSL.cc" Click="SendQueueToEqslMenuItem_Click">
                         <MenuItem.ContextMenu>
                             <ContextMenu>
+                                <MenuItem Header="View Queue" Click="ViewEqslQueueContextMenuItem_Click"/>
                                 <MenuItem Header="Clear eQSL Queue" Click="ClearEqslQueueContextMenuItem_Click"/>
                             </ContextMenu>
                         </MenuItem.ContextMenu>
@@ -427,6 +428,7 @@
                     <MenuItem x:Name="SendQueueToLotwMenuItem" Header="Upload Queue to LoTW" ToolTip="Sign and upload pending QSOs to ARRL Logbook of the World via TQSL." Click="SendQueueToLotwMenuItem_Click">
                         <MenuItem.ContextMenu>
                             <ContextMenu>
+                                <MenuItem Header="View Queue" Click="ViewLotwQueueContextMenuItem_Click"/>
                                 <MenuItem Header="Clear LoTW Queue" Click="ClearLotwQueueContextMenuItem_Click"/>
                             </ContextMenu>
                         </MenuItem.ContextMenu>
@@ -440,6 +442,7 @@
                     <MenuItem x:Name="UploadQueueToQrzMenuItem" Header="Upload Queue to QRZ Logbook  (0)" ToolTip="Upload pending QSOs to your QRZ.com online logbook." Click="UploadQueueToQrzMenuItem_Click">
                         <MenuItem.ContextMenu>
                             <ContextMenu>
+                                <MenuItem Header="View Queue" Click="ViewQrzQueueContextMenuItem_Click"/>
                                 <MenuItem Header="Clear QRZ Queue" Click="ClearQrzQueueContextMenuItem_Click"/>
                             </ContextMenu>
                         </MenuItem.ContextMenu>

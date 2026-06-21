@@ -3016,8 +3016,7 @@ namespace HolyLogger
 
         private EqslQueueWindow _eqslQueueWindow;
 
-        // Opens (or focuses) a small window listing the QSOs still waiting for eQSL, with a Send
-        // button that runs the same upload pass and refreshes the list as each one goes out.
+        // Opens (or focuses) a window listing the QSOs still waiting for eQSL.
         private void ShowEqslQueueWindow()
         {
             if (dal == null) return;
@@ -3031,12 +3030,107 @@ namespace HolyLogger
 
             _eqslQueueWindow = new EqslQueueWindow(
                 () => dal.GetPendingEqslQsos(),
-                () => PumpEqslQueue())
+                () => PumpEqslQueue(),
+                "eQSL",
+                () => dal.GetDismissedEqslQsos(),
+                () => { dal.RequeueAllEqslDismissed(); UpdateEqslQueueIndicator(); })
             {
                 Owner = this
             };
             _eqslQueueWindow.Closed += (s, ev) => { _eqslQueueWindow = null; UpdateEqslQueueIndicator(); };
             _eqslQueueWindow.Show();
+        }
+
+        private void ViewEqslQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            ShowEqslQueueWindow();
+        }
+
+        private EqslQueueWindow _lotwQueueWindow;
+
+        private void ShowLotwQueueWindow()
+        {
+            if (dal == null) return;
+
+            if (_lotwQueueWindow != null)
+            {
+                _lotwQueueWindow.Activate();
+                _lotwQueueWindow.RefreshList();
+                return;
+            }
+
+            _lotwQueueWindow = new EqslQueueWindow(
+                () => dal.GetPendingLotwQsos(),
+                async () =>
+                {
+                    string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
+                    string location = Properties.Settings.Default.LotwStationLocation?.Trim();
+                    string password = Properties.Settings.Default.LotwTqslPassword;
+                    if (string.IsNullOrWhiteSpace(tqslPath) || !System.IO.File.Exists(tqslPath))
+                        throw new Exception("TQSL not found. Please configure it in Options → LoTW Upload.");
+                    if (string.IsNullOrWhiteSpace(location))
+                        throw new Exception("Station location not set. Please configure it in Options → LoTW Upload.");
+                    var pending = dal.GetPendingLotwQsos();
+                    int before = pending.Count;
+                    await UploadLotwQueueCoreAsync(pending, tqslPath, location, password);
+                    int after = dal?.GetPendingLotwCount() ?? 0;
+                    UpdateLotwMenuCount();
+                    return before - after;
+                },
+                "LoTW",
+                () => dal.GetDismissedLotwQsos(),
+                () => { dal.RequeueAllLotwDismissed(); UpdateLotwMenuCount(); })
+            {
+                Owner = this
+            };
+            _lotwQueueWindow.Closed += (s, ev) => { _lotwQueueWindow = null; UpdateLotwMenuCount(); };
+            _lotwQueueWindow.Show();
+        }
+
+        private void ViewLotwQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            ShowLotwQueueWindow();
+        }
+
+        private EqslQueueWindow _qrzQueueWindow;
+
+        private void ShowQrzQueueWindow()
+        {
+            if (dal == null) return;
+
+            if (_qrzQueueWindow != null)
+            {
+                _qrzQueueWindow.Activate();
+                _qrzQueueWindow.RefreshList();
+                return;
+            }
+
+            _qrzQueueWindow = new EqslQueueWindow(
+                () => dal.GetPendingQrzQsos(),
+                async () =>
+                {
+                    string key = (Properties.Settings.Default.qrz_api_key ?? string.Empty).Trim();
+                    if (string.IsNullOrWhiteSpace(key))
+                        throw new Exception("QRZ API key not configured. Please set it in Options → QRZ Services.");
+                    int before = dal?.GetPendingQrzCount() ?? 0;
+                    await PumpQrzQueue();
+                    int after = dal?.GetPendingQrzCount() ?? 0;
+                    UpdateQrzMenuCount();
+                    return before - after;
+                },
+                "QRZ Logbook",
+                () => dal.GetDismissedQrzQsos(),
+                () => { dal.RequeueAllQrzDismissed(); UpdateQrzMenuCount(); })
+            {
+                Owner = this
+            };
+            _qrzQueueWindow.Closed += (s, ev) => { _qrzQueueWindow = null; UpdateQrzMenuCount(); };
+            _qrzQueueWindow.Show();
+        }
+
+        private void ViewQrzQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            ShowQrzQueueWindow();
         }
 
         // Builds an aligned, label-friendly text block of the full QSO record for the clipboard.
