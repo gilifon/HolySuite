@@ -338,7 +338,7 @@ namespace HolyLogger
 
         BackgroundWorker AdifHandlerWorker;
         private bool _isShutdownCleanupDone = false;
-        private bool _uploadOnExitHandled = false; // guards the single upload-on-exit pass in Window_Closing
+        private bool _lotwExitHandled = false;   // guards the upload-on-exit pass in Window_Closing
         // UNUSED: BackgroundWorker for entire log QRZ processing was disabled.
         // Left commented for future reference if batch QRZ processing is needed:
         // BackgroundWorker EntireLogQrzWorker;
@@ -519,7 +519,7 @@ namespace HolyLogger
                 }
                 catch
                 {
-                    HolyMessageBox.ShowWarning("Failed to open UDP port.", "UDP Client", this);
+                    System.Windows.Forms.MessageBox.Show("Failed to open UDP port");
                     Properties.Settings.Default.EnableUDPClient = false;
                 }
             }
@@ -533,7 +533,7 @@ namespace HolyLogger
                 }
                 catch
                 {
-                    HolyMessageBox.ShowWarning("Failed to open N1MM+ UDP port.", "N1MM+ UDP Client", this);
+                    System.Windows.Forms.MessageBox.Show("Failed to open N1MM+ UDP port");
                     Properties.Settings.Default.EnableN1MMUDPClient = false;
                 }
             }
@@ -607,7 +607,7 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
-                HolyMessageBox.ShowError(e.Message, "Database Error");
+                MessageBox.Show(e.Message);
                 System.Windows.Application.Current.Shutdown();
                 return;
             }
@@ -819,7 +819,7 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Failed to save QSO: " + ex.Message, "Save Error", this);
+                    System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
                 }
             });
             Client.BeginReceive(new AsyncCallback(StartUDPClient), null);
@@ -883,7 +883,7 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Failed to save QSO: " + ex.Message, "Save Error", this);
+                    System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
                 }
             });
             N1MMClient.BeginReceive(new AsyncCallback(StartN1MMUDPClient), null);
@@ -1250,7 +1250,6 @@ namespace HolyLogger
             {
                 Helper.SendHeartbeat(MachineName, TB_MyCallsign.Text.Trim(), TB_Operator.Text.Trim(), TB_Frequency.Text.Trim(), CB_Mode.Text.Trim(), Properties.Settings.Default.ShowOnTheAir); //1000->seconds 60->minute 5->minutes
             }
-
         }
 
 
@@ -1434,7 +1433,7 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Failed to save QSO: " + ex.Message, "Save Error", this);
+                    System.Windows.Forms.MessageBox.Show("Failed to save QSO: " + ex.Message);
                 }
             }
             else if (state == State.Edit)
@@ -1881,13 +1880,13 @@ namespace HolyLogger
 
             if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
             {
-                HolyMessageBox.ShowWarning("OmniRig CAT is not available.", "CW Text", this);
+                MessageBox.Show("OmniRig CAT is not available.", "CW Text", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
-                HolyMessageBox.ShowWarning("The radio is offline.", "CW Text", this);
+                MessageBox.Show("The radio is offline.", "CW Text", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -1901,7 +1900,7 @@ namespace HolyLogger
 
                 if (!string.IsNullOrWhiteSpace(stopCommand) && !TrySendOmniRigCustomCommand(stopCommand))
                 {
-                    HolyMessageBox.ShowWarning("Failed to send the CW stop CAT command to " + rigType + ".", "CW Text", this);
+                    MessageBox.Show("Failed to send the CW stop CAT command to " + rigType + ".", "CW Text", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -1917,7 +1916,7 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(cwText))
             {
-                HolyMessageBox.ShowWarning("CW text " + messageNumber + " is empty. Right-click the button to edit it.", "CW Text", this);
+                MessageBox.Show("CW text " + messageNumber + " is empty. Right-click the button to edit it.", "CW Text", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -1925,13 +1924,13 @@ namespace HolyLogger
 
             if (command == null)
             {
-                HolyMessageBox.ShowWarning("CW text keying via CAT is not supported for this radio model (" + rigType + ").", "CW Text", this);
+                MessageBox.Show("CW text keying via CAT is not supported for this radio model (" + rigType + ").", "CW Text", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (!TrySendOmniRigCustomCommand(command))
             {
-                HolyMessageBox.ShowWarning("Failed to send CW text CAT command to " + rigType + ".", "CW Text", this);
+                MessageBox.Show("Failed to send CW text CAT command to " + rigType + ".", "CW Text", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -2434,27 +2433,16 @@ namespace HolyLogger
         // and leaves anything that can't be confirmed sent as pending so nothing is ever lost. Called
         // only from the queue window's "Send" button. Returns the number of QSOs successfully uploaded
         // in this pass. Must run on the UI thread (touches DB + UI).
-        private async System.Threading.Tasks.Task<int> PumpEqslQueue(bool force = false, UploadProgressWindow progressWindow = null)
+        private async System.Threading.Tasks.Task<int> PumpEqslQueue()
         {
             if (dal == null) return 0;
 
-            // On a forced exit-upload, wait up to 30 s for any concurrent pump to finish rather
-            // than silently skipping. For normal fire-and-forget calls, give up immediately.
-            var timeout = force ? TimeSpan.FromSeconds(30) : TimeSpan.Zero;
-            if (!await _eqslPumpLock.WaitAsync(timeout)) return 0;
+            if (!await _eqslPumpLock.WaitAsync(0)) return 0;
             try
             {
                 // Only QSOs whose callsign has an account come back here.
                 System.Collections.Generic.List<QSO> pending = dal.GetPendingEqslQsos();
                 int sentCount = 0;
-
-                if (progressWindow != null)
-                {
-                    if (pending.Count > 0)
-                        progressWindow.StartService("eQSL", pending.Count);
-                    else
-                        progressWindow.SkipService("eQSL", "nothing to upload — queue is empty");
-                }
 
                 // Load the accounts once into a callsign-keyed map (case-insensitive, matching the DB
                 // NOCASE collation) instead of querying GetEqslAccount per QSO.
@@ -2492,12 +2480,10 @@ namespace HolyLogger
                     {
                         dal.SetEqslStatus(qso.id, 1);
                         sentCount++;
-                        progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, true);
                     }
                     else if (outcome == 2)   // permanently rejected (bad record) - skip so it can't block the queue
                     {
                         dal.SetEqslStatus(qso.id, 2);
-                        progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
                     }
                     // outcome 0 (unrecognized reply, e.g. one account's auth failed) -> leave this QSO
                     // pending and move on to the next, so one bad account can't block the others.
@@ -2593,10 +2579,8 @@ namespace HolyLogger
                 if (qso == null || dal == null) return;
                 if (!QrzPushEnabled) return;
 
-                // Wait for any concurrent pump to finish (e.g. the startup retry pass).
-                // Using a timeout instead of WaitAsync(0) so a just-saved QSO is not silently
-                // skipped when the startup pump is still holding the lock.
-                if (!await _qrzPumpLock.WaitAsync(TimeSpan.FromSeconds(30))) return;
+                // If a push pass is already running, leave this QSO pending; it gets picked up later.
+                if (!await _qrzPumpLock.WaitAsync(0)) return;
                 try
                 {
                     string key = Properties.Settings.Default.qrz_api_key.Trim();
@@ -2624,31 +2608,18 @@ namespace HolyLogger
         // anything that could not be pushed while offline is retried automatically. Stops on the first
         // network error (everything else stays pending); a per-record rejection is marked and skipped so
         // one bad record can't block the queue. Never throws.
-        // force=true bypasses the QrzPushEnabled guard — used by the on-exit upload when the user
-        // explicitly confirmed the upload even though real-time auto-push is turned off.
-        private async System.Threading.Tasks.Task PumpQrzQueue(bool force = false, UploadProgressWindow progressWindow = null)
+        private async System.Threading.Tasks.Task PumpQrzQueue()
         {
             try
             {
                 if (dal == null) return;
-                if (!force && !QrzPushEnabled) return;
+                if (!QrzPushEnabled) return;
 
-                // When forced (exit-upload), wait up to 30 s for a concurrent pump to finish.
-                // For regular fire-and-forget calls give up immediately so the caller is not blocked.
-                var lockTimeout = force ? TimeSpan.FromSeconds(30) : TimeSpan.Zero;
-                if (!await _qrzPumpLock.WaitAsync(lockTimeout)) return;
+                if (!await _qrzPumpLock.WaitAsync(0)) return;
                 try
                 {
                     string key = Properties.Settings.Default.qrz_api_key.Trim();
                     System.Collections.Generic.List<QSO> pending = dal.GetPendingQrzQsos();
-
-                    if (progressWindow != null)
-                    {
-                        if (pending.Count > 0)
-                            progressWindow.StartService("QRZ Logbook", pending.Count);
-                        else
-                            progressWindow.SkipService("QRZ Logbook", "nothing to upload — queue is empty");
-                    }
 
                     foreach (var qso in pending)
                     {
@@ -2658,22 +2629,15 @@ namespace HolyLogger
                             break;   // offline -> stop; the rest stays pending for next time
 
                         if (r.Ok)
-                        {
                             dal.SetQrzStatus(qso.id, 1, r.LogId);
-                            progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, true);
-                        }
                         else if (r.IsPermanentFailure)
-                        {
                             dal.SetQrzStatus(qso.id, 2, null);
-                            progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
-                        }
                     }
                 }
                 finally
                 {
                     _qrzPumpLock.Release();
                 }
-                UpdateQrzMenuCount();
             }
             catch
             {
@@ -2702,6 +2666,8 @@ namespace HolyLogger
 
             if (SendQueueToEqslMenuItem != null)
             {
+                SendQueueToEqslMenuItem.IsEnabled = any;
+
                 // Build the header with just the word "eQSL" in bold; always append the count
                 // (including (0)) so the queue state is never ambiguous.
                 var header = new System.Windows.Controls.TextBlock();
@@ -2868,24 +2834,36 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(tqslPath) || !System.IO.File.Exists(tqslPath))
             {
-                HolyMessageBox.ShowWarning("TQSL executable not found.\nPlease set the correct path in Options → LoTW Upload.", "LoTW Upload", this);
+                System.Windows.Forms.MessageBox.Show(
+                    "TQSL executable not found.\nPlease set the correct path in Options → LoTW Upload.",
+                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Warning);
                 return;
             }
             if (string.IsNullOrWhiteSpace(location))
             {
-                HolyMessageBox.ShowWarning("Station location is not configured.\nPlease set it in Options → LoTW Upload.", "LoTW Upload", this);
+                System.Windows.Forms.MessageBox.Show(
+                    "Station location is not configured.\nPlease set it in Options → LoTW Upload.",
+                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Warning);
                 return;
             }
 
             var pending = dal.GetPendingLotwQsos();
             if (pending.Count == 0)
             {
-                HolyMessageBox.Show("No pending QSOs to upload to LoTW.", "LoTW Upload", HolyMsgType.Info, this);
+                System.Windows.Forms.MessageBox.Show(
+                    "No pending QSOs to upload to LoTW.",
+                    "LoTW Upload", System.Windows.Forms.MessageBoxButtons.OK,
+                    System.Windows.Forms.MessageBoxIcon.Information);
                 return;
             }
 
-            if (!HolyMessageBox.ShowConfirm($"Upload {pending.Count} pending QSO(s) to LoTW?\n\nStation location: {location}", "LoTW Upload", HolyMsgType.Warning, this))
-                return;
+            var confirm = System.Windows.Forms.MessageBox.Show(
+                $"Upload {pending.Count} pending QSO(s) to LoTW?\n\nStation location: {location}",
+                "LoTW Upload", System.Windows.Forms.MessageBoxButtons.YesNo,
+                System.Windows.Forms.MessageBoxIcon.Question);
+            if (confirm != System.Windows.Forms.DialogResult.Yes) return;
 
             SendQueueToLotwMenuItem.IsEnabled = false;
             try { await UploadLotwQueueCoreAsync(pending, tqslPath, location, password); }
@@ -2895,13 +2873,12 @@ namespace HolyLogger
         // Core LoTW queue upload — writes the ADIF, signs+uploads via TQSL, clears the queue on
         // success and reports the result. Shared by the "Upload Queue to LoTW" menu command and the
         // upload-on-exit feature.
-        private async Task UploadLotwQueueCoreAsync(List<QSO> pending, string tqslPath, string location, string password, UploadProgressWindow progressWindow = null)
+        private async Task UploadLotwQueueCoreAsync(List<QSO> pending, string tqslPath, string location, string password)
         {
             string adiPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "holylogger_lotw.adi");
             UploadProgressTitle = "LoTW Upload";
             UploadProgress = $"Preparing QSO 0 / {pending.Count:N0}";
-            if (progressWindow == null) ToggleUploadProgress(Visibility.Visible);
-            else progressWindow.StartService("LoTW", pending.Count);
+            ToggleUploadProgress(Visibility.Visible);
             var lotwProgress = new Progress<string>(msg => UploadProgress = msg);
             try
             {
@@ -2911,7 +2888,7 @@ namespace HolyLogger
                 UploadProgress = $"Signing QSO 0 / {toSign:N0}";
                 var result = await LotwUploader.SignAndUploadAsync(
                     tqslPath, location, password, adiPath, lotwProgress, toSign);
-                if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
+                ToggleUploadProgress(Visibility.Hidden);
 
                 // Always save TQSL's full report so the actual outcome can be inspected.
                 string reportPath = System.IO.Path.Combine(
@@ -2933,14 +2910,11 @@ namespace HolyLogger
                 {
                     // TQSL found no QSOs to process — something is off; leave the queue untouched.
                     UpdateLotwMenuCount();
-                    if (progressWindow != null)
-                        progressWindow.ReportBatchResult("TQSL found no QSOs to process — queue unchanged", false);
-                    else
-                        HolyMessageBox.ShowWarning(
-                            "TQSL did not process any QSOs.\n\n" +
-                            "The queue was left unchanged. The full TQSL report was saved to " +
-                            "lotw_last_upload.txt on your Desktop.",
-                            "LoTW Upload", this);
+                    System.Windows.MessageBox.Show(
+                        "TQSL did not process any QSOs.\n\n" +
+                        "The queue was left unchanged. The full TQSL report was saved to " +
+                        "lotw_last_upload.txt on your Desktop.",
+                        "LoTW Upload", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 else
                 {
@@ -2953,34 +2927,22 @@ namespace HolyLogger
                     }
                     UpdateLotwMenuCount();
                     int handled = pending.Count - skippedNoBand;
-                    if (progressWindow != null)
-                    {
-                        string resultLine = result.NothingUploaded
-                            ? $"All {handled:N0} QSO(s) already in LoTW (duplicates — queue cleared)"
-                            : $"{handled:N0} QSO(s) uploaded to LoTW";
-                        if (skippedNoBand > 0)
-                            resultLine += $" ({skippedNoBand:N0} skipped — no band/frequency)";
-                        progressWindow.ReportBatchResult(resultLine, true);
-                    }
+                    var sb = new System.Text.StringBuilder();
+                    if (result.NothingUploaded)
+                        sb.AppendLine($"All {handled:N0} QSO(s) are already in LoTW (detected as duplicates).\n\nThey have been cleared from the upload queue.");
                     else
-                    {
-                        var sb = new System.Text.StringBuilder();
-                        if (result.NothingUploaded)
-                            sb.AppendLine($"All {handled:N0} QSO(s) are already in LoTW (detected as duplicates).\n\nThey have been cleared from the upload queue.");
-                        else
-                            sb.AppendLine($"Successfully uploaded {handled:N0} QSO(s) to LoTW.");
-                        if (skippedNoBand > 0)
-                            sb.AppendLine($"\n{skippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
-                        sb.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
-                        HolyMessageBox.ShowSuccess(
-                            sb.ToString().TrimEnd(),
-                            "LoTW Upload", this);
-                    }
+                        sb.AppendLine($"Successfully uploaded {handled:N0} QSO(s) to LoTW.");
+                    if (skippedNoBand > 0)
+                        sb.AppendLine($"\n{skippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
+                    sb.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
+                    System.Windows.MessageBox.Show(
+                        sb.ToString().TrimEnd(),
+                        "LoTW Upload", MessageBoxButton.OK, MessageBoxImage.Information);
                 }
             }
             catch (Exception ex)
             {
-                if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
+                ToggleUploadProgress(Visibility.Hidden);
                 try
                 {
                     string logPath = System.IO.Path.Combine(
@@ -2992,13 +2954,10 @@ namespace HolyLogger
                         System.Text.Encoding.UTF8);
                 }
                 catch { }
-                if (progressWindow != null)
-                    progressWindow.ReportBatchResult($"Upload failed: {ex.Message}", false);
-                else
-                    HolyMessageBox.ShowError(
-                        "LoTW upload failed:\n\n" + ex.Message +
-                        "\n\nDetails written to lotw_upload_error.txt on your Desktop.",
-                        "LoTW Upload Failed", this);
+                System.Windows.MessageBox.Show(
+                    "LoTW upload failed:\n\n" + ex.Message +
+                    "\n\nDetails written to lotw_upload_error.txt on your Desktop.",
+                    "LoTW Upload Failed", MessageBoxButton.OK, MessageBoxImage.Error);
             }
             finally
             {
@@ -3093,7 +3052,7 @@ namespace HolyLogger
         private void EditQsoFromContextMenu(QSO qso)
         {
             if (qso == null) return;
-            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || HolyMessageBox.ShowConfirm("Do you want to override current QSO?", "Edit QSO", HolyMsgType.Warning, this))
+            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || System.Windows.Forms.MessageBox.Show("Do you want to override current QSO?", "Edit QSO", System.Windows.Forms.MessageBoxButtons.YesNo, System.Windows.Forms.MessageBoxIcon.Question) == System.Windows.Forms.DialogResult.Yes)
             {
                 QsoToUpdate = qso;
                 try
@@ -3108,7 +3067,7 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Error: " + ex.Message, "Edit QSO", this);
+                    System.Windows.Forms.MessageBox.Show("Error! " + ex.Message);
                 }
                 UpdateMatrix();
             }
@@ -3117,7 +3076,7 @@ namespace HolyLogger
         private void DeleteQsoFromContextMenu(QSO qso)
         {
             if (qso == null) return;
-            if (!HolyMessageBox.ShowConfirm("Are you sure you want to delete this QSO?\n\n" + (qso.DXCall ?? string.Empty), "Delete Confirmation", HolyMsgType.Warning, this))
+            if (System.Windows.MessageBox.Show("Are you sure you want to delete this QSO?\n\n" + (qso.DXCall ?? string.Empty), "Delete Confirmation", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 
             // Remove from the filtered view (if present) so the grid updates immediately,
@@ -3135,7 +3094,7 @@ namespace HolyLogger
             string freqText = (qso.Freq ?? string.Empty).Trim();
             if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqValue) || freqValue <= 0)
             {
-                HolyMessageBox.ShowWarning("This QSO has no valid frequency.", "Set Radio to Frequency", this);
+                System.Windows.MessageBox.Show("This QSO has no valid frequency.", "Set Radio to Freq", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -3404,7 +3363,7 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError(ex.Message, "Spot Failed", dialog);
+                    MessageBox.Show(dialog, ex.Message, "Spot Failed", MessageBoxButton.OK, MessageBoxImage.Warning);
                 }
                 finally
                 {
@@ -3787,7 +3746,7 @@ namespace HolyLogger
 
             if (!TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out string rigType, out string errorMessage))
             {
-                HolyMessageBox.ShowWarning(errorMessage, "Voice Message", this);
+                MessageBox.Show(errorMessage, "Voice Message", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
@@ -3797,7 +3756,7 @@ namespace HolyLogger
             {
                 if (!string.IsNullOrWhiteSpace(profile.StopCommand) && !TrySendOmniRigCustomCommand(profile.StopCommand))
                 {
-                    HolyMessageBox.ShowWarning("Failed to send the stop CAT command to " + rigType + ".", "Voice Message", this);
+                    MessageBox.Show("Failed to send the stop CAT command to " + rigType + ".", "Voice Message", MessageBoxButton.OK, MessageBoxImage.Warning);
                     return;
                 }
 
@@ -3813,13 +3772,13 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(command))
             {
-                HolyMessageBox.ShowWarning("No voice-message CAT command is defined for this button.", "Voice Message", this);
+                MessageBox.Show("No voice-message CAT command is defined for this button.", "Voice Message", MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
 
             if (!TrySendOmniRigCustomCommand(command))
             {
-                HolyMessageBox.ShowWarning("Failed to send the CAT command to " + rigType + ".", "Voice Message", this);
+                MessageBox.Show("Failed to send the CAT command to " + rigType + ".", "Voice Message", MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
 
@@ -4243,7 +4202,9 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Failed to save the backup:\n" + ex.Message + "\n\nReplace cancelled — your log was not changed.", "Backup Failed", this);
+                System.Windows.MessageBox.Show(this,
+                    "Failed to save the backup:\n" + ex.Message + "\n\nReplace cancelled — your log was not changed.",
+                    "Backup failed", MessageBoxButton.OK, MessageBoxImage.Error);
                 return false;
             }
 
@@ -4273,7 +4234,8 @@ namespace HolyLogger
             if (e.Error != null)
             {
                 ToggleUploadProgress(Visibility.Hidden);
-                HolyMessageBox.ShowError($"Import failed.\n\n{e.Error.Message}", "Import Error", this);
+                System.Windows.Forms.MessageBox.Show($"Import failed.\n\n{e.Error.Message}", "Import Error",
+                    System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error);
                 return;
             }
 
@@ -4304,14 +4266,16 @@ namespace HolyLogger
 
             if (result.FaultyQso > 0)
             {
-                HolyMessageBox.ShowWarning($"{result.FaultyQso} QSO(s) failed to import. Check the file format and try again.", "Import Complete with Errors", this);
+                System.Windows.Forms.MessageBox.Show($"{result.FaultyQso} QSO(s) failed to import. Check the file format and try again.", 
+                    "Import Complete with Errors", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning);
             }
             else
             {
                 if (result.ImportedQsoCount > 0)
                 {
                     int totalQsos = result.RefreshedQsos != null ? result.RefreshedQsos.Count : dal.GetQsoCount();
-                    HolyMessageBox.ShowSuccess($"Import completed successfully!\nImported QSOs: {result.ImportedQsoCount}\nTotal QSOs in log: {totalQsos}", "Import Complete", this);
+                    System.Windows.Forms.MessageBox.Show($"Import completed successfully!\nImported QSOs: {result.ImportedQsoCount}\nTotal QSOs in log: {totalQsos}", 
+                        "Import Complete", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Information);
                 }
             }
             TB_Comment.Text = "";
@@ -4361,7 +4325,8 @@ namespace HolyLogger
                     if (!File.Exists(filename))
                     {
                         this.Dispatcher.Invoke(() =>
-                            HolyMessageBox.ShowError($"File not found:\n{filename}", "Import Error", this));
+                            System.Windows.Forms.MessageBox.Show($"File not found:\n{filename}", "Import Error", 
+                                System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error));
                         continue;
                     }
 
@@ -4372,7 +4337,8 @@ namespace HolyLogger
                     if (string.IsNullOrWhiteSpace(RawAdif))
                     {
                         this.Dispatcher.Invoke(() =>
-                            HolyMessageBox.ShowWarning($"File is empty:\n{filename}", "Import Error", this));
+                            System.Windows.Forms.MessageBox.Show($"File is empty:\n{filename}", "Import Error", 
+                                System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning));
                         continue;
                     }
 
@@ -4395,7 +4361,8 @@ namespace HolyLogger
                     if (count == 0)
                     {
                         this.Dispatcher.Invoke(() =>
-                            HolyMessageBox.ShowWarning($"No QSOs found in file:\n{filename}\n\nThe file may be in an unsupported format or empty.", "Import Warning", this));
+                            System.Windows.Forms.MessageBox.Show($"No QSOs found in file:\n{filename}\n\nThe file may be in an unsupported format or empty.", 
+                                "Import Warning", System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Warning));
                         continue;
                     }
 
@@ -4416,12 +4383,13 @@ namespace HolyLogger
                             string fileName = System.IO.Path.GetFileName(filename);
                             string callsInFile = fileCalls.Count > 0 ? string.Join(", ", fileCalls) : "(none)";
                             bool approved = this.Dispatcher.Invoke(() =>
-                                HolyMessageBox.ShowConfirm(
+                                System.Windows.MessageBox.Show(this,
                                     "The ADIF file \"" + fileName + "\" contains QSOs logged under a different callsign than your current station callsign.\n\n" +
                                     "Callsign(s) in the file:  " + callsInFile + "\n" +
                                     "Your current station callsign:  " + myCallsign.Trim() + "\n\n" +
                                     "Do you want to import these QSOs into your log anyway?",
-                                    "Different callsign in ADIF file", HolyMsgType.Warning, this));
+                                    "Different callsign in ADIF file",
+                                    MessageBoxButton.YesNo, MessageBoxImage.Warning) == MessageBoxResult.Yes);
 
                             if (!approved)
                             {
@@ -4472,7 +4440,8 @@ namespace HolyLogger
                         errorMsg += $"\n\nDetails: {ex.InnerException.Message}";
                     }
                     this.Dispatcher.Invoke(() =>
-                        HolyMessageBox.ShowError(errorMsg, "Import Error", this));
+                        System.Windows.Forms.MessageBox.Show(errorMsg, "Import Error", 
+                            System.Windows.Forms.MessageBoxButtons.OK, System.Windows.Forms.MessageBoxIcon.Error));
                 }
             }
 
@@ -4544,12 +4513,12 @@ namespace HolyLogger
                     {
                         sw.Write(adif);
                     }
-                    HolyMessageBox.ShowSuccess("File created successfully!", "Export ADIF", this);
+                    MessageBox.Show("File created successfully!");
                 }
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", this);
+                MessageBox.Show("Export failed: " + ex.Message);
             }
         }
 
@@ -4587,12 +4556,12 @@ namespace HolyLogger
                     {
                         sw.Write(cabrillo);
                     }
-                    HolyMessageBox.ShowSuccess("File created successfully!", "Export Cabrillo", this);
+                    MessageBox.Show("File created successfully!");
                 }
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export Cabrillo", this);
+                MessageBox.Show("Export failed: " + ex.Message);
             }
         }
 
@@ -4618,12 +4587,12 @@ namespace HolyLogger
                     {
                         sw.Write(adif);
                     }
-                    HolyMessageBox.ShowSuccess("File created successfully!", "Export CSV", this);
+                    MessageBox.Show("File created successfully!");
                 }
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export CSV", this);
+                MessageBox.Show("Export failed: " + ex.Message);
             }
 
         }
@@ -4633,7 +4602,7 @@ namespace HolyLogger
             LogUploadWindow w = (LogUploadWindow)sender;
             if (Qsos.Count == 0)
             {
-                HolyMessageBox.ShowWarning("Cannot upload an empty log.", "Log Upload", this);
+                System.Windows.Forms.MessageBox.Show("You can not upload empty log");
                 w.Close();
                 return;
             }
@@ -4647,14 +4616,14 @@ namespace HolyLogger
             {
                 string UploadCabrilloToIARC_result = await UploadCabrilloToIARC(bareCallsign, w.selectedOperator.Name, w.selectedMode.Name, w.selectedBand.Name, w.selectedPower.Name, w.selectedOverlay.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country, dal.GetAllQSOs());
                 w.Close();
-                HolyMessageBox.Show(UploadCabrilloToIARC_result, "Log Upload", HolyMsgType.Info, this);
+                System.Windows.Forms.MessageBox.Show(UploadCabrilloToIARC_result);
             }
             else
             {
                 string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedOperator.Name, w.selectedMode.Name, w.selectedPower.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
                 string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
                 w.Close();
-                HolyMessageBox.Show(UploadLogToIARC_result, "Log Upload", HolyMsgType.Info, this);
+                System.Windows.Forms.MessageBox.Show(UploadLogToIARC_result);
             }
             
         }
@@ -4891,8 +4860,15 @@ namespace HolyLogger
         {
             if (e.Key == Key.Delete)
             {
-                if (!HolyMessageBox.ShowConfirm("Are you sure you want to delete this QSO?", "Delete Confirmation", HolyMsgType.Warning, this))
+                MessageBoxResult messageBoxResult = System.Windows.MessageBox.Show("Are you sure?", "Delete Confirmation", System.Windows.MessageBoxButton.YesNo);
+                if (messageBoxResult == MessageBoxResult.Yes)
+                {
+
+                }
+                else
+                {
                     e.Handled = true;
+                }
             }
         }
 
@@ -5253,7 +5229,7 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
-                HolyMessageBox.ShowError("Parsing failed.", "HolyLogger", this);
+                System.Windows.Forms.MessageBox.Show("Parsing failed.");
             }
         }
 
@@ -5269,19 +5245,12 @@ namespace HolyLogger
             if (_isShutdownCleanupDone)
                 return;
 
-            // Upload-on-exit: show ALL service dialogs in one pass before any uploading starts,
-            // so we never call Close() from inside an async upload (which caused freezes when the
-            // second/third dialog tried to show while the main window was already half-destroyed).
-            // A single UploadAllAndCloseAsync call does all uploads, then calls Close() exactly once.
-            if (!_uploadOnExitHandled)
+            // Upload-on-exit: show dialog synchronously here so "No" / "Cancel" never need to
+            // call Close() again — they just fall through or return from this handler directly.
+            // Only "Yes" (upload) cancels the close and starts the async upload.
+            if (!_lotwExitHandled)
             {
-                _uploadOnExitHandled = true;
-
-                List<QSO> lotwToUpload = null;
-                bool uploadEqsl = false;
-                bool uploadQrz = false;
-
-                // ── LoTW ─────────────────────────────────────────────────────────────────────
+                _lotwExitHandled = true;
                 int lotwMode = Properties.Settings.Default.LotwUploadOnExitMode;
                 if (lotwMode != 0)
                 {
@@ -5289,82 +5258,35 @@ namespace HolyLogger
                     try { lotwPending = dal?.GetPendingLotwQsos(); } catch { }
                     if (lotwPending != null && lotwPending.Count > 0)
                     {
-                        bool doUpload = lotwMode == 2;
-                        if (lotwMode == 1)
+                        bool doUpload = false;
+                        if (lotwMode == 1) // Ask
                         {
                             var dlg = new LotwUploadOnExitDialog(lotwPending.Count) { Owner = this };
                             dlg.ShowDialog();
                             if (dlg.Choice == LotwExitChoice.Cancel)
                             {
-                                _uploadOnExitHandled = false;
+                                _lotwExitHandled = false;   // re-ask next close attempt
                                 e.Cancel = true;
                                 return;
                             }
                             doUpload = dlg.Choice == LotwExitChoice.Upload;
+                            // ExitWithout → doUpload stays false → fall through to normal shutdown
                         }
-                        if (doUpload) lotwToUpload = lotwPending;
-                    }
-                }
-
-                // ── eQSL ─────────────────────────────────────────────────────────────────────
-                int eqslMode = Properties.Settings.Default.EqslUploadOnExitMode;
-                if (eqslMode != 0)
-                {
-                    int eqslPending = 0;
-                    try { eqslPending = dal?.GetPendingEqslCount() ?? 0; } catch { }
-                    if (eqslPending > 0)
-                    {
-                        bool doUpload = eqslMode == 2;
-                        if (eqslMode == 1)
+                        else // mode 2: Always
                         {
-                            var dlg = new ServiceUploadOnExitDialog("eQSL", eqslPending) { Owner = this };
-                            dlg.ShowDialog();
-                            if (dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Cancel)
-                            {
-                                _uploadOnExitHandled = false;
-                                e.Cancel = true;
-                                return;
-                            }
-                            doUpload = dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Yes;
+                            doUpload = true;
                         }
-                        uploadEqsl = doUpload;
-                    }
-                }
 
-                // ── QRZ ──────────────────────────────────────────────────────────────────────
-                int qrzMode = Properties.Settings.Default.QrzUploadOnExitMode;
-                if (qrzMode != 0)
-                {
-                    int qrzPending = 0;
-                    try { qrzPending = dal?.GetPendingQrzCount() ?? 0; } catch { }
-                    if (qrzPending > 0)
-                    {
-                        bool doUpload = qrzMode == 2;
-                        if (qrzMode == 1)
+                        if (doUpload)
                         {
-                            var dlg = new ServiceUploadOnExitDialog("QRZ Logbook", qrzPending) { Owner = this };
-                            dlg.ShowDialog();
-                            if (dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Cancel)
-                            {
-                                _uploadOnExitHandled = false;
-                                e.Cancel = true;
-                                return;
-                            }
-                            doUpload = dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Yes;
+                            e.Cancel = true;
+                            LotwUploadThenCloseAsync(lotwPending);
+                            return;
                         }
-                        uploadQrz = doUpload;
                     }
-                }
-
-                if (lotwToUpload != null || uploadEqsl || uploadQrz)
-                {
-                    e.Cancel = true;
-                    UploadAllAndCloseAsync(lotwToUpload, uploadEqsl, uploadQrz);
-                    return;
                 }
             }
 
-            SaveAutosnapshot();
             _isShutdownCleanupDone = true;
 
             // Stop all timers before shutdown to prevent pending async operations
@@ -5414,63 +5336,34 @@ namespace HolyLogger
             try { MapControl.SpotHoverEnded -= OnMapSpotHoverEnded; } catch { }
         }
 
-        // Uploads any confirmed services in sequence, showing per-QSO progress, then closes exactly once.
-        // All confirmation dialogs were already shown in Window_Closing before this is called.
-        private async void UploadAllAndCloseAsync(List<QSO> lotwPending, bool uploadEqsl, bool uploadQrz)
+        // Called only when the user confirmed "Yes — Upload". Runs the upload then closes.
+        // The close in Window_Closing was already canceled before this is called, so there
+        // is no re-entrant close issue: when this calls this.Close() it is the only close.
+        private async void LotwUploadThenCloseAsync(List<QSO> pending)
         {
-            this.IsEnabled = false;
+            string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
+            string location = Properties.Settings.Default.LotwStationLocation?.Trim();
+            string password = Properties.Settings.Default.LotwTqslPassword;
 
-            // Check connectivity before showing the window so the window never appears blank
-            // while waiting for the network check to complete.
+            bool tqslConfigured = !string.IsNullOrWhiteSpace(tqslPath) && System.IO.File.Exists(tqslPath)
+                                  && !string.IsNullOrWhiteSpace(location);
             bool online = false;
             try { online = Helper.CheckForInternetConnection(); } catch { }
 
-            var progressWindow = new UploadProgressWindow { Owner = this };
-            progressWindow.Show();
-
-            if (lotwPending != null)
+            if (!online || !tqslConfigured)
             {
-                string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
-                string location = Properties.Settings.Default.LotwStationLocation?.Trim();
-                string password = Properties.Settings.Default.LotwTqslPassword;
-                bool tqslConfigured = !string.IsNullOrWhiteSpace(tqslPath) && System.IO.File.Exists(tqslPath)
-                                      && !string.IsNullOrWhiteSpace(location);
-                if (!online || !tqslConfigured)
-                {
-                    string why = !online ? "no internet connection"
-                        : "TQSL not configured (set path and location in Options → LoTW)";
-                    progressWindow.SkipService("LoTW", $"{lotwPending.Count:N0} QSO(s) — {why}");
-                }
-                else
-                {
-                    try { await UploadLotwQueueCoreAsync(lotwPending, tqslPath, location, password, progressWindow); } catch { }
-                }
+                string why = !online
+                    ? "there is no internet connection"
+                    : "LoTW/TQSL is not fully configured (set the TQSL path and station location in Options → LoTW)";
+                System.Windows.MessageBox.Show(
+                    $"{pending.Count:N0} QSO(s) are still waiting for LoTW, but they were not uploaded because {why}.\n\nThey remain in the queue.",
+                    "LoTW Upload Skipped", MessageBoxButton.OK, MessageBoxImage.Information);
             }
-
-            if (uploadEqsl)
+            else
             {
-                if (!online)
-                    progressWindow.SkipService("eQSL", "no internet connection — QSOs remain in queue");
-                else
-                    try { await PumpEqslQueue(force: true, progressWindow); } catch { }
+                try { await UploadLotwQueueCoreAsync(pending, tqslPath, location, password); }
+                catch { }
             }
-
-            if (uploadQrz)
-            {
-                bool qrzConfigured = Properties.Settings.Default.qrz_logbook_key_valid
-                                     && !string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_api_key);
-                if (!online || !qrzConfigured)
-                {
-                    string why = !online ? "no internet connection"
-                        : "API key not configured (set it in Options → QRZ)";
-                    progressWindow.SkipService("QRZ Logbook", $"{why} — QSOs remain in queue");
-                }
-                else
-                    try { await PumpQrzQueue(force: true, progressWindow); } catch { }
-            }
-
-            progressWindow.ShowComplete();
-            await progressWindow.WaitForOkAsync();
 
             this.Close();
         }
@@ -5705,7 +5598,8 @@ namespace HolyLogger
 
         private void ClearLogMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            if (HolyMessageBox.ShowConfirm("Are you sure you want to clear the entire log?", "Delete Confirmation", HolyMsgType.Warning, this))
+            MessageBoxResult messageBoxResult = System.Windows.MessageBox.Show("Are you sure?", "Delete Confirmation", System.Windows.MessageBoxButton.YesNo);
+            if (messageBoxResult == MessageBoxResult.Yes)
             {
 
                 string adif = Services.GenerateAdif(dal.GetAllQSOs());
@@ -5720,7 +5614,7 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    HolyMessageBox.ShowError("Backup failed: " + ex.Message, "Clear Log", this);
+                    MessageBox.Show("Backup failed: " + ex.Message);
                 }
                 finally
                 {
@@ -5737,91 +5631,6 @@ namespace HolyLogger
             {
                 e.Handled = true;
             }            
-        }
-
-        // ── Autosave ──────────────────────────────────────────────────────────────
-
-        private static readonly string AutosaveDir =
-            Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "autosave");
-
-        private void SaveAutosnapshot()
-        {
-            try
-            {
-                if (dal == null) return;
-                var qsos = dal.GetAllQSOs();
-                if (qsos == null || qsos.Count == 0) return;
-
-                Directory.CreateDirectory(AutosaveDir);
-                string filename = Path.Combine(AutosaveDir,
-                    "autosave_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi");
-                File.WriteAllText(filename, Services.GenerateAdif(qsos), Encoding.UTF8);
-
-                PruneAutosaves(AutosaveDir);
-            }
-            catch { }
-        }
-
-        private static void PruneAutosaves(string dir)
-        {
-            try
-            {
-                var files = Directory.GetFiles(dir, "autosave_*.adi")
-                    .Select(f => new FileInfo(f))
-                    .OrderByDescending(f => f.LastWriteTime)
-                    .ToList();
-
-                if (files.Count <= 5) return;
-
-                var cutoff = DateTime.Now.AddDays(-10);
-                foreach (var f in files.Skip(5))
-                {
-                    if (f.LastWriteTime < cutoff)
-                        try { f.Delete(); } catch { }
-                }
-            }
-            catch { }
-        }
-
-        private void ImportAutosaveMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            var dlg = new OpenFileDialog
-            {
-                Title = "Import Autosaved Log",
-                Filter = "ADIF files (*.adi;*.adif)|*.adi;*.adif|All files (*.*)|*.*",
-                FilterIndex = 1
-            };
-            if (Directory.Exists(AutosaveDir))
-                dlg.InitialDirectory = AutosaveDir;
-
-            if (dlg.ShowDialog() != true) return;
-
-            int existing = 0;
-            try { if (dal != null) existing = dal.GetQsoCount(); } catch { }
-
-            if (existing > 0)
-            {
-                ImportLogChoice choice = AskImportMergeOrReplace(existing);
-                if (choice == ImportLogChoice.Cancel) return;
-
-                if (choice == ImportLogChoice.Replace)
-                {
-                    // This is already a restore from backup, so no second backup is needed.
-                    Properties.Settings.Default.RecentQSOCounter = 0;
-                    Qsos.CollectionChanged -= Qsos_CollectionChanged;
-                    Qsos.Clear();
-                    Qsos.CollectionChanged += Qsos_CollectionChanged;
-                    dal.DeleteAll();
-                    ClearBtn_Click(null, null);
-                    UpdateNumOfQSOs();
-                    UpdateEqslQueueIndicator();
-                    UpdateQrzMenuCount();
-                }
-            }
-
-            ImportFileQ.Clear();
-            ImportFileQ.Add(dlg.FileName);
-            StartAdifImportWorker();
         }
 
         private void UploadMenuItem_Click(object sender, RoutedEventArgs e)
@@ -6036,7 +5845,7 @@ namespace HolyLogger
                 }
                 catch
                 {
-                    HolyMessageBox.ShowWarning("Failed to open UDP port.", "UDP Client", this);
+                    System.Windows.Forms.MessageBox.Show("Failed to open UDP port");
                     Properties.Settings.Default.EnableUDPClient = false;
                 }
             }
@@ -6060,7 +5869,7 @@ namespace HolyLogger
                 }
                 catch
                 {
-                    HolyMessageBox.ShowWarning("Failed to open N1MM+ UDP port.", "N1MM+ UDP Client", this);
+                    System.Windows.Forms.MessageBox.Show("Failed to open N1MM+ UDP port");
                     Properties.Settings.Default.EnableN1MMUDPClient = false;
                 }
             }
@@ -6238,7 +6047,7 @@ namespace HolyLogger
             }
             catch (Exception)
             {
-                HolyMessageBox.Show("Please install 'Chrome' and try again.", "HolyLogger", HolyMsgType.Info, this);
+                MessageBox.Show("Please install 'Chrome' and try again");
             }
         }
 
@@ -6251,7 +6060,7 @@ namespace HolyLogger
             }
             catch (Exception)
             {
-                HolyMessageBox.Show("Please install 'Chrome' and try again.", "HolyLogger", HolyMsgType.Info, this);
+                MessageBox.Show("Please install 'Chrome' and try again");
             }
         }
 
@@ -9074,7 +8883,6 @@ namespace HolyLogger
 
             // Rebuild the band selector panel to show the new color
             RebuildClusterBandSelector();
-            UpdateBandTextBoxColor();
 
             // Repaint everything already on screen with the new color instead of waiting for the
             // next spot to arrive: the cluster list's Freq color (FreqForeground is re-evaluated on
@@ -9920,7 +9728,7 @@ namespace HolyLogger
             }
             catch (Exception)
             {
-                HolyMessageBox.Show("Please install 'Chrome' and try again.", "HolyLogger", HolyMsgType.Info, this);
+                MessageBox.Show("Please install 'Chrome' and try again");
             }
         }
 
@@ -9933,7 +9741,7 @@ namespace HolyLogger
             }
             catch (Exception)
             {
-                HolyMessageBox.Show("Please install 'Chrome' and try again.", "HolyLogger", HolyMsgType.Info, this);
+                MessageBox.Show("Please install 'Chrome' and try again");
             }
         }
 
@@ -9962,8 +9770,15 @@ namespace HolyLogger
 
                     if (CompareVersions(CurrentVersion, responseFromServer))
                     {
-                        if (HolyMessageBox.ShowConfirm("There is a new version. Do you want to install?", "New updates are available", HolyMsgType.Info, this))
+                        string messageBoxText = "There is a new version. Do you want to install?";
+                        string caption = "New updates are available";
+                        MessageBoxButton button = MessageBoxButton.YesNoCancel;
+                        MessageBoxImage icon = MessageBoxImage.Warning;
+                        // Ensure the dialog is owned by the main window so it doesn't get closed when the splash window is closed
+                        if (MessageBox.Show(this, messageBoxText, caption, button, icon) == MessageBoxResult.Yes)
                         {
+                            //HolyLoggerMenuItem_Click(null, null);
+
                             try
                             {
                                 if (File.Exists(filename))
@@ -9976,7 +9791,7 @@ namespace HolyLogger
                             }
                             catch (Exception ex)
                             {
-                                HolyMessageBox.ShowError(ex.Message, "Download Error", this);
+                                MessageBox.Show(ex.Message.ToString());
                             }
                         }
                     }
@@ -9984,7 +9799,7 @@ namespace HolyLogger
                     {
                         if (NotifyVersionUpToDate)
                         {
-                            HolyMessageBox.ShowSuccess("Your version is up-to-date.", "HolyLogger", this);
+                            System.Windows.Forms.MessageBox.Show("Your version is up-to-date");
                         }
                         else
                         {
@@ -9994,7 +9809,7 @@ namespace HolyLogger
                 }
                 catch (Exception)
                 {
-                    HolyMessageBox.ShowWarning("Auto checking for update failed. Please try again manually later.", "HolyLogger Update", this);
+                    System.Windows.Forms.MessageBox.Show("Auto checking for update Failed. Please try manualy later.");
                 }
             }
         }
@@ -10011,7 +9826,7 @@ namespace HolyLogger
             }
             else
             {
-                HolyMessageBox.ShowError("Failed to download, please check your connection.", "Download Failed", this);
+                MessageBox.Show("Failed to download, please check your connection", "Download failed!");
             }
         }
 
@@ -10270,7 +10085,7 @@ namespace HolyLogger
             if (!MaidenheadLocator.IsValidLocator(locator))
             {
                 e.Handled = true;
-                HolyMessageBox.ShowWarning("\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72), optionally followed by 2 letters (e.g. KM72OR). Note: the 5th/6th characters are letters (O), not zeros (0).", "Invalid My Locator", this);
+                MessageBox.Show("\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72), optionally followed by 2 letters (e.g. KM72OR). Note: the 5th/6th characters are letters (O), not zeros (0).", "Invalid My Locator", MessageBoxButton.OK, MessageBoxImage.Warning);
                 TB_MyLocator.Focus();
                 TB_MyLocator.SelectAll();
             }
@@ -10296,27 +10111,6 @@ namespace HolyLogger
             if (string.Equals(Properties.Settings.Default.ClusterBandFilterMode, "Active", StringComparison.OrdinalIgnoreCase))
             {
                 RefreshClusterVisibleSpots();
-            }
-
-            UpdateBandTextBoxColor();
-        }
-
-        private void UpdateBandTextBoxColor()
-        {
-            if (TB_Band == null) return;
-            string band = TB_Band.Text;
-            if (string.IsNullOrWhiteSpace(band))
-            {
-                TB_Band.Foreground = SystemColors.ControlTextBrush;
-                return;
-            }
-            try
-            {
-                TB_Band.Foreground = (Brush)new BrushConverter().ConvertFromString(GetBandColor(band));
-            }
-            catch
-            {
-                TB_Band.Foreground = SystemColors.ControlTextBrush;
             }
         }
 
