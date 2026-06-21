@@ -189,6 +189,7 @@
     <Compile Include="EqslQueueWindow.cs" />
     <Compile Include="LotwUploader.cs" />
     <Compile Include="QrzLogbookService.cs" />
+    <Compile Include="TqslStationData.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="LogInfoWindow.xaml.cs">
       <DependentUpon>LogInfoWindow.xaml</DependentUpon>

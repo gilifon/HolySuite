@@ -9,12 +9,13 @@ namespace HolyLogger
     {
         public bool Confirmed { get; private set; }
 
-        private HolyMessageBox(string message, string title, HolyMsgType type, Window owner, bool confirm)
+        private HolyMessageBox(string message, string title, HolyMsgType type, Window owner, bool confirm, double width = 0)
         {
             InitializeComponent();
             Title = title;
             MessageText.Text = message;
             if (owner != null) Owner = owner;
+            if (width > 0) Width = width;
             ApplyType(type);
 
             if (confirm)
@@ -65,9 +66,9 @@ namespace HolyLogger
         // ── Static helpers ────────────────────────────────────────────────
 
         public static void Show(string message, string title = "HolyLogger",
-            HolyMsgType type = HolyMsgType.Info, Window owner = null)
+            HolyMsgType type = HolyMsgType.Info, Window owner = null, double width = 0)
         {
-            new HolyMessageBox(message, title, type, owner, confirm: false).ShowDialog();
+            new HolyMessageBox(message, title, type, owner, confirm: false, width).ShowDialog();
         }
 
         public static bool ShowConfirm(string message, string title = "HolyLogger",
@@ -84,7 +85,7 @@ namespace HolyLogger
         public static void ShowError(string message, string title = "HolyLogger", Window owner = null)
             => Show(message, title, HolyMsgType.Error, owner);
 
-        public static void ShowWarning(string message, string title = "HolyLogger", Window owner = null)
-            => Show(message, title, HolyMsgType.Warning, owner);
+        public static void ShowWarning(string message, string title = "HolyLogger", Window owner = null, double width = 0)
+            => Show(message, title, HolyMsgType.Warning, owner, width);
     }
 }

@@ -461,6 +461,9 @@
     <Setting Name="LotwStationLocation" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>
+    <Setting Name="LotwCallsignLocations" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
     <Setting Name="LotwTqslPassword" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>

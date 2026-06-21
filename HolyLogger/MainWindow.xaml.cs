@@ -2863,17 +2863,11 @@ namespace HolyLogger
         private async void SendQueueToLotwMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
-            string location = Properties.Settings.Default.LotwStationLocation?.Trim();
             string password = Properties.Settings.Default.LotwTqslPassword;
 
             if (string.IsNullOrWhiteSpace(tqslPath) || !System.IO.File.Exists(tqslPath))
             {
                 HolyMessageBox.ShowWarning("TQSL executable not found.\nPlease set the correct path in Options → LoTW Upload.", "LoTW Upload", this);
-                return;
-            }
-            if (string.IsNullOrWhiteSpace(location))
-            {
-                HolyMessageBox.ShowWarning("Station location is not configured.\nPlease set it in Options → LoTW Upload.", "LoTW Upload", this);
                 return;
             }
 
@@ -2884,18 +2878,32 @@ namespace HolyLogger
                 return;
             }
 
-            if (!HolyMessageBox.ShowConfirm($"Upload {pending.Count} pending QSO(s) to LoTW?\n\nStation location: {location}", "LoTW Upload", HolyMsgType.Warning, this))
+            // Resolve each callsign in the queue to its TQSL station location and show the plan.
+            var preview = ResolveLotwGroupsPreview(pending, out int resolvable);
+            if (resolvable == 0)
+            {
+                HolyMessageBox.ShowWarning(
+                    "None of the pending QSOs can be matched to a TQSL station location:\n\n" +
+                    string.Join("\n", preview) +
+                    "\n\nCreate the station location(s) in TQSL, then pick them in Options → LoTW Upload.",
+                    "LoTW Upload", this);
+                return;
+            }
+
+            if (!HolyMessageBox.ShowConfirm(
+                    $"Upload {resolvable} pending QSO(s) to LoTW?\n\n" + string.Join("\n", preview),
+                    "LoTW Upload", HolyMsgType.Warning, this))
                 return;
 
             SendQueueToLotwMenuItem.IsEnabled = false;
-            try { await UploadLotwQueueCoreAsync(pending, tqslPath, location, password); }
+            try { await UploadLotwQueueCoreAsync(pending, tqslPath, password); }
             finally { SendQueueToLotwMenuItem.IsEnabled = true; }
         }
 
         // Core LoTW queue upload — writes the ADIF, signs+uploads via TQSL, clears the queue on
         // success and reports the result. Shared by the "Upload Queue to LoTW" menu command and the
         // upload-on-exit feature.
-        private async Task UploadLotwQueueCoreAsync(List<QSO> pending, string tqslPath, string location, string password, UploadProgressWindow progressWindow = null)
+        private async Task UploadLotwQueueCoreAsync(List<QSO> pending, string tqslPath, string password, UploadProgressWindow progressWindow = null)
         {
             string adiPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "holylogger_lotw.adi");
             UploadProgressTitle = "LoTW Upload";
@@ -2903,80 +2911,137 @@ namespace HolyLogger
             if (progressWindow == null) ToggleUploadProgress(Visibility.Visible);
             else progressWindow.StartService("LoTW", pending.Count);
             var lotwProgress = new Progress<string>(msg => UploadProgress = msg);
+
+            string savedPicks = Properties.Settings.Default.LotwCallsignLocations;
+
+            // Group the queue by station callsign. Each group is signed with the TQSL station
+            // location (and therefore the certificate) that belongs to that callsign, so QSOs made
+            // under a special-event call are credited to that call, not to the everyday callsign.
+            var groups = pending
+                .GroupBy(q => (q.MyCall ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            int totalUploaded = 0;                  // QSOs accepted by LoTW (uploaded or duplicate)
+            int totalSkippedNoBand = 0;
+            var unresolved = new List<string>();    // callsign groups left in the queue (no location)
+            var failures = new List<string>();      // callsign groups that errored at TQSL
+            var reportSb = new System.Text.StringBuilder();
+            reportSb.AppendLine($"LoTW upload report — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            reportSb.AppendLine();
+
             try
             {
-                int skippedNoBand = 0;
-                await Task.Run(() => { skippedNoBand = LotwUploader.WriteAdif(pending, adiPath, lotwProgress); });
-                int toSign = pending.Count - skippedNoBand;
-                UploadProgress = $"Signing QSO 0 / {toSign:N0}";
-                var result = await LotwUploader.SignAndUploadAsync(
-                    tqslPath, location, password, adiPath, lotwProgress, toSign);
-                if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
+                foreach (var group in groups)
+                {
+                    string call = group.Key;
+                    string callLabel = string.IsNullOrEmpty(call) ? "(no callsign)" : call;
+                    var qsos = group.ToList();
 
-                // Always save TQSL's full report so the actual outcome can be inspected.
+                    var choice = LotwStationResolver.Resolve(call, savedPicks);
+                    if (string.IsNullOrWhiteSpace(choice.LocationName))
+                    {
+                        // Cannot sign this callsign — leave its QSOs in the queue and say why.
+                        string reason = choice.Ambiguous
+                            ? $"{callLabel}: {qsos.Count} QSO(s) — several TQSL locations, choose one in Options → LoTW"
+                            : $"{callLabel}: {qsos.Count} QSO(s) — no TQSL certificate / station location";
+                        unresolved.Add(reason);
+                        reportSb.AppendLine($"=== {callLabel}: SKIPPED — {reason} (left in queue) ===");
+                        continue;
+                    }
+
+                    string location = choice.LocationName;
+                    UploadProgress = $"Preparing {callLabel}: 0 / {qsos.Count:N0}";
+                    int skippedNoBand = 0;
+                    await Task.Run(() => { skippedNoBand = LotwUploader.WriteAdif(qsos, adiPath, lotwProgress); });
+                    totalSkippedNoBand += skippedNoBand;
+                    int toSign = qsos.Count - skippedNoBand;
+                    if (toSign <= 0)
+                    {
+                        reportSb.AppendLine($"=== {callLabel} via \"{location}\": no QSOs with band/frequency — skipped ===");
+                        continue;
+                    }
+
+                    UploadProgress = $"Signing {callLabel}: 0 / {toSign:N0}";
+                    LotwUploadResult result;
+                    try
+                    {
+                        result = await LotwUploader.SignAndUploadAsync(
+                            tqslPath, location, password, adiPath, lotwProgress, toSign);
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add($"{callLabel} → \"{location}\": {ex.Message}");
+                        reportSb.AppendLine($"=== {callLabel} via \"{location}\": ERROR {ex.Message} (left in queue) ===");
+                        continue;
+                    }
+
+                    reportSb.AppendLine($"=== {callLabel} via \"{location}\" — TQSL exit {result.ExitCode} ===");
+                    reportSb.AppendLine(result.Detail ?? string.Empty);
+                    reportSb.AppendLine();
+
+                    if (result.ExitCode == 8)
+                    {
+                        // TQSL processed nothing (usually a callsign/location mismatch) — leave in queue.
+                        failures.Add($"{callLabel}: TQSL processed no QSOs — check the station location matches the callsign");
+                    }
+                    else
+                    {
+                        // exit 0 = uploaded, exit 9 = already in LoTW (duplicates). Either way the
+                        // QSOs are now in LoTW, so clear this group from the queue.
+                        foreach (var q in qsos)
+                            if (!string.IsNullOrWhiteSpace(q.Band) || !string.IsNullOrWhiteSpace(q.Freq))
+                                dal.SetLotwStatus(q.id, 1);
+                        totalUploaded += toSign;
+                    }
+                }
+
+                if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
+                UpdateLotwMenuCount();
+
+                // Save the combined TQSL report to the Desktop for inspection.
                 string reportPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                    "lotw_last_upload.txt");
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "lotw_last_upload.txt");
                 try
                 {
-                    string detail = result.Detail ?? "";
+                    string detail = reportSb.ToString();
                     if (detail.Length > 500000) detail = detail.Substring(0, 500000) + "\r\n…(truncated)";
-                    System.IO.File.WriteAllText(reportPath,
-                        $"LoTW upload report — {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n" +
-                        $"TQSL exit code: {result.ExitCode}\r\n" +
-                        $"QSOs sent to TQSL: {toSign}\r\n\r\n" +
-                        detail, System.Text.Encoding.UTF8);
+                    System.IO.File.WriteAllText(reportPath, detail, System.Text.Encoding.UTF8);
                 }
                 catch { }
 
-                if (result.ExitCode == 8)
+                // Build the user-facing summary.
+                var summary = new System.Text.StringBuilder();
+                summary.AppendLine(totalUploaded > 0
+                    ? $"{totalUploaded:N0} QSO(s) accepted by LoTW."
+                    : "No QSOs were uploaded to LoTW.");
+                if (totalSkippedNoBand > 0)
+                    summary.AppendLine($"{totalSkippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
+                if (unresolved.Count > 0)
                 {
-                    // TQSL found no QSOs to process — something is off; leave the queue untouched.
-                    UpdateLotwMenuCount();
-                    if (progressWindow != null)
-                        progressWindow.ReportBatchResult("TQSL found no QSOs to process — queue unchanged", false);
-                    else
-                        HolyMessageBox.ShowWarning(
-                            "TQSL did not process any QSOs.\n\n" +
-                            "The queue was left unchanged. The full TQSL report was saved to " +
-                            "lotw_last_upload.txt on your Desktop.",
-                            "LoTW Upload", this);
+                    summary.AppendLine("\nLeft in the queue (no matching TQSL location):");
+                    foreach (var u in unresolved) summary.AppendLine("  • " + u);
                 }
+                if (failures.Count > 0)
+                {
+                    summary.AppendLine("\nNot uploaded:");
+                    foreach (var f in failures) summary.AppendLine("  • " + f);
+                }
+                summary.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
+
+                bool clean = failures.Count == 0 && unresolved.Count == 0;
+                if (progressWindow != null)
+                {
+                    string line = totalUploaded > 0
+                        ? $"{totalUploaded:N0} QSO(s) uploaded to LoTW"
+                        : "No QSOs uploaded to LoTW";
+                    int leftover = unresolved.Count + failures.Count;
+                    if (leftover > 0) line += $" ({leftover} callsign group(s) left in queue)";
+                    progressWindow.ReportBatchResult(line, clean);
+                }
+                else if (clean)
+                    HolyMessageBox.ShowSuccess(summary.ToString().TrimEnd(), "LoTW Upload", this);
                 else
-                {
-                    // exit 0 = uploaded, exit 9 = already in LoTW (duplicates).
-                    // Either way the QSOs are now in LoTW, so clear them from the queue.
-                    foreach (var q in pending)
-                    {
-                        if (!string.IsNullOrWhiteSpace(q.Band) || !string.IsNullOrWhiteSpace(q.Freq))
-                            dal.SetLotwStatus(q.id, 1);
-                    }
-                    UpdateLotwMenuCount();
-                    int handled = pending.Count - skippedNoBand;
-                    if (progressWindow != null)
-                    {
-                        string resultLine = result.NothingUploaded
-                            ? $"All {handled:N0} QSO(s) already in LoTW (duplicates — queue cleared)"
-                            : $"{handled:N0} QSO(s) uploaded to LoTW";
-                        if (skippedNoBand > 0)
-                            resultLine += $" ({skippedNoBand:N0} skipped — no band/frequency)";
-                        progressWindow.ReportBatchResult(resultLine, true);
-                    }
-                    else
-                    {
-                        var sb = new System.Text.StringBuilder();
-                        if (result.NothingUploaded)
-                            sb.AppendLine($"All {handled:N0} QSO(s) are already in LoTW (detected as duplicates).\n\nThey have been cleared from the upload queue.");
-                        else
-                            sb.AppendLine($"Successfully uploaded {handled:N0} QSO(s) to LoTW.");
-                        if (skippedNoBand > 0)
-                            sb.AppendLine($"\n{skippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
-                        sb.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
-                        HolyMessageBox.ShowSuccess(
-                            sb.ToString().TrimEnd(),
-                            "LoTW Upload", this);
-                    }
-                }
+                    HolyMessageBox.ShowWarning(summary.ToString().TrimEnd(), "LoTW Upload", this);
             }
             catch (Exception ex)
             {
@@ -3006,6 +3071,31 @@ namespace HolyLogger
                 UploadProgress = "";
                 try { if (System.IO.File.Exists(adiPath)) System.IO.File.Delete(adiPath); } catch { }
             }
+        }
+
+        // Builds a per-callsign preview of how the pending LoTW queue will be signed, and reports how
+        // many QSOs can actually be resolved to a TQSL station location.
+        private List<string> ResolveLotwGroupsPreview(List<QSO> pending, out int resolvableQsos)
+        {
+            resolvableQsos = 0;
+            string savedPicks = Properties.Settings.Default.LotwCallsignLocations;
+            var lines = new List<string>();
+            foreach (var g in pending.GroupBy(q => (q.MyCall ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase))
+            {
+                string callLabel = string.IsNullOrEmpty(g.Key) ? "(no callsign)" : g.Key;
+                int n = g.Count();
+                var choice = LotwStationResolver.Resolve(g.Key, savedPicks);
+                if (!string.IsNullOrWhiteSpace(choice.LocationName))
+                {
+                    resolvableQsos += n;
+                    lines.Add($"{callLabel}: {n} QSO(s) → \"{choice.LocationName}\"");
+                }
+                else if (choice.Ambiguous)
+                    lines.Add($"{callLabel}: {n} QSO(s) → ⚠ choose a location in Options → LoTW");
+                else
+                    lines.Add($"{callLabel}: {n} QSO(s) → ⚠ no TQSL certificate/location (stays in queue)");
+            }
+            return lines;
         }
 
         // Click on the "!" badge in the log grid's header corner opens the same queue window.
@@ -3064,15 +3154,12 @@ namespace HolyLogger
                 async () =>
                 {
                     string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
-                    string location = Properties.Settings.Default.LotwStationLocation?.Trim();
                     string password = Properties.Settings.Default.LotwTqslPassword;
                     if (string.IsNullOrWhiteSpace(tqslPath) || !System.IO.File.Exists(tqslPath))
                         throw new Exception("TQSL not found. Please configure it in Options → LoTW Upload.");
-                    if (string.IsNullOrWhiteSpace(location))
-                        throw new Exception("Station location not set. Please configure it in Options → LoTW Upload.");
                     var pending = dal.GetPendingLotwQsos();
                     int before = pending.Count;
-                    await UploadLotwQueueCoreAsync(pending, tqslPath, location, password);
+                    await UploadLotwQueueCoreAsync(pending, tqslPath, password);
                     int after = dal?.GetPendingLotwCount() ?? 0;
                     UpdateLotwMenuCount();
                     return before - after;
@@ -5351,11 +5438,25 @@ namespace HolyLogger
             }
         }
 
+        private bool _startupCallsignChecked;
+
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
             if (Properties.Settings.Default.EnableOmniRigCAT)
                 StartOmniRig();
             UpdateStatus();
+
+            // Also check the stored Station Callsign on startup: a wrong/uncovered callsign saved in a
+            // previous session would otherwise give no clue that no upload service handles it. Deferred
+            // so the main window paints before the alert (if any) appears, and run only once.
+            if (!_startupCallsignChecked)
+            {
+                _startupCallsignChecked = true;
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    ShowStationCallsignServicesAlert(TB_MyCallsign.Text?.Trim());
+                }), System.Windows.Threading.DispatcherPriority.Background);
+            }
         }
 
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
@@ -5525,19 +5626,17 @@ namespace HolyLogger
             if (lotwPending != null)
             {
                 string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
-                string location = Properties.Settings.Default.LotwStationLocation?.Trim();
                 string password = Properties.Settings.Default.LotwTqslPassword;
-                bool tqslConfigured = !string.IsNullOrWhiteSpace(tqslPath) && System.IO.File.Exists(tqslPath)
-                                      && !string.IsNullOrWhiteSpace(location);
+                bool tqslConfigured = !string.IsNullOrWhiteSpace(tqslPath) && System.IO.File.Exists(tqslPath);
                 if (!online || !tqslConfigured)
                 {
                     string why = !online ? "no internet connection"
-                        : "TQSL not configured (set path and location in Options → LoTW)";
+                        : "TQSL not configured (set the path in Options → LoTW)";
                     progressWindow.SkipService("LoTW", $"{lotwPending.Count:N0} QSO(s) — {why}");
                 }
                 else
                 {
-                    try { await UploadLotwQueueCoreAsync(lotwPending, tqslPath, location, password, progressWindow); } catch { }
+                    try { await UploadLotwQueueCoreAsync(lotwPending, tqslPath, password, progressWindow); } catch { }
                 }
             }
 
@@ -6064,6 +6163,7 @@ namespace HolyLogger
             options.QRZServicesControlInstance.ConnectionTested += QRZServiceControl_ConnectionTested;
             // Give the LoTW control access to the database so it can reset the upload queue.
             options.LotwControlInstance.Dal = dal;
+            options.LotwControlInstance.CurrentCallsign = TB_MyCallsign.Text?.Trim();
             options.LotwControlInstance.LotwQueueChanged += UpdateLotwMenuCount;
             options.EqslServiceControlInstance.EqslQueueChanged += UpdateEqslQueueIndicator;
             options.QRZServicesControlInstance.QrzQueueChanged += UpdateQrzMenuCount;
@@ -10341,6 +10441,78 @@ namespace HolyLogger
             if (TB_MyHolyland == null) return;
             UpdateMatrix();
             RefreshClusterMyCallsignHighlight();
+        }
+
+        // Remembers the callsign when editing begins, so LostFocus can tell whether it actually
+        // changed (and avoid firing on a programmatic Text update, which never moves focus).
+        private string _callsignOnFocus;
+
+        private void TB_MyCallsign_GotFocus(object sender, RoutedEventArgs e)
+        {
+            _callsignOnFocus = TB_MyCallsign.Text?.Trim();
+        }
+
+        private void TB_MyCallsign_LostFocus(object sender, RoutedEventArgs e)
+        {
+            string now = TB_MyCallsign.Text?.Trim();
+            if (string.IsNullOrEmpty(now)) return;
+            if (string.Equals(now, _callsignOnFocus, StringComparison.OrdinalIgnoreCase)) return;
+            _callsignOnFocus = now;
+            ShowStationCallsignServicesAlert(now);
+        }
+
+        // When the operator switches to a different Station Callsign, summarise how each upload
+        // service will treat QSOs logged under it, so special-event calls aren't silently sent to
+        // the wrong place. Only shown when at least one service needs attention.
+        private void ShowStationCallsignServicesAlert(string call)
+        {
+            if (string.IsNullOrWhiteSpace(call) || dal == null) return;
+            call = call.Trim();
+
+            // eQSL — per-callsign accounts table.
+            bool eqslHasAccount = false;
+            try { eqslHasAccount = dal.IsCallsignInEqslTable(call); } catch { }
+
+            // LoTW — per-callsign TQSL station location.
+            string savedPicks = Properties.Settings.Default.LotwCallsignLocations;
+            var choice = LotwStationResolver.Resolve(call, savedPicks);
+            bool lotwOk = !choice.Ambiguous && !string.IsNullOrWhiteSpace(choice.LocationName);
+
+            // QRZ — one logbook/API key for every callsign.
+            bool qrzOn = QrzPushEnabled;
+
+            bool anyIssue = !eqslHasAccount || !lotwOk || qrzOn;
+            if (!anyIssue) return;   // everything already correct — no need to interrupt
+
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine($"Station callsign is now {call}.");
+            sb.AppendLine("How each upload service will treat QSOs logged under this callsign:");
+            sb.AppendLine();
+
+            sb.AppendLine("eQSL:");
+            sb.AppendLine(eqslHasAccount
+                ? $"   ✓ Account configured — QSOs upload under\n      {call}"
+                : $"   ⚠ No eQSL account for {call} — its QSOs will NOT be sent to eQSL.");
+            sb.AppendLine();
+
+            sb.AppendLine("LoTW:");
+            if (choice.Ambiguous)
+                sb.AppendLine($"   ⚠ {call} has several TQSL locations — pick one in Options → LoTW Upload.");
+            else if (!string.IsNullOrWhiteSpace(choice.LocationName))
+            {
+                sb.AppendLine("   ✓ Will sign with TQSL location:");
+                sb.AppendLine($"      \"{choice.LocationName}\"");
+            }
+            else
+                sb.AppendLine($"   ⚠ No TQSL certificate/location for {call} — its QSOs will NOT upload to LoTW.");
+            sb.AppendLine();
+
+            sb.AppendLine("QRZ Logbook:");
+            sb.AppendLine(qrzOn
+                ? $"   ⚠ QRZ uses ONE logbook for all callsigns. QSOs under {call} go into your configured QRZ logbook regardless of the call. Turn off QRZ auto-upload (Options → QRZ Services) if that is wrong."
+                : "   • QRZ auto-upload is off — nothing is sent automatically.");
+
+            HolyMessageBox.ShowWarning(sb.ToString().TrimEnd(), "Station callsign changed", this, 540);
         }
         
         private void TB_MyHolyland_TextChanged(object sender, TextChangedEventArgs e)
