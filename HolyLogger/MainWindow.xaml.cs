@@ -5992,6 +5992,9 @@ namespace HolyLogger
             statisticsWindow.Show();
         }
 
+        private void RigLabel_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+            => OptionsMenuItemMenuItem_Click(null, null);
+
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (options != null)
