@@ -5454,7 +5454,7 @@ namespace HolyLogger
                 _startupCallsignChecked = true;
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    ShowStationCallsignServicesAlert(TB_MyCallsign.Text?.Trim());
+                    ShowStationCallsignServicesAlert(TB_MyCallsign.Text?.Trim(), isStartup: true);
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
@@ -10464,7 +10464,7 @@ namespace HolyLogger
         // When the operator switches to a different Station Callsign, summarise how each upload
         // service will treat QSOs logged under it, so special-event calls aren't silently sent to
         // the wrong place. Only shown when at least one service needs attention.
-        private void ShowStationCallsignServicesAlert(string call)
+        private void ShowStationCallsignServicesAlert(string call, bool isStartup = false)
         {
             if (string.IsNullOrWhiteSpace(call) || dal == null) return;
             call = call.Trim();
@@ -10481,8 +10481,19 @@ namespace HolyLogger
             // QRZ — one logbook/API key for every callsign.
             bool qrzOn = QrzPushEnabled;
 
-            bool anyIssue = !eqslHasAccount || !lotwOk || qrzOn;
-            if (!anyIssue) return;   // everything already correct — no need to interrupt
+            bool registered = eqslHasAccount && lotwOk;
+            if (isStartup)
+            {
+                // On startup only interrupt when the callsign is NOT registered for eQSL/LoTW. A
+                // fully-registered call opens silently even if QRZ auto-upload is on.
+                if (registered) return;
+            }
+            else
+            {
+                // On a deliberate change, surface anything worth knowing — including the QRZ
+                // single-logbook caveat.
+                if (registered && !qrzOn) return;
+            }
 
             var sb = new System.Text.StringBuilder();
             sb.AppendLine($"Station callsign is now {call}.");
