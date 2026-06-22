@@ -274,6 +274,11 @@ namespace HolyLogger
         StackPanel clusterShowBandsPanel = null;
         TextBlock clusterShowBandsLabelText = null;
         TextBlock clusterNewCountryLegendText = null;
+        TextBlock clusterNewCountryCountText = null;
+        DispatcherTimer _clusterNewCountryBlinkTimer = null;
+        DateTime _clusterNewCountryBlinkStopTime;
+        bool _clusterNewCountryBlinkOn = true;
+        int _lastNewCountryCount = 0;
         StackPanel clusterOnMyFreqLegendItem = null;
         Canvas clusterHeaderCanvas = null;
         DataGridColumn clusterDxColumn = null;
@@ -6694,6 +6699,10 @@ namespace HolyLogger
             clusterUndoButton = null;
             clusterUndoCountText = null;
             clusterSpotCountText = null;
+            clusterNewCountryCountText = null;
+            _clusterNewCountryBlinkTimer?.Stop();
+            _clusterNewCountryBlinkTimer = null;
+            _lastNewCountryCount = 0;
             clusterActiveBandIndicatorText = null;
             clusterDxColumn = null;
             clusterSpotterColumn = null;
@@ -7163,7 +7172,20 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 8, 0, 1)
             };
-            row.Children.Add(BuildClusterLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 24, 0)));
+            row.Children.Add(BuildClusterLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 6, 0)));
+
+            var countText = new TextBlock
+            {
+                Text = "0",
+                Foreground = Brushes.Red,
+                FontWeight = FontWeights.Bold,
+                FontSize = 22,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 0, 18, 0)
+            };
+            clusterNewCountryCountText = countText;
+            row.Children.Add(countText);
+
             return row;
         }
 
@@ -9211,6 +9233,8 @@ namespace HolyLogger
                         spot.IsNeededCountry = IsNeededCountry(spot.DXCallsign, clusterWorkedCountries);
                     }
                 }
+
+                UpdateClusterSpotCountIndicator();
             }));
         }
 
@@ -9680,6 +9704,43 @@ namespace HolyLogger
 
             int count = clusterVisibleSpots != null ? clusterVisibleSpots.Count : 0;
             clusterSpotCountText.Text = count.ToString(CultureInfo.InvariantCulture);
+
+            if (clusterNewCountryCountText != null)
+            {
+                int newCountry = clusterVisibleSpots != null
+                    ? clusterVisibleSpots.Count(s => s.IsNeededCountry)
+                    : 0;
+                clusterNewCountryCountText.Text = newCountry.ToString(CultureInfo.InvariantCulture);
+                if (newCountry > _lastNewCountryCount)
+                    StartNewCountryBlink();
+                _lastNewCountryCount = newCountry;
+            }
+        }
+
+        private void StartNewCountryBlink()
+        {
+            if (_clusterNewCountryBlinkTimer == null)
+            {
+                _clusterNewCountryBlinkTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
+                _clusterNewCountryBlinkTimer.Tick += (s, e) =>
+                {
+                    if (clusterNewCountryCountText == null || DateTime.UtcNow >= _clusterNewCountryBlinkStopTime)
+                    {
+                        _clusterNewCountryBlinkTimer.Stop();
+                        if (clusterNewCountryCountText != null)
+                            clusterNewCountryCountText.Opacity = 1.0;
+                        return;
+                    }
+                    _clusterNewCountryBlinkOn = !_clusterNewCountryBlinkOn;
+                    clusterNewCountryCountText.Opacity = _clusterNewCountryBlinkOn ? 1.0 : 0.0;
+                };
+            }
+            _clusterNewCountryBlinkStopTime = DateTime.UtcNow.AddSeconds(10);
+            _clusterNewCountryBlinkOn = true;
+            if (clusterNewCountryCountText != null)
+                clusterNewCountryCountText.Opacity = 1.0;
+            _clusterNewCountryBlinkTimer.Stop();
+            _clusterNewCountryBlinkTimer.Start();
         }
 
         public bool GetClusterHoverPopupEnabled()

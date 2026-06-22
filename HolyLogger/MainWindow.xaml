@@ -665,7 +665,7 @@
         </TextBlock>
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" GotFocus="TB_MyCallsign_GotFocus" LostFocus="TB_MyCallsign_LostFocus" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
-                    Margin="192,55,0,0" Grid.Row="1">
+                    Margin="192,52,0,0" Grid.Row="1">
             <!-- Both LED and no-CAT borders share one Grid so the kHz label never shifts.
                  Width is the single fixed constraint — content never drives the layout width. -->
             <Grid VerticalAlignment="Center" Width="160">
@@ -701,7 +701,7 @@
             <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="#444444"
                        VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
         </StackPanel>
-        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,55,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,54,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid Width="95">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -712,7 +712,7 @@
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M81,3 C88,8 88,24 81,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </Grid>
         </Button>
-        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="462,12,0,0" Width="205" Height="38" BorderThickness="1" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
+        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="462,6,0,0" Width="205" Height="38" BorderThickness="1" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="BorderBrush" Value="#9966CC"/>
