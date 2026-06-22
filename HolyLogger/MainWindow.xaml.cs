@@ -2725,12 +2725,6 @@ namespace HolyLogger
                 SendQueueToEqslMenuItem.Header = header;
             }
 
-            // The "!" badge is red when QSOs are waiting, gray when the queue is empty (a custom
-            // colored Border doesn't dim on its own when the menu item is disabled).
-            if (SendQueueBadgeIcon != null)
-                SendQueueBadgeIcon.Background = new SolidColorBrush(
-                    any ? (Color)ColorConverter.ConvertFromString("#D32F2F")
-                        : (Color)ColorConverter.ConvertFromString("#9E9E9E"));
 
             // Keep an open queue window in sync too (e.g. a QSO was deleted from the log behind it).
             if (_eqslQueueWindow != null)

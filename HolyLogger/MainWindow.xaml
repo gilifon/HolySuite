@@ -419,6 +419,7 @@
                             <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="SendQueueToEqslMenuItem" Header="Upload Queue to eQSL" ToolTip="Upload the QSOs that are still waiting to be sent to eQSL.cc" Click="SendQueueToEqslMenuItem_Click">
                         <MenuItem.ContextMenu>
                             <ContextMenu>
@@ -427,11 +428,10 @@
                             </ContextMenu>
                         </MenuItem.ContextMenu>
                         <MenuItem.Icon>
-                            <!-- Same red "!" badge as the one on the log table, so the user instantly
-                                 links this menu item to the alert they saw there. -->
-                            <Border x:Name="SendQueueBadgeIcon" Width="16" Height="16" CornerRadius="8" Background="#9E9E9E" BorderBrush="White" BorderThickness="1">
-                                <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
+                            </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="SendQueueToLotwMenuItem" Header="Upload Queue to LoTW" ToolTip="Sign and upload pending QSOs to ARRL Logbook of the World via TQSL." Click="SendQueueToLotwMenuItem_Click">
@@ -462,6 +462,7 @@
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="SearchMenuItem" Header="Search" ToolTip="Search the log" Click="SearchMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
