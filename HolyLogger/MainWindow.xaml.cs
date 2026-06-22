@@ -1316,8 +1316,22 @@ namespace HolyLogger
 
         private void setLockBtnState()
         {
-            if (!Properties.Settings.Default.isLocked) Lock_Btn.Source = unlock_path;
-            else Lock_Btn.Source = lock_path;
+            bool locked = Properties.Settings.Default.isLocked;
+            Lock_Btn.Source = locked ? lock_path : unlock_path;
+
+            var lightRed = new SolidColorBrush(Color.FromRgb(0xFF, 0xCC, 0xCC));
+            if (locked)
+            {
+                if (LockBtnBorder != null) LockBtnBorder.Background = SystemColors.ControlBrush;
+                TB_MyCallsign.ClearValue(TextBox.BackgroundProperty);
+                TB_Operator.ClearValue(TextBox.BackgroundProperty);
+            }
+            else
+            {
+                if (LockBtnBorder != null) LockBtnBorder.Background = lightRed;
+                TB_MyCallsign.Background = lightRed;
+                TB_Operator.Background = lightRed;
+            }
         }
 
         private void LockComment_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -5389,6 +5403,30 @@ namespace HolyLogger
             UpdateDup();
         }
 
+        private void ContestIndicator_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            ContestModeMenuItem_Click(null, null);
+        }
+
+        private void ShareStatusButton_Click(object sender, RoutedEventArgs e)
+        {
+            Properties.Settings.Default.ShowOnTheAir = !Properties.Settings.Default.ShowOnTheAir;
+            Properties.Settings.Default.Save();
+            UpdateShareStatusButtonState();
+        }
+
+        private void UpdateShareStatusButtonState()
+        {
+            if (ShareStatusButton == null) return;
+            bool on = Properties.Settings.Default.ShowOnTheAir;
+            ShareStatusButton.Background = on
+                ? new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50))
+                : new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
+            ShareStatusButton.BorderBrush = on
+                ? new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32))
+                : new SolidColorBrush(Color.FromRgb(0x75, 0x75, 0x75));
+        }
+
         private void UpdateContestModeMenuHeader()
         {
             bool on = Properties.Settings.Default.ContestMode;
@@ -5445,6 +5483,7 @@ namespace HolyLogger
             if (Properties.Settings.Default.EnableOmniRigCAT)
                 StartOmniRig();
             UpdateStatus();
+            UpdateShareStatusButtonState();
 
             // Also check the stored Station Callsign on startup: a wrong/uncovered callsign saved in a
             // previous session would otherwise give no clue that no upload service handles it. Deferred
@@ -5777,9 +5816,14 @@ namespace HolyLogger
                              && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
             if (catEnabled && !manualMode && !rigOnline)
             {
-                ShowLedBlank();
+                // Only initialise the no-CAT box when first switching to that mode so we don't
+                // overwrite text the user is actively typing.
+                if (FreqNoCatBezel != null && FreqNoCatBezel.Visibility != Visibility.Visible)
+                    ShowLedNoCat();
                 return;
             }
+
+            ShowLedActive();   // ensure LED bezel is visible when CAT is working
 
             string raw = (TB_Frequency.Text ?? string.Empty).Trim();
             if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double mhz) || mhz <= 0)
@@ -5807,9 +5851,66 @@ namespace HolyLogger
         private void ShowLedBlank()
         {
             if (FreqLedLive == null || FreqLedGhost == null) return;
-            FreqLedGhost.Text = "888888.888";
+            FreqLedGhost.Text = "8888888.888";
             FreqLedLive.Inlines.Clear();
-            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run("------.---") { Foreground = LedAmberBrush });
+            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run("-------.---") { Foreground = LedAmberBrush });
+        }
+
+        // No CAT / rig offline — switch to a plain editable textbox with a red border.
+        private void ShowLedNoCat()
+        {
+            if (FreqLedBezel == null || FreqNoCatBezel == null) return;
+            FreqLedBezel.Visibility = Visibility.Hidden;
+            FreqNoCatBezel.Visibility = Visibility.Visible;
+            // Pre-fill with any stored frequency.
+            string raw = (TB_Frequency.Text ?? string.Empty).Trim();
+            if (double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                                 System.Globalization.CultureInfo.InvariantCulture, out double mhz) && mhz > 0)
+            {
+                long hz = (long)Math.Round(mhz * 1000000.0);
+                TB_FreqNoCat.Text = (hz / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                                    + "." + (hz % 1000).ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
+            }
+            else
+            {
+                TB_FreqNoCat.Text = string.Empty;
+            }
+        }
+
+        // CAT / rig back online — switch back to the LED display.
+        private void ShowLedActive()
+        {
+            if (FreqNoCatBezel == null || FreqLedBezel == null) return;
+            // Do NOT CommitFreqNoCat here: the rig's live frequency takes priority over whatever
+            // the operator may have typed while offline. The rig will report its frequency via
+            // ShowRigParams, which sets TB_Frequency directly.
+            FreqNoCatBezel.Visibility = Visibility.Hidden;
+            FreqLedBezel.Visibility = Visibility.Visible;
+        }
+
+        private void CommitFreqNoCat()
+        {
+            string txt = (TB_FreqNoCat?.Text ?? string.Empty).Trim();
+            if (double.TryParse(txt, System.Globalization.NumberStyles.Float,
+                                 System.Globalization.CultureInfo.InvariantCulture, out double kHz) && kHz > 0)
+            {
+                double mhz = kHz / 1000.0;
+                TB_Frequency.Text = mhz.ToString("0.0#####", System.Globalization.CultureInfo.InvariantCulture);
+                long hz = (long)Math.Round(mhz * 1000000.0);
+                TB_FreqNoCat.Text = (hz / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture)
+                                    + "." + (hz % 1000).ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
+            }
+        }
+
+        private void TB_FreqNoCat_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Enter) { CommitFreqNoCat(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { UpdateFreqLed(); e.Handled = true; }
+        }
+
+        private void TB_FreqNoCat_LostFocus(object sender, RoutedEventArgs e)
+        {
+            CommitFreqNoCat();
         }
 
         // Click the LED to edit. Show an inline TextBox pre-filled with the current kHz value.
@@ -10602,9 +10703,12 @@ namespace HolyLogger
 
         private void TB_DX_Name_TextChanged(object sender, TextChangedEventArgs e)
         {
-            const double rightEdge = 371;
-            const double minLeft = 57;
-            const double defaultLeft = 101;
+            // The box is right-anchored: it keeps its right edge fixed and grows leftward so long
+            // names stay visible. These must match the XAML placement (Margin 69, Width 264 ->
+            // right edge 333) so the box does not jump when the text is cleared after saving a QSO.
+            const double rightEdge = 333;   // 69 + 264, stops short of the Country label at x=340
+            const double minLeft = 57;      // just right of the "Name" label, the leftmost it may grow
+            const double defaultLeft = 69;  // normal resting position (matches XAML)
 
             var ft = new System.Windows.Media.FormattedText(
                 TB_DX_Name.Text,
@@ -12431,14 +12535,9 @@ namespace HolyLogger
 
         private void UpdateShareIconVisibility()
         {
-            if (ShareStatusButton == null)
-            {
-                return;
-            }
-
-            ShareStatusButton.Visibility = isNetworkAvailable && Properties.Settings.Default.ShowOnTheAir
-                ? Visibility.Visible
-                : Visibility.Collapsed;
+            if (ShareStatusButton == null) return;
+            ShareStatusButton.Visibility = Visibility.Visible;
+            UpdateShareStatusButtonState();
         }
 
         private void ApplyClusterWindowSetting()
@@ -13327,14 +13426,25 @@ namespace HolyLogger
                     double radioTX = (double)Rig.GetTxFrequency() / 1000000;
                     if (Properties.Settings.Default.IsSatelliteMode)
                         radioRX += Properties.Settings.Default.SatelliteShift;
-                    RX = radioRX.ToString("###0.000000");
-                    TX = radioTX.ToString("###0.000000");
-                    //TB_Frequency.Text = RX;
-                    Properties.Settings.Default.Frequency = RX;
-                    CB_Mode.Text = GetNormalizedRigMode();
 
+                    // OmniRig can fire StatusChange before it has polled the rig's frequency
+                    // register; GetRxFrequency returns 0 in that window. Skip the update so
+                    // the LED keeps showing the previous known frequency instead of blank dashes.
+                    // The immediately following ParamsChange will carry the real value.
+                    if (radioRX > 0)
+                    {
+                        RX = radioRX.ToString("###0.000000");
+                        TX = radioTX.ToString("###0.000000");
+                        TB_Frequency.Text = RX;
+                        Properties.Settings.Default.Frequency = RX;
+                    }
+
+                    CB_Mode.Text = GetNormalizedRigMode();
                     UpdateVoiceMessageState();
                     UpdateVoiceMessageAvailabilityState();
+                    // Always refresh the LED — WPF skips no-op binding updates so TextChanged
+                    // may not fire when the frequency value didn't change.
+                    UpdateFreqLed();
                 });
             }
             catch (Exception e)
