@@ -839,13 +839,17 @@
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
 
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="427,56,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
-        <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="The DX Station Callsign"/>
+        <TextBlock HorizontalAlignment="Left" Margin="12,101,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="28" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="DX" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Callsign" />
+        </TextBlock>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
         <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
         <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
-                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,124,0,0"
+                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,131,0,0"
                       Width="78" Height="20" FontSize="11" FontWeight="Bold" Foreground="#1E2A36"
                       Focusable="False" Click="BtnSuggestToggle_Click"
                       ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
@@ -1074,14 +1078,14 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Date" IsReadOnly="True" SortMemberPath="Date">
+                <DataGridTemplateColumn Header="Date" IsReadOnly="True" SortMemberPath="Date" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Date, Converter={StaticResource QsoDateDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Time" IsReadOnly="True" SortMemberPath="Time">
+                <DataGridTemplateColumn Header="Time" IsReadOnly="True" SortMemberPath="Time" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Time, Converter={StaticResource QsoTimeDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1109,14 +1113,14 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False">
+                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Freq}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Band" IsReadOnly="True" CanUserSort="False">
+                <DataGridTemplateColumn Header="Band" IsReadOnly="True" CanUserSort="False" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Band}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1124,7 +1128,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="RST-R" IsReadOnly="True" CanUserSort="False">
+                <DataGridTemplateColumn Header="RST-R" IsReadOnly="True" CanUserSort="False" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding RST_RCVD}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1132,7 +1136,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="RST-S" IsReadOnly="True" CanUserSort="False">
+                <DataGridTemplateColumn Header="RST-S" IsReadOnly="True" CanUserSort="False" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding RST_SENT}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1140,7 +1144,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Mode" IsReadOnly="True" CanUserSort="False">
+                <DataGridTemplateColumn Header="Mode" IsReadOnly="True" CanUserSort="False" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Mode}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1148,7 +1152,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Exchange" IsReadOnly="True" CanUserSort="False">
+                <DataGridTemplateColumn Header="Exchange" IsReadOnly="True" CanUserSort="False" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding SRX}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1156,7 +1160,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="*" CanUserSort="False">
+                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="Auto" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,0,5,0" />

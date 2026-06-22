@@ -713,6 +713,12 @@ namespace HolyLogger
             {
                 item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
             }
+            var _rwCallsign = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Callsign");
+            var _rwName     = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Name");
+            var _rwCountry  = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Country");
+            if (_rwCallsign != null) _rwCallsign.Width = new DataGridLength(Properties.Settings.Default.ColWidthCallsign);
+            if (_rwName     != null) _rwName.Width     = new DataGridLength(Properties.Settings.Default.ColWidthName);
+            if (_rwCountry  != null) _rwCountry.Width  = new DataGridLength(Properties.Settings.Default.ColWidthCountry);
             ToggleMatrixControl();
             ToggleAzimuthControl();
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
@@ -5738,6 +5744,12 @@ namespace HolyLogger
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
+            var _cwCallsign = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Callsign");
+            var _cwName     = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Name");
+            var _cwCountry  = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Country");
+            if (_cwCallsign != null) Properties.Settings.Default.ColWidthCallsign = _cwCallsign.ActualWidth;
+            if (_cwName     != null) Properties.Settings.Default.ColWidthName     = _cwName.ActualWidth;
+            if (_cwCountry  != null) Properties.Settings.Default.ColWidthCountry  = _cwCountry.ActualWidth;
             try { Properties.Settings.Default.Save(); } catch { }
             if (dal != null) dal.Close();
         }
