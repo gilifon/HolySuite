@@ -332,6 +332,15 @@
                                     <Image Source="Images/folder.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
+                    <MenuItem x:Name="ImportAutosaveMenuItem" Header="Import Autosaved Log" ToolTip="Restore log from an autosaved backup file" Click="ImportAutosaveMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M13 3C8.03 3 4 7.03 4 12H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
                         <MenuItem.Icon>
                             <Image Source="Images/exit.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -473,15 +482,6 @@
                     <MenuItem x:Name="OptionsMenuItem" Header="Options (F2)" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator />
-                    <MenuItem x:Name="ImportAutosaveMenuItem" Header="Import Autosaved Log" ToolTip="Restore log from an autosaved backup file" Click="ImportAutosaveMenuItem_Click">
-                        <MenuItem.Icon>
-                            <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
-                                      Data="M13 3C8.03 3 4 7.03 4 12H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
-                            </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
                 </MenuItem>
