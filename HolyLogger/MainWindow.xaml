@@ -12,7 +12,7 @@
         WindowStartupLocation="Manual"
         MinHeight="560" MinWidth="800" 
         Icon="Images/crown.png" 
-        KeyDown="Window_KeyDown" Closing="Window_Closing" Closed="Window_Closed" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
+        PreviewKeyDown="Window_PreviewKeyDown" KeyDown="Window_KeyDown" Closing="Window_Closing" Closed="Window_Closed" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
 
     <Window.Resources>
         <local:QsoDateDisplayConverter x:Key="QsoDateDisplayConverter"/>
@@ -385,11 +385,13 @@
                             <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="ContestModeMenuItem" Header="Contest Mode - OFF" Click="ContestModeMenuItem_Click" ToolTip="When ON, a same band+mode QSO is flagged as a Duplicate. When OFF, the program only shows how many times the station was worked before.">
                         <MenuItem.Icon>
                             <!-- The negative margin lets the blue tile grow beyond the fixed icon slot
@@ -404,16 +406,19 @@
                             </Border>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Full-Log QRZ Service" ToolTip="Try to get QRZ info for the entire log" Click="EntireLogQrzServiseMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="RemoveDuplicatesMenuItem" Header="Remove Duplicates" ToolTip="Remove duplicates from the log" Click="RemoveDuplicatesMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -466,11 +471,12 @@
                     <MenuItem x:Name="SearchMenuItem" Header="Search" ToolTip="Search the log" Click="SearchMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
+                                <Path Stretch="Uniform" Fill="#1565C0"
                                       Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show statistics about the log" Click="StatisticsMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
@@ -839,18 +845,14 @@
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
 
         <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="427,56,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
-        <TextBlock HorizontalAlignment="Left" Margin="12,101,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="28" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
-            <Run Text="DX" FontWeight="Bold" />
-            <LineBreak />
-            <Run Text="Callsign" />
-        </TextBlock>
+        <TextBlock HorizontalAlignment="Left" Margin="12,96,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
         <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
         <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
-                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,131,0,0"
-                      Width="78" Height="20" FontSize="11" FontWeight="Bold" Foreground="#1E2A36"
+                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,115,0,0"
+                      Width="78" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
                       Focusable="False" Click="BtnSuggestToggle_Click"
                       ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
             <ToggleButton.Template>
@@ -1035,9 +1037,13 @@
             <LineBreak />
             <Run Text="Locator" />
         </TextBlock>
-        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
-        <Label Content="Comment" HorizontalAlignment="Left" Margin="165,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
-        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="248,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="390" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
+        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="70" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
+        <Label Content="ITU" HorizontalAlignment="Left" Margin="141,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="ITU Zone (from QRZ.com)"/>
+        <TextBox x:Name="TB_ITUZone" HorizontalAlignment="Left" Height="28" Margin="176,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" IsReadOnly="True" VerticalContentAlignment="Center" IsTabStop="False"/>
+        <Label Content="CQ" HorizontalAlignment="Left" Margin="211,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="CQ Zone (from QRZ.com)"/>
+        <TextBox x:Name="TB_CQZone" HorizontalAlignment="Left" Height="28" Margin="244,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" IsReadOnly="True" VerticalContentAlignment="Center" IsTabStop="False"/>
+        <Label Content="Comment" HorizontalAlignment="Left" Margin="281,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="364,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="274" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
         <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
