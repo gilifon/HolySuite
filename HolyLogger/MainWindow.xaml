@@ -12,7 +12,7 @@
         WindowStartupLocation="Manual"
         MinHeight="560" MinWidth="800" 
         Icon="Images/crown.png" 
-        PreviewKeyDown="Window_PreviewKeyDown" KeyDown="Window_KeyDown" Closing="Window_Closing" Closed="Window_Closed" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
+        KeyDown="Window_KeyDown" Closing="Window_Closing" Closed="Window_Closed" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
 
     <Window.Resources>
         <local:QsoDateDisplayConverter x:Key="QsoDateDisplayConverter"/>
@@ -332,15 +332,6 @@
                                     <Image Source="Images/folder.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
-                    <MenuItem x:Name="ImportAutosaveMenuItem" Header="Import Autosaved Log" ToolTip="Restore log from an autosaved backup file" Click="ImportAutosaveMenuItem_Click">
-                        <MenuItem.Icon>
-                            <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
-                                      Data="M13 3C8.03 3 4 7.03 4 12H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
-                            </Viewbox>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
                         <MenuItem.Icon>
                             <Image Source="Images/exit.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -385,13 +376,11 @@
                             <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="ContestModeMenuItem" Header="Contest Mode - OFF" Click="ContestModeMenuItem_Click" ToolTip="When ON, a same band+mode QSO is flagged as a Duplicate. When OFF, the program only shows how many times the station was worked before.">
                         <MenuItem.Icon>
                             <!-- The negative margin lets the blue tile grow beyond the fixed icon slot
@@ -406,25 +395,21 @@
                             </Border>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Full-Log QRZ Service" ToolTip="Try to get QRZ info for the entire log" Click="EntireLogQrzServiseMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="RemoveDuplicatesMenuItem" Header="Remove Duplicates" ToolTip="Remove duplicates from the log" Click="RemoveDuplicatesMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="SendQueueToEqslMenuItem" Header="Upload Queue to eQSL" ToolTip="Upload the QSOs that are still waiting to be sent to eQSL.cc" Click="SendQueueToEqslMenuItem_Click">
                         <MenuItem.ContextMenu>
                             <ContextMenu>
@@ -433,10 +418,11 @@
                             </ContextMenu>
                         </MenuItem.ContextMenu>
                         <MenuItem.Icon>
-                            <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
-                                      Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
-                            </Viewbox>
+                            <!-- Same red "!" badge as the one on the log table, so the user instantly
+                                 links this menu item to the alert they saw there. -->
+                            <Border x:Name="SendQueueBadgeIcon" Width="16" Height="16" CornerRadius="8" Background="#9E9E9E" BorderBrush="White" BorderThickness="1">
+                                <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
                         </MenuItem.Icon>
                     </MenuItem>
                     <MenuItem x:Name="SendQueueToLotwMenuItem" Header="Upload Queue to LoTW" ToolTip="Sign and upload pending QSOs to ARRL Logbook of the World via TQSL." Click="SendQueueToLotwMenuItem_Click">
@@ -467,16 +453,14 @@
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="SearchMenuItem" Header="Search" ToolTip="Search the log" Click="SearchMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#1565C0"
+                                <Path Stretch="Uniform" Fill="#444444"
                                       Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show statistics about the log" Click="StatisticsMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
@@ -489,6 +473,15 @@
                     <MenuItem x:Name="OptionsMenuItem" Header="Options (F2)" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="ImportAutosaveMenuItem" Header="Import Autosaved Log" ToolTip="Restore log from an autosaved backup file" Click="ImportAutosaveMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M13 3C8.03 3 4 7.03 4 12H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+                            </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
                 </MenuItem>
@@ -610,7 +603,7 @@
                     </StatusBarItem.ContextMenu>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}" Margin="0,0,0,0" FontSize="16" VerticalAlignment="Center"/>
-                        <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="30,0,0,0" Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1" ToolTipService.InitialShowDelay="200" ToolTipService.Placement="Top" Visibility="Visible" Cursor="Hand" Click="ShareStatusButton_Click">
+                        <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="30,0,0,0" Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1" ToolTipService.InitialShowDelay="200" ToolTipService.Placement="Top" Visibility="Collapsed">
                             <Button.ToolTip>
                                 <TextBlock TextAlignment="Center">
                                     <Run Text="Send heartbeat to"/>
@@ -630,23 +623,14 @@
                     </StackPanel>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <!-- Contest Mode toggle button: gold trophy on a blue tile when ON, gray when OFF.
-                         Click to toggle contest mode (same as Tools → Contest Mode). -->
-                    <Border x:Name="ContestIndicator" Width="26" Height="24" Margin="5,0,0,0" CornerRadius="4" Background="Transparent"
-                            ToolTipService.InitialShowDelay="0" Cursor="Hand"
-                            MouseLeftButtonUp="ContestIndicator_MouseLeftButtonUp">
+                    <!-- Contest Mode state indicator (display only, not clickable): gold trophy on a
+                         blue tile when Contest Mode is ON, gray trophy when OFF. -->
+                    <Border x:Name="ContestIndicator" Width="26" Height="24" Margin="5,0,0,0" CornerRadius="4" Background="Transparent" ToolTip="Contest Mode state" ToolTipService.InitialShowDelay="0">
                         <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Path x:Name="ContestIndicatorPath" Stretch="Uniform" Width="24" Height="24"
                                   Data="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"
                                   Fill="#9E9E9E"/>
                         </Viewbox>
-                    </Border>
-                </StatusBarItem>
-                <StatusBarItem>
-                    <Border x:Name="LockBtnBorder" CornerRadius="3" Padding="3,1" Margin="5,0,0,0" Background="Transparent">
-                        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'"
-                               Height="22" Width="20" Source="Images/lock.png" Stretch="None"
-                               MouseUp="Lock_Btn_MouseUp" Cursor="Hand"/>
                     </Border>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Right">
@@ -670,44 +654,30 @@
             <Run Text="Callsign" />
         </TextBlock>
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" GotFocus="TB_MyCallsign_GotFocus" LostFocus="TB_MyCallsign_LostFocus" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
+        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'" HorizontalAlignment="Left" Height="22" Margin="186,15,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="Lock_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
-                    Margin="192,52,0,0" Grid.Row="1">
-            <!-- Both LED and no-CAT borders share one Grid so the kHz label never shifts.
-                 Width is the single fixed constraint — content never drives the layout width. -->
-            <Grid VerticalAlignment="Center" Width="160">
-                <Border x:Name="FreqLedBezel" Margin="0,1,2,1"
-                        Background="#080808" CornerRadius="4" BorderBrush="#3A3A3A" BorderThickness="1"
-                        Cursor="Hand" MouseLeftButtonUp="FreqLed_MouseLeftButtonUp"
-                        ToolTip="Working frequency in kHz — click to edit">
-                    <Grid Margin="4,1,4,2">
-                        <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
-                                   FontSize="18" VerticalAlignment="Center" Foreground="#1E1500"
-                                   TextAlignment="Right"/>
-                        <TextBlock x:Name="FreqLedLive" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
-                                   FontSize="18" VerticalAlignment="Center" TextAlignment="Right"/>
-                        <TextBox x:Name="TB_FreqLedEdit" Visibility="Collapsed" MinWidth="175"
-                                 FontFamily="Consolas" FontSize="17" FontWeight="Bold"
-                                 Background="#080808" Foreground="#FFB000" BorderThickness="0" Padding="0"
-                                 CaretBrush="#FFB000" SelectionBrush="#664400"
-                                 VerticalContentAlignment="Center"
-                                 KeyDown="TB_FreqLedEdit_KeyDown" LostFocus="TB_FreqLedEdit_LostFocus"/>
-                    </Grid>
-                </Border>
-                <Border x:Name="FreqNoCatBezel" Margin="0,1,2,1"
-                        Background="White" CornerRadius="4" BorderBrush="#D32F2F" BorderThickness="2"
-                        Visibility="Hidden" HorizontalAlignment="Stretch">
-                    <TextBox x:Name="TB_FreqNoCat" Padding="4,0"
-                             FontFamily="Consolas" FontSize="22" FontWeight="Bold"
-                             Background="White" BorderThickness="0"
-                             TextAlignment="Right" MaxLength="11"
+                    Margin="214,12,0,0" Grid.Row="1">
+            <Border x:Name="FreqLedBezel" VerticalAlignment="Center" Margin="0,1,2,1"
+                    Background="#080808" CornerRadius="4" BorderBrush="#3A3A3A" BorderThickness="1"
+                    Cursor="Hand" MouseLeftButtonUp="FreqLed_MouseLeftButtonUp"
+                    ToolTip="Working frequency in kHz — click to edit">
+                <Grid Margin="8,1,8,2">
+                    <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
+                               FontSize="18" VerticalAlignment="Center" Foreground="#1E1500"/>
+                    <TextBlock x:Name="FreqLedLive" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
+                               FontSize="18" VerticalAlignment="Center"/>
+                    <TextBox x:Name="TB_FreqLedEdit" Visibility="Collapsed" MinWidth="135"
+                             FontFamily="Consolas" FontSize="17" FontWeight="Bold"
+                             Background="#080808" Foreground="#FFB000" BorderThickness="0" Padding="0"
+                             CaretBrush="#FFB000" SelectionBrush="#664400"
                              VerticalContentAlignment="Center"
-                             KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"/>
-                </Border>
-            </Grid>
+                             KeyDown="TB_FreqLedEdit_KeyDown" LostFocus="TB_FreqLedEdit_LostFocus"/>
+                </Grid>
+            </Border>
             <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="#444444"
                        VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
         </StackPanel>
-        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,54,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,12,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid Width="95">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -718,7 +688,7 @@
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M81,3 C88,8 88,24 81,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
             </Grid>
         </Button>
-        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="462,6,0,0" Width="205" Height="38" BorderThickness="1" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
+        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="462,50,0,0" Width="205" Height="38" BorderThickness="1" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="BorderBrush" Value="#9966CC"/>
@@ -770,20 +740,20 @@
                 </Button>
             </Grid>
         </Border>
-        <TextBlock HorizontalAlignment="Left" Margin="192,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Your grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="192,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Your grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="My" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Locator" />
         </TextBlock>
-        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="75" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="6" TabIndex="3"/>
-        <TextBlock HorizontalAlignment="Left" Margin="335,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="15" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="75" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="6" TabIndex="3"/>
+        <TextBlock HorizontalAlignment="Left" Margin="335,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="15" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Holyland" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Square" />
         </TextBlock>
-        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="404,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="54" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="5" TabIndex="4"/>
-        <Label Content="Mode" HorizontalAlignment="Left" Margin="478,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="530,56,0,0" Grid.Row="1" VerticalAlignment="Top" Width="40" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3">
+        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="404,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="54" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="5" TabIndex="4"/>
+        <Label Content="Mode" HorizontalAlignment="Left" Margin="478,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="530,13,0,0" Grid.Row="1" VerticalAlignment="Top" Width="40" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3">
             <ComboBox.Template>
                 <ControlTemplate TargetType="ComboBox">
                     <Grid>
@@ -829,7 +799,7 @@
         <!-- Kept (hidden) as the data source: it still drives band calculation and is bound to
              Settings.Frequency. The new LED readout reads/writes this same value. -->
         <TextBox x:Name="TB_Frequency" Visibility="Collapsed" HorizontalAlignment="Left" Margin="216,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
-        <Label Content="Band" HorizontalAlignment="Left" Margin="383,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <Label Content="Band" HorizontalAlignment="Left" Margin="383,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
@@ -844,15 +814,15 @@
         </Border>
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
 
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="427,56,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
-        <TextBlock HorizontalAlignment="Left" Margin="12,96,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="427,13,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
+        <Label Content="DX Callsign" HorizontalAlignment="Left" Margin="6,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="The DX Station Callsign"/>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
         <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
         <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
-                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,115,0,0"
-                      Width="78" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
+                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,124,0,0"
+                      Width="78" Height="20" FontSize="11" FontWeight="Bold" Foreground="#1E2A36"
                       Focusable="False" Click="BtnSuggestToggle_Click"
                       ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
             <ToggleButton.Template>
@@ -1037,13 +1007,9 @@
             <LineBreak />
             <Run Text="Locator" />
         </TextBlock>
-        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="70" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
-        <Label Content="ITU" HorizontalAlignment="Left" Margin="141,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="ITU Zone (from QRZ.com)"/>
-        <TextBox x:Name="TB_ITUZone" HorizontalAlignment="Left" Height="28" Margin="176,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" IsReadOnly="True" VerticalContentAlignment="Center" IsTabStop="False"/>
-        <Label Content="CQ" HorizontalAlignment="Left" Margin="211,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="CQ Zone (from QRZ.com)"/>
-        <TextBox x:Name="TB_CQZone" HorizontalAlignment="Left" Height="28" Margin="244,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" IsReadOnly="True" VerticalContentAlignment="Center" IsTabStop="False"/>
-        <Label Content="Comment" HorizontalAlignment="Left" Margin="281,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
-        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="364,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="274" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
+        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="90" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
+        <Label Content="Comment" HorizontalAlignment="Left" Margin="165,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="248,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="390" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
         <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
@@ -1084,14 +1050,14 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Date" IsReadOnly="True" SortMemberPath="Date" Width="Auto">
+                <DataGridTemplateColumn Header="Date" IsReadOnly="True" SortMemberPath="Date">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Date, Converter={StaticResource QsoDateDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Time" IsReadOnly="True" SortMemberPath="Time" Width="Auto">
+                <DataGridTemplateColumn Header="Time" IsReadOnly="True" SortMemberPath="Time">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Time, Converter={StaticResource QsoTimeDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1119,14 +1085,14 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Freq}" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Band" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                <DataGridTemplateColumn Header="Band" IsReadOnly="True" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Band}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1134,7 +1100,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="RST-R" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                <DataGridTemplateColumn Header="RST-R" IsReadOnly="True" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding RST_RCVD}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1142,7 +1108,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="RST-S" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                <DataGridTemplateColumn Header="RST-S" IsReadOnly="True" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding RST_SENT}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1150,7 +1116,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Mode" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                <DataGridTemplateColumn Header="Mode" IsReadOnly="True" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Mode}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1158,7 +1124,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Exchange" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                <DataGridTemplateColumn Header="Exchange" IsReadOnly="True" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding SRX}" HorizontalAlignment="Center" Padding="5,0,5,0" />
@@ -1166,7 +1132,7 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
 
-                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="Auto" CanUserSort="False">
+                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="*" CanUserSort="False">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,0,5,0" />

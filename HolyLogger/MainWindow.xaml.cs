@@ -274,11 +274,6 @@ namespace HolyLogger
         StackPanel clusterShowBandsPanel = null;
         TextBlock clusterShowBandsLabelText = null;
         TextBlock clusterNewCountryLegendText = null;
-        TextBlock clusterNewCountryCountText = null;
-        DispatcherTimer _clusterNewCountryBlinkTimer = null;
-        DateTime _clusterNewCountryBlinkStopTime;
-        bool _clusterNewCountryBlinkOn = true;
-        int _lastNewCountryCount = 0;
         StackPanel clusterOnMyFreqLegendItem = null;
         Canvas clusterHeaderCanvas = null;
         DataGridColumn clusterDxColumn = null;
@@ -713,12 +708,6 @@ namespace HolyLogger
             {
                 item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
             }
-            var _rwCallsign = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Callsign");
-            var _rwName     = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Name");
-            var _rwCountry  = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Country");
-            if (_rwCallsign != null) _rwCallsign.Width = new DataGridLength(Properties.Settings.Default.ColWidthCallsign);
-            if (_rwName     != null) _rwName.Width     = new DataGridLength(Properties.Settings.Default.ColWidthName);
-            if (_rwCountry  != null) _rwCountry.Width  = new DataGridLength(Properties.Settings.Default.ColWidthCountry);
             ToggleMatrixControl();
             ToggleAzimuthControl();
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
@@ -1199,41 +1188,10 @@ namespace HolyLogger
             if (Properties.Settings.Default.MainWindowHeight > 0)
                 Height = Properties.Settings.Default.MainWindowHeight;
 
-            double savedLeft = Properties.Settings.Default.MainWindowLeft;
-            double savedTop  = Properties.Settings.Default.MainWindowTop;
-
-            // Guard against a position saved off-screen: a minimized window reports
-            // (-32000,-32000), and a monitor that's since been disconnected leaves a
-            // position outside the virtual desktop. Either way the window would open
-            // where the user can't see it ("program doesn't load"). Fall back to a
-            // visible spot on the primary work area.
-            if (!IsPositionOnScreen(savedLeft, savedTop))
-            {
-                savedLeft = SystemParameters.WorkArea.Left + 40;
-                savedTop  = SystemParameters.WorkArea.Top + 40;
-            }
-
-            Left = savedLeft;
-            Top  = savedTop;
+            Left = Properties.Settings.Default.MainWindowLeft;
+            Top = Properties.Settings.Default.MainWindowTop;
 
             hasRestoredMainWindowBounds = true;
-        }
-
-        // True when the given top-left corner falls inside the current virtual screen
-        // (with a margin so at least a grabbable sliver of the title bar is reachable).
-        private static bool IsPositionOnScreen(double left, double top)
-        {
-            if (double.IsNaN(left) || double.IsNaN(top) ||
-                double.IsInfinity(left) || double.IsInfinity(top))
-                return false;
-
-            double vsLeft   = SystemParameters.VirtualScreenLeft;
-            double vsTop    = SystemParameters.VirtualScreenTop;
-            double vsRight  = vsLeft + SystemParameters.VirtualScreenWidth;
-            double vsBottom = vsTop  + SystemParameters.VirtualScreenHeight;
-
-            return left >= vsLeft - 10 && top >= vsTop - 10 &&
-                   left <= vsRight - 100 && top <= vsBottom - 60;
         }
 
         private void StartUTCTimer()
@@ -1358,22 +1316,8 @@ namespace HolyLogger
 
         private void setLockBtnState()
         {
-            bool locked = Properties.Settings.Default.isLocked;
-            Lock_Btn.Source = locked ? lock_path : unlock_path;
-
-            var lightRed = new SolidColorBrush(Color.FromRgb(0xFF, 0xCC, 0xCC));
-            if (locked)
-            {
-                if (LockBtnBorder != null) LockBtnBorder.Background = new SolidColorBrush(Color.FromRgb(0x64, 0xB5, 0xF6));
-                TB_MyCallsign.ClearValue(TextBox.BackgroundProperty);
-                TB_Operator.ClearValue(TextBox.BackgroundProperty);
-            }
-            else
-            {
-                if (LockBtnBorder != null) LockBtnBorder.Background = lightRed;
-                TB_MyCallsign.Background = lightRed;
-                TB_Operator.Background = lightRed;
-            }
+            if (!Properties.Settings.Default.isLocked) Lock_Btn.Source = unlock_path;
+            else Lock_Btn.Source = lock_path;
         }
 
         private void LockComment_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -1623,8 +1567,6 @@ namespace HolyLogger
             TB_DXCallsign.Clear();
             TB_Exchange.Clear();
             TB_DXLocator.Clear();
-            TB_ITUZone.Text = "";
-            TB_CQZone.Text = "";
 
             if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
             {
@@ -1762,34 +1704,6 @@ namespace HolyLogger
             if (idx >= 0)
                 header = header.Substring(0, idx).TrimEnd();
             return header;
-        }
-
-        // Tunnels from the window root for EVERY key, regardless of which field has focus — so Esc
-        // can clear a selected log row even though keyboard focus normally stays on the entry fields.
-        private void Window_PreviewKeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key != Key.Escape) return;
-            if (QSODataGrid == null) return;
-
-            // Leave an in-progress cell edit alone: there the source is the edit TextBox inside a
-            // DataGridCell, and Esc should cancel that edit (handled by the grid further down the tunnel).
-            bool editingGridCell = (e.OriginalSource is System.Windows.Controls.Primitives.TextBoxBase)
-                                   && FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject) != null;
-            if (editingGridCell) return;
-
-            // If a log row (or cell) is highlighted, Esc clears the selection (row returns to its
-            // normal color) and is consumed so it doesn't also fire the global Esc = Clear-the-entry-
-            // form. When nothing is selected, Esc falls through unchanged and still clears the form.
-            bool hasSelection = QSODataGrid.SelectedItem != null
-                                || QSODataGrid.SelectedItems.Count > 0
-                                || QSODataGrid.SelectedCells.Count > 0;
-            if (hasSelection)
-            {
-                QSODataGrid.UnselectAll();
-                QSODataGrid.UnselectAllCells();
-                QSODataGrid.SelectedItem = null;
-                e.Handled = true;
-            }
         }
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
@@ -2267,23 +2181,8 @@ namespace HolyLogger
                 return;
             }
 
-            // Build a fresh menu bound to the right-clicked QSO. By default a right-click menu opens
-            // at the mouse, on top of the table. ContextMenu ignores Custom placement on auto-open,
-            // but it DOES honor the named placement modes: anchoring it to the grid with Placement
-            // = Top puts the menu directly ABOVE the grid, its bottom edge at the grid's top (just
-            // above the header row), so it never covers any QSO data.
-            var menu = BuildQsoRowContextMenu(qso);
-            menu.PlacementTarget = QSODataGrid;
-            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
-            // Don't leave the row highlighted blue once the menu goes away (e.g. dismissed with
-            // Esc or by clicking elsewhere). Clear the selection when the menu closes. The menu-item
-            // actions captured the QSO directly, so they don't rely on the selection.
-            menu.Closed += (s2, e2) =>
-            {
-                QSODataGrid.SelectedItem = null;
-                QSODataGrid.UnselectAll();
-            };
-            QSODataGrid.ContextMenu = menu;
+            // Build a fresh menu bound to the right-clicked QSO and let WPF open it on mouse-up.
+            QSODataGrid.ContextMenu = BuildQsoRowContextMenu(qso);
         }
 
         // Parsed-once styles for the log-row context menu (rounded card, hover highlights, icons).
@@ -2812,6 +2711,12 @@ namespace HolyLogger
                 SendQueueToEqslMenuItem.Header = header;
             }
 
+            // The "!" badge is red when QSOs are waiting, gray when the queue is empty (a custom
+            // colored Border doesn't dim on its own when the menu item is disabled).
+            if (SendQueueBadgeIcon != null)
+                SendQueueBadgeIcon.Background = new SolidColorBrush(
+                    any ? (Color)ColorConverter.ConvertFromString("#D32F2F")
+                        : (Color)ColorConverter.ConvertFromString("#9E9E9E"));
 
             // Keep an open queue window in sync too (e.g. a QSO was deleted from the log behind it).
             if (_eqslQueueWindow != null)
@@ -5484,30 +5389,6 @@ namespace HolyLogger
             UpdateDup();
         }
 
-        private void ContestIndicator_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            ContestModeMenuItem_Click(null, null);
-        }
-
-        private void ShareStatusButton_Click(object sender, RoutedEventArgs e)
-        {
-            Properties.Settings.Default.ShowOnTheAir = !Properties.Settings.Default.ShowOnTheAir;
-            Properties.Settings.Default.Save();
-            UpdateShareStatusButtonState();
-        }
-
-        private void UpdateShareStatusButtonState()
-        {
-            if (ShareStatusButton == null) return;
-            bool on = Properties.Settings.Default.ShowOnTheAir;
-            ShareStatusButton.Background = on
-                ? new SolidColorBrush(Color.FromRgb(0x4C, 0xAF, 0x50))
-                : new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
-            ShareStatusButton.BorderBrush = on
-                ? new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32))
-                : new SolidColorBrush(Color.FromRgb(0x75, 0x75, 0x75));
-        }
-
         private void UpdateContestModeMenuHeader()
         {
             bool on = Properties.Settings.Default.ContestMode;
@@ -5564,7 +5445,6 @@ namespace HolyLogger
             if (Properties.Settings.Default.EnableOmniRigCAT)
                 StartOmniRig();
             UpdateStatus();
-            UpdateShareStatusButtonState();
 
             // Also check the stored Station Callsign on startup: a wrong/uncovered callsign saved in a
             // previous session would otherwise give no clue that no upload service handles it. Deferred
@@ -5820,12 +5700,6 @@ namespace HolyLogger
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
-            var _cwCallsign = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Callsign");
-            var _cwName     = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Name");
-            var _cwCountry  = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Country");
-            if (_cwCallsign != null) Properties.Settings.Default.ColWidthCallsign = _cwCallsign.ActualWidth;
-            if (_cwName     != null) Properties.Settings.Default.ColWidthName     = _cwName.ActualWidth;
-            if (_cwCountry  != null) Properties.Settings.Default.ColWidthCountry  = _cwCountry.ActualWidth;
             try { Properties.Settings.Default.Save(); } catch { }
             if (dal != null) dal.Close();
         }
@@ -5903,14 +5777,9 @@ namespace HolyLogger
                              && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
             if (catEnabled && !manualMode && !rigOnline)
             {
-                // Only initialise the no-CAT box when first switching to that mode so we don't
-                // overwrite text the user is actively typing.
-                if (FreqNoCatBezel != null && FreqNoCatBezel.Visibility != Visibility.Visible)
-                    ShowLedNoCat();
+                ShowLedBlank();
                 return;
             }
-
-            ShowLedActive();   // ensure LED bezel is visible when CAT is working
 
             string raw = (TB_Frequency.Text ?? string.Empty).Trim();
             if (!double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double mhz) || mhz <= 0)
@@ -5938,66 +5807,9 @@ namespace HolyLogger
         private void ShowLedBlank()
         {
             if (FreqLedLive == null || FreqLedGhost == null) return;
-            FreqLedGhost.Text = "8888888.888";
+            FreqLedGhost.Text = "888888.888";
             FreqLedLive.Inlines.Clear();
-            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run("-------.---") { Foreground = LedAmberBrush });
-        }
-
-        // No CAT / rig offline — switch to a plain editable textbox with a red border.
-        private void ShowLedNoCat()
-        {
-            if (FreqLedBezel == null || FreqNoCatBezel == null) return;
-            FreqLedBezel.Visibility = Visibility.Hidden;
-            FreqNoCatBezel.Visibility = Visibility.Visible;
-            // Pre-fill with any stored frequency.
-            string raw = (TB_Frequency.Text ?? string.Empty).Trim();
-            if (double.TryParse(raw, System.Globalization.NumberStyles.Float,
-                                 System.Globalization.CultureInfo.InvariantCulture, out double mhz) && mhz > 0)
-            {
-                long hz = (long)Math.Round(mhz * 1000000.0);
-                TB_FreqNoCat.Text = (hz / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture)
-                                    + "." + (hz % 1000).ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
-            }
-            else
-            {
-                TB_FreqNoCat.Text = string.Empty;
-            }
-        }
-
-        // CAT / rig back online — switch back to the LED display.
-        private void ShowLedActive()
-        {
-            if (FreqNoCatBezel == null || FreqLedBezel == null) return;
-            // Do NOT CommitFreqNoCat here: the rig's live frequency takes priority over whatever
-            // the operator may have typed while offline. The rig will report its frequency via
-            // ShowRigParams, which sets TB_Frequency directly.
-            FreqNoCatBezel.Visibility = Visibility.Hidden;
-            FreqLedBezel.Visibility = Visibility.Visible;
-        }
-
-        private void CommitFreqNoCat()
-        {
-            string txt = (TB_FreqNoCat?.Text ?? string.Empty).Trim();
-            if (double.TryParse(txt, System.Globalization.NumberStyles.Float,
-                                 System.Globalization.CultureInfo.InvariantCulture, out double kHz) && kHz > 0)
-            {
-                double mhz = kHz / 1000.0;
-                TB_Frequency.Text = mhz.ToString("0.0#####", System.Globalization.CultureInfo.InvariantCulture);
-                long hz = (long)Math.Round(mhz * 1000000.0);
-                TB_FreqNoCat.Text = (hz / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture)
-                                    + "." + (hz % 1000).ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
-            }
-        }
-
-        private void TB_FreqNoCat_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Enter) { CommitFreqNoCat(); e.Handled = true; }
-            else if (e.Key == Key.Escape) { UpdateFreqLed(); e.Handled = true; }
-        }
-
-        private void TB_FreqNoCat_LostFocus(object sender, RoutedEventArgs e)
-        {
-            CommitFreqNoCat();
+            FreqLedLive.Inlines.Add(new System.Windows.Documents.Run("------.---") { Foreground = LedAmberBrush });
         }
 
         // Click the LED to edit. Show an inline TextBox pre-filled with the current kHz value.
@@ -6787,10 +6599,6 @@ namespace HolyLogger
             clusterUndoButton = null;
             clusterUndoCountText = null;
             clusterSpotCountText = null;
-            clusterNewCountryCountText = null;
-            _clusterNewCountryBlinkTimer?.Stop();
-            _clusterNewCountryBlinkTimer = null;
-            _lastNewCountryCount = 0;
             clusterActiveBandIndicatorText = null;
             clusterDxColumn = null;
             clusterSpotterColumn = null;
@@ -7260,20 +7068,7 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 8, 0, 1)
             };
-            row.Children.Add(BuildClusterLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 6, 0)));
-
-            var countText = new TextBlock
-            {
-                Text = "0",
-                Foreground = Brushes.Black,   // starts at 0 → black; turns red when new countries appear
-                FontWeight = FontWeights.Bold,
-                FontSize = 22,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 18, 0)
-            };
-            clusterNewCountryCountText = countText;
-            row.Children.Add(countText);
-
+            row.Children.Add(BuildClusterLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 24, 0)));
             return row;
         }
 
@@ -9321,8 +9116,6 @@ namespace HolyLogger
                         spot.IsNeededCountry = IsNeededCountry(spot.DXCallsign, clusterWorkedCountries);
                     }
                 }
-
-                UpdateClusterSpotCountIndicator();
             }));
         }
 
@@ -9792,45 +9585,6 @@ namespace HolyLogger
 
             int count = clusterVisibleSpots != null ? clusterVisibleSpots.Count : 0;
             clusterSpotCountText.Text = count.ToString(CultureInfo.InvariantCulture);
-
-            if (clusterNewCountryCountText != null)
-            {
-                int newCountry = clusterVisibleSpots != null
-                    ? clusterVisibleSpots.Count(s => s.IsNeededCountry)
-                    : 0;
-                clusterNewCountryCountText.Text = newCountry.ToString(CultureInfo.InvariantCulture);
-                // Black when there are no new countries, red when there are.
-                clusterNewCountryCountText.Foreground = newCountry > 0 ? Brushes.Red : Brushes.Black;
-                if (newCountry > _lastNewCountryCount)
-                    StartNewCountryBlink();
-                _lastNewCountryCount = newCountry;
-            }
-        }
-
-        private void StartNewCountryBlink()
-        {
-            if (_clusterNewCountryBlinkTimer == null)
-            {
-                _clusterNewCountryBlinkTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
-                _clusterNewCountryBlinkTimer.Tick += (s, e) =>
-                {
-                    if (clusterNewCountryCountText == null || DateTime.UtcNow >= _clusterNewCountryBlinkStopTime)
-                    {
-                        _clusterNewCountryBlinkTimer.Stop();
-                        if (clusterNewCountryCountText != null)
-                            clusterNewCountryCountText.Opacity = 1.0;
-                        return;
-                    }
-                    _clusterNewCountryBlinkOn = !_clusterNewCountryBlinkOn;
-                    clusterNewCountryCountText.Opacity = _clusterNewCountryBlinkOn ? 1.0 : 0.0;
-                };
-            }
-            _clusterNewCountryBlinkStopTime = DateTime.UtcNow.AddSeconds(10);
-            _clusterNewCountryBlinkOn = true;
-            if (clusterNewCountryCountText != null)
-                clusterNewCountryCountText.Opacity = 1.0;
-            _clusterNewCountryBlinkTimer.Stop();
-            _clusterNewCountryBlinkTimer.Start();
         }
 
         public bool GetClusterHoverPopupEnabled()
@@ -10848,12 +10602,9 @@ namespace HolyLogger
 
         private void TB_DX_Name_TextChanged(object sender, TextChangedEventArgs e)
         {
-            // The box is right-anchored: it keeps its right edge fixed and grows leftward so long
-            // names stay visible. These must match the XAML placement (Margin 69, Width 264 ->
-            // right edge 333) so the box does not jump when the text is cleared after saving a QSO.
-            const double rightEdge = 333;   // 69 + 264, stops short of the Country label at x=340
-            const double minLeft = 57;      // just right of the "Name" label, the leftmost it may grow
-            const double defaultLeft = 69;  // normal resting position (matches XAML)
+            const double rightEdge = 371;
+            const double minLeft = 57;
+            const double defaultLeft = 101;
 
             var ft = new System.Windows.Media.FormattedText(
                 TB_DX_Name.Text,
@@ -11182,8 +10933,6 @@ namespace HolyLogger
                     TB_DXCC.Text = "";
                     TB_DX_Name.Text = "";
                     TB_State.Text = "";
-                    TB_ITUZone.Text = "";
-                    TB_CQZone.Text = "";
                     UpdateCountryFlag(null);
                     // Use ClearAzimuth (not ClearAzimuthForTyping) so emptying the DX callsign removes
                     // the azimuth line to the deleted station and immediately restores the cluster-spots
@@ -11202,8 +10951,6 @@ namespace HolyLogger
                 {
                     FName = string.Empty;
                     ClearDXLocator();
-                    TB_ITUZone.Text = "";
-                    TB_CQZone.Text = "";
                 }), DispatcherPriority.Send);
 
                 // Keep typing snappy: skip heavy DXCC/matrix/filter work until at least 2 chars.
@@ -12392,13 +12139,8 @@ namespace HolyLogger
             if (bounds.Height > 0)
                 Properties.Settings.Default.MainWindowHeight = bounds.Height;
 
-            // Never persist an off-screen top-left (e.g. -32000,-32000 while minimized,
-            // or RestoreBounds = Empty). Otherwise the next launch opens invisibly.
-            if (IsPositionOnScreen(bounds.Left, bounds.Top))
-            {
-                Properties.Settings.Default.MainWindowLeft = bounds.Left;
-                Properties.Settings.Default.MainWindowTop = bounds.Top;
-            }
+            Properties.Settings.Default.MainWindowLeft = bounds.Left;
+            Properties.Settings.Default.MainWindowTop = bounds.Top;
         }
 
         private void SetAzimuth()
@@ -12689,9 +12431,14 @@ namespace HolyLogger
 
         private void UpdateShareIconVisibility()
         {
-            if (ShareStatusButton == null) return;
-            ShareStatusButton.Visibility = Visibility.Visible;
-            UpdateShareStatusButtonState();
+            if (ShareStatusButton == null)
+            {
+                return;
+            }
+
+            ShareStatusButton.Visibility = isNetworkAvailable && Properties.Settings.Default.ShowOnTheAir
+                ? Visibility.Visible
+                : Visibility.Collapsed;
         }
 
         private void ApplyClusterWindowSetting()
@@ -12854,11 +12601,6 @@ namespace HolyLogger
                             if (grid.Count() > 0)
                                 QRZGrid = grid.FirstOrDefault().Value.ToUpper();
 
-                            IEnumerable<XElement> ituEl = xDoc.Root.Descendants(ns + "ituzone");
-                            TB_ITUZone.Text = ituEl.Count() > 0 ? ituEl.FirstOrDefault().Value : "";
-                            IEnumerable<XElement> cqEl = xDoc.Root.Descendants(ns + "cqzone");
-                            TB_CQZone.Text = cqEl.Count() > 0 ? cqEl.FirstOrDefault().Value : "";
-
                             IEnumerable<XElement> stateEl = xDoc.Root.Descendants(ns + "state");
                             TB_State.Text = stateEl.Count() > 0 ? stateEl.FirstOrDefault().Value.Trim() : string.Empty;
 
@@ -12906,8 +12648,6 @@ namespace HolyLogger
                             {
                                 FName = "";
                                 TB_State.Text = "";
-                                TB_ITUZone.Text = "";
-                                TB_CQZone.Text = "";
                                 ClearQrzPhoto();
                             }
                         }
@@ -12917,8 +12657,6 @@ namespace HolyLogger
                 {
                     FName = "";
                     TB_State.Text = "";
-                    TB_ITUZone.Text = "";
-                    TB_CQZone.Text = "";
                     ClearQrzPhoto();
                 }
             }
@@ -12926,8 +12664,6 @@ namespace HolyLogger
             {
                 FName = "";
                 TB_State.Text = "";
-                TB_ITUZone.Text = "";
-                TB_CQZone.Text = "";
                 ClearQrzPhoto();
             }
         }
@@ -13591,25 +13327,14 @@ namespace HolyLogger
                     double radioTX = (double)Rig.GetTxFrequency() / 1000000;
                     if (Properties.Settings.Default.IsSatelliteMode)
                         radioRX += Properties.Settings.Default.SatelliteShift;
-
-                    // OmniRig can fire StatusChange before it has polled the rig's frequency
-                    // register; GetRxFrequency returns 0 in that window. Skip the update so
-                    // the LED keeps showing the previous known frequency instead of blank dashes.
-                    // The immediately following ParamsChange will carry the real value.
-                    if (radioRX > 0)
-                    {
-                        RX = radioRX.ToString("###0.000000");
-                        TX = radioTX.ToString("###0.000000");
-                        TB_Frequency.Text = RX;
-                        Properties.Settings.Default.Frequency = RX;
-                    }
-
+                    RX = radioRX.ToString("###0.000000");
+                    TX = radioTX.ToString("###0.000000");
+                    //TB_Frequency.Text = RX;
+                    Properties.Settings.Default.Frequency = RX;
                     CB_Mode.Text = GetNormalizedRigMode();
+
                     UpdateVoiceMessageState();
                     UpdateVoiceMessageAvailabilityState();
-                    // Always refresh the LED — WPF skips no-op binding updates so TextChanged
-                    // may not fire when the frequency value didn't change.
-                    UpdateFreqLed();
                 });
             }
             catch (Exception e)

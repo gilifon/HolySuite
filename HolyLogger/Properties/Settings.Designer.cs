@@ -1335,42 +1335,6 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("120")]
-        public double ColWidthCallsign {
-            get {
-                return ((double)(this["ColWidthCallsign"]));
-            }
-            set {
-                this["ColWidthCallsign"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("120")]
-        public double ColWidthName {
-            get {
-                return ((double)(this["ColWidthName"]));
-            }
-            set {
-                this["ColWidthName"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("150")]
-        public double ColWidthCountry {
-            get {
-                return ((double)(this["ColWidthCountry"]));
-            }
-            set {
-                this["ColWidthCountry"] = value;
-            }
-        }
-
-        [global::System.Configuration.UserScopedSettingAttribute()]
-        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("83.546666666666667")]
         public double ClusterColWidthDX {
             get {
