@@ -461,6 +461,15 @@
     <Setting Name="LotwStationLocation" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>
+    <Setting Name="ColWidthCallsign" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">120</Value>
+    </Setting>
+    <Setting Name="ColWidthName" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">120</Value>
+    </Setting>
+    <Setting Name="ColWidthCountry" Type="System.Double" Scope="User">
+      <Value Profile="(Default)">150</Value>
+    </Setting>
     <Setting Name="LotwCallsignLocations" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>

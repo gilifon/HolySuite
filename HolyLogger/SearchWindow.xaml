@@ -7,6 +7,8 @@
         MinHeight="300" MinWidth="600"
         ResizeMode="CanResize"
         WindowStartupLocation="Manual"
+        PreviewKeyDown="Window_PreviewKeyDown"
+        Loaded="Window_Loaded"
         LocationChanged="Window_LocationChanged"
         SizeChanged="Window_SizeChanged">
 
@@ -34,9 +36,24 @@
                     <TextBox x:Name="TB_Callsign" Width="140" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <TextBox x:Name="TB_Country" Width="200" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
-                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
-                    <Button x:Name="Btn_Search" FontSize="14" Padding="16,4" IsEnabled="False"
+                    <ComboBox x:Name="CB_Country" Width="220" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
+                              IsEditable="True" StaysOpenOnEdit="True" IsTextSearchEnabled="False" MaxDropDownHeight="280"
+                              IsSynchronizedWithCurrentItem="False"
+                              PreviewKeyDown="CB_Country_PreviewKeyDown"
+                              PreviewTextInput="CB_Country_PreviewTextInput"
+                              KeyUp="CB_Country_KeyUp">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Image Source="{Binding FlagImage}" Width="24" Height="16"
+                                           VerticalAlignment="Center" Margin="0,0,6,0"
+                                           RenderOptions.BitmapScalingMode="HighQuality"/>
+                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button x:Name="Btn_Search" FontSize="14" Padding="16,4"
                             Click="Btn_Search_Click" Background="#1565C0" Foreground="White"
                             BorderBrush="#0D47A1" Cursor="Hand">
                         <StackPanel Orientation="Horizontal">
@@ -47,6 +64,9 @@
                             <TextBlock Text="Search" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
+                    <Button x:Name="Btn_Clear" Content="Clear" FontSize="14" Padding="12,4"
+                            Click="Btn_Clear_Click" Background="#757575" Foreground="White"
+                            BorderBrush="#616161" Cursor="Hand" Margin="8,0,0,0"/>
                 </WrapPanel>
                 <!-- QSO count, right-justified so it tracks the right edge on resize -->
                 <TextBlock x:Name="TB_Count" Grid.Column="1" VerticalAlignment="Center"
