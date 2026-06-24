@@ -24,6 +24,22 @@ namespace HolyLogger
             InitializeComponent();
             GeneralItem.IsSelected = true;
         }
+
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            // Never open taller than the screen's work area. On a low-resolution screen or with
+            // Windows display scaling at 125/150%, the fixed 750px height exceeded the visible
+            // area and the bottom controls were clipped off the screen edge. Shrink to fit; the
+            // ScrollViewer then exposes a scrollbar so nothing is unreachable. Also nudge the
+            // window up if it would hang off the bottom.
+            var work = SystemParameters.WorkArea;
+            if (Height > work.Height)
+                Height = work.Height;
+            if (!double.IsNaN(Top) && Top + Height > work.Bottom)
+                Top = Math.Max(work.Top, work.Bottom - Height);
+        }
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
         {
             // Make sure any eQSL account edit still in progress (typed but not yet committed) is saved.

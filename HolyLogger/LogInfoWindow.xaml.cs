@@ -62,6 +62,22 @@ namespace HolyLogger
             DataContext = this;
         }
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            // This window opens at 800px tall - taller than a low-resolution or display-scaled
+            // screen's work area, where it would open partly below the screen edge. The pie charts
+            // are laid out with proportional (*) rows, so shrinking the window just scales them
+            // down; nothing is lost. Clamp the startup height to fit and nudge it up if it would
+            // hang off the bottom.
+            var work = SystemParameters.WorkArea;
+            if (Height > work.Height)
+                Height = work.Height;
+            if (!double.IsNaN(Top) && Top + Height > work.Bottom)
+                Top = Math.Max(work.Top, work.Bottom - Height);
+        }
+
         private void BindCharts()
         {
             Band = new SeriesCollection

@@ -6,7 +6,7 @@
         xmlns:local="clr-namespace:HolyLogger"
         xmlns:OptionsUserControls="clr-namespace:HolyLogger.OptionsUserControls" x:Class="HolyLogger.OptionsWindow"
         mc:Ignorable="d"
-        Title="Properties" Height="750" MinHeight="750" MaxHeight="750" Width="900" MinWidth="900" MaxWidth="900" ResizeMode="NoResize" Icon="Images/properties.png" SizeChanged="Window_SizeChanged" KeyDown="Window_KeyDown">
+        Title="Properties" Height="750" MinHeight="400" Width="900" MinWidth="900" MaxWidth="900" ResizeMode="CanResize" Icon="Images/properties.png" SizeChanged="Window_SizeChanged" KeyDown="Window_KeyDown">
     <Grid>
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="180" />
@@ -24,12 +24,21 @@
                 <TreeViewItem x:Name="SatelliteItem" Header="Satellite Mode" Selected="SatelliteItem_Selected"/>
             </TreeView>
         </DockPanel>
-        <OptionsUserControls:QRZServicesControl x:Name="QRZServicesControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
-        <OptionsUserControls:EqslServiceControl x:Name="EqslServiceControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
-        <OptionsUserControls:LotwControl x:Name="LotwControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
-        <OptionsUserControls:UserInterfaceControl x:Name="UserInterfaceControlInstance" Grid.Column="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
-        <OptionsUserControls:GeneralSettingsControl x:Name="GeneralSettingsControlControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
-        <OptionsUserControls:ImportControl x:Name="ImportControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
-        <OptionsUserControls:SatelliteControl x:Name="SatelliteControlInstance" Grid.Column="1" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+        <!-- Each settings panel is a fixed-size UserControl. On a screen shorter than the window
+             (low resolution or 125/150% display scaling) the bottom controls used to fall off the
+             screen edge with no way to reach them. Hosting them in a ScrollViewer means that when
+             the window is shrunk to fit a short screen, a vertical scrollbar appears so every
+             control stays reachable. On a tall screen everything fits and no scrollbar shows. -->
+        <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid>
+                <OptionsUserControls:QRZServicesControl x:Name="QRZServicesControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
+                <OptionsUserControls:EqslServiceControl x:Name="EqslServiceControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
+                <OptionsUserControls:LotwControl x:Name="LotwControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
+                <OptionsUserControls:UserInterfaceControl x:Name="UserInterfaceControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
+                <OptionsUserControls:GeneralSettingsControl x:Name="GeneralSettingsControlControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+                <OptionsUserControls:ImportControl x:Name="ImportControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+                <OptionsUserControls:SatelliteControl x:Name="SatelliteControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+            </Grid>
+        </ScrollViewer>
     </Grid>
 </Window>

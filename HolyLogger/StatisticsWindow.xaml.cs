@@ -78,6 +78,21 @@ namespace HolyLogger
             };
         }
 
+        protected override void OnSourceInitialized(EventArgs e)
+        {
+            base.OnSourceInitialized(e);
+
+            // Never open taller than the screen. The default 680px (or a height restored from a
+            // bigger monitor) can exceed a low-resolution or display-scaled screen's work area.
+            // The body row is proportional with its own scrollbars, so shrinking to fit keeps the
+            // footer and all controls reachable. Nudge up if it would hang off the bottom.
+            var work = SystemParameters.WorkArea;
+            if (Height > work.Height)
+                Height = work.Height;
+            if (!double.IsNaN(Top) && Top + Height > work.Bottom)
+                Top = Math.Max(work.Top, work.Bottom - Height);
+        }
+
         // ── top-level entry point ─────────────────────────────────────────
 
         private void ComputeStats()
