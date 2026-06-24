@@ -44,13 +44,26 @@ namespace HolyLogger
             _allQsos = qsos;
 
             var s = Properties.Settings.Default;
-            if (s.StatisticsWindowLeft > 0 || s.StatisticsWindowTop > 0)
+
+            // Restore size first so the on-screen test below uses the real window size.
+            if (s.StatisticsWindowWidth  >= MinWidth)  Width  = s.StatisticsWindowWidth;
+            if (s.StatisticsWindowHeight >= MinHeight) Height = s.StatisticsWindowHeight;
+
+            // Restore the last position only if it still lands on a visible monitor. A position
+            // saved on a second monitor that's since been turned off or rearranged (e.g. Left=2250
+            // when only the primary screen is present) would otherwise open the window in dead
+            // space where it can't be seen — which looks exactly like "it didn't remember." When
+            // the saved spot is off-screen, fall back to a visible default.
+            if (IsPositionOnScreen(s.StatisticsWindowLeft, s.StatisticsWindowTop, Width, Height))
             {
                 Left = s.StatisticsWindowLeft;
                 Top  = s.StatisticsWindowTop;
             }
-            if (s.StatisticsWindowWidth  > MinWidth)  Width  = s.StatisticsWindowWidth;
-            if (s.StatisticsWindowHeight > MinHeight) Height = s.StatisticsWindowHeight;
+            else
+            {
+                Left = SystemParameters.WorkArea.Left + 60;
+                Top  = SystemParameters.WorkArea.Top  + 60;
+            }
 
             ComputeStats();
 
@@ -489,16 +502,45 @@ namespace HolyLogger
 
         private void Window_LocationChanged(object sender, EventArgs e)
         {
-            if (Left >= 0) Properties.Settings.Default.StatisticsWindowLeft = Left;
-            if (Top  >= 0) Properties.Settings.Default.StatisticsWindowTop  = Top;
+            // Use WindowState's restore bounds so a position saved while maximized is the real
+            // (un-maximized) corner, not the maximized 0,0. Skip NaN that can appear before the
+            // window has a position. No "Left >= 0" filter — a second monitor to the left gives
+            // valid negative coordinates that must be remembered too.
+            double left = WindowState == WindowState.Normal ? Left : RestoreBounds.Left;
+            double top  = WindowState == WindowState.Normal ? Top  : RestoreBounds.Top;
+            if (double.IsNaN(left) || double.IsNaN(top)) return;
+
+            Properties.Settings.Default.StatisticsWindowLeft = left;
+            Properties.Settings.Default.StatisticsWindowTop  = top;
             Properties.Settings.Default.Save();
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
-            if (Width  > 0) Properties.Settings.Default.StatisticsWindowWidth  = Width;
-            if (Height > 0) Properties.Settings.Default.StatisticsWindowHeight = Height;
+            double width  = WindowState == WindowState.Normal ? Width  : RestoreBounds.Width;
+            double height = WindowState == WindowState.Normal ? Height : RestoreBounds.Height;
+            if (width  > 0) Properties.Settings.Default.StatisticsWindowWidth  = width;
+            if (height > 0) Properties.Settings.Default.StatisticsWindowHeight = height;
             Properties.Settings.Default.Save();
+        }
+
+        // True when a window of the given size at (left, top) would still be reachable on some
+        // monitor of the current virtual desktop. Mirrors MainWindow.IsPositionOnScreen: requires
+        // the title bar to be grabbable rather than the whole window to fit, so a slightly
+        // off-bottom/right spot still counts as visible.
+        private static bool IsPositionOnScreen(double left, double top, double width, double height)
+        {
+            if (double.IsNaN(left) || double.IsNaN(top) ||
+                double.IsInfinity(left) || double.IsInfinity(top))
+                return false;
+
+            double vsLeft   = SystemParameters.VirtualScreenLeft;
+            double vsTop    = SystemParameters.VirtualScreenTop;
+            double vsRight  = vsLeft + SystemParameters.VirtualScreenWidth;
+            double vsBottom = vsTop  + SystemParameters.VirtualScreenHeight;
+
+            return left >= vsLeft - 10 && top >= vsTop - 10 &&
+                   left <= vsRight - 100 && top <= vsBottom - 60;
         }
     }
 
