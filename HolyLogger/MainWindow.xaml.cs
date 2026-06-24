@@ -262,6 +262,8 @@ namespace HolyLogger
             "HolyLogger", "cluster_connection.log");
         HashSet<string> clusterSpotKeys = new HashSet<string>(StringComparer.Ordinal);
         List<ClusterSpotViewItem> clusterAllSpots = new List<ClusterSpotViewItem>();
+        // Per-band spot-count label shown under each band checkbox, keyed by band name.
+        Dictionary<string, TextBlock> clusterBandSpotCountTexts = new Dictionary<string, TextBlock>(StringComparer.OrdinalIgnoreCase);
         ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
         // While the mouse hovers a band checkbox, the cluster temporarily shows ONLY that band's
         // spots (table + map), as if it were the active band; cleared when the mouse leaves.
@@ -280,16 +282,20 @@ namespace HolyLogger
         bool _clusterNewCountryBlinkOn = true;
         int _lastNewCountryCount = 0;
         StackPanel clusterOnMyFreqLegendItem = null;
+        FrameworkElement clusterLegendPanel = null;
         Canvas clusterHeaderCanvas = null;
         DataGridColumn clusterDxColumn = null;
         DataGridColumn clusterSpotterColumn = null;
         DataGridColumn clusterFreqColumn = null;
         DataGridColumn clusterUtcColumn = null;
         DataGrid clusterSpotsDataGrid = null;
+        // Stable key per cluster table column, used to persist/restore the column ORDER.
+        Dictionary<DataGridColumn, string> clusterColumnKeys = new Dictionary<DataGridColumn, string>();
         ScrollViewer clusterSpotsScrollViewer = null;
         bool clusterTableMarginInitialized = false;
         StackPanel clusterLastMinutesFilterPanel = null;
         StackPanel clusterBandSelectorPanel = null;
+        StackPanel clusterModeSelectorPanel = null;
         ComboBox clusterLastMinutesComboBox = null;
         int clusterLastMinutesFilterValue = 60;
         DispatcherTimer clusterSingleClickOpenQrzTimer = null;
@@ -302,6 +308,7 @@ namespace HolyLogger
         Button clusterUndoButton = null;
         TextBlock clusterUndoCountText = null;
         TextBlock clusterSpotCountText = null;
+        Border clusterSpotCountBadge = null;
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
         // Independent undo stack for the log-row "Set Radio to Freq" action — kept separate from the cluster undo.
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> logRadioUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
@@ -318,6 +325,14 @@ namespace HolyLogger
         // All Bands buttons at the same horizontal position whether the band is legal, illegal,
         // or a different band name (which would otherwise have a different text width).
         const double ClusterBandIndicatorHalfWidth = 15.0;
+        // Gap between the legend's right edge and the Selected/Active band-filter group, and
+        // between that group and the floating spot-count badge. These anchor the band group to
+        // the legend (left) instead of to the Freq column, so resizing columns no longer moves it.
+        const double ClusterLegendToBandGroupGap = 6.0;
+        const double ClusterBandGroupToCounterGap = 10.0;
+        // The counter badge and the Last/dropdown both sit this many px above the table top
+        // (the table top is at canvas-Y == ClusterTableTopGap).
+        const double ClusterControlsToTableGap = 2.0;
         const double ClusterBaseSharedVerticalShift = -45.0;
         const double ClusterLastMinutesDropdownTop = -45.0;
         const double ClusterLastMinutesDropdownWidth = 44;
@@ -6699,7 +6714,21 @@ namespace HolyLogger
             Canvas.SetLeft(lastMinutesFilterPanel, ClusterOffScreenPosition);
             headerCanvas.Children.Add(lastMinutesFilterPanel);
 
-            var layoutGrid = new Grid { Margin = new Thickness(12, 8, 12, 12) };
+            if (clusterSpotCountBadge != null)
+            {
+                Canvas.SetTop(clusterSpotCountBadge, 0);
+                Canvas.SetLeft(clusterSpotCountBadge, ClusterOffScreenPosition);
+                headerCanvas.Children.Add(clusterSpotCountBadge);
+            }
+
+            if (clusterModeSelectorPanel != null)
+            {
+                Canvas.SetTop(clusterModeSelectorPanel, 0);
+                Canvas.SetLeft(clusterModeSelectorPanel, ClusterOffScreenPosition);
+                headerCanvas.Children.Add(clusterModeSelectorPanel);
+            }
+
+            var layoutGrid = new Grid { Margin = new Thickness(12, 8, 4, 12) };
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -6716,7 +6745,7 @@ namespace HolyLogger
                 Title = "Cluster",
                 Width = Properties.Settings.Default.ClusterWindowWidth > 0 ? Properties.Settings.Default.ClusterWindowWidth : 600,
                 Height = Properties.Settings.Default.ClusterWindowHeight > 0 ? Properties.Settings.Default.ClusterWindowHeight : 400,
-                MinWidth = 200,
+                MinWidth = 355,   // narrowest width the user chose (band row fully visible)
                 MinHeight = 260,
                 Left = Properties.Settings.Default.ClusterWindowLeft,
                 Top = Properties.Settings.Default.ClusterWindowTop,
@@ -6788,6 +6817,8 @@ namespace HolyLogger
             clusterUndoButton = null;
             clusterUndoCountText = null;
             clusterSpotCountText = null;
+            clusterSpotCountBadge = null;
+            clusterLegendPanel = null;
             clusterNewCountryCountText = null;
             _clusterNewCountryBlinkTimer?.Stop();
             _clusterNewCountryBlinkTimer = null;
@@ -6803,6 +6834,8 @@ namespace HolyLogger
             clusterSpotsScrollViewer = null;
             clusterLastMinutesFilterPanel = null;
             clusterBandSelectorPanel = null;
+            clusterModeSelectorPanel = null;
+            clusterBandSpotCountTexts.Clear();
             clusterLastMinutesComboBox = null;
             clusterBandFilterAllBtn = null;
             clusterBandFilterPreSelectedBtn = null;
@@ -6927,6 +6960,23 @@ namespace HolyLogger
                 Margin = new Thickness(0, -(ClusterHeaderCanvasHeight - ClusterTableTopGap), 0, 0),
                 Opacity = 1
             };
+
+            // Let the grid shrink below the sum of its columns (it scrolls/clips the overflow)
+            // instead of forcing the whole window to stay wide enough for every column.
+            spotsGrid.MinWidth = 0;
+            ScrollViewer.SetHorizontalScrollBarVisibility(spotsGrid, ScrollBarVisibility.Auto);
+            // A DataGrid always reports its full column width as its desired size, which would pin
+            // the window open. Cap its MaxWidth to its container's actual width so its desired size
+            // can't exceed what's available — the window can then narrow down to the header.
+            var dgMaxWidthBinding = new System.Windows.Data.Binding("ActualWidth")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor)
+                {
+                    AncestorType = typeof(Grid),
+                    AncestorLevel = 1
+                }
+            };
+            spotsGrid.SetBinding(FrameworkElement.MaxWidthProperty, dgMaxWidthBinding);
 
 
             ToolTipService.SetInitialShowDelay(spotsGrid, 50);
@@ -7053,11 +7103,11 @@ namespace HolyLogger
             dxColumnTemplate.VisualTree = dxTextBlockFactory;
             var dxHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             dxHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-            var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, SortMemberPath = "DXCallsign", Width = DataGridLength.Auto };
+            var dxColumn = new DataGridTemplateColumn { Header = "DX", HeaderStyle = dxHeaderStyle, CellTemplate = dxColumnTemplate, SortMemberPath = "DXCallsign", Width = new DataGridLength(83) };
 
             // Spotter / Country columns
-            var spotterColumn = new DataGridTextColumn { Header = "Spotter", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(Math.Max(40, Properties.Settings.Default.ClusterColWidthSpotter)) };
-            var countryColumn = new DataGridTextColumn { Header = "Country", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(Math.Max(40, LoadClusterCountryColumnWidthSetting())) };
+            var spotterColumn = new DataGridTextColumn { Header = "Spotter", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("SpotterCallsign"), Width = new DataGridLength(61) };
+            var countryColumn = new DataGridTextColumn { Header = "Country", HeaderStyle = clusterColumnHeaderStyle, Binding = new System.Windows.Data.Binding("Country"), Width = new DataGridLength(76) };
 
             // Freq column with band color
             var freqHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
@@ -7110,7 +7160,7 @@ namespace HolyLogger
             // Comment column
             var commentHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
             commentHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-            var commentColumn = new DataGridTextColumn { Header = "Comment", HeaderStyle = commentHeaderStyle, Binding = new System.Windows.Data.Binding("Comment"), MinWidth = 60, Width = new DataGridLength(1, DataGridLengthUnitType.Star) };
+            var commentColumn = new DataGridTextColumn { Header = "Comment", HeaderStyle = commentHeaderStyle, Binding = new System.Windows.Data.Binding("Comment"), MinWidth = 60, Width = DataGridLength.Auto };
 
             // Flag column
             var flagHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
@@ -7123,7 +7173,7 @@ namespace HolyLogger
             flagImageFactory.SetValue(System.Windows.Controls.Image.StretchProperty, System.Windows.Media.Stretch.Uniform);
             flagImageFactory.SetValue(System.Windows.Controls.Image.HorizontalAlignmentProperty, HorizontalAlignment.Center);
             flagTemplate.VisualTree = flagImageFactory;
-            var flagColumn = new DataGridTemplateColumn { Header = "Flag", HeaderStyle = flagHeaderStyle, CellTemplate = flagTemplate, Width = new DataGridLength(40), CanUserResize = false };
+            var flagColumn = new DataGridTemplateColumn { Header = "Flag", HeaderStyle = flagHeaderStyle, CellTemplate = flagTemplate, Width = DataGridLength.Auto, CanUserResize = false };
 
             // Store references needed by other methods
             clusterDxColumn = dxColumn;
@@ -7136,6 +7186,18 @@ namespace HolyLogger
 
             utcColumn.SortDirection = ListSortDirection.Descending;
 
+            // Stable keys for persisting column ORDER. (Widths are never persisted — every column
+            // starts at its hard-coded/Auto default each time the window opens.)
+            clusterColumnKeys.Clear();
+            clusterColumnKeys[dxColumn] = "DX";
+            clusterColumnKeys[flagColumn] = "Flag";
+            clusterColumnKeys[spotterColumn] = "Spotter";
+            clusterColumnKeys[countryColumn] = "Country";
+            clusterColumnKeys[freqColumn] = "Freq";
+            clusterColumnKeys[utcColumn] = "UTC";
+            clusterColumnKeys[modeColumn] = "Mode";
+            clusterColumnKeys[commentColumn] = "Comment";
+
             spotsGrid.Columns.Add(dxColumn);
             spotsGrid.Columns.Add(flagColumn);
             spotsGrid.Columns.Add(spotterColumn);
@@ -7145,11 +7207,8 @@ namespace HolyLogger
             spotsGrid.Columns.Add(modeColumn);
             spotsGrid.Columns.Add(commentColumn);
 
-            int countryDisplayIndex = LoadClusterCountryColumnDisplayIndexSetting();
-            if (countryDisplayIndex >= 0 && countryDisplayIndex < spotsGrid.Columns.Count)
-            {
-                countryColumn.DisplayIndex = countryDisplayIndex;
-            }
+            // Restore the user's saved column order (order persists across sessions; widths do not).
+            ApplyClusterColumnOrder(spotsGrid);
 
             if (clusterVisibleSpots == null)
             {
@@ -7160,7 +7219,11 @@ namespace HolyLogger
             spotsGrid.MouseMove += ClusterSpotsGrid_MouseMove;
             spotsGrid.MouseLeave += ClusterSpotsGrid_MouseLeave;
             spotsGrid.SizeChanged += (s, e) => RequestClusterHeaderAlignmentRefresh();
-            spotsGrid.ColumnReordered += (s, e) => RequestClusterHeaderAlignmentRefresh();
+            spotsGrid.ColumnReordered += (s, e) =>
+            {
+                SaveClusterColumnOrder(spotsGrid);   // remember the order the user dragged to
+                RequestClusterHeaderAlignmentRefresh();
+            };
             spotsGrid.ColumnDisplayIndexChanged += (s, e) => RequestClusterHeaderAlignmentRefresh();
             AttachClusterColumnWidthTracking(dxColumn, spotterColumn, countryColumn, freqColumn, utcColumn, modeColumn, commentColumn);
             spotsGrid.Loaded += (s, e) =>
@@ -7180,18 +7243,44 @@ namespace HolyLogger
 
         private Grid BuildClusterHeaderPanel(Button undoButton)
         {
+            // Four legend lines with an even 5px gap. New Country shares its line with its big
+            // counter (its own TextBlock, kept right next to the text). The counter uses negative
+            // vertical margins so its FontSize-22 glyph does NOT make that line taller than the rest.
             var legendPanel = new StackPanel
             {
                 Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, -6, 4, 0)
+                Margin = new Thickness(0, -1, 4, 0)
             };
+            clusterLegendPanel = legendPanel;
 
-            legendPanel.Children.Add(BuildClusterLegendTopRow());
-            legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before", false, new Thickness(0, 7, 0, 0)));
+            var newCountryCountText = new TextBlock
+            {
+                Text = "0",
+                Foreground = Brushes.Black,   // 0 → black; turns red when new countries appear
+                FontWeight = FontWeights.Bold,
+                FontSize = 22,
+                VerticalAlignment = VerticalAlignment.Center,
+                // negative top/bottom keep this tall glyph from growing the New Country line
+                Margin = new Thickness(4, -7, 0, -7)
+            };
+            clusterNewCountryCountText = newCountryCountText;
+
+            var newCountryRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            newCountryRow.Children.Add(BuildClusterLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 0, 0)));
+            newCountryRow.Children.Add(newCountryCountText);
+            legendPanel.Children.Add(newCountryRow);
+
+            legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before", false, new Thickness(0, 5, 0, 0)));
             legendPanel.Children.Add(BuildClusterLegendItem(Brushes.Black, "Worked Country", false, new Thickness(0, 5, 0, 0)));
 
-            var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Freq", true, new Thickness(0, 7, 0, 0));
+            var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Freq", true, new Thickness(0, 5, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
             onMyFreqLegend.VerticalAlignment = VerticalAlignment.Top;
             clusterOnMyFreqLegendItem = onMyFreqLegend;
@@ -7209,28 +7298,59 @@ namespace HolyLogger
             };
             clusterSpotCountText = spotCountText;
 
-            // Add band selector panel
+            // Colored band selector + undo icon: left-justified, on their own row ABOVE the legend
+            // block (in the space freed by moving New Country down). No longer anchored to the right.
             var bandSelectorPanel = BuildClusterBandSelectorPanel();
-            bandSelectorPanel.Margin = new Thickness(0, -12, 0, 0);
-            bandSelectorPanel.HorizontalAlignment = HorizontalAlignment.Right;
+            bandSelectorPanel.Margin = new Thickness(0, 0, 0, 0);
+            bandSelectorPanel.HorizontalAlignment = HorizontalAlignment.Left;
             bandSelectorPanel.VerticalAlignment = VerticalAlignment.Center;
             clusterBandSelectorPanel = bandSelectorPanel;
 
-            // Add mode selector panel below band selector
-            var modeSelectorPanel = BuildClusterModeSelectorPanel();
-            modeSelectorPanel.Margin = new Thickness(0, -9, 34, 0);
-            modeSelectorPanel.HorizontalAlignment = HorizontalAlignment.Right;
-            modeSelectorPanel.VerticalAlignment = VerticalAlignment.Center;
-
-            var actionsPanel = new StackPanel
+            undoButton.VerticalAlignment = VerticalAlignment.Center;
+            var bandRow = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                HorizontalAlignment = HorizontalAlignment.Right,
-                VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, -8, 0, 0)
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                // top -9 moves the bands+labels up 9px; bottom is the gap below the per-band count
+                // line before the legend.
+                Margin = new Thickness(0, -9, 0, 6)
             };
-            actionsPanel.Children.Add(bandSelectorPanel);
-            actionsPanel.Children.Add(undoButton);
+            bandRow.Children.Add(bandSelectorPanel);
+            bandRow.Children.Add(undoButton);
+
+            // Left block: band row on top, then the legend block (lines + counter) — both start at
+            // the same left edge, so the bands are left-justified with the New Country legend.
+            var leftColumnPanel = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            leftColumnPanel.Children.Add(bandRow);
+            leftColumnPanel.Children.Add(legendPanel);
+
+            // Cap the header block to its container width so it (like the table) cannot force the
+            // window to stay wide enough for the whole band row. Past the band row's natural width
+            // the bands clip on the right, letting the window narrow further.
+            var leftMaxBinding = new System.Windows.Data.Binding("ActualWidth")
+            {
+                RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor)
+                {
+                    AncestorType = typeof(Grid),
+                    AncestorLevel = 1
+                }
+            };
+            leftColumnPanel.SetBinding(FrameworkElement.MaxWidthProperty, leftMaxBinding);
+
+            // Mode checkboxes are positioned on the header canvas (see
+            // UpdateClusterActiveBandIndicatorPosition): same row as the Selected/All Bands buttons,
+            // right-justified to the undo icon. Not added to the header grid.
+            var modeSelectorPanel = BuildClusterModeSelectorPanel();
+            modeSelectorPanel.Margin = new Thickness(0, 0, 0, 0);
+            modeSelectorPanel.HorizontalAlignment = HorizontalAlignment.Left;
+            modeSelectorPanel.VerticalAlignment = VerticalAlignment.Top;
+            clusterModeSelectorPanel = modeSelectorPanel;
 
             var rightColumnPanel = new StackPanel
             {
@@ -7239,16 +7359,24 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Top,
                 Margin = new Thickness(0, 0, -12, 0)
             };
-            rightColumnPanel.Children.Add(actionsPanel);
-            rightColumnPanel.Children.Add(modeSelectorPanel);
 
+            // Three columns:
+            //   0 = left block (band row + legend) -> Auto, left-justified, never clipped
+            //   1 = spacer                         -> Star, the empty gap that shrinks on resize
+            //   2 = mode selector                  -> Auto, stays on the right
+            // The window's MinWidth (set in the Loaded handler below) stops the drag once the
+            // spacer reaches zero, so the left block and mode selector always stay fully visible.
             var headerGrid = new Grid { Margin = new Thickness(0, 0, 0, 0) };
+            headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            Grid.SetColumn(legendPanel, 0);
-            Grid.SetColumn(rightColumnPanel, 1);
-            headerGrid.Children.Add(legendPanel);
+            Grid.SetColumn(leftColumnPanel, 0);
+            Grid.SetColumn(rightColumnPanel, 2);
+            headerGrid.Children.Add(leftColumnPanel);
             headerGrid.Children.Add(rightColumnPanel);
+
+            // The header block and the table are both capped to their container, so neither forces
+            // the window width. The window's only floor is its fixed MinWidth (set at creation).
 
             return headerGrid;
         }
@@ -7259,7 +7387,9 @@ namespace HolyLogger
             {
                 Orientation = Orientation.Horizontal,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 8, 0, 1)
+                // negative bottom absorbs the dead space the tall FontSize-22 counter adds below
+                // the "New Country" text, so the gap to Worked Before matches the others (5px).
+                Margin = new Thickness(0, 8, 0, -6)
             };
             row.Children.Add(BuildClusterLegendItem(Brushes.Red, "New Country", false, new Thickness(0, 0, 6, 0)));
 
@@ -7311,6 +7441,7 @@ namespace HolyLogger
 
         private StackPanel BuildClusterBandSelectorPanel()
         {
+            clusterBandSpotCountTexts.Clear();   // rebuilt below for this window instance
             var enabledBands = GetEnabledClusterBands();
             var bandColors = GetBandColors();
 
@@ -7391,7 +7522,8 @@ namespace HolyLogger
                 Height = 15,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(2, 2, 2, 2),
+                // top -1 (was 2): pulls the checkbox up 3px closer to its label above
+                Margin = new Thickness(2, -1, 2, 2),
                 Padding = new Thickness(4),
                 IsChecked = isChecked,
                 Tag = mode
@@ -7436,7 +7568,8 @@ namespace HolyLogger
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(1, 0, 1, 0)
+                // 0.5 each side → 1px gap between modes (was 1+1 = 2px); reduced by 1px
+                Margin = new Thickness(0.5, 0, 0.5, 0)
             };
             modeIndicator.Children.Add(modeText);
             modeIndicator.Children.Add(checkBox);
@@ -7537,7 +7670,8 @@ namespace HolyLogger
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(2, 0, 2, 0),
+                // 1 each side → 2px gap between bands (was 2+2 = 4px); condensed by 2px.
+                Margin = new Thickness(1, 0, 1, 0),
                 Tag = band  // Store band name for right-click handler
             };
             // Wrap the checkbox in a cell so a circle can appear around it on hover.
@@ -7548,8 +7682,8 @@ namespace HolyLogger
             };
             var hoverCircle = new System.Windows.Shapes.Ellipse
             {
-                Width = 23,
-                Height = 23,
+                Width = 18,
+                Height = 18,
                 Stroke = new SolidColorBrush(color),
                 StrokeThickness = 2.5,
                 Fill = Brushes.Transparent,
@@ -7564,8 +7698,37 @@ namespace HolyLogger
             checkBoxCell.Children.Add(hoverCircle);
             checkBoxCell.Children.Add(checkBox);
 
+            // Spot count for this band, shown under the checkbox (dark blue). Updated on every
+            // RefreshClusterVisibleSpots (new spot or "Last" change) via UpdateClusterBandSpotCounts.
+            var bandSpotCountText = new TextBlock
+            {
+                Text = "0",
+                FontSize = 9,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                TextAlignment = TextAlignment.Center
+            };
+            clusterBandSpotCountTexts[band] = bandSpotCountText;
+
+            // White number inside a red circular "coin" (pill for 2+ digits) under the checkbox.
+            var bandSpotCountCoin = new Border
+            {
+                Background = Brushes.Red,
+                CornerRadius = new CornerRadius(8),
+                MinWidth = 16,
+                Height = 16,
+                Padding = new Thickness(3, 0, 3, 0),
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(0, 1, 0, 0),
+                Child = bandSpotCountText
+            };
+
             bandIndicator.Children.Add(bandText);
             bandIndicator.Children.Add(checkBoxCell);
+            bandIndicator.Children.Add(bandSpotCountCoin);
 
             // A transparent background makes the whole cell a reliable hover target.
             bandIndicator.Background = Brushes.Transparent;
@@ -7807,7 +7970,7 @@ namespace HolyLogger
                 Width = ClusterLastMinutesDropdownWidth,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 TextAlignment = TextAlignment.Center,
-                Margin = new Thickness(0, 0, 0, -3)
+                Margin = new Thickness(0, 0, 0, 0)
             };
 
             var lastMinutesCombo = new ComboBox
@@ -7843,7 +8006,10 @@ namespace HolyLogger
                 Margin = new Thickness(4, 0, 0, 0)
             };
 
-            var spotCountBadge = new Border
+            // The spot-count badge is no longer part of this UTC-anchored panel; it floats on the
+            // header canvas between the band-filter group and this dropdown (positioned in
+            // UpdateClusterActiveBandIndicatorPosition). The dropdown itself stays attached to UTC.
+            clusterSpotCountBadge = new Border
             {
                 Width = 34,
                 Height = 34,
@@ -7851,7 +8017,6 @@ namespace HolyLogger
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)),
                 BorderThickness = new Thickness(2),
                 Background = Brushes.Transparent,
-                Margin = new Thickness(4, -6, 0, 0),
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Center,
                 Child = clusterSpotCountText
@@ -7865,7 +8030,6 @@ namespace HolyLogger
             };
             lastMinutesValuePanel.Children.Add(lastMinutesCombo);
             lastMinutesValuePanel.Children.Add(minutesUnitLabel);
-            lastMinutesValuePanel.Children.Add(spotCountBadge);
 
             var lastMinutesFilterPanel = new StackPanel
             {
@@ -7936,36 +8100,33 @@ namespace HolyLogger
                 return;
             }
 
-            double freqStart = GetClusterColumnLeft(clusterFreqColumn);
             double utcStart = GetClusterColumnLeft(clusterUtcColumn);
-            double freqWidth = GetClusterColumnWidth(clusterFreqColumn);
             double horizontalOffset = clusterSpotsScrollViewer != null ? clusterSpotsScrollViewer.HorizontalOffset : 0;
 
-            // Move Show Bands + dropdown vertically as one unit.
-            // Horizontal target: band indicator center aligned to Freq column center.
+            // The band-filter group (Selected / All Bands / Active Band + band indicator) is anchored
+            // to the LEFT, just past the legend's right edge — independent of the Freq column and of
+            // the total window width, so resizing/reordering grid columns no longer moves it.
             // Vertical target inside the unit: Active Band button bottom aligned to dropdown bottom.
             if (clusterShowBandsPanel != null && clusterHeaderCanvas != null)
             {
                 double panelWidth = clusterShowBandsPanel.ActualWidth > 0 ? clusterShowBandsPanel.ActualWidth : ClusterShowBandsPanelWidth;
-                double freqCenter = freqStart - horizontalOffset + freqWidth / 2.0;
-                double indicatorCenterOffset = panelWidth;
-                if (clusterActiveBandIndicatorText != null)
+
+                double legendRight = 0;
+                if (clusterLegendPanel != null)
                 {
                     try
                     {
-                        // Use the indicator's stable X-within-panel plus a FIXED half-width, so the
-                        // panel's horizontal position never depends on the band text width (or its
-                        // absence when the band is illegal). This keeps Selected/All Bands fixed.
-                        Point indicatorTopInShow = clusterActiveBandIndicatorText.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
-                        indicatorCenterOffset = indicatorTopInShow.X + ClusterBandIndicatorHalfWidth;
+                        Point legendRightInCanvas = clusterLegendPanel.TranslatePoint(
+                            new Point(clusterLegendPanel.ActualWidth, 0), clusterHeaderCanvas);
+                        legendRight = legendRightInCanvas.X;
                     }
                     catch
                     {
-                        indicatorCenterOffset = panelWidth;
+                        legendRight = 0;
                     }
                 }
 
-                double panelLeft = freqCenter - indicatorCenterOffset;
+                double panelLeft = legendRight + ClusterLegendToBandGroupGap;
                 if (panelLeft < 0) panelLeft = 0;
                 Canvas.SetLeft(clusterShowBandsPanel, panelLeft);
 
@@ -7990,7 +8151,6 @@ namespace HolyLogger
                 }
 
                 double showTop = showPanelTop + ClusterBaseSharedVerticalShift;
-                double dropdownTop = ClusterLastMinutesDropdownTop;
 
                 if (clusterBandFilterActiveBtn != null && clusterOnMyFreqLegendItem != null)
                 {
@@ -8004,7 +8164,6 @@ namespace HolyLogger
 
                         double delta = onMyFreqCenterInCanvas - (showTop + activeBtnCenterInPanel);
                         showTop += delta;
-                        dropdownTop += delta;
                     }
                     catch
                     {
@@ -8013,9 +8172,47 @@ namespace HolyLogger
 
                 Canvas.SetTop(clusterShowBandsPanel, showTop);
 
+                // Spot-count badge floats just to the right of the band-filter group; its bottom is
+                // pinned a small gap above the table top (canvas-Y == ClusterTableTopGap), so it never
+                // touches the grid header.
+                double tableTopInCanvas = ClusterTableTopGap;
+                if (clusterSpotCountBadge != null)
+                {
+                    double badgeLeft = panelLeft + panelWidth + ClusterBandGroupToCounterGap;
+                    double badgeTop = tableTopInCanvas - ClusterControlsToTableGap - clusterSpotCountBadge.Height;
+                    Canvas.SetLeft(clusterSpotCountBadge, badgeLeft);
+                    Canvas.SetTop(clusterSpotCountBadge, badgeTop);
+                }
+
+                // Mode checkboxes: right edge aligned to the right edge of the band checkboxes (the
+                // last band, not the undo icon), and the whole block sits ABOVE the Selected/All
+                // Bands buttons (its bottom a couple px above the Selected button top) so it never
+                // overlaps them when the window is narrow.
+                if (clusterModeSelectorPanel != null && clusterBandFilterPreSelectedBtn != null && clusterBandSelectorPanel != null)
+                {
+                    try
+                    {
+                        Point selBtnInPanel = clusterBandFilterPreSelectedBtn.TranslatePoint(new Point(0, 0), clusterShowBandsPanel);
+                        double selBtnTopInCanvas = showTop + selBtnInPanel.Y;
+                        double modesTop = selBtnTopInCanvas - clusterModeSelectorPanel.ActualHeight - 2;
+
+                        Point bandsTopRight = clusterBandSelectorPanel.TranslatePoint(new Point(clusterBandSelectorPanel.ActualWidth, 0), clusterHeaderCanvas);
+                        double modesLeft = bandsTopRight.X - clusterModeSelectorPanel.ActualWidth;
+
+                        Canvas.SetLeft(clusterModeSelectorPanel, modesLeft);
+                        Canvas.SetTop(clusterModeSelectorPanel, modesTop);
+                    }
+                    catch
+                    {
+                    }
+                }
+
+                // The Last/dropdown stays anchored to UTC horizontally (set below), but its bottom is
+                // pinned the same small gap above the table top so the frame nearly meets the grid.
                 if (clusterLastMinutesFilterPanel != null)
                 {
-                    Canvas.SetTop(clusterLastMinutesFilterPanel, dropdownTop);
+                    double dropH = clusterLastMinutesFilterPanel.ActualHeight > 0 ? clusterLastMinutesFilterPanel.ActualHeight : 40;
+                    Canvas.SetTop(clusterLastMinutesFilterPanel, tableTopInCanvas - ClusterControlsToTableGap - dropH);
                 }
             }
 
@@ -8568,6 +8765,64 @@ namespace HolyLogger
         {
             string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
             return Path.Combine(baseDir, "cluster-last-minutes-filter.txt");
+        }
+
+        private string GetClusterColumnOrderSettingPath()
+        {
+            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
+            return Path.Combine(baseDir, "cluster-col-order.txt");
+        }
+
+        // Persists ONLY the column order (comma-separated stable keys, left-to-right). Column widths
+        // are intentionally not saved, so they reset to their defaults each time the window opens.
+        private void SaveClusterColumnOrder(DataGrid grid)
+        {
+            if (grid == null) return;
+            try
+            {
+                var order = grid.Columns
+                    .Where(c => clusterColumnKeys.ContainsKey(c))
+                    .OrderBy(c => c.DisplayIndex)
+                    .Select(c => clusterColumnKeys[c]);
+                string content = string.Join(",", order);
+                string path = GetClusterColumnOrderSettingPath();
+                string dir = Path.GetDirectoryName(path);
+                if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                File.WriteAllText(path, content);
+            }
+            catch
+            {
+            }
+        }
+
+        private void ApplyClusterColumnOrder(DataGrid grid)
+        {
+            if (grid == null) return;
+            try
+            {
+                string path = GetClusterColumnOrderSettingPath();
+                if (!File.Exists(path)) return;
+                string content = File.ReadAllText(path).Trim();
+                if (string.IsNullOrWhiteSpace(content)) return;
+
+                var keys = content.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                int index = 0;
+                foreach (var key in keys)
+                {
+                    var col = grid.Columns.FirstOrDefault(c =>
+                        clusterColumnKeys.TryGetValue(c, out var k) &&
+                        string.Equals(k, key, StringComparison.OrdinalIgnoreCase));
+                    if (col != null)
+                    {
+                        col.DisplayIndex = index;
+                        index++;
+                    }
+                }
+            }
+            catch
+            {
+            }
         }
 
         private void ClusterWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -9697,8 +9952,43 @@ namespace HolyLogger
 
             UpdateClusterFrequencyHighlight();
             UpdateClusterSpotCountIndicator();
+            UpdateClusterBandSpotCounts();
             RequestClusterHeaderAlignmentRefresh();
             UpdateClusterSpotsOnMap();
+        }
+
+        // Per-band spot counts shown under each band checkbox. Counts spots on each band within the
+        // current "Last" time window and respecting the mode filter, independent of which bands are
+        // enabled. Recomputed on every RefreshClusterVisibleSpots (new spot or "Last" change).
+        private void UpdateClusterBandSpotCounts()
+        {
+            if (clusterBandSpotCountTexts == null || clusterBandSpotCountTexts.Count == 0)
+            {
+                return;
+            }
+
+            long cutoff = DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L);
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (clusterAllSpots != null)
+            {
+                foreach (var s in clusterAllSpots)
+                {
+                    if (s.UnixTime <= 0 || s.UnixTime < cutoff)
+                        continue;
+                    if (!IsClusterModeEnabled(s.Mode))
+                        continue;
+                    if (string.IsNullOrWhiteSpace(s.BandText))
+                        continue;
+                    counts.TryGetValue(s.BandText, out int c);
+                    counts[s.BandText] = c + 1;
+                }
+            }
+
+            foreach (var kv in clusterBandSpotCountTexts)
+            {
+                counts.TryGetValue(kv.Key, out int c);
+                kv.Value.Text = c.ToString(CultureInfo.InvariantCulture);
+            }
         }
 
         private void UpdateClusterSpotsOnMap()
