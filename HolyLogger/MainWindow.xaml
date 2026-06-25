@@ -1032,7 +1032,7 @@
             <Image x:Name="Img_QRZPhoto" Stretch="UniformToFill" Visibility="Collapsed" ToolTip="QRZ callsign image" />
         </Border>
 
-        <TextBlock HorizontalAlignment="Left" Margin="11,227,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="The DX station grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="11,231,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" FontSize="15" ToolTip="The DX station grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="DX" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Locator" />

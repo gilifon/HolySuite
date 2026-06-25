@@ -522,6 +522,14 @@ namespace HolyLogger
             ApplyMainFormBackgroundFromSettings();
             ApplyQsoTableHeaderBackgroundFromSettings();
 
+            // Restrict every text box in the app to English (ASCII) input only. Registered as a
+            // class handler so it applies to all TextBoxes without wiring each one individually,
+            // and blocks non-Latin scripts (e.g. Hebrew) whether typed or pasted.
+            EventManager.RegisterClassHandler(typeof(TextBox), UIElement.PreviewTextInputEvent,
+                new TextCompositionEventHandler(GlobalTextBox_EnglishOnly_PreviewTextInput));
+            EventManager.RegisterClassHandler(typeof(TextBox), DataObject.PastingEvent,
+                new DataObjectPastingEventHandler(GlobalTextBox_EnglishOnly_Pasting));
+
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
             LoadCallsignIndex();
@@ -11148,6 +11156,58 @@ namespace HolyLogger
         {
             //if (!char.IsDigit(e.Text, e.Text.Length - 1))
             //    e.Handled = true;
+        }
+
+        // True only when every character belongs to the Latin script (or is a common digit,
+        // space or punctuation symbol). Standard ASCII plus the Latin accented ranges are
+        // allowed — so names like "José" or "Müller" pass — while non-Latin scripts such as
+        // Hebrew, Cyrillic, Greek, Arabic and CJK are rejected.
+        private static bool IsEnglishOnly(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return true;
+            foreach (char c in text)
+            {
+                if (!IsAllowedLatinChar(c))
+                    return false;
+            }
+            return true;
+        }
+
+        private static bool IsAllowedLatinChar(char c)
+        {
+            // Printable ASCII: English letters, digits and common punctuation (U+0020..U+007E).
+            if (c >= ' ' && c <= '~') return true;
+            // Latin-1 Supplement: accented Western letters (U+00A0..U+00FF).
+            if (c >= ' ' && c <= 'ÿ') return true;
+            // Latin Extended-A and Extended-B (U+0100..U+024F).
+            if (c >= 'Ā' && c <= 'ɏ') return true;
+            // Latin Extended Additional (U+1E00..U+1EFF, e.g. Vietnamese letters).
+            if (c >= 'Ḁ' && c <= 'ỿ') return true;
+            // Everything else - Hebrew, Cyrillic, Greek, Arabic, CJK, etc. - is rejected.
+            return false;
+        }
+
+        // Blocks non-English characters typed into any text box.
+        private void GlobalTextBox_EnglishOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            if (!IsEnglishOnly(e.Text))
+                e.Handled = true;
+        }
+
+        // Cancels a paste into any text box when the clipboard text contains non-English characters.
+        private void GlobalTextBox_EnglishOnly_Pasting(object sender, DataObjectPastingEventArgs e)
+        {
+            if (e.DataObject.GetDataPresent(DataFormats.UnicodeText) || e.DataObject.GetDataPresent(DataFormats.Text))
+            {
+                string text = (e.DataObject.GetData(DataFormats.UnicodeText) ?? e.DataObject.GetData(DataFormats.Text)) as string;
+                if (!IsEnglishOnly(text))
+                    e.CancelCommand();
+            }
+            else
+            {
+                // Non-text payload (e.g. an image) — disallow.
+                e.CancelCommand();
+            }
         }
 
         private void TB_Band_TextChanged(object sender, TextChangedEventArgs e)
