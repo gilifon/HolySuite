@@ -657,7 +657,7 @@ namespace HolyLogger
             CB_Mode.Text = Properties.Settings.Default.Mode;
 
             // Initialize RST fields based on the selected mode
-            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
+            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM" || CB_Mode.Text == "AM")
             {
                 TB_RSTSent.Text = "59";
                 TB_RSTRcvd.Text = "59";
@@ -1202,7 +1202,7 @@ namespace HolyLogger
             _ = PumpQrzQueue();
 
             // Initialize RST fields based on the selected mode after window is fully loaded
-            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
+            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM" || CB_Mode.Text == "AM")
             {
                 TB_RSTSent.Text = "59";
                 TB_RSTRcvd.Text = "59";
@@ -1649,7 +1649,7 @@ namespace HolyLogger
             TB_ITUZone.Text = "";
             TB_CQZone.Text = "";
 
-            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM")
+            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM" || CB_Mode.Text == "AM")
             {
                 TB_RSTSent.Text = "59";
                 TB_RSTRcvd.Text = "59";
@@ -2805,24 +2805,15 @@ namespace HolyLogger
             }
         }
 
-        // Refreshes everything that reflects the eQSL queue size: the "!" badge on the log grid and
-        // the Tools-menu item (grayed when empty, with the count in its header). Safe to call often.
+        // Refreshes everything that reflects the eQSL queue size: the Tools-menu item (grayed when
+        // empty, with the count in its header). Safe to call often.
         private void UpdateEqslQueueIndicator()
         {
             int pending = 0;
             // Counts not-yet-sent QSOs whose callsign is in the eQSL table (the opt-in list). A
-            // callsign that isn't in the table is ignored, so the "!" never shows for callsigns the
-            // user chose not to upload.
+            // callsign that isn't in the table is ignored.
             try { if (dal != null) pending = dal.GetPendingEqslCount(); }
             catch { pending = 0; }
-
-            bool any = pending > 0;
-
-            if (EqslQueueBadge != null)
-            {
-                EqslQueueBadge.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
-                EqslQueueBadge.ToolTip = pending + (pending == 1 ? " QSO" : " QSOs") + " waiting for eQSL — click to review";
-            }
 
             if (SendQueueToEqslMenuItem != null)
             {
@@ -3214,12 +3205,6 @@ namespace HolyLogger
                     lines.Add($"{callLabel}: {n} QSO(s) → ⚠ no TQSL certificate/location (stays in queue)");
             }
             return lines;
-        }
-
-        // Click on the "!" badge in the log grid's header corner opens the same queue window.
-        private void EqslQueueBadge_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            ShowEqslQueueWindow();
         }
 
         private EqslQueueWindow _eqslQueueWindow;
@@ -11520,7 +11505,7 @@ namespace HolyLogger
 
                 val = (val ?? string.Empty).Trim().ToUpperInvariant();
 
-                if (val == "SSB" || val == "FM")
+                if (val == "SSB" || val == "FM" || val == "AM")
                 {
                     TB_RSTSent.Text = "59";
                     TB_RSTRcvd.Text = "59";

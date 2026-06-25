@@ -572,19 +572,12 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                    <TextBlock Text="Manual Mode: " Margin="20,0,0,0" FontSize="16"/>
+                    <TextBlock Margin="20,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Manual"/><LineBreak/><Run Text="Mode:"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <StatusBarItem.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Change mode" Click="ManualModeMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </ContextMenu>
-                    </StatusBarItem.ContextMenu>
-                    <TextBlock x:Name="L_IsManual" Margin="0,0,0,0" FontSize="16"/>
+                    <Button x:Name="Btn_ManualMode" Click="ManualModeMenuItem_Click" Cursor="Hand" Padding="8,1" MinWidth="40" ToolTip="Toggle Manual Mode (same as Tools &gt; Manual Mode)">
+                        <TextBlock x:Name="L_IsManual" FontSize="16" FontWeight="Bold" TextAlignment="Center"/>
+                    </Button>
                 </StatusBarItem>
                 <StatusBarItem>
                     <StatusBarItem.ContextMenu>
@@ -821,6 +814,7 @@
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
             <ComboBoxItem x:Name="op_ssb" Content="SSB"/>
             <ComboBoxItem x:Name="op_fm" Content="FM"/>
+            <ComboBoxItem x:Name="op_am" Content="AM"/>
         </ComboBox>
         <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
         <!-- Old "Freq" label hidden: the frequency is now shown on the LED readout in the menu bar. -->
@@ -1175,17 +1169,6 @@
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
-
-        <!-- eQSL queue alert: a red "!" badge overlaid on the log table's top-left header corner.
-             Hidden unless there are QSOs waiting to be sent to eQSL; click opens the queue window. -->
-        <Border x:Name="EqslQueueBadge" Grid.Row="2" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Margin="5,5,0,0" Width="22" Height="22" CornerRadius="11" Background="#D32F2F"
-                BorderBrush="White" BorderThickness="1.5" Panel.ZIndex="30" Cursor="Hand"
-                Visibility="Collapsed" MouseLeftButtonUp="EqslQueueBadge_MouseLeftButtonUp"
-                ToolTip="QSOs waiting for eQSL — click to review">
-            <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="15"
-                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-        </Border>
 
         <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
         <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
