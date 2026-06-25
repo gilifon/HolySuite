@@ -122,6 +122,7 @@ namespace HolyLogger
                 TB_MissingDxcc.Text     = totalDxcc.ToString();
                 TB_DateStart.Text = "—";
                 TB_DateEnd.Text   = "—";
+                PopulateMissingZones();
                 TB_Status.Text          = "No QSOs to analyze.";
                 return;
             }
@@ -159,7 +160,37 @@ namespace HolyLogger
                 BTN_EditProblems.Visibility = Visibility.Collapsed;
             }
 
+            PopulateMissingZones();
+
             TB_Status.Text = $"Statistics computed for {total} QSO{(total == 1 ? "" : "s")}.";
+        }
+
+        // Fills the "Missing CQ Zones" (1..40) and "Missing ITU Zones" (1..90) dropdowns with the
+        // zones not yet present in any QSO, and shows the count in each header.
+        private void PopulateMissingZones()
+        {
+            List<int> missingCq  = MissingZones(40, q => q.CQZone);
+            List<int> missingItu = MissingZones(90, q => q.ITUZone);
+
+            CB_MissingCQ.ItemsSource  = missingCq.Select(z => z.ToString()).ToList();
+            CB_MissingITU.ItemsSource = missingItu.Select(z => z.ToString()).ToList();
+
+            TB_MissingCQHeader.Text  = $"Missing CQ Zones ({missingCq.Count})";
+            TB_MissingITUHeader.Text = $"Missing ITU Zones ({missingItu.Count})";
+        }
+
+        private List<int> MissingZones(int maxZone, Func<QSO, string> selector)
+        {
+            var worked = new HashSet<int>();
+            if (_allQsos != null)
+            {
+                foreach (QSO q in _allQsos)
+                {
+                    if (int.TryParse((selector(q) ?? string.Empty).Trim(), out int z) && z >= 1 && z <= maxZone)
+                        worked.Add(z);
+                }
+            }
+            return Enumerable.Range(1, maxZone).Where(z => !worked.Contains(z)).ToList();
         }
 
         // ── pivot table builder ───────────────────────────────────────────

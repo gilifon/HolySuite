@@ -1446,6 +1446,8 @@ namespace HolyLogger
                 qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 qso.Country = Country;
                 qso.Continent = Continent;
+                qso.CQZone = TB_CQZone.Text;
+                qso.ITUZone = TB_ITUZone.Text;
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
                 qso.Operator = TB_Operator.Text;
@@ -1533,6 +1535,8 @@ namespace HolyLogger
                 QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
                 QsoToUpdate.Country = Country;
                 QsoToUpdate.Continent = Continent;
+                QsoToUpdate.CQZone = TB_CQZone.Text;
+                QsoToUpdate.ITUZone = TB_ITUZone.Text;
                 QsoToUpdate.Name = TB_DX_Name.Text.Length > 25 ? TB_DX_Name.Text.Substring(0, 25) : TB_DX_Name.Text; //FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.Operator = TB_Operator.Text;
@@ -3354,6 +3358,8 @@ namespace HolyLogger
             Add("Callsign", qso.DXCall);
             Add("Name", qso.Name);
             Add("Country", qso.Country);
+            Add("CQ Zone", qso.CQZone);
+            Add("ITU Zone", qso.ITUZone);
             Add("Date", FormatQsoDate(qso.Date));
             Add("Time", string.IsNullOrWhiteSpace(qso.Time) ? null : FormatQsoTime(qso.Time) + " UTC");
             Add("Band", qso.Band);
@@ -5290,6 +5296,24 @@ namespace HolyLogger
                 Country = QsoToUpdate.Country;
                 Continent = QsoToUpdate.Continent;
                 UpdateCountryFlag(QsoToUpdate.Country);
+
+                // Load the QSO's stored ITU/CQ zones. For QSOs logged before zones were stored
+                // (empty), fall back to re-deriving them from the callsign via cty.dat so the
+                // boxes aren't blank.
+                TB_CQZone.Text = QsoToUpdate.CQZone ?? string.Empty;
+                TB_ITUZone.Text = QsoToUpdate.ITUZone ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(TB_CQZone.Text) || string.IsNullOrWhiteSpace(TB_ITUZone.Text))
+                {
+                    try
+                    {
+                        DXCC editDxcc = rem.GetDXCC((QsoToUpdate.DXCall ?? string.Empty).Trim());
+                        if (string.IsNullOrWhiteSpace(TB_ITUZone.Text) && editDxcc.ItuZone > 0)
+                            TB_ITUZone.Text = editDxcc.ItuZone.ToString();
+                        if (string.IsNullOrWhiteSpace(TB_CQZone.Text) && editDxcc.CqZone > 0)
+                            TB_CQZone.Text = editDxcc.CqZone.ToString();
+                    }
+                    catch { }
+                }
 
                 try
                 {
@@ -11156,6 +11180,15 @@ namespace HolyLogger
             //    e.Handled = true;
         }
 
+        // ITU/CQ zone boxes accept digits only.
+        private void ZoneTextBox_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            foreach (char c in e.Text)
+            {
+                if (!char.IsDigit(c)) { e.Handled = true; return; }
+            }
+        }
+
         // True only when every character belongs to the Latin script (or is a common digit,
         // space or punctuation symbol). Standard ASCII plus the Latin accented ranges are
         // allowed — so names like "José" or "Müller" pass — while non-Latin scripts such as
@@ -11691,6 +11724,10 @@ namespace HolyLogger
             UpdateCountryFlag(dXCC.Name);
             Continent = dXCC.Continent;
             QRZGrid = dXCC.Locator;
+            // Fill ITU/CQ zones offline from cty.dat (entity default or the prefix-specific
+            // override). A later QRZ.com lookup, when available, overrides these as the gold source.
+            TB_ITUZone.Text = dXCC.ItuZone > 0 ? dXCC.ItuZone.ToString() : "";
+            TB_CQZone.Text = dXCC.CqZone > 0 ? dXCC.CqZone.ToString() : "";
             Prefix = dxCallText.Length >= 2 ? dxCallText.Substring(0, 2) : "";
 
             // Capture all UI-thread values needed for background computation.
@@ -13304,10 +13341,15 @@ namespace HolyLogger
                             if (grid.Count() > 0)
                                 QRZGrid = grid.FirstOrDefault().Value.ToUpper();
 
-                            IEnumerable<XElement> ituEl = xDoc.Root.Descendants(ns + "ituzone");
-                            TB_ITUZone.Text = ituEl.Count() > 0 ? ituEl.FirstOrDefault().Value : "";
-                            IEnumerable<XElement> cqEl = xDoc.Root.Descendants(ns + "cqzone");
-                            TB_CQZone.Text = cqEl.Count() > 0 ? cqEl.FirstOrDefault().Value : "";
+                            // Override the offline (cty.dat) zones with QRZ ONLY when QRZ actually
+                            // provides them. Many records (e.g. DXpeditions like VP6D) carry no
+                            // zone fields; blanking them here would wipe the good cty.dat values.
+                            XElement ituEl = xDoc.Root.Descendants(ns + "ituzone").FirstOrDefault();
+                            if (ituEl != null && !string.IsNullOrWhiteSpace(ituEl.Value))
+                                TB_ITUZone.Text = ituEl.Value.Trim();
+                            XElement cqEl = xDoc.Root.Descendants(ns + "cqzone").FirstOrDefault();
+                            if (cqEl != null && !string.IsNullOrWhiteSpace(cqEl.Value))
+                                TB_CQZone.Text = cqEl.Value.Trim();
 
                             IEnumerable<XElement> stateEl = xDoc.Root.Descendants(ns + "state");
                             TB_State.Text = stateEl.Count() > 0 ? stateEl.FirstOrDefault().Value.Trim() : string.Empty;
@@ -13356,8 +13398,8 @@ namespace HolyLogger
                             {
                                 FName = "";
                                 TB_State.Text = "";
-                                TB_ITUZone.Text = "";
-                                TB_CQZone.Text = "";
+                                // Keep the offline cty.dat ITU/CQ zones — QRZ not finding this call
+                                // doesn't invalidate the prefix-based zones already shown.
                                 ClearQrzPhoto();
                             }
                         }
@@ -13367,8 +13409,7 @@ namespace HolyLogger
                 {
                     FName = "";
                     TB_State.Text = "";
-                    TB_ITUZone.Text = "";
-                    TB_CQZone.Text = "";
+                    // Keep the offline cty.dat ITU/CQ zones (prefix-based, still valid).
                     ClearQrzPhoto();
                 }
             }

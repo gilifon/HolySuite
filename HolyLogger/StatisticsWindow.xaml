@@ -93,6 +93,22 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Missing CQ zones (of 1..40): pick from the dropdown to see which remain. -->
+                        <Border Margin="14,0,0,0" Padding="14,8" Background="White" BorderBrush="#BB3300" BorderThickness="1" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock x:Name="TB_MissingCQHeader" Text="Missing CQ Zones" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
+                                <ComboBox x:Name="CB_MissingCQ" Width="96" Margin="0,4,0,0" FontSize="14"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Missing ITU zones (of 1..90). -->
+                        <Border Margin="14,0,0,0" Padding="14,8" Background="White" BorderBrush="#BB3300" BorderThickness="1" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock x:Name="TB_MissingITUHeader" Text="Missing ITU Zones" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
+                                <ComboBox x:Name="CB_MissingITU" Width="96" Margin="0,4,0,0" FontSize="14"/>
+                            </StackPanel>
+                        </Border>
+
                     </StackPanel>
                     <!-- Shown only when the country file is overdue for a refresh (e.g. the download
                          URL no longer works); the text explains what to do. -->

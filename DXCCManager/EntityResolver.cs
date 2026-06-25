@@ -32,15 +32,27 @@ namespace DXCCManager
             public string PrimaryPrefix; // unique per entity; used as the DXCC.Entity key
             public double Lat;
             public double Lon; // standard convention: East-positive (cty.dat stores West-positive)
+            public int CqZone;  // entity-default CQ zone
+            public int ItuZone; // entity-default ITU zone
+        }
+
+        // A resolved match: the entity plus the EFFECTIVE zones for the matched prefix/callsign.
+        // cty.dat lets a prefix override the entity-default zones with (cq) and [itu] annotations
+        // (e.g. K0(4)[7] in the USA), so big multi-zone countries resolve to the right zone.
+        private class CtyMatch
+        {
+            public CtyEntity Entity;
+            public int Cq;
+            public int Itu;
         }
 
         // Exact full-callsign matches (from "=CALL" aliases).
-        private readonly Dictionary<string, CtyEntity> exactCalls =
-            new Dictionary<string, CtyEntity>(2000, StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, CtyMatch> exactCalls =
+            new Dictionary<string, CtyMatch>(2000, StringComparer.OrdinalIgnoreCase);
 
-        // Prefix -> entity. Resolution picks the longest matching prefix.
-        private readonly Dictionary<string, CtyEntity> prefixMap =
-            new Dictionary<string, CtyEntity>(4000, StringComparer.OrdinalIgnoreCase);
+        // Prefix -> match. Resolution picks the longest matching prefix.
+        private readonly Dictionary<string, CtyMatch> prefixMap =
+            new Dictionary<string, CtyMatch>(4000, StringComparer.OrdinalIgnoreCase);
 
         private int maxPrefixLength = 1;
         private readonly List<CtyEntity> allEntities = new List<CtyEntity>(360);
@@ -180,7 +192,9 @@ namespace DXCCManager
                 Continent = f[3].Trim(),
                 PrimaryPrefix = prefix,
                 Lat = lat,
-                Lon = -ctyLon
+                Lon = -ctyLon,
+                CqZone = ParseInt(f[1]),   // field 2: default CQ zone
+                ItuZone = ParseInt(f[2])   // field 3: default ITU zone
             };
         }
 
@@ -189,49 +203,60 @@ namespace DXCCManager
             aliasText = aliasText.TrimEnd(';');
             if (aliasText.Length == 0)
             {
-                // No alias list: fall back to the primary prefix as a matchable prefix.
-                AddPrefix(entity.PrimaryPrefix, entity);
+                // No alias list: fall back to the primary prefix with the entity-default zones.
+                AddPrefix(entity.PrimaryPrefix, entity, entity.CqZone, entity.ItuZone);
                 return;
             }
 
             foreach (string raw in aliasText.Split(','))
             {
-                string token = OverrideAnnotations.Replace(raw, string.Empty).Trim();
+                string trimmed = raw.Trim();
+                if (trimmed.Length == 0) continue;
+
+                // Per-prefix zone overrides: (cq) and [itu]; default to the entity zones.
+                int cq = entity.CqZone, itu = entity.ItuZone;
+                Match cqm = Regex.Match(trimmed, @"\((\d+)\)");
+                if (cqm.Success) int.TryParse(cqm.Groups[1].Value, out cq);
+                Match itm = Regex.Match(trimmed, @"\[(\d+)\]");
+                if (itm.Success) int.TryParse(itm.Groups[1].Value, out itu);
+
+                string token = OverrideAnnotations.Replace(trimmed, string.Empty).Trim();
                 if (token.Length == 0) continue;
 
                 if (token[0] == '=')
                 {
                     string call = token.Substring(1).Trim();
-                    if (call.Length > 0) exactCalls[call] = entity; // exact full-callsign match
+                    if (call.Length > 0)
+                        exactCalls[call] = new CtyMatch { Entity = entity, Cq = cq, Itu = itu };
                 }
                 else
                 {
-                    AddPrefix(token, entity);
+                    AddPrefix(token, entity, cq, itu);
                 }
             }
         }
 
-        private void AddPrefix(string prefix, CtyEntity entity)
+        private void AddPrefix(string prefix, CtyEntity entity, int cq, int itu)
         {
             if (string.IsNullOrEmpty(prefix)) return;
-            prefixMap[prefix] = entity;
+            prefixMap[prefix] = new CtyMatch { Entity = entity, Cq = cq, Itu = itu };
             if (prefix.Length > maxPrefixLength) maxPrefixLength = prefix.Length;
         }
 
-        private CtyEntity Resolve(string callsign)
+        private CtyMatch Resolve(string callsign)
         {
             if (string.IsNullOrWhiteSpace(callsign)) return null;
             string call = callsign.Trim().ToUpperInvariant();
 
             // 1) Exact full-callsign match wins.
-            if (exactCalls.TryGetValue(call, out CtyEntity exact)) return exact;
+            if (exactCalls.TryGetValue(call, out CtyMatch exact)) return exact;
 
             // 2) Otherwise the longest matching prefix wins.
             int len = Math.Min(call.Length, maxPrefixLength);
             for (int l = len; l >= 1; l--)
             {
                 string candidate = call.Substring(0, l);
-                if (prefixMap.TryGetValue(candidate, out CtyEntity byPrefix))
+                if (prefixMap.TryGetValue(candidate, out CtyMatch byPrefix))
                     return byPrefix;
             }
             return null;
@@ -239,16 +264,19 @@ namespace DXCCManager
 
         public DXCC GetDXCC(string callsign)
         {
-            CtyEntity e = Resolve(callsign);
-            if (e != null)
+            CtyMatch m = Resolve(callsign);
+            if (m != null)
             {
+                CtyEntity e = m.Entity;
                 return new DXCC
                 {
                     Name = e.Name,
                     Continent = e.Continent,
                     Entity = e.PrimaryPrefix,
                     Prefixes = e.PrimaryPrefix,
-                    Locator = LatLonToGrid(e.Lat, e.Lon)
+                    Locator = LatLonToGrid(e.Lat, e.Lon),
+                    CqZone = m.Cq,
+                    ItuZone = m.Itu
                 };
             }
 
@@ -274,7 +302,9 @@ namespace DXCCManager
                     Continent = e.Continent,
                     Entity = e.PrimaryPrefix,
                     Prefixes = e.PrimaryPrefix,
-                    Locator = LatLonToGrid(e.Lat, e.Lon)
+                    Locator = LatLonToGrid(e.Lat, e.Lon),
+                    CqZone = e.CqZone,
+                    ItuZone = e.ItuZone
                 };
             }
             return new DXCC { Continent = "XX", Entity = "-1", Name = "Unknown", Prefixes = "" };
@@ -282,14 +312,20 @@ namespace DXCCManager
 
         public string GetContinent(string callsign)
         {
-            CtyEntity e = Resolve(callsign);
-            return e != null ? e.Continent : "XX";
+            CtyMatch m = Resolve(callsign);
+            return m != null ? m.Entity.Continent : "XX";
         }
 
         public string GetLocator(string callsign)
         {
-            CtyEntity e = Resolve(callsign);
-            return e != null ? LatLonToGrid(e.Lat, e.Lon) : "";
+            CtyMatch m = Resolve(callsign);
+            return m != null ? LatLonToGrid(m.Entity.Lat, m.Entity.Lon) : "";
+        }
+
+        private static int ParseInt(string s)
+        {
+            int.TryParse((s ?? string.Empty).Trim(), out int v);
+            return v;
         }
 
         public IReadOnlyList<string> GetAllEntityNames()

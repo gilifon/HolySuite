@@ -82,6 +82,12 @@ namespace HolyParser
         [JsonProperty("continent")]
         public string Continent { get; set; }
 
+        [JsonProperty("cq_zone")]
+        public string CQZone { get; set; }
+
+        [JsonProperty("itu_zone")]
+        public string ITUZone { get; set; }
+
         [JsonProperty("operator")]
         public string Operator { get; set; }
 

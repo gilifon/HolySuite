@@ -108,6 +108,8 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.DXCall)) adif.AppendFormat("<call:{0}>{1}", qso.DXCall.Length, qso.DXCall);
                 if (!string.IsNullOrWhiteSpace(qso.Name)) adif.AppendFormat("<name:{0}>{1}", qso.Name.Length, qso.Name);
                 if (!string.IsNullOrWhiteSpace(qso.Country)) adif.AppendFormat("<country:{0}>{1}", qso.Country.Length, qso.Country);
+                if (!string.IsNullOrWhiteSpace(qso.CQZone)) adif.AppendFormat("<cqz:{0}>{1}", qso.CQZone.Length, qso.CQZone);
+                if (!string.IsNullOrWhiteSpace(qso.ITUZone)) adif.AppendFormat("<ituz:{0}>{1}", qso.ITUZone.Length, qso.ITUZone);
                 if (!string.IsNullOrWhiteSpace(qso.Freq)) adif.AppendFormat("<freq:{0}>{1}", qso.Freq.Length, qso.Freq);
                 if (!string.IsNullOrWhiteSpace(qso.Band)) adif.AppendFormat("<band:{0}>{1}", qso.Band.Length, qso.Band);
                 if (!string.IsNullOrWhiteSpace(qso.Mode)) adif.AppendFormat("<mode:{0}>{1}", qso.Mode.Length, qso.Mode);

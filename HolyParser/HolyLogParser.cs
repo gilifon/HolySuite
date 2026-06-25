@@ -100,6 +100,8 @@ namespace HolyParser
         private string sat_name_pattern = @"<sat_name:(\d{1,4})(?::[a-z]{1})?>";
         private string soapbox_pattern = @"<soapbox:(\d{1,4})(?::[a-z]{1})?>";
         private string lotw_qsl_sent_pattern = @"<lotw_qsl_sent:(\d{1,4})(?::[a-z]{1})?>";
+        private string cqz_pattern = @"<cqz:(\d{1,4})(?::[a-z]{1})?>";
+        private string ituz_pattern = @"<ituz:(\d{1,4})(?::[a-z]{1})?>";
 
         public HolyLogParser() : this("", Operator.Israeli)
         {
@@ -239,8 +241,21 @@ namespace HolyParser
                 qso_row.Country = ER_Dxcc.Name != "Unknown" ? ER_Dxcc.Name : qso_row.Country;
                 qso_row.DXCC = ER_Dxcc.Entity;
                 qso_row.Continent = ER_Dxcc.Continent;
-
+                // Default the zones from cty.dat; an explicit <cqz>/<ituz> in the file overrides below.
+                if (ER_Dxcc.CqZone > 0) qso_row.CQZone = ER_Dxcc.CqZone.ToString();
+                if (ER_Dxcc.ItuZone > 0) qso_row.ITUZone = ER_Dxcc.ItuZone.ToString();
             }
+
+            // If the file contains explicit zones, prefer them over the cty.dat defaults.
+            regex = new Regex(cqz_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+                qso_row.CQZone = Regex.Split(row, cqz_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim();
+
+            regex = new Regex(ituz_pattern, RegexOptions.IgnoreCase);
+            match = regex.Match(row);
+            if (match.Success)
+                qso_row.ITUZone = Regex.Split(row, ituz_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim();
 
             //if the file contains dxcc, prefer it over the EntityResolver
             regex = new Regex(dxcc_pattern, RegexOptions.IgnoreCase);
