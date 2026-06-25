@@ -185,6 +185,7 @@
     </Compile>
     <Compile Include="CallsignUploader.cs" />
     <Compile Include="CountDownTimer.cs" />
+    <Compile Include="CtyDatService.cs" />
     <Compile Include="DataAccess.cs" />
     <Compile Include="EqslQueueWindow.cs" />
     <Compile Include="LotwUploader.cs" />

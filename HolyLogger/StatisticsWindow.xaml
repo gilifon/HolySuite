@@ -38,6 +38,7 @@
 
                 <!-- Summary strip -->
                 <Border Grid.Row="0" Background="#EEF2F7" BorderBrush="#BBCDE8" BorderThickness="0,0,0,1" Padding="14,12">
+                    <StackPanel>
                     <StackPanel Orientation="Horizontal">
 
                         <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
@@ -56,8 +57,16 @@
 
                         <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="Countries / DXCC" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_UniqueCountries" FontSize="34" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Worked / DXCC" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
+                        <!-- Missing DXCC: how many of all DXCC entities are still un-worked. -->
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#BB3300" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="Missing DXCC" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_MissingDxcc" FontSize="34" FontWeight="Bold" Foreground="#BB3300" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
@@ -76,6 +85,19 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- cty.dat (DXCC entity database) release date, so the totals above are traceable. -->
+                        <Border Margin="14,0,0,0" Padding="14,8" Background="White" BorderBrush="#BBCDE8" BorderThickness="1" VerticalAlignment="Center">
+                            <StackPanel>
+                                <TextBlock Text="DXCC data" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_CtyVersion" FontSize="14" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                            </StackPanel>
+                        </Border>
+
+                    </StackPanel>
+                    <!-- Shown only when the country file is overdue for a refresh (e.g. the download
+                         URL no longer works); the text explains what to do. -->
+                    <TextBlock x:Name="TB_CtyWarning" Foreground="#BB3300" FontSize="13" FontWeight="SemiBold"
+                               TextWrapping="Wrap" Margin="2,8,2,0" Visibility="Collapsed"/>
                     </StackPanel>
                 </Border>
 

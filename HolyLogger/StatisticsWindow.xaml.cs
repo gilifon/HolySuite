@@ -99,11 +99,27 @@ namespace HolyLogger
         {
             int total = _allQsos != null ? _allQsos.Count : 0;
             TB_TotalQSOs.Text = total.ToString();
+            TB_CtyVersion.Text = string.IsNullOrEmpty(_masterResolver.Version) ? "—" : _masterResolver.Version;
+
+            // Warn if the country file is overdue for a refresh (e.g. AD1C moved the download URL).
+            string ctyWarning = CtyDatService.UpdateWarning();
+            if (!string.IsNullOrEmpty(ctyWarning))
+            {
+                TB_CtyWarning.Text = ctyWarning;
+                TB_CtyWarning.Visibility = Visibility.Visible;
+                TB_CtyVersion.Foreground = System.Windows.Media.Brushes.OrangeRed;
+            }
+            else
+            {
+                TB_CtyWarning.Visibility = Visibility.Collapsed;
+            }
 
             if (total == 0)
             {
+                int totalDxcc = _masterResolver.GetAllEntityNames().Count;
                 TB_UniqueCalls.Text     = "0";
-                TB_UniqueCountries.Text = "0";
+                TB_UniqueCountries.Text = $"0 / {totalDxcc}";
+                TB_MissingDxcc.Text     = totalDxcc.ToString();
                 TB_DateStart.Text = "—";
                 TB_DateEnd.Text   = "—";
                 TB_Status.Text          = "No QSOs to analyze.";
@@ -330,7 +346,8 @@ namespace HolyLogger
 
             TB_WorkedHeader.Text = $"Worked Countries ({_workedList.Count})";
 
-            _missingList = _masterResolver.GetAllEntityNames()
+            var allDxccEntities = _masterResolver.GetAllEntityNames();
+            _missingList = allDxccEntities
                 .Where(n => !workedNames.Contains(n))
                 .Select(name => new CountryItem
                 {
@@ -339,6 +356,14 @@ namespace HolyLogger
                 }).ToList();
 
             TB_MissingHeader.Text = $"Missing Countries ({_missingList.Count})";
+
+            // Top summary boxes: worked-of-total and the missing gap. Derived from the master
+            // entity list so worked + missing always equals the total (currently 340 DXCC entities).
+            int totalDxcc   = allDxccEntities.Count;
+            int missingDxcc = _missingList.Count;
+            int workedDxcc  = totalDxcc - missingDxcc;
+            TB_UniqueCountries.Text = $"{workedDxcc} / {totalDxcc}";
+            TB_MissingDxcc.Text     = missingDxcc.ToString();
 
             TB_SortWorkedName.MouseLeftButtonUp  -= SortWorkedByName;
             TB_SortWorkedName.MouseLeftButtonUp  += SortWorkedByName;

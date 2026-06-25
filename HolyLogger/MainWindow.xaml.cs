@@ -489,6 +489,9 @@ namespace HolyLogger
             LoadQrzPhotoWindowBoundsFromDisk();
 
             Qsos = new ObservableCollection<QSO>();
+            // Point the resolver at the updatable cty.dat (seeded from the embedded copy on first
+            // run) before any EntityResolver is created, so the whole app uses the same file.
+            CtyDatService.Initialize();
             rem = new EntityResolver();
             InitializeComponent();
 
@@ -537,6 +540,10 @@ namespace HolyLogger
             LoadNewCallsignsSet();
             _callsignUploader = new CallsignUploader(AppDomain.CurrentDomain.BaseDirectory);
             _callsignUploader.TrySendFireAndForget();
+
+            // Quietly check country-files.com for a newer cty.dat. A downloaded update lands on
+            // disk and is picked up on the next launch; failures (offline etc.) are ignored.
+            CheckCtyDatUpdateFireAndForget();
 
             if (Properties.Settings.Default.EnableUDPClient)
             {
@@ -2468,7 +2475,13 @@ namespace HolyLogger
             menu.Items.Add(editItem);
 
             var deleteItem = new MenuItem { Header = "Delete", Style = dangerStyle, Icon = MakeMenuGlyph("", red) };
-            deleteItem.Click += (s, e) => DeleteQsoFromContextMenu(qso);
+            // Defer the delete until the context menu has fully closed. Showing the modal confirm
+            // dialog synchronously here — while the menu is still dismissing and holding mouse
+            // capture — left the dialog unable to receive the click, so the delete appeared to do
+            // nothing. Running it at Background priority lets the menu close first.
+            deleteItem.Click += (s, e) =>
+                Dispatcher.BeginInvoke(new Action(() => DeleteQsoFromContextMenu(qso)),
+                                       System.Windows.Threading.DispatcherPriority.Background);
             menu.Items.Add(deleteItem);
 
             return menu;
@@ -11891,6 +11904,17 @@ namespace HolyLogger
             }
         }
 
+        // Background check for a newer cty.dat from country-files.com. The download (if any) is
+        // saved to disk and applied on the next launch; we stay silent so startup is undisturbed.
+        private void CheckCtyDatUpdateFireAndForget()
+        {
+            Task.Run(async () =>
+            {
+                try { await CtyDatService.CheckForUpdateAsync(_sharedHttpClient, isNetworkAvailable); }
+                catch { }
+            });
+        }
+
         private void FetchCallsignListUpdateInfoFireAndForget()
         {
             // Log immediately at startup
@@ -12432,6 +12456,45 @@ namespace HolyLogger
             {"South Orkney Is.","gb"},{"South Sandwich Is.","gb"},{"South Shetland Is.","gb"},
             {"St Maarten","nl"},{"Svalbard","no"},{"Tokelau Is.","nz"},{"Tromelin I.","fr"},
             {"Western Sahara","ma"},{"Niue","nu"},{"United Nations HQ","un"},
+            // --- cty.dat (AD1C) entity name spellings ---
+            // The resolver now returns cty.dat's names, which differ in spelling from the older
+            // table above (e.g. "...Islands" vs "...Is.", "United States" vs "...of America").
+            // These re-key the SAME flag images to the new names. The older spellings are kept
+            // above so previously-logged QSOs (stored under the old names) keep their flags.
+            {"African Italy","it"},{"Aland Islands","fi"},{"Annobon Island","gq"},
+            {"Ascension Island","sh"},{"Asiatic Turkey","tr"},{"Austral Islands","fr"},
+            {"Aves Island","ve"},{"Baker & Howland Islands","us"},{"Balearic Islands","es"},
+            {"Banaba Island","ki"},{"Bear Island","no"},{"British Virgin Islands","vg"},
+            {"Canary Islands","es"},{"Cayman Islands","ky"},{"Central African Republic","cf"},
+            {"Central Kiribati","ki"},{"Chagos Islands","gb"},{"Chatham Islands","nz"},
+            {"Chesterfield Islands","nc"},{"Christmas Island","au"},{"Clipperton Island","fr"},
+            {"Cocos (Keeling) Islands","au"},{"Cocos Island","cr"},{"Crozet Island","fr"},
+            {"DPR of Korea","kp"},{"Dem. Rep. of the Congo","cd"},{"Desecheo Island","pr"},
+            {"Ducie Island","gb"},{"Easter Island","cl"},{"Eastern Kiribati","ki"},
+            {"European Turkey","tr"},{"Falkland Islands","fk"},{"Faroe Islands","fo"},
+            {"Galapagos Islands","ec"},{"Glorioso Islands","fr"},{"Heard Island","au"},
+            {"Johnston Island","us"},{"Juan Fernandez Islands","cl"},{"Kerguelen Islands","fr"},
+            {"Kermadec Islands","nz"},{"Kingdom of Eswatini","sz"},{"Kure Island","us"},
+            {"Kyrgyzstan","kg"},{"Lakshadweep Islands","in"},{"Lord Howe Island","au"},
+            {"Macquarie Island","au"},{"Madeira Islands","pt"},{"Malpelo Island","co"},
+            {"Mariana Islands","mp"},{"Marquesas Islands","fr"},{"Marshall Islands","mh"},
+            {"Midway Island","us"},{"N.Z. Subantarctic Is.","nz"},{"Navassa Island","us"},
+            {"Norfolk Island","nf"},{"North Cook Islands","ck"},{"North Macedonia","mk"},
+            {"Palmyra & Jarvis Islands","us"},{"Peter 1 Island","no"},{"Pitcairn Island","gb"},
+            {"Pr. Edward & Marion Is.","za"},{"Pratas Island","tw"},{"Republic of Korea","kr"},
+            {"Republic of South Sudan","ss"},{"Republic of the Congo","cg"},{"Reunion Island","re"},
+            {"Revillagigedo","mx"},{"Rodriguez Island","mu"},{"Rotuma Island","fj"},
+            {"Sable Island","ca"},{"Samoa","ws"},{"Shetland Islands","gb"},{"Sicily","it"},
+            {"Sint Maarten","sx"},{"Solomon Islands","sb"},{"South Cook Islands","ck"},
+            {"South Georgia Island","gb"},{"South Orkney Islands","gb"},{"South Sandwich Islands","gb"},
+            {"South Shetland Islands","gb"},{"Sov Mil Order of Malta","it"},{"Spratly Islands","ph"},
+            {"St. Barthelemy","fr"},{"St. Martin","fr"},{"St. Paul Island","ca"},
+            {"St. Peter & St. Paul","br"},{"Swains Island","us"},{"Timor - Leste","tl"},
+            {"Tokelau Islands","nz"},{"Trindade & Martim Vaz","br"},{"Tristan da Cunha & Gough","gb"},
+            {"Tromelin Island","fr"},{"Turks & Caicos Islands","tc"},{"UK Base Areas on Cyprus","cy"},
+            {"US Virgin Islands","vi"},{"United States","us"},{"Vatican City","va"},
+            {"Vienna Intl Ctr","un"},{"Wake Island","us"},{"Wallis & Futuna Islands","wf"},
+            {"Western Kiribati","ki"},{"Willis Island","au"},
         };
 
         private void UpdateCountryFlag(string countryName)
