@@ -93,22 +93,6 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Missing CQ zones (of 1..40): pick from the dropdown to see which remain. -->
-                        <Border Margin="14,0,0,0" Padding="14,8" Background="White" BorderBrush="#BB3300" BorderThickness="1" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock x:Name="TB_MissingCQHeader" Text="Missing CQ Zones" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
-                                <ComboBox x:Name="CB_MissingCQ" Width="96" Margin="0,4,0,0" FontSize="14"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Missing ITU zones (of 1..90). -->
-                        <Border Margin="14,0,0,0" Padding="14,8" Background="White" BorderBrush="#BB3300" BorderThickness="1" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock x:Name="TB_MissingITUHeader" Text="Missing ITU Zones" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
-                                <ComboBox x:Name="CB_MissingITU" Width="96" Margin="0,4,0,0" FontSize="14"/>
-                            </StackPanel>
-                        </Border>
-
                     </StackPanel>
                     <!-- Shown only when the country file is overdue for a refresh (e.g. the download
                          URL no longer works); the text explains what to do. -->
@@ -123,7 +107,7 @@
 
                         <!-- Pivot table section -->
                         <StackPanel VerticalAlignment="Top">
-                            <TextBlock Text="QSOs by Band × Mode" FontSize="16" FontWeight="Bold"
+                            <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Band × Mode" FontSize="16" FontWeight="Bold"
                                        Foreground="#1565C0" Margin="0,0,0,6"/>
                             <!--
                                 Inner PivotBorder: left+top edge in blue (1px).
@@ -160,7 +144,7 @@
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortWorkedName" Text="Country ▲"
-                                                           Width="160" FontSize="13" FontWeight="Bold"
+                                                           Width="130" FontSize="13" FontWeight="Bold"
                                                            Cursor="Hand" Foreground="#333333"/>
                                                 <TextBlock x:Name="TB_SortWorkedCount" Text="Count ▼"
                                                            FontSize="13" FontWeight="Bold"
@@ -182,7 +166,7 @@
                                                                        Stretch="Fill"/>
                                                                 <TextBlock Text="{Binding Name}" FontSize="13"
                                                                            VerticalAlignment="Center"
-                                                                           Width="160"
+                                                                           Width="130"
                                                                            TextTrimming="CharacterEllipsis"/>
                                                                 <TextBlock Text="{Binding CountStr}" FontSize="13"
                                                                            FontWeight="Bold"
@@ -212,7 +196,7 @@
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortMissingName" Text="Country ▲"
-                                                           Width="175" FontSize="13" FontWeight="Bold"
+                                                           Width="130" FontSize="13" FontWeight="Bold"
                                                            Cursor="Hand" Foreground="#333333"/>
                                             </StackPanel>
                                         </Border>
@@ -231,7 +215,7 @@
                                                                        Stretch="Fill"/>
                                                                 <TextBlock Text="{Binding Name}" FontSize="13"
                                                                            VerticalAlignment="Center"
-                                                                           Width="175"
+                                                                           Width="130"
                                                                            TextTrimming="CharacterEllipsis"/>
                                                             </StackPanel>
                                                         </Border>
@@ -239,6 +223,70 @@
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
                                         </ScrollViewer>
+                                        </DockPanel>
+                                    </Border>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Missing CQ Zones (1..40) -->
+                            <StackPanel Margin="10,0,0,0" VerticalAlignment="Top">
+                                <TextBlock x:Name="TB_MissingCQHeader" Text="Missing CQ Zones"
+                                           FontSize="16" FontWeight="Bold" Foreground="#BB3300" Margin="0,0,0,6"/>
+                                <Border BorderBrush="Black" BorderThickness="0,0,2,2">
+                                    <Border BorderBrush="#1565C0" BorderThickness="1,1,0,0">
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Top" Background="#DEB887"
+                                                    BorderBrush="#AAAAAA" BorderThickness="0,0,0,1">
+                                                <TextBlock Text="Zone" Margin="4,3" Width="46" TextAlignment="Center"
+                                                           FontSize="13" FontWeight="Bold" Foreground="#333333"/>
+                                            </Border>
+                                            <ScrollViewer x:Name="SV_MissingCQ"
+                                                          VerticalScrollBarVisibility="Auto" MaxHeight="500">
+                                                <ItemsControl x:Name="IC_MissingCQ">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                                                                    Background="{Binding RowBg}">
+                                                                <TextBlock Text="{Binding Zone}" FontSize="13"
+                                                                           FontWeight="Bold" Foreground="#1565C0"
+                                                                           Margin="4,2" Width="46" TextAlignment="Center"/>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
+                                        </DockPanel>
+                                    </Border>
+                                </Border>
+                            </StackPanel>
+
+                            <!-- Missing ITU Zones (1..90) -->
+                            <StackPanel Margin="10,0,0,0" VerticalAlignment="Top">
+                                <TextBlock x:Name="TB_MissingITUHeader" Text="Missing ITU Zones"
+                                           FontSize="16" FontWeight="Bold" Foreground="#BB3300" Margin="0,0,0,6"/>
+                                <Border BorderBrush="Black" BorderThickness="0,0,2,2">
+                                    <Border BorderBrush="#1565C0" BorderThickness="1,1,0,0">
+                                        <DockPanel>
+                                            <Border DockPanel.Dock="Top" Background="#DEB887"
+                                                    BorderBrush="#AAAAAA" BorderThickness="0,0,0,1">
+                                                <TextBlock Text="Zone" Margin="4,3" Width="46" TextAlignment="Center"
+                                                           FontSize="13" FontWeight="Bold" Foreground="#333333"/>
+                                            </Border>
+                                            <ScrollViewer x:Name="SV_MissingITU"
+                                                          VerticalScrollBarVisibility="Auto" MaxHeight="500">
+                                                <ItemsControl x:Name="IC_MissingITU">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate>
+                                                            <Border BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                                                                    Background="{Binding RowBg}">
+                                                                <TextBlock Text="{Binding Zone}" FontSize="13"
+                                                                           FontWeight="Bold" Foreground="#1565C0"
+                                                                           Margin="4,2" Width="46" TextAlignment="Center"/>
+                                                            </Border>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </ScrollViewer>
                                         </DockPanel>
                                     </Border>
                                 </Border>

@@ -74,6 +74,8 @@ namespace HolyLogger
                 {
                     SV_WorkedCountries.Height  = e.NewSize.Height;
                     SV_MissingCountries.Height = e.NewSize.Height;
+                    SV_MissingCQ.Height        = e.NewSize.Height;
+                    SV_MissingITU.Height       = e.NewSize.Height;
                 }
             };
         }
@@ -99,6 +101,7 @@ namespace HolyLogger
         {
             int total = _allQsos != null ? _allQsos.Count : 0;
             TB_TotalQSOs.Text = total.ToString();
+            TB_PivotHeader.Text = "QSOs by Band × Mode\n(" + total + ")";
             TB_CtyVersion.Text = string.IsNullOrEmpty(_masterResolver.Version) ? "—" : _masterResolver.Version;
 
             // Warn if the country file is overdue for a refresh (e.g. AD1C moved the download URL).
@@ -165,18 +168,36 @@ namespace HolyLogger
             TB_Status.Text = $"Statistics computed for {total} QSO{(total == 1 ? "" : "s")}.";
         }
 
-        // Fills the "Missing CQ Zones" (1..40) and "Missing ITU Zones" (1..90) dropdowns with the
-        // zones not yet present in any QSO, and shows the count in each header.
+        // Fills the "Missing CQ Zones" (1..40) and "Missing ITU Zones" (1..90) scrollable lists with
+        // the zones not yet present in any QSO, and shows the count in each header.
         private void PopulateMissingZones()
         {
             List<int> missingCq  = MissingZones(40, q => q.CQZone);
             List<int> missingItu = MissingZones(90, q => q.ITUZone);
 
-            CB_MissingCQ.ItemsSource  = missingCq.Select(z => z.ToString()).ToList();
-            CB_MissingITU.ItemsSource = missingItu.Select(z => z.ToString()).ToList();
+            IC_MissingCQ.ItemsSource  = ToZoneRows(missingCq);
+            IC_MissingITU.ItemsSource = ToZoneRows(missingItu);
 
-            TB_MissingCQHeader.Text  = $"Missing CQ Zones ({missingCq.Count})";
-            TB_MissingITUHeader.Text = $"Missing ITU Zones ({missingItu.Count})";
+            TB_MissingCQHeader.Text  = $"Missing CQ\nZones ({missingCq.Count})";
+            TB_MissingITUHeader.Text = $"Missing ITU\nZones ({missingItu.Count})";
+        }
+
+        private static List<ZoneRow> ToZoneRows(List<int> zones)
+        {
+            var rows = new List<ZoneRow>(zones.Count);
+            for (int i = 0; i < zones.Count; i++)
+                rows.Add(new ZoneRow
+                {
+                    Zone  = zones[i].ToString(),
+                    RowBg = i % 2 == 0 ? (Brush)Brushes.White : Br(0xDC, 0xDC, 0xDC)
+                });
+            return rows;
+        }
+
+        private class ZoneRow
+        {
+            public string Zone { get; set; }
+            public Brush RowBg { get; set; }
         }
 
         private List<int> MissingZones(int maxZone, Func<QSO, string> selector)
@@ -375,7 +396,7 @@ namespace HolyLogger
                     FlagImage = GetFlagImage(name),
                 }).ToList();
 
-            TB_WorkedHeader.Text = $"Worked Countries ({_workedList.Count})";
+            TB_WorkedHeader.Text = $"Worked Countries\n({_workedList.Count})";
 
             var allDxccEntities = _masterResolver.GetAllEntityNames();
             _missingList = allDxccEntities
@@ -386,7 +407,7 @@ namespace HolyLogger
                     FlagImage = GetFlagImage(name),
                 }).ToList();
 
-            TB_MissingHeader.Text = $"Missing Countries ({_missingList.Count})";
+            TB_MissingHeader.Text = $"Missing Countries\n({_missingList.Count})";
 
             // Top summary boxes: worked-of-total and the missing gap. Derived from the master
             // entity list so worked + missing always equals the total (currently 340 DXCC entities).
