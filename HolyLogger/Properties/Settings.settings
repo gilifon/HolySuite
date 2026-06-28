@@ -170,6 +170,12 @@
     <Setting Name="QsoTableHeaderBackgroundColor" Type="System.String" Scope="User">
       <Value Profile="(Default)">#DEB887</Value>
     </Setting>
+    <Setting Name="ContestExchangeColor" Type="System.String" Scope="User">
+      <Value Profile="(Default)">#FFF6C8</Value>
+    </Setting>
+    <Setting Name="ContestSendColor" Type="System.String" Scope="User">
+      <Value Profile="(Default)">#E1F5EE</Value>
+    </Setting>
     <Setting Name="IsParseWARC" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>
@@ -402,6 +408,9 @@
       <Value Profile="(Default)">False</Value>
     </Setting>
     <Setting Name="ContestName" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="ActiveContestId" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>
     <Setting Name="CwMsgText1" Type="System.String" Scope="User">

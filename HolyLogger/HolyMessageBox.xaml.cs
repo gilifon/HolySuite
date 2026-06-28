@@ -1,4 +1,5 @@
 using System.Windows;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace HolyLogger
@@ -22,6 +23,24 @@ namespace HolyLogger
             {
                 OkBtn.Visibility = Visibility.Collapsed;
                 ConfirmPanel.Visibility = Visibility.Visible;
+            }
+
+            // Give a button keyboard focus when the dialog opens, so key presses have somewhere to route.
+            Loaded += (s, e) =>
+            {
+                if (OkBtn.Visibility == Visibility.Visible) OkBtn.Focus();
+                else YesBtn.Focus();
+            };
+        }
+
+        // Esc closes the dialog (wired as Window.KeyDown in XAML, matching the app's other windows).
+        // For confirm dialogs Esc means No.
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key == Key.Escape)
+            {
+                Confirmed = false;
+                Close();
             }
         }
 

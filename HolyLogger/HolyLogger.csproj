@@ -179,12 +179,18 @@
     <Compile Include="AboutWindow.xaml.cs">
       <DependentUpon>AboutWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ContestPickerWindow.xaml.cs">
+      <DependentUpon>ContestPickerWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="CwSendMonitorWindow.cs" />
     <Compile Include="SplashWindow.xaml.cs">
       <DependentUpon>SplashWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="CallsignUploader.cs" />
     <Compile Include="CountDownTimer.cs" />
+    <Compile Include="Contests\ContestModels.cs" />
+    <Compile Include="Contests\ContestService.cs" />
+    <EmbeddedResource Include="contests.json" />
     <Compile Include="CtyDatService.cs" />
     <Compile Include="DataAccess.cs" />
     <Compile Include="EqslQueueWindow.cs" />
@@ -273,6 +279,10 @@
       <DependentUpon>MapUserControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="UDPSocket.cs" />
+    <Page Include="ContestPickerWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="AboutWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

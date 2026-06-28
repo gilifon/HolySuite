@@ -1,0 +1,1293 @@
+<Window
+
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:xctk="http://schemas.xceed.com/wpf/xaml/toolkit" 
+        xmlns:xcdg="http://schemas.xceed.com/wpf/xaml/datagrid"
+        xmlns:local="clr-namespace:HolyLogger"
+        xmlns:gif="http://wpfanimatedgif.codeplex.com"
+        xmlns:ToolsUserControls="clr-namespace:HolyLogger.ToolsUserControls"
+        x:Class="HolyLogger.MainWindow"
+        Title="HolyLogger" 
+        WindowStartupLocation="Manual"
+        MinHeight="560" MinWidth="800" 
+        Icon="Images/crown.png" 
+        PreviewKeyDown="Window_PreviewKeyDown" KeyDown="Window_KeyDown" Closing="Window_Closing" Closed="Window_Closed" Loaded="Window_Loaded" SourceInitialized="Window_SourceInitialized" LocationChanged="Window_LocationChanged" SizeChanged="Window_SizeChanged">
+
+    <Window.Resources>
+        <local:QsoDateDisplayConverter x:Key="QsoDateDisplayConverter"/>
+        <local:QsoTimeDisplayConverter x:Key="QsoTimeDisplayConverter"/>
+        <local:BoolToFontWeightConverter x:Key="BoolToFontWeightConverter"/>
+        <Style x:Key="RaisedActionButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#1E2A34"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush" Value="#7A95A8"/>
+            <Setter Property="Background" Value="#E8F2FA"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="ButtonBorder"
+                                CornerRadius="4"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                SnapsToDevicePixels="True">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#F7FBFF" Offset="0"/>
+                                    <GradientStop Color="#DCEAF6" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <Border.Effect>
+                                <DropShadowEffect BlurRadius="3" ShadowDepth="1" Opacity="0.35" Color="#6A8296"/>
+                            </Border.Effect>
+                            <ContentPresenter x:Name="ContentHost"
+                                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                              Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Foreground" Value="White"/>
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#1F5C8E"/>
+                                <Setter TargetName="ButtonBorder" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#4D9AD8" Offset="0"/>
+                                            <GradientStop Color="#2E76B4" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="ButtonBorder" Property="BorderBrush" Value="#486A86"/>
+                                <Setter TargetName="ButtonBorder" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#C9DCEF" Offset="0"/>
+                                            <GradientStop Color="#B5CEE5" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter TargetName="ButtonBorder" Property="Effect" Value="{x:Null}"/>
+                                <Setter TargetName="ContentHost" Property="Margin" Value="0,1,0,0"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="ButtonBorder" Property="Opacity" Value="0.55"/>
+                                <Setter Property="Foreground" Value="#8797A4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="RoundedButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#E6CCFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="RoundedButtonBorder"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="#9966CC"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RoundedButtonBorder" Property="Background" Value="#CFA6FF"/>
+                                <Setter TargetName="RoundedButtonBorder" Property="BorderBrush" Value="#7A33CC"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="RoundedButtonBorder" Property="Background" Value="#B980F5"/>
+                                <Setter TargetName="RoundedButtonBorder" Property="BorderBrush" Value="#5E1FA8"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="RoundedButtonBorder" Property="Background" Value="#E4E4E4"/>
+                                <Setter TargetName="RoundedButtonBorder" Property="BorderBrush" Value="#B5B5B5"/>
+                                <Setter Property="Foreground" Value="#7A7A7A"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Msg button style: same keyboard-key shape as cluster band filter buttons, purple when CAT OK / gray when disabled -->
+        <Style x:Key="MsgButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#E6CCFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,1,0,1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <!-- Outer border: darker bottom edge like a physical key -->
+                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#7A33CC" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                            <!-- Inner face with gradient -->
+                            <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#9966CC" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#5E1FA8"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#CFA6FF"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#7A33CC"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                                <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#B980F5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                                <Setter Property="Foreground" Value="#7A7A7A"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Msg button style for CW mode: cyan keyboard-key shape with 3D effect, matching SSB style -->
+        <Style x:Key="MsgButtonCwStyle" TargetType="Button">
+            <Setter Property="Background" Value="#7FFEFF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,1,0,1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <!-- Outer border: darker bottom edge like a physical key -->
+                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#0099CC" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                            <!-- Inner face -->
+                            <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#00CCFF" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#005C80"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#33C2D6"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#0077AA"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                                <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#1FA6BC"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                                <Setter Property="Foreground" Value="#7A7A7A"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Action button style: same keyboard-key shape, light blue for Add/Clear -->
+        <Style x:Key="ActionButtonStyle" TargetType="Button">
+            <Setter Property="Background" Value="#CCE8FF"/>
+            <Setter Property="Foreground" Value="#000000"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Margin" Value="0,1,0,1"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#3A80C8" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                            <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#5599DD" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#1F5C8E"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#A8D8FF"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#3A80C8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                                <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#7DC0F5"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                                <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                                <Setter Property="Foreground" Value="#7A7A7A"/>
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <Style x:Key="SpotButtonStyle" TargetType="Button">
+            <Setter Property="Foreground" Value="#1E2A34"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#C9A800" SnapsToDevicePixels="True">
+                            <Border x:Name="KeyFace" CornerRadius="4,4,3,3" BorderThickness="1" BorderBrush="#E0C94A" Margin="0,0,0,3" SnapsToDevicePixels="True">
+                                <Border.Background>
+                                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                        <GradientStop Color="#FFF9C4" Offset="0"/>
+                                        <GradientStop Color="#FFEB3B" Offset="1"/>
+                                    </LinearGradientBrush>
+                                </Border.Background>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#1F5C8E"/>
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#1860B0"/>
+                                <Setter TargetName="KeyFace" Property="Background">
+                                    <Setter.Value>
+                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                            <GradientStop Color="#4D9AD8" Offset="0"/>
+                                            <GradientStop Color="#2E76B4" Offset="1"/>
+                                        </LinearGradientBrush>
+                                    </Setter.Value>
+                                </Setter>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,1"/>
+                                <Setter TargetName="KeyOuter" Property="Background" Value="#666666"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="KeyOuter" Property="Opacity" Value="0.55"/>
+                                <Setter Property="Foreground" Value="#8797A4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="38" />
+            <RowDefinition x:Name="MainForm" Height="325" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="40" />
+        </Grid.RowDefinitions>
+        <DockPanel x:Name="MainScreen" Grid.Row="0">
+            <Grid DockPanel.Dock="Top">
+            <Menu VerticalAlignment="Center" HorizontalAlignment="Left" Background="Transparent">
+                <MenuItem Header="File" FontSize="16">
+                    <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
+                        <MenuItem.Icon>
+                            <Image Source="Images/import.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="ExportMenuItem" Header="Export ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExportMenuItem_Click" >
+                        <MenuItem.Icon>
+                            <Image Source="Images/exportA.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="ExportCabrilloMenuItem" Header="Export Cabrillo" ToolTip="Generates Cabrillo file from the QSO list" Click="ExportCabrilloMenuItem_Click" >
+                        <MenuItem.Icon>
+                            <Image Source="Images/exportC.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="ExpotExlMenuItem" Header="Export CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >
+                        <MenuItem.Icon>
+                            <Image Source="Images/exportX.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="UploadMenuItem" Header="Send log" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <!--<MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/folder.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>-->
+                    <MenuItem x:Name="ImportAutosaveMenuItem" Header="Import Autosaved Log" ToolTip="Restore log from an autosaved backup file" Click="ImportAutosaveMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M13 3C8.03 3 4 7.03 4 12H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
+                        <MenuItem.Icon>
+                            <Image Source="Images/exit.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </MenuItem>
+                <MenuItem Header="View" FontSize="16">
+                    <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/sign.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="TimerItem" Header="Timer" ToolTip="Open a 1 hour countdown timer" Click="TimerMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="MatrixMenuItem" Header="Matrix" ToolTip="Open a matrix presentation for the DX station" Click="MatrixMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/matrix.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="ClusterMenuItem" Header="Cluster" ToolTip="Open cluster window" Click="ClusterMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <!--<MenuItem x:Name="LogInfoMenuItem" Header="Statistics" ToolTip="Show some log statistics" Click="LogInfoMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/chart.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>-->
+                </MenuItem>
+                <MenuItem Header="Tools" FontSize="16" SubmenuOpened="ToolsMenu_SubmenuOpened">
+                    <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>-->
+                    <MenuItem x:Name="ClearLogMenuItem" Header="Clear Log" ToolTip="Clear Log" Click="ClearLogMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="ContestModeMenuItem" Header="Contest Mode - OFF" Click="ContestModeMenuItem_Click" ToolTip="When ON, a same band+mode QSO is flagged as a Duplicate. When OFF, the program only shows how many times the station was worked before.">
+                        <MenuItem.Icon>
+                            <!-- The negative margin lets the blue tile grow beyond the fixed icon slot
+                                 symmetrically, so it gets bigger without moving from its aligned spot. -->
+                            <Border x:Name="ContestTrophyBg" Width="22" Height="22" CornerRadius="4" Background="Transparent"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" Margin="-3">
+                                <Viewbox Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Path x:Name="ContestTrophyPath" Stretch="Uniform" Width="24" Height="24"
+                                          Data="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"
+                                          Fill="#9E9E9E"/>
+                                </Viewbox>
+                            </Border>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Full-Log QRZ Service" ToolTip="Try to get QRZ info for the entire log" Click="EntireLogQrzServiseMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/qrz.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="RemoveDuplicatesMenuItem" Header="Remove Duplicates" ToolTip="Remove duplicates from the log" Click="RemoveDuplicatesMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="SendQueueToEqslMenuItem" Header="Upload Queue to eQSL" ToolTip="Upload the QSOs that are still waiting to be sent to eQSL.cc" Click="SendQueueToEqslMenuItem_Click">
+                        <MenuItem.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="View Queue" Click="ViewEqslQueueContextMenuItem_Click"/>
+                                <MenuItem Header="Clear eQSL Queue" Click="ClearEqslQueueContextMenuItem_Click"/>
+                            </ContextMenu>
+                        </MenuItem.ContextMenu>
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="SendQueueToLotwMenuItem" Header="Upload Queue to LoTW" ToolTip="Sign and upload pending QSOs to ARRL Logbook of the World via TQSL." Click="SendQueueToLotwMenuItem_Click">
+                        <MenuItem.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="View Queue" Click="ViewLotwQueueContextMenuItem_Click"/>
+                                <MenuItem Header="Clear LoTW Queue" Click="ClearLotwQueueContextMenuItem_Click"/>
+                            </ContextMenu>
+                        </MenuItem.ContextMenu>
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="UploadQueueToQrzMenuItem" Header="Upload Queue to QRZ Logbook  (0)" ToolTip="Upload pending QSOs to your QRZ.com online logbook." Click="UploadQueueToQrzMenuItem_Click">
+                        <MenuItem.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="View Queue" Click="ViewQrzQueueContextMenuItem_Click"/>
+                                <MenuItem Header="Clear QRZ Queue" Click="ClearQrzQueueContextMenuItem_Click"/>
+                            </ContextMenu>
+                        </MenuItem.ContextMenu>
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="SearchMenuItem" Header="Search" ToolTip="Search the log" Click="SearchMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#1565C0"
+                                      Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show statistics about the log" Click="StatisticsMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#1565C0"
+                                      Data="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="OptionsMenuItem" Header="Options (F2)" ToolTip="Customize your Holylogger" Click="OptionsMenuItemMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </MenuItem>
+                <MenuItem Header="Help" FontSize="16">
+                    <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/update.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="HolyLogWebsiteMenuItem" Header="HolyLogger web page" ToolTip="Go to HolyLogger website" Click="HolyLoggerMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/crown.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="OmnirigMenuItem" Header="Omni-Rig web page" ToolTip="Go to Omni-Rig website" Click="OmnirigMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/OmniRigIcon.gif" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="GridSquareItem" Header="Grid / Square Map" ToolTip="Find your Grid / Square" Click="GridSquareMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/pin.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="OnTheAir" Header="HolyLogger On The Air" ToolTip="A cluster of HolyLogger user that are currently on the air" Click="OnTheAirMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
+                    <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </MenuItem>
+            </Menu>
+
+                <!-- UTC clock, centred over the map (the map spans x=677..right-6 in the row below). -->
+                <TextBlock x:Name="L_TitleClock" HorizontalAlignment="Stretch" TextAlignment="Center"
+                           Margin="677,0,6,0" VerticalAlignment="Center"
+                           FontWeight="Bold" Foreground="Black" FontSize="20" IsHitTestVisible="False" Visibility="Collapsed"/>
+            </Grid>
+        </DockPanel>
+        <DockPanel Grid.Row="4">
+            <StatusBar DockPanel.Dock="Bottom" MouseDoubleClick="StatusBar_MouseDoubleClick">
+                <StatusBarItem x:Name="NetworkFlagItem">
+                    <Ellipse x:Name="NetworkFlag" Margin="5,0,0,0" Fill="#00FF00" Height="16" Stroke="Black" Width="16" Visibility="Visible" ToolTip="Network conectivity" />
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock x:Name="L_QSO_Label" Text="QSOs: " Margin="10,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock x:Name="L_numOfQSO" Text="{Binding NumOfQSOs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <!-- Two-line "Holyland Squares" label. Width 56 + left margin 4 = the same 60px
+                         footprint as the old "Grids: " (40.1px + 20px), so the number does not move.
+                         Left-aligned (both lines share the same left edge) + vertically centered so it
+                         is symmetric with the number, leaving room for up to a 3-digit count. -->
+                    <TextBlock Margin="4,0,0,0" FontSize="14" Width="56" TextAlignment="Left"
+                               VerticalAlignment="Center" LineHeight="15" LineStackingStrategy="BlockLineHeight"><Run Text="Holyland"/><LineBreak/><Run Text="Squares"/></TextBlock>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock x:Name="L_numOfGrids" Text="{Binding NumOfGrids, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock Text="DXCCs: " Margin="10,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <TextBlock x:Name="L_numOfDXCC" Text="{Binding NumOfDXCCs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Change mode" Click="ManualModeMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
+                    <TextBlock Margin="10,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Manual"/><LineBreak/><Run Text="Mode:"/></TextBlock>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <Button x:Name="Btn_ManualMode" Click="ManualModeMenuItem_Click" Cursor="Hand" Padding="8,1" MinWidth="40" ToolTip="Toggle Manual Mode (same as Tools &gt; Manual Mode)">
+                        <TextBlock x:Name="L_IsManual" FontSize="16" FontWeight="Bold" TextAlignment="Center"/>
+                    </Button>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
+                    <TextBlock Margin="8,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Recent"/><LineBreak/><Run Text="QSOs:"/></TextBlock>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}" Margin="0,0,0,0" FontSize="16" VerticalAlignment="Center"/>
+                        <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="30,0,0,0" Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1" ToolTipService.InitialShowDelay="200" ToolTipService.Placement="Top" Visibility="Visible" Cursor="Hand" Click="ShareStatusButton_Click">
+                            <Button.ToolTip>
+                                <TextBlock TextAlignment="Center">
+                                    <Run Text="Send heartbeat to"/>
+                                    <LineBreak/>
+                                    <Run Text="HolyLogger On The Air"/>
+                                </TextBlock>
+                            </Button.ToolTip>
+                            <Viewbox Width="14" Height="14">
+                                <Canvas Width="24" Height="24">
+                                    <Path Stroke="#303030" StrokeThickness="2" Fill="Transparent" Data="M7,12 L16,7 M7,12 L16,17"/>
+                                    <Ellipse Canvas.Left="3.5" Canvas.Top="8.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                                    <Ellipse Canvas.Left="14.5" Canvas.Top="3.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                                    <Ellipse Canvas.Left="14.5" Canvas.Top="13.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                                </Canvas>
+                            </Viewbox>
+                        </Button>
+                    </StackPanel>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <Border x:Name="LockBtnBorder" CornerRadius="3" Padding="3,1" Margin="5,0,0,0" Background="Transparent">
+                        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'"
+                               Height="22" Width="20" Source="Images/lock.png" Stretch="None"
+                               MouseUp="Lock_Btn_MouseUp" Cursor="Hand"/>
+                    </Border>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <!-- Contest indicator: click the trophy to open the contest picker. When a contest
+                         is active the trophy goes gold and the contest name shows beside it, wrapped to
+                         two lines and width-capped so it never pushes the RIG label. -->
+                    <StackPanel Orientation="Horizontal">
+                    <Border x:Name="ContestIndicator" Width="26" Height="24" Margin="5,0,0,0" CornerRadius="4" Background="Transparent"
+                            ToolTipService.InitialShowDelay="0" Cursor="Hand"
+                            MouseLeftButtonUp="ContestIndicator_MouseLeftButtonUp">
+                        <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Path x:Name="ContestIndicatorPath" Stretch="Uniform" Width="24" Height="24"
+                                  Data="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"
+                                  Fill="#9E9E9E"/>
+                        </Viewbox>
+                    </Border>
+                    <TextBlock x:Name="L_ContestName" VerticalAlignment="Center" Margin="7,0,0,0"
+                               MaxWidth="150" TextWrapping="Wrap" FontSize="12" LineHeight="14"
+                               LineStackingStrategy="BlockLineHeight"
+                               FontWeight="Bold" Foreground="#1565C0"/>
+                    </StackPanel>
+                </StatusBarItem>
+                <StatusBarItem HorizontalAlignment="Right">
+                    <StackPanel Orientation="Horizontal">
+                        <!--<TextBlock Text="Omni-Rig: " FontSize="16"/>-->
+                        <TextBlock x:Name="RigLabel" Text="RIG1" FontWeight="Normal" FontSize="14" Foreground="#333333"
+                                   VerticalAlignment="Center" Margin="0,0,6,0"
+                                   Cursor="Hand" MouseLeftButtonUp="RigLabel_MouseLeftButtonUp"
+                                   ToolTip="Open Tools → Options"/>
+                        <Label x:Name="L_OmniRig" Content="{Binding Status, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Margin="0,0,20,0" FontSize="16" />
+                    </StackPanel>
+                </StatusBarItem>
+            </StatusBar>
+        </DockPanel>
+
+
+        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="272" />
+        <TextBlock HorizontalAlignment="Left" Margin="11,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="Station" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Callsign" />
+        </TextBlock>
+        <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" GotFocus="TB_MyCallsign_GotFocus" LostFocus="TB_MyCallsign_LostFocus" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
+                    Margin="192,52,0,0" Grid.Row="1">
+            <!-- Both LED and no-CAT borders share one Grid so the kHz label never shifts.
+                 Width is the single fixed constraint — content never drives the layout width. -->
+            <Grid VerticalAlignment="Center" Width="160">
+                <Border x:Name="FreqLedBezel" Margin="0,1,2,1"
+                        Background="#080808" CornerRadius="4" BorderBrush="#3A3A3A" BorderThickness="1"
+                        Cursor="Hand" MouseLeftButtonUp="FreqLed_MouseLeftButtonUp"
+                        ToolTip="Working frequency in kHz — click to edit">
+                    <Grid Margin="4,1,4,2">
+                        <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
+                                   FontSize="18" VerticalAlignment="Center" Foreground="#1E1500"
+                                   TextAlignment="Right"/>
+                        <TextBlock x:Name="FreqLedLive" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
+                                   FontSize="18" VerticalAlignment="Center" TextAlignment="Right"/>
+                        <TextBox x:Name="TB_FreqLedEdit" Visibility="Collapsed" MinWidth="175"
+                                 FontFamily="Consolas" FontSize="17" FontWeight="Bold"
+                                 Background="#080808" Foreground="#FFB000" BorderThickness="0" Padding="0"
+                                 CaretBrush="#FFB000" SelectionBrush="#664400"
+                                 VerticalContentAlignment="Center"
+                                 KeyDown="TB_FreqLedEdit_KeyDown" LostFocus="TB_FreqLedEdit_LostFocus"/>
+                    </Grid>
+                </Border>
+                <Border x:Name="FreqNoCatBezel" Margin="0,1,2,1"
+                        Background="White" CornerRadius="4" BorderBrush="#D32F2F" BorderThickness="2"
+                        Visibility="Hidden" HorizontalAlignment="Stretch">
+                    <TextBox x:Name="TB_FreqNoCat" Padding="4,0"
+                             FontFamily="Consolas" FontSize="22" FontWeight="Bold"
+                             Background="White" BorderThickness="0"
+                             TextAlignment="Right" MaxLength="11"
+                             VerticalContentAlignment="Center"
+                             KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"/>
+                </Border>
+            </Grid>
+            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="#444444"
+                       VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
+        </StackPanel>
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,54,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+            <Grid Width="95">
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0">
+                    <TextBlock Text="Spot (F3)" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                </StackPanel>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M86,3 C92,8 92,24 86,29"/>
+                <Path Stroke="#E53935" StrokeThickness="1.6" Data="M81,3 C88,8 88,24 81,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
+            </Grid>
+        </Button>
+        <Border x:Name="PlayCommandsBorder" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="462,6,0,0" Width="205" Height="38" BorderThickness="1" CornerRadius="5" Background="Transparent" ToolTip="Play radio voice messages (F5-F8)">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="BorderBrush" Value="#9966CC"/>
+                    <Setter Property="Background" Value="Transparent"/>
+                    <Style.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="BorderBrush" Value="#B5B5B5"/>
+                            <Setter Property="Background" Value="#F2F2F2"/>
+                            <Setter Property="Opacity" Value="0.85"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="1" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Msg1" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F5" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="2" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Msg2" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="3" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Msg3" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F7" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+                <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="4" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
+                    <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <TextBlock Text="Msg4" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F8" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+        <TextBlock HorizontalAlignment="Left" Margin="192,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Your grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="My" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Locator" />
+        </TextBlock>
+        <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="75" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="6" TabIndex="3"/>
+        <TextBlock HorizontalAlignment="Left" Margin="335,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="15" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="Holyland" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Square" />
+        </TextBlock>
+        <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="404,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="54" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="5" TabIndex="4"/>
+        <Label Content="Mode" HorizontalAlignment="Left" Margin="478,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="530,56,0,0" Grid.Row="1" VerticalAlignment="Top" Width="40" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3">
+            <ComboBox.Template>
+                <ControlTemplate TargetType="ComboBox">
+                    <Grid>
+                        <ToggleButton IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                                      BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}"
+                                      Cursor="Hand">
+                            <ToggleButton.Template>
+                                <ControlTemplate TargetType="ToggleButton">
+                                    <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsMouseOver" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="#CCE4FF"/>
+                                            <Setter TargetName="bd" Property="BorderBrush" Value="#0078D7"/>
+                                        </Trigger>
+                                        <Trigger Property="IsChecked" Value="True">
+                                            <Setter TargetName="bd" Property="Background" Value="#B0D4F5"/>
+                                            <Setter TargetName="bd" Property="BorderBrush" Value="#0078D7"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </ToggleButton.Template>
+                        </ToggleButton>
+                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0"/>
+                        <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom">
+                            <Border BorderBrush="#0078D7" BorderThickness="1" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{TemplateBinding ActualWidth}">
+                                <ScrollViewer>
+                                    <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                </ScrollViewer>
+                            </Border>
+                        </Popup>
+                    </Grid>
+                </ControlTemplate>
+            </ComboBox.Template>
+            <ComboBoxItem x:Name="op_cw" Content="CW"/>
+            <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
+            <ComboBoxItem x:Name="op_ssb" Content="SSB"/>
+            <ComboBoxItem x:Name="op_fm" Content="FM"/>
+            <ComboBoxItem x:Name="op_am" Content="AM"/>
+        </ComboBox>
+        <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
+        <!-- Old "Freq" label hidden: the frequency is now shown on the LED readout in the menu bar. -->
+        <Label Content="Freq" Visibility="Collapsed" HorizontalAlignment="Left" Margin="175,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
+        <!--<xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="348,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="9" />-->
+        <!-- Kept (hidden) as the data source: it still drives band calculation and is bound to
+             Settings.Frequency. The new LED readout reads/writes this same value. -->
+        <TextBox x:Name="TB_Frequency" Visibility="Collapsed" HorizontalAlignment="Left" Margin="216,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
+        <Label Content="Band" HorizontalAlignment="Left" Margin="383,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
+
+        <Border Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Visibility, ElementName=UploadProgressSpinner}" Panel.ZIndex="50" IsHitTestVisible="False" Background="#F2FFFFFF" BorderBrush="#1565C0" BorderThickness="2" CornerRadius="8" Padding="20,14,20,14">
+            <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                <TextBlock Text="{Binding UploadProgressTitle, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"
+                           HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="#0E3F6E"
+                           Margin="0,0,0,8" IsHitTestVisible="False"/>
+                <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center" Source="Images/spinner2.gif" Height="44" Width="44" Visibility="Hidden" IsHitTestVisible="False"/>
+                <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Center" Margin="0,8,0,0" MinWidth="180" Padding="4,4,4,6" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="#0E3F6E" Background="Transparent" Visibility="Hidden" IsHitTestVisible="False"/>
+            </StackPanel>
+        </Border>
+        <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
+
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="427,56,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
+        <TextBlock HorizontalAlignment="Left" Margin="12,96,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
+
+        <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
+             Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
+        <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
+                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,115,0,0"
+                      Width="78" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
+                      Focusable="False" Click="BtnSuggestToggle_Click"
+                      ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
+            <ToggleButton.Template>
+                <ControlTemplate TargetType="ToggleButton">
+                    <!-- Two-tone bevel for a real 3D look:
+                         brBR carries the BOTTOM-RIGHT edge + a drop shadow (raised = pops OUT);
+                         brTL carries the TOP-LEFT highlight edge.
+                         When ON the two edge colors swap and the shadow is removed, so it reads as
+                         pressed INTO the screen. -->
+                    <Border x:Name="brBR" CornerRadius="3" BorderThickness="0,0,1,1" BorderBrush="#9AA1A8" Background="#E8EBEF">
+                        <Border.Effect>
+                            <DropShadowEffect Color="#000000" Direction="315" ShadowDepth="1" BlurRadius="2.5" Opacity="0.28"/>
+                        </Border.Effect>
+                        <Border x:Name="brTL" CornerRadius="3" BorderThickness="1,1,0,0" BorderBrush="#FCFCFC">
+                            <ContentPresenter x:Name="cp" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                <ContentPresenter.RenderTransform>
+                                    <TranslateTransform Y="-1"/>
+                                </ContentPresenter.RenderTransform>
+                            </ContentPresenter>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="brBR" Property="Background" Value="#EDF1F5"/>
+                        </Trigger>
+                        <!-- ON: pressed INTO the screen — inverted bevel (dark top-left, light
+                             bottom-right), green fill, no drop shadow, content nudged in (down-right). -->
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="brBR" Property="Background" Value="#7FC988"/>
+                            <Setter TargetName="brBR" Property="BorderBrush" Value="#CFEAD0"/>
+                            <Setter TargetName="brTL" Property="BorderBrush" Value="#54915E"/>
+                            <Setter TargetName="brBR" Property="Effect" Value="{x:Null}"/>
+                            <Setter TargetName="cp" Property="Margin" Value="1,1,0,0"/>
+                        </Trigger>
+                        <!-- momentary press feedback while the mouse button is held down -->
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="brBR" Property="Effect" Value="{x:Null}"/>
+                            <Setter TargetName="brTL" Property="BorderBrush" Value="#9AA1A8"/>
+                            <Setter TargetName="cp" Property="Margin" Value="1,1,0,0"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </ToggleButton.Template>
+        </ToggleButton>
+        <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,101,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="12" Foreground="#555555" Visibility="Collapsed"/>
+        <Popup x:Name="CallsignSuggestionsPopup" PlacementTarget="{Binding ElementName=TB_DXCallsign}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
+            <Border BorderBrush="Gray" BorderThickness="1" Background="White">
+                <ListBox x:Name="LB_DXCallsignSuggestions" Width="160" MaxHeight="440" FontSize="14" PreviewMouseMove="LB_DXCallsignSuggestions_PreviewMouseMove" MouseLeave="LB_DXCallsignSuggestions_MouseLeave" PreviewMouseLeftButtonDown="LB_DXCallsignSuggestions_PreviewMouseLeftButtonDown" MouseDoubleClick="LB_DXCallsignSuggestions_MouseDoubleClick">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <Border x:Name="Bd" Background="White" Padding="3,2">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="#A9D4FF"/>
+                                                <Setter Property="Foreground" Value="Black"/>
+                                            </Trigger>
+                                            <MultiTrigger>
+                                                <MultiTrigger.Conditions>
+                                                    <Condition Property="IsMouseOver" Value="True"/>
+                                                    <Condition Property="IsSelected" Value="False"/>
+                                                </MultiTrigger.Conditions>
+                                                <Setter TargetName="Bd" Property="Background" Value="#EAF5FF"/>
+                                            </MultiTrigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <ItemsControl ItemsSource="{Binding Segments}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <StackPanel Orientation="Horizontal"/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <TextBlock Text="{Binding Text}" FontWeight="{Binding IsBold, Converter={StaticResource BoolToFontWeightConverter}}">
+                                            <TextBlock.Style>
+                                                <Style TargetType="TextBlock">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Color}" Value="Green">
+                                                            <Setter Property="Foreground" Value="Green"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Color}" Value="Red">
+                                                            <Setter Property="Foreground" Value="Red"/>
+                                                        </DataTrigger>
+                                                        <DataTrigger Binding="{Binding Color}" Value="Normal">
+                                                            <Setter Property="Foreground" Value="Black"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </TextBlock.Style>
+                                        </TextBlock>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Border>
+        </Popup>
+        <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
+        <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" FontWeight="Bold" FontStyle="Italic" FontSize="14" Visibility="Hidden"><Run Text="Legal " Foreground="Green"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="Green"/></TextBlock>
+        <Border HorizontalAlignment="Left" Margin="237,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="15000">
+            <Border.ToolTip>
+                <ToolTip>
+                    <StackPanel>
+                        <TextBlock FontWeight="Bold" Text="Smart Callsign Search"/>
+                        <TextBlock Text="Type ? in any location"/>
+                        <TextBlock Text="you are not sure about"/>
+                    </StackPanel>
+                </ToolTip>
+            </Border.ToolTip>
+            <TextBlock Text="i" Foreground="White" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" FontStyle="Italic"/>
+        </Border>
+        <Image x:Name="QRZBtn" ToolTip="Get Data from QRZ.com and open the callsign's QRZ.com page" HorizontalAlignment="Left" Height="24" Margin="261,103,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
+        <!-- "No QRZ.com connection" alert: a red "!" badge on the QRZ icon's top-right corner, shown
+             only when no QRZ session could be established (toggled by SetQrzConnected). Not hit-testable
+             so clicks pass through to the QRZ icon underneath. -->
+        <Border x:Name="QrzNoConnBadge" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Margin="275,99,0,0" Width="14" Height="14" CornerRadius="7" Background="#D32F2F"
+                BorderBrush="White" BorderThickness="1.5" Panel.ZIndex="40" IsHitTestVisible="False"
+                Visibility="Collapsed" ToolTip="No connection to QRZ.com">
+            <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="10"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0"/>
+        </Border>
+
+        <!-- Contest exchange highlight frame: a soft rounded panel behind the exchange row, shown only
+             in contest mode. Background colour is user-editable in Options and remembered. -->
+        <Border x:Name="ContestExchangeFrame" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Margin="4,148,0,0" Width="668" Height="54" CornerRadius="8" Background="#FFF6C8"
+                BorderBrush="#D9B441" BorderThickness="1" Visibility="Collapsed" Panel.ZIndex="0"/>
+        <Label x:Name="L_ExchangeLabel" Content="Exchange" HorizontalAlignment="Left" Margin="6,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The Exchange sent by the DX station" />
+        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
+        <!-- Contest received-exchange boxes, built at runtime per the active contest (Phase 2). When a
+             contest is active this replaces the single Exchange box; otherwise it's hidden. -->
+        <StackPanel x:Name="ContestRxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
+                    VerticalAlignment="Top" Margin="101,142,0,0" Grid.Row="1" Visibility="Collapsed"/>
+        <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
+        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
+        <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,143,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
+        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="349,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
+        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="383,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
+        <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="288,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
+        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" />
+        <Label Content="Time" HorizontalAlignment="Left" Margin="451,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
+        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="496,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" />
+
+
+        <Border x:Name="ContestDividerLine" BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
+        <!-- "You send" band: shown only in contest mode, in the strip freed when the divider drops.
+             Placeholder content for now; the real composed exchange comes in a later phase. -->
+        <Border x:Name="ContestSendBand" Grid.Row="1" Margin="10,96,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Width="657" Height="34" Background="#E1F5EE" BorderBrush="#5DCAA5" BorderThickness="1" CornerRadius="6"
+                Visibility="Collapsed" Panel.ZIndex="5">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="10,0,0,0">
+                <TextBlock Text="YOU SEND" FontSize="12" FontWeight="Bold" Foreground="#0F6E56" VerticalAlignment="Center" Margin="0,0,16,0"/>
+                <TextBlock x:Name="L_SendExchange" Text="(your outgoing exchange will appear here)" FontSize="15" FontWeight="Bold" Foreground="#0B3D2E" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Border>
+        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,143,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
+        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,98,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
+            </StackPanel>
+        </Button>
+        <!-- Undo icon for log-row "Set Radio to Freq" (independent of the cluster undo). Hidden when nothing to undo. -->
+        <!-- Centered vertically between the Exchange (y=141) and Name (y=185) labels; horizontally centered to the Name label. -->
+        <Grid x:Name="MainUndoIconGrid" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,164,0,0" Width="26" Height="26" Visibility="Collapsed" Panel.ZIndex="30">
+            <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" PreviewMouseLeftButtonDown="MainUndoButton_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MainUndoButton_PreviewMouseLeftButtonUp" MouseLeave="MainUndoButton_MouseLeave" ToolTip="Click to undo radio frequency/mode change • Hold to clear all">
+                <Grid>
+                    <Image Source="Images/UNDO_Icon.png" Width="22" Height="22" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                    <TextBlock x:Name="MainUndoCountText" FontSize="10" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                </Grid>
+            </Button>
+        </Grid>
+        <Label Content="Name" HorizontalAlignment="Left" Margin="6,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="69,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="264" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" TextChanged="TB_DX_Name_TextChanged" />
+        <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="340,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
+        <Image x:Name="Img_CountryFlag" HorizontalAlignment="Left" Margin="376,193,0,0" VerticalAlignment="Top" Grid.Row="1" Width="30" Height="20" Stretch="Uniform" Visibility="Collapsed" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
+        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="411,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="169" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" IsReadOnly="True" FontSize="16" TabIndex="16" />
+        <Label Content="State" HorizontalAlignment="Left" Margin="580,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="627,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" CharacterCasing="Upper" MaxLength="3" Grid.Row="1" FontSize="16" TabIndex="17" TextChanged="TB_State_TextChanged" />
+        <!-- Orphaned QRZ-photo frame: never populated by any code (Img_QRZPhoto is unreferenced),
+             but its opaque #F5F7FA background at ZIndex 20 painted a white box over the map
+             placeholder whenever the WebBrowser was hidden. Collapsed so it cannot bleed through. -->
+        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="752,94,0,0" Width="160" Height="160" BorderBrush="#7A95A8" BorderThickness="1" Background="#F5F7FA" CornerRadius="4" Panel.ZIndex="20" Visibility="Collapsed">
+            <Image x:Name="Img_QRZPhoto" Stretch="UniformToFill" Visibility="Collapsed" ToolTip="QRZ callsign image" />
+        </Border>
+
+        <TextBlock HorizontalAlignment="Left" Margin="11,231,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" FontSize="15" ToolTip="The DX station grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="DX" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Locator" />
+        </TextBlock>
+        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="70" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
+        <Label Content="ITU" HorizontalAlignment="Left" Margin="141,229,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="ITU Zone (from QRZ.com)"/>
+        <TextBox x:Name="TB_ITUZone" HorizontalAlignment="Left" Height="28" Margin="176,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
+        <Label Content="CQ" HorizontalAlignment="Left" Margin="211,229,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="CQ Zone (from QRZ.com)"/>
+        <TextBox x:Name="TB_CQZone" HorizontalAlignment="Left" Height="28" Margin="244,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
+        <Label Content="Comment" HorizontalAlignment="Left" Margin="281,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="364,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="274" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
+        <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
+             HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
+        <Rectangle Grid.Row="1" Fill="Gainsboro" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="53" Margin="0,272,0,0" />
+        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,272,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
+        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="#888888" HorizontalGridLinesBrush="#888888" Padding="0,0,0,0">
+            <DataGrid.Resources>
+                <!-- Keep the selected row blue even when the grid loses focus (e.g. while the right-click
+                     context menu is open), so the user clearly sees which row the menu refers to. -->
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="{x:Static SystemColors.HighlightColor}"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="{x:Static SystemColors.HighlightTextColor}"/>
+            </DataGrid.Resources>
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="BorderBrush" Value="#1565C0"/>
+                    <Setter Property="BorderThickness" Value="0,0,1,3"/>
+                    <Setter Property="Padding" Value="5,3,5,3"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                    <Setter Property="Background" Value="#DEB887"/>
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
+            <DataGrid.RowHeaderStyle>
+                <Style TargetType="DataGridRowHeader">
+                    <Setter Property="BorderBrush" Value="#1565C0"/>
+                    <Setter Property="BorderThickness" Value="0,0,1,0"/>
+                </Style>
+            </DataGrid.RowHeaderStyle>
+            <!--<DataGrid.ContextMenu>
+                <ContextMenu >
+                    <MenuItem Header="Delete" Click="MenuItem_Click" />
+                </ContextMenu>
+            </DataGrid.ContextMenu>-->
+            <DataGrid.Columns>
+                <DataGridTemplateColumn Header="Id" IsReadOnly="True" Visibility="Hidden">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding id}"  HorizontalAlignment="Center" Padding="5,0,5,0"  />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Date" IsReadOnly="True" SortMemberPath="Date" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Date, Converter={StaticResource QsoDateDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Time" IsReadOnly="True" SortMemberPath="Time" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Time, Converter={StaticResource QsoTimeDisplayConverter}}"  HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Callsign" IsReadOnly="False" SortMemberPath="DXCall">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,0,5,0" FontWeight="Bold" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Name" IsReadOnly="True" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Country" IsReadOnly="True" SortMemberPath="Country">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Freq}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Band" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Band}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="RST-R" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding RST_RCVD}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="RST-S" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding RST_SENT}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Mode" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Mode}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Exchange" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding SRX}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="Auto" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
+        <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
+            <Image x:Name="Img_CustomGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
+        </Border>
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="QRZGraphicsBorder">
+            <Image x:Name="Img_QRZGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
+        </Border>
+        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="#4A90E2" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CompassBorder">
+            <Grid>
+                <Viewbox Width="280" Height="280" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <Canvas Width="100" Height="100">
+                        <!-- Compass ring background -->
+                        <Ellipse Width="100" Height="100" Canvas.Left="0" Canvas.Top="0" StrokeThickness="2">
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#25464a"/>
+                            </Ellipse.Stroke>
+                            <Ellipse.Fill>
+                                <RadialGradientBrush>
+                                    <GradientStop Color="#FFFCFC" Offset="0"/>
+                                    <GradientStop Color="#DCE4EC" Offset="0.7"/>
+                                    <GradientStop Color="#C8D4E0" Offset="1"/>
+                                </RadialGradientBrush>
+                            </Ellipse.Fill>
+                        </Ellipse>
+
+                        <!-- Inner compass face -->
+                        <Ellipse Width="78" Height="78" Canvas.Left="11" Canvas.Top="11" StrokeThickness="2">
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#b9b37e"/>
+                            </Ellipse.Stroke>
+                            <Ellipse.Fill>
+                                <SolidColorBrush Color="#efe6a0"/>
+                            </Ellipse.Fill>
+                        </Ellipse>
+
+                        <!-- Cardinal direction markers (N, E, S, W) -->
+                        <TextBlock Text="N" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="6" FontFamily="Segoe UI"/>
+                        <TextBlock Text="E" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="82" Canvas.Top="46" FontFamily="Segoe UI"/>
+                        <TextBlock Text="S" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="82" FontFamily="Segoe UI"/>
+                        <TextBlock Text="W" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="8" Canvas.Top="46" FontFamily="Segoe UI"/>
+
+                        <!-- Compass needle (rotates based on azimuth) -->
+                        <Canvas x:Name="CompassNeedle" Width="100" Height="100" RenderTransformOrigin="0.5,0.5">
+                            <Canvas.RenderTransform>
+                                <RotateTransform x:Name="CompassNeedleRotation" Angle="0"/>
+                            </Canvas.RenderTransform>
+                            <!-- North pointer (red) -->
+                            <Polygon Points="50,12 58,50 42,50" StrokeThickness="1.2">
+                                <Polygon.Fill>
+                                    <SolidColorBrush Color="#d10f20"/>
+                                </Polygon.Fill>
+                                <Polygon.Stroke>
+                                    <SolidColorBrush Color="#7b0d18"/>
+                                </Polygon.Stroke>
+                            </Polygon>
+                            <!-- South pointer (blue/green) -->
+                            <Polygon Points="50,88 58,50 42,50" StrokeThickness="1.2">
+                                <Polygon.Fill>
+                                    <SolidColorBrush Color="#197a74"/>
+                                </Polygon.Fill>
+                                <Polygon.Stroke>
+                                    <SolidColorBrush Color="#0f4e4a"/>
+                                </Polygon.Stroke>
+                            </Polygon>
+                        </Canvas>
+
+                        <!-- Center pivot -->
+                        <Ellipse Width="9" Height="9" Canvas.Left="45.5" Canvas.Top="45.5" StrokeThickness="1.2">
+                            <Ellipse.Fill>
+                                <SolidColorBrush Color="#e9e4b9"/>
+                            </Ellipse.Fill>
+                            <Ellipse.Stroke>
+                                <SolidColorBrush Color="#6f6a4d"/>
+                            </Ellipse.Stroke>
+                        </Ellipse>
+                    </Canvas>
+                </Viewbox>
+
+                <!-- Azimuth text display in top-left corner -->
+                <Border Background="White" BorderBrush="#aaa" BorderThickness="1" CornerRadius="3" Padding="4,2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5,5,0,0">
+                    <TextBlock x:Name="CompassAzimuthText" Text="AZ 0°" FontSize="14" FontWeight="Bold" Foreground="#18393c" FontFamily="Segoe UI"/>
+                </Border>
+            </Grid>
+        </Border>
+
+        <TextBlock HorizontalAlignment="Left" Margin="11,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+            <Run Text="Operator" FontWeight="Bold" />
+            <LineBreak />
+            <Run Text="Callsign" />
+        </TextBlock>
+        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" VerticalContentAlignment="Center" MaxLength="14" TabIndex="2"/>
+    </Grid>
+
+</Window>

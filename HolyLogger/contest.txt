@@ -1,0 +1,2283 @@
+
+Contests · JSON
+{
+  "metadata": {
+    "version": "1.0",
+    "description": "Ham Radio Contest Exchange Database",
+    "author": "Generated for C# logging program",
+    "notes": "Each contest lists its exchange fields split into individual components. 'sent' = what YOU transmit, 'received' = what you LOG from the other station. asymmetric=true means sent and received differ."
+  },
+  "field_definitions": {
+    "RST": "Signal report: 59 (SSB/FM), 599 (CW), 59 (digital) — usually fixed",
+    "RS": "Signal report without tone: 59 (SSB only)",
+    "SERIAL": "QSO serial number, auto-incrementing from 001",
+    "NAME": "Operator first name",
+    "CQ_ZONE": "CQ zone number (1-40)",
+    "ITU_ZONE": "ITU zone number (1-90)",
+    "DXCC": "DXCC entity / country name or abbreviation",
+    "STATE": "US State abbreviation (e.g. CA, TX)",
+    "PROVINCE": "Canadian province abbreviation",
+    "STATE_PROVINCE": "US State or Canadian Province abbreviation",
+    "ARRL_SECTION": "ARRL/RAC section abbreviation",
+    "GRID": "Maidenhead grid locator (4 or 6 characters)",
+    "POWER": "Transmitter power in watts",
+    "AGE": "Operator age in years",
+    "IOTA_REF": "IOTA reference number (e.g. EU-005)",
+    "SOTA_REF": "SOTA summit reference (e.g. VK2/HU-001)",
+    "POTA_REF": "POTA park reference (e.g. K-0001)",
+    "HOLYLAND_AREA": "Holyland area code: grid square + region (e.g. F15TA)",
+    "PRECEDENCE": "ARRL Sweepstakes precedence letter (A/B/M/Q/S/U)",
+    "CHECK": "ARRL Sweepstakes check: last 2 digits of year first licensed",
+    "FIELD_DAY_CLASS": "ARRL Field Day operating class (e.g. 2A, 1B)",
+    "FIELD_DAY_SECTION": "ARRL Field Day ARRL/RAC section",
+    "MEMBER_NR": "Club or organization membership number",
+    "COUNTY": "US County name",
+    "PREFECTURE": "Japanese prefecture code",
+    "OBLAST": "Russian oblast code",
+    "DISTRICT": "Administrative district code",
+    "AGE_GROUP": "Age/gender group category (e.g. OM, YL, Youth)",
+    "CALLSIGN": "Station callsign (used in Sweepstakes exchange)"
+  },
+  "contests": [
+    {
+      "id": "CQWW_SSB",
+      "name": "CQ Worldwide DX Contest, SSB",
+      "sponsor": "CQ Magazine",
+      "period": "Last full weekend of October",
+      "duration_hours": 48,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "CQ_ZONE"
+        ],
+        "received": [
+          "RST",
+          "CQ_ZONE"
+        ]
+      },
+      "multipliers": [
+        "DXCC per band",
+        "CQ zones per band"
+      ],
+      "qso_points": "1pt same country, 2pt same continent, 3pt diff continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "CQ-WW-SSB",
+      "rules_url": "https://www.cqww.com/rules.htm"
+    },
+    {
+      "id": "CQWW_CW",
+      "name": "CQ Worldwide DX Contest, CW",
+      "sponsor": "CQ Magazine",
+      "period": "Last full weekend of November",
+      "duration_hours": 48,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "CQ_ZONE"
+        ],
+        "received": [
+          "RST",
+          "CQ_ZONE"
+        ]
+      },
+      "multipliers": [
+        "DXCC per band",
+        "CQ zones per band"
+      ],
+      "qso_points": "1pt same country, 2pt same continent, 3pt diff continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "CQ-WW-CW",
+      "rules_url": "https://www.cqww.com/rules.htm"
+    },
+    {
+      "id": "CQWW_RTTY",
+      "name": "CQ Worldwide DX Contest, RTTY",
+      "sponsor": "CQ Magazine",
+      "period": "Last full weekend of September",
+      "duration_hours": 48,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "RTTY"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "CQ_ZONE"
+        ],
+        "received": [
+          "RST",
+          "CQ_ZONE"
+        ]
+      },
+      "multipliers": [
+        "DXCC per band",
+        "CQ zones per band"
+      ],
+      "qso_points": "1pt same country, 2pt same continent, 3pt diff continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "CQ-WW-RTTY",
+      "rules_url": "https://www.cqwwrtty.com/rules.htm"
+    },
+    {
+      "id": "CQWPX_SSB",
+      "name": "CQ WW WPX Contest, SSB",
+      "sponsor": "CQ Magazine",
+      "period": "Last full weekend of March",
+      "duration_hours": 48,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "multipliers": [
+        "Unique callsign prefixes"
+      ],
+      "qso_points": "1-6 pts depending on continent and band",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "CQ-WPX-SSB",
+      "rules_url": "https://www.cqwpx.com/rules.htm"
+    },
+    {
+      "id": "CQWPX_CW",
+      "name": "CQ WW WPX Contest, CW",
+      "sponsor": "CQ Magazine",
+      "period": "Last full weekend of May",
+      "duration_hours": 48,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "multipliers": [
+        "Unique callsign prefixes"
+      ],
+      "qso_points": "1-6 pts depending on continent and band",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "CQ-WPX-CW",
+      "rules_url": "https://www.cqwpx.com/rules.htm"
+    },
+    {
+      "id": "CQWPX_RTTY",
+      "name": "CQ WW RTTY WPX Contest",
+      "sponsor": "CQ Magazine",
+      "period": "Second full weekend of February",
+      "duration_hours": 48,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "RTTY"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "multipliers": [
+        "Unique callsign prefixes"
+      ],
+      "qso_points": "1-6 pts depending on continent and band",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "CQ-WPX-RTTY",
+      "rules_url": "https://www.cqwpx.com/rules.htm"
+    },
+    {
+      "id": "ARRL_DX_SSB",
+      "name": "ARRL International DX Contest, SSB",
+      "sponsor": "ARRL",
+      "period": "First full weekend of March",
+      "duration_hours": 48,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_W_VE": [
+          "RST",
+          "STATE_PROVINCE"
+        ],
+        "sent_DX": [
+          "RST",
+          "POWER"
+        ],
+        "received_W_VE": [
+          "RST",
+          "POWER"
+        ],
+        "received_DX": [
+          "RST",
+          "STATE_PROVINCE"
+        ]
+      },
+      "notes": "W/VE stations send State/Province; DX stations send power in watts",
+      "multipliers": "W/VE: DXCC entities per band; DX: US States + DC + VE provinces per band",
+      "qso_points": "W/VE: 1pt; DX: 3pt",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "ARRL-DX-SSB",
+      "rules_url": "https://www.arrl.org/arrl-dx"
+    },
+    {
+      "id": "ARRL_DX_CW",
+      "name": "ARRL International DX Contest, CW",
+      "sponsor": "ARRL",
+      "period": "Third full weekend of February",
+      "duration_hours": 48,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_W_VE": [
+          "RST",
+          "STATE_PROVINCE"
+        ],
+        "sent_DX": [
+          "RST",
+          "POWER"
+        ],
+        "received_W_VE": [
+          "RST",
+          "POWER"
+        ],
+        "received_DX": [
+          "RST",
+          "STATE_PROVINCE"
+        ]
+      },
+      "notes": "W/VE stations send State/Province; DX stations send power in watts",
+      "multipliers": "W/VE: DXCC entities per band; DX: US States + DC + VE provinces per band",
+      "qso_points": "W/VE: 1pt; DX: 3pt",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "ARRL-DX-CW",
+      "rules_url": "https://www.arrl.org/arrl-dx"
+    },
+    {
+      "id": "ARRL_SWEEPSTAKES_SSB",
+      "name": "ARRL November Sweepstakes, SSB",
+      "sponsor": "ARRL",
+      "period": "Third weekend of November",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "SERIAL",
+          "PRECEDENCE",
+          "CALLSIGN",
+          "CHECK",
+          "ARRL_SECTION"
+        ],
+        "received": [
+          "SERIAL",
+          "PRECEDENCE",
+          "CALLSIGN",
+          "CHECK",
+          "ARRL_SECTION"
+        ]
+      },
+      "notes": "Longest exchange in contesting. PRECEDENCE: A=assisted, B=unassisted, M=multi, Q=QRP, S=school, U=unlimited. CHECK=last 2 digits of year first licensed.",
+      "multipliers": [
+        "ARRL sections"
+      ],
+      "qso_points": "2 points per QSO",
+      "dupe_rule": "Once per contest",
+      "cabrillo_name": "ARRL-SS-SSB",
+      "rules_url": "https://www.arrl.org/sweepstakes"
+    },
+    {
+      "id": "ARRL_SWEEPSTAKES_CW",
+      "name": "ARRL November Sweepstakes, CW",
+      "sponsor": "ARRL",
+      "period": "First weekend of November",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "SERIAL",
+          "PRECEDENCE",
+          "CALLSIGN",
+          "CHECK",
+          "ARRL_SECTION"
+        ],
+        "received": [
+          "SERIAL",
+          "PRECEDENCE",
+          "CALLSIGN",
+          "CHECK",
+          "ARRL_SECTION"
+        ]
+      },
+      "notes": "PRECEDENCE: A=assisted, B=unassisted, M=multi, Q=QRP, S=school, U=unlimited. CHECK=last 2 digits of year first licensed.",
+      "multipliers": [
+        "ARRL sections"
+      ],
+      "qso_points": "2 points per QSO",
+      "dupe_rule": "Once per contest",
+      "cabrillo_name": "ARRL-SS-CW",
+      "rules_url": "https://www.arrl.org/sweepstakes"
+    },
+    {
+      "id": "ARRL_FIELD_DAY",
+      "name": "ARRL Field Day",
+      "sponsor": "ARRL",
+      "period": "4th full weekend of June",
+      "duration_hours": 24,
+      "bands": [
+        "All except 60m/30m/17m/12m"
+      ],
+      "modes": [
+        "SSB",
+        "CW",
+        "Digital",
+        "Mixed"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_W_VE": [
+          "FIELD_DAY_CLASS",
+          "FIELD_DAY_SECTION"
+        ],
+        "sent_DX": [
+          "FIELD_DAY_CLASS",
+          "DX"
+        ],
+        "received_W_VE": [
+          "FIELD_DAY_CLASS",
+          "FIELD_DAY_SECTION"
+        ],
+        "received_DX": [
+          "FIELD_DAY_CLASS",
+          "DX"
+        ]
+      },
+      "notes": "Class example: 2A = 2 transmitters, Class A. Section = ARRL/RAC section. DX stations send 'DX' as section.",
+      "multipliers": "None — bonus points instead",
+      "qso_points": "1pt phone, 2pt CW/digital",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "ARRL-FIELD-DAY",
+      "rules_url": "https://www.arrl.org/field-day"
+    },
+    {
+      "id": "ARRL_RTTY_ROUNDUP",
+      "name": "ARRL RTTY Roundup",
+      "sponsor": "ARRL",
+      "period": "First full weekend of January",
+      "duration_hours": 30,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "RTTY",
+        "Digital"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_W_VE": [
+          "RST",
+          "STATE_PROVINCE"
+        ],
+        "sent_DX": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_W_VE": [
+          "RST",
+          "STATE_PROVINCE"
+        ],
+        "received_DX": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "notes": "W/VE send State or Province; DX stations send serial number",
+      "multipliers": [
+        "US states + DC + VE provinces + DXCC per band"
+      ],
+      "qso_points": "1 point per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "ARRL-RTTY",
+      "rules_url": "https://www.arrl.org/rtty-roundup"
+    },
+    {
+      "id": "ARRL_160M",
+      "name": "ARRL 160-Meter Contest",
+      "sponsor": "ARRL",
+      "period": "First full weekend of December",
+      "duration_hours": 42,
+      "bands": [
+        "160m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_W_VE": [
+          "RST",
+          "ARRL_SECTION"
+        ],
+        "sent_DX": [
+          "RST",
+          "DXCC"
+        ],
+        "received_W_VE": [
+          "RST",
+          "ARRL_SECTION"
+        ],
+        "received_DX": [
+          "RST",
+          "DXCC"
+        ]
+      },
+      "multipliers": [
+        "ARRL sections",
+        "DXCC entities"
+      ],
+      "qso_points": "2pt W/VE QSO, 5pt DX QSO",
+      "dupe_rule": "Once per contest",
+      "cabrillo_name": "ARRL-160M",
+      "rules_url": "https://www.arrl.org/160-meter"
+    },
+    {
+      "id": "ARRL_10M",
+      "name": "ARRL 10-Meter Contest",
+      "sponsor": "ARRL",
+      "period": "Second full weekend of December",
+      "duration_hours": 48,
+      "bands": [
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_W_VE": [
+          "RST",
+          "STATE"
+        ],
+        "sent_DX": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_W_VE": [
+          "RST",
+          "STATE_or_SERIAL"
+        ],
+        "received_DX": [
+          "RST",
+          "STATE_or_SERIAL"
+        ]
+      },
+      "notes": "W/VE send State; DX sends serial number",
+      "multipliers": [
+        "US states per mode",
+        "DXCC entities per mode"
+      ],
+      "qso_points": "SSB: 2pt, CW: 4pt",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "ARRL-10M",
+      "rules_url": "https://www.arrl.org/10-meter"
+    },
+    {
+      "id": "ARRL_VHF_JUNE",
+      "name": "ARRL June VHF Contest",
+      "sponsor": "ARRL",
+      "period": "Second full weekend of June",
+      "duration_hours": 33,
+      "bands": [
+        "50MHz",
+        "144MHz",
+        "222MHz",
+        "432MHz",
+        "Above"
+      ],
+      "modes": [
+        "SSB",
+        "CW",
+        "FM",
+        "Digital"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "GRID"
+        ],
+        "received": [
+          "GRID"
+        ]
+      },
+      "notes": "4-character Maidenhead grid square (e.g. FN31)",
+      "multipliers": [
+        "Unique grid squares per band"
+      ],
+      "qso_points": "1pt per QSO per band",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "ARRL-VHF-JUN",
+      "rules_url": "https://www.arrl.org/june-vhf"
+    },
+    {
+      "id": "IARU_HF",
+      "name": "IARU HF World Championship",
+      "sponsor": "IARU",
+      "period": "Second full weekend of July",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_HQ": [
+          "RST",
+          "IARU_HQ_abbreviation"
+        ],
+        "sent_others": [
+          "RST",
+          "ITU_ZONE"
+        ],
+        "received_HQ": [
+          "RST",
+          "IARU_HQ_abbreviation"
+        ],
+        "received_others": [
+          "RST",
+          "ITU_ZONE"
+        ]
+      },
+      "notes": "IARU HQ stations send their society abbreviation (e.g. W1AW sends ARRL); others send ITU zone",
+      "multipliers": [
+        "IARU member societies",
+        "ITU zones per band"
+      ],
+      "qso_points": "1pt same zone, 3pt diff zone same continent, 5pt diff continent",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "IARU-HF",
+      "rules_url": "https://www.iaru.org/on-the-air/contests/hf-contest/"
+    },
+    {
+      "id": "WAE_SSB",
+      "name": "WAE DX Contest, SSB",
+      "sponsor": "DARC",
+      "period": "Second full weekend of September",
+      "duration_hours": 48,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "notes": "Non-European stations can also send/receive QTCs (batches of 10 previous QSO data). QTCs are a unique WAE feature.",
+      "multipliers": [
+        "DXCC entities in Europe"
+      ],
+      "qso_points": "1 point per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "WAE-SSB",
+      "rules_url": "https://www.darc.de/der-club/referate/dx/wae-dx-contest/en/"
+    },
+    {
+      "id": "WAE_CW",
+      "name": "WAE DX Contest, CW",
+      "sponsor": "DARC",
+      "period": "Second full weekend of August",
+      "duration_hours": 48,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "notes": "Non-European stations can also send/receive QTCs (batches of 10 previous QSO data).",
+      "multipliers": [
+        "DXCC entities in Europe"
+      ],
+      "qso_points": "1 point per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "WAE-CW",
+      "rules_url": "https://www.darc.de/der-club/referate/dx/wae-dx-contest/en/"
+    },
+    {
+      "id": "WAE_RTTY",
+      "name": "WAE DX Contest, RTTY",
+      "sponsor": "DARC",
+      "period": "Last full weekend of November (Sat only)",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "RTTY"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "multipliers": [
+        "DXCC entities in Europe"
+      ],
+      "qso_points": "1 point per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "WAE-RTTY",
+      "rules_url": "https://www.darc.de/der-club/referate/dx/wae-dx-contest/en/"
+    },
+    {
+      "id": "RSGB_IOTA",
+      "name": "RSGB IOTA Contest",
+      "sponsor": "RSGB",
+      "period": "Last full weekend of July",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_island": [
+          "RST",
+          "SERIAL",
+          "IOTA_REF"
+        ],
+        "sent_non_island": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_island": [
+          "RST",
+          "SERIAL",
+          "IOTA_REF"
+        ],
+        "received_non_island": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "notes": "Island stations include their IOTA reference (e.g. EU-005). Non-island stations send serial only.",
+      "multipliers": [
+        "IOTA references"
+      ],
+      "qso_points": "3pt QSO with island, 1pt QSO non-island",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "RSGB-IOTA",
+      "rules_url": "https://www.iota-world.org/iotacontest/"
+    },
+    {
+      "id": "HOLYLAND",
+      "name": "World Wide Holyland DX Contest",
+      "sponsor": "Israel Amateur Radio Club (IARC)",
+      "period": "Third weekend of April",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_DX": [
+          "RST",
+          "SERIAL"
+        ],
+        "sent_4X_4Z": [
+          "RST",
+          "HOLYLAND_AREA"
+        ],
+        "received_DX": [
+          "RST",
+          "HOLYLAND_AREA"
+        ],
+        "received_4X_4Z": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "notes": "HOLYLAND_AREA = 10x10km grid square + region abbreviation (e.g. F15TA). 23 regions in Israel. Israeli stations (4X/4Z prefix) send their area; DX stations send serial number.",
+      "multipliers": [
+        "Holyland areas per band"
+      ],
+      "qso_points": "2pt on 160/80/40m, 1pt on 20/15/10m",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "HOLYLAND",
+      "rules_url": "https://www.iarc.org/holyland-dx-contest/"
+    },
+    {
+      "id": "CQ_160M_CW",
+      "name": "CQ 160-Meter Contest, CW",
+      "sponsor": "CQ Magazine",
+      "period": "Last full weekend of January",
+      "duration_hours": 48,
+      "bands": [
+        "160m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_W_VE": [
+          "RST",
+          "STATE_PROVINCE"
+        ],
+        "sent_DX": [
+          "RST",
+          "DXCC"
+        ],
+        "received_W_VE": [
+          "RST",
+          "STATE_PROVINCE"
+        ],
+        "received_DX": [
+          "RST",
+          "DXCC"
+        ]
+      },
+      "multipliers": [
+        "US states + DC",
+        "VE provinces",
+        "DXCC entities"
+      ],
+      "qso_points": "2pt W/VE, 5pt DX",
+      "dupe_rule": "Once per contest",
+      "cabrillo_name": "CQ-160-CW",
+      "rules_url": "https://cq160.com/rules.htm"
+    },
+    {
+      "id": "CQ_160M_SSB",
+      "name": "CQ 160-Meter Contest, SSB",
+      "sponsor": "CQ Magazine",
+      "period": "Third full weekend of February",
+      "duration_hours": 48,
+      "bands": [
+        "160m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_W_VE": [
+          "RST",
+          "STATE_PROVINCE"
+        ],
+        "sent_DX": [
+          "RST",
+          "DXCC"
+        ],
+        "received_W_VE": [
+          "RST",
+          "STATE_PROVINCE"
+        ],
+        "received_DX": [
+          "RST",
+          "DXCC"
+        ]
+      },
+      "multipliers": [
+        "US states + DC",
+        "VE provinces",
+        "DXCC entities"
+      ],
+      "qso_points": "2pt W/VE, 5pt DX",
+      "dupe_rule": "Once per contest",
+      "cabrillo_name": "CQ-160-SSB",
+      "rules_url": "https://cq160.com/rules.htm"
+    },
+    {
+      "id": "ALL_ASIAN_CW",
+      "name": "All Asian DX Contest, CW",
+      "sponsor": "JARL",
+      "period": "Third full weekend of June",
+      "duration_hours": 48,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_Asian": [
+          "RST",
+          "AGE"
+        ],
+        "sent_non_Asian": [
+          "RST",
+          "AGE"
+        ],
+        "received": [
+          "RST",
+          "AGE"
+        ]
+      },
+      "notes": "Both sides send age in years. Use 00 if operator prefers not to disclose. Only QSOs with Asian stations count.",
+      "multipliers": [
+        "Asian DXCC entities per band"
+      ],
+      "qso_points": "1pt same continent, 3pt different continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "ALL-ASIAN-DX-CW",
+      "rules_url": "https://www.jarl.org/English/4_Library/A-4-3_Contests/allasian-e.htm"
+    },
+    {
+      "id": "ALL_ASIAN_SSB",
+      "name": "All Asian DX Contest, Phone",
+      "sponsor": "JARL",
+      "period": "Third full weekend of September",
+      "duration_hours": 48,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "AGE"
+        ],
+        "received": [
+          "RST",
+          "AGE"
+        ]
+      },
+      "notes": "Both sides send age. Use 00 if not disclosing. Only QSOs with Asian stations count.",
+      "multipliers": [
+        "Asian DXCC entities per band"
+      ],
+      "qso_points": "1pt same continent, 3pt different continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "ALL-ASIAN-DX-PHONE",
+      "rules_url": "https://www.jarl.org/English/4_Library/A-4-3_Contests/allasian-e.htm"
+    },
+    {
+      "id": "OCEANIA_SSB",
+      "name": "Oceania DX Contest, Phone",
+      "sponsor": "OCDX",
+      "period": "First full weekend of October (Saturday SSB)",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "multipliers": [
+        "Oceania DXCC entities per band"
+      ],
+      "qso_points": "1pt same continent, 3pt different continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "OCEANIA-DX-PHONE",
+      "rules_url": "https://ocdxc.com/rules/"
+    },
+    {
+      "id": "OCEANIA_CW",
+      "name": "Oceania DX Contest, CW",
+      "sponsor": "OCDX",
+      "period": "First full weekend of October (Sunday CW)",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "multipliers": [
+        "Oceania DXCC entities per band"
+      ],
+      "qso_points": "1pt same continent, 3pt different continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "OCEANIA-DX-CW",
+      "rules_url": "https://ocdxc.com/rules/"
+    },
+    {
+      "id": "JIDX_CW",
+      "name": "JIDX CW Contest",
+      "sponsor": "JA DX Contest Committee",
+      "period": "Second full weekend of April",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_JA": [
+          "RST",
+          "PREFECTURE"
+        ],
+        "sent_non_JA": [
+          "RST",
+          "CQ_ZONE"
+        ],
+        "received_JA": [
+          "RST",
+          "CQ_ZONE"
+        ],
+        "received_non_JA": [
+          "RST",
+          "PREFECTURE"
+        ]
+      },
+      "notes": "JA stations send their prefecture code (47 prefectures); non-JA stations send CQ zone",
+      "multipliers": "JA: CQ zones; non-JA: JA prefectures per band",
+      "qso_points": "1pt same continent, 3pt different continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "JIDX-CW",
+      "rules_url": "https://jidx.org/index-e.html"
+    },
+    {
+      "id": "JIDX_SSB",
+      "name": "JIDX Phone Contest",
+      "sponsor": "JA DX Contest Committee",
+      "period": "Third full weekend of October",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_JA": [
+          "RST",
+          "PREFECTURE"
+        ],
+        "sent_non_JA": [
+          "RST",
+          "CQ_ZONE"
+        ],
+        "received_JA": [
+          "RST",
+          "CQ_ZONE"
+        ],
+        "received_non_JA": [
+          "RST",
+          "PREFECTURE"
+        ]
+      },
+      "notes": "JA stations send prefecture code; non-JA stations send CQ zone",
+      "multipliers": "JA: CQ zones; non-JA: JA prefectures per band",
+      "qso_points": "1pt same continent, 3pt different continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "JIDX-PHONE",
+      "rules_url": "https://jidx.org/index-e.html"
+    },
+    {
+      "id": "RUSSIAN_DX",
+      "name": "Russian DX Contest",
+      "sponsor": "SRR",
+      "period": "Third full weekend of March",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_UA": [
+          "RST",
+          "OBLAST"
+        ],
+        "sent_non_UA": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_UA": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_UA": [
+          "RST",
+          "OBLAST"
+        ]
+      },
+      "notes": "Russian stations send their oblast (district) code; non-Russian send serial number",
+      "multipliers": [
+        "Russian oblasts per band per mode"
+      ],
+      "qso_points": "2pt UA QSO, 3pt DX QSO",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "RDXC",
+      "rules_url": "https://www.rdxc.org/asp/pages/ruleE.asp"
+    },
+    {
+      "id": "UKRAINIAN_DX",
+      "name": "Ukrainian DX Contest",
+      "sponsor": "UCC",
+      "period": "Third full weekend of February",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_UR": [
+          "RST",
+          "DISTRICT"
+        ],
+        "sent_non_UR": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_UR": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_UR": [
+          "RST",
+          "DISTRICT"
+        ]
+      },
+      "notes": "Ukrainian stations send their oblast code; non-Ukrainian send serial number",
+      "multipliers": [
+        "Ukrainian oblasts per band"
+      ],
+      "qso_points": "1pt same continent, 3pt different continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "UKR-CHAMP",
+      "rules_url": "https://www.ucc.zp.ua/en/"
+    },
+    {
+      "id": "HUNGARIAN_DX",
+      "name": "Hungarian DX Contest",
+      "sponsor": "MRASZ",
+      "period": "First full weekend of November",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_HA": [
+          "RST",
+          "DISTRICT"
+        ],
+        "sent_non_HA": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_HA": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_HA": [
+          "RST",
+          "DISTRICT"
+        ]
+      },
+      "notes": "HA stations send 2-letter county code; others send serial number",
+      "multipliers": [
+        "Hungarian counties per band"
+      ],
+      "qso_points": "1pt HA-HA, 3pt DX-HA",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "HA-DX",
+      "rules_url": "https://www.ha-dx.org/rules.html"
+    },
+    {
+      "id": "HELVETIA",
+      "name": "Helvetia Contest",
+      "sponsor": "USKA",
+      "period": "Third full weekend of April",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m",
+        "VHF",
+        "UHF"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_HB": [
+          "RST",
+          "DISTRICT"
+        ],
+        "sent_non_HB": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_HB": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_HB": [
+          "RST",
+          "DISTRICT"
+        ]
+      },
+      "notes": "Swiss (HB9) stations send their canton code; others send serial number",
+      "multipliers": [
+        "Swiss cantons per band"
+      ],
+      "qso_points": "1pt same country, 2pt same continent, 3pt different continent",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "HEL",
+      "rules_url": "https://www.uska.ch/aktivitaeten/contests/helvetia-contest/"
+    },
+    {
+      "id": "KING_OF_SPAIN_SSB",
+      "name": "His Maj. King of Spain Contest, SSB",
+      "sponsor": "URE",
+      "period": "Last full weekend of June",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_EA": [
+          "RST",
+          "PROVINCE"
+        ],
+        "sent_non_EA": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_EA": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_EA": [
+          "RST",
+          "PROVINCE"
+        ]
+      },
+      "notes": "EA stations send their province code; non-EA send serial number",
+      "multipliers": [
+        "EA provinces per band",
+        "DXCC entities per band"
+      ],
+      "qso_points": "See rules",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "KOS-SSB",
+      "rules_url": "https://concursos.ure.es"
+    },
+    {
+      "id": "KING_OF_SPAIN_CW",
+      "name": "His Maj. King of Spain Contest, CW",
+      "sponsor": "URE",
+      "period": "Third full weekend of April",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_EA": [
+          "RST",
+          "PROVINCE"
+        ],
+        "sent_non_EA": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_EA": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_EA": [
+          "RST",
+          "PROVINCE"
+        ]
+      },
+      "multipliers": [
+        "EA provinces per band",
+        "DXCC entities per band"
+      ],
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "KOS-CW",
+      "rules_url": "https://concursos.ure.es"
+    },
+    {
+      "id": "ARI_DX",
+      "name": "ARI International DX Contest",
+      "sponsor": "ARI",
+      "period": "First full weekend of May",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW",
+        "RTTY"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_I": [
+          "RST",
+          "PROVINCE"
+        ],
+        "sent_non_I": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_I": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_I": [
+          "RST",
+          "PROVINCE"
+        ]
+      },
+      "notes": "Italian stations send province abbreviation; others send serial number",
+      "multipliers": [
+        "Italian provinces per band per mode"
+      ],
+      "qso_points": "1pt I-I, 3pt I-DX or DX-I",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "ARI-DX",
+      "rules_url": "https://www.ari.it/index.php/hf-contest-ari-dx/"
+    },
+    {
+      "id": "SP_DX",
+      "name": "SP DX Contest",
+      "sponsor": "PZK",
+      "period": "First full weekend of April",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_SP": [
+          "RST",
+          "DISTRICT"
+        ],
+        "sent_non_SP": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_SP": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_SP": [
+          "RST",
+          "DISTRICT"
+        ]
+      },
+      "notes": "Polish (SP) stations send their district (voivodeship) code; others send serial number",
+      "multipliers": [
+        "Polish districts per band"
+      ],
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "SP-DX-RTTY",
+      "rules_url": "https://www.pzk.org.pl/en/sp-dx-contest"
+    },
+    {
+      "id": "NORTH_AMERICAN_QSO_SSB",
+      "name": "North American QSO Party, SSB",
+      "sponsor": "NCCC",
+      "period": "Second full weekend of January",
+      "duration_hours": 12,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_NA": [
+          "NAME",
+          "STATE_PROVINCE"
+        ],
+        "sent_non_NA": [
+          "NAME"
+        ],
+        "received_NA": [
+          "NAME",
+          "STATE_PROVINCE"
+        ],
+        "received_non_NA": [
+          "NAME"
+        ]
+      },
+      "notes": "No RST exchanged. NA stations send name + state/province. Non-NA stations send name only.",
+      "multipliers": [
+        "NA stations (each unique call once)"
+      ],
+      "qso_points": "1pt per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "NAQP-SSB",
+      "rules_url": "https://ncjweb.com/naqp/"
+    },
+    {
+      "id": "NORTH_AMERICAN_QSO_CW",
+      "name": "North American QSO Party, CW",
+      "sponsor": "NCCC",
+      "period": "Third full weekend of January",
+      "duration_hours": 12,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_NA": [
+          "NAME",
+          "STATE_PROVINCE"
+        ],
+        "sent_non_NA": [
+          "NAME"
+        ],
+        "received_NA": [
+          "NAME",
+          "STATE_PROVINCE"
+        ],
+        "received_non_NA": [
+          "NAME"
+        ]
+      },
+      "notes": "No RST. NA stations send name + state/province; non-NA send name only.",
+      "multipliers": [
+        "NA stations (each unique call once)"
+      ],
+      "qso_points": "1pt per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "NAQP-CW",
+      "rules_url": "https://ncjweb.com/naqp/"
+    },
+    {
+      "id": "NORTH_AMERICAN_SPRINT_CW",
+      "name": "North American Sprint, CW",
+      "sponsor": "NCCC",
+      "period": "September (Saturday night)",
+      "duration_hours": 4,
+      "bands": [
+        "40m",
+        "20m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "SERIAL",
+          "NAME",
+          "STATE_PROVINCE"
+        ],
+        "received": [
+          "SERIAL",
+          "NAME",
+          "STATE_PROVINCE"
+        ]
+      },
+      "notes": "After each QSO, the station that was called must QSY. No RST.",
+      "multipliers": "None",
+      "qso_points": "1pt per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "NA-SPRINT-CW",
+      "rules_url": "https://ncjweb.com/na-sprint/"
+    },
+    {
+      "id": "NORTH_AMERICAN_SPRINT_SSB",
+      "name": "North American SSB Sprint Contest",
+      "sponsor": "NCCC",
+      "period": "September (Sunday night)",
+      "duration_hours": 4,
+      "bands": [
+        "40m",
+        "20m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "SERIAL",
+          "NAME",
+          "STATE_PROVINCE"
+        ],
+        "received": [
+          "SERIAL",
+          "NAME",
+          "STATE_PROVINCE"
+        ]
+      },
+      "notes": "After each QSO the called station must QSY. No RST.",
+      "multipliers": "None",
+      "qso_points": "1pt per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "NA-SPRINT-SSB",
+      "rules_url": "https://ncjweb.com/na-sprint/"
+    },
+    {
+      "id": "BARTG_RTTY",
+      "name": "BARTG HF RTTY Contest",
+      "sponsor": "BARTG",
+      "period": "Third full weekend of March",
+      "duration_hours": 48,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "RTTY"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL",
+          "UTC_TIME"
+        ],
+        "received": [
+          "RST",
+          "SERIAL",
+          "UTC_TIME"
+        ]
+      },
+      "notes": "Unique: exchange includes current UTC time (HHMM) of the QSO",
+      "multipliers": [
+        "DXCC entities per band"
+      ],
+      "qso_points": "1pt per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "BARTG-HF-RTTY",
+      "rules_url": "https://www.bartg.org.uk/contests/"
+    },
+    {
+      "id": "WWSAC",
+      "name": "Worldwide Sideband Activity Contest",
+      "sponsor": "WWSAC",
+      "period": "Weekly, Tuesday 0100-0159 UTC",
+      "duration_hours": 1,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m",
+        "6m"
+      ],
+      "modes": [
+        "SSB"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RS",
+          "AGE_GROUP"
+        ],
+        "received": [
+          "RS",
+          "AGE_GROUP"
+        ]
+      },
+      "notes": "AGE_GROUP: OM (male >26), YL (female >26), Youth (<=26), Youth YL (female <=26). No serial number.",
+      "multipliers": [
+        "DXCC per band"
+      ],
+      "qso_points": "1pt OM, 5pt YL, 10pt Youth, 15pt Youth YL",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "WWSAC",
+      "rules_url": "https://wwsac.com/rules.html"
+    },
+    {
+      "id": "SKCC_SPRINT",
+      "name": "SKCC Sprint",
+      "sponsor": "SKCC",
+      "period": "Monthly (Wednesday evening)",
+      "duration_hours": 2,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m",
+        "6m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "STATE_PROVINCE_DXCC",
+          "NAME",
+          "MEMBER_NR"
+        ],
+        "received": [
+          "RST",
+          "STATE_PROVINCE_DXCC",
+          "NAME",
+          "MEMBER_NR"
+        ]
+      },
+      "notes": "MEMBER_NR: SKCC membership number or 'NONE' for non-members",
+      "multipliers": [
+        "States/provinces/countries"
+      ],
+      "qso_points": "See rules",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "SKCC-SPRINT",
+      "rules_url": "https://www.skccgroup.com"
+    },
+    {
+      "id": "CWOPS_CWT",
+      "name": "CWops Test (CWT)",
+      "sponsor": "CWops",
+      "period": "Weekly Wednesday (3 sessions)",
+      "duration_hours": 1,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_member": [
+          "NAME",
+          "MEMBER_NR"
+        ],
+        "sent_non_member": [
+          "NAME",
+          "STATE_PROVINCE_DXCC"
+        ],
+        "received_member": [
+          "NAME",
+          "MEMBER_NR"
+        ],
+        "received_non_member": [
+          "NAME",
+          "STATE_PROVINCE_DXCC"
+        ]
+      },
+      "notes": "No RST. Members send name + membership number. Non-members send name + state/province/country.",
+      "multipliers": [
+        "Each unique callsign once"
+      ],
+      "qso_points": "1pt per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "CWT",
+      "rules_url": "https://cwops.org/cwops-tests/"
+    },
+    {
+      "id": "POTA",
+      "name": "Parks on the Air (POTA)",
+      "sponsor": "POTA",
+      "period": "Year-round (no fixed schedule)",
+      "duration_hours": 0,
+      "bands": [
+        "All"
+      ],
+      "modes": [
+        "All"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_activator": [
+          "RST",
+          "POTA_REF"
+        ],
+        "sent_hunter": [
+          "RST"
+        ],
+        "received_activator": [
+          "RST"
+        ],
+        "received_hunter": [
+          "RST",
+          "POTA_REF"
+        ]
+      },
+      "notes": "Activator at a park sends their park reference (e.g. K-0001). Hunter just confirms RST. Not a traditional timed contest.",
+      "multipliers": "Park references",
+      "dupe_rule": "Once per band per mode per park",
+      "cabrillo_name": "N/A",
+      "rules_url": "https://parksontheair.com"
+    },
+    {
+      "id": "SOTA",
+      "name": "Summits on the Air (SOTA)",
+      "sponsor": "SOTA",
+      "period": "Year-round (no fixed schedule)",
+      "duration_hours": 0,
+      "bands": [
+        "All"
+      ],
+      "modes": [
+        "All"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_activator": [
+          "RST",
+          "SOTA_REF"
+        ],
+        "sent_chaser": [
+          "RST"
+        ],
+        "received_activator": [
+          "RST"
+        ],
+        "received_chaser": [
+          "RST",
+          "SOTA_REF"
+        ]
+      },
+      "notes": "Activator on a summit sends summit reference (e.g. VK2/HU-001). Not a traditional timed contest.",
+      "multipliers": "Summit references",
+      "dupe_rule": "Once per band per mode per summit",
+      "cabrillo_name": "N/A",
+      "rules_url": "https://sota.org.uk"
+    },
+    {
+      "id": "RAC_CANADA_DAY",
+      "name": "RAC Canada Day Contest",
+      "sponsor": "RAC",
+      "period": "July 1st",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m",
+        "VHF",
+        "UHF"
+      ],
+      "modes": [
+        "SSB",
+        "CW",
+        "Digital"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_VE": [
+          "RST",
+          "PROVINCE"
+        ],
+        "sent_non_VE": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_VE": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_VE": [
+          "RST",
+          "PROVINCE"
+        ]
+      },
+      "notes": "VE stations send province; non-VE send serial number",
+      "multipliers": [
+        "Canadian provinces/territories per band"
+      ],
+      "qso_points": "1pt per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "RAC-CANADA-DAY",
+      "rules_url": "https://www.rac.ca/canada-day-and-winter-contests/"
+    },
+    {
+      "id": "LZ_DX",
+      "name": "LZ DX Contest",
+      "sponsor": "BFRA",
+      "period": "Third full weekend of November",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_LZ": [
+          "RST",
+          "DISTRICT"
+        ],
+        "sent_non_LZ": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_LZ": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_LZ": [
+          "RST",
+          "DISTRICT"
+        ]
+      },
+      "notes": "LZ stations send their district code; others send serial",
+      "multipliers": [
+        "LZ districts per band per mode"
+      ],
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "LZ-DX",
+      "rules_url": "https://www.lzdx.bfra.bg/"
+    },
+    {
+      "id": "OK_OM_DX_CW",
+      "name": "OK/OM DX Contest, CW",
+      "sponsor": "CRC",
+      "period": "Third full weekend of November",
+      "duration_hours": 24,
+      "bands": [
+        "160m",
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_OK_OM": [
+          "RST",
+          "DISTRICT"
+        ],
+        "sent_non_OK_OM": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_OK_OM": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_OK_OM": [
+          "RST",
+          "DISTRICT"
+        ]
+      },
+      "notes": "OK/OM stations send district code; others send serial number",
+      "multipliers": [
+        "OK/OM districts per band"
+      ],
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "OK-OM-DX-CW",
+      "rules_url": "https://www.okomdx.radioamater.cz/"
+    },
+    {
+      "id": "YO_DX_HF",
+      "name": "YO DX HF Contest",
+      "sponsor": "FRR",
+      "period": "Third full weekend of October",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_YO": [
+          "RST",
+          "DISTRICT"
+        ],
+        "sent_non_YO": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_YO": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_non_YO": [
+          "RST",
+          "DISTRICT"
+        ]
+      },
+      "notes": "YO (Romanian) stations send their district code; others send serial",
+      "multipliers": [
+        "YO districts per band per mode"
+      ],
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "YO-DX-HF",
+      "rules_url": "https://yodx.ro/"
+    },
+    {
+      "id": "IOTA",
+      "name": "RSGB IOTA Contest",
+      "sponsor": "RSGB / IOTA",
+      "period": "Last full weekend of July",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": true,
+      "exchange": {
+        "sent_island": [
+          "RST",
+          "SERIAL",
+          "IOTA_REF"
+        ],
+        "sent_non_island": [
+          "RST",
+          "SERIAL"
+        ],
+        "received_island": [
+          "RST",
+          "SERIAL",
+          "IOTA_REF"
+        ],
+        "received_non_island": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "notes": "Island operators include IOTA reference (e.g. EU-005). Non-island stations send RST+serial only.",
+      "multipliers": [
+        "IOTA island references"
+      ],
+      "qso_points": "15pt island-island, 15pt island-non-island, 2pt non-island contacts",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "RSGB-IOTA",
+      "rules_url": "https://www.iota-world.org/iotacontest/"
+    },
+    {
+      "id": "COMMONWEALTH_BERU",
+      "name": "Commonwealth (BERU) Contest",
+      "sponsor": "RSGB",
+      "period": "Second full weekend of March",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "SERIAL"
+        ],
+        "received": [
+          "RST",
+          "SERIAL"
+        ]
+      },
+      "notes": "Commonwealth stations only — only QSOs between Commonwealth countries count",
+      "multipliers": [
+        "Commonwealth DXCC entities"
+      ],
+      "qso_points": "1pt per QSO",
+      "dupe_rule": "Once per band",
+      "cabrillo_name": "COMM-CW",
+      "rules_url": "https://www.rsgbcc.org/hf/rules/"
+    },
+    {
+      "id": "CQMM_DX",
+      "name": "CQMM DX Contest",
+      "sponsor": "CQMM",
+      "period": "Third full weekend of April",
+      "duration_hours": 24,
+      "bands": [
+        "80m",
+        "40m",
+        "20m",
+        "15m",
+        "10m"
+      ],
+      "modes": [
+        "SSB",
+        "CW"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "RST",
+          "CQ_ZONE"
+        ],
+        "received": [
+          "RST",
+          "CQ_ZONE"
+        ]
+      },
+      "multipliers": [
+        "CQ zones"
+      ],
+      "qso_points": "1-5pt depending on CQ zone difference",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "CQMM",
+      "rules_url": "https://www.cqmm.org/"
+    },
+    {
+      "id": "WINTER_FIELD_DAY",
+      "name": "Winter Field Day",
+      "sponsor": "WFD Association",
+      "period": "Last full weekend of January",
+      "duration_hours": 24,
+      "bands": [
+        "All"
+      ],
+      "modes": [
+        "SSB",
+        "CW",
+        "Digital"
+      ],
+      "asymmetric": false,
+      "exchange": {
+        "sent": [
+          "FIELD_DAY_CLASS",
+          "STATE_PROVINCE_DXCC"
+        ],
+        "received": [
+          "FIELD_DAY_CLASS",
+          "STATE_PROVINCE_DXCC"
+        ]
+      },
+      "notes": "Similar to ARRL Field Day. Class example: 1H = 1 transmitter, Home.",
+      "multipliers": "None",
+      "qso_points": "1pt phone, 2pt CW/digital",
+      "dupe_rule": "Once per band per mode",
+      "cabrillo_name": "WFD",
+      "rules_url": "https://www.winterfieldday.com/"
+    }
+  ]
+}
+
+
+Authenticate to export to Google Drive

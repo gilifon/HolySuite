@@ -695,7 +695,31 @@ namespace HolyLogger.Properties {
                 this["QsoTableHeaderBackgroundColor"] = value;
             }
         }
-        
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("#FFF6C8")]
+        public string ContestExchangeColor {
+            get {
+                return ((string)(this["ContestExchangeColor"]));
+            }
+            set {
+                this["ContestExchangeColor"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("#E1F5EE")]
+        public string ContestSendColor {
+            get {
+                return ((string)(this["ContestSendColor"]));
+            }
+            set {
+                this["ContestSendColor"] = value;
+            }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
@@ -1666,6 +1690,18 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["ContestName"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ActiveContestId {
+            get {
+                return ((string)(this["ActiveContestId"]));
+            }
+            set {
+                this["ActiveContestId"] = value;
             }
         }
 

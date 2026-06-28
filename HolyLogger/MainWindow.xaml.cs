@@ -524,6 +524,8 @@ namespace HolyLogger
 
             ApplyMainFormBackgroundFromSettings();
             ApplyQsoTableHeaderBackgroundFromSettings();
+            ApplyContestExchangeColorFromSettings();
+            ApplyContestSendColorFromSettings();
 
             // Restrict every text box in the app to English (ASCII) input only. Registered as a
             // class handler so it applies to all TextBoxes without wiring each one individually,
@@ -1196,8 +1198,12 @@ namespace HolyLogger
             if (BtnSuggestToggle != null)
                 BtnSuggestToggle.IsChecked = Properties.Settings.Default.CallsignSuggestionsEnabled;
 
-            // Reflect the persisted Contest Mode state in its Tools-menu header (YES/NO).
+            // Restore the active contest (if any) selected in a previous session, then reflect the
+            // Contest Mode state in the Tools-menu header, trophy, and contest-name label.
+            Contests.ContestService.Activate(
+                Contests.ContestService.FindById(Properties.Settings.Default.ActiveContestId));
             UpdateContestModeMenuHeader();
+            ApplyContestExchangeUI();
 
             // eQSL queue: show how many QSOs are waiting (only for callsigns the user added to the
             // eQSL table). Nothing is sent automatically here.
@@ -5520,18 +5526,268 @@ namespace HolyLogger
         // Contest Mode on/off (Tools menu). When on, exact-match QSOs (same callsigns + band + mode)
         // are flagged as "Duplicate"; when off, the program never reports a duplicate and instead
         // shows how many times the station was worked before.
+        // Both the Tools-menu item and the status-bar trophy now open the contest picker, which is the
+        // single way to enter or leave Contest Mode.
         private void ContestModeMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            Properties.Settings.Default.ContestMode = !Properties.Settings.Default.ContestMode;
-            Properties.Settings.Default.Save();
-            UpdateContestModeMenuHeader();
-            // Re-evaluate the duplicate / worked-before indicator for the current callsign.
-            UpdateDup();
+            OpenContestPicker();
         }
 
         private void ContestIndicator_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            ContestModeMenuItem_Click(null, null);
+            OpenContestPicker();
+        }
+
+        private void OpenContestPicker()
+        {
+            var picker = new ContestPickerWindow(Contests.ContestService.Active) { Owner = this };
+            bool? ok = picker.ShowDialog();
+            if (ok != true) return;
+            if (picker.ExitRequested) ExitContest();
+            else if (picker.SelectedContest != null) EnterContest(picker.SelectedContest);
+        }
+
+        // Entering a contest selects its profile AND turns on Contest Mode (duplicate flagging).
+        private void EnterContest(Contests.Contest c)
+        {
+            Contests.ContestService.Activate(c);
+            Properties.Settings.Default.ContestMode = true;
+            Properties.Settings.Default.ActiveContestId = c.Id;
+            Properties.Settings.Default.Save();
+            UpdateContestModeMenuHeader();
+            ApplyContestExchangeUI();
+            UpdateDup();
+        }
+
+        private void ExitContest()
+        {
+            Contests.ContestService.Deactivate();
+            Properties.Settings.Default.ContestMode = false;
+            Properties.Settings.Default.ActiveContestId = "";
+            Properties.Settings.Default.Save();
+            UpdateContestModeMenuHeader();
+            ApplyContestExchangeUI();
+            UpdateDup();
+        }
+
+        // The contest received-exchange boxes currently shown in the Exchange row.
+        private readonly List<TextBox> _contestRxBoxes = new List<TextBox>();
+
+        // Builds the received-exchange boxes for the active contest (one per non-RST received field;
+        // RST keeps its own RST-R box), or restores the normal single Exchange box when not in a
+        // contest. Each box's value is mirrored into TB_Exchange so the existing save/log path
+        // captures the received exchange.
+        private void ApplyContestExchangeUI()
+        {
+            if (ContestRxPanel == null) return;
+
+            foreach (var b in _contestRxBoxes) b.TextChanged -= ContestRxBox_TextChanged;
+            _contestRxBoxes.Clear();
+            ContestRxPanel.Children.Clear();
+            if (ContestTxPanel != null) ContestTxPanel.Children.Clear();
+
+            Contests.Contest contest = Contests.ContestService.Active;
+            bool inContest = contest != null;
+
+            // The original exchange-row controls show only when NOT in a contest; in a contest the
+            // received row is rebuilt as ordered cells in ContestRxPanel and the sent row in ContestTxPanel.
+            Visibility orig = inContest ? Visibility.Collapsed : Visibility.Visible;
+            if (TB_Exchange != null) TB_Exchange.Visibility = orig;
+            if (TB_RSTSent != null) TB_RSTSent.Visibility = orig;
+            if (TB_RSTRcvd != null) TB_RSTRcvd.Visibility = orig;
+            if (L_RstSLabel != null) L_RstSLabel.Visibility = orig;
+            if (L_RstRLabel != null) L_RstRLabel.Visibility = orig;
+            // The received label is "Exchange" alone outside a contest, "Exchange / received" inside one.
+            SetExchangeLabel(L_ExchangeLabel, "Exchange", "received", inContest);
+
+            if (!inContest)
+            {
+                ContestRxPanel.Visibility = Visibility.Collapsed;
+                if (ContestTxPanel != null) ContestTxPanel.Visibility = Visibility.Collapsed;
+                if (L_SendLabel != null) L_SendLabel.Visibility = Visibility.Collapsed;
+                ApplyContestLayout(false);
+                return;
+            }
+
+            string myCall = TB_MyCallsign != null ? TB_MyCallsign.Text : string.Empty;
+            var fields = Contests.ContestService.GetReceivedFields(contest, myCall)
+                .Where(f => !string.Equals(f, "RST", StringComparison.OrdinalIgnoreCase)
+                         && !string.Equals(f, "RS", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            // RECEIVED frame: the order the DX sends — RST(R) first, then the contest items. Tab flows
+            // DX callsign -> RST-R -> items. The RST you send lives in the SEND frame instead.
+            int tab = 9;
+
+            TextBox rstr = AddContestCell("RST R", 52, tab++, ContestRxPanel);
+            rstr.Text = TB_RSTRcvd != null ? TB_RSTRcvd.Text : "59";
+            rstr.TextChanged += (s, e2) => { if (TB_RSTRcvd != null) TB_RSTRcvd.Text = rstr.Text; };
+
+            foreach (string field in fields)
+            {
+                ContestFieldUi(field, out string label, out double width);
+                TextBox box = AddContestCell(label, width, tab++, ContestRxPanel);
+                box.Text = _contestRxBoxes.Count == 0 && TB_Exchange != null ? TB_Exchange.Text : string.Empty;
+                box.TextChanged += ContestRxBox_TextChanged;
+                _contestRxBoxes.Add(box);
+            }
+
+            // SEND frame: RST(S) first (aligned under RST-R), then one outgoing field aligned under the
+            // first received item. Both are out of the Tab path — the operator types received data.
+            if (ContestTxPanel != null)
+            {
+                TextBox rsts = AddContestCell("RST S", 52, null, ContestTxPanel);
+                rsts.Text = TB_RSTSent != null ? TB_RSTSent.Text : "59";
+                rsts.TextChanged += (s, e2) => { if (TB_RSTSent != null) TB_RSTSent.Text = rsts.Text; };
+
+                if (fields.Count > 0)
+                {
+                    ContestFieldUi(fields[0], out string slabel, out double swidth);
+                    AddContestCell(slabel, swidth, null, ContestTxPanel);
+                }
+                ContestTxPanel.Visibility = Visibility.Visible;
+            }
+            SetExchangeLabel(L_SendLabel, "Exchange", "send", true);
+            if (L_SendLabel != null) L_SendLabel.Visibility = Visibility.Visible;
+
+            ContestRxPanel.Visibility = Visibility.Visible;
+            ApplyContestLayout(true);
+        }
+
+        // Sets a contest exchange label to "line1" alone, or "line1 / line2" (line2 bold) when twoLine.
+        private static void SetExchangeLabel(TextBlock tb, string line1, string line2, bool twoLine)
+        {
+            if (tb == null) return;
+            tb.Inlines.Clear();
+            tb.Inlines.Add(new System.Windows.Documents.Run(line1) { FontWeight = FontWeights.Bold });
+            if (twoLine)
+            {
+                tb.Inlines.Add(new System.Windows.Documents.LineBreak());
+                tb.Inlines.Add(new System.Windows.Documents.Run(line2));
+            }
+        }
+
+        // Adds one [label-above, box] cell to a contest exchange panel and returns the box. A null
+        // tabIndex makes the box skip the Tab order.
+        private TextBox AddContestCell(string label, double width, int? tabIndex, StackPanel target)
+        {
+            var blue = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+            var col = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 10, 0) };
+            col.Children.Add(new TextBlock
+            {
+                Text = label,
+                FontSize = 11,
+                FontWeight = FontWeights.Bold,
+                Foreground = blue,
+                HorizontalAlignment = HorizontalAlignment.Center
+            });
+            var box = new TextBox
+            {
+                Width = width,
+                Height = 28,
+                FontSize = 16,
+                CharacterCasing = CharacterCasing.Upper,
+                VerticalContentAlignment = VerticalAlignment.Center,
+                HorizontalContentAlignment = HorizontalAlignment.Center
+            };
+            if (tabIndex.HasValue) box.TabIndex = tabIndex.Value; else box.IsTabStop = false;
+            col.Children.Add(box);
+            target.Children.Add(col);
+            return box;
+        }
+
+        // Original Margin.Top of each Grid.Row=1 control, captured once so layout toggles are exact.
+        private Dictionary<FrameworkElement, double> _rowOrigTop;
+
+        // Switches the lower block (everything below the divider) between its normal positions and the
+        // condensed contest positions: the divider drops 44px, the rows tighten and slide down so the
+        // bottom row ends just above the band-button (X-icon) array, and the freed strip holds the
+        // "You send" band. The X icons and the log table never move.
+        private void ApplyContestLayout(bool contest)
+        {
+            Grid grid = this.Content as Grid;
+            if (grid == null) return;
+
+            if (_rowOrigTop == null)
+            {
+                _rowOrigTop = new Dictionary<FrameworkElement, double>();
+                foreach (FrameworkElement fe in grid.Children.OfType<FrameworkElement>())
+                    if (Grid.GetRow(fe) == 1)
+                        _rowOrigTop[fe] = fe.Margin.Top;
+            }
+
+            foreach (var kv in _rowOrigTop)
+            {
+                FrameworkElement fe = kv.Key;
+                double baseTop = kv.Value;
+                double off = contest ? RowShift(fe, baseTop) : 0;
+                Thickness m = fe.Margin;
+                fe.Margin = new Thickness(m.Left, baseTop + off, m.Right, m.Bottom);
+            }
+
+            if (ContestSendBand != null)
+                ContestSendBand.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
+            if (ContestExchangeFrame != null)
+                ContestExchangeFrame.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // How far each control moves in contest mode, by its normal Y band. Space is reclaimed from
+        // BOTH ends — the top two rows nudge up, the lower rows slide down toward the X-icons — so the
+        // Exchange row gets enough height to keep the label above the box without crowding.
+        private double RowShift(FrameworkElement fe, double baseTop)
+        {
+            if (fe == MainFormBackgroundRect) return 0;     // page background never moves
+            if (fe == ContestExchangeFrame) return 0;       // frame is positioned for contest mode already
+            if (fe.Margin.Left >= 670) return 0;            // right-hand map area never moves
+
+            if (fe == ContestSendBand) return -23;          // "You send" band sits in the freed top strip (~y73)
+            if (fe == ContestTxPanel) return -21;           // send cells (RST S + send field) centered in the band
+            if (fe == L_SendLabel) return -16;              // "Exchange/send" 2-line label, centered in the band
+            if (fe == ContestDividerLine) return 31;        // divider + DX Callsign row
+
+            if (fe == L_ExchangeLabel) return 27;           // "Exchange/received" 2-line label, centered in the frame
+
+            // The received exchange box gets a label above it, which lowers it. Drop the RST
+            // labels+boxes and the Add(F1) button to that same line so the Exchange row aligns.
+            if (fe == TB_RSTSent || fe == TB_RSTRcvd || fe == L_RstSLabel || fe == L_RstRLabel
+                || fe == SMeter || fe == AddBtn) return 32;
+
+            if (baseTop < 40) return -5;                    // top row (Station / My Locator / Square) up
+            if (baseTop < 90) return -10;                   // Operator / Freq / Band / Mode row up
+            if (baseTop < 140) return 26;                   // DX Callsign row down
+            if (baseTop < 184) return 20;                   // Exchange row content (boxes) down
+            if (baseTop < 226) return 23;                   // Name / Country / State row down (+2)
+            if (baseTop < 268) return 17;                   // DX Locator / ITU / CQ / Comment row down (+2)
+            return 0;                                       // X icons + log table — fixed
+        }
+
+        private void ContestRxBox_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (TB_Exchange != null)
+                TB_Exchange.Text = string.Join(" ",
+                    _contestRxBoxes.Select(b => b.Text).Where(t => !string.IsNullOrWhiteSpace(t)));
+        }
+
+        // Friendly label + box width for a contest exchange field name.
+        private static void ContestFieldUi(string field, out string label, out double width)
+        {
+            switch ((field ?? string.Empty).ToUpperInvariant())
+            {
+                case "SERIAL": label = "Serial"; width = 60; break;
+                case "CQ_ZONE": label = "CQ Zone"; width = 52; break;
+                case "ITU_ZONE": label = "ITU"; width = 48; break;
+                case "HOLYLAND_AREA": label = "Area"; width = 72; break;
+                case "STATE": case "STATE_PROVINCE": case "PROVINCE": label = "State/Prov"; width = 72; break;
+                case "NAME": label = "Name"; width = 90; break;
+                case "AGE": label = "Age"; width = 44; break;
+                case "POWER": label = "Power"; width = 52; break;
+                case "ARRL_SECTION": case "FIELD_DAY_SECTION": label = "Section"; width = 60; break;
+                case "IOTA_REF": label = "IOTA"; width = 64; break;
+                case "PRECEDENCE": label = "Prec"; width = 44; break;
+                case "CHECK": label = "Check"; width = 48; break;
+                case "MEMBER_NR": label = "Member#"; width = 64; break;
+                default: label = field; width = 70; break;
+            }
         }
 
         private void ShareStatusButton_Click(object sender, RoutedEventArgs e)
@@ -5577,9 +5833,15 @@ namespace HolyLogger
             {
                 ContestIndicator.Background = on ? blue : Brushes.Transparent;
                 ContestIndicator.ToolTip = on
-                    ? "Contest Mode: ON — duplicates are flagged.\nA QSO with the same callsign, band and mode\ncounts as a dupe. Change it in the Tools menu."
-                    : "Contest Mode: OFF — duplicates aren't flagged.\nThe log shows how many times each station\nwas worked. Change it in the Tools menu.";
+                    ? "In contest — duplicates are flagged.\nClick to change or exit the contest."
+                    : "Not in a contest.\nClick to choose a contest.";
             }
+
+            // Contest name beside the trophy, e.g. "World Wide Holyland DX — Active".
+            if (L_ContestName != null)
+                L_ContestName.Text = (on && Contests.ContestService.Active != null)
+                    ? Contests.ContestService.Active.Name + " — Active"
+                    : "";
         }
 
         private async void PropertiesWindow_Closed(object sender, EventArgs e)
@@ -13118,6 +13380,16 @@ namespace HolyLogger
                 Dispatcher.BeginInvoke(new Action(ApplyQsoTableHeaderBackgroundFromSettings), DispatcherPriority.Background);
             }
 
+            if (e.PropertyName == nameof(Properties.Settings.Default.ContestExchangeColor))
+            {
+                Dispatcher.BeginInvoke(new Action(ApplyContestExchangeColorFromSettings), DispatcherPriority.Background);
+            }
+
+            if (e.PropertyName == nameof(Properties.Settings.Default.ContestSendColor))
+            {
+                Dispatcher.BeginInvoke(new Action(ApplyContestSendColorFromSettings), DispatcherPriority.Background);
+            }
+
             if (e.PropertyName == nameof(Properties.Settings.Default.ShowPhotoFromQRZ))
             {
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -13267,6 +13539,70 @@ namespace HolyLogger
             QSODataGrid.ColumnHeaderStyle = headerStyle;
 
             ApplyClusterTableHeaderBackgroundFromSettings(color);
+        }
+
+        private Color ParseContestExchangeColor(string colorText)
+        {
+            try { return (Color)ColorConverter.ConvertFromString(colorText); }
+            catch { return (Color)ColorConverter.ConvertFromString("#FFF6C8"); }
+        }
+
+        private void ApplyContestExchangeColorFromSettings()
+        {
+            if (ContestExchangeFrame == null) return;
+            ContestExchangeFrame.Background =
+                new SolidColorBrush(ParseContestExchangeColor(Properties.Settings.Default.ContestExchangeColor));
+        }
+
+        // Right-click anywhere on the contest exchange frame to pick its colour, remembered in settings.
+        private void ContestExchangeFrame_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            Color current = ParseContestExchangeColor(Properties.Settings.Default.ContestExchangeColor);
+            using (var dlg = new System.Windows.Forms.ColorDialog())
+            {
+                dlg.FullOpen = true;
+                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    string hex = string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
+                    Properties.Settings.Default.ContestExchangeColor = hex;
+                    Properties.Settings.Default.Save();
+                    ApplyContestExchangeColorFromSettings();
+                }
+            }
+            e.Handled = true;
+        }
+
+        private Color ParseContestSendColor(string colorText)
+        {
+            try { return (Color)ColorConverter.ConvertFromString(colorText); }
+            catch { return (Color)ColorConverter.ConvertFromString("#E1F5EE"); }
+        }
+
+        private void ApplyContestSendColorFromSettings()
+        {
+            if (ContestSendBand == null) return;
+            ContestSendBand.Background =
+                new SolidColorBrush(ParseContestSendColor(Properties.Settings.Default.ContestSendColor));
+        }
+
+        // Right-click anywhere on the "You send" band to pick its colour, remembered in settings.
+        private void ContestSendBand_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            Color current = ParseContestSendColor(Properties.Settings.Default.ContestSendColor);
+            using (var dlg = new System.Windows.Forms.ColorDialog())
+            {
+                dlg.FullOpen = true;
+                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
+                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                {
+                    string hex = string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
+                    Properties.Settings.Default.ContestSendColor = hex;
+                    Properties.Settings.Default.Save();
+                    ApplyContestSendColorFromSettings();
+                }
+            }
+            e.Handled = true;
         }
 
         private void ApplyClusterTableHeaderBackgroundFromSettings(Color color)

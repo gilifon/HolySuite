@@ -23,6 +23,7 @@ namespace HolyLogger.OptionsUserControls
     {
         private const string DefaultMainFormBackgroundColor = "#BDDFFF";
         private const string DefaultQsoTableHeaderBackgroundColor = "#DEB887";
+        private const string DefaultContestExchangeColor = "#FFF6C8";
 
         private bool _isLoadingClusterSettings = false;
 
@@ -40,6 +41,7 @@ namespace HolyLogger.OptionsUserControls
             SetMapDistanceUnitSelection();
             RefreshMainFormBackgroundPreview();
             RefreshQsoTableHeaderBackgroundPreview();
+            RefreshContestExchangePreview();
             LoadMapDisplayModeSettings();
             LoadClusterMapSettings();
             LoadClusterSettings();
@@ -350,6 +352,40 @@ namespace HolyLogger.OptionsUserControls
             }
 
             RefreshQsoTableHeaderBackgroundPreview();
+        }
+
+        private void RefreshContestExchangePreview()
+        {
+            Color color = ParseColor(Properties.Settings.Default.ContestExchangeColor, DefaultContestExchangeColor);
+            ContestExchangePreview.Background = new SolidColorBrush(color);
+        }
+
+        private void ContestExchangePreview_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            string hex = PickColorHex(Properties.Settings.Default.ContestExchangeColor);
+            if (string.IsNullOrWhiteSpace(hex)) return;
+
+            if (!string.Equals(Properties.Settings.Default.ContestExchangeColor, hex, StringComparison.OrdinalIgnoreCase))
+            {
+                Properties.Settings.Default.ContestExchangeColor = hex;
+                Properties.Settings.Default.Save();
+                HasChanged = true;
+            }
+
+            RefreshContestExchangePreview();
+        }
+
+        private void BtnResetContestExchange_Click(object sender, RoutedEventArgs e)
+        {
+            if (!string.Equals(Properties.Settings.Default.ContestExchangeColor, DefaultContestExchangeColor, StringComparison.OrdinalIgnoreCase))
+            {
+                Properties.Settings.Default.ContestExchangeColor = DefaultContestExchangeColor;
+                try { Properties.Settings.Default.Save(); }
+                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Failed to save contest exchange color: {ex.Message}"); }
+                HasChanged = true;
+            }
+
+            RefreshContestExchangePreview();
         }
 
         private void MapDisplayMode_Changed(object sender, RoutedEventArgs e)

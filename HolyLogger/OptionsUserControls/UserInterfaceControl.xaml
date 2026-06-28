@@ -44,9 +44,10 @@
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
-        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,404,0,0" Width="360" Height="100" FontSize="16">
+        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,404,0,0" Width="360" Height="138" FontSize="16">
             <Grid>
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="38"/>
                     <RowDefinition Height="38"/>
                     <RowDefinition Height="38"/>
                 </Grid.RowDefinitions>
@@ -65,6 +66,12 @@
                 <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
                     <Border x:Name="QsoTableHeaderBackgroundPreview" Width="40" Height="28" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="2" Background="#DEB887" Cursor="Hand" MouseLeftButtonDown="QsoTableHeaderBackgroundPreview_MouseLeftButtonDown" ToolTip="Click to pick a color"/>
                     <Button x:Name="BtnResetQsoTableHeaderBackground" Content="Reset" Width="46" Height="24" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Click="BtnResetQsoTableHeaderBackground_Click"/>
+                </StackPanel>
+
+                <Label Content="Contest exchange" Grid.Row="2" Grid.Column="0" VerticalAlignment="Center" FontSize="14"/>
+                <StackPanel Grid.Row="2" Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" HorizontalAlignment="Left">
+                    <Border x:Name="ContestExchangePreview" Width="40" Height="28" VerticalAlignment="Center" BorderBrush="#666" BorderThickness="2" Background="#FFF6C8" Cursor="Hand" MouseLeftButtonDown="ContestExchangePreview_MouseLeftButtonDown" ToolTip="Click to pick a color"/>
+                    <Button x:Name="BtnResetContestExchange" Content="Reset" Width="46" Height="24" FontSize="12" Margin="8,0,0,0" VerticalAlignment="Center" Click="BtnResetContestExchange_Click"/>
                 </StackPanel>
             </Grid>
         </GroupBox>

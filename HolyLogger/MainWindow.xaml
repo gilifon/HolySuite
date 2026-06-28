@@ -557,7 +557,7 @@
                     <TextBlock x:Name="L_numOfGrids" Text="{Binding NumOfGrids, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <TextBlock Text="DXCCs: " Margin="20,0,0,0" FontSize="16"/>
+                    <TextBlock Text="DXCCs: " Margin="10,0,0,0" FontSize="16"/>
                 </StatusBarItem>
                 <StatusBarItem>
                     <TextBlock x:Name="L_numOfDXCC" Text="{Binding NumOfDXCCs, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"  Margin="0,0,0,0" FontSize="16"/>
@@ -572,7 +572,7 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                    <TextBlock Margin="20,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Manual"/><LineBreak/><Run Text="Mode:"/></TextBlock>
+                    <TextBlock Margin="10,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Manual"/><LineBreak/><Run Text="Mode:"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
                     <Button x:Name="Btn_ManualMode" Click="ManualModeMenuItem_Click" Cursor="Hand" Padding="8,1" MinWidth="40" ToolTip="Toggle Manual Mode (same as Tools &gt; Manual Mode)">
@@ -589,7 +589,7 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                    <TextBlock Text="Recent QSOs: " Margin="20,0,0,0" FontSize="16"/>
+                    <TextBlock Margin="8,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Recent"/><LineBreak/><Run Text="QSOs:"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
                     <StatusBarItem.ContextMenu>
@@ -623,8 +623,17 @@
                     </StackPanel>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <!-- Contest Mode toggle button: gold trophy on a blue tile when ON, gray when OFF.
-                         Click to toggle contest mode (same as Tools → Contest Mode). -->
+                    <Border x:Name="LockBtnBorder" CornerRadius="3" Padding="3,1" Margin="5,0,0,0" Background="Transparent">
+                        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'"
+                               Height="22" Width="20" Source="Images/lock.png" Stretch="None"
+                               MouseUp="Lock_Btn_MouseUp" Cursor="Hand"/>
+                    </Border>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <!-- Contest indicator: click the trophy to open the contest picker. When a contest
+                         is active the trophy goes gold and the contest name shows beside it, wrapped to
+                         two lines and width-capped so it never pushes the RIG label. -->
+                    <StackPanel Orientation="Horizontal">
                     <Border x:Name="ContestIndicator" Width="26" Height="24" Margin="5,0,0,0" CornerRadius="4" Background="Transparent"
                             ToolTipService.InitialShowDelay="0" Cursor="Hand"
                             MouseLeftButtonUp="ContestIndicator_MouseLeftButtonUp">
@@ -634,13 +643,11 @@
                                   Fill="#9E9E9E"/>
                         </Viewbox>
                     </Border>
-                </StatusBarItem>
-                <StatusBarItem>
-                    <Border x:Name="LockBtnBorder" CornerRadius="3" Padding="3,1" Margin="5,0,0,0" Background="Transparent">
-                        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'"
-                               Height="22" Width="20" Source="Images/lock.png" Stretch="None"
-                               MouseUp="Lock_Btn_MouseUp" Cursor="Hand"/>
-                    </Border>
+                    <TextBlock x:Name="L_ContestName" VerticalAlignment="Center" Margin="7,0,0,0"
+                               MaxWidth="150" TextWrapping="Wrap" FontSize="12" LineHeight="14"
+                               LineStackingStrategy="BlockLineHeight"
+                               FontWeight="Bold" Foreground="#1565C0"/>
+                    </StackPanel>
                 </StatusBarItem>
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
@@ -656,7 +663,7 @@
         </DockPanel>
 
 
-        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="272" />
+        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="#BDDFFF" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="279" />
         <TextBlock HorizontalAlignment="Left" Margin="11,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" FontWeight="Bold" />
             <LineBreak />
@@ -982,12 +989,25 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0"/>
         </Border>
 
-        <Label Content="Exchange" HorizontalAlignment="Left" Margin="6,141,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The Exchange sent by the DX station" />
+        <!-- Contest exchange highlight frame: a soft rounded panel behind the exchange row, shown only
+             in contest mode. Background colour is user-editable in Options and remembered. -->
+        <Border x:Name="ContestExchangeFrame" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Margin="4,161,0,0" Width="556" Height="48" CornerRadius="8" Background="#FFF6C8"
+                BorderBrush="#D9B441" BorderThickness="1" Visibility="Collapsed" Panel.ZIndex="0"
+                MouseRightButtonUp="ContestExchangeFrame_MouseRightButtonUp"
+                ToolTip="Right-click to change the contest exchange colour"/>
+        <TextBlock x:Name="L_ExchangeLabel" HorizontalAlignment="Left" Margin="12,141,0,0" VerticalAlignment="Top" Grid.Row="1"
+                   Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
+                   ToolTip="The exchange received from the DX station"><Run Text="Exchange" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
-        <TextBlock HorizontalAlignment="Left" Margin="228,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
+        <!-- Contest received-exchange boxes, built at runtime per the active contest (Phase 2). When a
+             contest is active this replaces the single Exchange box; otherwise it's hidden. -->
+        <StackPanel x:Name="ContestRxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
+                    VerticalAlignment="Top" Margin="101,142,0,0" Grid.Row="1" Visibility="Collapsed"/>
+        <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
         <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,143,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
-        <TextBlock HorizontalAlignment="Left" Margin="349,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
+        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="349,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="383,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
         <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="288,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
         <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" />
@@ -995,7 +1015,22 @@
         <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="496,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" />
 
 
-        <Border BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
+        <Border x:Name="ContestDividerLine" BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
+        <!-- "You send" band: shown only in contest mode, in the strip freed when the divider drops. It
+             mirrors the received frame — a coloured background panel (ContestSendBand) with a label
+             (L_SendLabel) and the send cells (ContestTxPanel) laid on top. Background colour is
+             user-editable (right-click) and remembered, like the received frame. -->
+        <Border x:Name="ContestSendBand" Grid.Row="1" Margin="4,96,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Width="556" Height="48" Background="#E1F5EE" BorderBrush="#5DCAA5" BorderThickness="1" CornerRadius="8"
+                Visibility="Collapsed" Panel.ZIndex="5"
+                MouseRightButtonUp="ContestSendBand_MouseRightButtonUp"
+                ToolTip="Right-click to change the send-exchange colour"/>
+        <TextBlock x:Name="L_SendLabel" Grid.Row="1" HorizontalAlignment="Left" Margin="12,96,0,0" VerticalAlignment="Top"
+                   Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
+                   Foreground="#0B3D2E" Panel.ZIndex="6" Visibility="Collapsed"
+                   ToolTip="The exchange your station sends"><Run Text="Exchange" FontWeight="Bold"/><LineBreak/><Run Text="send"/></TextBlock>
+        <StackPanel x:Name="ContestTxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
+                    VerticalAlignment="Top" Margin="101,96,0,0" Grid.Row="1" Panel.ZIndex="6" Visibility="Collapsed"/>
         <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,143,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
         <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,98,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
@@ -1041,8 +1076,8 @@
         <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
-        <Rectangle Grid.Row="1" Fill="Gainsboro" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="53" Margin="0,272,0,0" />
-        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,272,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
+        <Rectangle Grid.Row="1" Fill="Gainsboro" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="46" Margin="0,279,0,0" />
+        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,277,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
         <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" AlternatingRowBackground="Gainsboro" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="#888888" HorizontalGridLinesBrush="#888888" Padding="0,0,0,0">
             <DataGrid.Resources>
                 <!-- Keep the selected row blue even when the grid loses focus (e.g. while the right-click
