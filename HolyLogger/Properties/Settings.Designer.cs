@@ -722,6 +722,42 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("1")]
+        public int ContestNextSerial {
+            get {
+                return ((int)(this["ContestNextSerial"]));
+            }
+            set {
+                this["ContestNextSerial"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ContestMyZoneOverride {
+            get {
+                return ((string)(this["ContestMyZoneOverride"]));
+            }
+            set {
+                this["ContestMyZoneOverride"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ContestSendValues {
+            get {
+                return ((string)(this["ContestSendValues"]));
+            }
+            set {
+                this["ContestSendValues"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool IsParseWARC {
             get {

@@ -176,6 +176,15 @@
     <Setting Name="ContestSendColor" Type="System.String" Scope="User">
       <Value Profile="(Default)">#E1F5EE</Value>
     </Setting>
+    <Setting Name="ContestNextSerial" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">1</Value>
+    </Setting>
+    <Setting Name="ContestMyZoneOverride" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="ContestSendValues" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="IsParseWARC" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>
     </Setting>

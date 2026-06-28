@@ -1,5 +1,8 @@
+using System;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Interop;
 using System.Windows.Media;
 
 namespace HolyLogger
@@ -8,6 +11,8 @@ namespace HolyLogger
 
     public partial class HolyMessageBox : Window
     {
+        [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+
         public bool Confirmed { get; private set; }
 
         private HolyMessageBox(string message, string title, HolyMsgType type, Window owner, bool confirm, double width = 0)
@@ -25,23 +30,51 @@ namespace HolyLogger
                 ConfirmPanel.Visibility = Visibility.Visible;
             }
 
-            // Give a button keyboard focus when the dialog opens, so key presses have somewhere to route.
-            Loaded += (s, e) =>
+            // Esc must close the dialog even at STARTUP, when the app may not yet be the foreground
+            // window. PreviewKeyDown (registered with handledEventsToo) tunnels from the window before
+            // any child and fires even if a child marked the key handled — as long as keyboard focus is
+            // somewhere inside this window. ContentRendered forces the window to the foreground and puts
+            // focus on a button so that's guaranteed.
+            AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(OnDialogPreviewKeyDown), true);
+
+            ContentRendered += (s, e) =>
             {
-                if (OkBtn.Visibility == Visibility.Visible) OkBtn.Focus();
-                else YesBtn.Focus();
+                try
+                {
+                    Activate();
+                    IntPtr h = new WindowInteropHelper(this).Handle;
+                    if (h != IntPtr.Zero) SetForegroundWindow(h);
+                    IInputElement btn = OkBtn.Visibility == Visibility.Visible ? (IInputElement)OkBtn : YesBtn;
+                    Keyboard.Focus(btn);
+                    DiagLog($"opened title='{Title}' IsActive={IsActive} focus={Keyboard.FocusedElement?.GetType().Name ?? "null"}");
+                }
+                catch (Exception ex) { DiagLog("open-error " + ex.Message); }
             };
         }
 
-        // Esc closes the dialog (wired as Window.KeyDown in XAML, matching the app's other windows).
-        // For confirm dialogs Esc means No.
+        private void OnDialogPreviewKeyDown(object sender, KeyEventArgs e)
+        {
+            DiagLog($"PreviewKeyDown {e.Key} IsActive={IsActive} focus={Keyboard.FocusedElement?.GetType().Name ?? "null"}");
+            if (e.Key == Key.Escape) { Confirmed = false; e.Handled = true; Close(); }
+        }
+
+        // Esc closes the dialog (also wired as Window.KeyDown in XAML). For confirm dialogs Esc = No.
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
+            DiagLog($"KeyDown {e.Key}");
             if (e.Key == Key.Escape)
             {
                 Confirmed = false;
                 Close();
             }
+        }
+
+        // TEMPORARY diagnostics — confirms whether key events actually reach this dialog at startup.
+        private static void DiagLog(string msg)
+        {
+            try { System.IO.File.AppendAllText(@"C:\temp\holymsg_keylog.txt",
+                DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + Environment.NewLine); }
+            catch { }
         }
 
         private void ApplyType(HolyMsgType type)

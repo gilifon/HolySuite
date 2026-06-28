@@ -83,7 +83,9 @@ namespace HolyParser
             }
         }
 
-        public static string GenerateAdif(IEnumerable<QSO> qso_list)
+        // contestId (optional) tags every exported QSO with <contest_id:…>. Defaults to null so all
+        // existing callers produce byte-identical output; only the contest-log file exports pass it.
+        public static string GenerateAdif(IEnumerable<QSO> qso_list, string contestId = null)
         {
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
@@ -127,6 +129,16 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.STX)) adif.AppendFormat("<stx_string:{0}>{1}", qso.STX.Length, qso.STX);
                 if (!string.IsNullOrWhiteSpace(qso.SRX)) adif.AppendFormat("<sig:{0}>{1}", qso.SRX.Length, qso.SRX);
                 if (!string.IsNullOrWhiteSpace(qso.STX)) adif.AppendFormat("<my_sig:{0}>{1}", qso.STX.Length, qso.STX);
+
+                // ===== PROPOSED contest_id tag — pending Holyland score-processor approval (2026-06) =====
+                // Additive only: identifies which contest this log is for, e.g. <contest_id:8>HOLYLAND.
+                // Every other field above is unchanged, so existing parsers are unaffected. The value
+                // comes from the active contest's Cabrillo name and is passed in only by the full-log
+                // file exports. TO REVERT IF NOT APPROVED: delete this block and the `contestId`
+                // parameter, and drop the argument at the call sites (search "PROPOSED contest_id").
+                if (!string.IsNullOrWhiteSpace(contestId))
+                    adif.AppendFormat("<contest_id:{0}>{1}", contestId.Length, contestId);
+                // ===== end PROPOSED contest_id tag =====
                 if (!string.IsNullOrWhiteSpace(qso.PROP_MODE)) adif.AppendFormat("<prop_mode:{0}>{1}", qso.PROP_MODE.Length, qso.PROP_MODE);
                 else if (qso.Band == "13CM") adif.AppendFormat("<prop_mode:{0}>{1}", 3, "SAT");
                 if (!string.IsNullOrWhiteSpace(qso.SAT_NAME)) adif.AppendFormat("<sat_name:{0}>{1}", qso.SAT_NAME.Length, qso.SAT_NAME);

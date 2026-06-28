@@ -1457,7 +1457,7 @@ namespace HolyLogger
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
                 qso.Operator = TB_Operator.Text;
-                qso.STX = ContestSendExchangeForLog();
+                qso.STX = TB_MyHolyland.Text;
                 qso.MyLocator = TB_MyLocator.Text;
                 qso.DXLocator = TB_DXLocator.Text;
                 qso.RST_RCVD = TB_RSTRcvd.Text;
@@ -4550,8 +4550,7 @@ namespace HolyLogger
 
             try
             {
-                // PROPOSED contest_id tag — pass the active contest so the exported file is tagged.
-                string adif = Services.GenerateAdif(dal.GetAllQSOs(), Contests.ContestService.Active?.CabrilloName);
+                string adif = Services.GenerateAdif(dal.GetAllQSOs());
                 System.IO.File.WriteAllText(saveDialog.FileName, adif);
             }
             catch (Exception ex)
@@ -4840,8 +4839,7 @@ namespace HolyLogger
 
         private void ExportMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // PROPOSED contest_id tag — pass the active contest so the exported file is tagged.
-            string adif = Services.GenerateAdif(dal.GetAllQSOs(), Contests.ContestService.Active?.CabrilloName);
+            string adif = Services.GenerateAdif(dal.GetAllQSOs());
             SaveFileDialog saveFileDialog1 = new SaveFileDialog();
             saveFileDialog1.Filter = "ADIF File|*.adi";
             saveFileDialog1.Title = "Export ADIF";
@@ -5558,10 +5556,6 @@ namespace HolyLogger
             Contests.ContestService.Activate(c);
             Properties.Settings.Default.ContestMode = true;
             Properties.Settings.Default.ActiveContestId = c.Id;
-            // A freshly selected contest starts clean: serial back to 001 and no zone override (use
-            // cty.dat). A restart mid-contest goes through Activate (not here), so it resumes instead.
-            Properties.Settings.Default.ContestNextSerial = 1;
-            Properties.Settings.Default.ContestMyZoneOverride = string.Empty;
             Properties.Settings.Default.Save();
             UpdateContestModeMenuHeader();
             ApplyContestExchangeUI();
@@ -5620,11 +5614,9 @@ namespace HolyLogger
 
             string myCall = TB_MyCallsign != null ? TB_MyCallsign.Text : string.Empty;
             string dxCall = TB_DXCallsign != null ? TB_DXCallsign.Text : string.Empty;
-            string myCont = ContinentOf(myCall);
-            string dxCont = ContinentOf(dxCall);
 
-            // RECEIVED: what the WORKED station sends (asymmetric contests switch on the DX callsign).
-            var fields = Contests.ContestService.GetReceivedFields(contest, dxCall, dxCont)
+            // RECEIVED: what the WORKED station sends (Holyland switches on the DX callsign).
+            var fields = Contests.ContestService.GetReceivedFields(contest, dxCall)
                 .Where(f => !IsRstField(f)).ToList();
             _contestRxSig = string.Join(",", fields);
 
@@ -5645,29 +5637,27 @@ namespace HolyLogger
                 _contestRxBoxes.Add(box);
             }
 
-            // SEND frame: RST(S) first (aligned under RST-R), then EVERY field of the SENT exchange
-            // (asymmetric contests switch on MY callsign). Each is auto-filled (serial/zone/area) or a
-            // remembered editable value, and skipped by Tab — the operator types received data.
+            // SEND frame: RST(S) first (aligned under RST-R), then the outgoing field from the SENT
+            // exchange (Holyland switches on MY callsign), auto-filled and read-only. Out of the Tab path.
             _contestSendSerialBox = null;
-            _contestSendBoxes.Clear();
             if (ContestTxPanel != null)
             {
                 TextBox rsts = AddContestCell("RST S", 52, null, ContestTxPanel);
                 rsts.Text = TB_RSTSent != null ? TB_RSTSent.Text : "59";
                 rsts.TextChanged += (s, e2) => { if (TB_RSTSent != null) TB_RSTSent.Text = rsts.Text; };
 
-                var sentFields = Contests.ContestService.GetSentFields(contest, myCall, myCont)
+                var sentFields = Contests.ContestService.GetSentFields(contest, myCall)
                     .Where(f => !IsRstField(f)).ToList();
-                foreach (string sf in sentFields)
+                if (sentFields.Count > 0)
                 {
+                    string sf = sentFields[0];
                     ContestFieldUi(sf, out string slabel, out double swidth);
                     TextBox sbox = AddContestCell(slabel, swidth, null, ContestTxPanel);
-                    sbox.IsTabStop = false;                 // auto-filled, but editable; skipped by Tab
-                    sbox.Text = GetSendFieldValue(sf, myCall);   // set before wiring, so it isn't "an edit"
-                    string fieldKey = (sf ?? string.Empty).ToUpperInvariant();
-                    sbox.TextChanged += (s, e2) => SaveSendFieldEdit(fieldKey, sbox.Text);
-                    if (fieldKey == "SERIAL") _contestSendSerialBox = sbox;
-                    _contestSendBoxes.Add(sbox);
+                    sbox.IsReadOnly = true;                 // auto value, not typed
+                    sbox.IsTabStop = false;
+                    sbox.Text = GetSendFieldValue(sf, myCall);
+                    if (string.Equals(sf, "SERIAL", StringComparison.OrdinalIgnoreCase))
+                        _contestSendSerialBox = sbox;       // refreshed after each logged QSO
                 }
                 ContestTxPanel.Visibility = Visibility.Visible;
             }
@@ -5682,36 +5672,23 @@ namespace HolyLogger
         // rebuild the received frame, and Add can advance the serial, without a full re-render otherwise.
         private string _contestRxSig = string.Empty;
         private TextBox _contestSendSerialBox;
-        private readonly List<TextBox> _contestSendBoxes = new List<TextBox>();
-
-        // The cty.dat continent ("NA","AS",…) for a callsign, used to pick asymmetric exchange variants.
-        private string ContinentOf(string call)
-        {
-            if (rem == null || string.IsNullOrWhiteSpace(call)) return null;
-            var d = rem.GetDXCC(call.Trim());
-            return d != null ? d.Continent : null;
-        }
 
         private static bool IsRstField(string f) =>
             string.Equals(f, "RST", StringComparison.OrdinalIgnoreCase) ||
             string.Equals(f, "RS", StringComparison.OrdinalIgnoreCase);
 
-        // The value your station sends for a given exchange field: the operator's override for the
-        // current contest if set, otherwise the auto value (cty.dat zone / serial counter / my square).
+        // The auto-filled value your station sends for a given exchange field.
         private string GetSendFieldValue(string field, string myCall)
         {
-            string zoneOverride = (Properties.Settings.Default.ContestMyZoneOverride ?? string.Empty).Trim();
             switch ((field ?? string.Empty).ToUpperInvariant())
             {
                 case "CQ_ZONE":
                 {
-                    if (zoneOverride.Length > 0) return zoneOverride;
                     var d = rem != null ? rem.GetDXCC((myCall ?? string.Empty).Trim()) : null;
                     return d != null && d.CqZone > 0 ? d.CqZone.ToString() : string.Empty;
                 }
                 case "ITU_ZONE":
                 {
-                    if (zoneOverride.Length > 0) return zoneOverride;
                     var d = rem != null ? rem.GetDXCC((myCall ?? string.Empty).Trim()) : null;
                     return d != null && d.ItuZone > 0 ? d.ItuZone.ToString() : string.Empty;
                 }
@@ -5720,80 +5697,8 @@ namespace HolyLogger
                 case "HOLYLAND_AREA":
                     return Properties.Settings.Default.my_square ?? string.Empty;
                 default:
-                    // Anything else (NAME, STATE, SECTION, CHECK, GRID, …) has no automatic source, so
-                    // we reuse whatever the operator last typed for that field (remembered across the
-                    // contest and restarts).
-                    return GetRememberedSendValue((field ?? string.Empty).ToUpperInvariant());
+                    return string.Empty;
             }
-        }
-
-        // A small remembered store of operator-typed send values keyed by field name, persisted as a
-        // simple "FIELD=value" line list in settings so fields like NAME / STATE survive restarts.
-        private static Dictionary<string, string> LoadRememberedSendValues()
-        {
-            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            string raw = Properties.Settings.Default.ContestSendValues ?? string.Empty;
-            foreach (string line in raw.Split(new[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                int eq = line.IndexOf('=');
-                if (eq > 0) map[line.Substring(0, eq)] = line.Substring(eq + 1);
-            }
-            return map;
-        }
-
-        private static string GetRememberedSendValue(string fieldKey)
-        {
-            return LoadRememberedSendValues().TryGetValue(fieldKey, out string v) ? v : string.Empty;
-        }
-
-        private static void SetRememberedSendValue(string fieldKey, string value)
-        {
-            var map = LoadRememberedSendValues();
-            map[fieldKey] = value;
-            Properties.Settings.Default.ContestSendValues =
-                string.Join("\n", map.Select(kv => kv.Key + "=" + kv.Value));
-            Properties.Settings.Default.Save();
-        }
-
-        // Persists an operator edit to an auto-filled send box so it sticks for the rest of the contest
-        // and across restarts. A serial keeps counting from the entered number; a zone overrides cty.dat.
-        private void SaveSendFieldEdit(string fieldKey, string text)
-        {
-            string t = (text ?? string.Empty).Trim();
-            switch (fieldKey)
-            {
-                case "SERIAL":
-                    if (int.TryParse(t, out int n) && n > 0)
-                    {
-                        Properties.Settings.Default.ContestNextSerial = n;
-                        Properties.Settings.Default.Save();
-                    }
-                    break;
-                case "CQ_ZONE":
-                case "ITU_ZONE":
-                    Properties.Settings.Default.ContestMyZoneOverride = t;
-                    Properties.Settings.Default.Save();
-                    break;
-                case "HOLYLAND_AREA":
-                    Properties.Settings.Default.my_square = t;
-                    Properties.Settings.Default.Save();
-                    break;
-                default:
-                    SetRememberedSendValue(fieldKey, t);
-                    break;
-            }
-        }
-
-        // The sent-exchange string stored on a QSO (ADIF stx_string). In a contest it's the joined
-        // send-box values (serial / zone / area / …); otherwise the Holyland square, as before. For
-        // Holyland this resolves to the same square value, so existing logs are unchanged.
-        private string ContestSendExchangeForLog()
-        {
-            if (Contests.ContestService.Active != null && _contestSendBoxes.Count > 0)
-                return string.Join(" ", _contestSendBoxes
-                    .Select(b => (b.Text ?? string.Empty).Trim())
-                    .Where(s => s.Length > 0));
-            return TB_MyHolyland.Text;
         }
 
         // After logging a QSO in a contest whose sent exchange is a serial number, bump the running
@@ -5803,7 +5708,7 @@ namespace HolyLogger
             var c = Contests.ContestService.Active;
             if (c == null) return;
             string myCall = TB_MyCallsign != null ? TB_MyCallsign.Text : string.Empty;
-            bool sendsSerial = Contests.ContestService.GetSentFields(c, myCall, ContinentOf(myCall))
+            bool sendsSerial = Contests.ContestService.GetSentFields(c, myCall)
                 .Any(f => string.Equals(f, "SERIAL", StringComparison.OrdinalIgnoreCase));
             if (!sendsSerial) return;
 
@@ -5820,7 +5725,7 @@ namespace HolyLogger
             var c = Contests.ContestService.Active;
             if (c == null || !c.Asymmetric) return;
             string dxCall = TB_DXCallsign != null ? TB_DXCallsign.Text : string.Empty;
-            var rf = Contests.ContestService.GetReceivedFields(c, dxCall, ContinentOf(dxCall))
+            var rf = Contests.ContestService.GetReceivedFields(c, dxCall)
                 .Where(f => !IsRstField(f));
             if (string.Join(",", rf) != _contestRxSig)
                 ApplyContestExchangeUI();
@@ -5958,16 +5863,6 @@ namespace HolyLogger
                 case "PRECEDENCE": label = "Prec"; width = 44; break;
                 case "CHECK": label = "Check"; width = 48; break;
                 case "MEMBER_NR": label = "Member#"; width = 64; break;
-                case "CALLSIGN": label = "Call"; width = 90; break;
-                case "FIELD_DAY_CLASS": label = "Class"; width = 56; break;
-                case "GRID": label = "Grid"; width = 64; break;
-                case "DXCC": label = "DXCC"; width = 56; break;
-                case "STATE_PROVINCE_DXCC": label = "St/Pr/DX"; width = 72; break;
-                case "STATE_OR_SERIAL": label = "St/Ser"; width = 64; break;
-                case "UTC_TIME": label = "UTC"; width = 56; break;
-                case "IARU_HQ_ABBREVIATION": label = "Zone/HQ"; width = 64; break;
-                case "AGE_GROUP": label = "Age"; width = 48; break;
-                case "DX": label = "Power"; width = 56; break;
                 default: label = field; width = 70; break;
             }
         }
@@ -6578,8 +6473,7 @@ namespace HolyLogger
             if (HolyMessageBox.ShowConfirm("Are you sure you want to clear the entire log?", "Delete Confirmation", HolyMsgType.Warning, this))
             {
 
-                // PROPOSED contest_id tag — the pre-clear backup file is tagged with the active contest.
-                string adif = Services.GenerateAdif(dal.GetAllQSOs(), Contests.ContestService.Active?.CabrilloName);
+                string adif = Services.GenerateAdif(dal.GetAllQSOs());
                 try
                 {
                     // Saves the Image via a FileStream created by the OpenFile method.
@@ -6626,8 +6520,7 @@ namespace HolyLogger
                 Directory.CreateDirectory(AutosaveDir);
                 string filename = Path.Combine(AutosaveDir,
                     "autosave_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi");
-                // PROPOSED contest_id tag — autosave backup is tagged with the active contest.
-                File.WriteAllText(filename, Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName), Encoding.UTF8);
+                File.WriteAllText(filename, Services.GenerateAdif(qsos), Encoding.UTF8);
 
                 PruneAutosaves(AutosaveDir);
             }
