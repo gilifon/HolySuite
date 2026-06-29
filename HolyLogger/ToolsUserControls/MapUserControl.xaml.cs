@@ -117,6 +117,11 @@ namespace HolyLogger.ToolsUserControls
             _isPolar = Properties.Settings.Default.MapUsePolar;
             _tempMapFile = Path.Combine(Path.GetTempPath(), "holylogger_map.html");
             MapBrowser.ObjectForScripting = new MapScriptHelper(this);
+            // The IE WebBrowser control resets its "Silent" flag on every navigation, so a script
+            // error that fires while the page is still loading would pop the native IE error dialog
+            // before LoadCompleted runs. Re-suppress on Navigated (fires before body scripts run) so
+            // the dialog never appears on any navigation, not just the first.
+            MapBrowser.Navigated += (s, e) => SuppressScriptErrors();
             MapBrowser.LoadCompleted += (s, e) =>
             {
                 SuppressScriptErrors();
@@ -140,15 +145,31 @@ namespace HolyLogger.ToolsUserControls
                 {
                     // Force the browser to recalculate and trigger resize by dispatching event
                     // and then explicitly forcing a layout recalculation
-                    MapBrowser.InvokeScript("eval", new object[] { 
+                    MapBrowser.InvokeScript("eval", new object[] {
                         @"
                         (function() {
-                            window.dispatchEvent(new Event('resize'));
+                            // The legacy WebBrowser engine may not support the Event() constructor,
+                            // which throws 'object doesn't support this property or method'. Build the
+                            // resize event in a way that works on both modern and legacy engines.
+                            function fireResize() {
+                                try {
+                                    if (typeof Event === 'function') {
+                                        window.dispatchEvent(new Event('resize'));
+                                    } else if (document.createEvent) {
+                                        var ev = document.createEvent('Event');
+                                        ev.initEvent('resize', true, true);
+                                        window.dispatchEvent(ev);
+                                    } else if (window.fireEvent) {
+                                        window.fireEvent('onresize');
+                                    }
+                                } catch (e) {}
+                            }
+                            fireResize();
                             if (typeof svg !== 'undefined') {
-                                setTimeout(function() { window.dispatchEvent(new Event('resize')); }, 50);
+                                setTimeout(fireResize, 50);
                             }
                         })();
-                        " 
+                        "
                     });
                 }
                 catch { }

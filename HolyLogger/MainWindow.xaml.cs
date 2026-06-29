@@ -6063,7 +6063,9 @@ namespace HolyLogger
                 _startupCallsignChecked = true;
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    ShowStationCallsignServicesAlert(TB_MyCallsign.Text?.Trim(), isStartup: true);
+                    // DISABLED per user request (2026-06-29): the "Station callsign changed" popup is
+                    // suppressed for now. Uncomment to bring it back once we decide how to present it.
+                    // ShowStationCallsignServicesAlert(TB_MyCallsign.Text?.Trim(), isStartup: true);
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
@@ -11522,7 +11524,9 @@ namespace HolyLogger
             if (string.IsNullOrEmpty(now)) return;
             if (string.Equals(now, _callsignOnFocus, StringComparison.OrdinalIgnoreCase)) return;
             _callsignOnFocus = now;
-            ShowStationCallsignServicesAlert(now);
+            // DISABLED per user request (2026-06-29): the "Station callsign changed" popup is
+            // suppressed for now. Uncomment to bring it back once we decide how to present it.
+            // ShowStationCallsignServicesAlert(now);
         }
 
         // When the operator switches to a different Station Callsign, summarise how each upload

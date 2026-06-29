@@ -1,6 +1,7 @@
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 
 namespace HolyLogger
@@ -165,6 +166,19 @@ namespace HolyLogger
         {
             _done.TrySetResult(true);
             Close();
+        }
+
+        // Let the keyboard dismiss the window once the upload has finished (OK is showing).
+        // Ignored while uploading so a keypress can't abort an in-progress upload.
+        private void Window_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (OkBtn.Visibility != Visibility.Visible) return;
+            if (e.Key == Key.Escape || e.Key == Key.Enter)
+            {
+                e.Handled = true;
+                _done.TrySetResult(true);
+                Close();
+            }
         }
 
         protected override void OnClosing(System.ComponentModel.CancelEventArgs e)

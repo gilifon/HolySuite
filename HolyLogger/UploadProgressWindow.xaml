@@ -5,7 +5,8 @@
         WindowStartupLocation="CenterOwner"
         ResizeMode="NoResize"
         Background="#F6F6F6"
-        FontFamily="Segoe UI">
+        FontFamily="Segoe UI"
+        KeyDown="Window_KeyDown">
     <Grid Margin="22,18,22,20">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -45,6 +46,7 @@
                 Content="OK" Width="110" Height="34" FontSize="14"
                 HorizontalAlignment="Right" Margin="0,12,0,0"
                 Background="#1A73E8" Foreground="White" BorderThickness="0"
+                IsDefault="True" IsCancel="True"
                 Visibility="Collapsed" Click="OkBtn_Click"/>
     </Grid>
 </Window>

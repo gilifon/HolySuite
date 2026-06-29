@@ -12,6 +12,12 @@ namespace HolyLogger
     public partial class HolyMessageBox : Window
     {
         [DllImport("user32.dll")] private static extern bool SetForegroundWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] private static extern IntPtr SetFocus(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern IntPtr SetActiveWindow(IntPtr hWnd);
+        [DllImport("user32.dll")] private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+        [DllImport("user32.dll")] private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+        [DllImport("kernel32.dll")] private static extern uint GetCurrentThreadId();
 
         public bool Confirmed { get; private set; }
 
@@ -37,44 +43,89 @@ namespace HolyLogger
             // focus on a button so that's guaranteed.
             AddHandler(Keyboard.PreviewKeyDownEvent, new KeyEventHandler(OnDialogPreviewKeyDown), true);
 
+            // Raw Win32 hook: acts on Esc directly the moment WM_KEYDOWN reaches this dialog's HWND,
+            // so it works even if WPF's input routing is being bypassed.
+            SourceInitialized += (s, e) =>
+            {
+                var src = PresentationSource.FromVisual(this) as HwndSource;
+                if (src != null) src.AddHook(WndHook);
+            };
+
             ContentRendered += (s, e) =>
             {
                 try
                 {
-                    Activate();
-                    IntPtr h = new WindowInteropHelper(this).Handle;
-                    if (h != IntPtr.Zero) SetForegroundWindow(h);
+                    ForceKeyboardFocus();
                     IInputElement btn = OkBtn.Visibility == Visibility.Visible ? (IInputElement)OkBtn : YesBtn;
                     Keyboard.Focus(btn);
-                    DiagLog($"opened title='{Title}' IsActive={IsActive} focus={Keyboard.FocusedElement?.GetType().Name ?? "null"}");
                 }
-                catch (Exception ex) { DiagLog("open-error " + ex.Message); }
+                catch { }
             };
+
+            // If the dialog opens while another window (e.g. the embedded WebBrowser map) still holds
+            // the Win32 keyboard focus, simply becoming the foreground window is NOT enough — physical
+            // keystrokes go to GetFocus(), which stays null/elsewhere, so Esc is silently dropped even
+            // though the dialog looks active. Re-assert real keyboard focus whenever we are activated.
+            Activated += (s, e) => { try { ForceKeyboardFocus(); } catch { } };
+        }
+
+        // Force this dialog's HWND to actually own the Win32 keyboard focus. AttachThreadInput ties our
+        // input queue to the current foreground thread so SetForegroundWindow/SetFocus are honoured even
+        // when another window currently has focus; without this, GetFocus() can stay 0 and no key events
+        // are delivered to the window.
+        private void ForceKeyboardFocus()
+        {
+            Activate();
+            IntPtr h = new WindowInteropHelper(this).Handle;
+            if (h == IntPtr.Zero) return;
+
+            IntPtr fg = GetForegroundWindow();
+            uint myThread = GetCurrentThreadId();
+            uint fgThread = fg != IntPtr.Zero ? GetWindowThreadProcessId(fg, out _) : myThread;
+
+            bool attached = fgThread != myThread && AttachThreadInput(myThread, fgThread, true);
+            try
+            {
+                SetForegroundWindow(h);
+                SetActiveWindow(h);
+                SetFocus(h);
+            }
+            finally
+            {
+                if (attached) AttachThreadInput(myThread, fgThread, false);
+            }
+        }
+
+        // Win32 message hook on this dialog's window. WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104,
+        // VK_ESCAPE = 0x1B. Closes the dialog the moment an Esc keystroke reaches this HWND.
+        private IntPtr WndHook(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+        {
+            if (msg == 0x0100 || msg == 0x0104)
+            {
+                int vk = (int)wParam;
+                if (vk == 0x1B) // Esc — close directly from the raw message
+                {
+                    Confirmed = false;
+                    handled = true;
+                    Dispatcher.BeginInvoke(new Action(Close));
+                }
+            }
+            return IntPtr.Zero;
         }
 
         private void OnDialogPreviewKeyDown(object sender, KeyEventArgs e)
         {
-            DiagLog($"PreviewKeyDown {e.Key} IsActive={IsActive} focus={Keyboard.FocusedElement?.GetType().Name ?? "null"}");
             if (e.Key == Key.Escape) { Confirmed = false; e.Handled = true; Close(); }
         }
 
         // Esc closes the dialog (also wired as Window.KeyDown in XAML). For confirm dialogs Esc = No.
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            DiagLog($"KeyDown {e.Key}");
             if (e.Key == Key.Escape)
             {
                 Confirmed = false;
                 Close();
             }
-        }
-
-        // TEMPORARY diagnostics — confirms whether key events actually reach this dialog at startup.
-        private static void DiagLog(string msg)
-        {
-            try { System.IO.File.AppendAllText(@"C:\temp\holymsg_keylog.txt",
-                DateTime.Now.ToString("HH:mm:ss.fff") + "  " + msg + Environment.NewLine); }
-            catch { }
         }
 
         private void ApplyType(HolyMsgType type)
