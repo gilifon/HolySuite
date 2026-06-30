@@ -77,6 +77,11 @@ namespace HolyLogger.ToolsUserControls
         private System.Collections.Generic.List<ClusterSpotInfo> _clusterSpots;
         private double _clusterHomeLat, _clusterHomeLon;
         private bool _clusterMapLoaded;
+        // For the polar home/DX map: once it has loaded with a given home, later DX-only changes
+        // (typing/clearing the DX callsign) are pushed via JS (updateDx) instead of a full reload,
+        // so the embedded d3 isn't re-parsed and the countries aren't rebuilt (keeps F9 fast).
+        private bool _homeMapLoaded;
+        private double? _renderedHomeLat, _renderedHomeLon;
 
         public bool IsClusterMode => _isClusterMode;
 
@@ -108,6 +113,7 @@ namespace HolyLogger.ToolsUserControls
         {
             _isPolar = !_isPolar;
             _clusterMapLoaded = false;
+            _homeMapLoaded = false;
             Properties.Settings.Default.MapUsePolar = _isPolar;
             Properties.Settings.Default.Save();
             if (_isClusterMode)
@@ -132,6 +138,8 @@ namespace HolyLogger.ToolsUserControls
                 SuppressScriptErrors();
                 if (_isClusterMode)
                     _clusterMapLoaded = true;
+                else if (_isPolar)
+                    _homeMapLoaded = true;
             };
             this.SizeChanged += MapUserControl_SizeChanged;
         }
@@ -1497,6 +1505,23 @@ window.addEventListener('resize', function() {
                 marginMultiplier = 1.15;
             }
 
+            // FAST PATH: polar home/DX map already loaded and the home (map center) is unchanged.
+            // Only the DX/spotter/zoom differ, so push them via JS (no reload, no d3 re-parse, no
+            // country rebuild). This is what makes clearing the DX callsign (F9) react quickly.
+            double centerLatNow = _currentHomeLat ?? _currentLat;
+            double centerLonNow = _currentHomeLon ?? _currentLon;
+            if (_isPolar && !_isClusterMode && _homeMapLoaded
+                && _renderedHomeLat.HasValue && _renderedHomeLon.HasValue
+                && Math.Abs(_renderedHomeLat.Value - centerLatNow) < 1e-9
+                && Math.Abs(_renderedHomeLon.Value - centerLonNow) < 1e-9)
+            {
+                if (TryUpdateDxViaJs())
+                {
+                    _lastRenderedHtml = null;  // overlay changed; force a real diff on the next full render
+                    return;
+                }
+            }
+
             string html = _isPolar
                 ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier, _currentSpotterLat, _currentSpotterLon)
                 : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier);
@@ -1505,10 +1530,46 @@ window.addEventListener('resize', function() {
             if (html == _lastRenderedHtml) return;
             _lastRenderedHtml = html;
 
+            // A full reload is happening: remember the home/center it loads with, and mark the map
+            // not-yet-loaded until LoadCompleted (so DX changes during the load still reload safely).
+            _homeMapLoaded = false;
+            _renderedHomeLat = centerLatNow;
+            _renderedHomeLon = centerLonNow;
+
             File.WriteAllText(_tempMapFile, html, System.Text.Encoding.UTF8);
             var uriBuilder = new UriBuilder(new Uri(_tempMapFile));
             uriBuilder.Query = "v=" + DateTime.UtcNow.Ticks.ToString();
             MapBrowser.Navigate(uriBuilder.Uri);
+        }
+
+        // Push the current DX / spotter / radius to the already-loaded polar home map's updateDx()
+        // JS function, so the map updates without a full reload. Returns false if the call fails
+        // (then RenderMap falls back to a full reload).
+        private bool TryUpdateDxViaJs()
+        {
+            try
+            {
+                var ic = System.Globalization.CultureInfo.InvariantCulture;
+                bool hasDx = _currentHomeLat.HasValue && _currentHomeLon.HasValue;   // home set => lat/lon is a real DX
+                bool hasSp = _currentSpotterLat.HasValue && _currentSpotterLon.HasValue;
+                double az = _currentAzimuth ?? 0;
+                MapBrowser.InvokeScript("updateDx", new object[]
+                {
+                    hasDx ? "1" : "0",
+                    _currentLat.ToString(ic),
+                    _currentLon.ToString(ic),
+                    az.ToString(ic),
+                    hasSp ? "1" : "0",
+                    hasSp ? _currentSpotterLat.Value.ToString(ic) : "0",
+                    hasSp ? _currentSpotterLon.Value.ToString(ic) : "0",
+                    _currentRadiusKm.ToString(ic)
+                });
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         public void ClearMap()
@@ -2160,13 +2221,15 @@ var overlaysG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 function drawOverlays() {
     overlaysG.selectAll('*').remove();
 
-    // Great-circle line home -> DX
-    try {
-        var gcLine = { type: 'LineString', coordinates: [[centerLon, centerLat], [dxLon, dxLat]] };
-        overlaysG.append('path').datum(gcLine).attr('d', path)
-            .attr('fill', 'none').attr('stroke', '#90CAF9').attr('stroke-width', 2.5)
-            .attr('stroke-dasharray', '7,4').attr('clip-path', 'url(#globe-clip)');
-    } catch(e2) {}
+    // Great-circle line home -> DX (only when a DX is referenced)
+    if (hasDxReference) {
+        try {
+            var gcLine = { type: 'LineString', coordinates: [[centerLon, centerLat], [dxLon, dxLat]] };
+            overlaysG.append('path').datum(gcLine).attr('d', path)
+                .attr('fill', 'none').attr('stroke', '#90CAF9').attr('stroke-width', 2.5)
+                .attr('stroke-dasharray', '7,4').attr('clip-path', 'url(#globe-clip)');
+        } catch(e2) {}
+    }
 
     // Home dot (projected): may move away from center while dragging view
     try {
@@ -2178,15 +2241,17 @@ function drawOverlays() {
         }
     } catch(eHome) {}
 
-    // DX dot
-    try {
-        var dxPt = projection([dxLon, dxLat]);
-        if (dxPt && isFinite(dxPt[0]) && isFinite(dxPt[1])) {
-            overlaysG.append('circle')
-            .attr('cx', dxPt[0]).attr('cy', dxPt[1]).attr('r', 4)
-            .attr('fill', '#E53935').attr('stroke', 'none');
-        }
-    } catch(e3) {}
+    // DX dot (only when a DX is referenced)
+    if (hasDxReference) {
+        try {
+            var dxPt = projection([dxLon, dxLat]);
+            if (dxPt && isFinite(dxPt[0]) && isFinite(dxPt[1])) {
+                overlaysG.append('circle')
+                .attr('cx', dxPt[0]).attr('cy', dxPt[1]).attr('r', 4)
+                .attr('fill', '#E53935').attr('stroke', 'none');
+            }
+        } catch(e3) {}
+    }
 
     // Spotter dot (black) - the spotter of the selected cluster spot, so pressing DE
     // (which centers on the spotter) lands on a visible marker.
@@ -2204,6 +2269,35 @@ function drawOverlays() {
     // Outer border ring
     overlaysG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', mapR)
         .attr('fill', 'none').attr('stroke', '#2a607a').attr('stroke-width', 2);
+}
+
+// Update the DX / spotter in place WITHOUT reloading the page (called from C# when only the
+// DX changes, e.g. typing or clearing the DX callsign). This avoids re-parsing the embedded d3
+// and rebuilding the country DOM, so clearing (F9) is fast. Same home center is assumed.
+function updateDx(hasDxStr, dLat, dLon, az, hasSpStr, sLat, sLon, newRadiusKm) {
+    dxLat = parseFloat(dLat); dxLon = parseFloat(dLon);
+    azimuthDeg = parseFloat(az);
+    spotterLat = parseFloat(sLat); spotterLon = parseFloat(sLon);
+    hasSpotter = (hasSpStr === '1' || hasSpStr === true || hasSpStr === 'true');
+    hasDxReference = (hasDxStr === '1' || hasDxStr === true || hasDxStr === 'true') && isFinite(dxLat) && isFinite(dxLon);
+    radiusKm = parseInt(newRadiusKm, 10);
+    dxDistKm = (hasHomeReference && hasDxReference) ? haversineKm(centerLat, centerLon, dxLat, dxLon) : null;
+
+    var azEl = document.getElementById('az-only');
+    if (azEl) azEl.innerHTML = hasDxReference
+        ? ('AZ ' + Math.round(azimuthDeg) + '&deg;' + '<br>(' + Math.round((azimuthDeg + 180) % 360) + '&deg;)')
+        : 'AZ --';
+    var distEl = document.getElementById('distance-box');
+    if (distEl) distEl.innerHTML = hasDxReference ? formatDistanceText(dxDistKm) : 'DIST --';
+    var dxBtn = document.getElementById('dx-center-btn');
+    if (dxBtn) dxBtn.style.display = hasDxReference ? '' : 'none';
+
+    viewCenterLat = centerLat; viewCenterLon = centerLon;
+    applyViewCenter();
+    scaleToRadius();
+    countriesG.selectAll('path').attr('d', path);
+    svg.selectAll('.graticule-path').attr('d', path);
+    drawRings(); drawRadiusRing(radiusKm); drawOverlays();
 }
 drawOverlays();
 
