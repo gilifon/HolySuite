@@ -40,11 +40,13 @@
 
         <DockPanel Grid.Row="2" Margin="0,12,0,0">
             <Button x:Name="Btn_Exit" Content="Exit contest" DockPanel.Dock="Left"
-                    Padding="12,6" Click="Btn_Exit_Click"/>
+                    Padding="12,6" Click="Btn_Exit_Click"
+                    FontSize="16" FontWeight="Bold"/>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button x:Name="Btn_Cancel" Content="Cancel" Padding="14,6" Margin="0,0,8,0" Click="Btn_Cancel_Click"/>
+                <Button x:Name="Btn_Cancel" Content="Cancel" Padding="14,6" Margin="0,0,8,0" Click="Btn_Cancel_Click"
+                        FontSize="16"/>
                 <Button x:Name="Btn_Activate" Content="Activate" Padding="18,6" FontWeight="Bold"
-                        IsEnabled="False" Click="Btn_Activate_Click"/>
+                        FontSize="16" IsEnabled="False" Click="Btn_Activate_Click"/>
             </StackPanel>
         </DockPanel>
     </Grid>

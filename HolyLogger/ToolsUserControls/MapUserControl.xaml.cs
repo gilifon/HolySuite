@@ -84,7 +84,11 @@ namespace HolyLogger.ToolsUserControls
         public event Action<string> SpotHovered;
         public event Action SpotHoverEnded;
 
-        internal void RaiseRadiusChanged(int km) => RadiusChanged?.Invoke(km);
+        // The map's JavaScript reports radius changes (wheel/dropdown) here. Keep _currentRadiusKm
+        // in sync so the next ShowClusterSpots does NOT see a radius change and trigger a full
+        // re-render — that re-render would recenter the map on home and lose a view the user has
+        // dragged/zoomed to. The JS already rescaled the view itself.
+        internal void RaiseRadiusChanged(int km) { _currentRadiusKm = km; RadiusChanged?.Invoke(km); }
         internal void RaiseSpotTuneRequested(string freq, string mode) => SpotTuneRequested?.Invoke(freq, mode);
         internal void RaiseSpotHovered(string callsign) => SpotHovered?.Invoke(callsign);
         internal void RaiseSpotHoverEnded() => SpotHoverEnded?.Invoke();
@@ -737,7 +741,7 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
 <meta charset='utf-8'/>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  html, body { width:100%; height:100%; overflow:hidden; background:#1a2a3a; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#000000; }
   #polar-svg { position:absolute; top:0; left:0; width:100%; height:100%; }
   #proj-btn {
     position:absolute; top:0; right:0; z-index:1000;
@@ -755,7 +759,7 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000; display:flex; align-items:flex-end;
   }
-  #radius-stack { display:flex; flex-direction:column; align-items:center; }
+  #radius-stack { display:flex; flex-direction:column; align-items:flex-start; }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
@@ -766,15 +770,15 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
     padding:2px 6px; font-size:13px; font-weight:700; font-family:sans-serif;
     color:#1a9e55; white-space:nowrap; text-align:center;
   }
-  #center-btn {
+  #center-btn, #home-btn, #de-btn {
     background:#9FCBF5; border:1px solid #4B76A0; border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333; height:24px; margin-bottom:2px;
     font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #center-btn:hover { background:#8CBDF0; }
-  #center-btn svg { width:16px; height:16px; }
-  #center-btn .de-label { margin-right:4px; }
+  #center-btn:hover, #home-btn:hover, #de-btn:hover { background:#8CBDF0; }
+  #center-btn svg, #home-btn svg, #de-btn svg { width:16px; height:16px; }
+  #center-btn .de-label, #de-btn .de-label { margin-right:4px; }
   #dx-center-btn {
     background:#9FCBF5; border:1px solid #4B76A0; border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
@@ -786,7 +790,7 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
   #dx-center-btn .dx-label { margin-right:4px; }
   #distance-stack {
     position:absolute; right:0; bottom:0; z-index:1000;
-    display:flex; flex-direction:column; align-items:center;
+    display:flex; flex-direction:column; align-items:flex-end;
   }
   #distance-box {
     background:rgba(255,255,255,0.9); border:1px solid #aaa;
@@ -834,17 +838,18 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
 <div id='az-only'>AZ --</div>
 <div id='bottom-ctrl'>
   <div id='radius-stack'>
-    <button id='center-btn' onclick='recenter()' title='Re-center map'><span class='de-label'>DE</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+    <button id='home-btn' title='Center on home' style='display:none'></button>
+    <button id='de-btn' title='Center on home'></button>
     <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
     <div id='radius-label'>-- km</div>
   </div>
 </div>
 <div id='distance-stack'>
-  <button id='dx-center-btn' onclick='recenter()' title='Re-center map'><span class='dx-label'>DX</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+  <button id='dx-center-btn' title='Center on DX' style='display:none'></button>
   <div id='distance-box'>DIST --</div>
 </div>
-<script src='https://d3js.org/d3.v5.min.js'></script>
-<script src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'></script>
+" + MapAssetProvider.D3ScriptTag + @"
+" + MapAssetProvider.CountryDataScriptTag + @"
 <script>
 window.onerror = function() { return true; };
 var centerLat = " + homeLatJs + @";
@@ -893,18 +898,18 @@ function scaleToRadius() {
 function applyViewCenter() { projection.rotate([-viewCenterLon, -viewCenterLat]); }
 
 var oceanFill = svg.append('circle').attr('class', 'ocean-fill').attr('cx', cx).attr('cy', cy).attr('r', mapR)
-    .attr('fill', '#4a90c4').attr('stroke', '#1a4060').attr('stroke-width', 2);
+    .attr('fill', '#b8e8ee').attr('stroke', '#000000').attr('stroke-width', 1.5);
 var countriesG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 svg.append('path').datum(d3.geoGraticule().step([30, 30])())
     .attr('class', 'graticule-path')
-    .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.15)').attr('stroke-width', 0.7)
+    .attr('fill', 'none').attr('stroke', '#6bb7c4').attr('stroke-width', 0.7)
     .attr('d', path).attr('clip-path', 'url(#globe-clip)');
 // Equator
 svg.append('path').datum({type:'LineString', coordinates:[[-180,0],[-90,0],[0,0],[90,0],[180,0]]})
     .attr('class', 'graticule-path')
-    .attr('fill','none').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.2)
+    .attr('fill','none').attr('stroke','rgba(0,0,0,0.55)').attr('stroke-width',1.2)
     .attr('d',path).attr('clip-path','url(#globe-clip)');
-var ringsG = svg.append('g');
+var ringsG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 function drawRings() {
     ringsG.selectAll('*').remove();
     for (var i = 1; i <= 5; i++) {
@@ -913,11 +918,11 @@ function drawRings() {
         if (ang >= Math.PI) continue;
         var r = projection.scale() * ang;
         ringsG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r)
-            .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.18)')
+            .attr('fill', 'none').attr('stroke', 'rgba(0,0,0,0.2)')
             .attr('stroke-width', 1).attr('stroke-dasharray', '4,3');
         var lbl = useMiles ? (Math.round(km * 0.621371) + ' mi') : (km + ' km');
         ringsG.append('text').attr('x', cx + 3).attr('y', cy - r - 2)
-            .attr('fill', 'rgba(255,255,255,0.4)').attr('font-size', '9px').text(lbl);
+            .attr('fill', 'rgba(0,0,0,0.45)').attr('font-size', '9px').text(lbl);
     }
 }
 drawRings();
@@ -933,7 +938,7 @@ function drawRadiusRing(km) {
 drawRadiusRing(radiusKm);
 
 // Solar position and day/night overlay
-var dayNightG = svg.append('g');
+var dayNightG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 
 function getSolarPosition() {
     var now = new Date();
@@ -1031,7 +1036,7 @@ function drawDayNight() {
         dayNightG.append('path')
             .datum({type: 'Polygon', coordinates: [nightCoords]})
             .attr('d', path)
-            .attr('fill', 'rgba(0,0,30,0.25)')
+            .attr('fill', 'rgba(0,0,170,0.3)')
             .attr('stroke', 'none');
         var sunPt = projection([sunPos.lon, sunPos.lat]);
         if (sunPt && isFinite(sunPt[0]) && isFinite(sunPt[1])) {
@@ -1068,7 +1073,7 @@ function drawDayNight() {
 drawDayNight();
 setInterval(drawDayNight, 60000);
 
-var overlaysG = svg.append('g');
+var overlaysG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 var tooltip = d3.select('body').append('div')
     .style('position','absolute').style('pointer-events','none')
     .style('background','rgba(255,255,255,0.95)').style('border','1px solid #aaa')
@@ -1133,6 +1138,7 @@ function drawOverlays() {
                         })
                         .on('mouseout', function() { tooltip.style('display','none'); try { window.external.SpotHoverEnd(); } catch(e4) {} })
                         .on('click', function() {
+                            selectSpot(spot);
                             try { window.external.TuneToSpot(spot.f, spot.m); } catch(e2) {}
                             try { window.external.SpotHoverEnd(); } catch(e5) {}
                         });
@@ -1148,25 +1154,21 @@ drawOverlays();
 drawDayNight();
 if (autoZoomActive) applyAutoZoom();
 
-var xhr = new XMLHttpRequest();
-xhr.open('GET', 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json', true);
-xhr.onreadystatechange = function() {
-    if (xhr.readyState !== 4) return;
-    if (xhr.status === 200) {
-        try {
-            var world = JSON.parse(xhr.responseText);
-            countriesG.selectAll('path').data(topojson.feature(world, world.objects.countries).features)
-                .enter().append('path').attr('d', path)
-                .attr('fill', '#5a8a6a').attr('stroke', '#2a4a3a').attr('stroke-width', 0.5);
-        } catch(e) {}
-    }
-    drawOverlays();
-    drawDayNight();
-    drawRadiusRing(radiusKm);
-    if (autoZoomActive) applyAutoZoom();
-};
-xhr.onerror = function() { drawOverlays(); if (autoZoomActive) applyAutoZoom(); };
-try { xhr.send(); } catch(e) { drawOverlays(); if (autoZoomActive) applyAutoZoom(); }
+// Offline colored countries from embedded window.DXCC_DATA (see non-cluster map for details).
+try {
+    var dxccFeatures = window.DXCC_DATA.features.map(function(f) {
+        return { type: 'Feature', properties: { ci: f.ci, p: f.p }, geometry: f.geometry };
+    });
+    var dxccPalette = window.DXCC_DATA.palette;
+    countriesG.selectAll('path').data(dxccFeatures).enter().append('path')
+        .attr('d', path)
+        .attr('fill', function(d) { return dxccPalette[d.properties.ci]; })
+        .attr('stroke', '#777777').attr('stroke-width', 0.4);
+} catch(e) {}
+drawOverlays();
+drawDayNight();
+drawRadiusRing(radiusKm);
+if (autoZoomActive) applyAutoZoom();
 
 function onRadiusChange(km) {
     radiusKm = parseInt(km, 10);
@@ -1183,6 +1185,68 @@ function recenter() {
     svg.selectAll('.graticule-path').attr('d', path);
     drawRings(); drawRadiusRing(radiusKm); drawOverlays(); drawDayNight();
 }
+
+// ---- Center buttons (Home / DE-spotter / DX) -------------------------------------------
+// Default (no spot picked): the bottom-left button is a Home icon -> center on home.
+// After the user clicks a spot dot: that button turns into 'DE' -> center on the spotter,
+// a Home icon button appears above it, and the bottom-right 'DX' button -> center on the DX.
+var CROSSHAIR_SVG = ""<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg>"";
+var HOME_SVG = ""<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10.5L12 3l9 7.5'/><path d='M5 9.5V21h5v-6h4v6h5V9.5'/></svg>"";
+
+var selActive = false, selSpotter = null, selDx = null;  // selected-spot centering state
+
+function panTo(lon, lat) {
+    if (!isFinite(lon) || !isFinite(lat)) return;
+    viewCenterLon = lon; viewCenterLat = lat;
+    applyViewCenter();
+    countriesG.selectAll('path').attr('d', path);
+    svg.selectAll('.graticule-path').attr('d', path);
+    drawRings(); drawRadiusRing(radiusKm); drawOverlays(); drawDayNight();
+}
+function centerOnHome()    { panTo(centerLon, centerLat); }
+function centerOnSpotter() { if (selSpotter) panTo(selSpotter[0], selSpotter[1]); }
+function centerOnDx()      { if (selDx) panTo(selDx[0], selDx[1]); }
+
+function selectSpot(spot) {
+    selActive = true;
+    selSpotter = spot.sp ? [spot.sp[0], spot.sp[1]] : null;
+    selDx = spot.c ? [spot.c[0], spot.c[1]] : null;
+    updateCenterButtons();
+}
+
+function updateCenterButtons() {
+    var homeBtn = document.getElementById('home-btn');
+    var deBtn = document.getElementById('de-btn');
+    var dxBtn = document.getElementById('dx-center-btn');
+    if (!deBtn) return;
+    if (!selActive) {
+        // No spot picked: the main button is just a Home icon.
+        if (homeBtn) homeBtn.style.display = 'none';
+        deBtn.innerHTML = HOME_SVG;
+        deBtn.onclick = centerOnHome;
+        deBtn.title = 'Center on home';
+        if (dxBtn) dxBtn.style.display = 'none';
+    } else {
+        // Spot picked: main button -> DE (spotter); Home pops up above; DX appears on the right.
+        if (homeBtn) {
+            homeBtn.style.display = '';
+            homeBtn.innerHTML = HOME_SVG;
+            homeBtn.onclick = centerOnHome;
+            homeBtn.title = 'Center on home';
+        }
+        deBtn.innerHTML = ""<span class='de-label'>DE</span>"" + CROSSHAIR_SVG;
+        deBtn.onclick = (selSpotter ? centerOnSpotter : centerOnHome);
+        deBtn.title = selSpotter ? 'Center on spotter' : 'Spotter location unknown';
+        if (dxBtn) {
+            dxBtn.style.display = '';
+            dxBtn.innerHTML = ""<span class='dx-label'>DX</span>"" + CROSSHAIR_SVG;
+            dxBtn.onclick = centerOnDx;
+            dxBtn.title = 'Center on DX';
+        }
+    }
+}
+updateCenterButtons();
+
 function toggleProjection() { try { window.external.ToggleProjection(); } catch(e) {} }
 function updateClusterSpots(json) {
     try { clusterSpots = JSON.parse(json); } catch(e) { return; }
@@ -1200,13 +1264,16 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 function applyAutoZoom() {
     if (!clusterSpots || clusterSpots.length === 0) return;
-    // Helper: validate a [lon,lat] pair and push its distance from home.
+    // Helper: validate a [lon,lat] pair and push its distance from the CURRENT view center.
+    // Using the view center (not home) means that when the user drags the map in auto-zoom
+    // mode, the radius re-fits so every spotted station stays inside the circle. At first
+    // render viewCenter == home, so the initial fit is unchanged.
     function pushDist(arr, distances) {
         if (!arr || arr.length !== 2) return;
         var lon = arr[0], lat = arr[1];
         if (!isFinite(lon) || !isFinite(lat)) return;
         if (lon < -180 || lon > 180 || lat < -90 || lat > 90) return;
-        var km = haversineKm(centerLat, centerLon, lat, lon);
+        var km = haversineKm(viewCenterLat, viewCenterLon, lat, lon);
         if (isFinite(km) && km > 0) distances.push(km);
     }
     // Helper: sample N intermediate great-circle points between two [lon,lat] coords
@@ -1307,8 +1374,58 @@ svg.call(d3.drag()
         countriesG.selectAll('path').attr('d', path);
         svg.selectAll('.graticule-path').attr('d', path);
         drawRings(); drawRadiusRing(radiusKm); drawOverlays(); drawDayNight();
+        // In auto-zoom, re-fit the radius around the new view center so dragging can never
+        // push a spotted station outside the circle.
+        if (autoZoomActive) applyAutoZoom();
     })
 );
+
+// Mouse-wheel zoom (like HolyCluster): wheel up = zoom in (smaller radius), wheel down =
+// zoom out. Steps through the preset radius levels so the radius control stays in sync.
+// The first wheel notch while Auto Zoom is on drops out to manual mode at the nearest level.
+function wheelZoom(zoomIn) {
+    var sel = document.getElementById('radius-ctrl');
+    if (!sel || sel.options.length === 0) return;
+    if (autoZoomActive) {
+        autoZoomActive = false;
+        var azb = document.getElementById('autozoom-wrap');
+        if (azb) azb.classList.remove('active');
+        setRadiusControlVisibility(false);
+        try { window.external.SetAutoZoom('0'); } catch(e) {}
+        var best = 0, bestDiff = Infinity;
+        for (var i = 0; i < sel.options.length; i++) {
+            var diff = Math.abs(parseInt(sel.options[i].value, 10) - radiusKm);
+            if (diff < bestDiff) { bestDiff = diff; best = i; }
+        }
+        sel.selectedIndex = best;
+        onRadiusChange(sel.value);
+        return;
+    }
+    // Options are ordered ascending (small km -> large km); zooming in picks a smaller radius.
+    var idx = sel.selectedIndex + (zoomIn ? -1 : 1);
+    if (idx < 0) idx = 0;
+    if (idx > sel.options.length - 1) idx = sel.options.length - 1;
+    if (idx === sel.selectedIndex) return;
+    sel.selectedIndex = idx;
+    onRadiusChange(sel.value);
+}
+function onWheelEvent(e) {
+    e = e || window.event;
+    var delta = 0;
+    if (e.wheelDelta !== undefined && e.wheelDelta !== 0) delta = e.wheelDelta;   // IE/legacy
+    else if (e.deltaY !== undefined) delta = -e.deltaY;                            // standard
+    else if (e.detail) delta = -e.detail;
+    if (delta !== 0) wheelZoom(delta > 0);
+    if (e.preventDefault) e.preventDefault();
+    e.returnValue = false;
+    return false;
+}
+// The host is the IE WebBrowser, which fires 'mousewheel'; fall back to 'wheel' otherwise.
+// Attach a single event name to avoid double-stepping per notch.
+var wheelName = ('onmousewheel' in document) ? 'mousewheel' : 'wheel';
+if (document.addEventListener) document.addEventListener(wheelName, onWheelEvent, false);
+else if (document.attachEvent) document.attachEvent('on' + wheelName, onWheelEvent);
+
 window.addEventListener('resize', function() {
     W = window.innerWidth; H = window.innerHeight;
     mapR = Math.floor((Math.min(W, H) / 2) - 4);
@@ -1800,7 +1917,7 @@ window.addEventListener('resize', function() {
 <meta charset='utf-8'/>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
-  html, body { width:100%; height:100%; overflow:hidden; background:#1a2a3a; }
+  html, body { width:100%; height:100%; overflow:hidden; background:#000000; }
   svg#polar-svg { width:100%; height:100%; display:block; }
   #proj-btn {
     position:absolute; top:0; right:0; z-index:1000;
@@ -1818,7 +1935,7 @@ window.addEventListener('resize', function() {
   }
   #distance-stack {
     position:absolute; right:0; bottom:0; z-index:1000;
-    display:flex; flex-direction:column; align-items:center;
+    display:flex; flex-direction:column; align-items:flex-end;
   }
   #dx-center-btn {
     background:#9FCBF5; border:1px solid #4B76A0;
@@ -1841,22 +1958,22 @@ window.addEventListener('resize', function() {
     display:flex; align-items:flex-end;
   }
   #radius-stack {
-    display:flex; flex-direction:column; align-items:center;
+    display:flex; flex-direction:column; align-items:flex-start;
   }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
     border-radius:0;
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
   }
-  #center-btn {
+  #center-btn, #home-btn {
     background:#9FCBF5; border:1px solid #4B76A0;
     border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333; height:24px; margin-bottom:2px;
     font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #center-btn:hover { background:#8CBDF0; }
-  #center-btn svg { width:16px; height:16px; }
+  #center-btn:hover, #home-btn:hover { background:#8CBDF0; }
+  #center-btn svg, #home-btn svg { width:16px; height:16px; }
   #center-btn .de-label { margin-right:4px; }
 </style>
 </head>
@@ -1866,6 +1983,7 @@ window.addEventListener('resize', function() {
 <div id='az-only'>AZ 0&deg;</div>
 <div id='bottom-ctrl'>
   <div id='radius-stack'>
+    <button id='home-btn' onclick='centerOnHome()' title='Center on home'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10.5L12 3l9 7.5'/><path d='M5 9.5V21h5v-6h4v6h5V9.5'/></svg></button>
     <button id='center-btn' onclick='recenter()' title='Reset zoom to selected radius'><span class='de-label'>DE</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
     <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
   </div>
@@ -1874,8 +1992,8 @@ window.addEventListener('resize', function() {
   <button id='dx-center-btn' onclick='centerOnDx()' title='Center on DX station'><span class='dx-label'>DX</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
   <div id='distance-box'>DIST --</div>
 </div>
-<script src='https://d3js.org/d3.v5.min.js'></script>
-<script src='https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js'></script>
+" + MapAssetProvider.D3ScriptTag + @"
+" + MapAssetProvider.CountryDataScriptTag + @"
 <script>
 window.onerror = function() { return true; };
 
@@ -1973,7 +2091,7 @@ function scaleToRadius() {
 // Ocean fill
 var oceanFill = svg.append('circle').attr('class', 'ocean-fill')
     .attr('cx', cx).attr('cy', cy).attr('r', mapR)
-    .attr('fill', '#4a90c4').attr('stroke', '#1a4060').attr('stroke-width', 2);
+    .attr('fill', '#b8e8ee').attr('stroke', '#000000').attr('stroke-width', 1.5);
 
 // Layer for countries (inserted before overlays)
 var countriesG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
@@ -1983,16 +2101,16 @@ svg.append('path')
     .datum(d3.geoGraticule().step([30, 30])())
   .attr('class', 'graticule-path')
     .attr('d', path)
-    .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.15)').attr('stroke-width', 0.7)
+    .attr('fill', 'none').attr('stroke', '#6bb7c4').attr('stroke-width', 0.7)
     .attr('clip-path', 'url(#globe-clip)');
 // Equator
 svg.append('path').datum({type:'LineString', coordinates:[[-180,0],[-90,0],[0,0],[90,0],[180,0]]})
     .attr('class', 'graticule-path')
-    .attr('fill','none').attr('stroke','rgba(255,255,255,0.7)').attr('stroke-width',1.2)
+    .attr('fill','none').attr('stroke','rgba(0,0,0,0.55)').attr('stroke-width',1.2)
     .attr('d',path).attr('clip-path','url(#globe-clip)');
 
 // Distance rings layer (above countries)
-var ringsG = svg.append('g');
+var ringsG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 function drawRings() {
     ringsG.selectAll('*').remove();
   var ringKms = [];
@@ -2004,11 +2122,11 @@ function drawRings() {
         if (ang >= Math.PI) return;
         var r = projection.scale() * ang;
         ringsG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', r)
-            .attr('fill', 'none').attr('stroke', 'rgba(255,255,255,0.18)')
+            .attr('fill', 'none').attr('stroke', 'rgba(0,0,0,0.2)')
             .attr('stroke-width', 1).attr('stroke-dasharray', '4,3');
         var ringLabel = useMiles ? (Math.round(km * 0.621371) + ' mi') : (km + ' km');
         ringsG.append('text').attr('x', cx + 3).attr('y', cy - r - 2)
-          .attr('fill', 'rgba(255,255,255,0.4)').attr('font-size', '9px').text(ringLabel);
+          .attr('fill', 'rgba(0,0,0,0.45)').attr('font-size', '9px').text(ringLabel);
     });
 }
 drawRings();
@@ -2027,7 +2145,7 @@ function drawRadiusRing(km) {
 drawRadiusRing(radiusKm);
 
 // Overlays layer (always on top)
-var overlaysG = svg.append('g');
+var overlaysG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 function drawOverlays() {
     overlaysG.selectAll('*').remove();
 
@@ -2065,28 +2183,22 @@ function drawOverlays() {
 }
 drawOverlays();
 
-// Load world countries via XHR (IE11-safe, no Promise)
-var xhr = new XMLHttpRequest();
-xhr.open('GET', 'https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json', true);
-xhr.onreadystatechange = function() {
-    if (xhr.readyState !== 4) return;
-    if (xhr.status === 200) {
-        try {
-            var world = JSON.parse(xhr.responseText);
-            var features = topojson.feature(world, world.objects.countries).features;
-            countriesG.selectAll('path').data(features).enter().append('path')
-                .attr('d', path)
-                .attr('fill', '#5a8a6a').attr('stroke', '#2a4a3a').attr('stroke-width', 0.5);
-        } catch(e4) {}
-    }
-    // Always redraw overlays on top after countries attempt
-    drawOverlays();
-    drawRadiusRing(radiusKm);
-    // If auto zoom was restored from settings, apply it now that all functions are ready
-    if (autoZoomActive) applyAutoZoom();
-};
-xhr.onerror = function() { drawOverlays(); if (autoZoomActive) applyAutoZoom(); };
-try { xhr.send(); } catch(e5) { drawOverlays(); if (autoZoomActive) applyAutoZoom(); }
+// Draw colored countries from the offline-embedded data (window.DXCC_DATA). Each feature
+// is wrapped as a GeoJSON Feature so every existing 'countriesG...attr(d, path)' redraw
+// keeps working unchanged. Per-country fill comes from the precomputed 4-color palette.
+try {
+    var dxccFeatures = window.DXCC_DATA.features.map(function(f) {
+        return { type: 'Feature', properties: { ci: f.ci, p: f.p }, geometry: f.geometry };
+    });
+    var dxccPalette = window.DXCC_DATA.palette;
+    countriesG.selectAll('path').data(dxccFeatures).enter().append('path')
+        .attr('d', path)
+        .attr('fill', function(d) { return dxccPalette[d.properties.ci]; })
+        .attr('stroke', '#777777').attr('stroke-width', 0.4);
+} catch(e4) {}
+drawOverlays();
+drawRadiusRing(radiusKm);
+if (autoZoomActive) applyAutoZoom();
 
 function onRadiusChange(km) {
     radiusKm = parseInt(km, 10);
@@ -2115,6 +2227,17 @@ function centerOnDx() {
   viewCenterLon = dxLon;
   applyViewCenter();
   scaleToRadius();
+  countriesG.selectAll('path').attr('d', path);
+  svg.selectAll('.graticule-path').attr('d', path);
+  drawRings();
+  drawRadiusRing(radiusKm);
+  drawOverlays();
+}
+// Home icon button: pan back to the home QTH, keeping the current zoom.
+function centerOnHome() {
+  viewCenterLat = centerLat;
+  viewCenterLon = centerLon;
+  applyViewCenter();
   countriesG.selectAll('path').attr('d', path);
   svg.selectAll('.graticule-path').attr('d', path);
   drawRings();

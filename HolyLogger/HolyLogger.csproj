@@ -182,6 +182,9 @@
     <Compile Include="ContestPickerWindow.xaml.cs">
       <DependentUpon>ContestPickerWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="StationServicesAlertWindow.xaml.cs">
+      <DependentUpon>StationServicesAlertWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="CwSendMonitorWindow.cs" />
     <Compile Include="SplashWindow.xaml.cs">
       <DependentUpon>SplashWindow.xaml</DependentUpon>
@@ -191,6 +194,8 @@
     <Compile Include="Contests\ContestModels.cs" />
     <Compile Include="Contests\ContestService.cs" />
     <EmbeddedResource Include="contests.json" />
+    <EmbeddedResource Include="MapAssets\d3.v5.min.js" />
+    <EmbeddedResource Include="MapAssets\dxcc_colored.json" />
     <Compile Include="CtyDatService.cs" />
     <Compile Include="DataAccess.cs" />
     <Compile Include="EqslQueueWindow.cs" />
@@ -278,8 +283,13 @@
     <Compile Include="ToolsUserControls\MapUserControl.xaml.cs">
       <DependentUpon>MapUserControl.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ToolsUserControls\MapAssetProvider.cs" />
     <Compile Include="UDPSocket.cs" />
     <Page Include="ContestPickerWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="StationServicesAlertWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

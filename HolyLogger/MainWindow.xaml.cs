@@ -6063,9 +6063,7 @@ namespace HolyLogger
                 _startupCallsignChecked = true;
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
-                    // DISABLED per user request (2026-06-29): the "Station callsign changed" popup is
-                    // suppressed for now. Uncomment to bring it back once we decide how to present it.
-                    // ShowStationCallsignServicesAlert(TB_MyCallsign.Text?.Trim(), isStartup: true);
+                    ShowStationCallsignServicesAlert(TB_MyCallsign.Text?.Trim(), isStartup: true);
                 }), System.Windows.Threading.DispatcherPriority.Background);
             }
         }
@@ -11524,9 +11522,7 @@ namespace HolyLogger
             if (string.IsNullOrEmpty(now)) return;
             if (string.Equals(now, _callsignOnFocus, StringComparison.OrdinalIgnoreCase)) return;
             _callsignOnFocus = now;
-            // DISABLED per user request (2026-06-29): the "Station callsign changed" popup is
-            // suppressed for now. Uncomment to bring it back once we decide how to present it.
-            // ShowStationCallsignServicesAlert(now);
+            ShowStationCallsignServicesAlert(now);
         }
 
         // When the operator switches to a different Station Callsign, summarise how each upload
@@ -11563,35 +11559,29 @@ namespace HolyLogger
                 if (registered && !qrzOn) return;
             }
 
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine($"Station callsign is now {call}.");
-            sb.AppendLine("How each upload service will treat QSOs logged under this callsign:");
-            sb.AppendLine();
+            string eqslMsg = eqslHasAccount
+                ? $"Account configured — QSOs will upload under {call}."
+                : $"No eQSL account for {call} — its QSOs will NOT be sent to eQSL.";
 
-            sb.AppendLine("eQSL:");
-            sb.AppendLine(eqslHasAccount
-                ? $"   ✓ Account configured — QSOs upload under\n      {call}"
-                : $"   ⚠ No eQSL account for {call} — its QSOs will NOT be sent to eQSL.");
-            sb.AppendLine();
-
-            sb.AppendLine("LoTW:");
+            string lotwMsg;
             if (choice.Ambiguous)
-                sb.AppendLine($"   ⚠ {call} has several TQSL locations — pick one in Options → LoTW Upload.");
+                lotwMsg = $"{call} has several TQSL locations — pick one in Options → LoTW Upload.";
             else if (!string.IsNullOrWhiteSpace(choice.LocationName))
-            {
-                sb.AppendLine("   ✓ Will sign with TQSL location:");
-                sb.AppendLine($"      \"{choice.LocationName}\"");
-            }
+                lotwMsg = $"Will sign with TQSL location: \"{choice.LocationName}\".";
             else
-                sb.AppendLine($"   ⚠ No TQSL certificate/location for {call} — its QSOs will NOT upload to LoTW.");
-            sb.AppendLine();
+                lotwMsg = $"No TQSL certificate/location for {call} — its QSOs will NOT upload to LoTW.";
 
-            sb.AppendLine("QRZ Logbook:");
-            sb.AppendLine(qrzOn
-                ? $"   ⚠ QRZ uses ONE logbook for all callsigns. QSOs under {call} go into your configured QRZ logbook regardless of the call. Turn off QRZ auto-upload (Options → QRZ Services) if that is wrong."
-                : "   • QRZ auto-upload is off — nothing is sent automatically.");
+            string qrzMsg = qrzOn
+                ? $"QRZ uses ONE logbook for all callsigns. QSOs under {call} go into your configured QRZ logbook regardless of the call. Turn off QRZ auto-upload in Options → QRZ Services if that is not what you want."
+                : "QRZ auto-upload is off — nothing is sent automatically.";
 
-            HolyMessageBox.ShowWarning(sb.ToString().TrimEnd(), "Station callsign changed", this, 540);
+            var alert = new StationServicesAlertWindow(
+                call,
+                eqslHasAccount, eqslMsg,
+                lotwOk,         lotwMsg,
+                !qrzOn,         qrzMsg)
+            { Owner = this };
+            alert.ShowDialog();
         }
         
         private void TB_MyHolyland_TextChanged(object sender, TextChangedEventArgs e)
@@ -13484,9 +13474,10 @@ namespace HolyLogger
             {
                 if (MapControl != null && MapControl.Visibility == Visibility.Visible)
                 {
-                    if (MapControl.IsClusterMode)
-                        UpdateClusterSpotsOnMap();
-                    else
+                    // Cluster map: the JavaScript already rescaled the view for the new radius, so
+                    // do NOT re-render here — a re-render recenters on home and discards a view the
+                    // user dragged/zoomed to. Only the non-cluster azimuth readout needs a refresh.
+                    if (!MapControl.IsClusterMode)
                         SetAzimuth();
                 }
             }), DispatcherPriority.Background);
