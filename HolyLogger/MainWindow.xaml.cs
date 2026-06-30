@@ -343,6 +343,10 @@ namespace HolyLogger
         DataGridColumn clusterCommentColumn = null;
         DispatcherTimer _mapUpdateDebounceTimer = null;
         bool _dxQsoInProgress = false;
+        // Spotter of the cluster spot the user last selected, so the map's DE button can center on
+        // it. Kept with the DX callsign it belongs to, so a hand-typed DX doesn't reuse a stale spotter.
+        double? _selectedSpotterLat, _selectedSpotterLon;
+        string _selectedSpotterDxCall;
         LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
@@ -7691,6 +7695,17 @@ namespace HolyLogger
                 clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
             }
             spotsGrid.ItemsSource = clusterVisibleSpots;
+            // Pin "New Country" (needed) spots to the top regardless of the active column sort:
+            // IsNeededCountry is the live primary sort key, the user's column choice is secondary.
+            spotsGrid.Sorting += ClusterSpotsGrid_Sorting;
+            var clusterView = System.Windows.Data.CollectionViewSource.GetDefaultView(clusterVisibleSpots) as System.Windows.Data.ListCollectionView;
+            if (clusterView != null)
+            {
+                ApplyClusterSort(clusterView, "UnixTime", System.ComponentModel.ListSortDirection.Descending);
+                clusterView.IsLiveSorting = true;
+                if (!clusterView.LiveSortingProperties.Contains("IsNeededCountry"))
+                    clusterView.LiveSortingProperties.Add("IsNeededCountry");
+            }
             spotsGrid.PreviewMouseLeftButtonDown += ClusterSpotsGrid_MouseLeftButtonDown;
             spotsGrid.MouseMove += ClusterSpotsGrid_MouseMove;
             spotsGrid.MouseLeave += ClusterSpotsGrid_MouseLeave;
@@ -7715,6 +7730,43 @@ namespace HolyLogger
             RefreshClusterVisibleSpots();
 
             return spotsGrid;
+        }
+
+        // Re-sort the cluster spots view so "New Country" (needed) spots are always on top, then
+        // the rest by the requested column/direction. Setting IsNeededCountry as the first
+        // SortDescription is what overrides any column sort for those rows only.
+        private void ApplyClusterSort(System.Windows.Data.ListCollectionView view, string memberPath, System.ComponentModel.ListSortDirection direction)
+        {
+            if (view == null) return;
+            using (view.DeferRefresh())
+            {
+                view.SortDescriptions.Clear();
+                view.SortDescriptions.Add(new System.ComponentModel.SortDescription("IsNeededCountry", System.ComponentModel.ListSortDirection.Descending));
+                if (!string.IsNullOrEmpty(memberPath) && memberPath != "IsNeededCountry")
+                    view.SortDescriptions.Add(new System.ComponentModel.SortDescription(memberPath, direction));
+            }
+        }
+
+        // Intercept column-header sorting on the cluster grid so "New Country" spots stay pinned at
+        // the top and the clicked column only sorts the remaining rows.
+        private void ClusterSpotsGrid_Sorting(object sender, DataGridSortingEventArgs e)
+        {
+            var grid = sender as DataGrid;
+            if (grid == null || e.Column == null || string.IsNullOrEmpty(e.Column.SortMemberPath))
+                return;
+
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(grid.ItemsSource) as System.Windows.Data.ListCollectionView;
+            if (view == null) return;
+
+            var direction = (e.Column.SortDirection != System.ComponentModel.ListSortDirection.Ascending)
+                ? System.ComponentModel.ListSortDirection.Ascending
+                : System.ComponentModel.ListSortDirection.Descending;
+
+            ApplyClusterSort(view, e.Column.SortMemberPath, direction);
+
+            foreach (var col in grid.Columns) col.SortDirection = null;
+            e.Column.SortDirection = direction;
+            e.Handled = true;
         }
 
         private Grid BuildClusterHeaderPanel(Button undoButton)
@@ -10819,6 +10871,12 @@ namespace HolyLogger
 
             TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
             // Callsign is pulled from the cluster/map, not typed — don't open the suggestions dropdown.
+            // Remember this spot's spotter so the map's DE button can center on it (SetAzimuth,
+            // triggered by the DX callsign below, reads these).
+            _selectedSpotterLat = spot.SpotterLat;
+            _selectedSpotterLon = spot.SpotterLon;
+            _selectedSpotterDxCall = (spot.DXCallsign ?? string.Empty).Trim().ToUpperInvariant();
+
             suppressNextCallsignSuggestions = true;
             TB_DXCallsign.Text = (spot.DXCallsign ?? string.Empty).Trim().ToUpperInvariant();
 
@@ -13369,10 +13427,20 @@ namespace HolyLogger
                     int autoFitRadius = Math.Max(500, (int)(distKm * 1.10));
                     _dxQsoInProgress = true;
 
+                    // If the current DX matches the cluster spot the user just selected, pass that
+                    // spot's spotter location so the map's DE button can center on the spotter.
+                    double? spotterLat = null, spotterLon = null;
+                    if (_selectedSpotterLat.HasValue && _selectedSpotterLon.HasValue &&
+                        string.Equals((TB_DXCallsign.Text ?? string.Empty).Trim(), _selectedSpotterDxCall, StringComparison.OrdinalIgnoreCase))
+                    {
+                        spotterLat = _selectedSpotterLat;
+                        spotterLon = _selectedSpotterLon;
+                    }
+
                     // Don't update map if Empty mode is active
                     if (Properties.Settings.Default.MapAreaDisplayMode != 4)
                     {
-                        MapControl.ShowMap(ll.Lat, ll.Long, autoFitRadius, Azimuth, homell.Lat, homell.Long);
+                        MapControl.ShowMap(ll.Lat, ll.Long, autoFitRadius, Azimuth, homell.Lat, homell.Long, spotterLat, spotterLon);
                     }
                 }
                 catch (Exception e)

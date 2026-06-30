@@ -71,6 +71,7 @@ namespace HolyLogger.ToolsUserControls
         private int _currentRadiusKm = 1000;
         private double _currentLat, _currentLon;
         private double? _currentAzimuth, _currentHomeLat, _currentHomeLon;
+        private double? _currentSpotterLat, _currentSpotterLon;  // spotter of the selected cluster spot (for the DE button)
         private bool _isPolar;
         private bool _isClusterMode;
         private System.Collections.Generic.List<ClusterSpotInfo> _clusterSpots;
@@ -1450,7 +1451,7 @@ window.addEventListener('resize', function() {
             MapBrowser.Navigate(uriBuilder.Uri);
         }
 
-        public void ShowMap(double lat, double lon, int radiusKm, double? azimuthDeg = null, double? homeLat = null, double? homeLon = null)
+        public void ShowMap(double lat, double lon, int radiusKm, double? azimuthDeg = null, double? homeLat = null, double? homeLon = null, double? spotterLat = null, double? spotterLon = null)
         {
             _isClusterMode = false;
             _currentLat = lat;
@@ -1459,6 +1460,8 @@ window.addEventListener('resize', function() {
             _currentAzimuth = azimuthDeg;
             _currentHomeLat = homeLat;
             _currentHomeLon = homeLon;
+            _currentSpotterLat = spotterLat;
+            _currentSpotterLon = spotterLon;
             PlaceholderPanel.Visibility = System.Windows.Visibility.Collapsed;
             MapBrowser.Visibility = System.Windows.Visibility.Visible;
             RenderMap();
@@ -1495,7 +1498,7 @@ window.addEventListener('resize', function() {
             }
 
             string html = _isPolar
-                ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier)
+                ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier, _currentSpotterLat, _currentSpotterLon)
                 : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier);
 
             // Identical map: nothing changed, skip the costly IE reload.
@@ -1878,11 +1881,16 @@ window.addEventListener('resize', function() {
 </html>";
         }
 
-        private string BuildPolarMapHtml(double dxLat, double dxLon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15)
+        private string BuildPolarMapHtml(double dxLat, double dxLon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15, double? spotterLat = null, double? spotterLon = null)
         {
             // Center on home QTH; fall back to DX if no home available.
             double centerLat = homeLat.HasValue ? homeLat.Value : dxLat;
             double centerLon = homeLon.HasValue ? homeLon.Value : dxLon;
+          // Spotter of the selected cluster spot (so the DE button can center on it).
+          bool hasSpotter = spotterLat.HasValue && spotterLon.HasValue;
+          string hasSpotterJs = hasSpotter ? "true" : "false";
+          string spotterLatJs = hasSpotter ? spotterLat.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
+          string spotterLonJs = hasSpotter ? spotterLon.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
           bool hasHomeReference = homeLat.HasValue && homeLon.HasValue;
           bool useMiles = string.Equals(Properties.Settings.Default.MapDistanceUnit, "Miles", StringComparison.OrdinalIgnoreCase);
           string useMilesJs = useMiles ? "true" : "false";
@@ -1984,7 +1992,7 @@ window.addEventListener('resize', function() {
 <div id='bottom-ctrl'>
   <div id='radius-stack'>
     <button id='home-btn' onclick='centerOnHome()' title='Center on home'><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10.5L12 3l9 7.5'/><path d='M5 9.5V21h5v-6h4v6h5V9.5'/></svg></button>
-    <button id='center-btn' onclick='recenter()' title='Reset zoom to selected radius'><span class='de-label'>DE</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+    <button id='center-btn' onclick='centerOnSpotter()' title='Center on spotter'><span class='de-label'>DE</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
     <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
   </div>
 </div>
@@ -2006,6 +2014,9 @@ var radiusKm   = " + radiusKm.ToString() + @";
 var marginMultiplier = " + marginJs + @";
 var useMiles = " + useMilesJs + @";
 var hasHomeReference = " + hasHomeReferenceJs + @";
+var spotterLat = " + spotterLatJs + @";
+var spotterLon = " + spotterLonJs + @";
+var hasSpotter = " + hasSpotterJs + @";
 var EARTH_KM   = 6371;
 var hasDxReference = isFinite(dxLat) && isFinite(dxLon);
 
@@ -2029,7 +2040,7 @@ function formatDistanceText(distanceKm) {
 }
 
 // Azimuth label (polar mode has no compass ring)
-document.getElementById('az-only').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
+document.getElementById('az-only').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;' + '<br>(' + Math.round((azimuthDeg + 180) % 360) + '&deg;)';
 document.getElementById('distance-box').innerHTML = formatDistanceText(dxDistKm);
 if (!hasDxReference) {
   document.getElementById('dx-center-btn').style.display = 'none';
@@ -2177,6 +2188,19 @@ function drawOverlays() {
         }
     } catch(e3) {}
 
+    // Spotter dot (black) - the spotter of the selected cluster spot, so pressing DE
+    // (which centers on the spotter) lands on a visible marker.
+    if (hasSpotter) {
+        try {
+            var spPt = projection([spotterLon, spotterLat]);
+            if (spPt && isFinite(spPt[0]) && isFinite(spPt[1])) {
+                overlaysG.append('circle')
+                  .attr('cx', spPt[0]).attr('cy', spPt[1]).attr('r', 3)
+                  .attr('fill', '#000000').attr('stroke', '#ffffff').attr('stroke-width', 1);
+            }
+        } catch(eSp) {}
+    }
+
     // Outer border ring
     overlaysG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', mapR)
         .attr('fill', 'none').attr('stroke', '#2a607a').attr('stroke-width', 2);
@@ -2237,6 +2261,23 @@ function centerOnDx() {
 function centerOnHome() {
   viewCenterLat = centerLat;
   viewCenterLon = centerLon;
+  applyViewCenter();
+  countriesG.selectAll('path').attr('d', path);
+  svg.selectAll('.graticule-path').attr('d', path);
+  drawRings();
+  drawRadiusRing(radiusKm);
+  drawOverlays();
+}
+// DE button: pan to the spotter of the selected cluster spot. If no spotter is known
+// (e.g. the DX was typed by hand), fall back to home so the button still does something.
+function centerOnSpotter() {
+  if (hasSpotter && isFinite(spotterLat) && isFinite(spotterLon)) {
+    viewCenterLat = spotterLat;
+    viewCenterLon = spotterLon;
+  } else {
+    viewCenterLat = centerLat;
+    viewCenterLon = centerLon;
+  }
   applyViewCenter();
   countriesG.selectAll('path').attr('d', path);
   svg.selectAll('.graticule-path').attr('d', path);
