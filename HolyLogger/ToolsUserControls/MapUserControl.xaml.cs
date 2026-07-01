@@ -453,7 +453,7 @@ var radiusKm = radiusMeters / 1000;
 var useMiles = " + useMilesJs + @";
 var showDayNight = " + (Properties.Settings.Default.MapShowDayNight ? "true" : "false") + @";
 var clusterSpots = " + spotsJs.ToString() + @";
-var map = L.map('map', { zoomControl:false, attributionControl:false, zoomSnap:0, scrollWheelZoom:false }).setView([homeLat, homeLon], 4);
+var map = L.map('map', { zoomControl:false, attributionControl:false, zoomSnap:0 }).setView([homeLat, homeLon], 4);
 // Colored countries drawn from the same embedded data + palette as the polar map (offline),
 // on the ocean-colored background, instead of online OpenStreetMap tiles.
 try {
@@ -600,7 +600,6 @@ setInterval(drawDayNight, 60000);
 
 var homeIcon = L.divIcon({ className:'', html:'<div style=""width:10px;height:10px;background:#1565C0;border:2px solid #fff;border-radius:50%;box-shadow:0 0 2px rgba(0,0,0,0.5)""></div>', iconAnchor:[5,5] });
 L.marker([homeLat, homeLon], { icon:homeIcon }).addTo(map);
-var radiusCircle = L.circle([homeLat, homeLon], { radius:radiusMeters, color:'#E53935', fill:false, weight:2 }).addTo(map);
 var spotIcon = L.divIcon({ className:'', html:'<div style=""width:8px;height:8px;background:#FF6600;border-radius:50%;box-shadow:0 0 2px rgba(0,0,0,0.5)""></div>', iconAnchor:[4,4] });
 var spotsLayer = L.layerGroup().addTo(map);
 // Translucent spot tooltip (matches the polar map): see-through so the map shows through, with a
@@ -674,7 +673,7 @@ function applyFlatHighlight(cs) {
     }
 }
 renderSpots();
-map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] });
+map.setView([homeLat, homeLon], map.getBoundsZoom(L.latLng(homeLat, homeLon).toBounds(radiusMeters * 2)));
 function updateClusterSpots(json) {
     try { clusterSpots = JSON.parse(json); } catch(e) { return; }
     renderSpots();
@@ -685,18 +684,14 @@ function clearSpotHighlight() { hlF = null; applyFlatHighlight(null); }
 function onRadiusChange(km) {
     radiusKm = parseInt(km, 10);
     radiusMeters = radiusKm * 1000;
-    radiusCircle.setRadius(radiusMeters);
-    // Center on home and pick the zoom that fits the circle. fitBounds(circle.getBounds()) would
-    // off-center the view for large circles (the bounds are pixel-symmetric, not lat/lon-symmetric
-    // under Mercator, and clip near the pole), so we set the center to home explicitly.
-    // animate:false so rapid wheel notches each settle instantly instead of interrupting a fit.
-    var fitZoom = map.getBoundsZoom(radiusCircle.getBounds(), false, L.point(2, 2));
-    map.setView([homeLat, homeLon], fitZoom, { animate:false });
+    // No circle now: picking a radius centers on home and zooms to roughly show that area; the user
+    // is then free to wheel-zoom and drag. The radius is still sent to C# for spot filtering.
+    map.setView([homeLat, homeLon], map.getBoundsZoom(L.latLng(homeLat, homeLon).toBounds(radiusMeters * 2)), { animate:false });
     drawDayNight();
     try { window.external.SetRadius(km); } catch(e) {}
 }
 function recenter() {
-    map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] });
+    map.setView([homeLat, homeLon], map.getZoom());
     drawDayNight();
 }
 // ---- Center buttons (Home / DE-spotter / DX), mirroring the polar cluster map --------------
@@ -748,67 +743,6 @@ updateCenterButtons();
 function toggleProjection() { try { window.external.ToggleProjection(); } catch(e) {} }
 map.on('move zoom resize', drawDayNight);
 window.addEventListener('resize', function() { if (map) { map.invalidateSize(); drawDayNight(); } });
-
-// Mouse-wheel zoom in fixed radius steps (same logic as the polar map): 500 km per notch, or
-// 250 km below 2000 km. The radius dropdown and the red circle both track the current value.
-function wheelZoom(zoomIn) {
-    var sel = document.getElementById('radius-ctrl');
-    if (!sel || sel.options.length === 0) return;
-    var step = zoomIn ? (radiusKm <= 2000 ? 250 : 500) : (radiusKm < 2000 ? 250 : 500);
-    var newKm = radiusKm + (zoomIn ? -step : step);
-    // Clamp to the preset radius range (ignore any temporary wheel option already present).
-    var minKm = Infinity, maxKm = -Infinity;
-    for (var i = 0; i < sel.options.length; i++) {
-        if (sel.options[i].getAttribute('data-wheel')) continue;
-        var v = parseInt(sel.options[i].value, 10);
-        if (v < minKm) minKm = v;
-        if (v > maxKm) maxKm = v;
-    }
-    if (newKm < minKm) newKm = minKm;
-    if (newKm > maxKm) newKm = maxKm;
-    if (newKm === radiusKm) return;
-    applyWheelRadius(newKm);
-}
-// Show an off-grid wheel radius in the dropdown via a single reusable 'custom' option, then apply.
-function applyWheelRadius(km) {
-    var sel = document.getElementById('radius-ctrl');
-    if (sel) {
-        for (var k = sel.options.length - 1; k >= 0; k--) {
-            if (sel.options[k].getAttribute('data-wheel')) sel.remove(k);
-        }
-        var matched = false;
-        for (var i = 0; i < sel.options.length; i++) {
-            if (parseInt(sel.options[i].value, 10) === km) { sel.selectedIndex = i; matched = true; break; }
-        }
-        if (!matched) {
-            var opt = document.createElement('option');
-            opt.value = km;
-            opt.text = useMiles ? (Math.round(km * 0.621371) + ' mi') : (km + ' km');
-            opt.setAttribute('data-wheel', '1');
-            var before = null;
-            for (var j = 0; j < sel.options.length; j++) {
-                if (parseInt(sel.options[j].value, 10) > km) { before = sel.options[j]; break; }
-            }
-            sel.add(opt, before);
-            sel.value = km;
-        }
-    }
-    onRadiusChange(km);
-}
-function onWheelEvent(e) {
-    e = e || window.event;
-    var delta = 0;
-    if (e.wheelDelta !== undefined && e.wheelDelta !== 0) delta = e.wheelDelta;   // IE/legacy
-    else if (e.deltaY !== undefined) delta = -e.deltaY;                            // standard
-    else if (e.detail) delta = -e.detail;
-    if (delta !== 0) wheelZoom(delta > 0);
-    if (e.preventDefault) e.preventDefault();
-    e.returnValue = false;
-    return false;
-}
-var wheelName = ('onmousewheel' in document) ? 'mousewheel' : 'wheel';
-if (document.addEventListener) document.addEventListener(wheelName, onWheelEvent, false);
-else if (document.attachEvent) document.attachEvent('on' + wheelName, onWheelEvent);
 </script>
 </body>
 </html>";
