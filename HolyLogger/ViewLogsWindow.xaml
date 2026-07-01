@@ -1,0 +1,52 @@
+<Window x:Class="HolyLogger.ViewLogsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Logs" Width="720" Height="440"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="#EEF2F7">
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button x:Name="Btn_Open" Content="Open Log" Width="110" Height="32" FontSize="13" FontWeight="Bold"
+                    Margin="0,0,8,0" IsEnabled="False" Click="Btn_Open_Click"/>
+            <Button x:Name="Btn_Rename" Content="Rename" Width="90" Height="32" FontSize="13"
+                    Margin="0,0,8,0" Click="Btn_Rename_Click"/>
+            <Button x:Name="Btn_Delete" Content="Delete" Width="90" Height="32" FontSize="13"
+                    Margin="0,0,8,0" Click="Btn_Delete_Click"/>
+            <Separator Width="1" Margin="6,4"/>
+            <Button x:Name="Btn_Adif" Content="Export ADIF" Width="110" Height="32" FontSize="13"
+                    Margin="0,0,8,0" Click="Btn_Adif_Click"/>
+            <Button x:Name="Btn_Cabrillo" Content="Export Cabrillo" Width="120" Height="32" FontSize="13"
+                    Click="Btn_Cabrillo_Click"/>
+        </StackPanel>
+
+        <DataGrid x:Name="LogsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                  CanUserAddRows="False" SelectionMode="Single" HeadersVisibility="Column"
+                  GridLinesVisibility="All" FontSize="13" RowHeaderWidth="0"
+                  BorderBrush="#1565C0" BorderThickness="1"
+                  SelectionChanged="LogsGrid_SelectionChanged"
+                  MouseDoubleClick="LogsGrid_MouseDoubleClick">
+            <DataGrid.Resources>
+                <!-- Keep the selected row blue even when the grid does not have keyboard focus. -->
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="#3399FF"/>
+                <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="White"/>
+            </DataGrid.Resources>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="#" Binding="{Binding Num}" Width="40"/>
+                <DataGridTextColumn Header="Log Name" Binding="{Binding Name}" Width="200"/>
+                <DataGridTextColumn Header="Event Type" Binding="{Binding EventType}" Width="150"/>
+                <DataGridTextColumn Header="Start Date" Binding="{Binding StartDate}" Width="100"/>
+                <DataGridTextColumn Header="End Date" Binding="{Binding EndDate}" Width="100"/>
+                <DataGridTextColumn Header="No. of QSOs" Binding="{Binding QsoCount}" Width="*"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <TextBlock x:Name="Hint" Grid.Row="2" Margin="0,8,0,0" FontSize="12" Foreground="#666666"
+                   Text="Select a log, then Open / Rename / Delete / Export. Double-click a row to open it."/>
+    </Grid>
+</Window>

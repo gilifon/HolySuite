@@ -185,6 +185,15 @@
     <Compile Include="StationServicesAlertWindow.xaml.cs">
       <DependentUpon>StationServicesAlertWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="LogSetupWindow.xaml.cs">
+      <DependentUpon>LogSetupWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="NewLogWindow.xaml.cs">
+      <DependentUpon>NewLogWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ViewLogsWindow.xaml.cs">
+      <DependentUpon>ViewLogsWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="CwSendMonitorWindow.cs" />
     <Compile Include="SplashWindow.xaml.cs">
       <DependentUpon>SplashWindow.xaml</DependentUpon>
@@ -290,6 +299,18 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="StationServicesAlertWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="LogSetupWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="NewLogWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ViewLogsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

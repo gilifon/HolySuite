@@ -653,6 +653,14 @@ namespace HolyLogger
                 return;
             }
 
+            // Resolve the active Log (first run forces creating the Main Log). Must happen before the
+            // QSO list is loaded below, since the table shows only the active log's QSOs.
+            if (!EnsureActiveLog())
+            {
+                System.Windows.Application.Current.Shutdown();
+                return;
+            }
+
             bool item_found = false;
             foreach (ComboBoxItem item in CB_Mode.Items)
             {
@@ -693,9 +701,10 @@ namespace HolyLogger
             TP_Date.Value = DateTime.UtcNow;
             TP_Time.Value = DateTime.UtcNow;
             
-            Qsos = dal.GetAllQSOs();
+            Qsos = dal.GetQSOsForLog(dal.ActiveLogId);
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
+            UpdateActiveLogTitle();
             UpdateLotwMenuCount();
             UpdateQrzMenuCount();
             LastQSO = Qsos.FirstOrDefault();
@@ -1714,6 +1723,191 @@ namespace HolyLogger
                 FilteredQsos = null;
                 DataContext = Qsos;
             }
+        }
+
+        // Resolves which Log is active at startup. On the first run of the multi-log version (no logs
+        // exist yet), the user is forced to create the Main Log and choose what happens to any existing
+        // QSOs. Returns false only if the user dismissed the mandatory setup dialog (app then shuts down).
+        private bool EnsureActiveLog()
+        {
+            if (dal == null) return false;
+            try
+            {
+                if (dal.GetLogCount() == 0)
+                {
+                    int existing = dal.CountUnassignedQSOs();
+                    var setup = new LogSetupWindow(existing);   // no Owner: main window not shown yet
+                    setup.ShowDialog();
+                    if (!setup.Completed) return false;
+
+                    long mainId = dal.CreateLog(setup.LogName, "");   // day-by-day log, no event type
+                    if (setup.ImportExisting)
+                    {
+                        dal.AssignUnassignedToLog(mainId);
+                    }
+                    else if (existing > 0)
+                    {
+                        // Option B: keep the old QSOs safe in a separate log; the new one stays empty.
+                        long prevId = dal.CreateLog(UniqueLogName("Previous Log"), "");
+                        dal.AssignUnassignedToLog(prevId);
+                    }
+                    dal.ActiveLogId = mainId;
+                }
+                else
+                {
+                    dal.ActiveLogId = Properties.Settings.Default.ActiveLogId;
+                    if (dal.GetLogName(dal.ActiveLogId) == null)   // saved log gone -> fall back to first
+                    {
+                        var logs = dal.GetLogs();
+                        if (logs.Count > 0) dal.ActiveLogId = logs[0].Id;
+                    }
+                }
+                Properties.Settings.Default.ActiveLogId = dal.ActiveLogId;
+                Properties.Settings.Default.Save();
+                return true;
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError("Failed to set up your log: " + ex.Message, "Log setup");
+                return false;
+            }
+        }
+
+        // Returns baseName, or baseName + " 2"/" 3"/... if that name is already taken by a log.
+        private string UniqueLogName(string baseName)
+        {
+            string name = baseName;
+            int i = 2;
+            while (dal.LogNameExists(name)) name = baseName + " " + (i++);
+            return name;
+        }
+
+        // Shows the active log's name in the window title bar.
+        public void UpdateActiveLogTitle()
+        {
+            string name = null;
+            try { if (dal != null) name = dal.GetLogName(dal.ActiveLogId); } catch { }
+            this.Title = string.IsNullOrEmpty(name) ? title : (title + "  —  Log: " + name);
+        }
+
+        // Makes the given log the active one: reloads the log table, refreshes counts/title and sets
+        // Contest Mode to match the log. Used by Create New Log, the contest flow and View Logs -> Open.
+        public void SwitchActiveLog(long logId)
+        {
+            dal.ActiveLogId = logId;
+            Properties.Settings.Default.ActiveLogId = logId;
+            Properties.Settings.Default.Save();
+
+            if (Qsos != null) Qsos.CollectionChanged -= Qsos_CollectionChanged;
+            Qsos = dal.GetQSOsForLog(logId);
+            Qsos.CollectionChanged += Qsos_CollectionChanged;
+            DataContext = Qsos;
+            RestoreDataContext();
+            LastQSO = Qsos.FirstOrDefault();
+
+            ClearBtn_Click(null, null);       // reset the entry form for the newly active log
+            ApplyContestModeForActiveLog();
+            UpdateActiveLogTitle();
+            UpdateNumOfQSOs();
+            UpdateEqslQueueIndicator();
+            UpdateQrzMenuCount();
+        }
+
+        // Contest Mode follows the active log: a normal (day-by-day) log turns it off; a contest log
+        // re-activates that contest without resetting its serial (event_type stores the contest Id).
+        private void ApplyContestModeForActiveLog()
+        {
+            string eventType = null;
+            try { eventType = dal.GetLogEventType(dal.ActiveLogId); } catch { }
+
+            if (string.IsNullOrWhiteSpace(eventType))
+            {
+                if (Properties.Settings.Default.ContestMode) ExitContest();
+                return;
+            }
+
+            var contest = Contests.ContestService.FindById(eventType);
+            if (contest != null)
+            {
+                Contests.ContestService.Activate(contest);
+                Properties.Settings.Default.ContestMode = true;
+                Properties.Settings.Default.ActiveContestId = contest.Id;
+                Properties.Settings.Default.Save();
+                UpdateContestModeMenuHeader();
+                ApplyContestExchangeUI();
+                UpdateDup();
+            }
+            else if (Properties.Settings.Default.ContestMode)
+            {
+                ExitContest();
+            }
+        }
+
+        // File -> Create New Log: name it (duplicates rejected), confirm, then create an empty log and
+        // make it active. No QSOs are deleted — the previous log's QSOs stay in the database.
+        private void CreateNewLogMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var dlg = new NewLogWindow(dal, "Enter a name for the new log:") { Owner = this };
+            if (dlg.ShowDialog() != true) return;
+
+            if (!HolyMessageBox.ShowConfirm(
+                    "A new empty log \"" + dlg.LogName + "\" will be created and shown.\n\n" +
+                    "The current log table will be cleared from view, but every QSO stays safely in the " +
+                    "HolyLogger database under its log — nothing is deleted.\n\nCreate the new log now?",
+                    "Create New Log", HolyMsgType.Info, this))
+                return;
+
+            long id = dal.CreateLog(dlg.LogName, string.Empty);   // normal (day-by-day) log
+            SwitchActiveLog(id);
+        }
+
+        // File -> View Logs: open the log manager (list all logs; open / rename / delete / export).
+        private void ViewLogsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var win = new ViewLogsWindow(this, dal) { Owner = this };
+            win.ShowDialog();
+        }
+
+        // Reusable ADIF export of a given QSO list (used by the File menu and by View Logs per-log).
+        public void ExportQsosToAdif(System.Collections.ObjectModel.ObservableCollection<QSO> qsos, Window owner)
+        {
+            string adif = Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName);
+            var save = new SaveFileDialog { Filter = "ADIF File|*.adi", Title = "Export ADIF" };
+            if (save.ShowDialog() != true) return;
+            try
+            {
+                System.IO.File.WriteAllText(save.FileName, adif);
+                HolyMessageBox.ShowSuccess("File created successfully!", "Export ADIF", owner);
+            }
+            catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", owner); }
+        }
+
+        // Reusable Cabrillo export of a given QSO list.
+        public void ExportQsosToCabrillo(System.Collections.ObjectModel.ObservableCollection<QSO> qsos, Window owner)
+        {
+            Contester c = new Contester
+            {
+                Callsign = Properties.Settings.Default.PersonalInfoCallsign,
+                Category_Mode = Properties.Settings.Default.selectedMode,
+                Category_Operator = Properties.Settings.Default.selectedOperator,
+                Category_Power = Properties.Settings.Default.selectedPower,
+                Category_Band = Properties.Settings.Default.selectedBand,
+                Category_Overlay = Properties.Settings.Default.selectedOverlay,
+                Contest = Properties.Settings.Default.selectedEvent,
+                Email = Properties.Settings.Default.PersonalInfoEmail,
+                Grid = Properties.Settings.Default.my_locator,
+                Name = Properties.Settings.Default.PersonalInfoName,
+                Soapbox = "HolyLogger",
+            };
+            string cabrillo = Services.GenerateCabrillo(qsos, c);
+            var save = new SaveFileDialog { Filter = "Text File|*.txt|Cabrillo File|*.cbr|Log File|*.log", Title = "Export Cabrillo" };
+            if (save.ShowDialog() != true) return;
+            try
+            {
+                System.IO.File.WriteAllText(save.FileName, cabrillo);
+                HolyMessageBox.ShowSuccess("File created successfully!", "Export Cabrillo", owner);
+            }
+            catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export Cabrillo", owner); }
         }
 
         // Default log ordering on load: newest QSO first (Date desc, then Time desc) so the operator
@@ -4415,9 +4609,9 @@ namespace HolyLogger
         private void UpdateNumOfQSOs()
         {
             //parseAdif();
-            NumOfQSOs = dal.GetQsoCount().ToString();
-            NumOfGrids = dal.GetGridCount().ToString();
-            NumOfDXCCs = dal.GetDXCCCount().ToString();
+            NumOfQSOs = dal.GetQsoCountForLog(dal.ActiveLogId).ToString();
+            NumOfGrids = dal.GetGridCountForLog(dal.ActiveLogId).ToString();
+            NumOfDXCCs = dal.GetDXCCCountForLog(dal.ActiveLogId).ToString();
             Score = "0";// _holyLogParser.Result.ToString();
         }
 

@@ -29,6 +29,9 @@ namespace HolyLogger
 
         public bool SchemaHasChanged { get; set; }
 
+        // The log currently loaded in the log table. New QSOs are stored under this log.
+        public long ActiveLogId { get; set; }
+
         private DataAccess()
         {
             try
@@ -52,6 +55,7 @@ namespace HolyLogger
 
                 con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
                 con.Open();
+                BackupBeforeLogsMigration();   // one-time safety copy before the logs-schema upgrade
                 UpdateSchema();
 
             }
@@ -94,7 +98,7 @@ namespace HolyLogger
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
@@ -142,7 +146,7 @@ namespace HolyLogger
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1)", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1," + ActiveLogId + ")", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
@@ -195,7 +199,7 @@ namespace HolyLogger
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?)", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -425,6 +429,75 @@ namespace HolyLogger
             return qso_list;
             }
         }
+
+        // Loads only the QSOs stored under one log (what the log table shows for the active log).
+        public ObservableCollection<QSO> GetQSOsForLog(long logId, Action<int> progressCallback = null)
+        {
+            lock (_dbLock)
+            {
+                ObservableCollection<QSO> qso_list = new ObservableCollection<QSO>();
+                int totalCount;
+                using (var c = new SQLiteCommand("SELECT count(*) FROM qso WHERE log_id = ?", con))
+                {
+                    c.Parameters.Add(new SQLiteParameter(null, logId));
+                    totalCount = Convert.ToInt32(c.ExecuteScalar());
+                }
+                int processedCount = 0;
+                int lastReportedProgress = -1;
+                using (SQLiteCommand cmd = new SQLiteCommand("SELECT * FROM qso WHERE log_id = ? ORDER BY date DESC, time DESC", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    using (SQLiteDataReader rdr = cmd.ExecuteReader())
+                    {
+                        while (rdr.Read())
+                        {
+                            QSO q = new QSO();
+                            if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                            if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
+                            if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
+                            if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                            if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
+                            if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
+                            if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
+                            if (rdr["band"] != null) q.Band = rdr["band"].ToString();
+                            if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
+                            if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
+                            if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
+                            if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
+                            if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
+                            if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
+                            if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
+                            if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                            if (rdr["country"] != null) q.Country = rdr["country"].ToString();
+                            if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
+                            if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
+                            if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                            if (rdr["time"] != null) q.Time = rdr["time"].ToString();
+                            if (rdr["date"] != null) q.Date = rdr["date"].ToString();
+                            if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
+                            if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
+                            if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                            if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
+                            if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                            q.StandartizeQSO();
+                            qso_list.Add(q);
+
+                            processedCount++;
+                            if (totalCount > 0)
+                            {
+                                int progress = (int)Math.Floor((double)processedCount * 100 / totalCount);
+                                if (progress > lastReportedProgress)
+                                {
+                                    lastReportedProgress = progress;
+                                    progressCallback?.Invoke(progress);
+                                }
+                            }
+                        }
+                    }
+                }
+                return qso_list;
+            }
+        }
         public ObservableCollection<QSO> GetTopQSOs(int i)
         {
             lock (_dbLock)
@@ -513,6 +586,26 @@ namespace HolyLogger
             }
         }
 
+        // Per-log versions of the status-bar counts (the counts follow the active log).
+        public int GetQsoCountForLog(long logId)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE log_id = ?", con))
+                { cmd.Parameters.Add(new SQLiteParameter(null, logId)); return Convert.ToInt32(cmd.ExecuteScalar()); }
+        }
+        public int GetGridCountForLog(long logId)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT count(distinct exchange) FROM qso WHERE (dx_callsign like '4X%' or dx_callsign like '4Z%') AND log_id = ?", con))
+                { cmd.Parameters.Add(new SQLiteParameter(null, logId)); return Convert.ToInt32(cmd.ExecuteScalar()); }
+        }
+        public int GetDXCCCountForLog(long logId)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT count(distinct country) FROM qso WHERE log_id = ?", con))
+                { cmd.Parameters.Add(new SQLiteParameter(null, logId)); return Convert.ToInt32(cmd.ExecuteScalar()); }
+        }
+
         public ObservableCollection<RadioEvent> GetRadioEvents()
         {
             lock (_dbLock)
@@ -594,6 +687,207 @@ namespace HolyLogger
                 throw new Exception(ex.Message);
             }
 
+        }
+
+        // True if the given column already exists on the table.
+        private bool ColumnExists(string table, string col)
+        {
+            using (var cmd = new SQLiteCommand($"SELECT count(*) FROM pragma_table_info('{table}') WHERE name = '{col}'", con))
+                return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+        }
+
+        // The first time a build with the multi-log feature runs on an existing database (qso table
+        // present but not yet migrated to logs), copy the whole DB file to a timestamped backup so the
+        // user can be restored if anything ever looked wrong. Best-effort: never blocks startup.
+        private void BackupBeforeLogsMigration()
+        {
+            try
+            {
+                if (!TableExists("qso")) return;          // brand-new DB: nothing to back up
+                if (ColumnExists("qso", "log_id")) return; // already migrated in a previous run
+                string backupPath = dbPath + ".pre-logs-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak";
+                if (File.Exists(backupPath)) return;
+                con.Close();
+                try { File.Copy(dbPath, backupPath, false); } catch { }
+                con.Open();
+            }
+            catch
+            {
+                if (con.State != System.Data.ConnectionState.Open)
+                {
+                    try { con.Open(); } catch { }
+                }
+            }
+        }
+
+        // Creates the logs table (name is unique, case-insensitive) if it does not exist yet.
+        private void EnsureLogsTable()
+        {
+            using (var cmd = new SQLiteCommand(
+                "CREATE TABLE IF NOT EXISTS [logs] (" +
+                "[Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                "[name] nvarchar(100) NOT NULL COLLATE NOCASE, " +
+                "[event_type] nvarchar(100) NULL COLLATE NOCASE, " +
+                "[created_utc] nvarchar(40) NULL);", con))
+                cmd.ExecuteNonQuery();
+            using (var idx = new SQLiteCommand(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_logs_name ON logs(name COLLATE NOCASE);", con))
+                idx.ExecuteNonQuery();
+        }
+
+        // ---- Logs API ------------------------------------------------------------------------
+
+        public int GetLogCount()
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT count(*) FROM logs", con))
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        public bool LogNameExists(string name)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT count(*) FROM logs WHERE name = ? COLLATE NOCASE", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, name ?? string.Empty));
+                    return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+                }
+        }
+
+        // True if the name is free to use. excludeId lets a log keep its own name during a rename.
+        public bool LogNameAvailable(string name, long excludeId = 0)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT count(*) FROM logs WHERE name = ? COLLATE NOCASE AND Id <> ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, name ?? string.Empty));
+                    cmd.Parameters.Add(new SQLiteParameter(null, excludeId));
+                    return Convert.ToInt32(cmd.ExecuteScalar()) == 0;
+                }
+        }
+
+        // Inserts a new log and returns its Id. event_type is the contest name, or "" for a normal log.
+        public long CreateLog(string name, string eventType)
+        {
+            lock (_dbLock)
+            {
+                using (var cmd = new SQLiteCommand("INSERT INTO logs (name, event_type, created_utc) VALUES (?,?,?)", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, name));
+                    cmd.Parameters.Add(new SQLiteParameter(null, eventType ?? string.Empty));
+                    cmd.Parameters.Add(new SQLiteParameter(null, DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")));
+                    cmd.ExecuteNonQuery();
+                }
+                using (var idcmd = new SQLiteCommand("SELECT last_insert_rowid()", con))
+                    return Convert.ToInt64(idcmd.ExecuteScalar());
+            }
+        }
+
+        // Renames a log. Returns false (no change) if the new name is already used by another log.
+        public bool RenameLog(long id, string newName)
+        {
+            lock (_dbLock)
+            {
+                using (var chk = new SQLiteCommand("SELECT count(*) FROM logs WHERE name = ? COLLATE NOCASE AND Id <> ?", con))
+                {
+                    chk.Parameters.Add(new SQLiteParameter(null, newName ?? string.Empty));
+                    chk.Parameters.Add(new SQLiteParameter(null, id));
+                    if (Convert.ToInt32(chk.ExecuteScalar()) > 0) return false;
+                }
+                using (var cmd = new SQLiteCommand("UPDATE logs SET name = ? WHERE Id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, newName));
+                    cmd.Parameters.Add(new SQLiteParameter(null, id));
+                    cmd.ExecuteNonQuery();
+                }
+                return true;
+            }
+        }
+
+        // Deletes a log AND all QSOs stored under it. Caller must confirm with the user first.
+        public void DeleteLog(long id)
+        {
+            lock (_dbLock)
+            {
+                using (var dq = new SQLiteCommand("DELETE FROM qso WHERE log_id = ?", con))
+                {
+                    dq.Parameters.Add(new SQLiteParameter(null, id));
+                    dq.ExecuteNonQuery();
+                }
+                using (var dl = new SQLiteCommand("DELETE FROM logs WHERE Id = ?", con))
+                {
+                    dl.Parameters.Add(new SQLiteParameter(null, id));
+                    dl.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public string GetLogName(long id)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT name FROM logs WHERE Id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, id));
+                    var o = cmd.ExecuteScalar();
+                    return o == null || o == DBNull.Value ? null : o.ToString();
+                }
+        }
+
+        public string GetLogEventType(long id)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT event_type FROM logs WHERE Id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, id));
+                    var o = cmd.ExecuteScalar();
+                    return o == null || o == DBNull.Value ? string.Empty : o.ToString();
+                }
+        }
+
+        // Assigns every QSO that has no log yet to the given log (used once during first-run migration).
+        public int AssignUnassignedToLog(long logId)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("UPDATE qso SET log_id = ? WHERE log_id IS NULL", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    return cmd.ExecuteNonQuery();
+                }
+        }
+
+        public int CountUnassignedQSOs()
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT count(*) FROM qso WHERE log_id IS NULL", con))
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+        }
+
+        // Returns all logs with computed stats (QSO count, first/last QSO date) for the View Logs window.
+        public List<LogInfo> GetLogs()
+        {
+            var list = new List<LogInfo>();
+            lock (_dbLock)
+            {
+                string stm =
+                    "SELECT l.Id, l.name, l.event_type, l.created_utc, " +
+                    "(SELECT count(*) FROM qso q WHERE q.log_id = l.Id) AS qso_count, " +
+                    "(SELECT min(q.date) FROM qso q WHERE q.log_id = l.Id) AS start_date, " +
+                    "(SELECT max(q.date) FROM qso q WHERE q.log_id = l.Id) AS end_date " +
+                    "FROM logs l ORDER BY l.Id ASC";
+                using (var cmd = new SQLiteCommand(stm, con))
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                        list.Add(new LogInfo
+                        {
+                            Id = Convert.ToInt64(rdr["Id"]),
+                            Name = rdr["name"]?.ToString() ?? string.Empty,
+                            EventType = rdr["event_type"] == DBNull.Value ? string.Empty : rdr["event_type"].ToString(),
+                            QsoCount = rdr["qso_count"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["qso_count"]),
+                            StartDate = rdr["start_date"] == DBNull.Value ? string.Empty : rdr["start_date"].ToString(),
+                            EndDate = rdr["end_date"] == DBNull.Value ? string.Empty : rdr["end_date"].ToString(),
+                        });
+            }
+            return list;
         }
 
         // Adds the eqsl_status column to an existing qso table the first time the user runs a build
@@ -1433,6 +1727,8 @@ namespace HolyLogger
             AddEqslStatusColumn();
             AddQrzColumns();
             AddLotwColumns();
+            AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
+            EnsureLogsTable();
             EnsureEqslAccountsTable();
             EnsureEqslIndexes();
             EnsureQrzIndexes();
@@ -1472,5 +1768,16 @@ namespace HolyLogger
         public string Callsign { get; set; }
         public string Username { get; set; }
         public string Password { get; set; }
+    }
+
+    // A named Log and its computed stats, for the View Logs window.
+    public class LogInfo
+    {
+        public long Id { get; set; }
+        public string Name { get; set; }
+        public string EventType { get; set; }   // contest name, or "" for a normal day-by-day log
+        public int QsoCount { get; set; }
+        public string StartDate { get; set; }   // first QSO date in the log (min)
+        public string EndDate { get; set; }     // last QSO date in the log (max)
     }
 }

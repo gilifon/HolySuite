@@ -299,6 +299,9 @@
             <Grid DockPanel.Dock="Top">
             <Menu VerticalAlignment="Center" HorizontalAlignment="Left" Background="Transparent">
                 <MenuItem Header="File" FontSize="16">
+                    <MenuItem x:Name="CreateNewLogMenuItem" Header="Create New Log" ToolTip="Start a new, empty log (your existing QSOs stay safe in the database)" Click="CreateNewLogMenuItem_Click"/>
+                    <MenuItem x:Name="ViewLogsMenuItem" Header="View Logs" ToolTip="See all your logs; open, rename, delete or export a log" Click="ViewLogsMenuItem_Click"/>
+                    <Separator />
                     <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
                         <MenuItem.Icon>
                             <Image Source="Images/import.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -380,12 +383,6 @@
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
-                    <MenuItem x:Name="ClearLogMenuItem" Header="Clear Log" ToolTip="Clear Log" Click="ClearLogMenuItem_Click">
-                        <MenuItem.Icon>
-                            <Image Source="Images/eraser.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
