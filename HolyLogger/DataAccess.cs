@@ -364,6 +364,18 @@ namespace HolyLogger
             }
             }
         }
+
+        // Deletes only the QSOs of one log (used by "Import ADIF -> Replace", which replaces just the
+        // active log, not every log in the database).
+        public void DeleteQSOsForLog(long logId)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("DELETE FROM qso WHERE log_id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    cmd.ExecuteNonQuery();
+                }
+        }
         public ObservableCollection<QSO> GetAllQSOs(Action<int> progressCallback = null)
         {
             lock (_dbLock)

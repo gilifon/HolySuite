@@ -4737,10 +4737,18 @@ namespace HolyLogger
         // backup fails — we never destroy the log without a successful backup.
         private bool BackupAndClearLogForReplace()
         {
+            // The active log's name is part of the proposed backup filename so it is easy to tell which
+            // log the backup belongs to. Invalid filename characters are replaced with '_'.
+            string logName = null;
+            try { logName = dal.GetLogName(dal.ActiveLogId); } catch { }
+            string safeLog = string.IsNullOrWhiteSpace(logName)
+                ? string.Empty
+                : string.Join("_", logName.Split(System.IO.Path.GetInvalidFileNameChars())).Trim() + "_";
+
             var saveDialog = new Microsoft.Win32.SaveFileDialog
             {
                 Filter = "ADIF files (*.adi)|*.adi",
-                FileName = "HolyLogger_backup_" + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi",
+                FileName = "HolyLogger_backup_" + safeLog + DateTime.Now.ToString("yyyyMMdd_HHmmss") + ".adi",
                 Title = "Save a backup of your current log before replacing it"
             };
             if (saveDialog.ShowDialog() != true)
@@ -4748,8 +4756,8 @@ namespace HolyLogger
 
             try
             {
-                // PROPOSED contest_id tag — pass the active contest so the exported file is tagged.
-                string adif = Services.GenerateAdif(dal.GetAllQSOs(), Contests.ContestService.Active?.CabrilloName);
+                // Back up ONLY the active log (Replace replaces just this log, not every log).
+                string adif = Services.GenerateAdif(dal.GetQSOsForLog(dal.ActiveLogId), Contests.ContestService.Active?.CabrilloName);
                 System.IO.File.WriteAllText(saveDialog.FileName, adif);
             }
             catch (Exception ex)
@@ -4758,10 +4766,10 @@ namespace HolyLogger
                 return false;
             }
 
-            // Backup succeeded -> safe to clear the current log before importing the new file.
+            // Backup succeeded -> safe to clear ONLY the active log before importing the new file.
             Properties.Settings.Default.RecentQSOCounter = 0;
             Qsos.Clear();
-            dal.DeleteAll();
+            dal.DeleteQSOsForLog(dal.ActiveLogId);
             ClearBtn_Click(null, null);
             UpdateNumOfQSOs();
             UpdateEqslQueueIndicator();
@@ -5753,17 +5761,26 @@ namespace HolyLogger
         // Entering a contest selects its profile AND turns on Contest Mode (duplicate flagging).
         private void EnterContest(Contests.Contest c)
         {
-            Contests.ContestService.Activate(c);
-            Properties.Settings.Default.ContestMode = true;
-            Properties.Settings.Default.ActiveContestId = c.Id;
+            // Selecting a contest forces a brand-new log dedicated to it: the user must give it a
+            // (unique) name. The log's Event Type is the contest, so contest mode and Cabrillo
+            // export follow the log from now on. Cancelling the name dialog aborts entering.
+            string suggested = UniqueLogName(c.Name + " " + DateTime.UtcNow.ToString("yyyy-MM-dd"));
+            var dlg = new NewLogWindow(dal,
+                "Name the log for the contest \"" + c.Name + "\":", suggested) { Owner = this };
+            if (dlg.ShowDialog() != true) return;   // cancelled -> do not enter the contest
+
+            long id = dal.CreateLog(dlg.LogName, c.Id);
+
             // A freshly selected contest starts clean: serial back to 001 and no zone override (use
-            // cty.dat). A restart mid-contest goes through Activate (not here), so it resumes instead.
+            // cty.dat). Set these before switching; ApplyContestModeForActiveLog won't reset them.
+            // A restart mid-contest goes through Activate (not here), so it resumes instead.
             Properties.Settings.Default.ContestNextSerial = 1;
             Properties.Settings.Default.ContestMyZoneOverride = string.Empty;
             Properties.Settings.Default.Save();
-            UpdateContestModeMenuHeader();
-            ApplyContestExchangeUI();
-            UpdateDup();
+
+            // Switch to the new (empty) log; this activates the contest via its Event Type and
+            // refreshes the entry form, title bar, counts and dup check.
+            SwitchActiveLog(id);
         }
 
         private void ExitContest()
@@ -6594,6 +6611,11 @@ namespace HolyLogger
                 // overwrite text the user is actively typing.
                 if (FreqNoCatBezel != null && FreqNoCatBezel.Visibility != Visibility.Visible)
                     ShowLedNoCat();
+                // Already showing: reflect a programmatic frequency change (e.g. tuning to a
+                // cluster/map spot) so the visible box follows TB_Frequency — but never while the
+                // user is typing in it.
+                else if (TB_FreqNoCat != null && !TB_FreqNoCat.IsFocused)
+                    FillFreqNoCatFromFrequency();
                 return;
             }
 
@@ -6636,14 +6658,21 @@ namespace HolyLogger
             if (FreqLedBezel == null || FreqNoCatBezel == null) return;
             FreqLedBezel.Visibility = Visibility.Hidden;
             FreqNoCatBezel.Visibility = Visibility.Visible;
-            // Pre-fill with any stored frequency.
+            FillFreqNoCatFromFrequency();   // pre-fill with any stored frequency
+        }
+
+        // Render TB_Frequency (MHz) into the no-CAT editable box as kHz with 3 decimals,
+        // e.g. 21.278520 -> "21278.520". Empty/invalid clears it. Callers must not invoke this
+        // while the box has focus, or they'll overwrite what the user is typing.
+        private void FillFreqNoCatFromFrequency()
+        {
+            if (TB_FreqNoCat == null) return;
             string raw = (TB_Frequency.Text ?? string.Empty).Trim();
-            if (double.TryParse(raw, System.Globalization.NumberStyles.Float,
-                                 System.Globalization.CultureInfo.InvariantCulture, out double mhz) && mhz > 0)
+            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double mhz) && mhz > 0)
             {
                 long hz = (long)Math.Round(mhz * 1000000.0);
-                TB_FreqNoCat.Text = (hz / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture)
-                                    + "." + (hz % 1000).ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
+                TB_FreqNoCat.Text = (hz / 1000).ToString(CultureInfo.InvariantCulture)
+                                    + "." + (hz % 1000).ToString("D3", CultureInfo.InvariantCulture);
             }
             else
             {

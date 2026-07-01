@@ -1,4 +1,6 @@
+using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
@@ -49,8 +51,8 @@ namespace HolyLogger
                     Num = n++,
                     Name = li.Name + (li.Id == _dal.ActiveLogId ? "  (active)" : ""),
                     EventType = eventDisplay,
-                    StartDate = li.StartDate,
-                    EndDate = li.EndDate,
+                    StartDate = FormatQsoDate(li.StartDate),
+                    EndDate = FormatQsoDate(li.EndDate),
                     QsoCount = li.QsoCount,
                     Id = li.Id,
                     IsContest = isContest,
@@ -62,6 +64,15 @@ namespace HolyLogger
             // (and a single log always appears selected). SelectionChanged then updates Open Log.
             var preselect = rows.FirstOrDefault(r => r.Id == _dal.ActiveLogId) ?? rows.FirstOrDefault();
             if (preselect != null) LogsGrid.SelectedItem = preselect;
+        }
+
+        // QSO dates are stored as YYYYMMDD; show them as e.g. "30 Sep 2006". Empty stays empty.
+        private static string FormatQsoDate(string yyyymmdd)
+        {
+            if (string.IsNullOrWhiteSpace(yyyymmdd)) return string.Empty;
+            if (DateTime.TryParseExact(yyyymmdd.Trim(), "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var d))
+                return d.ToString("dd MMM yyyy", CultureInfo.InvariantCulture);
+            return yyyymmdd;   // unexpected format -> show as-is
         }
 
         private Row Selected => LogsGrid.SelectedItem as Row;
