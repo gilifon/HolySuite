@@ -1100,19 +1100,25 @@ function drawOverlays() {
                 .attr('fill', '#1565C0').attr('stroke', 'none');
         }
     } catch(e) {}
-    // Cluster spots: lines, spotter dots, DX dots
+    // Draw in three layers so DX dots always sit above every arc/spotter dot: arcs, then spotter
+    // dots, then the interactive DX dots. Each element is tagged with its DX callsign (data-cs)
+    // so applyHighlight() can restyle the hovered spot's arc + dots in place (no full re-render).
+    var arcsG = overlaysG.append('g');
+    var spottersG = overlaysG.append('g');
+    var dxG = overlaysG.append('g');
     for (var i = 0; i < clusterSpots.length; i++) {
         try {
             var sp = clusterSpots[i];
-            var pt = projection(sp.c);
             var spt = sp.sp ? projection(sp.sp) : null;
+            var pt = projection(sp.c);
             // Great circle line spotter -> DX (D3 geoPath draws it curved automatically)
             if (sp.sp) {
                 try {
                     var gcLine = { type: 'LineString', coordinates: [sp.sp, sp.c] };
                     var arcColor = (sp.b === '40' || sp.b === '40m' || (parseFloat(sp.f) >= 7.0 && parseFloat(sp.f) <= 7.3)) ? '#FFFFFF' : (sp.k || '#FF6600');
-                    overlaysG.append('path')
+                    arcsG.append('path')
                         .datum(gcLine)
+                        .attr('class', 'spot-arc').attr('data-cs', sp.cs)
                         .attr('d', path)
                         .attr('fill', 'none')
                         .attr('stroke', arcColor).attr('stroke-width', 0.8).attr('opacity', 0.6)
@@ -1121,7 +1127,8 @@ function drawOverlays() {
             }
             // Spotter dot (black)
             if (spt && isFinite(spt[0]) && isFinite(spt[1])) {
-                overlaysG.append('circle')
+                spottersG.append('circle')
+                    .attr('class', 'spot-spotter').attr('data-cs', sp.cs)
                     .attr('cx', spt[0]).attr('cy', spt[1]).attr('r', 2)
                     .attr('fill', '#000000').attr('stroke', 'none')
                     .attr('clip-path', 'url(#globe-clip)');
@@ -1130,22 +1137,23 @@ function drawOverlays() {
             if (pt && isFinite(pt[0]) && isFinite(pt[1])) {
                 (function(spot, px, py) {
                     var dotColor = spot.k || '#FF6600';
-                    var isHl = (hlCs !== null && spot.cs === hlCs);
-                    overlaysG.append('circle')
-                        .attr('cx', px).attr('cy', py).attr('r', isHl ? 9 : 4)
-                        .attr('fill', dotColor).attr('stroke', isHl ? '#FFFFFF' : 'none').attr('stroke-width', isHl ? 2 : 0)
+                    dxG.append('circle')
+                        .attr('class', 'spot-dx').attr('data-cs', spot.cs)
+                        .attr('cx', px).attr('cy', py).attr('r', 4)
+                        .attr('fill', dotColor).attr('stroke', 'none').attr('stroke-width', 0)
                         .attr('clip-path', 'url(#globe-clip)')
                         .style('cursor', 'pointer')
                         .on('mouseover', function() {
                             tooltip.style('display','block')
                                 .html('<b>' + spot.cs + '</b><br/>' + spot.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + spot.m);
+                            applyHighlight(spot.cs);   // light up this spot's arc + dots on the map
                             try { window.external.SpotHovered(spot.cs); } catch(e3) {}
                         })
                         .on('mousemove', function() {
                             tooltip.style('left', (d3.event.pageX + 10) + 'px')
                                    .style('top',  (d3.event.pageY - 28) + 'px');
                         })
-                        .on('mouseout', function() { tooltip.style('display','none'); try { window.external.SpotHoverEnd(); } catch(e4) {} })
+                        .on('mouseout', function() { tooltip.style('display','none'); applyHighlight(null); try { window.external.SpotHoverEnd(); } catch(e4) {} })
                         .on('click', function() {
                             selectSpot(spot);
                             try { window.external.TuneToSpot(spot.f, spot.m); } catch(e2) {}
@@ -1158,6 +1166,28 @@ function drawOverlays() {
     // Outer border
     overlaysG.append('circle').attr('cx', cx).attr('cy', cy).attr('r', mapR)
         .attr('fill', 'none').attr('stroke', '#2a607a').attr('stroke-width', 2);
+    applyHighlight(hlCs);   // re-apply any active hover highlight after this redraw
+}
+// Restyle the hovered spot's arc + spotter dot + DX dot in place (matched by DX callsign) so the
+// change never removes/re-adds nodes -- which would otherwise retrigger the map's own hover
+// events and flicker. Only the non-interactive arc/spotter are raised (never the DX dot).
+function applyHighlight(cs) {
+    hlCs = cs;
+    if (!overlaysG) return;
+    overlaysG.selectAll('.spot-arc').each(function() {
+        var el = d3.select(this); var on = (cs !== null && el.attr('data-cs') === cs);
+        el.attr('stroke-width', on ? 2.5 : 0.8).attr('opacity', on ? 1 : 0.6);
+        if (on) el.raise();
+    });
+    overlaysG.selectAll('.spot-spotter').each(function() {
+        var el = d3.select(this); var on = (cs !== null && el.attr('data-cs') === cs);
+        el.attr('r', on ? 4 : 2).attr('stroke', on ? '#FFFFFF' : 'none').attr('stroke-width', on ? 1 : 0);
+        if (on) el.raise();
+    });
+    overlaysG.selectAll('.spot-dx').each(function() {
+        var el = d3.select(this); var on = (cs !== null && el.attr('data-cs') === cs);
+        el.attr('r', on ? 9 : 4).attr('stroke', on ? '#FFFFFF' : 'none').attr('stroke-width', on ? 2 : 0);
+    });
 }
 drawOverlays();
 drawDayNight();
@@ -1262,8 +1292,8 @@ function updateClusterSpots(json) {
     drawOverlays(); drawDayNight();
     if (autoZoomActive) applyAutoZoom();
 }
-function highlightSpot(cs, f) { hlCs = cs; hlF = f; drawOverlays(); }
-function clearSpotHighlight() { hlCs = null; hlF = null; drawOverlays(); }
+function highlightSpot(cs, f) { hlF = f; applyHighlight(cs); }
+function clearSpotHighlight() { hlF = null; applyHighlight(null); }
 function haversineKm(lat1, lon1, lat2, lon2) {
     var R = 6371, toR = Math.PI/180;
     var dLat = (lat2-lat1)*toR, dLon = (lon2-lon1)*toR;
@@ -1410,13 +1440,52 @@ function wheelZoom(zoomIn) {
         onRadiusChange(sel.value);
         return;
     }
-    // Options are ordered ascending (small km -> large km); zooming in picks a smaller radius.
-    var idx = sel.selectedIndex + (zoomIn ? -1 : 1);
-    if (idx < 0) idx = 0;
-    if (idx > sel.options.length - 1) idx = sel.options.length - 1;
-    if (idx === sel.selectedIndex) return;
-    sel.selectedIndex = idx;
-    onRadiusChange(sel.value);
+    // Fixed-step zoom (independent of the preset dropdown list): 500 km per notch, or 250 km
+    // when below 2000 km for finer control near home. Using '<=' when zooming in and '<' when
+    // zooming out keeps 2000 km a clean grid point in both directions.
+    var step = zoomIn ? (radiusKm <= 2000 ? 250 : 500) : (radiusKm < 2000 ? 250 : 500);
+    var newKm = radiusKm + (zoomIn ? -step : step);
+    // Clamp to the preset radius range (ignore any temporary wheel option already present).
+    var minKm = Infinity, maxKm = -Infinity;
+    for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].getAttribute('data-wheel')) continue;
+        var v = parseInt(sel.options[i].value, 10);
+        if (v < minKm) minKm = v;
+        if (v > maxKm) maxKm = v;
+    }
+    if (newKm < minKm) newKm = minKm;
+    if (newKm > maxKm) newKm = maxKm;
+    if (newKm === radiusKm) return;
+    applyWheelRadius(newKm);
+}
+// Apply an arbitrary (off-grid) wheel radius. The dropdown only carries preset values, so when
+// the stepped value isn't a preset we show it via a single reusable 'custom' option inserted in
+// ascending order; if it matches a preset we select that instead and drop the custom option.
+function applyWheelRadius(km) {
+    var sel = document.getElementById('radius-ctrl');
+    if (sel) {
+        // Remove any previous wheel-added option so only one custom entry ever exists.
+        for (var k = sel.options.length - 1; k >= 0; k--) {
+            if (sel.options[k].getAttribute('data-wheel')) sel.remove(k);
+        }
+        var matched = false;
+        for (var i = 0; i < sel.options.length; i++) {
+            if (parseInt(sel.options[i].value, 10) === km) { sel.selectedIndex = i; matched = true; break; }
+        }
+        if (!matched) {
+            var opt = document.createElement('option');
+            opt.value = km;
+            opt.text = useMiles ? (Math.round(km * 0.621371) + ' mi') : (km + ' km');
+            opt.setAttribute('data-wheel', '1');
+            var before = null;
+            for (var j = 0; j < sel.options.length; j++) {
+                if (parseInt(sel.options[j].value, 10) > km) { before = sel.options[j]; break; }
+            }
+            sel.add(opt, before);
+            sel.value = km;
+        }
+    }
+    onRadiusChange(km);
 }
 function onWheelEvent(e) {
     e = e || window.event;

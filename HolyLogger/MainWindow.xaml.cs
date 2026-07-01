@@ -9916,6 +9916,24 @@ namespace HolyLogger
                         }
                     }
 
+                    // Fall back to the spotter's DXCC-entity location when the cluster didn't send
+                    // spotter_loc, so the spotter->DX arc can be drawn (and highlighted on hover)
+                    // for every spot, not only the few that carry exact spotter coordinates.
+                    if ((!spotterLat.HasValue || !spotterLon.HasValue) && !string.IsNullOrWhiteSpace(spotter))
+                    {
+                        try
+                        {
+                            var spDxcc = rem.GetDXCC(spotter.Trim());
+                            if (spDxcc != null && !string.IsNullOrWhiteSpace(spDxcc.Locator))
+                            {
+                                var spll = MaidenheadLocator.LocatorToLatLng(spDxcc.Locator);
+                                spotterLat = spll.Lat;
+                                spotterLon = spll.Long;
+                            }
+                        }
+                        catch { }
+                    }
+
                     var dxccInfo = rem.GetDXCC(dx.Trim());
                     string countryName = dxccInfo != null ? dxccInfo.Name : string.Empty;
                     string flagPath = GetFlagPathFromCountryName(countryName);
