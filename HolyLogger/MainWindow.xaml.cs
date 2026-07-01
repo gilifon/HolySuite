@@ -1794,23 +1794,56 @@ namespace HolyLogger
         // Contest Mode to match the log. Used by Create New Log, the contest flow and View Logs -> Open.
         public void SwitchActiveLog(long logId)
         {
-            dal.ActiveLogId = logId;
-            Properties.Settings.Default.ActiveLogId = logId;
-            Properties.Settings.Default.Save();
+            // Loading a large log freezes the UI thread while the grid binds/renders; show a busy
+            // overlay + wait cursor so the user knows it is working, not hung.
+            Mouse.OverrideCursor = Cursors.Wait;
+            ShowLogLoadingOverlay(true);
+            try
+            {
+                dal.ActiveLogId = logId;
+                Properties.Settings.Default.ActiveLogId = logId;
+                Properties.Settings.Default.Save();
 
-            if (Qsos != null) Qsos.CollectionChanged -= Qsos_CollectionChanged;
-            Qsos = dal.GetQSOsForLog(logId);
-            Qsos.CollectionChanged += Qsos_CollectionChanged;
-            DataContext = Qsos;
-            RestoreDataContext();
-            LastQSO = Qsos.FirstOrDefault();
+                if (Qsos != null) Qsos.CollectionChanged -= Qsos_CollectionChanged;
+                Qsos = dal.GetQSOsForLog(logId);
+                Qsos.CollectionChanged += Qsos_CollectionChanged;
+                DataContext = Qsos;
+                RestoreDataContext();
+                LastQSO = Qsos.FirstOrDefault();
 
-            ClearBtn_Click(null, null);       // reset the entry form for the newly active log
-            ApplyContestModeForActiveLog();
-            UpdateActiveLogTitle();
-            UpdateNumOfQSOs();
-            UpdateEqslQueueIndicator();
-            UpdateQrzMenuCount();
+                ClearBtn_Click(null, null);       // reset the entry form for the newly active log
+                ApplyContestModeForActiveLog();
+                UpdateActiveLogTitle();
+                UpdateNumOfQSOs();
+                UpdateEqslQueueIndicator();
+                UpdateQrzMenuCount();
+                // Recompute worked countries from the newly active log so the cluster's "new
+                // country" (red) flags reflect THIS log immediately -- e.g. a brand-new empty log
+                // makes every spotted entity needed. Without this they stayed stale until restart.
+                RebuildWorkedCountriesAndRefreshCluster();
+            }
+            finally
+            {
+                // Clear the busy indicator only after the grid has finished its layout/render pass.
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    ShowLogLoadingOverlay(false);
+                    Mouse.OverrideCursor = null;
+                }), System.Windows.Threading.DispatcherPriority.ContextIdle);
+            }
+        }
+
+        // Toggle the "Loading log…" overlay. When showing, force a render pass so it actually
+        // paints before the heavy, UI-thread-blocking load begins.
+        private void ShowLogLoadingOverlay(bool show)
+        {
+            if (LogLoadingOverlay == null) return;
+            LogLoadingOverlay.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            if (show)
+            {
+                LogLoadingOverlay.UpdateLayout();
+                Dispatcher.Invoke(new Action(() => { }), System.Windows.Threading.DispatcherPriority.Render);
+            }
         }
 
         // Contest Mode follows the active log: a normal (day-by-day) log turns it off; a contest log
@@ -1880,6 +1913,19 @@ namespace HolyLogger
                 HolyMessageBox.ShowSuccess("File created successfully!", "Export ADIF", owner);
             }
             catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", owner); }
+        }
+
+        public void ExportQsosToCsv(System.Collections.ObjectModel.ObservableCollection<QSO> qsos, Window owner)
+        {
+            string csv = Services.GenerateCSV(qsos);
+            var save = new SaveFileDialog { Filter = "CSV File|*.csv", Title = "Export CSV" };
+            if (save.ShowDialog() != true) return;
+            try
+            {
+                System.IO.File.WriteAllText(save.FileName, csv);
+                HolyMessageBox.ShowSuccess("File created successfully!", "Export CSV", owner);
+            }
+            catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export CSV", owner); }
         }
 
         // Reusable Cabrillo export of a given QSO list.
@@ -5046,106 +5092,22 @@ namespace HolyLogger
 
         private void ExportMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // PROPOSED contest_id tag — pass the active contest so the exported file is tagged.
-            string adif = Services.GenerateAdif(dal.GetAllQSOs(), Contests.ContestService.Active?.CabrilloName);
-            SaveFileDialog saveFileDialog1 = new SaveFileDialog();
-            saveFileDialog1.Filter = "ADIF File|*.adi";
-            saveFileDialog1.Title = "Export ADIF";
-            saveFileDialog1.ShowDialog();
-
-            // If the file name is not an empty string open it for saving.
-            try
-            {
-                if (saveFileDialog1.FileName != "")
-                {
-                    // Saves the Image via a FileStream created by the OpenFile method.
-                    System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
-                    using (StreamWriter sw = new StreamWriter(fs))
-                    {
-                        sw.Write(adif);
-                    }
-                    HolyMessageBox.ShowSuccess("File created successfully!", "Export ADIF", this);
-                }
-            }
-            catch (Exception ex)
-            {
-                HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", this);
-            }
+            // Export the ACTIVE log only (the "(Active Log)" menu label). Uses the same helper /
+            // save dialog as the View Logs window's Export ADIF button, so behaviour is identical.
+            ExportQsosToAdif(dal.GetQSOsForLog(dal.ActiveLogId), this);
         }
 
         private void ExportCabrilloMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            Contester c = new Contester();
-            c.Callsign = Properties.Settings.Default.PersonalInfoCallsign;
-            c.Category_Mode = Properties.Settings.Default.selectedMode;
-            c.Category_Operator = Properties.Settings.Default.selectedOperator;
-            c.Category_Power = Properties.Settings.Default.selectedPower;
-            c.Category_Band = Properties.Settings.Default.selectedBand;
-            c.Category_Overlay = Properties.Settings.Default.selectedOverlay;
-            c.Contest = Properties.Settings.Default.selectedEvent;
-            c.Email = Properties.Settings.Default.PersonalInfoEmail;
-            c.Grid = Properties.Settings.Default.my_locator;
-            c.Name = Properties.Settings.Default.PersonalInfoName;
-            c.Soapbox = "HolyLogger";
-
-            string cabrillo = Services.GenerateCabrillo(dal.GetAllQSOs(), c);
-            // Displays a SaveFileDialog so the user can save the Image
-            // assigned to Button2.
-            SaveFileDialog saveFileDialog1 = new SaveFileDialog();
-            saveFileDialog1.Filter = "Text File|*.txt|Cabrillo File|*.cbr|Log File|*.log";
-            saveFileDialog1.Title = "Export Cabrillo";
-            saveFileDialog1.ShowDialog();
-
-            // If the file name is not an empty string open it for saving.
-            try
-            {
-                if (saveFileDialog1.FileName != "")
-                {
-                    // Saves the Image via a FileStream created by the OpenFile method.
-                    System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
-                    using (StreamWriter sw = new StreamWriter(fs))
-                    {
-                        sw.Write(cabrillo);
-                    }
-                    HolyMessageBox.ShowSuccess("File created successfully!", "Export Cabrillo", this);
-                }
-            }
-            catch (Exception ex)
-            {
-                HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export Cabrillo", this);
-            }
+            // Export the ACTIVE log only (the "(Active Log)" menu label). Uses the same helper /
+            // save dialog as the View Logs window's Export Cabrillo button.
+            ExportQsosToCabrillo(dal.GetQSOsForLog(dal.ActiveLogId), this);
         }
 
         private void ExpotCSVMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string adif = Services.GenerateCSV(dal.GetAllQSOs());
-
-            // Displays a SaveFileDialog so the user can save the Image
-            // assigned to Button2.
-            SaveFileDialog saveFileDialog1 = new SaveFileDialog();
-            saveFileDialog1.Filter = "CSV File|*.csv";
-            saveFileDialog1.Title = "Export CSV";
-            saveFileDialog1.ShowDialog();
-
-            // If the file name is not an empty string open it for saving.
-            try
-            {
-                if (saveFileDialog1.FileName != "")
-                {
-                    // Saves the Image via a FileStream created by the OpenFile method.
-                    System.IO.FileStream fs = (System.IO.FileStream)saveFileDialog1.OpenFile();
-                    using (StreamWriter sw = new StreamWriter(fs))
-                    {
-                        sw.Write(adif);
-                    }
-                    HolyMessageBox.ShowSuccess("File created successfully!", "Export CSV", this);
-                }
-            }
-            catch (Exception ex)
-            {
-                HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export CSV", this);
-            }
-
+            // Export the ACTIVE log only (the "(Active Log)" menu label), via the shared helper.
+            ExportQsosToCsv(dal.GetQSOsForLog(dal.ActiveLogId), this);
         }
 
         private async void L_SendLog(object sender, EventArgs e)

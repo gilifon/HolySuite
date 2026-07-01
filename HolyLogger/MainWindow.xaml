@@ -299,8 +299,24 @@
             <Grid DockPanel.Dock="Top">
             <Menu VerticalAlignment="Center" HorizontalAlignment="Left" Background="Transparent">
                 <MenuItem Header="File" FontSize="16">
-                    <MenuItem x:Name="CreateNewLogMenuItem" Header="Create New Log" ToolTip="Start a new, empty log (your existing QSOs stay safe in the database)" Click="CreateNewLogMenuItem_Click"/>
-                    <MenuItem x:Name="ViewLogsMenuItem" Header="View Logs" ToolTip="See all your logs; open, rename, delete or export a log" Click="ViewLogsMenuItem_Click"/>
+                    <MenuItem x:Name="CreateNewLogMenuItem" Header="Create New Log" ToolTip="Start a new, empty log (your existing QSOs stay safe in the database)" Click="CreateNewLogMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- Material "note_add": a page with a plus = create a new log -->
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#1565C0"
+                                      Data="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 14h-3v3h-2v-3H8v-2h3v-3h2v3h3v2zm-3-7V3.5L18.5 9H13z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="ViewLogsMenuItem" Header="View &amp; Select Logs" ToolTip="See all your logs; open, rename, delete or export a log" Click="ViewLogsMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- Material "library_books": stacked logbooks = view all logs -->
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="#444444"
+                                      Data="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <Separator />
                     <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
                         <MenuItem.Icon>
@@ -308,23 +324,23 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="ExportMenuItem" Header="Export ADIF" ToolTip="Generates ADIF file from the QSO list" Click="ExportMenuItem_Click" >
+                    <MenuItem x:Name="ExportMenuItem" Header="Export ADIF (Active Log)" ToolTip="Export the active log to an ADIF file" Click="ExportMenuItem_Click" >
                         <MenuItem.Icon>
                             <Image Source="Images/exportA.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <MenuItem x:Name="ExportCabrilloMenuItem" Header="Export Cabrillo" ToolTip="Generates Cabrillo file from the QSO list" Click="ExportCabrilloMenuItem_Click" >
+                    <MenuItem x:Name="ExportCabrilloMenuItem" Header="Export Cabrillo (Active Log)" ToolTip="Export the active log to a Cabrillo file" Click="ExportCabrilloMenuItem_Click" >
                         <MenuItem.Icon>
                             <Image Source="Images/exportC.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <MenuItem x:Name="ExpotExlMenuItem" Header="Export CSV" ToolTip="Generates CSV file from the QSO list" Click="ExpotCSVMenuItem_Click" >
+                    <MenuItem x:Name="ExpotExlMenuItem" Header="Export CSV (Active Log)" ToolTip="Export the active log to a CSV file" Click="ExpotCSVMenuItem_Click" >
                         <MenuItem.Icon>
                             <Image Source="Images/exportX.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="UploadMenuItem" Header="Send log" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
+                    <MenuItem x:Name="UploadMenuItem" Header="Send Log to IARC" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
@@ -1294,6 +1310,19 @@
             <Run Text="Callsign" />
         </TextBlock>
         <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" VerticalContentAlignment="Center" MaxLength="14" TabIndex="2"/>
+        <!-- Busy overlay shown while a (potentially large) log is loaded/switched, so the user
+             sees that work is happening rather than a frozen window. -->
+        <Border x:Name="LogLoadingOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed"
+                Background="#66000000" Panel.ZIndex="1000">
+            <Border Background="White" BorderBrush="#1565C0" BorderThickness="1" CornerRadius="6"
+                    Padding="28,18" HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="&#x231B;" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="LogLoadingText" Text="Loading log&#8230;" FontSize="16" FontWeight="Bold"
+                               Foreground="#18393c" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Border>
+        </Border>
     </Grid>
 
 </Window>

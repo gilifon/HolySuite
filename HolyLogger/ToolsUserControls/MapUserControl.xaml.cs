@@ -343,7 +343,7 @@ namespace HolyLogger.ToolsUserControls
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   html, body { width:100%; height:100%; margin:0; padding:0; overflow:hidden; }
-  #map { width:100%; height:100%; }
+  #map { width:100%; height:100%; background:#b8e8ee; }
   #compass-ctrl {
     position:absolute; top:0; left:0; z-index:1000;
     display:flex; flex-direction:column; align-items:center;
@@ -365,19 +365,19 @@ namespace HolyLogger.ToolsUserControls
   #bottom-ctrl {
     position:absolute; bottom:0; left:0; z-index:1000; display:flex; align-items:flex-end;
   }
-  #radius-stack { display:flex; flex-direction:column; align-items:center; }
+  #radius-stack { display:flex; flex-direction:column; align-items:flex-start; }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa; border-radius:0;
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer; height:100%;
   }
-  #center-btn {
+  #center-btn, #home-btn {
     background:#9FCBF5; border:1px solid #4B76A0; border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333; height:24px; margin-bottom:2px;
     font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #center-btn:hover { background:#8CBDF0; }
-  #center-btn svg { width:16px; height:16px; }
+  #center-btn:hover, #home-btn:hover { background:#8CBDF0; }
+  #center-btn svg, #home-btn svg { width:16px; height:16px; }
   #center-btn .de-label { margin-right:4px; }
   #dx-center-btn {
     background:#9FCBF5; border:1px solid #4B76A0; border-radius:10px; padding:0 6px; cursor:pointer;
@@ -434,31 +434,35 @@ namespace HolyLogger.ToolsUserControls
 </div>
 <div id='bottom-ctrl'>
   <div id='radius-stack'>
-    <button id='center-btn' onclick='recenter()' title='Re-center map'>
-      <span class='de-label'>DE</span>
-      <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
-        <circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/>
-        <line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/>
-        <line x1='18' y1='12' x2='22' y2='12'/>
-      </svg>
-    </button>
+    <button id='home-btn' title='Center on home' style='display:none'></button>
+    <button id='center-btn' title='Center on home'></button>
     <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
   </div>
 </div>
 <div id='distance-stack'>
-  <button id='dx-center-btn' onclick='centerOnDx()' title='Center on home station'><span class='dx-label'>DX</span><svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg></button>
+  <button id='dx-center-btn' title='Center on DX' style='display:none'></button>
   <div id='distance-box'>DIST --</div>
 </div>
+" + MapAssetProvider.CountryDataScriptTag + @"
 <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
 <script>
 window.onerror = function() { return true; };
 var homeLat = " + homeLatJs + @", homeLon = " + homeLonJs + @";
 var radiusMeters = " + radiusMeters.ToString(ic) + @";
+var radiusKm = radiusMeters / 1000;
 var useMiles = " + useMilesJs + @";
 var showDayNight = " + (Properties.Settings.Default.MapShowDayNight ? "true" : "false") + @";
 var clusterSpots = " + spotsJs.ToString() + @";
-var map = L.map('map', { zoomControl:false, attributionControl:false, zoomSnap:0 }).setView([homeLat, homeLon], 4);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:18 }).addTo(map);
+var map = L.map('map', { zoomControl:false, attributionControl:false, zoomSnap:0, scrollWheelZoom:false }).setView([homeLat, homeLon], 4);
+// Colored countries drawn from the same embedded data + palette as the polar map (offline),
+// on the ocean-colored background, instead of online OpenStreetMap tiles.
+try {
+    var dxccFC = { type:'FeatureCollection', features: window.DXCC_DATA.features.map(function(f){ return { type:'Feature', properties:{ci:f.ci}, geometry:f.geometry }; }) };
+    L.geoJSON(dxccFC, {
+        interactive:false,
+        style: function(feat){ return { fillColor: window.DXCC_DATA.palette[feat.properties.ci] || '#e0e0e0', fillOpacity:0.92, color:'#777777', weight:0.4 }; }
+    }).addTo(map);
+} catch(eCountry) {}
 // Equator
 L.polyline([[0,-180],[0,-90],[0,0],[0,90],[0,180]], { color:'#000000', weight:1.2, opacity:0.5, interactive:false }).addTo(map);
 
@@ -599,6 +603,9 @@ L.marker([homeLat, homeLon], { icon:homeIcon }).addTo(map);
 var radiusCircle = L.circle([homeLat, homeLon], { radius:radiusMeters, color:'#E53935', fill:false, weight:2 }).addTo(map);
 var spotIcon = L.divIcon({ className:'', html:'<div style=""width:8px;height:8px;background:#FF6600;border-radius:50%;box-shadow:0 0 2px rgba(0,0,0,0.5)""></div>', iconAnchor:[4,4] });
 var spotsLayer = L.layerGroup().addTo(map);
+// Translucent spot tooltip (matches the polar map): see-through so the map shows through, with a
+// white text halo for legibility. Injected here to override Leaflet's opaque default tooltip CSS.
+(function(){ var st=document.createElement('style'); st.innerHTML="".leaflet-tooltip.spot-tip{background:rgba(255,255,255,0.45);border:1px solid rgba(120,120,120,0.55);box-shadow:none;color:#222;font-size:12px;font-family:sans-serif;padding:3px 7px;border-radius:4px;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 3px #fff;} .leaflet-tooltip.spot-tip:before{display:none;}""; document.head.appendChild(st); })();
 function gcArcPoints(lat1, lon1, lat2, lon2, n) {
     var toRad = Math.PI/180, toDeg = 180/Math.PI;
     var la1=lat1*toRad, lo1=lon1*toRad, la2=lat2*toRad, lo2=lon2*toRad;
@@ -616,47 +623,54 @@ function gcArcPoints(lat1, lon1, lat2, lon2, n) {
     return pts;
 }
 var hlCs = null, hlF = null;  // cluster-list hover highlight (callsign + freq)
+var flatSpotRefs = [];        // per-spot Leaflet layers, for in-place hover highlighting
 function renderSpots() {
     spotsLayer.clearLayers();
+    flatSpotRefs = [];
     for (var i = 0; i < clusterSpots.length; i++) {
         var sp = clusterSpots[i];
-        // Great circle line spotter -> DX
+        var ref = { cs: sp.cs, arc: null, spDot: null, dxDot: null };
         if (sp.sp) {
+            // Great circle line spotter -> DX
             var arcPts = gcArcPoints(sp.sp[0], sp.sp[1], sp.c[0], sp.c[1], 50);
             var arcColor = (sp.b === '40' || sp.b === '40m' || (parseFloat(sp.f) >= 7.0 && parseFloat(sp.f) <= 7.3)) ? '#FFFFFF' : (sp.k || '#FF6600');
-            L.polyline(arcPts, {
-                color: arcColor, weight: 0.8, opacity: 0.7, interactive: false
-            }).addTo(spotsLayer);
+            ref.arc = L.polyline(arcPts, { color: arcColor, weight: 0.8, opacity: 0.7, interactive: false }).addTo(spotsLayer);
+            // Spotter dot (black)
+            ref.spDot = L.circleMarker(sp.sp, { radius: 2, color: '#000000', fillColor: '#000000', fillOpacity: 1, weight: 0, interactive: false }).addTo(spotsLayer);
         }
-        // Spotter dot (black)
-        if (sp.sp) {
-            L.circleMarker(sp.sp, {
-                radius: 2, color: '#000000', fillColor: '#000000', fillOpacity: 1,
-                weight: 0, interactive: false
-            }).addTo(spotsLayer);
-        }
-        // Band-colored DX dot with tooltip and click. When this spot's row is hovered in the
-        // cluster list, draw an enlarged dot with a white ring so it stands out on the map.
+        // Band-colored DX dot with tooltip and click.
         var dotColor = sp.k || '#FF6600';
-        var isHl = (hlCs !== null && sp.cs === hlCs);
-        var m = L.circleMarker(sp.c, {
-            radius: isHl ? 12 : 5, color: isHl ? '#FFFFFF' : dotColor,
-            fillColor: dotColor, fillOpacity: 1,
-            weight: isHl ? 2 : 0, interactive: true
-        });
+        var m = L.circleMarker(sp.c, { radius: 5, color: dotColor, fillColor: dotColor, fillOpacity: 1, weight: 0, interactive: true });
+        m._dotColor = dotColor;
         m.bindTooltip('<b>' + sp.cs + '</b><br/>' + sp.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + sp.m, {
-            permanent: false, sticky: true, direction: 'top',
-            className: 'spot-tip'
+            permanent: false, sticky: true, direction: 'top', className: 'spot-tip'
         });
-        (function(freq, mode, cs) {
+        (function(freq, mode, cs, spot) {
             m.on('click', function() {
+                selectSpot(spot);
                 try { window.external.TuneToSpot(freq, mode); } catch(e) {}
                 try { window.external.SpotHoverEnd(); } catch(e) {}
             });
-            m.on('mouseover', function() { try { window.external.SpotHovered(cs); } catch(e) {} });
-            m.on('mouseout', function() { try { window.external.SpotHoverEnd(); } catch(e) {} });
-        })(sp.f, sp.m, sp.cs);
+            m.on('mouseover', function() { applyFlatHighlight(cs); try { window.external.SpotHovered(cs); } catch(e) {} });
+            m.on('mouseout', function() { applyFlatHighlight(null); try { window.external.SpotHoverEnd(); } catch(e) {} });
+        })(sp.f, sp.m, sp.cs, sp);
         m.addTo(spotsLayer);
+        ref.dxDot = m;
+        flatSpotRefs.push(ref);
+    }
+    applyFlatHighlight(hlCs);   // re-apply any active hover highlight after a full re-render
+}
+// Restyle the hovered spot's arc + spotter dot + DX dot IN PLACE (matched by DX callsign) so a
+// hover never forces a full re-render -- matching the polar map. Only the non-interactive arc and
+// spotter dot are raised to the front (never the DX dot under the cursor, to avoid re-entrancy).
+function applyFlatHighlight(cs) {
+    hlCs = cs;
+    for (var i = 0; i < flatSpotRefs.length; i++) {
+        var r = flatSpotRefs[i];
+        var on = (cs !== null && r.cs === cs);
+        if (r.arc) { r.arc.setStyle({ weight: on ? 2.5 : 0.8, opacity: on ? 1 : 0.7 }); if (on) r.arc.bringToFront(); }
+        if (r.spDot) { r.spDot.setRadius(on ? 4 : 2); r.spDot.setStyle({ color: on ? '#FFFFFF' : '#000000', weight: on ? 1 : 0 }); if (on) r.spDot.bringToFront(); }
+        if (r.dxDot) { r.dxDot.setRadius(on ? 12 : 5); r.dxDot.setStyle({ color: on ? '#FFFFFF' : r.dxDot._dotColor, weight: on ? 2 : 0 }); }
     }
 }
 renderSpots();
@@ -666,23 +680,135 @@ function updateClusterSpots(json) {
     renderSpots();
     drawDayNight();
 }
-function highlightSpot(cs, f) { hlCs = cs; hlF = f; renderSpots(); }
-function clearSpotHighlight() { hlCs = null; hlF = null; renderSpots(); }
+function highlightSpot(cs, f) { hlF = f; applyFlatHighlight(cs); }
+function clearSpotHighlight() { hlF = null; applyFlatHighlight(null); }
 function onRadiusChange(km) {
-    radiusMeters = km * 1000;
+    radiusKm = parseInt(km, 10);
+    radiusMeters = radiusKm * 1000;
     radiusCircle.setRadius(radiusMeters);
-    map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] });
+    // Center on home and pick the zoom that fits the circle. fitBounds(circle.getBounds()) would
+    // off-center the view for large circles (the bounds are pixel-symmetric, not lat/lon-symmetric
+    // under Mercator, and clip near the pole), so we set the center to home explicitly.
+    // animate:false so rapid wheel notches each settle instantly instead of interrupting a fit.
+    var fitZoom = map.getBoundsZoom(radiusCircle.getBounds(), false, L.point(2, 2));
+    map.setView([homeLat, homeLon], fitZoom, { animate:false });
     drawDayNight();
     try { window.external.SetRadius(km); } catch(e) {}
 }
-function recenter() { 
-    map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] }); 
+function recenter() {
+    map.fitBounds(radiusCircle.getBounds(), { padding:[2,2] });
     drawDayNight();
 }
-function centerOnDx() { map.setView([homeLat, homeLon], map.getZoom()); }
+// ---- Center buttons (Home / DE-spotter / DX), mirroring the polar cluster map --------------
+// No spot picked: the bottom-left button is just a Home icon -> center on home. After the user
+// clicks a spot: that button becomes 'DE' -> center on the spotter, a Home button pops up above
+// it, and the bottom-right 'DX' button -> center on the DX.
+var HOME_SVG = ""<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10.5L12 3l9 7.5'/><path d='M5 9.5V21h5v-6h4v6h5V9.5'/></svg>"";
+var CROSSHAIR_SVG = ""<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg>"";
+var selActive = false, selSpotter = null, selDx = null;
+function centerOnHome()    { map.setView([homeLat, homeLon], map.getZoom()); }
+function centerOnSpotter() { if (selSpotter) map.setView([selSpotter[0], selSpotter[1]], map.getZoom()); }
+function centerOnDx()      { if (selDx) map.setView([selDx[0], selDx[1]], map.getZoom()); }
+function selectSpot(spot) {
+    selActive = true;
+    selSpotter = spot.sp ? [spot.sp[0], spot.sp[1]] : null;
+    selDx = spot.c ? [spot.c[0], spot.c[1]] : null;
+    updateCenterButtons();
+}
+function updateCenterButtons() {
+    var homeBtn = document.getElementById('home-btn');
+    var deBtn = document.getElementById('center-btn');
+    var dxBtn = document.getElementById('dx-center-btn');
+    if (!deBtn) return;
+    if (!selActive) {
+        if (homeBtn) homeBtn.style.display = 'none';
+        deBtn.innerHTML = HOME_SVG;
+        deBtn.onclick = centerOnHome;
+        deBtn.title = 'Center on home';
+        if (dxBtn) dxBtn.style.display = 'none';
+    } else {
+        if (homeBtn) {
+            homeBtn.style.display = '';
+            homeBtn.innerHTML = HOME_SVG;
+            homeBtn.onclick = centerOnHome;
+            homeBtn.title = 'Center on home';
+        }
+        deBtn.innerHTML = ""<span class='de-label'>DE</span>"" + CROSSHAIR_SVG;
+        deBtn.onclick = (selSpotter ? centerOnSpotter : centerOnHome);
+        deBtn.title = selSpotter ? 'Center on spotter' : 'Spotter location unknown';
+        if (dxBtn) {
+            dxBtn.style.display = '';
+            dxBtn.innerHTML = ""<span class='dx-label'>DX</span>"" + CROSSHAIR_SVG;
+            dxBtn.onclick = centerOnDx;
+            dxBtn.title = 'Center on DX';
+        }
+    }
+}
+updateCenterButtons();
 function toggleProjection() { try { window.external.ToggleProjection(); } catch(e) {} }
 map.on('move zoom resize', drawDayNight);
 window.addEventListener('resize', function() { if (map) { map.invalidateSize(); drawDayNight(); } });
+
+// Mouse-wheel zoom in fixed radius steps (same logic as the polar map): 500 km per notch, or
+// 250 km below 2000 km. The radius dropdown and the red circle both track the current value.
+function wheelZoom(zoomIn) {
+    var sel = document.getElementById('radius-ctrl');
+    if (!sel || sel.options.length === 0) return;
+    var step = zoomIn ? (radiusKm <= 2000 ? 250 : 500) : (radiusKm < 2000 ? 250 : 500);
+    var newKm = radiusKm + (zoomIn ? -step : step);
+    // Clamp to the preset radius range (ignore any temporary wheel option already present).
+    var minKm = Infinity, maxKm = -Infinity;
+    for (var i = 0; i < sel.options.length; i++) {
+        if (sel.options[i].getAttribute('data-wheel')) continue;
+        var v = parseInt(sel.options[i].value, 10);
+        if (v < minKm) minKm = v;
+        if (v > maxKm) maxKm = v;
+    }
+    if (newKm < minKm) newKm = minKm;
+    if (newKm > maxKm) newKm = maxKm;
+    if (newKm === radiusKm) return;
+    applyWheelRadius(newKm);
+}
+// Show an off-grid wheel radius in the dropdown via a single reusable 'custom' option, then apply.
+function applyWheelRadius(km) {
+    var sel = document.getElementById('radius-ctrl');
+    if (sel) {
+        for (var k = sel.options.length - 1; k >= 0; k--) {
+            if (sel.options[k].getAttribute('data-wheel')) sel.remove(k);
+        }
+        var matched = false;
+        for (var i = 0; i < sel.options.length; i++) {
+            if (parseInt(sel.options[i].value, 10) === km) { sel.selectedIndex = i; matched = true; break; }
+        }
+        if (!matched) {
+            var opt = document.createElement('option');
+            opt.value = km;
+            opt.text = useMiles ? (Math.round(km * 0.621371) + ' mi') : (km + ' km');
+            opt.setAttribute('data-wheel', '1');
+            var before = null;
+            for (var j = 0; j < sel.options.length; j++) {
+                if (parseInt(sel.options[j].value, 10) > km) { before = sel.options[j]; break; }
+            }
+            sel.add(opt, before);
+            sel.value = km;
+        }
+    }
+    onRadiusChange(km);
+}
+function onWheelEvent(e) {
+    e = e || window.event;
+    var delta = 0;
+    if (e.wheelDelta !== undefined && e.wheelDelta !== 0) delta = e.wheelDelta;   // IE/legacy
+    else if (e.deltaY !== undefined) delta = -e.deltaY;                            // standard
+    else if (e.detail) delta = -e.detail;
+    if (delta !== 0) wheelZoom(delta > 0);
+    if (e.preventDefault) e.preventDefault();
+    e.returnValue = false;
+    return false;
+}
+var wheelName = ('onmousewheel' in document) ? 'mousewheel' : 'wheel';
+if (document.addEventListener) document.addEventListener(wheelName, onWheelEvent, false);
+else if (document.attachEvent) document.attachEvent('on' + wheelName, onWheelEvent);
 </script>
 </body>
 </html>";
@@ -1085,7 +1211,8 @@ setInterval(drawDayNight, 60000);
 var overlaysG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
 var tooltip = d3.select('body').append('div')
     .style('position','absolute').style('pointer-events','none')
-    .style('background','rgba(255,255,255,0.95)').style('border','1px solid #aaa')
+    .style('background','rgba(255,255,255,0.45)').style('border','1px solid rgba(120,120,120,0.55)')
+    .style('text-shadow','0 0 3px #fff, 0 0 3px #fff, 0 0 3px #fff')
     .style('border-radius','4px').style('padding','3px 7px')
     .style('font-size','12px').style('font-family','sans-serif')
     .style('color','#222').style('display','none').style('z-index','9999');
@@ -1593,7 +1720,7 @@ window.addEventListener('resize', function() {
 
             string html = _isPolar
                 ? BuildPolarMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier, _currentSpotterLat, _currentSpotterLon)
-                : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier);
+                : BuildFlatMapHtml(_currentLat, _currentLon, _currentRadiusKm, _currentAzimuth, _currentHomeLat, _currentHomeLon, marginMultiplier, _currentSpotterLat, _currentSpotterLon);
 
             // Identical map: nothing changed, skip the costly IE reload.
             if (html == _lastRenderedHtml) return;
@@ -1657,7 +1784,7 @@ window.addEventListener('resize', function() {
         }
 
 
-        private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15)
+        private string BuildFlatMapHtml(double lat, double lon, int radiusKm, double? azimuthDeg, double? homeLat = null, double? homeLon = null, double marginMultiplier = 1.15, double? spotterLat = null, double? spotterLon = null)
         {
             // Check if we should show compass instead of map
             bool showCompass = Properties.Settings.Default.MapAreaDisplayMode == 1;
@@ -1687,6 +1814,13 @@ window.addEventListener('resize', function() {
                 : r.ToString(System.Globalization.CultureInfo.InvariantCulture) + " km";
               options.AppendFormat("<option value='{0}'{1}>{2}</option>", r, r == radiusKm ? " selected" : "", optionText);
             }
+
+            // Spotter of the selected cluster spot, so the DE button can center on it (matches the
+            // polar home/DX map). No spotter -> DE falls back to centering on home.
+            bool hasSpotter = spotterLat.HasValue && spotterLon.HasValue;
+            string hasSpotterJs = hasSpotter ? "true" : "false";
+            string spotterLatJs = hasSpotter ? spotterLat.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
+            string spotterLonJs = hasSpotter ? spotterLon.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : "0";
 
             return
 @"<!DOCTYPE html>
@@ -1741,7 +1875,7 @@ window.addEventListener('resize', function() {
     display:" + (showCompass ? "none" : "flex") + @"; align-items:flex-end;
   }
   #radius-stack {
-    display:flex; flex-direction:column; align-items:center;
+    display:flex; flex-direction:column; align-items:flex-start;
   }
   #radius-ctrl {
     background:rgba(255,255,255,0.88); border:1px solid #aaa;
@@ -1749,15 +1883,15 @@ window.addEventListener('resize', function() {
     padding:2px 4px; font-size:13px; font-family:sans-serif; cursor:pointer;
     height:100%;
   }
-  #center-btn {
+  #center-btn, #home-btn {
     background:#9FCBF5; border:1px solid #4B76A0;
     border-radius:10px; padding:0 6px; cursor:pointer;
     display:flex; align-items:center; justify-content:center;
     color:#333; height:24px; margin-bottom:2px;
     font-family:sans-serif; font-size:11px; font-weight:700;
   }
-  #center-btn:hover { background:#8CBDF0; }
-  #center-btn svg { width:16px; height:16px; }
+  #center-btn:hover, #home-btn:hover { background:#8CBDF0; }
+  #center-btn svg, #home-btn svg { width:16px; height:16px; }
   #center-btn .de-label { margin-right:4px; }
   #proj-btn {
     position:absolute; top:0; right:0; z-index:1000;
@@ -1821,30 +1955,13 @@ window.addEventListener('resize', function() {
 </div>
 <div id='bottom-ctrl'>
   <div id='radius-stack'>
-    <button id='center-btn' onclick='recenter()' title='Re-center map'>
-      <span class='de-label'>DE</span>
-      <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
-        <circle cx='12' cy='12' r='3'/>
-        <line x1='12' y1='2' x2='12' y2='6'/>
-        <line x1='12' y1='18' x2='12' y2='22'/>
-        <line x1='2' y1='12' x2='6' y2='12'/>
-        <line x1='18' y1='12' x2='22' y2='12'/>
-      </svg>
-    </button>
+    <button id='home-btn' title='Center on home' style='display:none'></button>
+    <button id='center-btn' title='Center on home'></button>
     <select id='radius-ctrl' onchange='onRadiusChange(this.value)'>" + options.ToString() + @"</select>
   </div>
 </div>
 <div id='distance-stack'>
-  <button id='dx-center-btn' onclick='centerOnDx()' title='Center on DX station'>
-    <span class='dx-label'>DX</span>
-    <svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>
-      <circle cx='12' cy='12' r='3'/>
-      <line x1='12' y1='2' x2='12' y2='6'/>
-      <line x1='12' y1='18' x2='12' y2='22'/>
-      <line x1='2' y1='12' x2='6' y2='12'/>
-      <line x1='18' y1='12' x2='22' y2='12'/>
-    </svg>
-  </button>
+  <button id='dx-center-btn' title='Center on DX' style='display:none'></button>
   <div id='distance-box'>DIST --</div>
 </div>
 <script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
@@ -1859,6 +1976,14 @@ var dxLat = homeLat, dxLon = homeLon;
 var operatorLat = " + homeLatJs + @";
 var operatorLon = " + homeLonJs + @";
 var hasDxReference = isFinite(dxLat) && isFinite(dxLon);
+var spotterLat = " + spotterLatJs + @";
+var spotterLon = " + spotterLonJs + @";
+var hasSpotter = " + hasSpotterJs + @";
+// A 'spotted station is selected' only when its spotter came through (i.e. the DX was picked from
+// the cluster). A plain typed/looked-up DX has no spotter -> show ONLY the Home button.
+var spotSelected = hasSpotter;
+var HOME_SVG = ""<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 10.5L12 3l9 7.5'/><path d='M5 9.5V21h5v-6h4v6h5V9.5'/></svg>"";
+var CROSSHAIR_SVG = ""<svg viewBox='0 0 24 24' fill='none' stroke='currentColor' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='12' cy='12' r='3'/><line x1='12' y1='2' x2='12' y2='6'/><line x1='12' y1='18' x2='12' y2='22'/><line x1='2' y1='12' x2='6' y2='12'/><line x1='18' y1='12' x2='22' y2='12'/></svg>"";
 // Center map and radius circle on operator home; fall back to DX if home unknown
 var circleLat = (operatorLat !== null) ? operatorLat : dxLat;
 var circleLon = (operatorLon !== null) ? operatorLon : dxLon;
@@ -1958,6 +2083,11 @@ if (operatorLat !== null && operatorLon !== null) {
 } else {
     L.marker([dxLat, dxLon]).addTo(map);
 }
+// Spotter dot (black) so pressing DE (which centers on the spotter) lands on a visible marker.
+if (hasSpotter) {
+    var spIcon = L.divIcon({ className: '', html: '<div style=""width:9px;height:9px;background:#000;border:1px solid #fff;border-radius:50%""></div>', iconAnchor:[4,4] });
+    L.marker([spotterLat, spotterLon], { icon: spIcon }).addTo(map);
+}
 
 document.getElementById('compass-text').innerHTML = 'AZ ' + Math.round(azimuthDeg) + '&deg;';
 document.getElementById('compass-needle').setAttribute('transform', 'rotate(' + azimuthDeg + ' 50 50)');
@@ -1965,9 +2095,6 @@ var dxDistanceMeters = (operatorLat !== null && operatorLon !== null)
   ? haversineMeters(operatorLat, operatorLon, dxLat, dxLon)
   : null;
 document.getElementById('distance-box').innerHTML = formatDistanceText(dxDistanceMeters);
-if (!hasDxReference) {
-  document.getElementById('dx-center-btn').style.display = 'none';
-}
 
 function fitAll() {
   map.fitBounds(buildFitBounds(), { padding: [2, 2] });
@@ -1987,6 +2114,41 @@ function centerOnDx() {
   if (!hasDxReference) return;
   map.setView([dxLat, dxLon], map.getZoom());
 }
+function centerOnHome()    { map.setView([circleLat, circleLon], map.getZoom()); }
+function centerOnSpotter() { if (hasSpotter) map.setView([spotterLat, spotterLon], map.getZoom()); }
+// Center buttons, matching the polar map: no spot selected -> only a Home button (bottom-left);
+// spot selected -> Home pops up above, the main button becomes 'DE' (spotter), and 'DX' appears
+// bottom-right.
+function updateCenterButtons() {
+    var homeBtn = document.getElementById('home-btn');
+    var deBtn = document.getElementById('center-btn');
+    var dxBtn = document.getElementById('dx-center-btn');
+    if (!deBtn) return;
+    if (!spotSelected) {
+        if (homeBtn) homeBtn.style.display = 'none';
+        deBtn.innerHTML = HOME_SVG;
+        deBtn.onclick = centerOnHome;
+        deBtn.title = 'Center on home';
+        if (dxBtn) dxBtn.style.display = 'none';
+    } else {
+        if (homeBtn) {
+            homeBtn.style.display = '';
+            homeBtn.innerHTML = HOME_SVG;
+            homeBtn.onclick = centerOnHome;
+            homeBtn.title = 'Center on home';
+        }
+        deBtn.innerHTML = ""<span class='de-label'>DE</span>"" + CROSSHAIR_SVG;
+        deBtn.onclick = (hasSpotter ? centerOnSpotter : centerOnHome);
+        deBtn.title = hasSpotter ? 'Center on spotter' : 'Spotter location unknown';
+        if (dxBtn) {
+            dxBtn.style.display = '';
+            dxBtn.innerHTML = ""<span class='dx-label'>DX</span>"" + CROSSHAIR_SVG;
+            dxBtn.onclick = centerOnDx;
+            dxBtn.title = 'Center on DX';
+        }
+    }
+}
+updateCenterButtons();
 function toggleProjection() {
     try { window.external.ToggleProjection(); } catch(e) {}
 }
