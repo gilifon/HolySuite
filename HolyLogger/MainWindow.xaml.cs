@@ -150,6 +150,11 @@ namespace HolyLogger
             }
         }
 
+        // Cancellation sources for the long-running spinner operations that the user can Stop
+        // (Remove Duplicates, Full-Log QRZ Service). Non-null only while the operation runs.
+        private CancellationTokenSource _dedupCts;
+        private CancellationTokenSource _qrzCts;
+
         private sealed class AdifImportResult
         {
             public int FaultyQso { get; set; }
@@ -474,8 +479,10 @@ namespace HolyLogger
         // Swapped by SetQrzConnected().
         BitmapImage qrz_on_path = new BitmapImage(new Uri("Images/qrz.png", UriKind.Relative));
         BitmapImage qrz_off_path = new BitmapImage(new Uri("Images/qrz_off.png", UriKind.Relative));
-        BitmapImage lock_path = new BitmapImage(new Uri("Images/lock.png", UriKind.Relative));
-        BitmapImage unlock_path = new BitmapImage(new Uri("Images/unlock.png", UriKind.Relative));
+        // Loaded as pack URIs (not filesystem-relative): these PNGs are compiled <Resource>s and are
+        // NOT copied to bin\Images, so a relative Uri would throw when used as an OpacityMask brush.
+        BitmapImage lock_path = new BitmapImage(new Uri("pack://application:,,,/Images/lock.png"));
+        BitmapImage unlock_path = new BitmapImage(new Uri("pack://application:,,,/Images/unlock.png"));
 
         List<string> ImportFileQ = new List<string>();
 
@@ -641,8 +648,10 @@ namespace HolyLogger
             
             TB_Exchange.IsEnabled = Properties.Settings.Default.validation_enabled;
 
-            TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
-            TB_Operator.IsEnabled = !Properties.Settings.Default.isLocked;
+            // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox
+            // dims to ~56%, which washed out the lock-blue background and greyed the text.
+            TB_MyCallsign.IsReadOnly = Properties.Settings.Default.isLocked;
+            TB_Operator.IsReadOnly = Properties.Settings.Default.isLocked;
             setLockBtnState();
 
             TB_Comment.IsEnabled = !Properties.Settings.Default.isCommentLocked;
@@ -1194,6 +1203,11 @@ namespace HolyLogger
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            // Re-assert the log name in the title bar once the window is fully loaded. The constructor
+            // already sets it, but if that early call hit a transient DB hiccup the title would be left
+            // bare; doing it again here (dal + ActiveLogId are settled by now) makes it reliable.
+            UpdateActiveLogTitle();
+
             ApplyClusterWindowSetting();
 
             _stickyWindow = new StickyWindow(this);
@@ -1405,8 +1419,10 @@ namespace HolyLogger
         private void Lock_Btn_MouseUp(object sender, MouseButtonEventArgs e)
         {
             Properties.Settings.Default.isLocked = !Properties.Settings.Default.isLocked;
-            TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
-            TB_Operator.IsEnabled = !Properties.Settings.Default.isLocked;
+            // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox
+            // dims to ~56%, which washed out the lock-blue background and greyed the text.
+            TB_MyCallsign.IsReadOnly = Properties.Settings.Default.isLocked;
+            TB_Operator.IsReadOnly = Properties.Settings.Default.isLocked;
             //TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
             setLockBtnState();
         }
@@ -1414,21 +1430,22 @@ namespace HolyLogger
         private void setLockBtnState()
         {
             bool locked = Properties.Settings.Default.isLocked;
-            Lock_Btn.Source = locked ? lock_path : unlock_path;
+            LockMask.ImageSource = locked ? lock_path : unlock_path;
 
-            var lightRed = new SolidColorBrush(Color.FromRgb(0xFF, 0xCC, 0xCC));
-            if (locked)
-            {
-                if (LockBtnBorder != null) LockBtnBorder.Background = new SolidColorBrush(Color.FromRgb(0x64, 0xB5, 0xF6));
-                TB_MyCallsign.ClearValue(TextBox.BackgroundProperty);
-                TB_Operator.ClearValue(TextBox.BackgroundProperty);
-            }
-            else
-            {
-                if (LockBtnBorder != null) LockBtnBorder.Background = lightRed;
-                TB_MyCallsign.Background = lightRed;
-                TB_Operator.Background = lightRed;
-            }
+            var lightRed  = new SolidColorBrush(Color.FromRgb(0xFF, 0xB0, 0xB0)); // unlocked / editable
+            var lightBlue = new SolidColorBrush(Color.FromRgb(0x64, 0xB5, 0xF6)); // locked (matches the status-bar lock)
+            var bg = locked ? lightBlue : lightRed;
+
+            if (LockBtnBorder != null) LockBtnBorder.Background = bg;
+
+            // Callsign fields carry the same red/blue background as the lock, with bold black text in
+            // both states (legible on the light red and the vivid lock-blue alike).
+            TB_MyCallsign.Background = bg;
+            TB_Operator.Background = bg;
+            TB_MyCallsign.Foreground = System.Windows.Media.Brushes.Black;
+            TB_Operator.Foreground = System.Windows.Media.Brushes.Black;
+            TB_MyCallsign.FontWeight = FontWeights.Bold;
+            TB_Operator.FontWeight = FontWeights.Bold;
         }
 
         private void LockComment_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -1440,8 +1457,8 @@ namespace HolyLogger
 
         private void setLockCommentBtnState()
         {
-            if (!Properties.Settings.Default.isCommentLocked) LockComment_Btn.Source = unlock_path;
-            else LockComment_Btn.Source = lock_path;
+            if (!Properties.Settings.Default.isCommentLocked) LockCommentMask.ImageSource = unlock_path;
+            else LockCommentMask.ImageSource = lock_path;
         }
 
         private void RefreshDateTime_Btn_MouseUp(object sender, MouseButtonEventArgs e)
@@ -1792,7 +1809,18 @@ namespace HolyLogger
         public void UpdateActiveLogTitle()
         {
             string name = null;
-            try { if (dal != null) name = dal.GetLogName(dal.ActiveLogId); } catch { }
+            try
+            {
+                if (dal != null) name = dal.GetLogName(dal.ActiveLogId);
+            }
+            catch (Exception ex)
+            {
+                // Transient DB failure (e.g. the connection is briefly busy during startup): keep the
+                // title already shown rather than silently dropping the log name to the bare title.
+                // Not swallowed silently anymore, and MainWindow_Loaded re-asserts the title later.
+                System.Diagnostics.Debug.WriteLine("UpdateActiveLogTitle failed: " + ex.Message);
+                return;
+            }
             this.Title = string.IsNullOrEmpty(name) ? title : (title + "  —  Log: " + name);
         }
 
@@ -4900,7 +4928,27 @@ namespace HolyLogger
             UploadProgressSpinner.Visibility = visibility;
             L_UploadProgress.Visibility = visibility;
         }
-         
+
+        // Show/hide the spinner's Stop button. Only the cancellable operations (Remove Duplicates,
+        // Full-Log QRZ Service) turn it on; everything else leaves it hidden.
+        private void ShowStopButton(bool show)
+        {
+            if (Btn_StopProgress == null) return;
+            Btn_StopProgress.Content = "Stop";
+            Btn_StopProgress.IsEnabled = true;
+            Btn_StopProgress.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        // Stop button inside the spinner window: cancels whichever long operation is running.
+        private void Btn_StopProgress_Click(object sender, RoutedEventArgs e)
+        {
+            _dedupCts?.Cancel();
+            _qrzCts?.Cancel();
+            Btn_StopProgress.IsEnabled = false;
+            Btn_StopProgress.Content = "Stopping…";
+            UploadProgress = "Stopping…";
+        }
+
         private void AdifHandlerWorker_DoWork(object sender, DoWorkEventArgs e)
         {
             // Capture UI-dependent values on the calling thread before going to background work
@@ -6567,14 +6615,15 @@ namespace HolyLogger
             // While the user is typing in the inline editor, leave the display alone.
             if (TB_FreqLedEdit != null && TB_FreqLedEdit.Visibility == Visibility.Visible) return;
 
-            // In CAT (non-manual) mode the frequency must come live from the selected rig. If that
-            // rig is not online (e.g. RIG2 selected but not present), there is no fresh value — show
-            // a blanked "------.---" display instead of the previous rig's stale frequency.
+            // The LED display is only valid when the frequency comes live from the rig — i.e. CAT is
+            // enabled AND the selected rig is online. Whenever it isn't (CAT disabled, no rig defined,
+            // or the rig not online) there is no radio frequency, so switch to the white/red no-CAT box
+            // where the operator types it. (Manual mode keeps the LED, which is editable by clicking.)
             bool catEnabled = Properties.Settings.Default.EnableOmniRigCAT;
             bool manualMode = Properties.Settings.Default.isManualMode;
             bool rigOnline = catEnabled && OmniRigEngine != null && Rig != null
                              && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
-            if (catEnabled && !manualMode && !rigOnline)
+            if (!manualMode && !rigOnline)
             {
                 // Only initialise the no-CAT box when first switching to that mode so we don't
                 // overwrite text the user is actively typing.
@@ -7087,7 +7136,7 @@ namespace HolyLogger
                 {
                     StopUTCTimer();
                 }
-                this.Title = title;
+                UpdateActiveLogTitle();   // keep the "— Log: <name>" suffix; don't reset to the bare title
                 UpdateTitleClock();
 
                 ApplyCallsignSuggestionRowsSetting();
@@ -7145,8 +7194,10 @@ namespace HolyLogger
                 }
             }
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
-            TB_MyCallsign.IsEnabled = !Properties.Settings.Default.isLocked;
-            TB_Operator.IsEnabled = !Properties.Settings.Default.isLocked;
+            // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox
+            // dims to ~56%, which washed out the lock-blue background and greyed the text.
+            TB_MyCallsign.IsReadOnly = Properties.Settings.Default.isLocked;
+            TB_Operator.IsReadOnly = Properties.Settings.Default.isLocked;
             setLockBtnState();
 
             // The eQSL accounts table may have changed (a callsign added/removed). Re-evaluate the "!"
@@ -7178,6 +7229,7 @@ namespace HolyLogger
             try { ApplyQsoTableHeaderBackgroundFromSettings(); } catch { }   // re-theme QSO + cluster headers
             try { ApplyMainFormBackgroundFromSettings(); } catch { }         // re-theme the main form background
             try { UpdateEditModeBackground(); } catch { }                    // re-theme the QSO entry fields
+            try { UpdateStatus(); } catch { }                                // re-color the CAT/RIG status text (was hard-coded black)
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
@@ -14370,14 +14422,25 @@ namespace HolyLogger
                 return;
             }
 
+            _qrzCts = new CancellationTokenSource();
             UploadProgressTitle = "QRZ Lookup";
+            ShowStopButton(true);
             ToggleUploadProgress(Visibility.Visible);
-            await GetQrzForEntireLogAsync(new Progress<string>(msg => UploadProgress = msg));
-            ToggleUploadProgress(Visibility.Hidden);
-            UploadProgressTitle = "";
+            try
+            {
+                await GetQrzForEntireLogAsync(new Progress<string>(msg => UploadProgress = msg), _qrzCts.Token);
+            }
+            finally
+            {
+                ShowStopButton(false);
+                ToggleUploadProgress(Visibility.Hidden);
+                UploadProgressTitle = "";
+                _qrzCts.Dispose();
+                _qrzCts = null;
+            }
         }
 
-        private async Task<bool> GetQrzForEntireLogAsync(IProgress<string> progress)
+        private async Task<bool> GetQrzForEntireLogAsync(IProgress<string> progress, CancellationToken token = default)
         {
             if (!isNetworkAvailable) return false;
 
@@ -14409,12 +14472,14 @@ namespace HolyLogger
             int updated = 0;
             for (int i = 0; i < needsLookup.Count; i++)
             {
+                if (token.IsCancellationRequested) break;   // Stop button pressed
                 progress.Report($"{i + 1} / {needsLookup.Count}");
                 try
                 {
                     // Small delay between requests to avoid QRZ rate-limiting
                     // and to keep the UI message loop free between iterations.
                     await Task.Delay(150);
+                    if (token.IsCancellationRequested) break;   // Stop pressed during the delay: write nothing
                     QSO qso = needsLookup[i];
                     var (name, grid) = await GetQrzForCall(qso.DXCall);
                     if (!string.IsNullOrWhiteSpace(name))
@@ -14506,50 +14571,92 @@ namespace HolyLogger
 
         private async void RemoveDuplicatesMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            ToggleUploadProgress(Visibility.Visible);
-            await RemoveDuplicates(new Progress<int>(percent => UploadProgress = percent.ToString()));
-            foreach (var item in dal.GetAllQSOs())
+            // Identify duplicates up front WITHOUT touching the DB. A QSO is a duplicate when an
+            // earlier one shares the same my-call + DX-call + band + mode + date (the log's dedup
+            // key); we keep the first occurrence and collect the rest. Deleting only these rows —
+            // instead of the old "delete every QSO then re-insert the unique ones" — means the log
+            // is never left partial: cancelling mid-run simply leaves some duplicates un-removed,
+            // and it is far faster (a couple hundred deletes vs. re-inserting the whole log).
+            var all = dal.GetAllQSOs();
+            var seen = new HashSet<string>();
+            var toDelete = new List<QSO>();
+            foreach (var q in all)
             {
-                Qsos.Add(item);
+                string key = ((q.MyCall ?? "") + "|" + (q.DXCall ?? "") + "|" + (q.Band ?? "") + "|" +
+                              (q.Mode ?? "") + "|" + (q.Date ?? "")).ToUpperInvariant();
+                if (!seen.Add(key))
+                    toDelete.Add(q);
             }
-            UpdateNumOfQSOs();
-            ToggleUploadProgress(Visibility.Hidden);
-        }
 
-        private Task RemoveDuplicates(IProgress<int> progress)
-        {
-            string adif = Services.GenerateAdif(dal.GetAllQSOs());
-            _holyLogParser = new HolyLogParser(adif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, false, true);
-            _holyLogParser.Parse();
-
-            Qsos.Clear();
-            dal.DeleteAll();
-
-            List<QSO> rawQSOList = _holyLogParser.GetRawQSO();//get the qso list
-            int count = rawQSOList.Count;
-
-            int faultyQSO = 0;
-            int i = 0;
-            return Task.Run(() =>
+            if (toDelete.Count == 0)
             {
-                
-                foreach (var rq in rawQSOList)
+                HolyMessageBox.Show("No duplicate QSOs were found in the active log.",
+                    "Remove Duplicates", HolyMsgType.Info, this);
+                return;
+            }
+
+            bool ok = HolyMessageBox.ShowConfirm(
+                $"Found {toDelete.Count:N0} duplicate QSO(s) out of {all.Count:N0}.\n\n" +
+                "Remove them from the active log? This cannot be undone.",
+                "Remove Duplicates", HolyMsgType.Warning, this);
+            if (!ok) return;
+
+            _dedupCts = new CancellationTokenSource();
+            var token = _dedupCts.Token;
+            UploadProgressTitle = "Removing Duplicates";
+            UploadProgress = $"0 / {toDelete.Count:N0}";
+            ShowStopButton(true);
+            ToggleUploadProgress(Visibility.Visible);
+
+            int removed = 0;
+            bool cancelled = false;
+            try
+            {
+                await Task.Run(() =>
                 {
-                    progress.Report((++i) * 100 / count);
-                    try
+                    int lastPct = -1;
+                    for (int i = 0; i < toDelete.Count; i++)
                     {
-                        lock (_syncLock)
+                        if (token.IsCancellationRequested) break;
+                        try
                         {
-                            QSO q = dal.Insert(rq);
+                            lock (_syncLock) { dal.Delete(toDelete[i].id); }
+                            removed++;
+                        }
+                        catch { /* skip a row that won't delete; never abort the whole run */ }
+
+                        int pct = (i + 1) * 100 / toDelete.Count;
+                        if (pct != lastPct)
+                        {
+                            lastPct = pct;
+                            int shown = removed;
+                            Dispatcher.Invoke(() => UploadProgress = $"{shown:N0} / {toDelete.Count:N0}");
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        faultyQSO++;
-                    }
-                }
-                
-            });
+                }, token);
+            }
+            catch (OperationCanceledException) { }
+            finally
+            {
+                cancelled = token.IsCancellationRequested;
+                ShowStopButton(false);
+                ToggleUploadProgress(Visibility.Hidden);
+                UploadProgressTitle = "";
+                _dedupCts.Dispose();
+                _dedupCts = null;
+            }
+
+            // Reload the grid from the (now smaller) log.
+            Qsos.Clear();
+            foreach (var item in dal.GetAllQSOs())
+                Qsos.Add(item);
+            UpdateNumOfQSOs();
+
+            HolyMessageBox.Show(
+                cancelled
+                    ? $"Stopped. Removed {removed:N0} duplicate(s); the rest were left in place."
+                    : $"Removed {removed:N0} duplicate QSO(s).",
+                "Remove Duplicates", HolyMsgType.Info, this);
         }
 
         private void StatusBar_MouseDoubleClick(object sender, MouseButtonEventArgs e)
@@ -14872,7 +14979,7 @@ namespace HolyLogger
         private void UpdateStatus()
         {
             TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
-            L_OmniRig.Foreground = System.Windows.Media.Brushes.Black;
+            L_OmniRig.Foreground = ThemeManager.Brush("TextBrush");
             L_OmniRig.FontWeight = FontWeights.Normal;
             
             Status = "CAT Enabled";

@@ -22,9 +22,11 @@ namespace HolyLogger
             { "WindowBg",         new[] { "#F0F0F0", "#121316" } }, // window / app background
             { "FormBg",           new[] { "#BDDFFF", "#17181C" } }, // main entry form area
             { "PanelBg",          new[] { "#FFFFFF", "#17181C" } }, // generic panels
-            { "MenuBg",           new[] { "#F0F0F0", "#17181C" } }, // menus / dropdowns
+            { "MenuBg",           new[] { "#F0F0F0", "#262A31" } }, // menus / dropdowns (elevated surface, lighter than the near-black base so popups read as a floating list)
             { "ControlBg",        new[] { "#FFFFFF", "#202227" } }, // text inputs
             { "EditFieldBg",      new[] { "#FFFF00", "#4A3D12" } }, // QSO fields while editing
+            { "ButtonBg",         new[] { "#E1E1E1", "#2A2E35" } }, // default push buttons
+            { "ButtonHoverBg",    new[] { "#D0D0D0", "#363C45" } }, // default push buttons (hover)
             { "GridRowBg",        new[] { "#FFFFFF", "#121316" } }, // table rows
             { "GridAltRowBg",     new[] { "#F5F5F5", "#17191D" } }, // alternating rows
             { "GridHeaderBg",     new[] { "#E6E6E6", "#23262C" } }, // column headers
@@ -37,9 +39,11 @@ namespace HolyLogger
 
             // ---- Lines ----------------------------------------------------------------------------
             { "ThemeBorderBrush", new[] { "#AAAAAA", "#2C2F35" } }, // borders / dividers
+            { "MenuBorder",       new[] { "#9AA0A6", "#4A515C" } }, // popup/menu frame — clearly visible against MenuBg
 
             // ---- Accent + stateful highlights -----------------------------------------------------
             { "AccentBrush",      new[] { "#1565C0", "#3B82F6" } }, // primary accent (blue)
+            { "Danger",           new[] { "#BB3300", "#F0846E" } }, // errors / missing / warnings (red)
             { "SelectionBg",      new[] { "#3399FF", "#2C4C7A" } }, // selected row/cell, menu hover
             { "RowHoverBg",       new[] { "#90CAF9", "#26456B" } }, // cluster: map-hovered spot
             { "RowOnFreqBg",      new[] { "#90EE90", "#1E4A2A" } }, // cluster: on-frequency spot

@@ -17,19 +17,19 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,0,0,2" Padding="10,8">
+        <Border Grid.Row="0" Background="{DynamicResource GridHeaderBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,0,0,2" Padding="10,8">
             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                 <Viewbox Width="22" Height="22" Margin="0,0,8,0" VerticalAlignment="Center">
-                    <Path Stretch="Uniform" Fill="#1565C0"
+                    <Path Stretch="Uniform" Fill="{DynamicResource AccentBrush}"
                           Data="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/>
                 </Viewbox>
                 <TextBlock Text="Log Statistics" FontSize="18" FontWeight="Bold"
-                           Foreground="#1565C0" VerticalAlignment="Center"/>
+                           Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
 
         <!-- Body -->
-        <Border Grid.Row="1" Background="#F8FAFB">
+        <Border Grid.Row="1" Background="{DynamicResource WindowBg}">
             <Grid>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -37,66 +37,66 @@
                 </Grid.RowDefinitions>
 
                 <!-- Summary strip -->
-                <Border Grid.Row="0" Background="#EEF2F7" BorderBrush="#BBCDE8" BorderThickness="0,0,0,1" Padding="14,12">
+                <Border Grid.Row="0" Background="{DynamicResource GridHeaderBg}" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1" Padding="14,12">
                     <StackPanel>
                     <StackPanel Orientation="Horizontal">
 
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="Total QSOs" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_TotalQSOs" FontSize="34" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Total QSOs" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_TotalQSOs" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="Unique Calls" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_UniqueCalls" FontSize="34" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Unique Calls" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_UniqueCalls" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="Worked / DXCC" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Worked / DXCC" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Missing DXCC: how many of all DXCC entities are still un-worked. -->
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="White" BorderBrush="#BB3300" BorderThickness="1">
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Danger}" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="Missing DXCC" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_MissingDxcc" FontSize="34" FontWeight="Bold" Foreground="#BB3300" HorizontalAlignment="Center"/>
+                                <TextBlock Text="Missing DXCC" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_MissingDxcc" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
                         <!-- Date Range — dates stacked with Start / End labels -->
-                        <Border Padding="14,8" Background="White" BorderBrush="#1565C0" BorderThickness="1">
+                        <Border Padding="14,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                             <StackPanel>
-                                <TextBlock Text="Date Range" FontSize="15" Foreground="#666666" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                <TextBlock Text="Date Range" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Start " FontSize="14" Foreground="#888888" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TB_DateStart" FontSize="14" FontWeight="Bold" Foreground="#1565C0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Start " FontSize="14" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TB_DateStart" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                                 <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <TextBlock Text="End   " FontSize="14" Foreground="#888888" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TB_DateEnd" FontSize="14" FontWeight="Bold" Foreground="#1565C0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="End   " FontSize="14" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="TB_DateEnd" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </StackPanel>
                         </Border>
 
                         <!-- cty.dat (DXCC entity database) release date, so the totals above are traceable. -->
-                        <Border Margin="14,0,0,0" Padding="14,8" Background="White" BorderBrush="#BBCDE8" BorderThickness="1" VerticalAlignment="Center">
+                        <Border Margin="14,0,0,0" Padding="14,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" VerticalAlignment="Center">
                             <StackPanel>
-                                <TextBlock Text="DXCC data" FontSize="15" Foreground="#666666" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_CtyVersion" FontSize="14" FontWeight="Bold" Foreground="#1565C0" HorizontalAlignment="Center" Margin="0,4,0,0"/>
+                                <TextBlock Text="DXCC data" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_CtyVersion" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
                             </StackPanel>
                         </Border>
 
                     </StackPanel>
                     <!-- Shown only when the country file is overdue for a refresh (e.g. the download
                          URL no longer works); the text explains what to do. -->
-                    <TextBlock x:Name="TB_CtyWarning" Foreground="#BB3300" FontSize="13" FontWeight="SemiBold"
+                    <TextBlock x:Name="TB_CtyWarning" Foreground="{DynamicResource Danger}" FontSize="13" FontWeight="SemiBold"
                                TextWrapping="Wrap" Margin="2,8,2,0" Visibility="Collapsed"/>
                     </StackPanel>
                 </Border>
@@ -108,7 +108,7 @@
                         <!-- Pivot table section -->
                         <StackPanel VerticalAlignment="Top">
                             <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Band × Mode" FontSize="16" FontWeight="Bold"
-                                       Foreground="#1565C0" Margin="0,0,0,6"/>
+                                       Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
                             <!--
                                 Inner PivotBorder: left+top edge in blue (1px).
                                 Outer PivotOuterBorder: right+bottom edge in black (2px).
@@ -116,13 +116,13 @@
                                 PivotOuterBorder.ActualHeight drives the country-table scroll heights.
                             -->
                             <Border x:Name="PivotOuterBorder" HorizontalAlignment="Left"
-                                    BorderBrush="Black" BorderThickness="2">
+                                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="2">
                                 <Border x:Name="PivotBorder"
                                         BorderBrush="Transparent"
                                         BorderThickness="0"/>
                             </Border>
                             <TextBlock x:Name="TB_DataQuality"
-                                       Margin="0,8,0,0" FontSize="13" Foreground="#BB3300"
+                                       Margin="0,8,0,0" FontSize="13" Foreground="{DynamicResource Danger}"
                                        FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"/>
                             <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
                                     Margin="0,6,0,0" Padding="10,4" FontSize="13"
@@ -135,20 +135,20 @@
                             <!-- Worked Countries -->
                             <StackPanel Margin="0,0,10,0" VerticalAlignment="Top">
                                 <TextBlock x:Name="TB_WorkedHeader" Text="Worked Countries"
-                                           FontSize="16" FontWeight="Bold" Foreground="#1565C0" Margin="0,0,0,6"/>
-                                <Border BorderBrush="Black" BorderThickness="0,0,2,2">
-                                    <Border BorderBrush="#1565C0" BorderThickness="1,1,0,0">
+                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                                <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
+                                    <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>
-                                        <Border DockPanel.Dock="Top" Background="#DEB887"
-                                                BorderBrush="#AAAAAA" BorderThickness="0,0,0,1">
+                                        <Border DockPanel.Dock="Top" Background="{DynamicResource GridHeaderBg}"
+                                                BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1">
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortWorkedName" Text="Country ▲"
                                                            Width="130" FontSize="13" FontWeight="Bold"
-                                                           Cursor="Hand" Foreground="#333333"/>
+                                                           Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                                 <TextBlock x:Name="TB_SortWorkedCount" Text="Count ▼"
                                                            FontSize="13" FontWeight="Bold"
-                                                           Cursor="Hand" TextAlignment="Right" Foreground="#333333"/>
+                                                           Cursor="Hand" TextAlignment="Right" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
                                         </Border>
                                         <ScrollViewer x:Name="SV_WorkedCountries"
@@ -157,7 +157,7 @@
                                             <ItemsControl x:Name="IC_WorkedCountries">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                                                        <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
                                                                 Background="{Binding RowBg}">
                                                             <StackPanel Orientation="Horizontal" Margin="4,1,4,1">
                                                                 <Image Source="{Binding FlagImage}"
@@ -172,7 +172,7 @@
                                                                            FontWeight="Bold"
                                                                            VerticalAlignment="Center"
                                                                            TextAlignment="Right" Width="40"
-                                                                           Foreground="#1565C0"/>
+                                                                           Foreground="{DynamicResource AccentBrush}"/>
                                                             </StackPanel>
                                                         </Border>
                                                     </DataTemplate>
@@ -187,17 +187,17 @@
                             <!-- Missing Countries -->
                             <StackPanel VerticalAlignment="Top">
                                 <TextBlock x:Name="TB_MissingHeader" Text="Missing Countries"
-                                           FontSize="16" FontWeight="Bold" Foreground="#BB3300" Margin="0,0,0,6"/>
-                                <Border BorderBrush="Black" BorderThickness="0,0,2,2">
-                                    <Border BorderBrush="#1565C0" BorderThickness="1,1,0,0">
+                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}" Margin="0,0,0,6"/>
+                                <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
+                                    <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>
-                                        <Border DockPanel.Dock="Top" Background="#DEB887"
-                                                BorderBrush="#AAAAAA" BorderThickness="0,0,0,1">
+                                        <Border DockPanel.Dock="Top" Background="{DynamicResource GridHeaderBg}"
+                                                BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1">
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortMissingName" Text="Country ▲"
                                                            Width="130" FontSize="13" FontWeight="Bold"
-                                                           Cursor="Hand" Foreground="#333333"/>
+                                                           Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
                                         </Border>
                                         <ScrollViewer x:Name="SV_MissingCountries"
@@ -206,7 +206,7 @@
                                             <ItemsControl x:Name="IC_MissingCountries">
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
-                                                        <Border BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                                                        <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
                                                                 Background="{Binding RowBg}">
                                                             <StackPanel Orientation="Horizontal" Margin="4,1,4,1">
                                                                 <Image Source="{Binding FlagImage}"
@@ -231,24 +231,24 @@
                             <!-- Missing CQ Zones (1..40) -->
                             <StackPanel Margin="10,0,0,0" VerticalAlignment="Top">
                                 <TextBlock x:Name="TB_MissingCQHeader" Text="Missing CQ Zones"
-                                           FontSize="16" FontWeight="Bold" Foreground="#BB3300" Margin="0,0,0,6"/>
-                                <Border BorderBrush="Black" BorderThickness="0,0,2,2">
-                                    <Border BorderBrush="#1565C0" BorderThickness="1,1,0,0">
+                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}" Margin="0,0,0,6"/>
+                                <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
+                                    <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>
-                                            <Border DockPanel.Dock="Top" Background="#DEB887"
-                                                    BorderBrush="#AAAAAA" BorderThickness="0,0,0,1">
+                                            <Border DockPanel.Dock="Top" Background="{DynamicResource GridHeaderBg}"
+                                                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1">
                                                 <TextBlock Text="Zone" Margin="4,3" Width="46" TextAlignment="Center"
-                                                           FontSize="13" FontWeight="Bold" Foreground="#333333"/>
+                                                           FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
                                             </Border>
                                             <ScrollViewer x:Name="SV_MissingCQ"
                                                           VerticalScrollBarVisibility="Auto" MaxHeight="500">
                                                 <ItemsControl x:Name="IC_MissingCQ">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                                                            <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
                                                                     Background="{Binding RowBg}">
                                                                 <TextBlock Text="{Binding Zone}" FontSize="13"
-                                                                           FontWeight="Bold" Foreground="#1565C0"
+                                                                           FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                                                                            Margin="4,2" Width="46" TextAlignment="Center"/>
                                                             </Border>
                                                         </DataTemplate>
@@ -263,24 +263,24 @@
                             <!-- Missing ITU Zones (1..90) -->
                             <StackPanel Margin="10,0,0,0" VerticalAlignment="Top">
                                 <TextBlock x:Name="TB_MissingITUHeader" Text="Missing ITU Zones"
-                                           FontSize="16" FontWeight="Bold" Foreground="#BB3300" Margin="0,0,0,6"/>
-                                <Border BorderBrush="Black" BorderThickness="0,0,2,2">
-                                    <Border BorderBrush="#1565C0" BorderThickness="1,1,0,0">
+                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}" Margin="0,0,0,6"/>
+                                <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
+                                    <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>
-                                            <Border DockPanel.Dock="Top" Background="#DEB887"
-                                                    BorderBrush="#AAAAAA" BorderThickness="0,0,0,1">
+                                            <Border DockPanel.Dock="Top" Background="{DynamicResource GridHeaderBg}"
+                                                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1">
                                                 <TextBlock Text="Zone" Margin="4,3" Width="46" TextAlignment="Center"
-                                                           FontSize="13" FontWeight="Bold" Foreground="#333333"/>
+                                                           FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
                                             </Border>
                                             <ScrollViewer x:Name="SV_MissingITU"
                                                           VerticalScrollBarVisibility="Auto" MaxHeight="500">
                                                 <ItemsControl x:Name="IC_MissingITU">
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate>
-                                                            <Border BorderBrush="#CCCCCC" BorderThickness="0,0,0,1"
+                                                            <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
                                                                     Background="{Binding RowBg}">
                                                                 <TextBlock Text="{Binding Zone}" FontSize="13"
-                                                                           FontWeight="Bold" Foreground="#1565C0"
+                                                                           FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                                                                            Margin="4,2" Width="46" TextAlignment="Center"/>
                                                             </Border>
                                                         </DataTemplate>
@@ -301,8 +301,8 @@
         </Border>
 
         <!-- Status bar -->
-        <Border Grid.Row="2" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,2,0,0" Padding="10,6">
-            <TextBlock x:Name="TB_Status" FontSize="14" Foreground="#333333" Text="Ready."/>
+        <Border Grid.Row="2" Background="{DynamicResource GridHeaderBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,2,0,0" Padding="10,6">
+            <TextBlock x:Name="TB_Status" FontSize="14" Foreground="{DynamicResource TextBrush}" Text="Ready."/>
         </Border>
     </Grid>
 </Window>

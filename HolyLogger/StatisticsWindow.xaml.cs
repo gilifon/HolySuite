@@ -189,7 +189,7 @@ namespace HolyLogger
                 rows.Add(new ZoneRow
                 {
                     Zone  = zones[i].ToString(),
-                    RowBg = i % 2 == 0 ? (Brush)Brushes.White : Br(0xDC, 0xDC, 0xDC)
+                    RowBg = i % 2 == 0 ? ThemeManager.Brush("GridRowBg") : ThemeManager.Brush("GridAltRowBg")
                 });
             return rows;
         }
@@ -263,11 +263,11 @@ namespace HolyLogger
                 tbl.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
             // Shared brushes
-            var headerBg = Br(0xDE, 0xB8, 0x87);   // #DEB887 (tan header)
-            var totalBg  = Br(0xEE, 0xF2, 0xF7);   // #EEF2F7 (light blue-grey)
-            var yellowBg = Br(0xFF, 0xFF, 0x00);   // yellow  (grand total)
-            var evenBg   = Brushes.White;
-            var oddBg    = Br(0xC0, 0xD8, 0xF0);   // light blue
+            var headerBg = ThemeManager.Brush("GridHeaderBg");
+            var totalBg  = ThemeManager.Brush("GridHeaderBg");
+            var yellowBg = ThemeManager.Brush("EditFieldBg");    // grand-total highlight
+            var evenBg   = ThemeManager.Brush("GridRowBg");
+            var oddBg    = ThemeManager.Brush("GridAltRowBg");
             var gridLine = Br(0xAA, 0xAA, 0xAA);     // grey grid lines
 
             // Cell shorthand
@@ -346,12 +346,12 @@ namespace HolyLogger
             // Wrappers: TL = 2px black top line, VL = 2px black left line
             Border TL(Border inner) => new Border
             {
-                BorderBrush = Brushes.Black, BorderThickness = new Thickness(0, 2, 0, 0),
+                BorderBrush = ThemeManager.Brush("ThemeBorderBrush"), BorderThickness = new Thickness(0, 2, 0, 0),
                 Child = inner
             };
             Border VL(Border inner) => new Border
             {
-                BorderBrush = Brushes.Black, BorderThickness = new Thickness(2, 0, 0, 0),
+                BorderBrush = ThemeManager.Brush("ThemeBorderBrush"), BorderThickness = new Thickness(2, 0, 0, 0),
                 Child = inner
             };
 
@@ -455,7 +455,7 @@ namespace HolyLogger
             else                                         sorted = _workedList.OrderByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
 
             for (int i = 0; i < sorted.Count; i++)
-                sorted[i].RowBg = i % 2 == 0 ? (Brush)Brushes.White : Br(0xDC, 0xDC, 0xDC);
+                sorted[i].RowBg = i % 2 == 0 ? ThemeManager.Brush("GridRowBg") : ThemeManager.Brush("GridAltRowBg");
 
             IC_WorkedCountries.ItemsSource = sorted;
             UpdateWorkedSortHeaders();
@@ -468,7 +468,7 @@ namespace HolyLogger
                 : _missingList.OrderByDescending(c => c.Name).ToList();
 
             for (int i = 0; i < sorted.Count; i++)
-                sorted[i].RowBg = i % 2 == 0 ? (Brush)Brushes.White : Br(0xDC, 0xDC, 0xDC);
+                sorted[i].RowBg = i % 2 == 0 ? ThemeManager.Brush("GridRowBg") : ThemeManager.Brush("GridAltRowBg");
 
             IC_MissingCountries.ItemsSource = sorted;
             UpdateMissingSortHeaders();
@@ -521,7 +521,7 @@ namespace HolyLogger
                     HorizontalAlignment = HorizontalAlignment.Stretch,
                     VerticalAlignment   = VerticalAlignment.Center,
                     Padding             = new Thickness(align == TextAlignment.Left ? 4 : 2, 2, 2, 2),
-                    Foreground          = Brushes.Black
+                    Foreground          = ThemeManager.Brush("TextBrush")
                 },
                 MinHeight = 20
             };

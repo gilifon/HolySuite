@@ -296,6 +296,10 @@
     </Compile>
     <Compile Include="ToolsUserControls\MapAssetProvider.cs" />
     <Compile Include="UDPSocket.cs" />
+    <Page Include="Themes\Controls.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
     <Page Include="ContestPickerWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>

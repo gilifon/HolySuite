@@ -20,97 +20,8 @@
         <local:QsoTimeDisplayConverter x:Key="QsoTimeDisplayConverter"/>
         <local:BoolToFontWeightConverter x:Key="BoolToFontWeightConverter"/>
 
-        <!-- Theme: form labels and text inputs follow the active Light/Dark palette. Controls that
-             set their own Background/Foreground inline keep those (accent panels, LED, etc.). -->
-        <Style TargetType="Label">
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-        </Style>
-        <!-- Menu bar + dropdown items follow the theme (top-level text was invisible on dark). -->
-        <Style TargetType="Menu">
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-        </Style>
-        <!-- Fully themed menu item (own template) so hover/open states are always readable; the
-             default WPF template forces its own highlight chrome and ignored our triggers. -->
-        <Style TargetType="MenuItem">
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="MenuItem">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}" SnapsToDevicePixels="True">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Grid Grid.Column="0" x:Name="IconCol" Width="22" Margin="2,0,2,0">
-                                    <ContentPresenter x:Name="Icon" ContentSource="Icon" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-                                    <TextBlock x:Name="Check" Text="&#x2713;" FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed" Foreground="{TemplateBinding Foreground}"/>
-                                </Grid>
-                                <ContentPresenter Grid.Column="1" ContentSource="Header" RecognizesAccessKey="True" Margin="6,4,8,4" VerticalAlignment="Center"/>
-                                <TextBlock Grid.Column="2" Text="{TemplateBinding InputGestureText}" Margin="8,0,12,0" VerticalAlignment="Center" Opacity="0.65"/>
-                                <Path x:Name="Arrow" Grid.Column="3" Margin="2,0,8,0" VerticalAlignment="Center" Data="M0,0 L0,7 L4,3.5 Z" Fill="{TemplateBinding Foreground}" Visibility="Collapsed"/>
-                                <Popup x:Name="PART_Popup" AllowsTransparency="True" Focusable="False" PopupAnimation="Fade"
-                                       IsOpen="{Binding IsSubmenuOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom">
-                                    <Border Background="{DynamicResource MenuBg}" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" Padding="2">
-                                        <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
-                                    </Border>
-                                </Popup>
-                            </Grid>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="Role" Value="SubmenuHeader">
-                                <Setter TargetName="Arrow" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="PART_Popup" Property="Placement" Value="Right"/>
-                            </Trigger>
-                            <Trigger Property="Role" Value="TopLevelItem">
-                                <Setter TargetName="IconCol" Property="Visibility" Value="Collapsed"/>
-                            </Trigger>
-                            <Trigger Property="Role" Value="TopLevelHeader">
-                                <Setter TargetName="IconCol" Property="Visibility" Value="Collapsed"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter TargetName="Check" Property="Visibility" Value="Visible"/>
-                                <Setter TargetName="Icon" Property="Visibility" Value="Collapsed"/>
-                            </Trigger>
-                            <Trigger Property="IsHighlighted" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SelectionBg}"/>
-                                <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
-                            </Trigger>
-                            <Trigger Property="IsSubmenuOpen" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SelectionBg}"/>
-                                <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-        <Style TargetType="TextBox">
-            <Setter Property="Background" Value="{DynamicResource ControlBg}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-            <Setter Property="CaretBrush" Value="{DynamicResource TextBrush}"/>
-        </Style>
-        <!-- QSO grid header + cells -->
-        <Style TargetType="DataGridColumnHeader">
-            <Setter Property="Background" Value="{DynamicResource GridHeaderBg}"/>
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-            <Setter Property="Padding" Value="6,3"/>
-        </Style>
-        <Style TargetType="DataGridCell">
-            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-            <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="{DynamicResource SelectionBg}"/>
-                    <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
-                </Trigger>
-            </Style.Triggers>
-        </Style>
+        <!-- Theme control styles (Label/TextBox/Menu/DataGrid/Window, etc.) now live app-wide in
+             Themes/Controls.xaml, merged in App.xaml, so every window is themed consistently. -->
         <Style x:Key="RaisedActionButtonStyle" TargetType="Button">
             <Setter Property="Foreground" Value="#1E2A34"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -599,6 +510,7 @@
                             <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <Separator />
                 </MenuItem>
                 <MenuItem Header="Help" FontSize="16">
                     <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
@@ -738,9 +650,16 @@
                 </StatusBarItem>
                 <StatusBarItem>
                     <Border x:Name="LockBtnBorder" CornerRadius="3" Padding="3,1" Margin="5,0,0,0" Background="Transparent">
-                        <Image x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'"
-                               Height="22" Width="20" Source="Images/lock.png" Stretch="None"
-                               MouseUp="Lock_Btn_MouseUp" Cursor="Hand"/>
+                        <!-- Icon rendered via OpacityMask so the PNG's shape is painted in a solid color.
+                             Always black: this lock always sits on the light red/blue lock background
+                             (a white icon would vanish there in dark mode). -->
+                        <Rectangle x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'"
+                                   Height="22" Width="20" Fill="Black"
+                                   MouseUp="Lock_Btn_MouseUp" Cursor="Hand">
+                            <Rectangle.OpacityMask>
+                                <ImageBrush x:Name="LockMask" ImageSource="Images/lock.png" Stretch="Uniform"/>
+                            </Rectangle.OpacityMask>
+                        </Rectangle>
                     </Border>
                 </StatusBarItem>
                 <StatusBarItem>
@@ -766,7 +685,7 @@
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
                         <!--<TextBlock Text="Omni-Rig: " FontSize="16"/>-->
-                        <TextBlock x:Name="RigLabel" Text="RIG1" FontWeight="Normal" FontSize="14" Foreground="#333333"
+                        <TextBlock x:Name="RigLabel" Text="RIG1" FontWeight="Normal" FontSize="14" Foreground="{DynamicResource MutedTextBrush}"
                                    VerticalAlignment="Center" Margin="0,0,6,0"
                                    Cursor="Hand" MouseLeftButtonUp="RigLabel_MouseLeftButtonUp"
                                    ToolTip="Open Tools → Options"/>
@@ -778,6 +697,12 @@
 
 
         <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="279" />
+        <!-- Blue frame around the entry form, matching the log-table frame (#1565C0, thickness 3). Fixed
+             blue so it shows in both light and dark mode. Height stops at y=277 (the X-array matrix top)
+             so the matrix stays outside the frame. Non-hit-testable so it never blocks the fields. -->
+        <Border x:Name="FormFrame" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Width="677" Height="277" BorderBrush="#1565C0" BorderThickness="3"
+                Background="Transparent" IsHitTestVisible="False"/>
         <TextBlock HorizontalAlignment="Left" Margin="11,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" FontWeight="Bold" />
             <LineBreak />
@@ -818,7 +743,7 @@
                              KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"/>
                 </Border>
             </Grid>
-            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="#444444"
+            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="#FFD400"
                        VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
         </StackPanel>
         <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,54,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
@@ -897,7 +822,7 @@
         </TextBlock>
         <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="404,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="54" Height="28" TextChanged="TB_MyHolyland_TextChanged" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="5" TabIndex="4"/>
         <Label Content="Mode" HorizontalAlignment="Left" Margin="478,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="530,56,0,0" Grid.Row="1" VerticalAlignment="Top" Width="40" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3">
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="530,56,0,0" Grid.Row="1" VerticalAlignment="Top" Width="40" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}">
             <ComboBox.Template>
                 <ControlTemplate TargetType="ComboBox">
                     <Grid>
@@ -909,12 +834,12 @@
                                     <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="bd" Property="Background" Value="#CCE4FF"/>
-                                            <Setter TargetName="bd" Property="BorderBrush" Value="#0078D7"/>
+                                            <Setter TargetName="bd" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
+                                            <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                         </Trigger>
                                         <Trigger Property="IsChecked" Value="True">
-                                            <Setter TargetName="bd" Property="Background" Value="#B0D4F5"/>
-                                            <Setter TargetName="bd" Property="BorderBrush" Value="#0078D7"/>
+                                            <Setter TargetName="bd" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
+                                            <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                         </Trigger>
                                     </ControlTemplate.Triggers>
                                 </ControlTemplate>
@@ -922,7 +847,7 @@
                         </ToggleButton>
                         <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0"/>
                         <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom">
-                            <Border BorderBrush="#0078D7" BorderThickness="1" Background="{DynamicResource {x:Static SystemColors.WindowBrushKey}}" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{TemplateBinding ActualWidth}">
+                            <Border BorderBrush="#0078D7" BorderThickness="1" Background="{DynamicResource MenuBg}" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{TemplateBinding ActualWidth}">
                                 <ScrollViewer>
                                     <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
                                 </ScrollViewer>
@@ -948,13 +873,14 @@
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
-        <Border Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Visibility, ElementName=UploadProgressSpinner}" Panel.ZIndex="50" IsHitTestVisible="False" Background="#F2FFFFFF" BorderBrush="#1565C0" BorderThickness="2" CornerRadius="8" Padding="20,14,20,14">
+        <Border Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Visibility, ElementName=UploadProgressSpinner}" Panel.ZIndex="50" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2" CornerRadius="8" Padding="20,14,20,14">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                <TextBlock Text="{Binding UploadProgressTitle, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"
-                           HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="#0E3F6E"
+                <TextBlock x:Name="L_UploadProgressTitle" Text="{Binding UploadProgressTitle, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"
+                           HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"
                            Margin="0,0,0,8" IsHitTestVisible="False"/>
                 <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center" Source="Images/spinner2.gif" Height="44" Width="44" Visibility="Hidden" IsHitTestVisible="False"/>
-                <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Center" Margin="0,8,0,0" MinWidth="180" Padding="4,4,4,6" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="#0E3F6E" Background="Transparent" Visibility="Hidden" IsHitTestVisible="False"/>
+                <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Center" Margin="0,8,0,0" MinWidth="180" Padding="4,4,4,6" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextBrush}" Background="Transparent" Visibility="Hidden" IsHitTestVisible="False"/>
+                <Button x:Name="Btn_StopProgress" Content="Stop" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,12,0,0" Padding="20,5" FontSize="14" FontWeight="Bold" Cursor="Hand" Click="Btn_StopProgress_Click"/>
             </StackPanel>
         </Border>
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
@@ -1078,7 +1004,7 @@
             </Border>
         </Popup>
         <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" Foreground="Red" FontWeight="Bold" RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="14"/>
-        <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" FontWeight="Bold" FontStyle="Italic" FontSize="14" Visibility="Hidden"><Run Text="Legal " Foreground="Green"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="Green"/></TextBlock>
+        <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="0" VerticalAlignment="Top" Grid.Row="1" Background="Transparent" FontWeight="Bold" FontStyle="Italic" FontSize="14" Visibility="Hidden"><Run Text="Legal " Foreground="#4CAF50"/><Run x:Name="L_LegalCount" Foreground="{DynamicResource TextBrush}"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#4CAF50"/></TextBlock>
         <Border HorizontalAlignment="Left" Margin="237,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
                 <ToolTip>
@@ -1124,9 +1050,9 @@
         <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="349,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="383,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
         <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="288,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
-        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
         <Label Content="Time" HorizontalAlignment="Left" Margin="451,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
-        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="496,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="496,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
 
 
         <Border x:Name="ContestDividerLine" BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
@@ -1187,7 +1113,11 @@
         <TextBox x:Name="TB_CQZone" HorizontalAlignment="Left" Height="28" Margin="244,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
         <Label Content="Comment" HorizontalAlignment="Left" Margin="281,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
         <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="364,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="274" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
-        <Image x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,235,0,0" VerticalAlignment="Top" Width="20" Source="Images/lock.png" Stretch="None" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand" />
+        <Rectangle x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,235,0,0" VerticalAlignment="Top" Width="20" Fill="{DynamicResource TextBrush}" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand">
+            <Rectangle.OpacityMask>
+                <ImageBrush x:Name="LockCommentMask" ImageSource="Images/lock.png" Stretch="Uniform"/>
+            </Rectangle.OpacityMask>
+        </Rectangle>
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <Rectangle Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="46" Margin="0,279,0,0" />
@@ -1415,12 +1345,12 @@
              sees that work is happening rather than a frozen window. -->
         <Border x:Name="LogLoadingOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed"
                 Background="#66000000" Panel.ZIndex="1000">
-            <Border Background="White" BorderBrush="#1565C0" BorderThickness="1" CornerRadius="6"
+            <Border Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="6"
                     Padding="28,18" HorizontalAlignment="Center" VerticalAlignment="Center">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="&#x231B;" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center"/>
+                    <TextBlock Text="&#x231B;" FontSize="20" Margin="0,0,10,0" VerticalAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
                     <TextBlock x:Name="LogLoadingText" Text="Loading log&#8230;" FontSize="16" FontWeight="Bold"
-                               Foreground="#18393c" VerticalAlignment="Center"/>
+                               Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center"/>
                 </StackPanel>
             </Border>
         </Border>
