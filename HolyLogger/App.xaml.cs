@@ -30,6 +30,9 @@ namespace HolyLogger
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // Apply the saved Light/Dark theme before the main window loads.
+            try { ThemeManager.ApplyFromSettings(); } catch { }
+
             // Enable IE11 rendering mode for the WebBrowser control (required for Leaflet.js map)
             try
             {

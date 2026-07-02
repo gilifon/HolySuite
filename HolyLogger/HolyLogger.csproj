@@ -191,6 +191,8 @@
     <Compile Include="NewLogWindow.xaml.cs">
       <DependentUpon>NewLogWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="ThemeManager.cs" />
+    <Compile Include="ThemePalette.cs" />
     <Compile Include="ViewLogsWindow.xaml.cs">
       <DependentUpon>ViewLogsWindow.xaml</DependentUpon>
     </Compile>

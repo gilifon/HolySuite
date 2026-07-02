@@ -253,6 +253,7 @@ namespace HolyLogger
         TimerWindow timerscreen = null;
         MatrixWindow matrix = null;
         Window clusterWindow = null;
+        DataGrid clusterSpotsGrid = null;   // cluster spots table, kept for live re-theming
         Window clusterSettingsWindow = null;
         ClientWebSocket clusterWebSocket = null;
         CancellationTokenSource clusterWebSocketCts = null;
@@ -498,6 +499,11 @@ namespace HolyLogger
             CtyDatService.Initialize();
             rem = new EntityResolver();
             InitializeComponent();
+
+            // Reflect the active theme in the View > Dark Mode toggle, and re-paint code-colored
+            // areas (QSO rows) whenever the theme changes.
+            DarkModeMenuItem.IsChecked = ThemeManager.IsDark;
+            ThemeManager.ThemeChanged += OnThemeChanged;
 
             // Overlay that shows the 3-decimal display while the box is not focused. Positioned to
             // sit exactly over TB_Frequency's text (its margin + border + left padding), at the same
@@ -2004,17 +2010,17 @@ namespace HolyLogger
 
             if (FilteredQsos != null && !isLastQso)
             {
-                // Filter active: green rows for matching QSOs.
+                // Filter active: green rows for matching QSOs (theme-aware light/dark green).
                 e.Row.Background = isAlternate
-                    ? new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xA8, 0xD8, 0xB4))
-                    : new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xC8, 0xF0, 0xD0));
+                    ? ThemeManager.Brush("FilterRowAltBg")
+                    : ThemeManager.Brush("FilterRowBg");
             }
             else
             {
-                // Normal state (or pinned last-QSO row): standard white/gainsboro alternation.
+                // Normal state (or pinned last-QSO row): themed row alternation.
                 e.Row.Background = isAlternate
-                    ? System.Windows.Media.Brushes.Gainsboro
-                    : System.Windows.Media.Brushes.White;
+                    ? ThemeManager.Brush("GridAltRowBg")
+                    : ThemeManager.Brush("GridRowBg");
             }
         }
 
@@ -5540,8 +5546,9 @@ namespace HolyLogger
 
         private void UpdateEditModeBackground()
         {
-            var editModeColor = new SolidColorBrush(Colors.Yellow);
-            var normalColor = new SolidColorBrush(Colors.White);
+            // Theme-aware: normal = input surface (white in light, dark in dark); edit = highlight.
+            var editModeColor = ThemeManager.Brush("EditFieldBg");
+            var normalColor = ThemeManager.Brush("ControlBg");
 
             var backgroundColor = (state == State.Edit) ? editModeColor : normalColor;
 
@@ -7154,6 +7161,25 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
+        private void DarkModeMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            ThemeManager.Apply(DarkModeMenuItem.IsChecked);
+        }
+
+        // Re-run code-driven coloring for the new palette. QSO rows are painted in LoadingRow, so a
+        // grid refresh re-fires it against the new theme brushes.
+        private void OnThemeChanged()
+        {
+            try { QSODataGrid?.Items.Refresh(); } catch { }
+            try { if (clusterWindow != null) clusterWindow.Background = ThemeManager.Brush("WindowBg"); } catch { }
+            // Grid bg/fg auto-update via resource references; refresh re-evaluates the per-spot
+            // colors (DXForeground / RowBackground) which read the palette at getter time.
+            try { clusterSpotsGrid?.Items.Refresh(); } catch { }
+            try { ApplyQsoTableHeaderBackgroundFromSettings(); } catch { }   // re-theme QSO + cluster headers
+            try { ApplyMainFormBackgroundFromSettings(); } catch { }         // re-theme the main form background
+            try { UpdateEditModeBackground(); } catch { }                    // re-theme the QSO entry fields
+        }
+
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (signboard != null)
@@ -7394,6 +7420,9 @@ namespace HolyLogger
             }
 
             var layoutGrid = new Grid { Margin = new Thickness(12, 8, 4, 12) };
+            // Default text in the whole cluster window follows the theme (band/mode labels, legend,
+            // counts). Colored/explicit text overrides it. Resource reference => live toggle.
+            layoutGrid.SetResourceReference(TextElement.ForegroundProperty, "TextBrush");
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
@@ -7417,6 +7446,7 @@ namespace HolyLogger
                 Content = layoutGrid
             };
             clusterWindow.Owner = this;
+            clusterWindow.Background = ThemeManager.Brush("WindowBg");
 
             // Ensure window is visible on screen
             EnsureClusterWindowOnScreen();
@@ -7625,6 +7655,14 @@ namespace HolyLogger
                 Margin = new Thickness(0, -(ClusterHeaderCanvasHeight - ClusterTableTopGap), 0, 0),
                 Opacity = 1
             };
+            clusterSpotsGrid = spotsGrid;
+            // Themed via resource references so they live-update on Light/Dark toggle.
+            spotsGrid.SetResourceReference(Control.BackgroundProperty, "GridRowBg");
+            spotsGrid.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+            // Visible table gridlines in both themes.
+            spotsGrid.GridLinesVisibility = DataGridGridLinesVisibility.All;
+            spotsGrid.SetResourceReference(DataGrid.HorizontalGridLinesBrushProperty, "GridLine");
+            spotsGrid.SetResourceReference(DataGrid.VerticalGridLinesBrushProperty, "GridLine");
 
             // Let the grid shrink below the sum of its columns (it scrolls/clips the overflow)
             // instead of forcing the whole window to stay wide enough for every column.
@@ -7668,8 +7706,26 @@ namespace HolyLogger
             clusterRowStyle.Setters.Add(new Setter(DataGridRow.FocusVisualStyleProperty, null));
             spotsGrid.RowStyle = clusterRowStyle;
 
+            // Default cell text follows the theme (Spotter/Country/UTC/Comment columns; the DX/Freq/
+            // Mode columns override with their own semantic colors). DynamicResource so it live-
+            // updates on Light/Dark toggle. Selected rows use the accent selection colors.
+            var clusterCellStyle = new Style(typeof(DataGridCell));
+            clusterCellStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("TextBrush")));
+            clusterCellStyle.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+            clusterCellStyle.Setters.Add(new Setter(Control.BorderBrushProperty, Brushes.Transparent));
+            var clusterCellSelTrigger = new Trigger { Property = DataGridCell.IsSelectedProperty, Value = true };
+            clusterCellSelTrigger.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("SelectionBg")));
+            clusterCellSelTrigger.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension("SelectionText")));
+            clusterCellStyle.Triggers.Add(clusterCellSelTrigger);
+            spotsGrid.CellStyle = clusterCellStyle;
+
             var clusterColumnHeaderStyle = new Style(typeof(DataGridColumnHeader));
-            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor))));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty, ThemeManager.IsDark
+                ? (Brush)ThemeManager.Brush("GridHeaderBg")
+                : new SolidColorBrush(ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor))));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.ForegroundProperty, ThemeManager.IsDark
+                ? (Brush)ThemeManager.Brush("TextBrush")
+                : Brushes.Black));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0))));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
@@ -7971,7 +8027,7 @@ namespace HolyLogger
             var newCountryCountText = new TextBlock
             {
                 Text = "0",
-                Foreground = Brushes.Black,   // 0 → black; turns red when new countries appear
+                Foreground = ThemeManager.Brush("TextBrush"),   // 0 → theme text; turns red when new countries appear
                 FontWeight = FontWeights.Bold,
                 FontSize = 22,
                 VerticalAlignment = VerticalAlignment.Center,
@@ -7991,7 +8047,7 @@ namespace HolyLogger
             legendPanel.Children.Add(newCountryRow);
 
             legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before", false, new Thickness(0, 5, 0, 0)));
-            legendPanel.Children.Add(BuildClusterLegendItem(Brushes.Black, "Worked Country", false, new Thickness(0, 5, 0, 0)));
+            legendPanel.Children.Add(BuildClusterLegendItem(ThemeManager.Brush("TextBrush"), "Worked Country", false, new Thickness(0, 5, 0, 0)));
 
             var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Freq", true, new Thickness(0, 5, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
@@ -8222,7 +8278,7 @@ namespace HolyLogger
                 Text = mode,
                 FontSize = 9,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.Black,
+                // Foreground inherited from the cluster window's themed TextElement.Foreground.
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
@@ -8297,7 +8353,7 @@ namespace HolyLogger
                 Text = band,
                 FontSize = 9,
                 FontWeight = FontWeights.Bold,
-                Foreground = Brushes.Black,
+                // Foreground inherited from the cluster window's themed TextElement.Foreground.
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 TextAlignment = TextAlignment.Center,
@@ -10029,10 +10085,10 @@ namespace HolyLogger
 
                     if (mode == "SSB")
                     {
-                        return Brushes.Blue;
+                        return ThemeManager.Brush("AccentBrush"); // readable blue in both themes
                     }
 
-                    return Brushes.Black;
+                    return ThemeManager.Brush("TextBrush");
                 }
             }
 
@@ -10058,7 +10114,7 @@ namespace HolyLogger
                     {
                         string bandText = (BandText ?? string.Empty).Trim();
                         if (string.IsNullOrWhiteSpace(bandText))
-                            return Brushes.Black;
+                            return ThemeManager.Brush("TextBrush");
 
                         // Resolve through the same band-color source as the band checkboxes and the
                         // map spot dots (defaults + user customizations, normalized band key) so the
@@ -10068,7 +10124,7 @@ namespace HolyLogger
                     }
                     catch
                     {
-                        return Brushes.Black;
+                        return ThemeManager.Brush("TextBrush");
                     }
                 }
             }
@@ -10131,7 +10187,7 @@ namespace HolyLogger
                         return Brushes.Red;
                     if (IsInLog)
                         return new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)); // Bold blue (not too dark)
-                    return Brushes.Black;
+                    return ThemeManager.Brush("TextBrush"); // normal: theme text (black light / light dark)
                 }
             }
 
@@ -10171,15 +10227,15 @@ namespace HolyLogger
                 {
                     if (IsMapHovered)
                     {
-                        return new SolidColorBrush(Color.FromRgb(0x90, 0xCA, 0xF9)); // Blue highlight (map hover)
+                        return ThemeManager.Brush("RowHoverBg"); // blue highlight (map hover), theme-aware
                     }
                     if (IsOnFrequency)
                     {
-                        return new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)); // LightGreen
+                        return ThemeManager.Brush("RowOnFreqBg"); // on-frequency green, theme-aware
                     }
                     else
                     {
-                        return Brushes.Transparent;
+                        return Brushes.Transparent; // normal: shows the grid's themed background
                     }
                 }
             }
@@ -10822,7 +10878,7 @@ namespace HolyLogger
                     : 0;
                 clusterNewCountryCountText.Text = newCountry.ToString(CultureInfo.InvariantCulture);
                 // Black when there are no new countries, red when there are.
-                clusterNewCountryCountText.Foreground = newCountry > 0 ? Brushes.Red : Brushes.Black;
+                clusterNewCountryCountText.Foreground = newCountry > 0 ? (Brush)Brushes.Red : ThemeManager.Brush("TextBrush");
                 if (newCountry > _lastNewCountryCount)
                     StartNewCountryBlink();
                 _lastNewCountryCount = newCountry;
@@ -13970,8 +14026,17 @@ namespace HolyLogger
                 return;
             }
 
-            Color color = ParseMainFormBackgroundColor(Properties.Settings.Default.MainFormBackgroundColor);
-            MainFormBackgroundRect.Fill = new SolidColorBrush(color);
+            // In dark mode use the theme form surface (resource reference => live toggle); in light
+            // mode keep the user's chosen main-form background color.
+            if (ThemeManager.IsDark)
+            {
+                MainFormBackgroundRect.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "FormBg");
+            }
+            else
+            {
+                Color color = ParseMainFormBackgroundColor(Properties.Settings.Default.MainFormBackgroundColor);
+                MainFormBackgroundRect.Fill = new SolidColorBrush(color);
+            }
         }
 
         private void ApplyQsoTableHeaderBackgroundFromSettings()
@@ -13983,16 +14048,19 @@ namespace HolyLogger
 
             Color color = ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
 
+            // In dark mode the user's (light) header color would clash, so use the theme header
+            // surface + text instead; light mode keeps the user's chosen color.
             var headerStyle = new Style(typeof(DataGridColumnHeader));
             headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
             headerStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
             headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
             headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
+            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, ThemeManager.IsDark ? (Brush)ThemeManager.Brush("GridHeaderBg") : new SolidColorBrush(color)));
+            headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, ThemeManager.IsDark ? (Brush)ThemeManager.Brush("TextBrush") : Brushes.Black));
 
             QSODataGrid.ColumnHeaderStyle = headerStyle;
 
-            ApplyClusterTableHeaderBackgroundFromSettings(color);
+            ApplyClusterTableHeaderBackgroundFromSettings(ThemeManager.IsDark ? ThemeManager.Color("GridHeaderBg") : color);
         }
 
         private Color ParseContestExchangeColor(string colorText)

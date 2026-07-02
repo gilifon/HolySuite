@@ -5,6 +5,14 @@
              StartupUri="MainWindow.xaml" Startup="Application_Startup"
              ShutdownMode="OnMainWindowClose">
     <Application.Resources>
-        <properties:Settings x:Key="Settings" />
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!-- App-wide control theming (styles/templates). The theme BRUSH tokens they
+                     reference are set on Application.Resources at startup by ThemeManager (single
+                     source of truth = ThemePalette). See Application_Startup. -->
+                <ResourceDictionary Source="Themes/Controls.xaml"/>
+            </ResourceDictionary.MergedDictionaries>
+            <properties:Settings x:Key="Settings" />
+        </ResourceDictionary>
     </Application.Resources>
 </Application>
