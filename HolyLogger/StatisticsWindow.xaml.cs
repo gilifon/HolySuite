@@ -172,8 +172,8 @@ namespace HolyLogger
         // the zones not yet present in any QSO, and shows the count in each header.
         private void PopulateMissingZones()
         {
-            List<int> missingCq  = MissingZones(40, q => q.CQZone);
-            List<int> missingItu = MissingZones(90, q => q.ITUZone);
+            List<int> missingCq  = MissingZones(40, d => d.CqZone);
+            List<int> missingItu = MissingZones(90, d => d.ItuZone);
 
             IC_MissingCQ.ItemsSource  = ToZoneRows(missingCq);
             IC_MissingITU.ItemsSource = ToZoneRows(missingItu);
@@ -200,15 +200,30 @@ namespace HolyLogger
             public Brush RowBg { get; set; }
         }
 
-        private List<int> MissingZones(int maxZone, Func<QSO, string> selector)
+        // Live cty.dat resolution keyed by callsign, so worked-DXCC and zones are computed FRESH from the
+        // current country file — never from the possibly-stale stored country/zone fields (that staleness
+        // is exactly what produced a wrong count after the DB restore). Cached so each call resolves once.
+        private Dictionary<string, DXCC> _resolveCache;
+        private DXCC Resolve(string call)
+        {
+            call = (call ?? string.Empty).Trim();
+            if (call.Length == 0 || _masterResolver == null) return null;
+            if (_resolveCache == null) _resolveCache = new Dictionary<string, DXCC>(StringComparer.OrdinalIgnoreCase);
+            if (!_resolveCache.TryGetValue(call, out var d)) { d = _masterResolver.GetDXCC(call); _resolveCache[call] = d; }
+            return d;
+        }
+
+        private List<int> MissingZones(int maxZone, Func<DXCC, int> zoneOf)
         {
             var worked = new HashSet<int>();
             if (_allQsos != null)
             {
                 foreach (QSO q in _allQsos)
                 {
-                    if (int.TryParse((selector(q) ?? string.Empty).Trim(), out int z) && z >= 1 && z <= maxZone)
-                        worked.Add(z);
+                    var d = Resolve(q.DXCall);
+                    if (d == null) continue;
+                    int z = zoneOf(d);
+                    if (z >= 1 && z <= maxZone) worked.Add(z);
                 }
             }
             return Enumerable.Range(1, maxZone).Where(z => !worked.Contains(z)).ToList();
@@ -381,9 +396,12 @@ namespace HolyLogger
 
         private void BuildCountryTables()
         {
+            // Group by the entity RESOLVED live from each callsign (not the stored country string), so the
+            // worked/missing DXCC counts always match the current cty.dat entity list and can never drift.
             var workedCounts = _allQsos
-                .Where(q => !string.IsNullOrEmpty(q.Country))
-                .GroupBy(q => q.Country, StringComparer.OrdinalIgnoreCase)
+                .Select(q => Resolve(q.DXCall)?.Name)
+                .Where(n => !string.IsNullOrEmpty(n))
+                .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
             var workedNames = new HashSet<string>(workedCounts.Keys, StringComparer.OrdinalIgnoreCase);

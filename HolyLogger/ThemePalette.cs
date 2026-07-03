@@ -36,6 +36,7 @@ namespace HolyLogger
             { "TextBrush",        new[] { "#000000", "#E8EAED" } }, // primary text
             { "MutedTextBrush",   new[] { "#666666", "#9BA1AC" } }, // secondary / disabled text
             { "SelectionText",    new[] { "#FFFFFF", "#FFFFFF" } }, // text on selected/accent surface
+            { "KHzText",          new[] { "#000000", "#FFD400" } }, // "kHz" unit label: black on light, yellow on dark
 
             // ---- Lines ----------------------------------------------------------------------------
             { "ThemeBorderBrush", new[] { "#AAAAAA", "#2C2F35" } }, // borders / dividers

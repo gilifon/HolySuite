@@ -295,7 +295,7 @@
     <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="2,0,-2,0" TextElement.Foreground="{DynamicResource TextBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="38" />
-            <RowDefinition x:Name="MainForm" Height="325" />
+            <RowDefinition x:Name="MainForm" Height="332" />
             <RowDefinition Height="*" />
             <RowDefinition Height="40" />
         </Grid.RowDefinitions>
@@ -316,7 +316,7 @@
                         <MenuItem.Icon>
                             <!-- Material "library_books": stacked logbooks = view all logs -->
                             <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
                                       Data="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
                             </Viewbox>
                         </MenuItem.Icon>
@@ -346,7 +346,12 @@
                     <Separator />
                     <MenuItem x:Name="UploadMenuItem" Header="Send Log to IARC" ToolTip="Sends the log to the contest manager" Click="UploadMenuItem_Click">
                         <MenuItem.Icon>
-                            <Image Source="Images/upload_log.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                            <!-- Tint the dark PNG via OpacityMask so it shows in dark mode (theme text color). -->
+                            <Rectangle Width="16" Height="16" Fill="{DynamicResource TextBrush}">
+                                <Rectangle.OpacityMask>
+                                    <ImageBrush ImageSource="Images/upload_log.png" Stretch="Uniform"/>
+                                </Rectangle.OpacityMask>
+                            </Rectangle>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
@@ -358,7 +363,7 @@
                     <MenuItem x:Name="ImportAutosaveMenuItem" Header="Import Autosaved Log" ToolTip="Restore log from an autosaved backup file" Click="ImportAutosaveMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
                                       Data="M13 3C8.03 3 4 7.03 4 12H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
                             </Viewbox>
                         </MenuItem.Icon>
@@ -453,7 +458,7 @@
                         </MenuItem.ContextMenu>
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
                                       Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
                             </Viewbox>
                         </MenuItem.Icon>
@@ -467,7 +472,7 @@
                         </MenuItem.ContextMenu>
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
                                       Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
                             </Viewbox>
                         </MenuItem.Icon>
@@ -481,13 +486,13 @@
                         </MenuItem.ContextMenu>
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="#444444"
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
                                       Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="SearchMenuItem" Header="Search" ToolTip="Search the log" Click="SearchMenuItem_Click">
+                    <MenuItem x:Name="SearchMenuItem" Header="Search (Active Log)" ToolTip="Search the active log" Click="SearchMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
                                 <Path Stretch="Uniform" Fill="#1565C0"
@@ -496,7 +501,7 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="StatisticsMenuItem" Header="Statistics" ToolTip="Show statistics about the log" Click="StatisticsMenuItem_Click">
+                    <MenuItem x:Name="StatisticsMenuItem" Header="Statistics (Active Log)" ToolTip="Show statistics about the active log" Click="StatisticsMenuItem_Click">
                         <MenuItem.Icon>
                             <Viewbox Width="16" Height="16">
                                 <Path Stretch="Uniform" Fill="#1565C0"
@@ -696,13 +701,16 @@
         </DockPanel>
 
 
-        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="279" />
-        <!-- Blue frame around the entry form, matching the log-table frame (#1565C0, thickness 3). Fixed
-             blue so it shows in both light and dark mode. Height stops at y=277 (the X-array matrix top)
-             so the matrix stays outside the frame. Non-hit-testable so it never blocks the fields. -->
+        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="284" />
+        <!-- Blue frame around the entry form INCLUDING the X-array, matching the log-table frame
+             (#1565C0, thickness 3). Fixed blue so it shows in light and dark mode. It spans the full form
+             row and has NO bottom border: the left/right sides run down to the log table, whose own top
+             frame closes the bottom (so there is no separate horizontal low rim). Width 680 places the
+             right side exactly on the map's left frame so the two read as a single vertical line. High
+             ZIndex so the sides draw over the X-array strip. Excluded from the contest shift (RowShift). -->
         <Border x:Name="FormFrame" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Width="677" Height="277" BorderBrush="#1565C0" BorderThickness="3"
-                Background="Transparent" IsHitTestVisible="False"/>
+                Width="680" Height="332" BorderBrush="#1565C0" BorderThickness="3,3,3,0"
+                Background="Transparent" IsHitTestVisible="False" Panel.ZIndex="30"/>
         <TextBlock HorizontalAlignment="Left" Margin="11,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" FontWeight="Bold" />
             <LineBreak />
@@ -743,7 +751,7 @@
                              KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"/>
                 </Border>
             </Grid>
-            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="#FFD400"
+            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"
                        VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
         </StackPanel>
         <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,54,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
@@ -1120,8 +1128,8 @@
         </Rectangle>
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
-        <Rectangle Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="46" Margin="0,279,0,0" />
-        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,277,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
+        <Rectangle Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="53" Margin="0,279,0,0" />
+        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,281,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
         <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
             <DataGrid.Resources>
                 <!-- Keep the selected row blue even when the grid loses focus (e.g. while the right-click
@@ -1249,15 +1257,15 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
+        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
         <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
-        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
+        <Border HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
             <Image x:Name="Img_CustomGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
         </Border>
-        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="QRZGraphicsBorder">
+        <Border HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="QRZGraphicsBorder">
             <Image x:Name="Img_QRZGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
         </Border>
-        <Border HorizontalAlignment="Stretch" Height="325" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="#4A90E2" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CompassBorder">
+        <Border HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="#4A90E2" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CompassBorder">
             <Grid>
                 <Viewbox Width="280" Height="280" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Canvas Width="100" Height="100">

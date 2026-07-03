@@ -5,6 +5,11 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              mc:Ignorable="d"
              d:DesignHeight="220" d:DesignWidth="220">
+    <!-- Blue frame around the map matching the entry-form/log-table frame (#1565C0, thickness 3). The
+         map is a WebBrowser (an airspace HWND) so a border cannot be drawn OVER it; instead the browser
+         sits inside this Border, inset by its thickness, so the frame shows around it. Fixed blue so it
+         appears in both light and dark mode. -->
+    <Border BorderBrush="#1565C0" BorderThickness="3,3,3,0">
     <Grid>
         <WebBrowser x:Name="MapBrowser" />
         <Border x:Name="PlaceholderPanel" Background="#DCEBF8">
@@ -53,4 +58,5 @@
             </Grid>
         </Border>
     </Grid>
+    </Border>
 </UserControl>

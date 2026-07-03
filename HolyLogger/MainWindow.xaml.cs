@@ -4686,12 +4686,39 @@ namespace HolyLogger
                 SMeter.SetSValue(0);
         }
 
+        // Callsign -> DXCC entity name, resolved live from cty.dat and cached. Lets the status-bar DXCC
+        // count be computed from the CURRENT country file (matching the Statistics window) instead of from
+        // possibly-stale stored country strings, so the headline number is always fresh and never drifts.
+        private readonly Dictionary<string, string> _dxccEntityCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        private string ResolveEntityName(string call)
+        {
+            call = (call ?? string.Empty).Trim();
+            if (call.Length == 0 || rem == null) return null;
+            if (!_dxccEntityCache.TryGetValue(call, out var name))
+            {
+                try { name = rem.GetDXCC(call)?.Name; } catch { name = null; }
+                _dxccEntityCache[call] = name;
+            }
+            return name;
+        }
+
         private void UpdateNumOfQSOs()
         {
             //parseAdif();
             NumOfQSOs = dal.GetQsoCountForLog(dal.ActiveLogId).ToString();
             NumOfGrids = dal.GetGridCountForLog(dal.ActiveLogId).ToString();
-            NumOfDXCCs = dal.GetDXCCCountForLog(dal.ActiveLogId).ToString();
+            // Count distinct DXCC entities resolved live from callsigns (always fresh, never from stale
+            // stored strings). Only names that are in the OFFICIAL DXCC entity list are counted — the exact
+            // same basis the Statistics window uses — so the two numbers always agree (a callsign that
+            // resolves to a non-DXCC name must not inflate the count).
+            var officialEntities = new HashSet<string>(
+                rem != null ? rem.GetAllEntityNames() : Enumerable.Empty<string>(),
+                StringComparer.OrdinalIgnoreCase);
+            NumOfDXCCs = (Qsos ?? new ObservableCollection<QSO>())
+                .Select(q => ResolveEntityName(q.DXCall))
+                .Where(n => !string.IsNullOrEmpty(n) && officialEntities.Contains(n))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count().ToString();
             Score = "0";// _holyLogParser.Result.ToString();
         }
 
@@ -6141,6 +6168,7 @@ namespace HolyLogger
         private double RowShift(FrameworkElement fe, double baseTop)
         {
             if (fe == MainFormBackgroundRect) return 0;     // page background never moves
+            if (fe == FormFrame) return 0;                  // blue entry-form frame is fixed; must not shift
             if (fe == ContestExchangeFrame) return 0;       // frame is positioned for contest mode already
             if (fe.Margin.Left >= 670) return 0;            // right-hand map area never moves
 
@@ -7683,9 +7711,12 @@ namespace HolyLogger
                 ToolTip = "Click to undo last spot tune • Hold to clear all",
                 Margin = new Thickness(0, 0, 0, 8),
                 IsEnabled = false,
-                Opacity = 0.35,
+                Opacity = 1.0,
                 Content = undoContentGrid
             };
+            // Opt out of the app-wide themed Button style (added for dark mode) whose Padding="12,5"
+            // template squeezes/clips this 24px icon. Use the default template like before dark mode.
+            undoButton.Style = null;
 
             return undoButton;
         }
@@ -7715,6 +7746,9 @@ namespace HolyLogger
             spotsGrid.GridLinesVisibility = DataGridGridLinesVisibility.All;
             spotsGrid.SetResourceReference(DataGrid.HorizontalGridLinesBrushProperty, "GridLine");
             spotsGrid.SetResourceReference(DataGrid.VerticalGridLinesBrushProperty, "GridLine");
+            // Blue frame matching the main log table / entry-form / map frames (fixed blue, both themes).
+            spotsGrid.BorderBrush = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+            spotsGrid.BorderThickness = new Thickness(3);
 
             // Let the grid shrink below the sum of its columns (it scrolls/clips the overflow)
             // instead of forcing the whole window to stay wide enough for every column.
@@ -11440,7 +11474,7 @@ namespace HolyLogger
 
             bool hasUndo = clusterUndoStates.Count > 0;
             clusterUndoButton.IsEnabled = hasUndo;
-            clusterUndoButton.Opacity = hasUndo ? 1.0 : 0.35;
+            clusterUndoButton.Opacity = 1.0;   // full opacity so the icon's white background stays truly white
 
             if (clusterUndoCountText != null)
             {
