@@ -24,7 +24,7 @@ namespace HolyLogger
                 LogPanel.Children.Add(new Separator
                 {
                     Margin = new Thickness(0, 6, 0, 6),
-                    Background = new SolidColorBrush(Color.FromRgb(0xDA, 0xDA, 0xDA))
+                    Background = ThemeManager.Brush("GridLine")
                 });
             }
             LogPanel.Children.Add(new TextBlock
@@ -32,7 +32,7 @@ namespace HolyLogger
                 Text = $"{name}  ({count} QSO{(count != 1 ? "s" : "")})",
                 FontSize = 13,
                 FontWeight = FontWeights.SemiBold,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x73, 0xE8)),
+                Foreground = ThemeManager.Brush("AccentBrush"),
                 Margin = new Thickness(0, 0, 0, 3)
             });
             ScrollToEnd();
@@ -46,7 +46,7 @@ namespace HolyLogger
                 LogPanel.Children.Add(new Separator
                 {
                     Margin = new Thickness(0, 6, 0, 6),
-                    Background = new SolidColorBrush(Color.FromRgb(0xDA, 0xDA, 0xDA))
+                    Background = ThemeManager.Brush("GridLine")
                 });
             }
             LogPanel.Children.Add(new TextBlock
@@ -84,7 +84,7 @@ namespace HolyLogger
             {
                 Text = label,
                 FontSize = 13,
-                Foreground = new SolidColorBrush(ok ? Colors.Black : okColor),
+                Foreground = ok ? ThemeManager.Brush("TextBrush") : new SolidColorBrush(okColor),
                 VerticalAlignment = VerticalAlignment.Center
             });
 
@@ -112,7 +112,7 @@ namespace HolyLogger
             {
                 Text = text,
                 FontSize = 13,
-                Foreground = new SolidColorBrush(ok ? Colors.Black : okColor),
+                Foreground = ok ? ThemeManager.Brush("TextBrush") : new SolidColorBrush(okColor),
                 TextWrapping = TextWrapping.Wrap,
                 VerticalAlignment = VerticalAlignment.Top
             });

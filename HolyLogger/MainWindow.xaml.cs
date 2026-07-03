@@ -258,6 +258,7 @@ namespace HolyLogger
         TimerWindow timerscreen = null;
         MatrixWindow matrix = null;
         Window clusterWindow = null;
+        Button clusterMaxRestoreBtn = null;  // custom title bar maximize/restore glyph, kept in sync by ClusterWindow_StateChanged
         DataGrid clusterSpotsGrid = null;   // cluster spots table, kept for live re-theming
         Window clusterSettingsWindow = null;
         ClientWebSocket clusterWebSocket = null;
@@ -369,6 +370,7 @@ namespace HolyLogger
         BackgroundWorker AdifHandlerWorker;
         private bool _isShutdownCleanupDone = false;
         private bool _uploadOnExitHandled = false; // guards the single upload-on-exit pass in Window_Closing
+        private bool _uploadInFlight = false; // true only while UploadAllAndCloseAsync's async work is actually running
         // UNUSED: BackgroundWorker for entire log QRZ processing was disabled.
         // Left commented for future reference if batch QRZ processing is needed:
         // BackgroundWorker EntireLogQrzWorker;
@@ -529,7 +531,7 @@ namespace HolyLogger
                 Visibility = Visibility.Collapsed
             };
             Grid.SetRow(TB_FrequencyDisplay, 1);
-            ((Grid)this.Content).Children.Add(TB_FrequencyDisplay);
+            AddLogGrid.Children.Add(TB_FrequencyDisplay);
 
             TB_Frequency.GotFocus += TB_Frequency_GotFocus;
             TB_Frequency.LostFocus += TB_Frequency_LostFocus;
@@ -1261,6 +1263,29 @@ namespace HolyLogger
             }
         }
 
+        // Custom title bar button handlers (WindowStyle="None" -- see MainWindow.xaml). These call
+        // the same SystemCommands the native caption buttons would, so behavior (Aero snap,
+        // taskbar thumbnail preview, Alt+Space system menu, etc.) is unchanged.
+        private void TitleBar_Minimize_Click(object sender, RoutedEventArgs e) => System.Windows.SystemCommands.MinimizeWindow(this);
+
+        private void TitleBar_MaxRestore_Click(object sender, RoutedEventArgs e)
+        {
+            if (WindowState == WindowState.Maximized) System.Windows.SystemCommands.RestoreWindow(this);
+            else System.Windows.SystemCommands.MaximizeWindow(this);
+        }
+
+        private void TitleBar_Close_Click(object sender, RoutedEventArgs e) => System.Windows.SystemCommands.CloseWindow(this);
+
+        // Keeps the maximize/restore glyph in sync when the window is maximized/restored by any
+        // means (the button, double-click on the title bar, Win+Up/Down, dragging to a screen edge).
+        private void MainWindow_StateChanged(object sender, EventArgs e)
+        {
+            if (TitleBar_MaxRestoreBtn == null) return;
+            bool maximized = WindowState == WindowState.Maximized;
+            TitleBar_MaxRestoreBtn.Content = maximized ? "\uE923" : "\uE922";
+            TitleBar_MaxRestoreBtn.ToolTip = maximized ? "Restore Down" : "Maximize";
+        }
+
         private void Window_SourceInitialized(object sender, EventArgs e)
         {
             // Restore window position and size before first show.
@@ -1917,28 +1942,30 @@ namespace HolyLogger
             }
         }
 
-        // File -> Create New Log: name it (duplicates rejected), confirm, then create an empty log and
-        // make it active. No QSOs are deleted — the previous log's QSOs stay in the database.
-        private void CreateNewLogMenuItem_Click(object sender, RoutedEventArgs e)
+        // "Create Regular Log" button in ViewLogsWindow: name it (duplicates rejected), confirm, then
+        // create an empty log and make it active. No QSOs are deleted — the previous log's QSOs stay
+        // in the database. Returns true if a log was created and activated; false if cancelled.
+        public bool CreateNewRegularLog(Window owner)
         {
-            var dlg = new NewLogWindow(dal, "Enter a name for the new log:") { Owner = this };
-            if (dlg.ShowDialog() != true) return;
+            var dlg = new NewLogWindow(dal, "Enter a name for the new log:") { Owner = owner };
+            if (dlg.ShowDialog() != true) return false;
 
             if (!HolyMessageBox.ShowConfirm(
                     "A new empty log \"" + dlg.LogName + "\" will be created and shown.\n\n" +
                     "The current log table will be cleared from view, but every QSO stays safely in the " +
                     "HolyLogger database under its log — nothing is deleted.\n\nCreate the new log now?",
-                    "Create New Log", HolyMsgType.Info, this))
-                return;
+                    "Create New Log", HolyMsgType.Info, owner))
+                return false;
 
             long id = dal.CreateLog(dlg.LogName, string.Empty);   // normal (day-by-day) log
             SwitchActiveLog(id);
+            return true;
         }
 
         // File -> View Logs: open the log manager (list all logs; open / rename / delete / export).
         private void ViewLogsMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            var win = new ViewLogsWindow(this, dal) { Owner = this };
+            var win = new ViewLogsWindow(this, dal, contestOnly: false) { Owner = this };
             win.ShowDialog();
         }
 
@@ -5788,29 +5815,39 @@ namespace HolyLogger
         // Contest Mode on/off (Tools menu). When on, exact-match QSOs (same callsigns + band + mode)
         // are flagged as "Duplicate"; when off, the program never reports a duplicate and instead
         // shows how many times the station was worked before.
-        // Both the Tools-menu item and the status-bar trophy now open the contest picker, which is the
-        // single way to enter or leave Contest Mode.
+        // Both the Tools-menu item and the status-bar trophy open the log window filtered to contest
+        // logs, where the user can select an existing contest log or create a new one. There is no
+        // standalone "exit contest" action: opening or creating a non-contest log exits contest mode
+        // (see ApplyContestModeForActiveLog).
         private void ContestModeMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            OpenContestPicker();
+            OpenContestLogsWindow();
         }
 
         private void ContestIndicator_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            OpenContestPicker();
+            OpenContestLogsWindow();
         }
 
-        private void OpenContestPicker()
+        private void OpenContestLogsWindow()
         {
-            var picker = new ContestPickerWindow(Contests.ContestService.Active) { Owner = this };
-            bool? ok = picker.ShowDialog();
-            if (ok != true) return;
-            if (picker.ExitRequested) ExitContest();
-            else if (picker.SelectedContest != null) EnterContest(picker.SelectedContest);
+            var win = new ViewLogsWindow(this, dal, contestOnly: true) { Owner = this };
+            win.ShowDialog();
+        }
+
+        // Lets the operator pick a contest and name a brand-new log for it. Used by the "Create New
+        // Contest Log" button in ViewLogsWindow. Returns true if a new contest log was created and
+        // made active; false if the operator cancelled at any step.
+        public bool CreateNewContestLog(Window owner)
+        {
+            var picker = new ContestPickerWindow(Contests.ContestService.Active) { Owner = owner };
+            if (picker.ShowDialog() != true || picker.SelectedContest == null) return false;
+            return EnterContest(picker.SelectedContest);
         }
 
         // Entering a contest selects its profile AND turns on Contest Mode (duplicate flagging).
-        private void EnterContest(Contests.Contest c)
+        // Returns true if the contest log was created and activated; false if cancelled.
+        private bool EnterContest(Contests.Contest c)
         {
             // Selecting a contest forces a brand-new log dedicated to it: the user must give it a
             // (unique) name. The log's Event Type is the contest, so contest mode and Cabrillo
@@ -5818,7 +5855,7 @@ namespace HolyLogger
             string suggested = UniqueLogName(c.Name + " " + DateTime.UtcNow.ToString("yyyy-MM-dd"));
             var dlg = new NewLogWindow(dal,
                 "Name the log for the contest \"" + c.Name + "\":", suggested) { Owner = this };
-            if (dlg.ShowDialog() != true) return;   // cancelled -> do not enter the contest
+            if (dlg.ShowDialog() != true) return false;   // cancelled -> do not enter the contest
 
             long id = dal.CreateLog(dlg.LogName, c.Id);
 
@@ -5832,6 +5869,7 @@ namespace HolyLogger
             // Switch to the new (empty) log; this activates the contest via its Event Type and
             // refreshes the entry form, title bar, counts and dup check.
             SwitchActiveLog(id);
+            return true;
         }
 
         private void ExitContest()
@@ -6143,7 +6181,7 @@ namespace HolyLogger
         // "You send" band. The X icons and the log table never move.
         private void ApplyContestLayout(bool contest)
         {
-            Grid grid = this.Content as Grid;
+            Grid grid = AddLogGrid;
             if (grid == null) return;
 
             if (_rowOrigTop == null)
@@ -6177,6 +6215,12 @@ namespace HolyLogger
             if (fe == MainFormBackgroundRect) return 0;     // page background never moves
             if (fe == FormFrame) return 0;                  // blue entry-form frame is fixed; must not shift
             if (fe == ContestExchangeFrame) return 0;       // frame is positioned for contest mode already
+
+            // Duplicate/Legal banner: vertically centered on ContestExchangeFrame's fixed 161-209 span
+            // (161 + (48-44)/2 = 163) regardless of its own baseTop, so the 44-tall card (4px shorter
+            // than the frame's 48px, 2px clearance top and bottom) always lands dead-center over it.
+            if (fe == L_Duplicate || fe == L_Legal) return 163 - baseTop;
+
             if (fe.Margin.Left >= 670) return 0;            // right-hand map area never moves
 
             if (fe == ContestSendBand) return -23;          // "You send" band sits in the freed top strip (~y73)
@@ -6282,8 +6326,8 @@ namespace HolyLogger
             {
                 ContestIndicator.Background = on ? blue : Brushes.Transparent;
                 ContestIndicator.ToolTip = on
-                    ? "In contest — duplicates are flagged.\nClick to change or exit the contest."
-                    : "Not in a contest.\nClick to choose a contest.";
+                    ? "In contest — duplicates are flagged.\nClick to view contest logs or start a new one."
+                    : "Not in a contest.\nClick to view or start a contest log.";
             }
 
             // Contest name beside the trophy, e.g. "World Wide Holyland DX — Active".
@@ -6339,6 +6383,21 @@ namespace HolyLogger
         {
             if (_isShutdownCleanupDone)
                 return;
+
+            // A re-entrant Closing call (Alt+F4, or the taskbar/system-menu close, arriving while the
+            // async upload from a PRIOR Closing pass is still running -- this.IsEnabled=false disables
+            // our own custom title-bar close button, but not OS-level close signals) must not fall
+            // through to the unconditional cleanup below and close the window out from under that
+            // in-flight work. Doing so left UploadProgressWindow (and the per-service confirmation
+            // dialogs) with Owner pointing at a window WPF had already torn down, throwing
+            // InvalidOperationException: "Cannot set Owner property to a Window that has been closed."
+            // This flag is only true while the upload is genuinely in flight; UploadAllAndCloseAsync
+            // clears it right before its own, legitimate, final Close() call, so that one isn't blocked.
+            if (_uploadInFlight)
+            {
+                e.Cancel = true;
+                return;
+            }
 
             // Upload-on-exit: show ALL service dialogs in one pass before any uploading starts,
             // so we never call Close() from inside an async upload (which caused freezes when the
@@ -6430,11 +6489,25 @@ namespace HolyLogger
                 if (lotwToUpload != null || uploadEqsl || uploadQrz)
                 {
                     e.Cancel = true;
+                    _uploadInFlight = true;
                     UploadAllAndCloseAsync(lotwToUpload, uploadEqsl, uploadQrz);
                     return;
                 }
             }
 
+            DoShutdownCleanup();
+        }
+
+        // Timer/socket/event teardown shared by the normal Closing path and the Window_Closed
+        // fallback. MUST stay dialog-free and window-free: Window_Closed runs it after the window
+        // is already closed, where creating any window with Owner = this throws
+        // InvalidOperationException ("Cannot set Owner property to a Window that has been closed").
+        // That crash happened when a close proceeded despite e.Cancel (WPF ignores Cancel during
+        // Application.Shutdown / Windows session end): the old fallback re-invoked Window_Closing
+        // itself, which re-entered the upload-on-exit block and tried to show the LoTW dialog
+        // owned by the dead window.
+        private void DoShutdownCleanup()
+        {
             SaveAutosnapshot();
             _isShutdownCleanupDone = true;
 
@@ -6541,6 +6614,7 @@ namespace HolyLogger
             progressWindow.ShowComplete();
             await progressWindow.WaitForOkAsync();
 
+            _uploadInFlight = false;   // this is the legitimate final close; let it through
             this.Close();
         }
 
@@ -6548,7 +6622,9 @@ namespace HolyLogger
         {
             if (!_isShutdownCleanupDone)
             {
-                Window_Closing(this, new System.ComponentModel.CancelEventArgs());
+                // Cleanup only — never Window_Closing, whose upload-on-exit block shows dialogs
+                // with Owner = this and throws now that the window is closed (see DoShutdownCleanup).
+                DoShutdownCleanup();
             }
 
             // Unsubscribe from event handlers to prevent memory leaks
@@ -7516,19 +7592,50 @@ namespace HolyLogger
             layoutGrid.Children.Add(headerCanvas);
             layoutGrid.Children.Add(spotsGrid);
 
+            // Outer grid keeps the custom title bar flush with the frame edge (layoutGrid has its
+            // own inset margin, above, so nesting the title bar inside it would push the bar in too).
+            var clusterOuter = new Grid();
+            clusterOuter.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            clusterOuter.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            var clusterTitleBar = BuildClusterTitleBar();
+            Grid.SetRow(clusterTitleBar, 0);
+            Grid.SetRow(layoutGrid, 1);
+            clusterOuter.Children.Add(clusterTitleBar);
+            clusterOuter.Children.Add(layoutGrid);
+
+            var clusterFrame = new Border
+            {
+                BorderBrush = Brushes.White,
+                BorderThickness = new Thickness(2),
+                Child = clusterOuter
+            };
+
             clusterWindow = new Window
             {
                 Title = "Cluster",
+                WindowStyle = WindowStyle.None,
                 Width = Properties.Settings.Default.ClusterWindowWidth > 0 ? Properties.Settings.Default.ClusterWindowWidth : 600,
                 Height = Properties.Settings.Default.ClusterWindowHeight > 0 ? Properties.Settings.Default.ClusterWindowHeight : 400,
                 MinWidth = 355,   // narrowest width the user chose (band row fully visible)
                 MinHeight = 260,
                 Left = Properties.Settings.Default.ClusterWindowLeft,
                 Top = Properties.Settings.Default.ClusterWindowTop,
-                Content = layoutGrid
+                Content = clusterFrame
             };
             clusterWindow.Owner = this;
             clusterWindow.Background = ThemeManager.Brush("WindowBg");
+
+            // Same custom-chrome setup as MainWindow: CaptionHeight matches the title bar we just
+            // built, so drag/double-click-maximize/Aero snap all keep working via the app-drawn bar.
+            System.Windows.Shell.WindowChrome.SetWindowChrome(clusterWindow, new System.Windows.Shell.WindowChrome
+            {
+                CaptionHeight = 32,
+                CornerRadius = new CornerRadius(0),
+                GlassFrameThickness = new Thickness(0),
+                ResizeBorderThickness = new Thickness(6),
+                UseAeroCaptionButtons = false
+            });
+            clusterWindow.StateChanged += ClusterWindow_StateChanged;
 
             // Ensure window is visible on screen
             EnsureClusterWindowOnScreen();
@@ -7557,6 +7664,68 @@ namespace HolyLogger
             {
                 await ConnectClusterWebSocketAsync(statusText, clusterVisibleSpots);
             }
+        }
+
+        // Custom title bar for the Cluster window (built in code since the window itself is), mirroring
+        // MainWindow's XAML title bar: icon, "Cluster" title, minimize/maximize/close buttons using the
+        // app-wide CaptionButtonStyle/CaptionCloseButtonStyle from Themes/Controls.xaml.
+        private Border BuildClusterTitleBar()
+        {
+            var minimizeBtn = new Button
+            {
+                Content = "\uE921",
+                Style = Application.Current.Resources["CaptionButtonStyle"] as Style,
+                ToolTip = "Minimize"
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(minimizeBtn, true);
+            minimizeBtn.Click += (s, e) => System.Windows.SystemCommands.MinimizeWindow(clusterWindow);
+
+            clusterMaxRestoreBtn = new Button
+            {
+                Content = "\uE922",
+                Style = Application.Current.Resources["CaptionButtonStyle"] as Style,
+                ToolTip = "Maximize"
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(clusterMaxRestoreBtn, true);
+            clusterMaxRestoreBtn.Click += (s, e) =>
+            {
+                if (clusterWindow.WindowState == WindowState.Maximized) System.Windows.SystemCommands.RestoreWindow(clusterWindow);
+                else System.Windows.SystemCommands.MaximizeWindow(clusterWindow);
+            };
+
+            var closeBtn = new Button
+            {
+                Content = "\uE8BB",
+                Style = Application.Current.Resources["CaptionCloseButtonStyle"] as Style,
+                ToolTip = "Close"
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(closeBtn, true);
+            closeBtn.Click += (s, e) => System.Windows.SystemCommands.CloseWindow(clusterWindow);
+
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+            buttons.Children.Add(minimizeBtn);
+            buttons.Children.Add(clusterMaxRestoreBtn);
+            buttons.Children.Add(closeBtn);
+            DockPanel.SetDock(buttons, Dock.Right);
+
+            var icon = new Image { Source = new BitmapImage(new Uri("Images/crown.png", UriKind.Relative)), Width = 16, Height = 16, Margin = new Thickness(10, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
+            var titleText = new TextBlock { Text = "Cluster", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Foreground = ThemeManager.Brush("TextBrush") };
+
+            var dock = new DockPanel { LastChildFill = true };
+            dock.Children.Add(buttons);
+            dock.Children.Add(icon);
+            dock.Children.Add(titleText);
+
+            return new Border { Height = 32, Background = ThemeManager.Brush("WindowBg"), Child = dock };
+        }
+
+        // Keeps the Cluster window's maximize/restore glyph in sync, same reasoning as MainWindow_StateChanged.
+        private void ClusterWindow_StateChanged(object sender, EventArgs e)
+        {
+            if (clusterMaxRestoreBtn == null) return;
+            bool maximized = clusterWindow.WindowState == WindowState.Maximized;
+            clusterMaxRestoreBtn.Content = maximized ? "\uE923" : "\uE922";
+            clusterMaxRestoreBtn.ToolTip = maximized ? "Restore Down" : "Maximize";
         }
 
         private void ClusterWindow_Closed(object sender, EventArgs e)
@@ -10572,8 +10741,10 @@ namespace HolyLogger
         }
 
         // Resolves a raw band string (e.g. "40", "40M", "70CM") to its color, normalizing it to the
-        // same key the band checkboxes use so the colors match exactly.
-        private static string GetBandColor(string band)
+        // same key the band checkboxes use so the colors match exactly. Internal (not private) so
+        // BandColorConverter, below, can reuse this single source of truth for the QSO log grid's
+        // Band/Frequency columns instead of duplicating the lookup.
+        internal static string GetBandColor(string band)
         {
             var colors = GetBandColors();
             string key = NormalizeClusterBandKey(band);
@@ -11383,8 +11554,13 @@ namespace HolyLogger
                 Padding = new Thickness(14, 7, 14, 7),
                 FontSize = 13,
                 Cursor = Cursors.Hand,
-                Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xCC, 0xCC)),
-                BorderBrush = new SolidColorBrush(Color.FromRgb(0xCC, 0x44, 0x44)),
+                // Dark red instead of the old light pink: this button never set its own Foreground, so
+                // it picks up the app-wide Button style's theme text color, which is white in dark mode
+                // -- white-on-light-pink was nearly unreadable. Foreground is now explicit (not
+                // theme-driven) so it stays readable in both light and dark mode against this background.
+                Background = new SolidColorBrush(Color.FromRgb(0x8B, 0x22, 0x22)),
+                Foreground = Brushes.White,
+                BorderBrush = new SolidColorBrush(Color.FromRgb(0xE5, 0x73, 0x73)),
                 BorderThickness = new Thickness(1)
             };
 
@@ -14136,19 +14312,20 @@ namespace HolyLogger
 
             Color color = ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
 
-            // In dark mode the user's (light) header color would clash, so use the theme header
-            // surface + text instead; light mode keeps the user's chosen color.
+            // Keep the user's chosen header color (and black text for contrast against it) in both
+            // light and dark mode -- previously dark mode swapped it for the theme's gray header,
+            // but the user wants their own color (default burlywood/tan, #DEB887) kept everywhere.
             var headerStyle = new Style(typeof(DataGridColumnHeader));
             headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
             headerStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
             headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
             headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, ThemeManager.IsDark ? (Brush)ThemeManager.Brush("GridHeaderBg") : new SolidColorBrush(color)));
-            headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, ThemeManager.IsDark ? (Brush)ThemeManager.Brush("TextBrush") : Brushes.Black));
+            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
+            headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
 
             QSODataGrid.ColumnHeaderStyle = headerStyle;
 
-            ApplyClusterTableHeaderBackgroundFromSettings(ThemeManager.IsDark ? ThemeManager.Color("GridHeaderBg") : color);
+            ApplyClusterTableHeaderBackgroundFromSettings(color);
         }
 
         private Color ParseContestExchangeColor(string colorText)
@@ -15154,6 +15331,25 @@ namespace HolyLogger
             }
 
             return value;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            return System.Windows.Data.Binding.DoNothing;
+        }
+    }
+
+    // Colors the Band/Frequency cells in the QSO log grid using the exact same per-band colors as
+    // the cluster band-filter buttons and spot dots (MainWindow.GetBandColor is the single source of
+    // truth for all three).
+    public class BandColorConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string band = value as string;
+            if (string.IsNullOrWhiteSpace(band)) return ThemeManager.Brush("TextBrush");
+            try { return new System.Windows.Media.BrushConverter().ConvertFromString(MainWindow.GetBandColor(band)); }
+            catch { return ThemeManager.Brush("TextBrush"); }
         }
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)

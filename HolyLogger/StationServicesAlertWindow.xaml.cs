@@ -134,13 +134,13 @@ namespace HolyLogger
                 Text = name,
                 FontSize = 13,
                 FontWeight = FontWeights.Bold,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#1565C0"))
+                Foreground = ThemeManager.Brush("AccentBrush")
             });
             textPanel.Children.Add(new TextBlock
             {
                 Text = message,
                 FontSize = 12,
-                Foreground = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#444444")),
+                Foreground = ThemeManager.Brush("MutedTextBrush"),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 2, 0, 0)
             });
@@ -153,7 +153,7 @@ namespace HolyLogger
             {
                 ServicesPanel.Children.Add(new Separator
                 {
-                    Background = new SolidColorBrush((Color)ColorConverter.ConvertFromString("#DDDDDD")),
+                    Background = ThemeManager.Brush("GridLine"),
                     Margin = new Thickness(0, 0, 0, 12),
                     Height = 1
                 });

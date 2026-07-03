@@ -14,6 +14,7 @@ namespace HolyLogger
     {
         private readonly MainWindow _main;
         private readonly DataAccess _dal;
+        private readonly bool _contestOnly;
 
         // One grid row.
         public class Row
@@ -28,11 +29,26 @@ namespace HolyLogger
             public bool IsContest { get; set; }
         }
 
-        public ViewLogsWindow(MainWindow main, DataAccess dal)
+        public ViewLogsWindow(MainWindow main, DataAccess dal, bool contestOnly = false)
         {
             InitializeComponent();
             _main = main;
             _dal = dal;
+            _contestOnly = contestOnly;
+
+            // Columns are Auto-width (they size to their own content), and the window is
+            // SizeToContent="Width" so it grows to fit -- but it must never grow past the screen's
+            // usable width (excludes the taskbar), so cap it here rather than in XAML.
+            MaxWidth = SystemParameters.WorkArea.Width;
+
+            if (_contestOnly)
+            {
+                Title = "Contest Logs";
+                Hint.Text = "Select a contest log, or press \"Create New Contest Log\" to start one. Double-click a row to open it.";
+                Btn_NewRegularLog.IsEnabled = false;
+                Btn_NewRegularLog.ToolTip = "Not available here — this view is for contest logs only. Use File > Log Manager to create a regular log.";
+            }
+
             LoadLogs();
         }
 
@@ -43,6 +59,7 @@ namespace HolyLogger
             foreach (var li in _dal.GetLogs())
             {
                 bool isContest = !string.IsNullOrEmpty(li.EventType);
+                if (_contestOnly && !isContest) continue;
                 string eventDisplay = isContest
                     ? (Contests.ContestService.FindById(li.EventType)?.Name ?? li.EventType)
                     : "General";
@@ -102,6 +119,16 @@ namespace HolyLogger
         }
 
         private void Btn_Open_Click(object sender, RoutedEventArgs e) => OpenSelected();
+
+        private void Btn_NewContestLog_Click(object sender, RoutedEventArgs e)
+        {
+            if (_main.CreateNewContestLog(this)) Close();
+        }
+
+        private void Btn_NewRegularLog_Click(object sender, RoutedEventArgs e)
+        {
+            if (_main.CreateNewRegularLog(this)) Close();
+        }
 
         private void LogsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {

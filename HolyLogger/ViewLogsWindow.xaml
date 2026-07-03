@@ -1,7 +1,7 @@
 <Window x:Class="HolyLogger.ViewLogsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Logs" Width="720" Height="440"
+        Title="Logs" SizeToContent="Width" Height="440" MinWidth="640"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False" Background="{DynamicResource WindowBg}">
     <Grid Margin="12">
         <Grid.RowDefinitions>
@@ -12,6 +12,13 @@
 
         <!-- Toolbar -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <Button x:Name="Btn_NewContestLog" Content="Create New Contest Log" Width="190" Height="34" FontSize="13" FontWeight="Bold"
+                    Margin="0,0,10,0" Click="Btn_NewContestLog_Click"
+                    Background="#FFC107" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
+            <Button x:Name="Btn_NewRegularLog" Content="Create Regular Log" Width="170" Height="34" FontSize="13" FontWeight="Bold"
+                    Margin="0,0,16,0" Click="Btn_NewRegularLog_Click"
+                    Background="#00E676" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
+            <Separator Width="1" Margin="0,4,10,4"/>
             <Button x:Name="Btn_Open" Content="Open Log" Width="110" Height="32" FontSize="13" FontWeight="Bold"
                     Margin="0,0,8,0" IsEnabled="False" Click="Btn_Open_Click"/>
             <Button x:Name="Btn_Rename" Content="Rename" Width="90" Height="32" FontSize="13"
@@ -41,12 +48,32 @@
                 <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="White"/>
             </DataGrid.Resources>
             <DataGrid.Columns>
-                <DataGridTextColumn Header="#" Binding="{Binding Num}" Width="40"/>
-                <DataGridTextColumn Header="Log Name" Binding="{Binding Name}" Width="200"/>
-                <DataGridTextColumn Header="Event Type" Binding="{Binding EventType}" Width="150"/>
-                <DataGridTextColumn Header="Start Date" Binding="{Binding StartDate}" Width="100"/>
-                <DataGridTextColumn Header="End Date" Binding="{Binding EndDate}" Width="100"/>
-                <DataGridTextColumn Header="No. of QSOs" Binding="{Binding QsoCount}" Width="*"/>
+                <DataGridTextColumn Header="#" Binding="{Binding Num}" Width="Auto"/>
+                <!-- Auto-width: each column sizes to its own content/header, so two logs never look
+                     alike just because a fixed column width silently clipped their names. The window
+                     itself is SizeToContent="Width" and code-behind caps MaxWidth to the screen's
+                     work area, so a long name grows the window rather than clipping, but the window
+                     can never exceed the screen; the tooltip is a fallback for the rare case a
+                     horizontal scrollbar appears anyway. -->
+                <DataGridTextColumn Header="Log Name" Binding="{Binding Name}" Width="Auto">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            <Setter Property="ToolTip" Value="{Binding Name}"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Event Type" Binding="{Binding EventType}" Width="Auto">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            <Setter Property="ToolTip" Value="{Binding EventType}"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Start Date" Binding="{Binding StartDate}" Width="Auto"/>
+                <DataGridTextColumn Header="End Date" Binding="{Binding EndDate}" Width="Auto"/>
+                <DataGridTextColumn Header="No. of QSOs" Binding="{Binding QsoCount}" Width="Auto"/>
             </DataGrid.Columns>
         </DataGrid>
 

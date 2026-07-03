@@ -44,6 +44,7 @@ namespace HolyLogger
 
             // ---- Accent + stateful highlights -----------------------------------------------------
             { "AccentBrush",      new[] { "#1565C0", "#3B82F6" } }, // primary accent (blue)
+            { "ContestNameBrush", new[] { "#1565C0", "#22D3EE" } }, // status-bar contest name: bright cyan reads far better on the near-black dark-mode status bar than the plain accent blue
             { "Danger",           new[] { "#BB3300", "#F0846E" } }, // errors / missing / warnings (red)
             { "SelectionBg",      new[] { "#3399FF", "#2C4C7A" } }, // selected row/cell, menu hover
             { "RowHoverBg",       new[] { "#90CAF9", "#26456B" } }, // cluster: map-hovered spot

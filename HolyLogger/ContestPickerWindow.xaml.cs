@@ -23,8 +23,6 @@ namespace HolyLogger
 
         // The chosen contest when Activate is pressed; null otherwise.
         public Contest SelectedContest { get; private set; }
-        // True when the operator asked to leave contest mode.
-        public bool ExitRequested { get; private set; }
 
         public ContestPickerWindow(Contest current)
         {
@@ -37,7 +35,6 @@ namespace HolyLogger
                 .ToList();
             LB_Contests.ItemsSource = rows;
 
-            Btn_Exit.IsEnabled = current != null;
             if (current != null)
             {
                 var match = rows.FirstOrDefault(r => r.Contest.Id == current.Id);
@@ -63,12 +60,6 @@ namespace HolyLogger
         {
             if (Selected == null || !Selected.Supported) return;
             SelectedContest = Selected.Contest;
-            DialogResult = true;
-        }
-
-        private void Btn_Exit_Click(object sender, RoutedEventArgs e)
-        {
-            ExitRequested = true;
             DialogResult = true;
         }
 

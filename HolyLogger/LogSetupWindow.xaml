@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Set up your log" Width="520" SizeToContent="Height"
         ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
-        ShowInTaskbar="False" Background="#EEF2F7">
+        ShowInTaskbar="False" Background="{DynamicResource WindowBg}">
     <Grid Margin="22,18,22,18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -14,8 +14,8 @@
         </Grid.RowDefinitions>
 
         <TextBlock Grid.Row="0" Text="Give your log a name"
-                   FontSize="17" FontWeight="Bold" Foreground="#1565C0"/>
-        <TextBlock Grid.Row="1" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="13" Foreground="#444444"
+                   FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+        <TextBlock Grid.Row="1" Margin="0,6,0,0" TextWrapping="Wrap" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"
                    Text="HolyLogger now organizes QSOs into named Logs. This will be your Main Log for everyday operating. You can create more logs later (e.g. for a contest)."/>
 
         <StackPanel Grid.Row="2" Orientation="Horizontal" Margin="0,14,0,0" VerticalAlignment="Center">
@@ -24,10 +24,10 @@
         </StackPanel>
 
         <Border x:Name="ExistingPanel" Grid.Row="3" Margin="0,16,0,0" Padding="12,10"
-                Background="White" BorderBrush="#1565C0" BorderThickness="1" CornerRadius="3"
+                Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" CornerRadius="3"
                 Visibility="Collapsed">
             <StackPanel>
-                <TextBlock x:Name="ExistingHeader" FontSize="13" FontWeight="Bold" Foreground="#1565C0"
+                <TextBlock x:Name="ExistingHeader" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                            TextWrapping="Wrap" Text="You already have QSOs in HolyLogger. What should happen to them?"/>
                 <RadioButton x:Name="RB_Import" Margin="0,8,0,0" FontSize="13" IsChecked="True">
                     <TextBlock x:Name="RB_ImportText" TextWrapping="Wrap" Text="Bring my existing QSOs into this log"/>

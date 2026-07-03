@@ -15,6 +15,7 @@
     <Window.Resources>
         <local:QsoDateDisplayConverter x:Key="QsoDateDisplayConverter"/>
         <local:QsoTimeDisplayConverter x:Key="QsoTimeDisplayConverter"/>
+        <local:BandColorConverter x:Key="BandColorConverter"/>
     </Window.Resources>
 
     <Grid>
@@ -139,14 +140,16 @@
                 <DataGridTemplateColumn Header="Frequency" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Freq}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
+                            <TextBlock Text="{Binding Freq}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
+                                       FontWeight="Bold" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Band" IsReadOnly="True">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Band}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
+                            <TextBlock Text="{Binding Band}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
+                                       FontWeight="Bold" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

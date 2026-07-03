@@ -33,6 +33,23 @@ namespace HolyLogger
             // Apply the saved Light/Dark theme before the main window loads.
             try { ThemeManager.ApplyFromSettings(); } catch { }
 
+            // Make every window's native title bar/border follow the theme too (not just the
+            // DynamicResource-themed client area), applying to the main window and every dialog
+            // (HolyMessageBox, ViewLogsWindow, NewLogWindow, etc.) as soon as each one gets its
+            // handle, with no per-window code needed. Intentional exceptions: SplashWindow has no
+            // native chrome to color (WindowStyle=None + AllowsTransparency); QRZPhotoWindow is a
+            // deliberately always-white photo viewer; OptionsWindow is forced to Background="White"
+            // in its own XAML because none of its many OptionsUserControls panels are theme-aware
+            // (all hardcoded black/gray text, never migrated). For all three, darkening only the
+            // title bar would create the exact light-body/dark-chrome mismatch this fix removes
+            // elsewhere.
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
+                new RoutedEventHandler((s, args) =>
+                {
+                    if (s is Window w && !(w is SplashWindow) && !(w is QRZPhotoWindow) && !(w is OptionsWindow))
+                        ThemeManager.ApplyWindowChrome(w);
+                }));
+
             // Enable IE11 rendering mode for the WebBrowser control (required for Leaflet.js map)
             try
             {

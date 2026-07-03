@@ -22,6 +22,28 @@ namespace HolyLogger
         public OptionsWindow()
         {
             InitializeComponent();
+
+            // This window and its ~10 OptionsUserControls panels were never migrated to dark mode --
+            // every color in them is hardcoded for a light background (confirmed: zero DynamicResource
+            // usage in any of those files). Setting this window's own Background="White" (in XAML)
+            // isn't enough on its own: every plain TextBox/Button/Label still resolves its Background/
+            // Foreground from the app-wide implicit Style in Themes/Controls.xaml, which points at the
+            // *current* theme's tokens, not this window's. Locking every token to its light-mode value
+            // in THIS window's own Resources makes every DynamicResource lookup inside it find the
+            // light value first (closer in the tree than Application.Resources), so the whole subtree
+            // renders in light mode regardless of the app's current theme -- without editing 10 files.
+            foreach (var kv in ThemePalette.Tokens)
+            {
+                var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(kv.Value[(int)ThemeMode.Light]));
+                brush.Freeze();
+                Resources[kv.Key] = brush;
+            }
+            // The TreeView's default background resolves through these SystemColors keys, which
+            // ThemeManager repoints at the theme's (dark) menu surface app-wide for combo-box popups;
+            // revert them locally so the left-hand navigation tree isn't dark-on-dark.
+            Resources[SystemColors.WindowBrushKey] = Brushes.White;
+            Resources[SystemColors.WindowFrameBrushKey] = SystemColors.ActiveBorderBrush;
+
             GeneralItem.IsSelected = true;
         }
 
