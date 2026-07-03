@@ -1218,8 +1218,9 @@ namespace HolyLogger
 
             RestartHeartbeatTimer();
 
-            if (Properties.Settings.Default.ShowTitleClock)
-                StartUTCTimer();
+            // Always run the 1-second UTC timer: besides the optional title clock it now keeps
+            // the QSO Date/Time pickers current (see UTCTimer_Elapsed).
+            StartUTCTimer();
 
             MapControl.RadiusChanged += OnMapRadiusChanged;
             MapControl.SpotTuneRequested += OnMapSpotTuneRequested;
@@ -1339,8 +1340,14 @@ namespace HolyLogger
             this.Dispatcher.Invoke(() =>
             {
                 UpdateTitleClock();
+                // Keep the QSO Date/Time pickers ticking with UTC — but never overwrite a
+                // QSO being edited (state != New) or a manually set time (Manual Mode).
+                if (state == State.New && !Properties.Settings.Default.isManualMode)
+                {
+                    TP_Date.Value = DateTime.UtcNow;
+                    TP_Time.Value = DateTime.UtcNow;
+                }
             });
-            
         }
 
         private void RestartHeartbeatTimer()
@@ -7156,14 +7163,9 @@ namespace HolyLogger
             }
             if (optionWindow.UserInterfaceControlInstance.HasChanged)
             {
-                if (Properties.Settings.Default.ShowTitleClock)
-                {
-                    StartUTCTimer();
-                }
-                else
-                {
-                    StopUTCTimer();
-                }
+                // The UTC timer always runs now (it also refreshes the QSO Date/Time pickers);
+                // UpdateTitleClock() itself shows/hides the clock label per the setting. Not
+                // calling StartUTCTimer() again also avoids stacking duplicate Tick handlers.
                 UpdateActiveLogTitle();   // keep the "— Log: <name>" suffix; don't reset to the bare title
                 UpdateTitleClock();
 

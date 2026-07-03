@@ -25,7 +25,7 @@
         </Grid.RowDefinitions>
 
         <!-- Search bar -->
-        <Border Grid.Row="0" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,0,0,2" Padding="10,8">
+        <Border Grid.Row="0" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,0,0,2" Padding="10,8">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -71,7 +71,7 @@
                 <!-- QSO count, right-justified so it tracks the right edge on resize -->
                 <TextBlock x:Name="TB_Count" Grid.Column="1" VerticalAlignment="Center"
                            HorizontalAlignment="Right" FontSize="16" FontWeight="Bold"
-                           Foreground="#1565C0" Margin="20,0,6,0"/>
+                           Foreground="{DynamicResource AccentBrush}" Margin="20,0,6,0"/>
             </Grid>
         </Border>
 
@@ -80,12 +80,14 @@
                   ItemsSource="{Binding}"
                   AutoGenerateColumns="False"
                   AlternationCount="2"
-                  AlternatingRowBackground="Gainsboro"
+                  Background="{DynamicResource WindowBg}"
+                  RowBackground="{DynamicResource GridRowBg}"
+                  AlternatingRowBackground="{DynamicResource GridAltRowBg}"
                   CanUserAddRows="False"
                   IsReadOnly="True"
                   FontSize="16"
-                  BorderBrush="#1565C0" BorderThickness="3"
-                  VerticalGridLinesBrush="#888888" HorizontalGridLinesBrush="#888888">
+                  BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3"
+                  VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}">
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
                     <Setter Property="BorderBrush" Value="#1565C0"/>
@@ -93,6 +95,9 @@
                     <Setter Property="Padding" Value="5,3,5,3"/>
                     <Setter Property="HorizontalContentAlignment" Value="Center"/>
                     <Setter Property="Background" Value="#DEB887"/>
+                    <!-- Tan header keeps its light-mode look in both modes, so the text on it must
+                         stay dark even when the dark theme's TextBrush turns white. -->
+                    <Setter Property="Foreground" Value="#1A1A1A"/>
                 </Style>
             </DataGrid.ColumnHeaderStyle>
             <DataGrid.Columns>
@@ -184,8 +189,8 @@
         </DataGrid>
 
         <!-- Status bar -->
-        <Border Grid.Row="2" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,2,0,0" Padding="10,5">
-            <TextBlock x:Name="TB_Status" FontSize="13" Foreground="#333333"
+        <Border Grid.Row="2" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,2,0,0" Padding="10,5">
+            <TextBlock x:Name="TB_Status" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"
                        Text="Enter a Callsign or Country (or both) and press Search."/>
         </Border>
     </Grid>

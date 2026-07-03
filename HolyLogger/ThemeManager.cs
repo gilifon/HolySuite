@@ -44,6 +44,13 @@ namespace HolyLogger
                 res[kv.Key] = brush;   // set/replace directly => DynamicResource re-resolves live
             }
 
+            // The default WPF ComboBox template paints its dropdown popup with the system window
+            // brushes via DynamicResource. Point those keys at the menu tokens so every combo
+            // popup surface follows the theme — otherwise the popup stays white behind
+            // theme-colored item text (white-on-white list in dark mode).
+            res[SystemColors.WindowBrushKey]      = res["MenuBg"];
+            res[SystemColors.WindowFrameBrushKey] = res["MenuBorder"];
+
             try
             {
                 Properties.Settings.Default.DarkMode = (mode == ThemeMode.Dark);

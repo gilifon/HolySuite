@@ -433,7 +433,12 @@
                     <Separator />
                     <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
                         <MenuItem.Icon>
-                            <Image Source="Images/gauge.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                            <!-- Tint the dark PNG via OpacityMask so it shows in dark mode (theme text color). -->
+                            <Rectangle Width="16" Height="16" Fill="{DynamicResource TextBrush}">
+                                <Rectangle.OpacityMask>
+                                    <ImageBrush ImageSource="Images/gauge.png" Stretch="Uniform"/>
+                                </Rectangle.OpacityMask>
+                            </Rectangle>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
@@ -445,7 +450,12 @@
                     <Separator />
                     <MenuItem x:Name="RemoveDuplicatesMenuItem" Header="Remove Duplicates" ToolTip="Remove duplicates from the log" Click="RemoveDuplicatesMenuItem_Click">
                         <MenuItem.Icon>
-                            <Image Source="Images/duplicate.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                            <!-- Tint the dark PNG via OpacityMask so it shows in dark mode (theme text color). -->
+                            <Rectangle Width="16" Height="16" Fill="{DynamicResource TextBrush}">
+                                <Rectangle.OpacityMask>
+                                    <ImageBrush ImageSource="Images/duplicate.png" Stretch="Uniform"/>
+                                </Rectangle.OpacityMask>
+                            </Rectangle>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
