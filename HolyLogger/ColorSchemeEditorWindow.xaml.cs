@@ -71,11 +71,12 @@ namespace HolyLogger
 
             Title = "Customize Colors — based on " + _base.DisplayName;
 
-            // The banner is the headline: WHAT is being edited (always the Custom scheme) and
-            // WHICH built-in scheme its colors start from, in large type nobody can miss.
+            // The banner is the headline: WHAT is being edited (always the user's own Custom
+            // scheme, never a built-in) in large type nobody can miss. "A copy of X" is the
+            // wording that explains itself: X stays untouched, your copy is what changes.
             TB_BannerPrefix.Text = editExisting
-                ? "You are editing your CUSTOM scheme, based on:"
-                : "Creating a new CUSTOM scheme, starting from:";
+                ? "You are editing your CUSTOM scheme — a copy of:"
+                : "You are editing a COPY of:";
             TB_BannerScheme.Text = _base.DisplayName.ToUpperInvariant();
 
             TB_SubHeader.Text =
