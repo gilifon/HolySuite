@@ -1,0 +1,68 @@
+<Window x:Class="HolyLogger.DuplicatesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Remove Duplicates" SizeToContent="Width" Height="520" MinWidth="700"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource WindowBg}">
+    <Grid Margin="14,10,14,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,8">
+            <TextBlock x:Name="TB_Header" FontSize="16" FontWeight="Bold"
+                       Foreground="{DynamicResource AccentBrush}"/>
+            <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       Text="QSOs are duplicates when ALL of these match: DX callsign, station callsign, operator, frequency, band, mode, date and time. Rows with the same background color belong to the same duplicate group. The first QSO of each group is KEPT; the others are deleted."/>
+        </StackPanel>
+
+        <DataGrid x:Name="DupsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
+                  CanUserAddRows="False" SelectionMode="Single" HeadersVisibility="Column"
+                  GridLinesVisibility="All" FontSize="13" RowHeaderWidth="0"
+                  BorderBrush="#1565C0" BorderThickness="1"
+                  Foreground="{DynamicResource TextBrush}"
+                  HorizontalGridLinesBrush="{DynamicResource GridLine}"
+                  VerticalGridLinesBrush="{DynamicResource GridLine}">
+            <DataGrid.RowStyle>
+                <!-- Whole-group coloring: every row carries its group's background so all members
+                     of one duplicate group look identical and adjacent groups alternate. -->
+                <Style TargetType="DataGridRow">
+                    <Setter Property="Background" Value="{Binding RowBackground}"/>
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.Columns>
+                <DataGridTextColumn Header="Group" Binding="{Binding GroupNo}" Width="52"/>
+                <DataGridTextColumn Header="Action" Binding="{Binding Action}" Width="70">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="Foreground" Value="{Binding ActionBrush}"/>
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Date" Binding="{Binding Date}" Width="Auto"/>
+                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="Auto"/>
+                <DataGridTextColumn Header="DX Callsign" Binding="{Binding DXCall}" Width="Auto"/>
+                <DataGridTextColumn Header="Station" Binding="{Binding MyCall}" Width="Auto"/>
+                <DataGridTextColumn Header="Operator" Binding="{Binding Operator}" Width="Auto"/>
+                <DataGridTextColumn Header="Frequency" Binding="{Binding Freq}" Width="Auto"/>
+                <DataGridTextColumn Header="Band" Binding="{Binding Band}" Width="Auto"/>
+                <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="Auto"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <DockPanel Grid.Row="2" Margin="0,12,0,0">
+            <Button x:Name="Btn_Cancel" Content="Cancel" DockPanel.Dock="Right" Width="110" Height="34"
+                    FontSize="13" IsCancel="True" Click="Btn_Cancel_Click"/>
+            <Button x:Name="Btn_Delete" DockPanel.Dock="Right" Width="230" Height="34" Margin="0,0,10,0"
+                    FontSize="13" FontWeight="Bold" Click="Btn_Delete_Click"
+                    Background="#C62828" Foreground="White" BorderBrush="#8E1B1B" BorderThickness="1.5"/>
+            <TextBlock x:Name="TB_Summary" VerticalAlignment="Center" FontSize="12.5"
+                       Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
+        </DockPanel>
+    </Grid>
+</Window>

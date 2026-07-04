@@ -8759,22 +8759,33 @@ namespace HolyLogger
 
         private async void RemoveDuplicatesMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // Identify duplicates up front WITHOUT touching the DB. A QSO is a duplicate when an
-            // earlier one shares the same my-call + DX-call + band + mode + date (the log's dedup
-            // key); we keep the first occurrence and collect the rest. Deleting only these rows —
-            // instead of the old "delete every QSO then re-insert the unique ones" — means the log
-            // is never left partial: cancelling mid-run simply leaves some duplicates un-removed,
-            // and it is far faster (a couple hundred deletes vs. re-inserting the whole log).
-            var all = dal.GetAllQSOs();
-            var seen = new HashSet<string>();
-            var toDelete = new List<QSO>();
+            // Identify duplicates up front WITHOUT touching the DB, in the ACTIVE log only. Two
+            // QSOs are duplicates when ALL of these match: DX callsign, station callsign, operator,
+            // frequency, band, mode, date and time. The first of each group is kept; the extras are
+            // shown for review in DuplicatesWindow (same background color per group) and deleted
+            // only after the operator confirms there. Deleting only those rows -- instead of the
+            // old "delete everything then re-insert the unique ones" -- means the log is never left
+            // partial: cancelling mid-run simply leaves some duplicates un-removed.
+            var all = dal.GetQSOsForLog(dal.ActiveLogId);
+            var groupsByKey = new Dictionary<string, List<QSO>>();
+            var groupOrder = new List<List<QSO>>();
             foreach (var q in all)
             {
-                string key = ((q.MyCall ?? "") + "|" + (q.DXCall ?? "") + "|" + (q.Band ?? "") + "|" +
-                              (q.Mode ?? "") + "|" + (q.Date ?? "")).ToUpperInvariant();
-                if (!seen.Add(key))
-                    toDelete.Add(q);
+                string key = ((q.DXCall ?? "").Trim() + "|" + (q.MyCall ?? "").Trim() + "|" +
+                              (q.Operator ?? "").Trim() + "|" + (q.Freq ?? "").Trim() + "|" +
+                              (q.Band ?? "").Trim() + "|" + (q.Mode ?? "").Trim() + "|" +
+                              (q.Date ?? "").Trim() + "|" + (q.Time ?? "").Trim()).ToUpperInvariant();
+                if (!groupsByKey.TryGetValue(key, out var group))
+                {
+                    group = new List<QSO>();
+                    groupsByKey[key] = group;
+                    groupOrder.Add(group);
+                }
+                group.Add(q);
             }
+
+            var dupGroups = groupOrder.Where(g => g.Count > 1).ToList();
+            var toDelete = dupGroups.SelectMany(g => g.Skip(1)).ToList();
 
             if (toDelete.Count == 0)
             {
@@ -8783,11 +8794,8 @@ namespace HolyLogger
                 return;
             }
 
-            bool ok = HolyMessageBox.ShowConfirm(
-                $"Found {toDelete.Count:N0} duplicate QSO(s) out of {all.Count:N0}.\n\n" +
-                "Remove them from the active log? This cannot be undone.",
-                "Remove Duplicates", HolyMsgType.Warning, this);
-            if (!ok) return;
+            var review = new DuplicatesWindow(dupGroups) { Owner = this };
+            if (review.ShowDialog() != true) return;
 
             _dedupCts = new CancellationTokenSource();
             var token = _dedupCts.Token;
@@ -8834,9 +8842,9 @@ namespace HolyLogger
                 _dedupCts = null;
             }
 
-            // Reload the grid from the (now smaller) log.
+            // Reload the grid from the (now smaller) ACTIVE log.
             Qsos.Clear();
-            foreach (var item in dal.GetAllQSOs())
+            foreach (var item in dal.GetQSOsForLog(dal.ActiveLogId))
                 Qsos.Add(item);
             UpdateNumOfQSOs();
 
