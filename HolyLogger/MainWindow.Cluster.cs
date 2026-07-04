@@ -514,7 +514,8 @@ namespace HolyLogger
                 Content = clusterFrame
             };
             clusterWindow.Owner = this;
-            clusterWindow.Background = ThemeManager.Brush("WindowBg");
+            // Resource reference, not a brush snapshot, so the body follows live scheme switches.
+            clusterWindow.SetResourceReference(Window.BackgroundProperty, "WindowBg");
 
             // Same custom-chrome setup as MainWindow: CaptionHeight matches the title bar we just
             // built, so drag/double-click-maximize/Aero snap all keep working via the app-drawn bar.
@@ -600,14 +601,20 @@ namespace HolyLogger
             DockPanel.SetDock(buttons, Dock.Right);
 
             var icon = new Image { Source = new BitmapImage(new Uri("Images/crown.png", UriKind.Relative)), Width = 16, Height = 16, Margin = new Thickness(10, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-            var titleText = new TextBlock { Text = "Cluster", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Foreground = ThemeManager.Brush("TextBrush") };
+            // Resource references (not brush snapshots) so the title bar follows a live scheme
+            // switch -- a snapshot froze whatever theme was active when the window opened, leaving
+            // a dark bar on a light scheme after toggling.
+            var titleText = new TextBlock { Text = "Cluster", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            titleText.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
 
             var dock = new DockPanel { LastChildFill = true };
             dock.Children.Add(buttons);
             dock.Children.Add(icon);
             dock.Children.Add(titleText);
 
-            return new Border { Height = 32, Background = ThemeManager.Brush("WindowBg"), Child = dock };
+            var bar = new Border { Height = 32, Child = dock };
+            bar.SetResourceReference(Border.BackgroundProperty, "WindowBg");
+            return bar;
         }
 
         // Keeps the Cluster window's maximize/restore glyph in sync, same reasoning as MainWindow_StateChanged.
