@@ -21,10 +21,6 @@ namespace HolyLogger.OptionsUserControls
     /// </summary>
     public partial class UserInterfaceControl : UserControl
     {
-        private const string DefaultMainFormBackgroundColor = "#BDDFFF";
-        private const string DefaultQsoTableHeaderBackgroundColor = "#DEB887";
-        private const string DefaultContestExchangeColor = "#FFF6C8";
-
         private bool _isLoadingClusterSettings = false;
 
         public bool HasChanged { get; set; }
@@ -39,9 +35,6 @@ namespace HolyLogger.OptionsUserControls
             SetCallsignSuggestionRowsSelection();
             SetMapAutoFitMarginSelection();
             SetMapDistanceUnitSelection();
-            RefreshMainFormBackgroundPreview();
-            RefreshQsoTableHeaderBackgroundPreview();
-            RefreshContestExchangePreview();
             LoadMapDisplayModeSettings();
             LoadClusterMapSettings();
             LoadClusterSettings();
@@ -232,161 +225,10 @@ namespace HolyLogger.OptionsUserControls
             }
         }
 
-        private static Color ParseColor(string colorText, string fallbackHex)
-        {
-            try
-            {
-                object parsed = ColorConverter.ConvertFromString(colorText);
-                if (parsed is Color)
-                {
-                    return (Color)parsed;
-                }
-            }
-            catch
-            {
-            }
-
-            return (Color)ColorConverter.ConvertFromString(fallbackHex);
-        }
-
-        private static string PickColorHex(string currentHex)
-        {
-            Color current = ParseColor(currentHex, DefaultMainFormBackgroundColor);
-
-            using (var dlg = new WinForms.ColorDialog())
-            {
-                dlg.AllowFullOpen = true;
-                dlg.FullOpen = true;
-                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
-
-                if (dlg.ShowDialog() != WinForms.DialogResult.OK)
-                {
-                    return null;
-                }
-
-                return string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
-            }
-        }
-
-        private void RefreshMainFormBackgroundPreview()
-        {
-            Color color = ParseColor(Properties.Settings.Default.MainFormBackgroundColor, DefaultMainFormBackgroundColor);
-            MainFormBackgroundPreview.Background = new SolidColorBrush(color);
-        }
-
-        private void RefreshQsoTableHeaderBackgroundPreview()
-        {
-            Color color = ParseColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor, DefaultQsoTableHeaderBackgroundColor);
-            QsoTableHeaderBackgroundPreview.Background = new SolidColorBrush(color);
-        }
-
-        private void MainFormBackgroundPreview_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            string hex = PickColorHex(Properties.Settings.Default.MainFormBackgroundColor);
-            if (string.IsNullOrWhiteSpace(hex))
-            {
-                return;
-            }
-
-            if (!string.Equals(Properties.Settings.Default.MainFormBackgroundColor, hex, StringComparison.OrdinalIgnoreCase))
-            {
-                Properties.Settings.Default.MainFormBackgroundColor = hex;
-                Properties.Settings.Default.Save();
-                HasChanged = true;
-            }
-
-            RefreshMainFormBackgroundPreview();
-        }
-
-        private void BtnResetMainFormBackground_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.Equals(Properties.Settings.Default.MainFormBackgroundColor, DefaultMainFormBackgroundColor, StringComparison.OrdinalIgnoreCase))
-            {
-                Properties.Settings.Default.MainFormBackgroundColor = DefaultMainFormBackgroundColor;
-                try
-                {
-                    Properties.Settings.Default.Save();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to save main form background setting: {ex.Message}");
-                }
-                HasChanged = true;
-            }
-
-            RefreshMainFormBackgroundPreview();
-        }
-
-        private void QsoTableHeaderBackgroundPreview_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            string hex = PickColorHex(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
-            if (string.IsNullOrWhiteSpace(hex))
-            {
-                return;
-            }
-
-            if (!string.Equals(Properties.Settings.Default.QsoTableHeaderBackgroundColor, hex, StringComparison.OrdinalIgnoreCase))
-            {
-                Properties.Settings.Default.QsoTableHeaderBackgroundColor = hex;
-                Properties.Settings.Default.Save();
-                HasChanged = true;
-            }
-
-            RefreshQsoTableHeaderBackgroundPreview();
-        }
-
-        private void BtnResetQsoTableHeaderBackground_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.Equals(Properties.Settings.Default.QsoTableHeaderBackgroundColor, DefaultQsoTableHeaderBackgroundColor, StringComparison.OrdinalIgnoreCase))
-            {
-                Properties.Settings.Default.QsoTableHeaderBackgroundColor = DefaultQsoTableHeaderBackgroundColor;
-                try
-                {
-                    Properties.Settings.Default.Save();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"Failed to save QSO table header background setting: {ex.Message}");
-                }
-                HasChanged = true;
-            }
-
-            RefreshQsoTableHeaderBackgroundPreview();
-        }
-
-        private void RefreshContestExchangePreview()
-        {
-            Color color = ParseColor(Properties.Settings.Default.ContestExchangeColor, DefaultContestExchangeColor);
-            ContestExchangePreview.Background = new SolidColorBrush(color);
-        }
-
-        private void ContestExchangePreview_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-        {
-            string hex = PickColorHex(Properties.Settings.Default.ContestExchangeColor);
-            if (string.IsNullOrWhiteSpace(hex)) return;
-
-            if (!string.Equals(Properties.Settings.Default.ContestExchangeColor, hex, StringComparison.OrdinalIgnoreCase))
-            {
-                Properties.Settings.Default.ContestExchangeColor = hex;
-                Properties.Settings.Default.Save();
-                HasChanged = true;
-            }
-
-            RefreshContestExchangePreview();
-        }
-
-        private void BtnResetContestExchange_Click(object sender, RoutedEventArgs e)
-        {
-            if (!string.Equals(Properties.Settings.Default.ContestExchangeColor, DefaultContestExchangeColor, StringComparison.OrdinalIgnoreCase))
-            {
-                Properties.Settings.Default.ContestExchangeColor = DefaultContestExchangeColor;
-                try { Properties.Settings.Default.Save(); }
-                catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Failed to save contest exchange color: {ex.Message}"); }
-                HasChanged = true;
-            }
-
-            RefreshContestExchangePreview();
-        }
+        // (The per-item color pickers that used to live here -- main form background, tables
+        // header row, contest exchange -- moved to View > Color Scheme > Customize Colors, where
+        // ALL application colors are edited in one place. Legacy values are migrated into the
+        // Custom color scheme on first run; see ThemeManager.MigrateLegacyItemColors.)
 
         private void MapDisplayMode_Changed(object sender, RoutedEventArgs e)
         {

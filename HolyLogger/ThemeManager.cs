@@ -115,6 +115,19 @@ namespace HolyLogger
         // Convenience overload kept for the old Light/Dark toggle call sites.
         public static void Apply(bool dark) => Apply(dark ? "dark" : "light");
 
+        // Sets one token in the user's Custom scheme and applies it immediately -- the programmatic
+        // twin of the Customize Colors dialog, used by in-place shortcuts like right-clicking the
+        // contest exchange frames. Creates the Custom scheme (based on the active scheme) if needed.
+        public static void SetCustomOverride(string token, string hex)
+        {
+            var colors = (CurrentSchemeId == CustomSchemeStore.Id ? CustomSchemeStore.Load() : null)
+                         ?? new System.Collections.Generic.Dictionary<string, string>();
+            string baseId = CurrentSchemeId == CustomSchemeStore.Id ? CustomSchemeStore.BaseId : CurrentScheme.Id;
+            colors[token] = hex;
+            CustomSchemeStore.Save(colors, baseId);
+            Apply(CustomSchemeStore.Id);
+        }
+
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
 
@@ -167,9 +180,54 @@ namespace HolyLogger
                 // One-time migration from the pre-scheme Light/Dark boolean.
                 if (string.IsNullOrEmpty(id))
                     id = Properties.Settings.Default.DarkMode ? "dark" : "light";
+
+                id = MigrateLegacyItemColors(id);
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             Apply(id ?? "light");
+        }
+
+        // One-time migration of the pre-palette per-item color settings (main form background,
+        // table header row, contest exchange frames -- formerly edited in Options > User Interface)
+        // into Custom-scheme overrides, so nobody's chosen colors are lost by the consolidation.
+        // Afterward the legacy settings are reset to their defaults so this never re-triggers.
+        // Returns the scheme id to apply (switches to "custom" when anything was migrated).
+        private static string MigrateLegacyItemColors(string schemeId)
+        {
+            var s = Properties.Settings.Default;
+            var legacy = new (string Token, string Value, string Default)[]
+            {
+                ("FormBg",       s.MainFormBackgroundColor,       "#BDDFFF"),
+                ("LogHeaderBg",  s.QsoTableHeaderBackgroundColor, "#DEB887"),
+                ("ContestRxBg",  s.ContestExchangeColor,          "#FFF6C8"),
+                ("ContestTxBg",  s.ContestSendColor,              "#E1F5EE"),
+            };
+
+            var overrides = new System.Collections.Generic.Dictionary<string, string>();
+            foreach (var item in legacy)
+                if (!string.IsNullOrWhiteSpace(item.Value)
+                    && !string.Equals(item.Value.Trim(), item.Default, StringComparison.OrdinalIgnoreCase))
+                    overrides[item.Token] = item.Value.Trim();
+
+            if (overrides.Count == 0) return schemeId;
+
+            var colors = CustomSchemeStore.Load() ?? new System.Collections.Generic.Dictionary<string, string>();
+            string baseId = CustomSchemeStore.Exists
+                ? CustomSchemeStore.BaseId
+                : (schemeId == CustomSchemeStore.Id ? "light" : schemeId);
+            foreach (var kv in overrides)
+                if (!colors.ContainsKey(kv.Key))   // never overwrite an explicit Customize Colors choice
+                    colors[kv.Key] = kv.Value;
+            CustomSchemeStore.Save(colors, baseId);
+
+            s.MainFormBackgroundColor = "#BDDFFF";
+            s.QsoTableHeaderBackgroundColor = "#DEB887";
+            s.ContestExchangeColor = "#FFF6C8";
+            s.ContestSendColor = "#E1F5EE";
+            try { s.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            Log.Warn("Migrated legacy item colors into the Custom scheme: " + string.Join(", ", overrides.Keys));
+            return CustomSchemeStore.Id;
         }
 
         public static void Toggle() => Apply(IsDark ? "light" : "dark");

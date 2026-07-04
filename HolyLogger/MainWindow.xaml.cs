@@ -321,10 +321,9 @@ namespace HolyLogger
             Dispatcher.BeginInvoke(new Action(UpdateFrequencyDisplay), System.Windows.Threading.DispatcherPriority.Loaded);
             Dispatcher.BeginInvoke(new Action(UpdateRigLabel), System.Windows.Threading.DispatcherPriority.Loaded);
 
-            ApplyMainFormBackgroundFromSettings();
+            // The form background, contest frames etc. are DynamicResource-bound in XAML; only the
+            // grid header style needs a one-time assignment (its background is dynamic from there).
             ApplyQsoTableHeaderBackgroundFromSettings();
-            ApplyContestExchangeColorFromSettings();
-            ApplyContestSendColorFromSettings();
 
             // Restrict every text box in the app to English (ASCII) input only. Registered as a
             // class handler so it applies to all TextBoxes without wiring each one individually,
@@ -4981,12 +4980,10 @@ namespace HolyLogger
         private void OnThemeChanged()
         {
             try { QSODataGrid?.Items.Refresh(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            try { if (clusterWindow != null) clusterWindow.Background = ThemeManager.Brush("WindowBg"); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            // Grid bg/fg auto-update via resource references; refresh re-evaluates the per-spot
-            // colors (DXForeground / RowBackground) which read the palette at getter time.
+            // Grid bg/fg and the table headers auto-update via resource references; refresh
+            // re-evaluates the per-spot colors (DXForeground / RowBackground) which read the
+            // palette at getter time.
             try { clusterSpotsGrid?.Items.Refresh(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            try { ApplyQsoTableHeaderBackgroundFromSettings(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }   // re-theme QSO + cluster headers
-            try { ApplyMainFormBackgroundFromSettings(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }         // re-theme the main form background
             try { UpdateEditModeBackground(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }                    // re-theme the QSO entry fields
             try { UpdateStatus(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }                                // re-color the CAT/RIG status text (was hard-coded black)
         }
@@ -8270,25 +8267,9 @@ namespace HolyLogger
                 Dispatcher.BeginInvoke(new Action(ApplyClusterWindowSetting), DispatcherPriority.Background);
             }
 
-            if (e.PropertyName == nameof(Properties.Settings.Default.MainFormBackgroundColor))
-            {
-                Dispatcher.BeginInvoke(new Action(ApplyMainFormBackgroundFromSettings), DispatcherPriority.Background);
-            }
-
-            if (e.PropertyName == nameof(Properties.Settings.Default.QsoTableHeaderBackgroundColor))
-            {
-                Dispatcher.BeginInvoke(new Action(ApplyQsoTableHeaderBackgroundFromSettings), DispatcherPriority.Background);
-            }
-
-            if (e.PropertyName == nameof(Properties.Settings.Default.ContestExchangeColor))
-            {
-                Dispatcher.BeginInvoke(new Action(ApplyContestExchangeColorFromSettings), DispatcherPriority.Background);
-            }
-
-            if (e.PropertyName == nameof(Properties.Settings.Default.ContestSendColor))
-            {
-                Dispatcher.BeginInvoke(new Action(ApplyContestSendColorFromSettings), DispatcherPriority.Background);
-            }
+            // (The old MainFormBackgroundColor / QsoTableHeaderBackgroundColor / ContestExchangeColor /
+            // ContestSendColor watchers are gone: those item colors are palette tokens now -- edited
+            // in View > Color Scheme > Customize Colors and updated live via DynamicResource.)
 
             if (e.PropertyName == nameof(Properties.Settings.Default.ShowPhotoFromQRZ))
             {
@@ -8340,69 +8321,26 @@ namespace HolyLogger
             UpdateShareStatusButtonState();
         }
 
-        private Color ParseMainFormBackgroundColor(string colorText)
-        {
-            try
-            {
-                var parsed = (Color)ColorConverter.ConvertFromString(colorText);
-                return parsed;
-            }
-            catch
-            {
-                return (Color)ColorConverter.ConvertFromString("#BDDFFF");
-            }
-        }
-
-        private static Color ParseQsoTableHeaderBackgroundColor(string colorText)
-        {
-            try
-            {
-                var parsed = (Color)ColorConverter.ConvertFromString(colorText);
-                return parsed;
-            }
-            catch
-            {
-                return (Color)ColorConverter.ConvertFromString("#DEB887");
-            }
-        }
-
         // The one header look used by every log-style table (QSO grid, cluster spots, and the
-        // Logs window's grid): the user's chosen header color (default burlywood #DEB887, edited
-        // in Options > User Interface) with black text, in light AND dark mode. Static so other
-        // windows (ViewLogsWindow) get the identical style from the same source of truth.
+        // Logs window's grid): the LogHeaderBg palette token (designer default burlywood in every
+        // scheme; user-overridable via View > Color Scheme > Customize Colors) with black text.
+        // Background is a DynamicResource setter, so scheme switches and Customize Colors edits
+        // repaint the headers live -- no per-change re-apply needed. Static so other windows
+        // (ViewLogsWindow) get the identical style from the same source of truth.
         internal static Style BuildLogTableHeaderStyle()
         {
-            Color color = ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
             var headerStyle = new Style(typeof(DataGridColumnHeader));
             headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
             headerStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
             headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
             headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
+            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("LogHeaderBg")));
             headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
             return headerStyle;
         }
 
-        private void ApplyMainFormBackgroundFromSettings()
-        {
-            if (MainFormBackgroundRect == null)
-            {
-                return;
-            }
-
-            // In dark mode use the theme form surface (resource reference => live toggle); in light
-            // mode keep the user's chosen main-form background color.
-            if (ThemeManager.IsDark)
-            {
-                MainFormBackgroundRect.SetResourceReference(System.Windows.Shapes.Shape.FillProperty, "FormBg");
-            }
-            else
-            {
-                Color color = ParseMainFormBackgroundColor(Properties.Settings.Default.MainFormBackgroundColor);
-                MainFormBackgroundRect.Fill = new SolidColorBrush(color);
-            }
-        }
-
+        // Assigns the shared header style to the QSO grid (once; the style's DynamicResource
+        // background keeps it current from then on).
         private void ApplyQsoTableHeaderBackgroundFromSettings()
         {
             if (QSODataGrid == null)
@@ -8411,9 +8349,6 @@ namespace HolyLogger
             }
 
             QSODataGrid.ColumnHeaderStyle = BuildLogTableHeaderStyle();
-
-            ApplyClusterTableHeaderBackgroundFromSettings(
-                ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor));
         }
 
         private async void GetQrzData()

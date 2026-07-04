@@ -94,6 +94,11 @@ namespace HolyLogger
             { "RowOnFreqBg",      new[] { "#90EE90", "#1E4A2A", "#1E4A2A" } }, // cluster: on-frequency spot
             { "FilterRowBg",      new[] { "#C8F0D0", "#1E4030", "#1E4030" } }, // QSO grid: filtered-match row
             { "FilterRowAltBg",   new[] { "#A8D8B4", "#183328", "#183328" } }, // QSO grid: filtered-match alt row
+
+            // ---- Designer accent surfaces (same in every scheme by design; user-overridable) -------
+            { "LogHeaderBg",      new[] { "#DEB887", "#DEB887", "#DEB887" } }, // QSO log / cluster / Logs window header row (black text on it)
+            { "ContestRxBg",      new[] { "#FFF6C8", "#FFF6C8", "#FFF6C8" } }, // contest mode: received-exchange frame
+            { "ContestTxBg",      new[] { "#E1F5EE", "#E1F5EE", "#E1F5EE" } }, // contest mode: send-exchange band
         };
 
         // What each role means, in words the operator understands. Shown by the Customize Colors
@@ -116,13 +121,17 @@ namespace HolyLogger
 
             new TokenInfo("GridRowBg",        "Tables", "Table rows",                 "Background of table rows (log, cluster, lists)."),
             new TokenInfo("GridAltRowBg",     "Tables", "Table rows (alternate)",     "Every second table row, for easier reading."),
-            new TokenInfo("GridHeaderBg",     "Tables", "Table headers (other)",      "Headers of secondary tables. The QSO log and cluster headers use their own color, set in Options > User Interface."),
+            new TokenInfo("LogHeaderBg",      "Tables", "Log table headers",          "Header row of the QSO log, the cluster and the Logs window (text on it is always black)."),
+            new TokenInfo("GridHeaderBg",     "Tables", "Table headers (other)",      "Headers of secondary tables and lists."),
             new TokenInfo("GridLine",         "Tables", "Table grid lines",           "The thin lines between table rows and columns."),
             new TokenInfo("SelectionBg",      "Tables", "Selected item",              "Background of the selected row, cell or menu item."),
             new TokenInfo("FilterRowBg",      "Tables", "Filter match rows",          "Log rows that match the active callsign filter."),
             new TokenInfo("FilterRowAltBg",   "Tables", "Filter match rows (alt.)",   "Every second filter-match row."),
             new TokenInfo("RowHoverBg",       "Tables", "Cluster: map-hovered spot",  "Cluster row highlighted while hovering its dot on the map."),
             new TokenInfo("RowOnFreqBg",      "Tables", "Cluster: on-frequency spot", "Cluster row whose frequency matches your radio."),
+
+            new TokenInfo("ContestRxBg",      "Contest mode", "Received exchange frame", "The frame behind the received-exchange boxes in contest mode. Also editable by right-clicking the frame itself."),
+            new TokenInfo("ContestTxBg",      "Contest mode", "Send exchange band",      "The band behind the sent-exchange boxes in contest mode. Also editable by right-clicking the band itself."),
 
             new TokenInfo("ThemeBorderBrush", "Borders and accents", "Borders",       "Borders and divider lines around panels and controls."),
             new TokenInfo("MenuBorder",       "Borders and accents", "Menu frame",    "The frame around popup menus and dropdown lists."),

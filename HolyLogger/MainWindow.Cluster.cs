@@ -874,11 +874,11 @@ namespace HolyLogger
             clusterCellStyle.Triggers.Add(clusterCellSelTrigger);
             spotsGrid.CellStyle = clusterCellStyle;
 
-            // Same rule as the QSO table header: the user's chosen color (default burlywood) with
-            // black text, in light AND dark mode -- never the theme's dark header surface.
+            // Same rule as the QSO table header: the LogHeaderBg palette token (designer burlywood
+            // in every scheme; user-overridable via Customize Colors) with black text. Dynamic, so
+            // scheme switches and color edits repaint the header live.
             var clusterColumnHeaderStyle = new Style(typeof(DataGridColumnHeader));
-            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty,
-                new SolidColorBrush(ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor))));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension("LogHeaderBg")));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0))));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
@@ -3779,28 +3779,8 @@ namespace HolyLogger
             }
         }
 
-        private void ApplyClusterTableHeaderBackgroundFromSettings(Color color)
-        {
-            if (clusterSpotsDataGrid == null)
-            {
-                return;
-            }
-
-            var clusterHeaderStyle = new Style(typeof(DataGridColumnHeader));
-            clusterHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
-            // Explicit black text: without it the header inherits the grid's theme Foreground, which
-            // is white in dark mode -- white-on-burlywood after a light->dark toggle was unreadable.
-            clusterHeaderStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
-            clusterHeaderStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
-            clusterHeaderStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
-            clusterHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
-            clusterHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-
-            clusterSpotsDataGrid.ColumnHeaderStyle = clusterHeaderStyle;
-            foreach (var col in clusterSpotsDataGrid.Columns)
-            {
-                col.HeaderStyle = new Style(typeof(DataGridColumnHeader), clusterHeaderStyle);
-            }
-        }
+        // (The old ApplyClusterTableHeaderBackgroundFromSettings is gone: the header style's
+        // Background is a DynamicResource on the LogHeaderBg token, so scheme switches and
+        // Customize Colors edits repaint it without any re-apply.)
     }
 }

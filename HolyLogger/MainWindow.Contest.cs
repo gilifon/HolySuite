@@ -425,68 +425,38 @@ namespace HolyLogger
                     : "";
         }
 
-        private Color ParseContestExchangeColor(string colorText)
-        {
-            try { return (Color)ColorConverter.ConvertFromString(colorText); }
-            catch { return (Color)ColorConverter.ConvertFromString("#FFF6C8"); }
-        }
-
-        private void ApplyContestExchangeColorFromSettings()
-        {
-            if (ContestExchangeFrame == null) return;
-            ContestExchangeFrame.Background =
-                new SolidColorBrush(ParseContestExchangeColor(Properties.Settings.Default.ContestExchangeColor));
-        }
-
-        // Right-click anywhere on the contest exchange frame to pick its colour, remembered in settings.
+        // Right-click either contest frame to pick its colour in place. The frames are palette
+        // tokens (ContestRxBg / ContestTxBg), so this shortcut writes the choice into the user's
+        // Custom color scheme -- the exact same place View > Color Scheme > Customize Colors edits
+        // it -- and DynamicResource repaints the frame instantly.
         private void ContestExchangeFrame_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
-            Color current = ParseContestExchangeColor(Properties.Settings.Default.ContestExchangeColor);
-            using (var dlg = new System.Windows.Forms.ColorDialog())
-            {
-                dlg.FullOpen = true;
-                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    string hex = string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
-                    Properties.Settings.Default.ContestExchangeColor = hex;
-                    Properties.Settings.Default.Save();
-                    ApplyContestExchangeColorFromSettings();
-                }
-            }
+            PickCustomTokenColor("ContestRxBg");
             e.Handled = true;
         }
 
-        private Color ParseContestSendColor(string colorText)
-        {
-            try { return (Color)ColorConverter.ConvertFromString(colorText); }
-            catch { return (Color)ColorConverter.ConvertFromString("#E1F5EE"); }
-        }
-
-        private void ApplyContestSendColorFromSettings()
-        {
-            if (ContestSendBand == null) return;
-            ContestSendBand.Background =
-                new SolidColorBrush(ParseContestSendColor(Properties.Settings.Default.ContestSendColor));
-        }
-
-        // Right-click anywhere on the "You send" band to pick its colour, remembered in settings.
         private void ContestSendBand_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
         {
-            Color current = ParseContestSendColor(Properties.Settings.Default.ContestSendColor);
+            PickCustomTokenColor("ContestTxBg");
+            e.Handled = true;
+        }
+
+        private static void PickCustomTokenColor(string token)
+        {
+            Color current;
+            try { current = (Color)ColorConverter.ConvertFromString(ThemeManager.CurrentHex(token)); }
+            catch { current = Colors.Gray; }
+
             using (var dlg = new System.Windows.Forms.ColorDialog())
             {
                 dlg.FullOpen = true;
-                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
+                dlg.Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B);
                 if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    string hex = string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
-                    Properties.Settings.Default.ContestSendColor = hex;
-                    Properties.Settings.Default.Save();
-                    ApplyContestSendColorFromSettings();
+                    ThemeManager.SetCustomOverride(token,
+                        string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B));
                 }
             }
-            e.Handled = true;
         }
     }
 }

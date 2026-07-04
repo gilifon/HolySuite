@@ -1104,7 +1104,7 @@
         <!-- Contest exchange highlight frame: a soft rounded panel behind the exchange row, shown only
              in contest mode. Background colour is user-editable in Options and remembered. -->
         <Border x:Name="ContestExchangeFrame" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Margin="4,161,0,0" Width="556" Height="48" CornerRadius="8" Background="#FFF6C8"
+                Margin="4,161,0,0" Width="556" Height="48" CornerRadius="8" Background="{DynamicResource ContestRxBg}"
                 BorderBrush="#D9B441" BorderThickness="1" Visibility="Collapsed" Panel.ZIndex="0"
                 MouseRightButtonUp="ContestExchangeFrame_MouseRightButtonUp"
                 ToolTip="Right-click to change the contest exchange colour"/>
@@ -1133,7 +1133,7 @@
              (L_SendLabel) and the send cells (ContestTxPanel) laid on top. Background colour is
              user-editable (right-click) and remembered, like the received frame. -->
         <Border x:Name="ContestSendBand" Grid.Row="1" Margin="4,96,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Width="556" Height="48" Background="#E1F5EE" BorderBrush="#5DCAA5" BorderThickness="1" CornerRadius="8"
+                Width="556" Height="48" Background="{DynamicResource ContestTxBg}" BorderBrush="#5DCAA5" BorderThickness="1" CornerRadius="8"
                 Visibility="Collapsed" Panel.ZIndex="5"
                 MouseRightButtonUp="ContestSendBand_MouseRightButtonUp"
                 ToolTip="Right-click to change the send-exchange colour"/>
