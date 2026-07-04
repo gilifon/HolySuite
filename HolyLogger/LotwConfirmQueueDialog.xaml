@@ -52,7 +52,7 @@
         <!-- Sub note -->
         <TextBlock Grid.Row="4" Grid.Column="1"
                    Text="LoTW will automatically skip any QSOs already in the system."
-                   FontSize="14" Foreground="#666666" TextWrapping="Wrap"/>
+                   FontSize="14" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap"/>
 
         <!-- Buttons -->
         <StackPanel Grid.Row="6" Grid.Column="0" Grid.ColumnSpan="2"

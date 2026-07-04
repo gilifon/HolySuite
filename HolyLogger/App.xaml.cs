@@ -64,8 +64,24 @@ namespace HolyLogger
             EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
                 new RoutedEventHandler((s, args) =>
                 {
-                    if (s is Window w && !(w is SplashWindow) && !(w is QRZPhotoWindow) && !(w is OptionsWindow))
+                    if (!(s is Window w) || w is SplashWindow || w is QRZPhotoWindow) return;
+
+                    if (!(w is OptionsWindow))
                         ThemeManager.ApplyWindowChrome(w);
+
+                    // Close the Window-SUBCLASS theming hole in one place. WPF implicit styles match
+                    // exact types only, so the app-wide themed Window style never reaches subclasses:
+                    // their background fell back to the system WindowBrush key (repointed at MenuBg by
+                    // ThemeManager) while their TextBlocks kept the hardwired BLACK default -- the
+                    // recurring "black text on dark dialog" bug (About window, LoTW exit dialog, ...).
+                    // For any window that did not set its own value locally, wire Background and the
+                    // inheritable text color to the theme tokens. Windows that DID set their own (XAML
+                    // or code) are left untouched. OptionsWindow resolves these against the light
+                    // tokens locked in its own Resources, so it stays correctly light.
+                    if (w.ReadLocalValue(Window.BackgroundProperty) == DependencyProperty.UnsetValue)
+                        w.SetResourceReference(Window.BackgroundProperty, "WindowBg");
+                    if (w.ReadLocalValue(System.Windows.Documents.TextElement.ForegroundProperty) == DependencyProperty.UnsetValue)
+                        w.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, "TextBrush");
                 }));
 
             // Enable IE11 rendering mode for the WebBrowser control (required for Leaflet.js map)
