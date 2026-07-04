@@ -44,7 +44,7 @@
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
-        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,404,0,0" Width="360" Height="86" FontSize="16">
+        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,404,0,0" Width="360" FontSize="16">
             <TextBlock Margin="6,8" FontSize="13" TextWrapping="Wrap"
                        Text="All application colors (form background, table headers, contest frames, …) are now edited in one place: View  ›  Color Scheme  ›  Customize Colors."/>
         </GroupBox>
