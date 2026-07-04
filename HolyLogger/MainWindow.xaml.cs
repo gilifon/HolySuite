@@ -1683,7 +1683,7 @@ namespace HolyLogger
         // File -> View Logs: open the log manager (list all logs; open / rename / delete / export).
         private void ViewLogsMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            var win = new ViewLogsWindow(this, dal, contestOnly: false) { Owner = this };
+            var win = new ViewLogsWindow(this, dal) { Owner = this };
             win.ShowDialog();
         }
 
