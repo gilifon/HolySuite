@@ -586,6 +586,16 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
+                    <MenuItem x:Name="OpenDataFolderMenuItem" Header="Open Data Folder" ToolTip="Open the folder with your log database, daily backups and the diagnostic log" Click="OpenDataFolderMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- Material "folder_open" -->
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
+                                      Data="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>

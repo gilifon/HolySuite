@@ -5993,6 +5993,22 @@ namespace HolyLogger
             return false;
         }
 
+        // Help -> Open Data Folder: the folder with logDB.db, the daily Backups (and their
+        // HOW TO RESTORE.txt), and holylogger.log -- one click instead of dictating a %LOCALAPPDATA%
+        // path over the phone when helping a user recover or report a problem.
+        private void OpenDataFolderMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start("explorer.exe", dal.DataFolder);
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HolyMessageBox.ShowError("Could not open the data folder:\n" + dal.DataFolder, "Open Data Folder", this);
+            }
+        }
+
         private void AboutMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (about != null)
