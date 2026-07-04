@@ -34,7 +34,7 @@ namespace HolyLogger
             // renders in light mode regardless of the app's current theme -- without editing 10 files.
             foreach (var kv in ThemePalette.Tokens)
             {
-                var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(kv.Value[(int)ThemeMode.Light]));
+                var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(kv.Value[ThemePalette.FindScheme("light").Column]));
                 brush.Freeze();
                 Resources[kv.Key] = brush;
             }

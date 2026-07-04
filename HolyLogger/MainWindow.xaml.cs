@@ -289,9 +289,9 @@ namespace HolyLogger
             rem = new EntityResolver();
             InitializeComponent();
 
-            // Reflect the active theme in the View > Dark Mode toggle, and re-paint code-colored
-            // areas (QSO rows) whenever the theme changes.
-            DarkModeMenuItem.IsChecked = ThemeManager.IsDark;
+            // Build the View > Color Scheme submenu from the palette's scheme registry, and
+            // re-paint code-colored areas (QSO rows) whenever the theme changes.
+            BuildColorSchemeMenu();
             ThemeManager.ThemeChanged += OnThemeChanged;
 
             // Overlay that shows the 3-decimal display while the box is not focused. Positioned to
@@ -4915,9 +4915,33 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
-        private void DarkModeMenuItem_Click(object sender, RoutedEventArgs e)
+        // Fills View > Color Scheme with one radio-checked item per scheme in ThemePalette.Schemes.
+        // Adding a scheme to the palette automatically shows up here -- no menu code to touch.
+        private void BuildColorSchemeMenu()
         {
-            ThemeManager.Apply(DarkModeMenuItem.IsChecked);
+            if (ColorSchemeMenuItem == null) return;
+            ColorSchemeMenuItem.Items.Clear();
+            foreach (var scheme in ThemePalette.Schemes)
+            {
+                var item = new MenuItem
+                {
+                    Header = scheme.DisplayName,
+                    IsCheckable = true,
+                    IsChecked = scheme.Id == ThemeManager.CurrentScheme.Id,
+                    Tag = scheme.Id
+                };
+                item.Click += ColorSchemeItem_Click;
+                ColorSchemeMenuItem.Items.Add(item);
+            }
+        }
+
+        private void ColorSchemeItem_Click(object sender, RoutedEventArgs e)
+        {
+            if ((sender as MenuItem)?.Tag is string id)
+                ThemeManager.Apply(id);
+            // Re-check exactly the active one (clicking a checked radio item must not un-check it).
+            foreach (MenuItem item in ColorSchemeMenuItem.Items)
+                item.IsChecked = (item.Tag as string) == ThemeManager.CurrentScheme.Id;
         }
 
         // Re-run code-driven coloring for the new palette. QSO rows are painted in LoadingRow, so a

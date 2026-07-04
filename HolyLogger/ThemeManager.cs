@@ -7,16 +7,18 @@ using System.Windows.Media;
 
 namespace HolyLogger
 {
-    // Central theme switch. Applying a mode turns the corresponding ThemePalette column into frozen
+    // Central theme switch. Applying a scheme turns the corresponding ThemePalette column into frozen
     // brushes set DIRECTLY on Application.Resources, so every DynamicResource in the live UI (and
     // every ThemeManager.Brush() call in code) re-resolves to the new values. Anything painted in
     // code subscribes to ThemeChanged and re-paints. The choice is persisted in Settings.
     public static class ThemeManager
     {
-        public static ThemeMode CurrentMode { get; private set; } = ThemeMode.Light;
+        public static ColorScheme CurrentScheme { get; private set; } = ThemePalette.FindScheme("light");
 
-        // Convenience for the current Light/Dark toggle UI.
-        public static bool IsDark => CurrentMode == ThemeMode.Dark;
+        // True when the ACTIVE SCHEME declares dark chrome -- drives the DWM title-bar color and
+        // any icon/asset choices. A property of the scheme, not of which scheme is selected, so
+        // any number of dark-ish schemes work without touching this.
+        public static bool IsDark => CurrentScheme.IsDarkChrome;
 
         // Raised after the palette changes, so code-painted areas can re-run their coloring.
         //
@@ -39,14 +41,14 @@ namespace HolyLogger
             return b != null ? b.Color : Colors.Transparent;
         }
 
-        public static void Apply(ThemeMode mode)
+        public static void Apply(string schemeId)
         {
-            CurrentMode = mode;
+            CurrentScheme = ThemePalette.FindScheme(schemeId);
 
             var res = Application.Current.Resources;
             foreach (var kv in ThemePalette.Tokens)
             {
-                string hex = kv.Value[(int)mode];
+                string hex = kv.Value[CurrentScheme.Column];
                 var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
                 brush.Freeze();
                 res[kv.Key] = brush;   // set/replace directly => DynamicResource re-resolves live
@@ -61,7 +63,9 @@ namespace HolyLogger
 
             try
             {
-                Properties.Settings.Default.DarkMode = (mode == ThemeMode.Dark);
+                Properties.Settings.Default.ColorSchemeId = CurrentScheme.Id;
+                // Kept in sync for backward compatibility (older builds sharing this user.config).
+                Properties.Settings.Default.DarkMode = CurrentScheme.IsDarkChrome;
                 Properties.Settings.Default.Save();
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -75,8 +79,8 @@ namespace HolyLogger
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // Convenience overload for the Light/Dark checkbox toggle.
-        public static void Apply(bool dark) => Apply(dark ? ThemeMode.Dark : ThemeMode.Light);
+        // Convenience overload kept for the old Light/Dark toggle call sites.
+        public static void Apply(bool dark) => Apply(dark ? "dark" : "light");
 
         [DllImport("dwmapi.dll", PreserveSig = true)]
         private static extern int DwmSetWindowAttribute(IntPtr hwnd, int attr, ref int attrValue, int attrSize);
@@ -123,11 +127,18 @@ namespace HolyLogger
 
         public static void ApplyFromSettings()
         {
-            bool dark = false;
-            try { dark = Properties.Settings.Default.DarkMode; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            Apply(dark ? ThemeMode.Dark : ThemeMode.Light);
+            string id = null;
+            try
+            {
+                id = Properties.Settings.Default.ColorSchemeId;
+                // One-time migration from the pre-scheme Light/Dark boolean.
+                if (string.IsNullOrEmpty(id))
+                    id = Properties.Settings.Default.DarkMode ? "dark" : "light";
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            Apply(id ?? "light");
         }
 
-        public static void Toggle() => Apply(IsDark ? ThemeMode.Light : ThemeMode.Dark);
+        public static void Toggle() => Apply(IsDark ? "light" : "dark");
     }
 }

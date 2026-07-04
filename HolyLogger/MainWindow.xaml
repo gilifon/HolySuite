@@ -407,7 +407,9 @@
                     </MenuItem>
                 </MenuItem>
                 <MenuItem Header="View" FontSize="16">
-                    <MenuItem x:Name="DarkModeMenuItem" Header="Dark Mode" IsCheckable="True" ToolTip="Switch between light and dark appearance" Click="DarkModeMenuItem_Click"/>
+                    <!-- Populated in code from ThemePalette.Schemes (one radio-checked item per
+                         scheme), so adding a scheme to the palette automatically adds it here. -->
+                    <MenuItem x:Name="ColorSchemeMenuItem" Header="Color Scheme" ToolTip="Choose the application's color scheme"/>
                     <Separator/>
                     <MenuItem x:Name="SignboardMenuItem" Header="Signboard" ToolTip="Open a Signboard with your callsign and square" Click="SignboardMenuItem_Click">
                         <MenuItem.Icon>
