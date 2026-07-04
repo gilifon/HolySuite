@@ -1072,6 +1072,42 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool UseLotwService {
+            get {
+                return ((bool)(this["UseLotwService"]));
+            }
+            set {
+                this["UseLotwService"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool UseEqslService {
+            get {
+                return ((bool)(this["UseEqslService"]));
+            }
+            set {
+                this["UseEqslService"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool UseQrzLogbook {
+            get {
+                return ((bool)(this["UseQrzLogbook"]));
+            }
+            set {
+                this["UseQrzLogbook"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool MapUsePolar {
             get {
                 return ((bool)(this["MapUsePolar"]));

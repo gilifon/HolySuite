@@ -4166,7 +4166,9 @@ namespace HolyLogger
                 bool uploadQrz = false;
 
                 // ── LoTW ─────────────────────────────────────────────────────────────────────
-                int lotwMode = Properties.Settings.Default.LotwUploadOnExitMode;
+                int lotwMode = Properties.Settings.Default.UseLotwService
+                    ? Properties.Settings.Default.LotwUploadOnExitMode
+                    : 0;   // service switched off in Options -> never prompt or upload on exit
                 if (lotwMode != 0)
                 {
                     List<QSO> lotwPending = null;
@@ -4191,7 +4193,9 @@ namespace HolyLogger
                 }
 
                 // ── eQSL ─────────────────────────────────────────────────────────────────────
-                int eqslMode = Properties.Settings.Default.EqslUploadOnExitMode;
+                int eqslMode = Properties.Settings.Default.UseEqslService
+                    ? Properties.Settings.Default.EqslUploadOnExitMode
+                    : 0;   // service switched off in Options -> never prompt or upload on exit
                 if (eqslMode != 0)
                 {
                     int eqslPending = 0;
@@ -4216,7 +4220,9 @@ namespace HolyLogger
                 }
 
                 // ── QRZ ──────────────────────────────────────────────────────────────────────
-                int qrzMode = Properties.Settings.Default.QrzUploadOnExitMode;
+                int qrzMode = Properties.Settings.Default.UseQrzLogbook
+                    ? Properties.Settings.Default.QrzUploadOnExitMode
+                    : 0;   // service switched off in Options -> never prompt or upload on exit
                 if (qrzMode != 0)
                 {
                     int qrzPending = 0;
@@ -6441,6 +6447,14 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(call) || dal == null) return;
             call = call.Trim();
 
+            // Per-service "use this service" master switches (Options pages). A service the user
+            // switched off never triggers this alert and is reported as "not in use". With all
+            // three off there is nothing to check at all.
+            bool useEqsl = Properties.Settings.Default.UseEqslService;
+            bool useLotw = Properties.Settings.Default.UseLotwService;
+            bool useQrz  = Properties.Settings.Default.UseQrzLogbook;
+            if (!useEqsl && !useLotw && !useQrz) return;
+
             // eQSL — per-callsign accounts table.
             bool eqslHasAccount = false;
             try { eqslHasAccount = dal.IsCallsignInEqslTable(call); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -6451,13 +6465,15 @@ namespace HolyLogger
             bool lotwOk = !choice.Ambiguous && !string.IsNullOrWhiteSpace(choice.LocationName);
 
             // QRZ — one logbook/API key for every callsign.
-            bool qrzOn = QrzPushEnabled;
+            bool qrzOn = useQrz && QrzPushEnabled;
 
-            bool registered = eqslHasAccount && lotwOk;
+            // A disabled service counts as "nothing to warn about".
+            bool registered = (!useEqsl || eqslHasAccount) && (!useLotw || lotwOk);
             if (isStartup)
             {
-                // On startup only interrupt when the callsign is NOT registered for eQSL/LoTW. A
-                // fully-registered call opens silently even if QRZ auto-upload is on.
+                // On startup only interrupt when the callsign is NOT registered for an eQSL/LoTW
+                // service that is in use. A fully-registered call opens silently even if QRZ
+                // auto-upload is on.
                 if (registered) return;
             }
             else
@@ -6467,27 +6483,33 @@ namespace HolyLogger
                 if (registered && !qrzOn) return;
             }
 
-            string eqslMsg = eqslHasAccount
-                ? $"Account configured — QSOs will upload under {call}."
-                : $"No eQSL account for {call} — its QSOs will NOT be sent to eQSL.";
+            string eqslMsg = !useEqsl
+                ? "Not in use — switched off in Options → eQSL Service."
+                : eqslHasAccount
+                    ? $"Account configured — QSOs will upload under {call}."
+                    : $"No eQSL account for {call} — its QSOs will NOT be sent to eQSL.";
 
             string lotwMsg;
-            if (choice.Ambiguous)
+            if (!useLotw)
+                lotwMsg = "Not in use — switched off in Options → LoTW Upload.";
+            else if (choice.Ambiguous)
                 lotwMsg = $"{call} has several TQSL locations — pick one in Options → LoTW Upload.";
             else if (!string.IsNullOrWhiteSpace(choice.LocationName))
                 lotwMsg = $"Will sign with TQSL location: \"{choice.LocationName}\".";
             else
                 lotwMsg = $"No TQSL certificate/location for {call} — its QSOs will NOT upload to LoTW.";
 
-            string qrzMsg = qrzOn
-                ? $"QRZ uses ONE logbook for all callsigns. QSOs under {call} go into your configured QRZ logbook regardless of the call. Turn off QRZ auto-upload in Options → QRZ Services if that is not what you want."
-                : "QRZ auto-upload is off — nothing is sent automatically.";
+            string qrzMsg = !useQrz
+                ? "Not in use — switched off in Options → QRZ Services."
+                : qrzOn
+                    ? $"QRZ uses ONE logbook for all callsigns. QSOs under {call} go into your configured QRZ logbook regardless of the call. Turn off QRZ auto-upload in Options → QRZ Services if that is not what you want."
+                    : "QRZ auto-upload is off — nothing is sent automatically.";
 
             var alert = new StationServicesAlertWindow(
                 call,
-                eqslHasAccount, eqslMsg,
-                lotwOk,         lotwMsg,
-                !qrzOn,         qrzMsg)
+                !useEqsl || eqslHasAccount, eqslMsg,
+                !useLotw || lotwOk,         lotwMsg,
+                !qrzOn,                     qrzMsg)
             { Owner = this };
             alert.ShowDialog();
         }

@@ -121,6 +121,7 @@ namespace HolyLogger
         private async System.Threading.Tasks.Task<int> PumpEqslQueue(bool force = false, UploadProgressWindow progressWindow = null)
         {
             if (dal == null) return 0;
+            if (!Properties.Settings.Default.UseEqslService) return 0;   // service switched off in Options
 
             // On a forced exit-upload, wait up to 30 s for any concurrent pump to finish rather
             // than silently skipping. For normal fire-and-forget calls, give up immediately.
@@ -250,6 +251,7 @@ namespace HolyLogger
             try
             {
                 if (dal == null) return;
+                if (!Properties.Settings.Default.UseQrzLogbook) return;   // service switched off in Options
                 if (!force && !QrzPushEnabled) return;
 
                 // When forced (exit-upload), wait up to 30 s for a concurrent pump to finish.

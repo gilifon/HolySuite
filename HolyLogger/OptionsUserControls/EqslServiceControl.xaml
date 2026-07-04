@@ -8,7 +8,23 @@
     <UserControl.Resources>
         <local:PasswordMaskConverter x:Key="PwMask"/>
     </UserControl.Resources>
-    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+    <DockPanel>
+        <!-- Master switch: when off, this service is out of use (no startup configuration alert,
+             no uploads) and all its settings below are greyed out. -->
+        <CheckBox DockPanel.Dock="Top" x:Name="CBX_UseEqsl" Content="Use eQSL for QSOs logging"
+                  FontSize="15" FontWeight="Bold" Margin="2,4,0,8"
+                  IsChecked="{Binding Default.UseEqslService, Source={StaticResource Settings}, Mode=TwoWay}"/>
+    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+          IsEnabled="{Binding IsChecked, ElementName=CBX_UseEqsl}">
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.45"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -108,4 +124,5 @@
             </ComboBox>
         </StackPanel>
     </Grid>
+    </DockPanel>
 </UserControl>

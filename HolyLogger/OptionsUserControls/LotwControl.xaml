@@ -5,7 +5,23 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
              mc:Ignorable="d" Height="730" Width="690">
-    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch">
+    <DockPanel>
+        <!-- Master switch: when off, this service is out of use (no startup configuration alert,
+             no uploads) and all its settings below are greyed out. -->
+        <CheckBox DockPanel.Dock="Top" x:Name="CBX_UseLotw" Content="Use LoTW for QSOs logging"
+                  FontSize="15" FontWeight="Bold" Margin="2,4,0,8"
+                  IsChecked="{Binding Default.UseLotwService, Source={StaticResource Settings}, Mode=TwoWay}"/>
+    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+          IsEnabled="{Binding IsChecked, ElementName=CBX_UseLotw}">
+        <Grid.Style>
+            <Style TargetType="Grid">
+                <Style.Triggers>
+                    <Trigger Property="IsEnabled" Value="False">
+                        <Setter Property="Opacity" Value="0.45"/>
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+        </Grid.Style>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
@@ -193,4 +209,5 @@
             </ComboBox>
         </StackPanel>
     </Grid>
+    </DockPanel>
 </UserControl>
