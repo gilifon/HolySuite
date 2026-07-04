@@ -105,17 +105,6 @@ namespace HolyLogger
                 OnPropertyChanged("NumOfDXCCs");
             }
         }
-        
-        private string _IsOmniRigEnabled;
-        public string IsOmniRigEnabled
-        {
-            get { return _IsOmniRigEnabled; }
-            set
-            {
-                _IsOmniRigEnabled = value;
-                OnPropertyChanged("IsOmniRigEnabled");
-            }
-        }
 
         private string _Score;
         public string Score
@@ -1730,36 +1719,6 @@ namespace HolyLogger
             }
         }
 
-        // Contest Mode follows the active log: a normal (day-by-day) log turns it off; a contest log
-        // re-activates that contest without resetting its serial (event_type stores the contest Id).
-        private void ApplyContestModeForActiveLog()
-        {
-            string eventType = null;
-            try { eventType = dal.GetLogEventType(dal.ActiveLogId); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-            if (string.IsNullOrWhiteSpace(eventType))
-            {
-                if (Properties.Settings.Default.ContestMode) ExitContest();
-                return;
-            }
-
-            var contest = Contests.ContestService.FindById(eventType);
-            if (contest != null)
-            {
-                Contests.ContestService.Activate(contest);
-                Properties.Settings.Default.ContestMode = true;
-                Properties.Settings.Default.ActiveContestId = contest.Id;
-                Properties.Settings.Default.Save();
-                UpdateContestModeMenuHeader();
-                ApplyContestExchangeUI();
-                UpdateDup();
-            }
-            else if (Properties.Settings.Default.ContestMode)
-            {
-                ExitContest();
-            }
-        }
-
         // "Create Regular Log" button in ViewLogsWindow: name it (duplicates rejected), confirm, then
         // create an empty log and make it active. No QSOs are deleted — the previous log's QSOs stay
         // in the database. Returns true if a log was created and activated; false if cancelled.
@@ -1994,18 +1953,6 @@ namespace HolyLogger
             // editor — uses a separate event and still works.
             if (!_messageSendAvailable)
                 e.Handled = true;
-        }
-
-        private void MessageButton_RightClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if (sender is Button button && int.TryParse(button.Tag?.ToString(), out int messageNumber))
-            {
-                e.Handled = true;
-                // Right-click edits the CW text only while the buttons are in their CW ("Txt") look. In
-                // voice ("Msg") mode the buttons play radio audio files, so there's no CW text to edit.
-                if (IsCwModeActive())
-                    ShowCwMessageEditDialog(messageNumber);
-            }
         }
 
         private void ShowCwMessageEditDialog(int messageNumber)
@@ -2638,203 +2585,6 @@ namespace HolyLogger
             try { Process.Start("https://www.qrz.com/db/" + call); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // Shared client for eQSL uploads (a single long-lived HttpClient avoids socket exhaustion).
-        private static readonly System.Net.Http.HttpClient _eqslHttp =
-            new System.Net.Http.HttpClient { Timeout = TimeSpan.FromSeconds(25) };
-
-        // Guarantees only one upload operation runs at a time, so the on-save auto-upload and the
-        // manual "Send" pass can never double-send the same QSO.
-        private readonly System.Threading.SemaphoreSlim _eqslPumpLock = new System.Threading.SemaphoreSlim(1, 1);
-
-        // Builds the eQSL ImportADIF upload URL for a single QSO.
-        private static string BuildEqslUrl(QSO qso, string user, string pwd, string nickname)
-        {
-            string adif = BuildEqslAdif(qso, nickname);
-            return "https://www.eQSL.cc/qslcard/ImportADIF.cfm"
-                + "?EQSL_USER=" + Uri.EscapeDataString(user)
-                + "&EQSL_PSWD=" + Uri.EscapeDataString(pwd)
-                + "&ADIFData=" + Uri.EscapeDataString(adif);
-        }
-
-        // Auto-uploads a single just-logged QSO to the eQSL account that belongs to the callsign it
-        // was logged under. On success it is marked sent; if it can't be confirmed (offline / auth /
-        // error) it stays pending and the "!" badge appears so the user can send it manually later.
-        // Does nothing unless "Automatically upload each QSO" is on AND that callsign has an account
-        // with credentials. The backlog is NEVER flushed here.
-        private async System.Threading.Tasks.Task SendOneQsoToEqsl(QSO qso)
-        {
-            // This runs as fire-and-forget (_ = SendOneQsoToEqsl(...)). Any exception here (e.g. a DB
-            // error from GetEqslAccount/SetEqslStatus) would otherwise be an unobserved task exception,
-            // so the whole body is guarded. The QSO simply stays pending if anything goes wrong.
-            try
-            {
-                if (qso == null || dal == null) return;
-                if (!Properties.Settings.Default.EqslAutoUpload) return;
-
-                EqslAccount acct = dal.GetEqslAccount(qso.MyCall);
-                if (acct == null || string.IsNullOrWhiteSpace(acct.Username) || string.IsNullOrWhiteSpace(acct.Password))
-                    return; // no eQSL account configured for this callsign -> leave it pending
-
-                // If a send pass is already running, leave this QSO pending; it will be picked up later.
-                if (!await _eqslPumpLock.WaitAsync(0)) return;
-                try
-                {
-                    string url = BuildEqslUrl(qso, acct.Username, acct.Password, null);
-
-                    int outcome;
-                    try
-                    {
-                        string body = await _eqslHttp.GetStringAsync(url);
-                        outcome = ClassifyEqslResponse(body);
-                    }
-                    catch
-                    {
-                        outcome = 0; // offline / timeout -> leave pending
-                    }
-
-                    if (outcome == 1) dal.SetEqslStatus(qso.id, 1);
-                    else if (outcome == 2) dal.SetEqslStatus(qso.id, 2);
-                    // outcome 0 -> leave pending
-
-                    UpdateEqslQueueIndicator();
-                }
-                finally
-                {
-                    _eqslPumpLock.Release();
-                }
-            }
-            catch
-            {
-                // Auto-upload must never crash the app; the QSO remains pending for a later retry.
-            }
-        }
-
-        // Manually uploads every pending QSO that has a configured account, routing each to the eQSL
-        // account of the callsign it was logged under. Marks each sent or rejected from eQSL's reply,
-        // and leaves anything that can't be confirmed sent as pending so nothing is ever lost. Called
-        // only from the queue window's "Send" button. Returns the number of QSOs successfully uploaded
-        // in this pass. Must run on the UI thread (touches DB + UI).
-        private async System.Threading.Tasks.Task<int> PumpEqslQueue(bool force = false, UploadProgressWindow progressWindow = null)
-        {
-            if (dal == null) return 0;
-
-            // On a forced exit-upload, wait up to 30 s for any concurrent pump to finish rather
-            // than silently skipping. For normal fire-and-forget calls, give up immediately.
-            var timeout = force ? TimeSpan.FromSeconds(30) : TimeSpan.Zero;
-            if (!await _eqslPumpLock.WaitAsync(timeout)) return 0;
-            try
-            {
-                // Only QSOs whose callsign has an account come back here.
-                System.Collections.Generic.List<QSO> pending = dal.GetPendingEqslQsos();
-                int sentCount = 0;
-
-                if (progressWindow != null)
-                {
-                    if (pending.Count > 0)
-                        progressWindow.StartService("eQSL", pending.Count);
-                    else
-                        progressWindow.SkipService("eQSL", "nothing to upload — queue is empty");
-                }
-
-                // Load the accounts once into a callsign-keyed map (case-insensitive, matching the DB
-                // NOCASE collation) instead of querying GetEqslAccount per QSO.
-                var accounts = new System.Collections.Generic.Dictionary<string, EqslAccount>(StringComparer.OrdinalIgnoreCase);
-                foreach (var a in dal.GetEqslAccounts())
-                    if (!string.IsNullOrWhiteSpace(a.Callsign)) accounts[a.Callsign.Trim()] = a;
-
-                foreach (var qso in pending)
-                {
-                    EqslAccount acct = null;
-                    string myCall = (qso.MyCall ?? string.Empty).Trim();
-                    if (myCall.Length > 0) accounts.TryGetValue(myCall, out acct);
-                    if (acct == null || string.IsNullOrWhiteSpace(acct.Username) || string.IsNullOrWhiteSpace(acct.Password))
-                        continue; // shouldn't happen (filtered), but skip defensively
-
-                    string url = BuildEqslUrl(qso, acct.Username, acct.Password, null);
-                    int outcome;
-                    bool networkError = false;
-                    try
-                    {
-                        // No ConfigureAwait(false): resume on the UI thread so DB/UI stay single-threaded.
-                        string body = await _eqslHttp.GetStringAsync(url);
-                        outcome = ClassifyEqslResponse(body);
-                    }
-                    catch
-                    {
-                        networkError = true; // offline / timeout
-                        outcome = 0;
-                    }
-
-                    if (networkError)
-                        break; // no internet -> stop; everything else stays pending for next time
-
-                    if (outcome == 1)        // accepted by eQSL
-                    {
-                        dal.SetEqslStatus(qso.id, 1);
-                        sentCount++;
-                        progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, true);
-                    }
-                    else if (outcome == 2)   // permanently rejected (bad record) - skip so it can't block the queue
-                    {
-                        dal.SetEqslStatus(qso.id, 2);
-                        progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
-                    }
-                    // outcome 0 (unrecognized reply, e.g. one account's auth failed) -> leave this QSO
-                    // pending and move on to the next, so one bad account can't block the others.
-
-                    UpdateEqslQueueIndicator();
-                }
-
-                UpdateEqslQueueIndicator();
-                return sentCount;
-            }
-            finally
-            {
-                _eqslPumpLock.Release();
-            }
-        }
-
-        // Interprets eQSL's ImportADIF reply. Deliberately conservative: only an explicit success is
-        // treated as "sent"; an explicit bad-record is treated as "rejected"; anything else (auth
-        // failure, maintenance page, unrecognized text) leaves the QSO pending so it is never lost.
-        // Returns 1 = sent, 2 = rejected, 0 = unknown (keep pending). May need tuning once we have a
-        // real eQSL response sample to look at.
-        private static int ClassifyEqslResponse(string body)
-        {
-            if (string.IsNullOrWhiteSpace(body)) return 0;
-            string text = body.ToLowerInvariant();
-
-            // eQSL reports e.g. "Result: 1 out of 1 records added".
-            var m = System.Text.RegularExpressions.Regex.Match(text, @"(\d+)\s+out\s+of\s+(\d+)\s+record");
-            if (m.Success)
-            {
-                int added = 0;
-                int.TryParse(m.Groups[1].Value, out added);
-                if (added >= 1) return 1;
-                // 0 added: a duplicate already on eQSL counts as done; a real bad record is rejected.
-                if (text.Contains("duplicate") || text.Contains("already")) return 1;
-                if (text.Contains("bad record") || text.Contains("rejected") || text.Contains("error")) return 2;
-                return 0;
-            }
-
-            if (text.Contains("bad record") || text.Contains("rejected")) return 2;
-            return 0;
-        }
-
-        // Builds a one-record ADIF for eQSL by reusing the app's ADIF generator and (optionally)
-        // injecting the QTH nickname tag so eQSL matches the upload to the right QTH profile.
-        private static string BuildEqslAdif(QSO qso, string qthNickname)
-        {
-            string adif = Services.GenerateAdif(new System.Collections.Generic.List<QSO> { qso });
-            if (!string.IsNullOrWhiteSpace(qthNickname))
-            {
-                string tag = string.Format("<app_eqsl_qth_nickname:{0}>{1}", qthNickname.Length, qthNickname);
-                int idx = adif.LastIndexOf("<eor>", StringComparison.OrdinalIgnoreCase);
-                if (idx >= 0) adif = adif.Insert(idx, tag);
-            }
-            return adif;
-        }
-
         // ---- QRZ.com Logbook real-time upload --------------------------------------------------------
 
         // Serializes one QSO Plus terminates it with a single <EOR>. Reuses the app's canonical ADIF
@@ -2900,118 +2650,11 @@ namespace HolyLogger
             }
         }
 
-        // Silently uploads every QSO still pending for QRZ (status 0), oldest first. Runs at startup so
-        // anything that could not be pushed while offline is retried automatically. Stops on the first
-        // network error (everything else stays pending); a per-record rejection is marked and skipped so
-        // one bad record can't block the queue. Never throws.
-        // force=true bypasses the QrzPushEnabled guard — used by the on-exit upload when the user
-        // explicitly confirmed the upload even though real-time auto-push is turned off.
-        private async System.Threading.Tasks.Task PumpQrzQueue(bool force = false, UploadProgressWindow progressWindow = null)
-        {
-            try
-            {
-                if (dal == null) return;
-                if (!force && !QrzPushEnabled) return;
-
-                // When forced (exit-upload), wait up to 30 s for a concurrent pump to finish.
-                // For regular fire-and-forget calls give up immediately so the caller is not blocked.
-                var lockTimeout = force ? TimeSpan.FromSeconds(30) : TimeSpan.Zero;
-                if (!await _qrzPumpLock.WaitAsync(lockTimeout)) return;
-                try
-                {
-                    string key = Properties.Settings.Default.qrz_api_key.Trim();
-                    System.Collections.Generic.List<QSO> pending = dal.GetPendingQrzQsos();
-
-                    if (progressWindow != null)
-                    {
-                        if (pending.Count > 0)
-                            progressWindow.StartService("QRZ Logbook", pending.Count);
-                        else
-                            progressWindow.SkipService("QRZ Logbook", "nothing to upload — queue is empty");
-                    }
-
-                    foreach (var qso in pending)
-                    {
-                        QrzLogbookResult r = await QrzLogbookService.InsertAsync(key, BuildQrzAdif(qso));
-
-                        if (r.NetworkError)
-                            break;   // offline -> stop; the rest stays pending for next time
-
-                        if (r.Ok)
-                        {
-                            dal.SetQrzStatus(qso.id, 1, r.LogId);
-                            progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, true);
-                        }
-                        else if (r.IsPermanentFailure)
-                        {
-                            dal.SetQrzStatus(qso.id, 2, null);
-                            progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
-                        }
-                    }
-                }
-                finally
-                {
-                    _qrzPumpLock.Release();
-                }
-                UpdateQrzMenuCount();
-            }
-            catch
-            {
-                // Best effort; anything not confirmed sent simply stays pending.
-            }
-        }
-
-        // Refreshes everything that reflects the eQSL queue size: the Tools-menu item (grayed when
-        // empty, with the count in its header). Safe to call often.
-        private void UpdateEqslQueueIndicator()
-        {
-            int pending = 0;
-            // Counts not-yet-sent QSOs whose callsign is in the eQSL table (the opt-in list). A
-            // callsign that isn't in the table is ignored.
-            try { if (dal != null) pending = dal.GetPendingEqslCount(); }
-            catch { pending = 0; }
-
-            if (SendQueueToEqslMenuItem != null)
-            {
-                // Build the header with just the word "eQSL" in bold; always append the count
-                // (including (0)) so the queue state is never ambiguous.
-                var header = new System.Windows.Controls.TextBlock();
-                header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
-                header.Inlines.Add(new System.Windows.Documents.Run("eQSL") { FontWeight = System.Windows.FontWeights.Bold });
-                header.Inlines.Add(new System.Windows.Documents.Run("  (" + pending + ")"));
-                SendQueueToEqslMenuItem.Header = header;
-            }
-
-
-            // Keep an open queue window in sync too (e.g. a QSO was deleted from the log behind it).
-            if (_eqslQueueWindow != null)
-                _eqslQueueWindow.RefreshList();
-        }
-
         // Recompute the queue size whenever the Tools menu is opened, so the menu item's gray state
         // and count are always current.
         private void ToolsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
         {
             UpdateEqslQueueIndicator();
-        }
-
-        private void SendQueueToEqslMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            ShowEqslQueueWindow();
-        }
-
-        private void UpdateLotwMenuCount()
-        {
-            try
-            {
-                int count = dal?.GetPendingLotwQsos()?.Count ?? 0;
-                var header = new System.Windows.Controls.TextBlock();
-                header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
-                header.Inlines.Add(new System.Windows.Documents.Run("LoTW") { FontWeight = System.Windows.FontWeights.Bold });
-                header.Inlines.Add(new System.Windows.Documents.Run("  (" + count + ")"));
-                SendQueueToLotwMenuItem.Header = header;
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void UpdateQrzMenuCount()
@@ -3026,457 +2669,6 @@ namespace HolyLogger
                 UploadQueueToQrzMenuItem.Header = header;
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        private async void UploadQueueToQrzMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            string key = (Properties.Settings.Default.qrz_api_key ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(key))
-            {
-                HolyMessageBox.ShowWarning(
-                    "QRZ Logbook API key is not configured.\nPlease enter your API key in Options → QRZ Services.",
-                    "QRZ Logbook", this);
-                return;
-            }
-
-            int before = dal?.GetPendingQrzCount() ?? 0;
-            if (before == 0)
-            {
-                HolyMessageBox.Show("The QRZ Logbook queue is empty. Nothing to upload.",
-                    "QRZ Logbook", HolyMsgType.Info, this);
-                return;
-            }
-
-            UploadQueueToQrzMenuItem.IsEnabled = false;
-            try
-            {
-                await PumpQrzQueue();
-                int after = dal?.GetPendingQrzCount() ?? 0;
-                int uploaded = before - after;
-                UpdateQrzMenuCount();
-
-                if (uploaded > 0)
-                    HolyMessageBox.ShowSuccess(
-                        $"{uploaded} QSO{(uploaded == 1 ? "" : "s")} uploaded to QRZ Logbook successfully." +
-                        (after > 0 ? $"\n{after} QSO{(after == 1 ? "" : "s")} could not be uploaded (network error or rejected)." : ""),
-                        "QRZ Logbook", this);
-                else
-                    HolyMessageBox.ShowWarning(
-                        "No QSOs were uploaded.\nCheck your internet connection and API key.",
-                        "QRZ Logbook", this);
-            }
-            finally
-            {
-                UploadQueueToQrzMenuItem.IsEnabled = true;
-            }
-        }
-
-        private void ClearLotwQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            int pending = dal?.GetPendingLotwCount() ?? 0;
-            if (pending == 0)
-            {
-                HolyMessageBox.Show("The LoTW queue is already empty.", "Clear LoTW Queue", HolyMsgType.Info, this);
-                return;
-            }
-
-            bool confirmed = HolyMessageBox.ShowConfirm(
-                $"Remove all {pending:N0} QSO(s) from the LoTW upload queue?\n\nThey will no longer be included in the next upload.",
-                "Clear LoTW Queue", HolyMsgType.Warning, this);
-            if (!confirmed) return;
-
-            dal.ClearLotwQueue();
-            UpdateLotwMenuCount();
-        }
-
-        private void ClearEqslQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            int pending = dal?.GetPendingEqslCount() ?? 0;
-            if (pending == 0)
-            {
-                HolyMessageBox.Show("The eQSL queue is already empty.", "Clear eQSL Queue", HolyMsgType.Info, this);
-                return;
-            }
-
-            bool confirmed = HolyMessageBox.ShowConfirm(
-                $"Remove all {pending:N0} QSO(s) from the eQSL upload queue?\n\nThey will no longer be included in the next upload.",
-                "Clear eQSL Queue", HolyMsgType.Warning, this);
-            if (!confirmed) return;
-
-            dal.ClearEqslQueue();
-            UpdateEqslQueueIndicator();
-        }
-
-        private void ClearQrzQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            int pending = dal?.GetPendingQrzCount() ?? 0;
-            if (pending == 0)
-            {
-                HolyMessageBox.Show("The QRZ Logbook queue is already empty.", "Clear QRZ Queue", HolyMsgType.Info, this);
-                return;
-            }
-
-            bool confirmed = HolyMessageBox.ShowConfirm(
-                $"Remove all {pending:N0} QSO(s) from the QRZ Logbook upload queue?\n\nThey will no longer be included in the next upload.",
-                "Clear QRZ Queue", HolyMsgType.Warning, this);
-            if (!confirmed) return;
-
-            dal.ClearQrzQueue();
-            UpdateQrzMenuCount();
-        }
-
-        private async void SendQueueToLotwMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
-            string password = Properties.Settings.Default.LotwTqslPassword;
-
-            if (string.IsNullOrWhiteSpace(tqslPath) || !System.IO.File.Exists(tqslPath))
-            {
-                HolyMessageBox.ShowWarning("TQSL executable not found.\nPlease set the correct path in Options → LoTW Upload.", "LoTW Upload", this);
-                return;
-            }
-
-            var pending = dal.GetPendingLotwQsos();
-            if (pending.Count == 0)
-            {
-                HolyMessageBox.Show("No pending QSOs to upload to LoTW.", "LoTW Upload", HolyMsgType.Info, this);
-                return;
-            }
-
-            // Resolve each callsign in the queue to its TQSL station location and show the plan.
-            var preview = ResolveLotwGroupsPreview(pending, out int resolvable);
-            if (resolvable == 0)
-            {
-                HolyMessageBox.ShowWarning(
-                    "None of the pending QSOs can be matched to a TQSL station location:\n\n" +
-                    string.Join("\n", preview) +
-                    "\n\nCreate the station location(s) in TQSL, then pick them in Options → LoTW Upload.",
-                    "LoTW Upload", this);
-                return;
-            }
-
-            if (!HolyMessageBox.ShowConfirm(
-                    $"Upload {resolvable} pending QSO(s) to LoTW?\n\n" + string.Join("\n", preview),
-                    "LoTW Upload", HolyMsgType.Warning, this))
-                return;
-
-            SendQueueToLotwMenuItem.IsEnabled = false;
-            try { await UploadLotwQueueCoreAsync(pending, tqslPath, password); }
-            finally { SendQueueToLotwMenuItem.IsEnabled = true; }
-        }
-
-        // Core LoTW queue upload — writes the ADIF, signs+uploads via TQSL, clears the queue on
-        // success and reports the result. Shared by the "Upload Queue to LoTW" menu command and the
-        // upload-on-exit feature.
-        private async Task UploadLotwQueueCoreAsync(List<QSO> pending, string tqslPath, string password, UploadProgressWindow progressWindow = null)
-        {
-            string adiPath = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "holylogger_lotw.adi");
-            UploadProgressTitle = "LoTW Upload";
-            UploadProgress = $"Preparing QSO 0 / {pending.Count:N0}";
-            if (progressWindow == null) ToggleUploadProgress(Visibility.Visible);
-            else progressWindow.StartService("LoTW", pending.Count);
-            var lotwProgress = new Progress<string>(msg => UploadProgress = msg);
-
-            string savedPicks = Properties.Settings.Default.LotwCallsignLocations;
-
-            // Group the queue by station callsign. Each group is signed with the TQSL station
-            // location (and therefore the certificate) that belongs to that callsign, so QSOs made
-            // under a special-event call are credited to that call, not to the everyday callsign.
-            var groups = pending
-                .GroupBy(q => (q.MyCall ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase)
-                .ToList();
-
-            int totalUploaded = 0;                  // QSOs accepted by LoTW (uploaded or duplicate)
-            int totalSkippedNoBand = 0;
-            var unresolved = new List<string>();    // callsign groups left in the queue (no location)
-            var failures = new List<string>();      // callsign groups that errored at TQSL
-            var reportSb = new System.Text.StringBuilder();
-            reportSb.AppendLine($"LoTW upload report — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            reportSb.AppendLine();
-
-            try
-            {
-                foreach (var group in groups)
-                {
-                    string call = group.Key;
-                    string callLabel = string.IsNullOrEmpty(call) ? "(no callsign)" : call;
-                    var qsos = group.ToList();
-
-                    var choice = LotwStationResolver.Resolve(call, savedPicks);
-                    if (string.IsNullOrWhiteSpace(choice.LocationName))
-                    {
-                        // Cannot sign this callsign — leave its QSOs in the queue and say why.
-                        string reason = choice.Ambiguous
-                            ? $"{callLabel}: {qsos.Count} QSO(s) — several TQSL locations, choose one in Options → LoTW"
-                            : $"{callLabel}: {qsos.Count} QSO(s) — no TQSL certificate / station location";
-                        unresolved.Add(reason);
-                        reportSb.AppendLine($"=== {callLabel}: SKIPPED — {reason} (left in queue) ===");
-                        continue;
-                    }
-
-                    string location = choice.LocationName;
-                    UploadProgress = $"Preparing {callLabel}: 0 / {qsos.Count:N0}";
-                    int skippedNoBand = 0;
-                    await Task.Run(() => { skippedNoBand = LotwUploader.WriteAdif(qsos, adiPath, lotwProgress); });
-                    totalSkippedNoBand += skippedNoBand;
-                    int toSign = qsos.Count - skippedNoBand;
-                    if (toSign <= 0)
-                    {
-                        reportSb.AppendLine($"=== {callLabel} via \"{location}\": no QSOs with band/frequency — skipped ===");
-                        continue;
-                    }
-
-                    UploadProgress = $"Signing {callLabel}: 0 / {toSign:N0}";
-                    LotwUploadResult result;
-                    try
-                    {
-                        result = await LotwUploader.SignAndUploadAsync(
-                            tqslPath, location, password, adiPath, lotwProgress, toSign);
-                    }
-                    catch (Exception ex)
-                    {
-                        failures.Add($"{callLabel} → \"{location}\": {ex.Message}");
-                        reportSb.AppendLine($"=== {callLabel} via \"{location}\": ERROR {ex.Message} (left in queue) ===");
-                        continue;
-                    }
-
-                    reportSb.AppendLine($"=== {callLabel} via \"{location}\" — TQSL exit {result.ExitCode} ===");
-                    reportSb.AppendLine(result.Detail ?? string.Empty);
-                    reportSb.AppendLine();
-
-                    if (result.ExitCode == 8)
-                    {
-                        // TQSL processed nothing (usually a callsign/location mismatch) — leave in queue.
-                        failures.Add($"{callLabel}: TQSL processed no QSOs — check the station location matches the callsign");
-                    }
-                    else
-                    {
-                        // exit 0 = uploaded, exit 9 = already in LoTW (duplicates). Either way the
-                        // QSOs are now in LoTW, so clear this group from the queue.
-                        foreach (var q in qsos)
-                            if (!string.IsNullOrWhiteSpace(q.Band) || !string.IsNullOrWhiteSpace(q.Freq))
-                                dal.SetLotwStatus(q.id, 1);
-                        totalUploaded += toSign;
-                    }
-                }
-
-                if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
-                UpdateLotwMenuCount();
-
-                // Save the combined TQSL report to the Desktop for inspection.
-                string reportPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "lotw_last_upload.txt");
-                try
-                {
-                    string detail = reportSb.ToString();
-                    if (detail.Length > 500000) detail = detail.Substring(0, 500000) + "\r\n…(truncated)";
-                    System.IO.File.WriteAllText(reportPath, detail, System.Text.Encoding.UTF8);
-                }
-                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-                // Build the user-facing summary.
-                var summary = new System.Text.StringBuilder();
-                summary.AppendLine(totalUploaded > 0
-                    ? $"{totalUploaded:N0} QSO(s) accepted by LoTW."
-                    : "No QSOs were uploaded to LoTW.");
-                if (totalSkippedNoBand > 0)
-                    summary.AppendLine($"{totalSkippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
-                if (unresolved.Count > 0)
-                {
-                    summary.AppendLine("\nLeft in the queue (no matching TQSL location):");
-                    foreach (var u in unresolved) summary.AppendLine("  • " + u);
-                }
-                if (failures.Count > 0)
-                {
-                    summary.AppendLine("\nNot uploaded:");
-                    foreach (var f in failures) summary.AppendLine("  • " + f);
-                }
-                summary.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
-
-                bool clean = failures.Count == 0 && unresolved.Count == 0;
-                if (progressWindow != null)
-                {
-                    string line = totalUploaded > 0
-                        ? $"{totalUploaded:N0} QSO(s) uploaded to LoTW"
-                        : "No QSOs uploaded to LoTW";
-                    int leftover = unresolved.Count + failures.Count;
-                    if (leftover > 0) line += $" ({leftover} callsign group(s) left in queue)";
-                    progressWindow.ReportBatchResult(line, clean);
-                }
-                else if (clean)
-                    HolyMessageBox.ShowSuccess(summary.ToString().TrimEnd(), "LoTW Upload", this);
-                else
-                    HolyMessageBox.ShowWarning(summary.ToString().TrimEnd(), "LoTW Upload", this);
-            }
-            catch (Exception ex)
-            {
-                if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
-                try
-                {
-                    string logPath = System.IO.Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
-                        "lotw_upload_error.txt");
-                    System.IO.File.WriteAllText(logPath,
-                        $"LoTW upload error — {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n" +
-                        $"Message: {ex.Message}\r\n",
-                        System.Text.Encoding.UTF8);
-                }
-                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-                if (progressWindow != null)
-                    progressWindow.ReportBatchResult($"Upload failed: {ex.Message}", false);
-                else
-                    HolyMessageBox.ShowError(
-                        "LoTW upload failed:\n\n" + ex.Message +
-                        "\n\nDetails written to lotw_upload_error.txt on your Desktop.",
-                        "LoTW Upload Failed", this);
-            }
-            finally
-            {
-                UploadProgressTitle = "";
-                UploadProgress = "";
-                try { if (System.IO.File.Exists(adiPath)) System.IO.File.Delete(adiPath); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            }
-        }
-
-        // Builds a per-callsign preview of how the pending LoTW queue will be signed, and reports how
-        // many QSOs can actually be resolved to a TQSL station location.
-        private List<string> ResolveLotwGroupsPreview(List<QSO> pending, out int resolvableQsos)
-        {
-            resolvableQsos = 0;
-            string savedPicks = Properties.Settings.Default.LotwCallsignLocations;
-            var lines = new List<string>();
-            foreach (var g in pending.GroupBy(q => (q.MyCall ?? string.Empty).Trim(), StringComparer.OrdinalIgnoreCase))
-            {
-                string callLabel = string.IsNullOrEmpty(g.Key) ? "(no callsign)" : g.Key;
-                int n = g.Count();
-                var choice = LotwStationResolver.Resolve(g.Key, savedPicks);
-                if (!string.IsNullOrWhiteSpace(choice.LocationName))
-                {
-                    resolvableQsos += n;
-                    lines.Add($"{callLabel}: {n} QSO(s) → \"{choice.LocationName}\"");
-                }
-                else if (choice.Ambiguous)
-                    lines.Add($"{callLabel}: {n} QSO(s) → ⚠ choose a location in Options → LoTW");
-                else
-                    lines.Add($"{callLabel}: {n} QSO(s) → ⚠ no TQSL certificate/location (stays in queue)");
-            }
-            return lines;
-        }
-
-        private EqslQueueWindow _eqslQueueWindow;
-
-        // Opens (or focuses) a window listing the QSOs still waiting for eQSL.
-        private void ShowEqslQueueWindow()
-        {
-            if (dal == null) return;
-
-            if (_eqslQueueWindow != null)
-            {
-                _eqslQueueWindow.Activate();
-                _eqslQueueWindow.RefreshList();
-                return;
-            }
-
-            _eqslQueueWindow = new EqslQueueWindow(
-                () => dal.GetPendingEqslQsos(),
-                () => PumpEqslQueue(),
-                "eQSL",
-                () => dal.GetDismissedEqslQsos(),
-                () => { dal.RequeueAllEqslDismissed(); UpdateEqslQueueIndicator(); })
-            {
-                Owner = this
-            };
-            _eqslQueueWindow.Closed += (s, ev) => { _eqslQueueWindow = null; UpdateEqslQueueIndicator(); };
-            _eqslQueueWindow.Show();
-        }
-
-        private void ViewEqslQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            ShowEqslQueueWindow();
-        }
-
-        private EqslQueueWindow _lotwQueueWindow;
-
-        private void ShowLotwQueueWindow()
-        {
-            if (dal == null) return;
-
-            if (_lotwQueueWindow != null)
-            {
-                _lotwQueueWindow.Activate();
-                _lotwQueueWindow.RefreshList();
-                return;
-            }
-
-            _lotwQueueWindow = new EqslQueueWindow(
-                () => dal.GetPendingLotwQsos(),
-                async () =>
-                {
-                    string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
-                    string password = Properties.Settings.Default.LotwTqslPassword;
-                    if (string.IsNullOrWhiteSpace(tqslPath) || !System.IO.File.Exists(tqslPath))
-                        throw new Exception("TQSL not found. Please configure it in Options → LoTW Upload.");
-                    var pending = dal.GetPendingLotwQsos();
-                    int before = pending.Count;
-                    await UploadLotwQueueCoreAsync(pending, tqslPath, password);
-                    int after = dal?.GetPendingLotwCount() ?? 0;
-                    UpdateLotwMenuCount();
-                    return before - after;
-                },
-                "LoTW",
-                () => dal.GetDismissedLotwQsos(),
-                () => { dal.RequeueAllLotwDismissed(); UpdateLotwMenuCount(); })
-            {
-                Owner = this
-            };
-            _lotwQueueWindow.Closed += (s, ev) => { _lotwQueueWindow = null; UpdateLotwMenuCount(); };
-            _lotwQueueWindow.Show();
-        }
-
-        private void ViewLotwQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            ShowLotwQueueWindow();
-        }
-
-        private EqslQueueWindow _qrzQueueWindow;
-
-        private void ShowQrzQueueWindow()
-        {
-            if (dal == null) return;
-
-            if (_qrzQueueWindow != null)
-            {
-                _qrzQueueWindow.Activate();
-                _qrzQueueWindow.RefreshList();
-                return;
-            }
-
-            _qrzQueueWindow = new EqslQueueWindow(
-                () => dal.GetPendingQrzQsos(),
-                async () =>
-                {
-                    string key = (Properties.Settings.Default.qrz_api_key ?? string.Empty).Trim();
-                    if (string.IsNullOrWhiteSpace(key))
-                        throw new Exception("QRZ API key not configured. Please set it in Options → QRZ Services.");
-                    int before = dal?.GetPendingQrzCount() ?? 0;
-                    await PumpQrzQueue();
-                    int after = dal?.GetPendingQrzCount() ?? 0;
-                    UpdateQrzMenuCount();
-                    return before - after;
-                },
-                "QRZ Logbook",
-                () => dal.GetDismissedQrzQsos(),
-                () => { dal.RequeueAllQrzDismissed(); UpdateQrzMenuCount(); })
-            {
-                Owner = this
-            };
-            _qrzQueueWindow.Closed += (s, ev) => { _qrzQueueWindow = null; UpdateQrzMenuCount(); };
-            _qrzQueueWindow.Show();
-        }
-
-        private void ViewQrzQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            ShowQrzQueueWindow();
         }
 
         // Builds an aligned, label-friendly text block of the full QSO record for the clipboard.
@@ -3570,66 +2762,6 @@ namespace HolyLogger
                 Qsos.Remove(qso);
         }
 
-        private async void SetRadioToQsoFreq(QSO qso)
-        {
-            if (qso == null) return;
-
-            string freqText = (qso.Freq ?? string.Empty).Trim();
-            if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqValue) || freqValue <= 0)
-            {
-                HolyMessageBox.ShowWarning("This QSO has no valid frequency.", "Set Radio to Frequency", this);
-                return;
-            }
-
-            double freqMhz = freqValue >= 1000 ? (freqValue / 1000.0) : freqValue;
-            string normalizedMode = NormalizeClusterModeForLogger(qso.Mode);
-
-            // Capture the current freq/mode onto the LOG-ROW undo stack (independent of the cluster undo),
-            // so the log undo icon's counter increments and the user can step back to the original.
-            CaptureLogRadioUndoState();
-
-            // Reflect the QSO's freq/mode in the logger fields (mirrors cluster-spot behavior so undo restores them).
-            TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
-            SelectLoggerMode(normalizedMode);
-
-            if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
-            {
-                return;
-            }
-
-            int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
-            int? rigMode = MapClusterModeToRigMode(normalizedMode, freqMhz);
-            var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
-            await TryTuneRigFrequencyAsync(freqHz, modeToSend);
-        }
-
-        // ---- Log-row "Set Radio to Freq" undo (independent of the cluster undo) ----
-
-        private void CaptureLogRadioUndoState()
-        {
-            string frequencyText = (TB_Frequency.Text ?? string.Empty).Trim();
-            string modeText = (CB_Mode.Text ?? string.Empty).Trim().ToUpperInvariant();
-            string dxCallsignText = (TB_DXCallsign.Text ?? string.Empty).Trim().ToUpperInvariant();
-            if (string.IsNullOrWhiteSpace(frequencyText) || string.IsNullOrWhiteSpace(modeText))
-            {
-                return;
-            }
-
-            if (logRadioUndoStates.Count > 0)
-            {
-                var last = logRadioUndoStates.Peek();
-                if (string.Equals(last.FrequencyText, frequencyText, StringComparison.Ordinal)
-                    && string.Equals(last.ModeText, modeText, StringComparison.OrdinalIgnoreCase)
-                    && string.Equals(last.DxCallsignText, dxCallsignText, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-            }
-
-            logRadioUndoStates.Push((frequencyText, modeText, dxCallsignText));
-            UpdateLogRadioUndoButtonState();
-        }
-
         // Long-press support for the undo icon: holding the button for ~700 ms clears the whole undo
         // stack at once, instead of stepping back one entry per click.
         private System.Windows.Threading.DispatcherTimer _undoResetTimer;
@@ -3665,79 +2797,6 @@ namespace HolyLogger
         {
             // Moved off the button before the hold completed - cancel the reset.
             _undoResetTimer?.Stop();
-        }
-
-        // Clears the entire log-radio undo stack (the "reset" action triggered by a long press).
-        private void ResetLogRadioUndo()
-        {
-            if (logRadioUndoStates.Count == 0) return;
-            logRadioUndoStates.Clear();
-            UpdateLogRadioUndoButtonState();
-            if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
-                QSODataGrid.UnselectAll();
-        }
-
-        private async void LogRadioUndoButton_Click(object sender, RoutedEventArgs e)
-        {
-            // async void: an exception here would be unhandled and crash the app, so the whole body
-            // is guarded.
-            try
-            {
-                // If a long press just cleared the stack, swallow this click so it doesn't also undo.
-                if (_undoResetFired)
-                {
-                    _undoResetFired = false;
-                    return;
-                }
-
-                if (logRadioUndoStates.Count == 0)
-                {
-                    return;
-                }
-
-                var undoState = logRadioUndoStates.Pop();
-                UpdateLogRadioUndoButtonState();
-
-                // Clear the log-row blue highlight once an undo step is taken.
-                if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
-                    QSODataGrid.UnselectAll();
-
-                string freqText = undoState.FrequencyText;
-                string modeText = undoState.ModeText;
-                string dxCallsignText = undoState.DxCallsignText;
-
-                if (!double.TryParse(freqText, NumberStyles.Float, CultureInfo.InvariantCulture, out double freqMhz) || freqMhz <= 0)
-                {
-                    return;
-                }
-
-                TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
-                SelectLoggerMode(modeText);
-                TB_DXCallsign.Text = dxCallsignText;
-
-                if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
-                {
-                    int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
-                    int? rigMode = MapClusterModeToRigMode(modeText, freqMhz);
-                    var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
-                    await TryTuneRigFrequencyAsync(freqHz, modeToSend);
-                }
-            }
-            catch { /* never crash the app from the undo button */ }
-        }
-
-        private void UpdateLogRadioUndoButtonState()
-        {
-            bool hasUndo = logRadioUndoStates.Count > 0;
-
-            if (MainUndoIconGrid != null)
-            {
-                MainUndoIconGrid.Visibility = hasUndo ? Visibility.Visible : Visibility.Collapsed;
-            }
-            if (MainUndoCountText != null)
-            {
-                MainUndoCountText.Text = hasUndo ? logRadioUndoStates.Count.ToString(CultureInfo.InvariantCulture) : string.Empty;
-            }
         }
 
         private Window BuildSpotDialog(string presetCallsign = null, string presetFrequency = null)
@@ -4191,20 +3250,6 @@ namespace HolyLogger
                     return "DIGI";
                 default:
                     return "DIGI";
-            }
-        }
-
-        private bool TrySendOmniRigCustomCommand(string command)
-        {
-            try
-            {
-                byte[] rawCommand = ParseCustomCommand(command);
-                Rig.SendCustomCommand(rawCommand, 0, string.Empty);
-                return true;
-            }
-            catch
-            {
-                return false;
             }
         }
 
@@ -5466,182 +4511,6 @@ namespace HolyLogger
             Properties.Settings.Default.RecentQSOCounter = 0;
         }
 
-        // Contest Mode on/off (Tools menu). When on, exact-match QSOs (same callsigns + band + mode)
-        // are flagged as "Duplicate"; when off, the program never reports a duplicate and instead
-        // shows how many times the station was worked before.
-        // Both the Tools-menu item and the status-bar trophy open the log window filtered to contest
-        // logs, where the user can select an existing contest log or create a new one. There is no
-        // standalone "exit contest" action: opening or creating a non-contest log exits contest mode
-        // (see ApplyContestModeForActiveLog).
-        private void ContestModeMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            OpenContestLogsWindow();
-        }
-
-        private void ContestIndicator_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            OpenContestLogsWindow();
-        }
-
-        private void OpenContestLogsWindow()
-        {
-            var win = new ViewLogsWindow(this, dal, contestOnly: true) { Owner = this };
-            win.ShowDialog();
-        }
-
-        // Lets the operator pick a contest and name a brand-new log for it. Used by the "Create New
-        // Contest Log" button in ViewLogsWindow. Returns true if a new contest log was created and
-        // made active; false if the operator cancelled at any step.
-        public bool CreateNewContestLog(Window owner)
-        {
-            var picker = new ContestPickerWindow(Contests.ContestService.Active) { Owner = owner };
-            if (picker.ShowDialog() != true || picker.SelectedContest == null) return false;
-            return EnterContest(picker.SelectedContest);
-        }
-
-        // Entering a contest selects its profile AND turns on Contest Mode (duplicate flagging).
-        // Returns true if the contest log was created and activated; false if cancelled.
-        private bool EnterContest(Contests.Contest c)
-        {
-            // Selecting a contest forces a brand-new log dedicated to it: the user must give it a
-            // (unique) name. The log's Event Type is the contest, so contest mode and Cabrillo
-            // export follow the log from now on. Cancelling the name dialog aborts entering.
-            string suggested = UniqueLogName(c.Name + " " + DateTime.UtcNow.ToString("yyyy-MM-dd"));
-            var dlg = new NewLogWindow(dal,
-                "Name the log for the contest \"" + c.Name + "\":", suggested) { Owner = this };
-            if (dlg.ShowDialog() != true) return false;   // cancelled -> do not enter the contest
-
-            long id = dal.CreateLog(dlg.LogName, c.Id);
-
-            // A freshly selected contest starts clean: serial back to 001 and no zone override (use
-            // cty.dat). Set these before switching; ApplyContestModeForActiveLog won't reset them.
-            // A restart mid-contest goes through Activate (not here), so it resumes instead.
-            Properties.Settings.Default.ContestNextSerial = 1;
-            Properties.Settings.Default.ContestMyZoneOverride = string.Empty;
-            Properties.Settings.Default.Save();
-
-            // Switch to the new (empty) log; this activates the contest via its Event Type and
-            // refreshes the entry form, title bar, counts and dup check.
-            SwitchActiveLog(id);
-            return true;
-        }
-
-        private void ExitContest()
-        {
-            Contests.ContestService.Deactivate();
-            Properties.Settings.Default.ContestMode = false;
-            Properties.Settings.Default.ActiveContestId = "";
-            Properties.Settings.Default.Save();
-            UpdateContestModeMenuHeader();
-            ApplyContestExchangeUI();
-            UpdateDup();
-        }
-
-        // The contest received-exchange boxes currently shown in the Exchange row.
-        private readonly List<TextBox> _contestRxBoxes = new List<TextBox>();
-
-        // Builds the received-exchange boxes for the active contest (one per non-RST received field;
-        // RST keeps its own RST-R box), or restores the normal single Exchange box when not in a
-        // contest. Each box's value is mirrored into TB_Exchange so the existing save/log path
-        // captures the received exchange.
-        private void ApplyContestExchangeUI()
-        {
-            if (ContestRxPanel == null) return;
-
-            foreach (var b in _contestRxBoxes) b.TextChanged -= ContestRxBox_TextChanged;
-            _contestRxBoxes.Clear();
-            ContestRxPanel.Children.Clear();
-            if (ContestTxPanel != null) ContestTxPanel.Children.Clear();
-
-            Contests.Contest contest = Contests.ContestService.Active;
-            bool inContest = contest != null;
-
-            // The original exchange-row controls show only when NOT in a contest; in a contest the
-            // received row is rebuilt as ordered cells in ContestRxPanel and the sent row in ContestTxPanel.
-            Visibility orig = inContest ? Visibility.Collapsed : Visibility.Visible;
-            if (TB_Exchange != null) TB_Exchange.Visibility = orig;
-            if (TB_RSTSent != null) TB_RSTSent.Visibility = orig;
-            if (TB_RSTRcvd != null) TB_RSTRcvd.Visibility = orig;
-            if (L_RstSLabel != null) L_RstSLabel.Visibility = orig;
-            if (L_RstRLabel != null) L_RstRLabel.Visibility = orig;
-            // The received label is "Exchange" alone outside a contest, "Exchange / received" inside one.
-            SetExchangeLabel(L_ExchangeLabel, "Exchange", "received", inContest);
-
-            if (!inContest)
-            {
-                ContestRxPanel.Visibility = Visibility.Collapsed;
-                if (ContestTxPanel != null) ContestTxPanel.Visibility = Visibility.Collapsed;
-                if (L_SendLabel != null) L_SendLabel.Visibility = Visibility.Collapsed;
-                ApplyContestLayout(false);
-                return;
-            }
-
-            string myCall = TB_MyCallsign != null ? TB_MyCallsign.Text : string.Empty;
-            string dxCall = TB_DXCallsign != null ? TB_DXCallsign.Text : string.Empty;
-            string myCont = ContinentOf(myCall);
-            string dxCont = ContinentOf(dxCall);
-
-            // RECEIVED: what the WORKED station sends (asymmetric contests switch on the DX callsign).
-            var fields = Contests.ContestService.GetReceivedFields(contest, dxCall, dxCont)
-                .Where(f => !IsRstField(f)).ToList();
-            _contestRxSig = string.Join(",", fields);
-
-            // RECEIVED frame: RST(R) first, then the contest items. Tab flows DX callsign -> RST-R ->
-            // items. The RST you send lives in the SEND frame instead.
-            int tab = 9;
-
-            TextBox rstr = AddContestCell("RST R", 52, tab++, ContestRxPanel);
-            rstr.Text = TB_RSTRcvd != null ? TB_RSTRcvd.Text : "59";
-            rstr.TextChanged += (s, e2) => { if (TB_RSTRcvd != null) TB_RSTRcvd.Text = rstr.Text; };
-
-            foreach (string field in fields)
-            {
-                ContestFieldUi(field, out string label, out double width);
-                TextBox box = AddContestCell(label, width, tab++, ContestRxPanel);
-                box.Text = _contestRxBoxes.Count == 0 && TB_Exchange != null ? TB_Exchange.Text : string.Empty;
-                box.TextChanged += ContestRxBox_TextChanged;
-                _contestRxBoxes.Add(box);
-            }
-
-            // SEND frame: RST(S) first (aligned under RST-R), then EVERY field of the SENT exchange
-            // (asymmetric contests switch on MY callsign). Each is auto-filled (serial/zone/area) or a
-            // remembered editable value, and skipped by Tab — the operator types received data.
-            _contestSendSerialBox = null;
-            _contestSendBoxes.Clear();
-            if (ContestTxPanel != null)
-            {
-                TextBox rsts = AddContestCell("RST S", 52, null, ContestTxPanel);
-                rsts.Text = TB_RSTSent != null ? TB_RSTSent.Text : "59";
-                rsts.TextChanged += (s, e2) => { if (TB_RSTSent != null) TB_RSTSent.Text = rsts.Text; };
-
-                var sentFields = Contests.ContestService.GetSentFields(contest, myCall, myCont)
-                    .Where(f => !IsRstField(f)).ToList();
-                foreach (string sf in sentFields)
-                {
-                    ContestFieldUi(sf, out string slabel, out double swidth);
-                    TextBox sbox = AddContestCell(slabel, swidth, null, ContestTxPanel);
-                    sbox.IsTabStop = false;                 // auto-filled, but editable; skipped by Tab
-                    sbox.Text = GetSendFieldValue(sf, myCall);   // set before wiring, so it isn't "an edit"
-                    string fieldKey = (sf ?? string.Empty).ToUpperInvariant();
-                    sbox.TextChanged += (s, e2) => SaveSendFieldEdit(fieldKey, sbox.Text);
-                    if (fieldKey == "SERIAL") _contestSendSerialBox = sbox;
-                    _contestSendBoxes.Add(sbox);
-                }
-                ContestTxPanel.Visibility = Visibility.Visible;
-            }
-            SetExchangeLabel(L_SendLabel, "Exchange", "send", true);
-            if (L_SendLabel != null) L_SendLabel.Visibility = Visibility.Visible;
-
-            ContestRxPanel.Visibility = Visibility.Visible;
-            ApplyContestLayout(true);
-        }
-
-        // Tracks the current received-field signature and the auto serial box so callsign changes can
-        // rebuild the received frame, and Add can advance the serial, without a full re-render otherwise.
-        private string _contestRxSig = string.Empty;
-        private TextBox _contestSendSerialBox;
-        private readonly List<TextBox> _contestSendBoxes = new List<TextBox>();
-
         // The cty.dat continent ("NA","AS",…) for a callsign, used to pick asymmetric exchange variants.
         private string ContinentOf(string call)
         {
@@ -5742,48 +4611,6 @@ namespace HolyLogger
             }
         }
 
-        // The sent-exchange string stored on a QSO (ADIF stx_string). In a contest it's the joined
-        // send-box values (serial / zone / area / …); otherwise the Holyland square, as before. For
-        // Holyland this resolves to the same square value, so existing logs are unchanged.
-        private string ContestSendExchangeForLog()
-        {
-            if (Contests.ContestService.Active != null && _contestSendBoxes.Count > 0)
-                return string.Join(" ", _contestSendBoxes
-                    .Select(b => (b.Text ?? string.Empty).Trim())
-                    .Where(s => s.Length > 0));
-            return TB_MyHolyland.Text;
-        }
-
-        // After logging a QSO in a contest whose sent exchange is a serial number, bump the running
-        // serial and refresh the (read-only) send box so the next QSO shows the new number.
-        private void AdvanceContestSerial()
-        {
-            var c = Contests.ContestService.Active;
-            if (c == null) return;
-            string myCall = TB_MyCallsign != null ? TB_MyCallsign.Text : string.Empty;
-            bool sendsSerial = Contests.ContestService.GetSentFields(c, myCall, ContinentOf(myCall))
-                .Any(f => string.Equals(f, "SERIAL", StringComparison.OrdinalIgnoreCase));
-            if (!sendsSerial) return;
-
-            Properties.Settings.Default.ContestNextSerial++;
-            Properties.Settings.Default.Save();
-            if (_contestSendSerialBox != null)
-                _contestSendSerialBox.Text = Properties.Settings.Default.ContestNextSerial.ToString("000");
-        }
-
-        // In an asymmetric contest the received field can change with the DX callsign (Holyland: Area
-        // vs Serial). Rebuild the received/send frames only when that field set actually changes.
-        private void RefreshContestRxForCallsign()
-        {
-            var c = Contests.ContestService.Active;
-            if (c == null || !c.Asymmetric) return;
-            string dxCall = TB_DXCallsign != null ? TB_DXCallsign.Text : string.Empty;
-            var rf = Contests.ContestService.GetReceivedFields(c, dxCall, ContinentOf(dxCall))
-                .Where(f => !IsRstField(f));
-            if (string.Join(",", rf) != _contestRxSig)
-                ApplyContestExchangeUI();
-        }
-
         // Sets a contest exchange label to "line1" alone, or "line1 / line2" (line2 bold) when twoLine.
         private static void SetExchangeLabel(TextBlock tb, string line1, string line2, bool twoLine)
         {
@@ -5797,69 +4624,8 @@ namespace HolyLogger
             }
         }
 
-        // Adds one [label-above, box] cell to a contest exchange panel and returns the box. A null
-        // tabIndex makes the box skip the Tab order.
-        private TextBox AddContestCell(string label, double width, int? tabIndex, StackPanel target)
-        {
-            var blue = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
-            var col = new StackPanel { Orientation = Orientation.Vertical, Margin = new Thickness(0, 0, 10, 0) };
-            col.Children.Add(new TextBlock
-            {
-                Text = label,
-                FontSize = 11,
-                FontWeight = FontWeights.Bold,
-                Foreground = blue,
-                HorizontalAlignment = HorizontalAlignment.Center
-            });
-            var box = new TextBox
-            {
-                Width = width,
-                Height = 28,
-                FontSize = 16,
-                CharacterCasing = CharacterCasing.Upper,
-                VerticalContentAlignment = VerticalAlignment.Center,
-                HorizontalContentAlignment = HorizontalAlignment.Center
-            };
-            if (tabIndex.HasValue) box.TabIndex = tabIndex.Value; else box.IsTabStop = false;
-            col.Children.Add(box);
-            target.Children.Add(col);
-            return box;
-        }
-
         // Original Margin.Top of each Grid.Row=1 control, captured once so layout toggles are exact.
         private Dictionary<FrameworkElement, double> _rowOrigTop;
-
-        // Switches the lower block (everything below the divider) between its normal positions and the
-        // condensed contest positions: the divider drops 44px, the rows tighten and slide down so the
-        // bottom row ends just above the band-button (X-icon) array, and the freed strip holds the
-        // "You send" band. The X icons and the log table never move.
-        private void ApplyContestLayout(bool contest)
-        {
-            Grid grid = AddLogGrid;
-            if (grid == null) return;
-
-            if (_rowOrigTop == null)
-            {
-                _rowOrigTop = new Dictionary<FrameworkElement, double>();
-                foreach (FrameworkElement fe in grid.Children.OfType<FrameworkElement>())
-                    if (Grid.GetRow(fe) == 1)
-                        _rowOrigTop[fe] = fe.Margin.Top;
-            }
-
-            foreach (var kv in _rowOrigTop)
-            {
-                FrameworkElement fe = kv.Key;
-                double baseTop = kv.Value;
-                double off = contest ? RowShift(fe, baseTop) : 0;
-                Thickness m = fe.Margin;
-                fe.Margin = new Thickness(m.Left, baseTop + off, m.Right, m.Bottom);
-            }
-
-            if (ContestSendBand != null)
-                ContestSendBand.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
-            if (ContestExchangeFrame != null)
-                ContestExchangeFrame.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
-        }
 
         // How far each control moves in contest mode, by its normal Y band. Space is reclaimed from
         // BOTH ends — the top two rows nudge up, the lower rows slide down toward the X-icons — so the
@@ -5898,45 +4664,6 @@ namespace HolyLogger
             return 0;                                       // X icons + log table — fixed
         }
 
-        private void ContestRxBox_TextChanged(object sender, TextChangedEventArgs e)
-        {
-            if (TB_Exchange != null)
-                TB_Exchange.Text = string.Join(" ",
-                    _contestRxBoxes.Select(b => b.Text).Where(t => !string.IsNullOrWhiteSpace(t)));
-        }
-
-        // Friendly label + box width for a contest exchange field name.
-        private static void ContestFieldUi(string field, out string label, out double width)
-        {
-            switch ((field ?? string.Empty).ToUpperInvariant())
-            {
-                case "SERIAL": label = "Serial"; width = 60; break;
-                case "CQ_ZONE": label = "CQ Zone"; width = 52; break;
-                case "ITU_ZONE": label = "ITU"; width = 48; break;
-                case "HOLYLAND_AREA": label = "Area"; width = 72; break;
-                case "STATE": case "STATE_PROVINCE": case "PROVINCE": label = "State/Prov"; width = 72; break;
-                case "NAME": label = "Name"; width = 90; break;
-                case "AGE": label = "Age"; width = 44; break;
-                case "POWER": label = "Power"; width = 52; break;
-                case "ARRL_SECTION": case "FIELD_DAY_SECTION": label = "Section"; width = 60; break;
-                case "IOTA_REF": label = "IOTA"; width = 64; break;
-                case "PRECEDENCE": label = "Prec"; width = 44; break;
-                case "CHECK": label = "Check"; width = 48; break;
-                case "MEMBER_NR": label = "Member#"; width = 64; break;
-                case "CALLSIGN": label = "Call"; width = 90; break;
-                case "FIELD_DAY_CLASS": label = "Class"; width = 56; break;
-                case "GRID": label = "Grid"; width = 64; break;
-                case "DXCC": label = "DXCC"; width = 56; break;
-                case "STATE_PROVINCE_DXCC": label = "St/Pr/DX"; width = 72; break;
-                case "STATE_OR_SERIAL": label = "St/Ser"; width = 64; break;
-                case "UTC_TIME": label = "UTC"; width = 56; break;
-                case "IARU_HQ_ABBREVIATION": label = "Zone/HQ"; width = 64; break;
-                case "AGE_GROUP": label = "Age"; width = 48; break;
-                case "DX": label = "Power"; width = 56; break;
-                default: label = field; width = 70; break;
-            }
-        }
-
         private void ShareStatusButton_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.ShowOnTheAir = !Properties.Settings.Default.ShowOnTheAir;
@@ -5954,41 +4681,6 @@ namespace HolyLogger
             ShareStatusButton.BorderBrush = on
                 ? new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32))
                 : new SolidColorBrush(Color.FromRgb(0x75, 0x75, 0x75));
-        }
-
-        private void UpdateContestModeMenuHeader()
-        {
-            bool on = Properties.Settings.Default.ContestMode;
-            var gold = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07));
-            var gray = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
-            Brush blue = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
-
-            if (ContestModeMenuItem != null)
-                ContestModeMenuItem.Header = on ? "Contest Mode - ON" : "Contest Mode - OFF";
-
-            // Tools-menu icon: gold trophy on a blue tile when contesting, plain gray when not.
-            if (ContestTrophyPath != null)
-                ContestTrophyPath.Fill = on ? gold : gray;
-            if (ContestTrophyBg != null)
-                ContestTrophyBg.Background = on ? blue : Brushes.Transparent;
-
-            // Main-screen state indicator (display only) mirrors the same look, and its tooltip
-            // explains the current mode on hover.
-            if (ContestIndicatorPath != null)
-                ContestIndicatorPath.Fill = on ? gold : gray;
-            if (ContestIndicator != null)
-            {
-                ContestIndicator.Background = on ? blue : Brushes.Transparent;
-                ContestIndicator.ToolTip = on
-                    ? "In contest — duplicates are flagged.\nClick to view contest logs or start a new one."
-                    : "Not in a contest.\nClick to view or start a contest log.";
-            }
-
-            // Contest name beside the trophy, e.g. "World Wide Holyland DX — Active".
-            if (L_ContestName != null)
-                L_ContestName.Text = (on && Contests.ContestService.Active != null)
-                    ? Contests.ContestService.Active.Name + " — Active"
-                    : "";
         }
 
         private async void PropertiesWindow_Closed(object sender, EventArgs e)
@@ -6212,66 +4904,6 @@ namespace HolyLogger
             try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { MapControl.SpotHovered -= OnMapSpotHovered; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { MapControl.SpotHoverEnded -= OnMapSpotHoverEnded; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        // Uploads any confirmed services in sequence, showing per-QSO progress, then closes exactly once.
-        // All confirmation dialogs were already shown in Window_Closing before this is called.
-        private async void UploadAllAndCloseAsync(List<QSO> lotwPending, bool uploadEqsl, bool uploadQrz)
-        {
-            this.IsEnabled = false;
-
-            // Check connectivity before showing the window so the window never appears blank
-            // while waiting for the network check to complete.
-            bool online = false;
-            try { online = Helper.CheckForInternetConnection(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-            var progressWindow = new UploadProgressWindow { Owner = this };
-            progressWindow.Show();
-
-            if (lotwPending != null)
-            {
-                string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
-                string password = Properties.Settings.Default.LotwTqslPassword;
-                bool tqslConfigured = !string.IsNullOrWhiteSpace(tqslPath) && System.IO.File.Exists(tqslPath);
-                if (!online || !tqslConfigured)
-                {
-                    string why = !online ? "no internet connection"
-                        : "TQSL not configured (set the path in Options → LoTW)";
-                    progressWindow.SkipService("LoTW", $"{lotwPending.Count:N0} QSO(s) — {why}");
-                }
-                else
-                {
-                    try { await UploadLotwQueueCoreAsync(lotwPending, tqslPath, password, progressWindow); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-                }
-            }
-
-            if (uploadEqsl)
-            {
-                if (!online)
-                    progressWindow.SkipService("eQSL", "no internet connection — QSOs remain in queue");
-                else
-                    try { await PumpEqslQueue(force: true, progressWindow); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            }
-
-            if (uploadQrz)
-            {
-                bool qrzConfigured = Properties.Settings.Default.qrz_logbook_key_valid
-                                     && !string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_api_key);
-                if (!online || !qrzConfigured)
-                {
-                    string why = !online ? "no internet connection"
-                        : "API key not configured (set it in Options → QRZ)";
-                    progressWindow.SkipService("QRZ Logbook", $"{why} — QSOs remain in queue");
-                }
-                else
-                    try { await PumpQrzQueue(force: true, progressWindow); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            }
-
-            progressWindow.ShowComplete();
-            await progressWindow.WaitForOkAsync();
-
-            _uploadInFlight = false;   // this is the legitimate final close; let it through
-            this.Close();
         }
 
         private void Window_Closed(object sender, EventArgs e)
@@ -6785,9 +5417,6 @@ namespace HolyLogger
             statisticsWindow.Show();
         }
 
-        private void RigLabel_MouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-            => OptionsMenuItemMenuItem_Click(null, null);
-
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)
         {
             if (options != null)
@@ -6811,22 +5440,6 @@ namespace HolyLogger
             options.GeneralSettingsControlControlInstance.OmniRigEngine_Changed += GeneralSettingsControlControlInstance_OmniRigEngine_Changed;
             options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
             options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
-        }
-
-        private void GeneralSettingsControlControlInstance_OmniRigEngine_Changed()
-        {
-            if (Properties.Settings.Default.EnableOmniRigCAT)
-            {
-                StartOmniRig();
-                options.GeneralSettingsControlControlInstance.Rig1 = Rig1;
-                options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
-            }
-            else
-                StopOmniRig();
-
-            SelectRig();
-            ShowRigParams();
-            UpdateVoiceMessageAvailabilityState();
         }
 
         private void GenerateNewOptionsWindow()
@@ -8060,20 +6673,6 @@ namespace HolyLogger
         {
             about = new AboutWindow(callsignListVersion);
             about.Show();
-        }
-
-        private void OmnirigMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            string url = "http://www.dxatlas.com/OmniRig/";
-
-            try
-            {
-                System.Diagnostics.Process.Start(url);
-            }
-            catch (Exception)
-            {
-                HolyMessageBox.Show("Please install 'Chrome' and try again.", "HolyLogger", HolyMsgType.Info, this);
-            }
         }
 
         private void HolyLoggerMenuItem_Click(object sender, RoutedEventArgs e)
@@ -10609,70 +9208,6 @@ namespace HolyLogger
             ApplyClusterTableHeaderBackgroundFromSettings(color);
         }
 
-        private Color ParseContestExchangeColor(string colorText)
-        {
-            try { return (Color)ColorConverter.ConvertFromString(colorText); }
-            catch { return (Color)ColorConverter.ConvertFromString("#FFF6C8"); }
-        }
-
-        private void ApplyContestExchangeColorFromSettings()
-        {
-            if (ContestExchangeFrame == null) return;
-            ContestExchangeFrame.Background =
-                new SolidColorBrush(ParseContestExchangeColor(Properties.Settings.Default.ContestExchangeColor));
-        }
-
-        // Right-click anywhere on the contest exchange frame to pick its colour, remembered in settings.
-        private void ContestExchangeFrame_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            Color current = ParseContestExchangeColor(Properties.Settings.Default.ContestExchangeColor);
-            using (var dlg = new System.Windows.Forms.ColorDialog())
-            {
-                dlg.FullOpen = true;
-                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    string hex = string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
-                    Properties.Settings.Default.ContestExchangeColor = hex;
-                    Properties.Settings.Default.Save();
-                    ApplyContestExchangeColorFromSettings();
-                }
-            }
-            e.Handled = true;
-        }
-
-        private Color ParseContestSendColor(string colorText)
-        {
-            try { return (Color)ColorConverter.ConvertFromString(colorText); }
-            catch { return (Color)ColorConverter.ConvertFromString("#E1F5EE"); }
-        }
-
-        private void ApplyContestSendColorFromSettings()
-        {
-            if (ContestSendBand == null) return;
-            ContestSendBand.Background =
-                new SolidColorBrush(ParseContestSendColor(Properties.Settings.Default.ContestSendColor));
-        }
-
-        // Right-click anywhere on the "You send" band to pick its colour, remembered in settings.
-        private void ContestSendBand_MouseRightButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            Color current = ParseContestSendColor(Properties.Settings.Default.ContestSendColor);
-            using (var dlg = new System.Windows.Forms.ColorDialog())
-            {
-                dlg.FullOpen = true;
-                dlg.Color = System.Drawing.Color.FromArgb(current.A, current.R, current.G, current.B);
-                if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
-                {
-                    string hex = string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B);
-                    Properties.Settings.Default.ContestSendColor = hex;
-                    Properties.Settings.Default.Save();
-                    ApplyContestSendColorFromSettings();
-                }
-            }
-            e.Handled = true;
-        }
-
         private async void GetQrzData()
         {
             if (string.IsNullOrWhiteSpace(SessionKey) && isNetworkAvailable)
@@ -11247,10 +9782,6 @@ namespace HolyLogger
             }
         }
 
-
-        public string Rig1 { get; set; }
-        public string Rig2 { get; set; }
-
         #endregion
         #region Constants
         // Constants for enum RigParamX
@@ -11294,69 +9825,10 @@ namespace HolyLogger
         private const int ST_ONLINE = 0x00000004;
 
         #endregion
-
-        /// <summary>
-        /// The omni rig engine
-        /// </summary>
-        OmniRig.OmniRigX OmniRigEngine;
-        /// <summary>
-        /// The rig
-        /// </summary>
-        OmniRig.RigX Rig;
         /// <summary>
         /// The events subscribed
         /// </summary>
         private bool EventsSubscribed = false;
-        private bool _showRigParamsQueued;
-
-        private void StartOmniRig()
-        {
-            try
-            {
-                if (OmniRigEngine != null)
-                {
-                    //MessageBox.Show("OmniRig Is running");
-                }
-                else
-                {
-
-                    OmniRigEngine = new OmniRig.OmniRigX();
-                    //OmniRigEngine = (OmniRig.OmniRigX)Activator.CreateInstance(Type.GetTypeFromProgID("OmniRig.OmniRigX"));
-                    // we want OmniRig interface V.1.1 to 1.99
-                    // as V2.0 will likely be incompatible  with 1.x
-                    if (OmniRigEngine.InterfaceVersion < 0x101 && OmniRigEngine.InterfaceVersion > 0x299)
-                    {
-                        OmniRigEngine = null;
-                        MessageBox.Show("OmniRig Is Not installed Or has a wrong version number");
-                    }
-                    GetRigTypes();
-                    SubscribeToEvents();
-                    SelectRig();
-                    ShowRigParams();
-                }
-            }
-            catch (Exception e)
-            {
-                //Mouse.OverrideCursor = null;
-                //MessageBox.Show(ex.Message);
-                //throw;
-                Status = "Not installed";
-            }
-        }
-        private void StopOmniRig()
-        {
-            UnsubscribeFromEvents();
-            Process[] workers = Process.GetProcessesByName("OmniRig");
-            foreach (Process worker in workers)
-            {
-                worker.Kill();
-                worker.WaitForExit();
-                worker.Dispose();
-            }
-            OmniRigEngine = null;
-            Rig = null;
-            UpdateStatus();
-        }
 
         private void GetRigTypes()
         {
@@ -11390,49 +9862,12 @@ namespace HolyLogger
                 OmniRigEngine.ParamsChange -= OmniRigEngine_ParamsChange;
             }
         }
-        private void SelectRig()
-        {
-            UpdateRigLabel();
-            if (OmniRigEngine == null) { UpdateFreqLed(); return; }
-            if (Properties.Settings.Default.SelectedOmniRig1)
-                Rig = OmniRigEngine.Rig1;
-            else if (Properties.Settings.Default.SelectedOmniRig2)
-                Rig = OmniRigEngine.Rig2;
-            UpdateFreqLed();   // reflect the newly-selected rig (or blank if it isn't online)
-        }
 
         // Shows "RIG1" or "RIG2" next to the LED, reflecting the rig chosen in Options → General.
         private void UpdateRigLabel()
         {
             if (RigLabel == null) return;
             RigLabel.Text = Properties.Settings.Default.SelectedOmniRig2 ? "RIG2" : "RIG1";
-        }
-
-        //OmniRig ParamsChange events
-        private void OmniRigEngine_ParamsChange(int RigNumber, int Params)
-        {
-            QueueShowRigParams();
-        }
-
-        //OmniRig StatusChange events
-        private void OmniRigEngine_StatusChange(int RigNumber)
-        {
-            QueueShowRigParams();
-        }
-
-        private void QueueShowRigParams()
-        {
-            if (_showRigParamsQueued)
-            {
-                return;
-            }
-
-            _showRigParamsQueued = true;
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                _showRigParamsQueued = false;
-                ShowRigParams();
-            }), DispatcherPriority.Background);
         }
 
         private void ShowRigStatus()
@@ -11489,65 +9924,6 @@ namespace HolyLogger
             }
         }
 
-        private void ShowRigParams()
-        {
-            ShowRigStatus();
-
-            bool rigOnline = OmniRigEngine != null && Rig != null
-                             && Rig.Status == OmniRig.RigStatusX.ST_ONLINE
-                             && Properties.Settings.Default.EnableOmniRigCAT;
-
-            // When the radio is online it controls the mode — block user interaction with the combo.
-            // When offline the operator must be able to pick the mode manually.
-            if (CB_Mode != null) CB_Mode.IsHitTestVisible = !rigOnline;
-
-            if (!rigOnline)
-            {
-                ClearVoiceMessageState();
-                UpdateFreqLed();   // no live rig -> blank the LED instead of showing a stale value
-                return;
-            }
-
-            if (Properties.Settings.Default.isManualMode || state == State.Edit)
-            {
-                return;
-            }
-            try
-            {
-                this.Dispatcher.Invoke(() =>
-                {
-                    double radioRX = (double)Rig.GetRxFrequency() / 1000000;
-                    double radioTX = (double)Rig.GetTxFrequency() / 1000000;
-                    if (Properties.Settings.Default.IsSatelliteMode)
-                        radioRX += Properties.Settings.Default.SatelliteShift;
-
-                    // OmniRig can fire StatusChange before it has polled the rig's frequency
-                    // register; GetRxFrequency returns 0 in that window. Skip the update so
-                    // the LED keeps showing the previous known frequency instead of blank dashes.
-                    // The immediately following ParamsChange will carry the real value.
-                    if (radioRX > 0)
-                    {
-                        RX = radioRX.ToString("###0.000000");
-                        TX = radioTX.ToString("###0.000000");
-                        TB_Frequency.Text = RX;
-                        Properties.Settings.Default.Frequency = RX;
-                    }
-
-                    CB_Mode.Text = GetNormalizedRigMode();
-                    UpdateVoiceMessageState();
-                    UpdateVoiceMessageAvailabilityState();
-                    // Always refresh the LED — WPF skips no-op binding updates so TextChanged
-                    // may not fire when the frequency value didn't change.
-                    UpdateFreqLed();
-                });
-            }
-            catch (Exception e)
-            {
-                System.Windows.Forms.MessageBox.Show("Error: " + e.Message);
-            }
-
-        }
-
         #endregion
 
         private void PreventSpaceInCallsign(object sender, KeyEventArgs e)
@@ -11559,6 +9935,18 @@ namespace HolyLogger
         }
 
         
+
+        private void MessageButton_RightClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (sender is Button button && int.TryParse(button.Tag?.ToString(), out int messageNumber))
+            {
+                e.Handled = true;
+                // Right-click edits the CW text only while the buttons are in their CW ("Txt") look. In
+                // voice ("Msg") mode the buttons play radio audio files, so there's no CW text to edit.
+                if (IsCwModeActive())
+                    ShowCwMessageEditDialog(messageNumber);
+            }
+        }
     }
 
     public class QsoDateDisplayConverter : System.Windows.Data.IValueConverter
