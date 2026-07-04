@@ -13,12 +13,30 @@ namespace HolyLogger
     // code subscribes to ThemeChanged and re-paints. The choice is persisted in Settings.
     public static class ThemeManager
     {
+        // The BASE built-in scheme currently in effect. When the user's Custom scheme is active,
+        // this is the scheme it was derived from (supplying chrome darkness and reset values);
+        // check CurrentSchemeId to know whether Custom itself is what's selected.
         public static ColorScheme CurrentScheme { get; private set; } = ThemePalette.FindScheme("light");
+
+        // What the user actually selected: a built-in scheme id, or CustomSchemeStore.Id.
+        public static string CurrentSchemeId { get; private set; } = "light";
+
+        // The user's custom token->hex overrides while the Custom scheme is active; null otherwise.
+        private static System.Collections.Generic.Dictionary<string, string> _customColors;
 
         // True when the ACTIVE SCHEME declares dark chrome -- drives the DWM title-bar color and
         // any icon/asset choices. A property of the scheme, not of which scheme is selected, so
         // any number of dark-ish schemes work without touching this.
         public static bool IsDark => CurrentScheme.IsDarkChrome;
+
+        // The hex currently in effect for a token: the custom override when the Custom scheme is
+        // active and defines it, otherwise the base scheme's palette value. This is what the
+        // Customize Colors dialog shows in its swatches.
+        public static string CurrentHex(string token)
+        {
+            if (_customColors != null && _customColors.TryGetValue(token, out string custom)) return custom;
+            return ThemePalette.Tokens.TryGetValue(token, out string[] row) ? row[CurrentScheme.Column] : "#FF6600";
+        }
 
         // Raised after the palette changes, so code-painted areas can re-run their coloring.
         //
@@ -43,12 +61,27 @@ namespace HolyLogger
 
         public static void Apply(string schemeId)
         {
+            // The Custom scheme is not a palette column: it is the user's stored token->hex map,
+            // layered over the built-in scheme it was derived from (which also supplies the
+            // window-chrome darkness and any token added to the palette after it was saved).
+            if (schemeId == CustomSchemeStore.Id)
+            {
+                _customColors = CustomSchemeStore.Load();
+                if (_customColors == null) schemeId = "light";   // custom requested but none stored
+                else schemeId = CustomSchemeStore.BaseId;
+            }
+            else
+            {
+                _customColors = null;
+            }
+
             CurrentScheme = ThemePalette.FindScheme(schemeId);
+            CurrentSchemeId = _customColors != null ? CustomSchemeStore.Id : CurrentScheme.Id;
 
             var res = Application.Current.Resources;
             foreach (var kv in ThemePalette.Tokens)
             {
-                string hex = kv.Value[CurrentScheme.Column];
+                string hex = CurrentHex(kv.Key);
                 var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
                 brush.Freeze();
                 res[kv.Key] = brush;   // set/replace directly => DynamicResource re-resolves live
@@ -63,7 +96,7 @@ namespace HolyLogger
 
             try
             {
-                Properties.Settings.Default.ColorSchemeId = CurrentScheme.Id;
+                Properties.Settings.Default.ColorSchemeId = CurrentSchemeId;
                 // Kept in sync for backward compatibility (older builds sharing this user.config).
                 Properties.Settings.Default.DarkMode = CurrentScheme.IsDarkChrome;
                 Properties.Settings.Default.Save();

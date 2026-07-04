@@ -19,6 +19,22 @@ namespace HolyLogger
         }
     }
 
+    // User-facing description of one color role, for the Customize Colors dialog: which token it
+    // controls, the group it is shown under, and a friendly name + explanation a non-programmer
+    // can act on. The catalog order is the display order.
+    public class TokenInfo
+    {
+        public string Key { get; }
+        public string Group { get; }
+        public string DisplayName { get; }
+        public string Description { get; }
+
+        public TokenInfo(string key, string group, string displayName, string description)
+        {
+            Key = key; Group = group; DisplayName = displayName; Description = description;
+        }
+    }
+
     // SINGLE SOURCE OF TRUTH for every themeable color. Each token lists one hex per scheme,
     // in the column order declared in Schemes below. ThemeManager turns the active column into
     // frozen brushes on Application.Resources, so XAML (DynamicResource "Token") and C#
@@ -78,6 +94,41 @@ namespace HolyLogger
             { "RowOnFreqBg",      new[] { "#90EE90", "#1E4A2A", "#1E4A2A" } }, // cluster: on-frequency spot
             { "FilterRowBg",      new[] { "#C8F0D0", "#1E4030", "#1E4030" } }, // QSO grid: filtered-match row
             { "FilterRowAltBg",   new[] { "#A8D8B4", "#183328", "#183328" } }, // QSO grid: filtered-match alt row
+        };
+
+        // What each role means, in words the operator understands. Shown by the Customize Colors
+        // dialog (View > Color Scheme > Customize Colors). Keep every Tokens key listed here.
+        public static readonly IReadOnlyList<TokenInfo> TokenCatalog = new List<TokenInfo>
+        {
+            new TokenInfo("WindowBg",         "Surfaces", "Window background",        "Background of every window and dialog."),
+            new TokenInfo("FormBg",           "Surfaces", "Entry form",               "Background of the QSO entry area on the main screen."),
+            new TokenInfo("PanelBg",          "Surfaces", "Panels",                   "Background of lists and content panels inside windows."),
+            new TokenInfo("MenuBg",           "Surfaces", "Menus and dropdowns",      "Background of menus and dropdown lists."),
+            new TokenInfo("ControlBg",        "Surfaces", "Input fields",             "Background of text boxes you type into."),
+            new TokenInfo("EditFieldBg",      "Surfaces", "Field being edited",       "Highlight of the QSO fields while editing an existing QSO."),
+            new TokenInfo("ButtonBg",         "Surfaces", "Buttons",                  "Background of standard buttons."),
+            new TokenInfo("ButtonHoverBg",    "Surfaces", "Buttons (mouse over)",     "Button background when the mouse is over it."),
+
+            new TokenInfo("TextBrush",        "Text", "Main text",                    "Almost all text in the application."),
+            new TokenInfo("MutedTextBrush",   "Text", "Secondary text",               "Hints, notes and less important labels."),
+            new TokenInfo("SelectionText",    "Text", "Text on selection",            "Text drawn on top of a selected (highlighted) item."),
+            new TokenInfo("KHzText",          "Text", "kHz label",                    "The small kHz unit next to the frequency readout."),
+
+            new TokenInfo("GridRowBg",        "Tables", "Table rows",                 "Background of table rows (log, cluster, lists)."),
+            new TokenInfo("GridAltRowBg",     "Tables", "Table rows (alternate)",     "Every second table row, for easier reading."),
+            new TokenInfo("GridHeaderBg",     "Tables", "Table headers (other)",      "Headers of secondary tables. The QSO log and cluster headers use their own color, set in Options > User Interface."),
+            new TokenInfo("GridLine",         "Tables", "Table grid lines",           "The thin lines between table rows and columns."),
+            new TokenInfo("SelectionBg",      "Tables", "Selected item",              "Background of the selected row, cell or menu item."),
+            new TokenInfo("FilterRowBg",      "Tables", "Filter match rows",          "Log rows that match the active callsign filter."),
+            new TokenInfo("FilterRowAltBg",   "Tables", "Filter match rows (alt.)",   "Every second filter-match row."),
+            new TokenInfo("RowHoverBg",       "Tables", "Cluster: map-hovered spot",  "Cluster row highlighted while hovering its dot on the map."),
+            new TokenInfo("RowOnFreqBg",      "Tables", "Cluster: on-frequency spot", "Cluster row whose frequency matches your radio."),
+
+            new TokenInfo("ThemeBorderBrush", "Borders and accents", "Borders",       "Borders and divider lines around panels and controls."),
+            new TokenInfo("MenuBorder",       "Borders and accents", "Menu frame",    "The frame around popup menus and dropdown lists."),
+            new TokenInfo("AccentBrush",      "Borders and accents", "Accent",        "Headings, links and emphasized labels (the blue)."),
+            new TokenInfo("ContestNameBrush", "Borders and accents", "Contest name",  "The active contest's name in the status bar."),
+            new TokenInfo("Danger",           "Borders and accents", "Errors and warnings", "Error text and warning markers (the red)."),
         };
     }
 }

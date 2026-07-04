@@ -4915,33 +4915,65 @@ namespace HolyLogger
             Properties.Settings.Default.Save();
         }
 
-        // Fills View > Color Scheme with one radio-checked item per scheme in ThemePalette.Schemes.
+        // Fills View > Color Scheme with one radio-checked item per scheme in ThemePalette.Schemes,
+        // plus the user's Custom scheme (when one exists) and the "Customize Colors" editor entry.
         // Adding a scheme to the palette automatically shows up here -- no menu code to touch.
         private void BuildColorSchemeMenu()
         {
             if (ColorSchemeMenuItem == null) return;
             ColorSchemeMenuItem.Items.Clear();
+
             foreach (var scheme in ThemePalette.Schemes)
+                ColorSchemeMenuItem.Items.Add(MakeSchemeItem(scheme.Id, scheme.DisplayName));
+
+            if (CustomSchemeStore.Exists)
+                ColorSchemeMenuItem.Items.Add(MakeSchemeItem(CustomSchemeStore.Id, "Custom"));
+
+            ColorSchemeMenuItem.Items.Add(new Separator());
+            var customize = new MenuItem
             {
-                var item = new MenuItem
-                {
-                    Header = scheme.DisplayName,
-                    IsCheckable = true,
-                    IsChecked = scheme.Id == ThemeManager.CurrentScheme.Id,
-                    Tag = scheme.Id
-                };
-                item.Click += ColorSchemeItem_Click;
-                ColorSchemeMenuItem.Items.Add(item);
-            }
+                Header = "Customize Colors…",
+                ToolTip = "Change individual colors; your changes are saved as the Custom scheme"
+            };
+            customize.Click += CustomizeColorsItem_Click;
+            ColorSchemeMenuItem.Items.Add(customize);
+        }
+
+        private MenuItem MakeSchemeItem(string id, string displayName)
+        {
+            var item = new MenuItem
+            {
+                Header = displayName,
+                IsCheckable = true,
+                IsChecked = id == ThemeManager.CurrentSchemeId,
+                Tag = id
+            };
+            item.Click += ColorSchemeItem_Click;
+            return item;
         }
 
         private void ColorSchemeItem_Click(object sender, RoutedEventArgs e)
         {
             if ((sender as MenuItem)?.Tag is string id)
                 ThemeManager.Apply(id);
-            // Re-check exactly the active one (clicking a checked radio item must not un-check it).
-            foreach (MenuItem item in ColorSchemeMenuItem.Items)
-                item.IsChecked = (item.Tag as string) == ThemeManager.CurrentScheme.Id;
+            RefreshColorSchemeChecks();
+        }
+
+        // Re-check exactly the active scheme (clicking a checked radio item must not un-check it).
+        private void RefreshColorSchemeChecks()
+        {
+            foreach (var item in ColorSchemeMenuItem.Items.OfType<MenuItem>())
+                if (item.Tag is string id)
+                    item.IsChecked = id == ThemeManager.CurrentSchemeId;
+        }
+
+        private void CustomizeColorsItem_Click(object sender, RoutedEventArgs e)
+        {
+            var editor = new ColorSchemeEditorWindow { Owner = this };
+            editor.ShowDialog();
+            // The editor may have created or deleted the Custom scheme; rebuild so the menu
+            // reflects it and the checkmark sits on whatever is active now.
+            BuildColorSchemeMenu();
         }
 
         // Re-run code-driven coloring for the new palette. QSO rows are painted in LoadingRow, so a

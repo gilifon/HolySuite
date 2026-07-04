@@ -1047,6 +1047,30 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CustomSchemeColors {
+            get {
+                return ((string)(this["CustomSchemeColors"]));
+            }
+            set {
+                this["CustomSchemeColors"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CustomSchemeBaseId {
+            get {
+                return ((string)(this["CustomSchemeBaseId"]));
+            }
+            set {
+                this["CustomSchemeBaseId"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool MapUsePolar {
             get {

@@ -253,6 +253,11 @@
     <Compile Include="Helper.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="SettingsFlush.cs" />
+    <Compile Include="CustomSchemeStore.cs" />
+    <Compile Include="ColorSchemeEditorWindow.xaml.cs">
+      <DependentUpon>ColorSchemeEditorWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Settings.cs" />
     <Compile Include="SearchWindow.xaml.cs">
       <DependentUpon>SearchWindow.xaml</DependentUpon>
@@ -319,6 +324,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ViewLogsWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ColorSchemeEditorWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
