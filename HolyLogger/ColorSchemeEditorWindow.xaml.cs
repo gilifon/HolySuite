@@ -37,18 +37,46 @@ namespace HolyLogger
         {
             InitializeComponent();
 
-            // Editing continues an existing Custom scheme, or starts a fresh one from whichever
-            // built-in scheme is active right now.
-            if (ThemeManager.CurrentSchemeId == CustomSchemeStore.Id)
+            // Decide WHAT is being edited, and say so explicitly in the header -- the one question
+            // every user asks here is "which scheme am I changing?". The answer is always: your own
+            // Custom scheme; the built-in schemes are never modified.
+            bool editExisting = ThemeManager.CurrentSchemeId == CustomSchemeStore.Id;
+
+            if (!editExisting && CustomSchemeStore.Exists)
+            {
+                // A Custom scheme exists but a built-in one is active. Editing must not silently
+                // overwrite the user's earlier work -- make the choice theirs.
+                string existingBase = ThemePalette.FindScheme(CustomSchemeStore.BaseId).DisplayName;
+                editExisting = HolyMessageBox.ShowConfirm(
+                    "You already have a Custom scheme (based on " + existingBase + ").\n\n" +
+                    "YES — continue editing your existing Custom scheme.\n" +
+                    "NO — start over from the current " + ThemeManager.CurrentScheme.DisplayName +
+                    " scheme (your first change will replace the existing Custom scheme).",
+                    "Customize Colors", HolyMsgType.Info, Application.Current.MainWindow);
+            }
+
+            if (editExisting)
             {
                 _base = ThemePalette.FindScheme(CustomSchemeStore.BaseId);
                 _colors = CustomSchemeStore.Load() ?? new Dictionary<string, string>();
+                // Make the scheme being edited the one on screen, so every click is seen live.
+                if (ThemeManager.CurrentSchemeId != CustomSchemeStore.Id)
+                    ThemeManager.Apply(CustomSchemeStore.Id);
             }
             else
             {
                 _base = ThemeManager.CurrentScheme;
                 _colors = new Dictionary<string, string>();
             }
+
+            Title = "Customize Colors — based on " + _base.DisplayName;
+            TB_SubHeader.Text =
+                (editExisting
+                    ? "You are editing your own Custom scheme, which was created from the " + _base.DisplayName + " scheme. "
+                    : "You are creating your own color scheme, starting from the current " + _base.DisplayName + " scheme. ")
+                + "Click a color square to change it — changes apply immediately to the whole application and are "
+                + "saved automatically as \"Custom\" in the Color Scheme menu. The built-in schemes (Light, Dark, …) "
+                + "are never modified; you can always switch back to them.";
 
             BuildRows();
             UpdateFooter();
