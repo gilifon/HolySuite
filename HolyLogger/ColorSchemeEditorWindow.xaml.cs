@@ -70,11 +70,16 @@ namespace HolyLogger
             }
 
             Title = "Customize Colors — based on " + _base.DisplayName;
+
+            // The banner is the headline: WHAT is being edited (always the Custom scheme) and
+            // WHICH built-in scheme its colors start from, in large type nobody can miss.
+            TB_BannerPrefix.Text = editExisting
+                ? "You are editing your CUSTOM scheme, based on:"
+                : "Creating a new CUSTOM scheme, starting from:";
+            TB_BannerScheme.Text = _base.DisplayName.ToUpperInvariant();
+
             TB_SubHeader.Text =
-                (editExisting
-                    ? "You are editing your own Custom scheme, which was created from the " + _base.DisplayName + " scheme. "
-                    : "You are creating your own color scheme, starting from the current " + _base.DisplayName + " scheme. ")
-                + "Click a color square to change it — changes apply immediately to the whole application and are "
+                "Click a color square to change it — changes apply immediately to the whole application and are "
                 + "saved automatically as \"Custom\" in the Color Scheme menu. The built-in schemes (Light, Dark, …) "
                 + "are never modified; you can always switch back to them.";
 

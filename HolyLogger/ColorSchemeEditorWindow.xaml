@@ -11,11 +11,23 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Header: what this window does, in plain words -->
+        <!-- Header: what this window does, in plain words. The banner is the loud, unmissable
+             answer to "which scheme am I editing?": large scheme name on an accent tile. -->
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="Customize Colors" FontSize="17" FontWeight="Bold"
                        Foreground="{DynamicResource AccentBrush}"/>
-            <TextBlock x:Name="TB_SubHeader" FontSize="12.5" TextWrapping="Wrap" Margin="0,4,0,0"
+            <Border Background="{DynamicResource AccentBrush}" CornerRadius="5" Padding="14,8"
+                    Margin="0,8,0,0" HorizontalAlignment="Stretch">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="TB_BannerPrefix" FontSize="14" VerticalAlignment="Center"
+                               Foreground="{DynamicResource SelectionText}"
+                               Text="You are editing your CUSTOM scheme, based on:"/>
+                    <TextBlock x:Name="TB_BannerScheme" FontSize="20" FontWeight="ExtraBold" Margin="10,0,0,0"
+                               VerticalAlignment="Center" Foreground="{DynamicResource SelectionText}"
+                               Text="DARK"/>
+                </StackPanel>
+            </Border>
+            <TextBlock x:Name="TB_SubHeader" FontSize="12.5" TextWrapping="Wrap" Margin="0,8,0,0"
                        Foreground="{DynamicResource MutedTextBrush}"
                        Text="Click a color square to change it. Changes apply immediately to the whole application and are saved as your own scheme, named Custom in the Color Scheme menu."/>
         </StackPanel>
