@@ -5554,8 +5554,7 @@ namespace HolyLogger
                         // Resolve through the same band-color source as the band checkboxes and the
                         // map spot dots (defaults + user customizations, normalized band key) so the
                         // Freq color always matches the band selection checkbox exactly.
-                        string colorHex = GetBandColor(bandText);
-                        return (Brush)new BrushConverter().ConvertFromString(colorHex);
+                        return GetBandBrush(bandText);
                     }
                     catch
                     {
@@ -5793,6 +5792,27 @@ namespace HolyLogger
             return "#FF6600";
         }
 
+        // Frozen-brush cache in front of GetBandColor. The cluster grid's FreqForeground and the
+        // QSO grid's Band/Frequency cells resolve a brush per cell on every refresh; allocating a
+        // BrushConverter + SolidColorBrush each time added constant GC churn. Keyed by hex (a few
+        // distinct values), invalidated together with _bandColorCache when the user edits a color.
+        private static Dictionary<string, SolidColorBrush> _bandBrushCache = new Dictionary<string, SolidColorBrush>(StringComparer.OrdinalIgnoreCase);
+
+        internal static SolidColorBrush GetBandBrush(string band)
+        {
+            string hex = GetBandColor(band);
+            lock (_bandBrushCache)
+            {
+                if (!_bandBrushCache.TryGetValue(hex, out SolidColorBrush b))
+                {
+                    b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+                    b.Freeze();   // frozen => shareable across the UI thread and render thread
+                    _bandBrushCache[hex] = b;
+                }
+                return b;
+            }
+        }
+
         private void SaveBandColors(Dictionary<string, string> colors)
         {
             try
@@ -5802,6 +5822,7 @@ namespace HolyLogger
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             _bandColorCache = null;
+            lock (_bandBrushCache) _bandBrushCache.Clear();
         }
 
         private void EditBandColor(string band)
@@ -6520,7 +6541,7 @@ namespace HolyLogger
             }
             try
             {
-                TB_Band.Foreground = (Brush)new BrushConverter().ConvertFromString(GetBandColor(band));
+                TB_Band.Foreground = GetBandBrush(band);
             }
             catch
             {
@@ -8000,7 +8021,9 @@ namespace HolyLogger
                 }
             }
 
-            UpdateDup();
+            // qso_list is exactly the per-station filter UpdateDup would rebuild; reuse it so a
+            // keystroke costs one scan of the log instead of two.
+            UpdateDupCore(qso_list);
         }
 
         private void UpdateMatrixWithData(List<QSO> qso_list, bool skipDupUpdate = false)
@@ -8044,21 +8067,46 @@ namespace HolyLogger
 
         private void UpdateDup()
         {
-            // Optimize: cache values and materialize queries to avoid repeated enumeration
+            // Single pass over the log (this runs on the typing hot path): collect the QSOs with
+            // this station once, then evaluate dup + worked-before from that small list. The old
+            // code enumerated the full collection up to three times per keystroke (here twice,
+            // plus UpdateMatrix's own scan). No caching on purpose: QSO edits mutate objects
+            // in place without collection events, so any cross-call cache could go stale and
+            // report a wrong Duplicate verdict mid-contest.
+            if (Qsos == null) return;
             string myCall = TB_MyCallsign.Text;
             string dxCall = TB_DXCallsign.Text;
+
+            var perStation = new List<QSO>();
+            foreach (var qso in Qsos)
+                if (qso.MyCall == myCall && qso.DXCall == dxCall)
+                    perStation.Add(qso);
+
+            UpdateDupCore(perStation);
+        }
+
+        // Evaluates the Duplicate / "Legal N QSOs Before" indicators from an already-filtered
+        // list of QSOs with the current station (same MyCall + DXCall). Lets UpdateMatrix reuse
+        // its own filtered list instead of rescanning the whole log.
+        private void UpdateDupCore(List<QSO> perStation)
+        {
             string band = TB_Band.Text;
             string mode = CB_Mode.Text;
 
-            var dups = Qsos.Where(qso => qso.MyCall == myCall && qso.DXCall == dxCall && qso.Band == band && qso.Mode == mode);
-            var legal = Qsos.Where(qso => qso.MyCall == myCall && qso.DXCall == dxCall);
-
-            if (state == State.Edit)
-                dups = dups.Where(p => p.id != QsoToUpdate.id);
+            bool hasDup = false;
+            foreach (var qso in perStation)
+            {
+                if (qso.Band == band && qso.Mode == mode
+                    && (state != State.Edit || qso.id != QsoToUpdate.id))
+                {
+                    hasDup = true;
+                    break;
+                }
+            }
 
             // "Duplicate" is only meaningful in Contest Mode. Outside a contest we never report a
             // duplicate; we just show how many times the station was worked before.
-            if (Properties.Settings.Default.ContestMode && dups.Any())
+            if (Properties.Settings.Default.ContestMode && hasDup)
             {
                 L_Duplicate.Visibility = Visibility.Visible;
                 L_Legal.Visibility = Visibility.Hidden;
@@ -8070,7 +8118,7 @@ namespace HolyLogger
             else
             {
                 L_Duplicate.Visibility = Visibility.Hidden;
-                int legalCount = legal.Count();
+                int legalCount = perStation.Count;
                 if (legalCount > 0)
                 {
                     ShowLegalQsoBefore(legalCount);
@@ -9077,7 +9125,7 @@ namespace HolyLogger
         {
             string band = value as string;
             if (string.IsNullOrWhiteSpace(band)) return ThemeManager.Brush("TextBrush");
-            try { return new System.Windows.Media.BrushConverter().ConvertFromString(MainWindow.GetBandColor(band)); }
+            try { return MainWindow.GetBandBrush(band); }
             catch { return ThemeManager.Brush("TextBrush"); }
         }
 
