@@ -84,7 +84,7 @@ namespace HolyLogger
                 if (File.Exists(LocalPath))
                     return EntityResolver.ParseVersion(File.ReadAllText(LocalPath));
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             return "";
         }
 
@@ -144,7 +144,7 @@ namespace HolyLogger
 
         private static void RecordSuccessfulCheck()
         {
-            try { File.WriteAllText(LastOkPath, DateTime.UtcNow.ToString("o")); } catch { }
+            try { File.WriteAllText(LastOkPath, DateTime.UtcNow.ToString("o")); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // When the country file was last confirmed current (downloaded or verified up-to-date).
@@ -157,13 +157,13 @@ namespace HolyLogger
                         System.Globalization.DateTimeStyles.RoundtripKind, out DateTime dt))
                     return dt.ToUniversalTime();
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try
             {
                 string v = LocalVersion();
                 if (DateTime.TryParse(v, out DateTime vd)) return DateTime.SpecifyKind(vd, DateTimeKind.Utc);
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             return DateTime.MinValue;
         }
 

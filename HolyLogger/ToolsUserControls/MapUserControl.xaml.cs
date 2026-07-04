@@ -185,7 +185,7 @@ namespace HolyLogger.ToolsUserControls
                         "
                     });
                 }
-                catch { }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             };
             timer.Start();
         }
@@ -224,7 +224,7 @@ namespace HolyLogger.ToolsUserControls
             {
                 MapBrowser.InvokeScript("updateClusterSpots", new object[] { sb.ToString() });
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Enlarges the map dot(s) for the given DX callsign — called while the user hovers a row in
@@ -234,7 +234,7 @@ namespace HolyLogger.ToolsUserControls
         {
             if (!_isClusterMode || !_clusterMapLoaded || string.IsNullOrEmpty(callsign)) return;
             try { MapBrowser.InvokeScript("highlightSpot", new object[] { callsign, "" }); }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Restores all spot dots to their normal size (called when the hover leaves the row/grid).
@@ -242,7 +242,7 @@ namespace HolyLogger.ToolsUserControls
         {
             if (!_isClusterMode || !_clusterMapLoaded) return;
             try { MapBrowser.InvokeScript("clearSpotHighlight", new object[] { }); }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         public void ShowClusterSpots(System.Collections.Generic.IList<ClusterSpotInfo> spots, double homeLat, double homeLon, int radiusKm)
@@ -2640,7 +2640,7 @@ window.addEventListener('resize', function() {
                 if (activeX != null)
                     activeX.Silent = true;
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         public void ShowMapView()
@@ -2649,7 +2649,7 @@ window.addEventListener('resize', function() {
             {
                 MapBrowser.InvokeScript("showMapView");
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         public void ShowCompassView()
@@ -2658,7 +2658,7 @@ window.addEventListener('resize', function() {
             {
                 MapBrowser.InvokeScript("showCompassView");
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
     }
 }

@@ -554,7 +554,7 @@ namespace HolyLogger.OptionsUserControls
                 else if (sender == CBX_ClusterPlotMap)
                 {
                     Properties.Settings.Default.ClusterMapEnabled = CBX_ClusterPlotMap.IsChecked == true;
-                    try { Properties.Settings.Default.Save(); } catch { }
+                    try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     mainWindow.UpdateClusterMapFromSettings();
                 }
             }
@@ -566,7 +566,7 @@ namespace HolyLogger.OptionsUserControls
                 return;
 
             Properties.Settings.Default.MapShowDayNight = CBX_MapShowDayNight.IsChecked == true;
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             var mainWindow = Application.Current.MainWindow as MainWindow;
             if (mainWindow != null)
@@ -600,7 +600,7 @@ namespace HolyLogger.OptionsUserControls
 
             bool isActive = CBX_ClusterActive.IsChecked == true;
             Properties.Settings.Default.ClusterActive = isActive;
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             UpdateClusterVisibleState();
 
@@ -630,7 +630,7 @@ namespace HolyLogger.OptionsUserControls
 
             bool isVisible = CBX_ClusterVisible.IsChecked == true;
             Properties.Settings.Default.ShowClusterWindowOption = isVisible;
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             var mainWindow = Application.Current.MainWindow as MainWindow;
             if (mainWindow != null)

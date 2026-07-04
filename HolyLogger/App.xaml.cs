@@ -30,8 +30,18 @@ namespace HolyLogger
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            // Last-chance diagnostics. These hooks change NO behavior (nothing is marked handled;
+            // a crash still crashes) -- they only make sure every unhandled exception lands in
+            // holylogger.log with a stack trace before the process dies. This matters most for the
+            // codebase's many "async void" handlers: an exception escaping one of those never
+            // surfaces through normal call-stack error handling, so without these hooks the app
+            // just vanishes with nothing to debug.
+            DispatcherUnhandledException += (s, args) => Log.Fatal("Dispatcher", args.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (s, args) => Log.Fatal("AppDomain", args.ExceptionObject as Exception);
+            TaskScheduler.UnobservedTaskException += (s, args) => Log.Fatal("UnobservedTask", args.Exception);
+
             // Apply the saved Light/Dark theme before the main window loads.
-            try { ThemeManager.ApplyFromSettings(); } catch { }
+            try { ThemeManager.ApplyFromSettings(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Make every window's native title bar/border follow the theme too (not just the
             // DynamicResource-themed client area), applying to the main window and every dialog
@@ -58,7 +68,7 @@ namespace HolyLogger
                     @"HKEY_CURRENT_USER\SOFTWARE\Microsoft\Internet Explorer\Main\FeatureControl\FEATURE_BROWSER_EMULATION",
                     exeName, 11001, Microsoft.Win32.RegistryValueKind.DWord);
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             bool aIsNewInstance = false;
             myMutex = new Mutex(true, "HolyLoggerApplication", out aIsNewInstance);

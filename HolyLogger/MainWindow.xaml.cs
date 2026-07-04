@@ -799,12 +799,12 @@ namespace HolyLogger
             if (!addQsoWithEnter && !doNothing)
             {
                 Properties.Settings.Default.DoNothing = true;
-                try { Properties.Settings.Default.Save(); } catch { }
+                try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
             else if (addQsoWithEnter && doNothing)
             {
                 Properties.Settings.Default.DoNothing = false;
-                try { Properties.Settings.Default.Save(); } catch { }
+                try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
         }
 
@@ -1887,6 +1887,13 @@ namespace HolyLogger
                 // country" (red) flags reflect THIS log immediately -- e.g. a brand-new empty log
                 // makes every spotted entity needed. Without this they stayed stale until restart.
                 RebuildWorkedCountriesAndRefreshCluster();
+
+                // Search and Statistics capture the Qsos collection at construction (readonly field)
+                // and compute everything from it. We just REPLACED Qsos with the new log's collection,
+                // so an open instance would silently keep showing the previous log's data. Close them;
+                // reopening binds them to the new active log. (Both null their field on Closed.)
+                try { searchWindow?.Close(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                try { statisticsWindow?.Close(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
             finally
             {
@@ -1917,7 +1924,7 @@ namespace HolyLogger
         private void ApplyContestModeForActiveLog()
         {
             string eventType = null;
-            try { eventType = dal.GetLogEventType(dal.ActiveLogId); } catch { }
+            try { eventType = dal.GetLogEventType(dal.ActiveLogId); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             if (string.IsNullOrWhiteSpace(eventType))
             {
@@ -2301,7 +2308,7 @@ namespace HolyLogger
                 case 4: Properties.Settings.Default.CwMsgText4 = text; break;
             }
 
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private Button GetMessageButton(int messageNumber)
@@ -2481,7 +2488,7 @@ namespace HolyLogger
             }
             catch
             {
-                try { monitor.Close(); } catch { }
+                try { monitor.Close(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
         }
 
@@ -2789,7 +2796,7 @@ namespace HolyLogger
             var copyItem = new MenuItem { Header = "Copy QSO Info", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
             copyItem.Click += (s, e) =>
             {
-                try { Clipboard.SetText(BuildQsoClipboardText(qso)); } catch { }
+                try { Clipboard.SetText(BuildQsoClipboardText(qso)); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             };
             menu.Items.Add(copyItem);
 
@@ -2817,7 +2824,7 @@ namespace HolyLogger
             string call = (callsign ?? string.Empty).Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(call))
                 return;
-            try { Process.Start("https://www.qrz.com/db/" + call); } catch { }
+            try { Process.Start("https://www.qrz.com/db/" + call); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Shared client for eQSL uploads (a single long-lived HttpClient avoids socket exhaustion).
@@ -3193,7 +3200,7 @@ namespace HolyLogger
                 header.Inlines.Add(new System.Windows.Documents.Run("  (" + count + ")"));
                 SendQueueToLotwMenuItem.Header = header;
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void UpdateQrzMenuCount()
@@ -3207,7 +3214,7 @@ namespace HolyLogger
                 header.Inlines.Add(new System.Windows.Documents.Run(" Logbook  (" + count + ")"));
                 UploadQueueToQrzMenuItem.Header = header;
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private async void UploadQueueToQrzMenuItem_Click(object sender, RoutedEventArgs e)
@@ -3454,7 +3461,7 @@ namespace HolyLogger
                     if (detail.Length > 500000) detail = detail.Substring(0, 500000) + "\r\n…(truncated)";
                     System.IO.File.WriteAllText(reportPath, detail, System.Text.Encoding.UTF8);
                 }
-                catch { }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
                 // Build the user-facing summary.
                 var summary = new System.Text.StringBuilder();
@@ -3503,7 +3510,7 @@ namespace HolyLogger
                         $"Message: {ex.Message}\r\n",
                         System.Text.Encoding.UTF8);
                 }
-                catch { }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 if (progressWindow != null)
                     progressWindow.ReportBatchResult($"Upload failed: {ex.Message}", false);
                 else
@@ -3516,7 +3523,7 @@ namespace HolyLogger
             {
                 UploadProgressTitle = "";
                 UploadProgress = "";
-                try { if (System.IO.File.Exists(adiPath)) System.IO.File.Delete(adiPath); } catch { }
+                try { if (System.IO.File.Exists(adiPath)) System.IO.File.Delete(adiPath); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
         }
 
@@ -4881,7 +4888,7 @@ namespace HolyLogger
             // The active log's name is part of the proposed backup filename so it is easy to tell which
             // log the backup belongs to. Invalid filename characters are replaced with '_'.
             string logName = null;
-            try { logName = dal.GetLogName(dal.ActiveLogId); } catch { }
+            try { logName = dal.GetLogName(dal.ActiveLogId); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             string safeLog = string.IsNullOrWhiteSpace(logName)
                 ? string.Empty
                 : string.Join("_", logName.Split(System.IO.Path.GetInvalidFileNameChars())).Trim() + "_";
@@ -5606,7 +5613,7 @@ namespace HolyLogger
                         if (string.IsNullOrWhiteSpace(TB_CQZone.Text) && editDxcc.CqZone > 0)
                             TB_CQZone.Text = editDxcc.CqZone.ToString();
                     }
-                    catch { }
+                    catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
                 try
@@ -6416,7 +6423,7 @@ namespace HolyLogger
                 if (lotwMode != 0)
                 {
                     List<QSO> lotwPending = null;
-                    try { lotwPending = dal?.GetPendingLotwQsos(); } catch { }
+                    try { lotwPending = dal?.GetPendingLotwQsos(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     if (lotwPending != null && lotwPending.Count > 0)
                     {
                         bool doUpload = lotwMode == 2;
@@ -6441,7 +6448,7 @@ namespace HolyLogger
                 if (eqslMode != 0)
                 {
                     int eqslPending = 0;
-                    try { eqslPending = dal?.GetPendingEqslCount() ?? 0; } catch { }
+                    try { eqslPending = dal?.GetPendingEqslCount() ?? 0; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     if (eqslPending > 0)
                     {
                         bool doUpload = eqslMode == 2;
@@ -6466,7 +6473,7 @@ namespace HolyLogger
                 if (qrzMode != 0)
                 {
                     int qrzPending = 0;
-                    try { qrzPending = dal?.GetPendingQrzCount() ?? 0; } catch { }
+                    try { qrzPending = dal?.GetPendingQrzCount() ?? 0; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     if (qrzPending > 0)
                     {
                         bool doUpload = qrzMode == 2;
@@ -6512,18 +6519,20 @@ namespace HolyLogger
             _isShutdownCleanupDone = true;
 
             // Stop all timers before shutdown to prevent pending async operations
-            try { if (HeartbeatTimer != null && HeartbeatTimer.IsEnabled) HeartbeatTimer.Stop(); } catch { }
-            try { if (UTCTimer != null && UTCTimer.IsEnabled) UTCTimer.Stop(); } catch { }
-            try { if (CallsignLookupDebounceTimer != null && CallsignLookupDebounceTimer.IsEnabled) CallsignLookupDebounceTimer.Stop(); } catch { }
-            try { VoiceMessageAvailabilityTimer.Tick -= VoiceMessageAvailabilityTimer_Tick; if (VoiceMessageAvailabilityTimer.IsEnabled) VoiceMessageAvailabilityTimer.Stop(); } catch { }
-            try { if (NewDXCCTimer != null) { NewDXCCTimer.Stop(); NewDXCCTimer.Dispose(); } } catch { }
-            try { if (_mapUpdateDebounceTimer != null) { _mapUpdateDebounceTimer.Stop(); _mapUpdateDebounceTimer = null; } } catch { }
+            try { if (HeartbeatTimer != null && HeartbeatTimer.IsEnabled) HeartbeatTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { if (UTCTimer != null && UTCTimer.IsEnabled) UTCTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { if (CallsignLookupDebounceTimer != null && CallsignLookupDebounceTimer.IsEnabled) CallsignLookupDebounceTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { VoiceMessageAvailabilityTimer.Tick -= VoiceMessageAvailabilityTimer_Tick; if (VoiceMessageAvailabilityTimer.IsEnabled) VoiceMessageAvailabilityTimer.Stop(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            // Null after disposing so Window_Closed's teardown (which runs after this on a normal
+            // close) can tell it's already done and doesn't Stop()/Dispose() a disposed timer.
+            try { if (NewDXCCTimer != null) { NewDXCCTimer.Tick -= NewDXCCTimer_Tick; NewDXCCTimer.Stop(); NewDXCCTimer.Dispose(); NewDXCCTimer = null; } } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { if (_mapUpdateDebounceTimer != null) { _mapUpdateDebounceTimer.Stop(); _mapUpdateDebounceTimer = null; } } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Unsubscribe from network availability events
-            try { NetworkChange.NetworkAvailabilityChanged -= NetworkChange_NetworkAvailabilityChanged; } catch { }
+            try { NetworkChange.NetworkAvailabilityChanged -= NetworkChange_NetworkAvailabilityChanged; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Dispose CallsignUploader to unsubscribe from NetworkChange events
-            try { _callsignUploader?.Dispose(); } catch { }
+            try { _callsignUploader?.Dispose(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Close and dispose UDP clients
             try 
@@ -6535,7 +6544,7 @@ namespace HolyLogger
                     Client = null;
                 }
             } 
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             try 
             { 
@@ -6546,16 +6555,16 @@ namespace HolyLogger
                     N1MMClient = null;
                 }
             } 
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Close cluster WebSocket
-            try { CloseClusterWebSocket(); } catch { }
+            try { CloseClusterWebSocket(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Unsubscribe from MapControl events
-            try { MapControl.RadiusChanged -= OnMapRadiusChanged; } catch { }
-            try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch { }
-            try { MapControl.SpotHovered -= OnMapSpotHovered; } catch { }
-            try { MapControl.SpotHoverEnded -= OnMapSpotHoverEnded; } catch { }
+            try { MapControl.RadiusChanged -= OnMapRadiusChanged; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { MapControl.SpotTuneRequested -= OnMapSpotTuneRequested; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { MapControl.SpotHovered -= OnMapSpotHovered; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { MapControl.SpotHoverEnded -= OnMapSpotHoverEnded; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Uploads any confirmed services in sequence, showing per-QSO progress, then closes exactly once.
@@ -6567,7 +6576,7 @@ namespace HolyLogger
             // Check connectivity before showing the window so the window never appears blank
             // while waiting for the network check to complete.
             bool online = false;
-            try { online = Helper.CheckForInternetConnection(); } catch { }
+            try { online = Helper.CheckForInternetConnection(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             var progressWindow = new UploadProgressWindow { Owner = this };
             progressWindow.Show();
@@ -6585,7 +6594,7 @@ namespace HolyLogger
                 }
                 else
                 {
-                    try { await UploadLotwQueueCoreAsync(lotwPending, tqslPath, password, progressWindow); } catch { }
+                    try { await UploadLotwQueueCoreAsync(lotwPending, tqslPath, password, progressWindow); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 }
             }
 
@@ -6594,7 +6603,7 @@ namespace HolyLogger
                 if (!online)
                     progressWindow.SkipService("eQSL", "no internet connection — QSOs remain in queue");
                 else
-                    try { await PumpEqslQueue(force: true, progressWindow); } catch { }
+                    try { await PumpEqslQueue(force: true, progressWindow); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
 
             if (uploadQrz)
@@ -6608,7 +6617,7 @@ namespace HolyLogger
                     progressWindow.SkipService("QRZ Logbook", $"{why} — QSOs remain in queue");
                 }
                 else
-                    try { await PumpQrzQueue(force: true, progressWindow); } catch { }
+                    try { await PumpQrzQueue(force: true, progressWindow); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
 
             progressWindow.ShowComplete();
@@ -6628,14 +6637,14 @@ namespace HolyLogger
             }
 
             // Unsubscribe from event handlers to prevent memory leaks
-            try { this.Loaded -= MainWindow_Loaded; } catch { }
-            try { Properties.Settings.Default.PropertyChanged -= Settings_PropertyChanged; } catch { }
+            try { this.Loaded -= MainWindow_Loaded; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { Properties.Settings.Default.PropertyChanged -= Settings_PropertyChanged; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             if (AdifHandlerWorker != null)
             {
-                try { AdifHandlerWorker.DoWork -= AdifHandlerWorker_DoWork; } catch { }
-                try { AdifHandlerWorker.ProgressChanged -= AdifHandlerWorker_ProgressChanged; } catch { }
-                try { AdifHandlerWorker.RunWorkerCompleted -= AdifHandlerWorker_RunWorkerCompleted; } catch { }
+                try { AdifHandlerWorker.DoWork -= AdifHandlerWorker_DoWork; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                try { AdifHandlerWorker.ProgressChanged -= AdifHandlerWorker_ProgressChanged; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                try { AdifHandlerWorker.RunWorkerCompleted -= AdifHandlerWorker_RunWorkerCompleted; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
 
             UTCTimer.Tick -= UTCTimer_Elapsed;
@@ -6646,9 +6655,12 @@ namespace HolyLogger
                 Rig = null;
                 OmniRigEngine = null;
             }
-            NewDXCCTimer.Tick -= NewDXCCTimer_Tick;
-            NewDXCCTimer.Stop();
-            NewDXCCTimer.Dispose();
+            // DoShutdownCleanup normally disposed and nulled this already; only tear it down here
+            // if that path was somehow skipped (Stop() on a disposed WinForms timer throws).
+            if (NewDXCCTimer != null)
+            {
+                try { NewDXCCTimer.Tick -= NewDXCCTimer_Tick; NewDXCCTimer.Stop(); NewDXCCTimer.Dispose(); NewDXCCTimer = null; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
@@ -6658,7 +6670,7 @@ namespace HolyLogger
             if (_cwCallsign != null) Properties.Settings.Default.ColWidthCallsign = _cwCallsign.ActualWidth;
             if (_cwName     != null) Properties.Settings.Default.ColWidthName     = _cwName.ActualWidth;
             if (_cwCountry  != null) Properties.Settings.Default.ColWidthCountry  = _cwCountry.ActualWidth;
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             if (dal != null) dal.Close();
         }
 
@@ -6987,7 +6999,7 @@ namespace HolyLogger
 
                 PruneAutosaves(AutosaveDir);
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private static void PruneAutosaves(string dir)
@@ -7005,10 +7017,10 @@ namespace HolyLogger
                 foreach (var f in files.Skip(5))
                 {
                     if (f.LastWriteTime < cutoff)
-                        try { f.Delete(); } catch { }
+                        try { f.Delete(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 }
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void ImportAutosaveMenuItem_Click(object sender, RoutedEventArgs e)
@@ -7025,7 +7037,7 @@ namespace HolyLogger
             if (dlg.ShowDialog() != true) return;
 
             int existing = 0;
-            try { if (dal != null) existing = dal.GetQsoCount(); } catch { }
+            try { if (dal != null) existing = dal.GetQsoCount(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             if (existing > 0)
             {
@@ -7327,15 +7339,15 @@ namespace HolyLogger
         // grid refresh re-fires it against the new theme brushes.
         private void OnThemeChanged()
         {
-            try { QSODataGrid?.Items.Refresh(); } catch { }
-            try { if (clusterWindow != null) clusterWindow.Background = ThemeManager.Brush("WindowBg"); } catch { }
+            try { QSODataGrid?.Items.Refresh(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { if (clusterWindow != null) clusterWindow.Background = ThemeManager.Brush("WindowBg"); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             // Grid bg/fg auto-update via resource references; refresh re-evaluates the per-spot
             // colors (DXForeground / RowBackground) which read the palette at getter time.
-            try { clusterSpotsGrid?.Items.Refresh(); } catch { }
-            try { ApplyQsoTableHeaderBackgroundFromSettings(); } catch { }   // re-theme QSO + cluster headers
-            try { ApplyMainFormBackgroundFromSettings(); } catch { }         // re-theme the main form background
-            try { UpdateEditModeBackground(); } catch { }                    // re-theme the QSO entry fields
-            try { UpdateStatus(); } catch { }                                // re-color the CAT/RIG status text (was hard-coded black)
+            try { clusterSpotsGrid?.Items.Refresh(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { ApplyQsoTableHeaderBackgroundFromSettings(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }   // re-theme QSO + cluster headers
+            try { ApplyMainFormBackgroundFromSettings(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }         // re-theme the main form background
+            try { UpdateEditModeBackground(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }                    // re-theme the QSO entry fields
+            try { UpdateStatus(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }                                // re-color the CAT/RIG status text (was hard-coded black)
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
@@ -7519,7 +7531,7 @@ namespace HolyLogger
 
             // Update the Visible setting when user opens cluster from View menu
             Properties.Settings.Default.ShowClusterWindowOption = true;
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Refresh the settings dialog if it's open
             var optionsWindow = Application.Current.Windows.OfType<OptionsWindow>().FirstOrDefault();
@@ -7741,7 +7753,7 @@ namespace HolyLogger
             Properties.Settings.Default.ClusterColWidthUtc = clusterUtcColumn != null ? clusterUtcColumn.ActualWidth : Properties.Settings.Default.ClusterColWidthUtc;
             Properties.Settings.Default.ClusterColWidthMode = clusterModeColumn != null ? clusterModeColumn.ActualWidth : Properties.Settings.Default.ClusterColWidthMode;
             Properties.Settings.Default.ClusterColWidthComment = clusterCommentColumn != null ? clusterCommentColumn.ActualWidth : Properties.Settings.Default.ClusterColWidthComment;
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             if (clusterSettingsWindow != null)
             {
@@ -7758,7 +7770,7 @@ namespace HolyLogger
                 clusterWorkedCountries = null;
             }
 
-            try { _clusterWidthHandlerCleanup?.Invoke(); } catch { }
+            try { _clusterWidthHandlerCleanup?.Invoke(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             _clusterWidthHandlerCleanup = null;
             clusterUndoButton = null;
             clusterUndoCountText = null;
@@ -8929,7 +8941,7 @@ namespace HolyLogger
             // so that Active mode is restored — even across program restarts — when a legal band returns.
             if (userInitiated)
                 Properties.Settings.Default.ClusterPreferredBandMode = newMode;
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             if (clusterBandFilterAllBtn != null)
                 clusterBandFilterAllBtn.Style = MakeClusterBandFilterBtnStyle(string.Equals(newMode, "All", StringComparison.OrdinalIgnoreCase));
             if (clusterBandFilterPreSelectedBtn != null)
@@ -9098,7 +9110,7 @@ namespace HolyLogger
                 {
                     if (col != null)
                     {
-                        try { widthDescriptor.RemoveValueChanged(col, handler); } catch { }
+                        try { widthDescriptor.RemoveValueChanged(col, handler); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     }
                 }
             };
@@ -9382,7 +9394,7 @@ namespace HolyLogger
                     if (hoveredCall != _lastHoveredSpotCall)
                     {
                         _lastHoveredSpotCall = hoveredCall;
-                        try { MapControl?.HighlightSpot(hoveredCall); } catch { }
+                        try { MapControl?.HighlightSpot(hoveredCall); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     }
                 }
                 else
@@ -9437,7 +9449,7 @@ namespace HolyLogger
             if (_lastHoveredSpotCall != null)
             {
                 _lastHoveredSpotCall = null;
-                try { MapControl?.ClearSpotHighlight(); } catch { }
+                try { MapControl?.ClearSpotHighlight(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
         }
 
@@ -9586,7 +9598,7 @@ namespace HolyLogger
 
             Properties.Settings.Default.ClusterWindowLeft = clusterWindow.Left;
             Properties.Settings.Default.ClusterWindowTop = clusterWindow.Top;
-            try { Properties.Settings.Default.Save(); } catch { }
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Cluster settings window removed - settings now in cluster header and main User Interface settings
@@ -9876,7 +9888,7 @@ namespace HolyLogger
                     DateTime.Now, message, Environment.NewLine);
                 System.IO.File.AppendAllText(ClusterLogPath, line, Encoding.UTF8);
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private async Task ConnectClusterWebSocketAsync(TextBlock statusText, ObservableCollection<ClusterSpotViewItem> spots)
@@ -10206,7 +10218,7 @@ namespace HolyLogger
                                 spotterLon = spll.Long;
                             }
                         }
-                        catch { }
+                        catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     }
 
                     var dxccInfo = rem.GetDXCC(dx.Trim());
@@ -10278,7 +10290,7 @@ namespace HolyLogger
                     clusterWebSocket = null;
                 }
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void CloseClusterWebSocket()
@@ -10735,7 +10747,7 @@ namespace HolyLogger
                         foreach (var kv in saved) colors[kv.Key] = kv.Value;
                 }
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             _bandColorCache = colors;
             return colors;
         }
@@ -10759,7 +10771,7 @@ namespace HolyLogger
                 Properties.Settings.Default.ClusterBandColors = Newtonsoft.Json.JsonConvert.SerializeObject(colors);
                 Properties.Settings.Default.Save();
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             _bandColorCache = null;
         }
 
@@ -10785,7 +10797,7 @@ namespace HolyLogger
             // Repaint everything already on screen with the new color instead of waiting for the
             // next spot to arrive: the cluster list's Freq color (FreqForeground is re-evaluated on
             // refresh) and the map spot dots.
-            try { clusterSpotsDataGrid?.Items.Refresh(); } catch { }
+            try { clusterSpotsDataGrid?.Items.Refresh(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             if (Properties.Settings.Default.ClusterMapEnabled
                 && MapControl != null && MapControl.Visibility == Visibility.Visible)
             {
@@ -12116,7 +12128,7 @@ namespace HolyLogger
 
             // eQSL — per-callsign accounts table.
             bool eqslHasAccount = false;
-            try { eqslHasAccount = dal.IsCallsignInEqslTable(call); } catch { }
+            try { eqslHasAccount = dal.IsCallsignInEqslTable(call); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // LoTW — per-callsign TQSL station location.
             string savedPicks = Properties.Settings.Default.LotwCallsignLocations;
@@ -12870,7 +12882,7 @@ namespace HolyLogger
                     string filePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "callsigns_new.txt");
                     File.AppendAllText(filePath, call + Environment.NewLine);
                 }
-                catch { }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 _callsignUploader?.TrySendFireAndForget();
             }
         }
@@ -12894,7 +12906,7 @@ namespace HolyLogger
                 // Rewrite file without duplicates
                 File.WriteAllLines(filePath, deduped);
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void LoadCallsignIndex()
@@ -12973,7 +12985,7 @@ namespace HolyLogger
             Task.Run(async () =>
             {
                 try { await CtyDatService.CheckForUpdateAsync(_sharedHttpClient, isNetworkAvailable); }
-                catch { }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             });
         }
 
@@ -12990,7 +13002,7 @@ namespace HolyLogger
                 string logPath = Path.Combine(logDir, "callsign_update.log");
                 File.WriteAllText(logPath, "Update process started at " + DateTime.Now.ToString() + "\n");
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Run async work on background thread
             Task.Run(async () =>
@@ -13021,7 +13033,7 @@ namespace HolyLogger
                             }
                         }
                     }
-                    catch { }
+                    catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
                     Action<string> appendTrace = message =>
                     {
@@ -13032,7 +13044,7 @@ namespace HolyLogger
                         {
                             File.AppendAllText(traceLogPath, message + "\n");
                         }
-                        catch { }
+                        catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     };
 
                     appendTrace("============================================================");
@@ -13165,7 +13177,7 @@ namespace HolyLogger
                                 + " - " + msg + "\n");
                         }
                     }
-                    catch { }
+                    catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     
                     // No popup on failure; error is kept in status and log.
                 }
@@ -13578,7 +13590,7 @@ namespace HolyLogger
                     L_CountryLabel.Visibility = Visibility.Collapsed;
                     return;
                 }
-                catch { }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
             Img_CountryFlag.Visibility = Visibility.Collapsed;
             L_CountryLabel.Visibility = Visibility.Visible;
@@ -14574,14 +14586,14 @@ namespace HolyLogger
                         html = await client.GetStringAsync("https://www.qrz.com/db/" + bareCallsign);
                     }
 
-                    Match match = Regex.Match(html, @"https://cdn-bio\.qrz\.com/[^""'<> --]+", RegexOptions.IgnoreCase);
+                    Match match = Regex.Match(html, @"https://cdn-bio\.qrz\.com/[^""'<>\x00--]+", RegexOptions.IgnoreCase);
                     if (match.Success)
                     {
                         SetQrzPhoto(match.Value);
                         return;
                     }
 
-                    Match altMatch = Regex.Match(html, @"https?://[^""'<> --]+\.(jpg|jpeg|png|gif)", RegexOptions.IgnoreCase);
+                    Match altMatch = Regex.Match(html, @"https?://[^""'<>\x00--]+\.(jpg|jpeg|png|gif)", RegexOptions.IgnoreCase);
                     if (altMatch.Success)
                     {
                         SetQrzPhoto(altMatch.Value);
@@ -14732,7 +14744,7 @@ namespace HolyLogger
                 foreach (var line in debugResults) sb.AppendLine(line);
                 System.IO.File.AppendAllText(debugPath, sb.ToString(), System.Text.Encoding.UTF8);
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             return true;
         }

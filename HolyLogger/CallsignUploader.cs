@@ -67,7 +67,7 @@ namespace HolyLogger
                 string snapshotPath = Path.Combine(
                     Path.GetDirectoryName(_pendingFilePath),
                     string.Format("new_call_{0}.txt", timestamp));
-                try { File.Copy(_pendingFilePath, snapshotPath, overwrite: true); } catch { }
+                try { File.Copy(_pendingFilePath, snapshotPath, overwrite: true); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
                 // Send in batches of up to BatchSize
                 bool allSucceeded = true;
@@ -115,7 +115,7 @@ namespace HolyLogger
                 // All batches confirmed by server — delete the pending file
                 if (allSucceeded)
                 {
-                    try { File.Delete(_pendingFilePath); } catch { }
+                    try { File.Delete(_pendingFilePath); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     LogAndNotify("ALL BATCHES CONFIRMED. callsigns_new.txt deleted.");
                 }
                 // If not all succeeded, leave callsigns_new.txt for the next retry

@@ -44,7 +44,7 @@ namespace HolyLogger.Contests
                         return JsonConvert.DeserializeObject<ContestDatabase>(r.ReadToEnd())
                                ?? new ContestDatabase();
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             return new ContestDatabase();
         }
 

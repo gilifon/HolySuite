@@ -121,7 +121,7 @@ namespace HolyLogger
                 int eq = pair.IndexOf('=');
                 string key = eq >= 0 ? pair.Substring(0, eq) : pair;
                 string val = eq >= 0 ? pair.Substring(eq + 1) : "";
-                try { val = Uri.UnescapeDataString(val.Replace('+', ' ')); } catch { }
+                try { val = Uri.UnescapeDataString(val.Replace('+', ' ')); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 map[key.Trim()] = val.Trim();
             }
 

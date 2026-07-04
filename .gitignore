@@ -6,6 +6,9 @@
 *.user
 *.sln.docstates
 
+# Editor/tool temp copies (e.g. MainWindow.xaml.cs.tmp.<pid>.<hash>)
+*.tmp.*
+
 [Dd]ata/
 
 # Build results

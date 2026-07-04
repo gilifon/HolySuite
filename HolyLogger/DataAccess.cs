@@ -720,14 +720,14 @@ namespace HolyLogger
                 string backupPath = dbPath + ".pre-logs-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak";
                 if (File.Exists(backupPath)) return;
                 con.Close();
-                try { File.Copy(dbPath, backupPath, false); } catch { }
+                try { File.Copy(dbPath, backupPath, false); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 con.Open();
             }
             catch
             {
                 if (con.State != System.Data.ConnectionState.Open)
                 {
-                    try { con.Open(); } catch { }
+                    try { con.Open(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 }
             }
         }

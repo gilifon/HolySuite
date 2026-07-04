@@ -68,7 +68,7 @@ namespace HolyLogger
                 SetFocus(h);
                 Keyboard.Focus(Btn_Close);
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // WM_KEYDOWN = 0x0100, WM_SYSKEYDOWN = 0x0104, VK_ESCAPE = 0x1B.

@@ -69,7 +69,7 @@ namespace HolyLogger
 
                 // If TQSL hangs (e.g. hidden dialog, network stall), kill it after 10 minutes so
                 // the app is never left frozen waiting forever.
-                timeout.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch { } });
+                timeout.Token.Register(() => { try { if (!proc.HasExited) proc.Kill(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); } });
 
                 // Drain stdout silently to prevent the process from blocking on a full stdout buffer.
                 var drainStdout = proc.StandardOutput.ReadToEndAsync();

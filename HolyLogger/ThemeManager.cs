@@ -59,15 +59,15 @@ namespace HolyLogger
                 Properties.Settings.Default.DarkMode = (mode == ThemeMode.Dark);
                 Properties.Settings.Default.Save();
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
-            try { ThemeChanged?.Invoke(); } catch { }
+            try { ThemeChanged?.Invoke(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Re-paint the native title bar of every window already open (the DynamicResource
             // brushes above only reach the WPF-drawn client area). Newly opened windows are caught
             // by the app-wide SourceInitialized handler registered in App.xaml.cs.
             try { foreach (Window w in Application.Current.Windows.OfType<Window>().ToList()) ApplyWindowChrome(w); }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Convenience overload for the Light/Dark checkbox toggle.
@@ -119,7 +119,7 @@ namespace HolyLogger
         public static void ApplyFromSettings()
         {
             bool dark = false;
-            try { dark = Properties.Settings.Default.DarkMode; } catch { }
+            try { dark = Properties.Settings.Default.DarkMode; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             Apply(dark ? ThemeMode.Dark : ThemeMode.Light);
         }
 

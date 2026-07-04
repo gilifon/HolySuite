@@ -281,7 +281,7 @@ namespace HolyLogger
         private void RequeueButton_Click(object sender, RoutedEventArgs e)
         {
             try { _requeueDismissed?.Invoke(); }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             _statusText.Text = "Dismissed QSOs moved back to the upload queue.";
             RefreshList();
         }

@@ -57,7 +57,7 @@ namespace HolyLogger
                     });
                 }
             }
-            catch { }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             return list;
         }
 

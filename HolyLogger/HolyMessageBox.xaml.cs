@@ -59,14 +59,14 @@ namespace HolyLogger
                     IInputElement btn = OkBtn.Visibility == Visibility.Visible ? (IInputElement)OkBtn : YesBtn;
                     Keyboard.Focus(btn);
                 }
-                catch { }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             };
 
             // If the dialog opens while another window (e.g. the embedded WebBrowser map) still holds
             // the Win32 keyboard focus, simply becoming the foreground window is NOT enough — physical
             // keystrokes go to GetFocus(), which stays null/elsewhere, so Esc is silently dropped even
             // though the dialog looks active. Re-assert real keyboard focus whenever we are activated.
-            Activated += (s, e) => { try { ForceKeyboardFocus(); } catch { } };
+            Activated += (s, e) => { try { ForceKeyboardFocus(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); } };
         }
 
         // Force this dialog's HWND to actually own the Win32 keyboard focus. AttachThreadInput ties our

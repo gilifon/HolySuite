@@ -107,7 +107,7 @@ namespace HolyLogger.OptionsUserControls
             if (TB_LocationsHelp == null) return;
 
             bool fileExists = false;
-            try { fileExists = File.Exists(TqslStationData.DefaultPath); } catch { }
+            try { fileExists = File.Exists(TqslStationData.DefaultPath); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             if (fileExists && count == 0)
             {

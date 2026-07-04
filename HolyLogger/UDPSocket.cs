@@ -77,7 +77,7 @@ namespace HolyLogger
                             _socket.Close();
                             _socket.Dispose();
                         }
-                        catch { }
+                        catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                         _socket = null;
                     }
                 }

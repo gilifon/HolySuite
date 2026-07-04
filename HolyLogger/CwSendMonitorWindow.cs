@@ -265,7 +265,7 @@ namespace HolyLogger
             _finished = true;
             _advanceTimer.Stop();
             _blinkTimer.Stop();
-            try { Close(); } catch { }
+            try { Close(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         /// <summary>Transmission aborted early: close the window immediately, no delay.</summary>
@@ -275,7 +275,7 @@ namespace HolyLogger
             _finished = true;
             _advanceTimer.Stop();
             _blinkTimer.Stop();
-            try { Close(); } catch { }
+            try { Close(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void AdvanceTimer_Tick(object sender, EventArgs e)
