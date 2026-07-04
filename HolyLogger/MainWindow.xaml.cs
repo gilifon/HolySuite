@@ -9150,7 +9150,7 @@ namespace HolyLogger
             }
         }
 
-        private Color ParseQsoTableHeaderBackgroundColor(string colorText)
+        private static Color ParseQsoTableHeaderBackgroundColor(string colorText)
         {
             try
             {
@@ -9161,6 +9161,23 @@ namespace HolyLogger
             {
                 return (Color)ColorConverter.ConvertFromString("#DEB887");
             }
+        }
+
+        // The one header look used by every log-style table (QSO grid, cluster spots, and the
+        // Logs window's grid): the user's chosen header color (default burlywood #DEB887, edited
+        // in Options > User Interface) with black text, in light AND dark mode. Static so other
+        // windows (ViewLogsWindow) get the identical style from the same source of truth.
+        internal static Style BuildLogTableHeaderStyle()
+        {
+            Color color = ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
+            var headerStyle = new Style(typeof(DataGridColumnHeader));
+            headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
+            headerStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
+            headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
+            headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
+            headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
+            return headerStyle;
         }
 
         private void ApplyMainFormBackgroundFromSettings()
@@ -9190,22 +9207,10 @@ namespace HolyLogger
                 return;
             }
 
-            Color color = ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor);
+            QSODataGrid.ColumnHeaderStyle = BuildLogTableHeaderStyle();
 
-            // Keep the user's chosen header color (and black text for contrast against it) in both
-            // light and dark mode -- previously dark mode swapped it for the theme's gray header,
-            // but the user wants their own color (default burlywood/tan, #DEB887) kept everywhere.
-            var headerStyle = new Style(typeof(DataGridColumnHeader));
-            headerStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
-            headerStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
-            headerStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
-            headerStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
-            headerStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
-            headerStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
-
-            QSODataGrid.ColumnHeaderStyle = headerStyle;
-
-            ApplyClusterTableHeaderBackgroundFromSettings(color);
+            ApplyClusterTableHeaderBackgroundFromSettings(
+                ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor));
         }
 
         private async void GetQrzData()

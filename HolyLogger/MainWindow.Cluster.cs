@@ -867,13 +867,12 @@ namespace HolyLogger
             clusterCellStyle.Triggers.Add(clusterCellSelTrigger);
             spotsGrid.CellStyle = clusterCellStyle;
 
+            // Same rule as the QSO table header: the user's chosen color (default burlywood) with
+            // black text, in light AND dark mode -- never the theme's dark header surface.
             var clusterColumnHeaderStyle = new Style(typeof(DataGridColumnHeader));
-            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty, ThemeManager.IsDark
-                ? (Brush)ThemeManager.Brush("GridHeaderBg")
-                : new SolidColorBrush(ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor))));
-            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.ForegroundProperty, ThemeManager.IsDark
-                ? (Brush)ThemeManager.Brush("TextBrush")
-                : Brushes.Black));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty,
+                new SolidColorBrush(ParseQsoTableHeaderBackgroundColor(Properties.Settings.Default.QsoTableHeaderBackgroundColor))));
+            clusterColumnHeaderStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0))));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
             clusterColumnHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));
@@ -3782,6 +3781,9 @@ namespace HolyLogger
 
             var clusterHeaderStyle = new Style(typeof(DataGridColumnHeader));
             clusterHeaderStyle.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(color)));
+            // Explicit black text: without it the header inherits the grid's theme Foreground, which
+            // is white in dark mode -- white-on-burlywood after a light->dark toggle was unreadable.
+            clusterHeaderStyle.Setters.Add(new Setter(Control.ForegroundProperty, Brushes.Black));
             clusterHeaderStyle.Setters.Add(new Setter(Control.BorderBrushProperty, (Brush)new BrushConverter().ConvertFromString("#1565C0")));
             clusterHeaderStyle.Setters.Add(new Setter(Control.BorderThicknessProperty, new Thickness(0, 0, 1, 3)));
             clusterHeaderStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(5, 3, 5, 3)));

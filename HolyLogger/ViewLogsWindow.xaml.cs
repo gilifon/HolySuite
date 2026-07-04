@@ -41,6 +41,9 @@ namespace HolyLogger
             // usable width (excludes the taskbar), so cap it here rather than in XAML.
             MaxWidth = SystemParameters.WorkArea.Width;
 
+            // Same header look as the QSO log table (user's chosen color, default burlywood).
+            LogsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+
             if (_contestOnly)
             {
                 Title = "Contest Logs";
