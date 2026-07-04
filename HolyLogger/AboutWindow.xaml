@@ -2,7 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="About" Height="220" Width="390" MinHeight="220" MaxHeight="220" MinWidth="390" MaxWidth="390" Icon="Images/about.png" KeyDown="Window_KeyDown">
-    <Grid Background="{DynamicResource WindowBg}">
+    <!-- TextElement.Foreground here because plain TextBlocks default to black, not the theme text
+         color: the app-wide implicit Window style doesn't apply to Window SUBCLASSES like this one
+         (WPF implicit styles match exact type only), so without this the text vanished in dark mode. -->
+    <Grid Background="{DynamicResource WindowBg}" TextElement.Foreground="{DynamicResource TextBrush}">
 
         <Image HorizontalAlignment="Left" Height="113" Margin="10,10,0,0" VerticalAlignment="Top" Width="111" Source="Images/crown100.png"/>
         <StackPanel HorizontalAlignment="Left" Height="169" Margin="138,10,0,0" VerticalAlignment="Top" Width="234">
