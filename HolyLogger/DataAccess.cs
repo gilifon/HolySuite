@@ -70,8 +70,11 @@ namespace HolyLogger
             
         }
 
-        // The folder holding logDB.db (and the Backups subfolder) -- for Help > Open Data Folder.
+        // The folder holding logDB.db (and the Backups subfolder).
         public string DataFolder => Path.GetDirectoryName(dbPath);
+
+        // The daily-backups folder (with HOW TO RESTORE.txt) -- for Help > Open Backups Folder.
+        public string BackupsFolder => Path.Combine(DataFolder, "Backups");
 
         // How many daily backups to keep in the Backups folder; older ones are pruned.
         private const int DailyBackupsToKeep = 7;

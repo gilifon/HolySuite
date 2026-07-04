@@ -5993,19 +5993,20 @@ namespace HolyLogger
             return false;
         }
 
-        // Help -> Open Data Folder: the folder with logDB.db, the daily Backups (and their
-        // HOW TO RESTORE.txt), and holylogger.log -- one click instead of dictating a %LOCALAPPDATA%
-        // path over the phone when helping a user recover or report a problem.
+        // Help -> Open Backups Folder: straight to the daily backups and their HOW TO RESTORE.txt,
+        // not the parent data folder full of internals (logDB.db, cty.dat, ...) the user must not
+        // touch by accident. The restore instructions handle the one step that needs the parent.
         private void OpenDataFolderMenuItem_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                System.Diagnostics.Process.Start("explorer.exe", dal.DataFolder);
+                System.IO.Directory.CreateDirectory(dal.BackupsFolder);   // first run: may not exist yet
+                System.Diagnostics.Process.Start("explorer.exe", dal.BackupsFolder);
             }
             catch (Exception ex)
             {
                 Log.Swallow(ex);
-                HolyMessageBox.ShowError("Could not open the data folder:\n" + dal.DataFolder, "Open Data Folder", this);
+                HolyMessageBox.ShowError("Could not open the backups folder:\n" + dal.BackupsFolder, "Open Backups Folder", this);
             }
         }
 

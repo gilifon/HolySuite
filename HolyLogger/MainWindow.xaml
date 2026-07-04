@@ -586,7 +586,7 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="OpenDataFolderMenuItem" Header="Open Data Folder" ToolTip="Open the folder with your log database, daily backups and the diagnostic log" Click="OpenDataFolderMenuItem_Click">
+                    <MenuItem x:Name="OpenDataFolderMenuItem" Header="Open Backups Folder" ToolTip="Open the folder with the daily backups of your log database and the restore instructions" Click="OpenDataFolderMenuItem_Click">
                         <MenuItem.Icon>
                             <!-- Material "folder_open" -->
                             <Viewbox Width="16" Height="16">
