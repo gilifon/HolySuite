@@ -441,6 +441,30 @@ namespace HolyLogger
             e.Handled = true;
         }
 
+        // The contest labels sit ON the user-editable frames, so neither black nor the theme text
+        // color is always right: recompute black-or-white from each frame's actual brightness.
+        // Called at startup and on every theme/scheme/color change (OnThemeChanged).
+        internal void UpdateContestLabelContrast()
+        {
+            if (L_ExchangeLabel != null) L_ExchangeLabel.Foreground = ContrastTextFor("ContestRxBg");
+            if (L_SendLabel != null) L_SendLabel.Foreground = ContrastTextFor("ContestTxBg");
+        }
+
+        private static Brush ContrastTextFor(string token)
+        {
+            try
+            {
+                var c = (Color)ColorConverter.ConvertFromString(ThemeManager.CurrentHex(token));
+                double luminance = (0.299 * c.R + 0.587 * c.G + 0.114 * c.B) / 255.0;
+                return luminance > 0.5 ? Brushes.Black : Brushes.White;
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                return Brushes.Black;
+            }
+        }
+
         private static void PickCustomTokenColor(string token)
         {
             Color current;

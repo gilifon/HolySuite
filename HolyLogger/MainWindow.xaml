@@ -1108,9 +1108,10 @@
                 BorderBrush="#D9B441" BorderThickness="1" Visibility="Collapsed" Panel.ZIndex="0"
                 MouseRightButtonUp="ContestExchangeFrame_MouseRightButtonUp"
                 ToolTip="Right-click to change the contest exchange colour"/>
+        <!-- Foreground of both contest labels is set in code (UpdateContestLabelContrast): black or
+             white depending on the brightness of the frame each one sits on, which is user-editable. -->
         <TextBlock x:Name="L_ExchangeLabel" HorizontalAlignment="Left" Margin="12,141,0,0" VerticalAlignment="Top" Grid.Row="1"
                    Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
-                   Foreground="{DynamicResource TextBrush}"
                    ToolTip="The exchange received from the DX station"><Run Text="Exchange" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
         <!-- Contest received-exchange boxes, built at runtime per the active contest (Phase 2). When a
@@ -1140,7 +1141,7 @@
                 ToolTip="Right-click to change the send-exchange colour"/>
         <TextBlock x:Name="L_SendLabel" Grid.Row="1" HorizontalAlignment="Left" Margin="12,96,0,0" VerticalAlignment="Top"
                    Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
-                   Foreground="#0B3D2E" Panel.ZIndex="6" Visibility="Collapsed"
+                   Panel.ZIndex="6" Visibility="Collapsed"
                    ToolTip="The exchange your station sends"><Run Text="Exchange" FontWeight="Bold"/><LineBreak/><Run Text="send"/></TextBlock>
         <StackPanel x:Name="ContestTxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="101,96,0,0" Grid.Row="1" Panel.ZIndex="6" Visibility="Collapsed"/>

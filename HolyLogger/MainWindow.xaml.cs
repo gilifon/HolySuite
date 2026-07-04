@@ -324,6 +324,7 @@ namespace HolyLogger
             // The form background, contest frames etc. are DynamicResource-bound in XAML; only the
             // grid header style needs a one-time assignment (its background is dynamic from there).
             ApplyQsoTableHeaderBackgroundFromSettings();
+            UpdateContestLabelContrast();
 
             // Restrict every text box in the app to English (ASCII) input only. Registered as a
             // class handler so it applies to all TextBoxes without wiring each one individually,
@@ -4986,6 +4987,7 @@ namespace HolyLogger
             try { clusterSpotsGrid?.Items.Refresh(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { UpdateEditModeBackground(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }                    // re-theme the QSO entry fields
             try { UpdateStatus(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }                                // re-color the CAT/RIG status text (was hard-coded black)
+            try { UpdateContestLabelContrast(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }                  // black/white contest labels per frame brightness
         }
 
         private void SignboardMenuItem_Click(object sender, RoutedEventArgs e)
