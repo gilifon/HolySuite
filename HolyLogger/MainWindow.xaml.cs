@@ -979,7 +979,7 @@ namespace HolyLogger
             // Contest Mode state in the Tools-menu header, trophy, and contest-name label.
             Contests.ContestService.Activate(
                 Contests.ContestService.FindById(Properties.Settings.Default.ActiveContestId));
-            UpdateContestModeMenuHeader();
+            UpdateContestIndicator();
             ApplyContestExchangeUI();
 
             // eQSL queue: show how many QSOs are waiting (only for callsigns the user added to the

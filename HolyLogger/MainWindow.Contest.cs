@@ -62,7 +62,7 @@ namespace HolyLogger
                 Properties.Settings.Default.ContestMode = true;
                 Properties.Settings.Default.ActiveContestId = contest.Id;
                 Properties.Settings.Default.Save();
-                UpdateContestModeMenuHeader();
+                UpdateContestIndicator();
                 ApplyContestExchangeUI();
                 UpdateDup();
             }
@@ -72,28 +72,10 @@ namespace HolyLogger
             }
         }
 
-        // Contest Mode on/off (Tools menu). When on, exact-match QSOs (same callsigns + band + mode)
-        // are flagged as "Duplicate"; when off, the program never reports a duplicate and instead
-        // shows how many times the station was worked before.
-        // Both the Tools-menu item and the status-bar trophy open the log window filtered to contest
-        // logs, where the user can select an existing contest log or create a new one. There is no
-        // standalone "exit contest" action: opening or creating a non-contest log exits contest mode
-        // (see ApplyContestModeForActiveLog).
-        private void ContestModeMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            OpenContestLogsWindow();
-        }
-
-        private void ContestIndicator_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            OpenContestLogsWindow();
-        }
-
-        private void OpenContestLogsWindow()
-        {
-            var win = new ViewLogsWindow(this, dal, contestOnly: true) { Owner = this };
-            win.ShowDialog();
-        }
+        // Contest Mode follows the active log, and the ONLY place to enter or leave it is
+        // File > Log Manager (open/create a contest log to enter; open/create a regular log to
+        // leave). The status-bar trophy is a passive indicator (see UpdateContestIndicator);
+        // there is no Tools-menu item and no standalone "exit contest" action.
 
         // Lets the operator pick a contest and name a brand-new log for it. Used by the "Create New
         // Contest Log" button in ViewLogsWindow. Returns true if a new contest log was created and
@@ -138,7 +120,7 @@ namespace HolyLogger
             Properties.Settings.Default.ContestMode = false;
             Properties.Settings.Default.ActiveContestId = "";
             Properties.Settings.Default.Save();
-            UpdateContestModeMenuHeader();
+            UpdateContestIndicator();
             ApplyContestExchangeUI();
             UpdateDup();
         }
@@ -390,39 +372,27 @@ namespace HolyLogger
             }
         }
 
-        private void UpdateContestModeMenuHeader()
+        // Status-bar contest indicator: PASSIVE, display-only. Shown (gold trophy on a blue tile +
+        // contest name) only while a contest log is active; completely hidden otherwise -- so its
+        // mere presence answers "am I in a contest, and which one?". Entering/leaving contest mode
+        // happens in exactly one place: File > Log Manager.
+        private void UpdateContestIndicator()
         {
-            bool on = Properties.Settings.Default.ContestMode;
-            var gold = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07));
-            var gray = new SolidColorBrush(Color.FromRgb(0x9E, 0x9E, 0x9E));
-            Brush blue = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+            bool on = Properties.Settings.Default.ContestMode && Contests.ContestService.Active != null;
 
-            if (ContestModeMenuItem != null)
-                ContestModeMenuItem.Header = on ? "Contest Mode - ON" : "Contest Mode - OFF";
+            if (ContestIndicatorPanel != null)
+                ContestIndicatorPanel.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+            if (!on) return;
 
-            // Tools-menu icon: gold trophy on a blue tile when contesting, plain gray when not.
-            if (ContestTrophyPath != null)
-                ContestTrophyPath.Fill = on ? gold : gray;
-            if (ContestTrophyBg != null)
-                ContestTrophyBg.Background = on ? blue : Brushes.Transparent;
-
-            // Main-screen state indicator (display only) mirrors the same look, and its tooltip
-            // explains the current mode on hover.
             if (ContestIndicatorPath != null)
-                ContestIndicatorPath.Fill = on ? gold : gray;
+                ContestIndicatorPath.Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0xC1, 0x07));   // gold
             if (ContestIndicator != null)
             {
-                ContestIndicator.Background = on ? blue : Brushes.Transparent;
-                ContestIndicator.ToolTip = on
-                    ? "In contest — duplicates are flagged.\nClick to view contest logs or start a new one."
-                    : "Not in a contest.\nClick to view or start a contest log.";
+                ContestIndicator.Background = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0)); // blue tile
+                ContestIndicator.ToolTip = "In contest — duplicates are flagged.\nTo leave, open a regular log in File > Log Manager.";
             }
-
-            // Contest name beside the trophy, e.g. "World Wide Holyland DX — Active".
             if (L_ContestName != null)
-                L_ContestName.Text = (on && Contests.ContestService.Active != null)
-                    ? Contests.ContestService.Active.Name + " — Active"
-                    : "";
+                L_ContestName.Text = Contests.ContestService.Active.Name + " — Active";
         }
 
         // Right-click either contest frame to pick its colour in place. The frames are palette
