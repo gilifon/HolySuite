@@ -53,6 +53,10 @@ namespace HolyLogger
 
                 Directory.CreateDirectory(Path.GetDirectoryName(dbPath));
 
+                // Daily rotating backup, taken before the database is opened or touched in any
+                // way, so even a backup of an already-corrupted-by-us session is impossible.
+                BackupDatabaseDaily();
+
                 con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
                 con.Open();
                 BackupBeforeLogsMigration();   // one-time safety copy before the logs-schema upgrade
@@ -64,6 +68,43 @@ namespace HolyLogger
                 throw new Exception("Failed to connect to DB: " + e.Message);
             }
             
+        }
+
+        // How many daily backups to keep in the Backups folder; older ones are pruned.
+        private const int DailyBackupsToKeep = 7;
+
+        // Copies logDB.db to Backups\logDB-yyyy-MM-dd.db once per calendar day (extra app starts
+        // on the same day are no-ops), then prunes to the newest DailyBackupsToKeep copies.
+        // Runs BEFORE the SQLite connection opens, so the copied file is never mid-write.
+        // A backup failure must never block startup: everything is swallowed (but logged).
+        private void BackupDatabaseDaily()
+        {
+            try
+            {
+                if (!File.Exists(dbPath)) return;   // first run: nothing to back up yet
+
+                string backupDir = Path.Combine(Path.GetDirectoryName(dbPath), "Backups");
+                Directory.CreateDirectory(backupDir);
+
+                string todays = Path.Combine(backupDir,
+                    "logDB-" + DateTime.Now.ToString("yyyy-MM-dd") + ".db");
+                if (!File.Exists(todays))
+                    File.Copy(dbPath, todays);
+
+                // Prune: the date-stamped names sort chronologically, so ordering by name
+                // descending puts the newest first.
+                var old = Directory.GetFiles(backupDir, "logDB-????-??-??.db")
+                                   .OrderByDescending(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                                   .Skip(DailyBackupsToKeep);
+                foreach (string f in old)
+                {
+                    try { File.Delete(f); } catch (Exception ex) { Log.Swallow(ex); }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+            }
         }
 
         // Public static method to get the single instance of the class.
