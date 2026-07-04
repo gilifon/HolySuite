@@ -17,6 +17,12 @@ namespace HolyLogger
     /// </summary>
     public partial class App : Application
     {
+        // True once Windows starts ending the session (logoff / shutdown / restart). Checked by
+        // MainWindow.Window_Closing to skip the upload-on-exit dialogs: a modal dialog there would
+        // stall the whole logoff, and WPF ignores e.Cancel during session end anyway, which used
+        // to strand the flow half-run (see DoShutdownCleanup's history).
+        internal static bool IsWindowsSessionEnding;
+
         Mutex myMutex;
         private SplashWindow _splash;
         private DispatcherTimer _splashCloseTimer;
@@ -39,6 +45,8 @@ namespace HolyLogger
             DispatcherUnhandledException += (s, args) => Log.Fatal("Dispatcher", args.Exception);
             AppDomain.CurrentDomain.UnhandledException += (s, args) => Log.Fatal("AppDomain", args.ExceptionObject as Exception);
             TaskScheduler.UnobservedTaskException += (s, args) => Log.Fatal("UnobservedTask", args.Exception);
+
+            SessionEnding += (s, args) => { IsWindowsSessionEnding = true; Log.Warn("Windows session ending: " + args.ReasonSessionEnding); };
 
             // Apply the saved Light/Dark theme before the main window loads.
             try { ThemeManager.ApplyFromSettings(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }

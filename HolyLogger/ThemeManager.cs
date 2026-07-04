@@ -19,6 +19,11 @@ namespace HolyLogger
         public static bool IsDark => CurrentMode == ThemeMode.Dark;
 
         // Raised after the palette changes, so code-painted areas can re-run their coloring.
+        //
+        // LEAK WARNING: this is a STATIC event, so it pins every subscriber for the lifetime of the
+        // process. MainWindow may subscribe without unsubscribing (it lives until exit), but any
+        // transient window or dialog that subscribes here MUST unsubscribe in its Closed handler,
+        // or the whole window (and everything it references) stays in memory forever.
         public static event Action ThemeChanged;
 
         public static SolidColorBrush Brush(string key)

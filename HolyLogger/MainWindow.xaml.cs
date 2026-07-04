@@ -4154,7 +4154,10 @@ namespace HolyLogger
             // so we never call Close() from inside an async upload (which caused freezes when the
             // second/third dialog tried to show while the main window was already half-destroyed).
             // A single UploadAllAndCloseAsync call does all uploads, then calls Close() exactly once.
-            if (!_uploadOnExitHandled)
+            // Skipped entirely during Windows logoff/shutdown: a modal dialog would stall the whole
+            // session end, and e.Cancel is ignored there anyway -- queued QSOs stay safely in the
+            // queues and upload on the next normal exit.
+            if (!_uploadOnExitHandled && !App.IsWindowsSessionEnding)
             {
                 _uploadOnExitHandled = true;
 
