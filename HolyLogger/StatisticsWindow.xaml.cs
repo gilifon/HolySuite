@@ -622,7 +622,7 @@ namespace HolyLogger
 
             Properties.Settings.Default.StatisticsWindowLeft = left;
             Properties.Settings.Default.StatisticsWindowTop  = top;
-            Properties.Settings.Default.Save();
+            SettingsFlush.RequestSave();   // fires per pixel while dragging; debounce the disk write
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -631,7 +631,7 @@ namespace HolyLogger
             double height = WindowState == WindowState.Normal ? Height : RestoreBounds.Height;
             if (width  > 0) Properties.Settings.Default.StatisticsWindowWidth  = width;
             if (height > 0) Properties.Settings.Default.StatisticsWindowHeight = height;
-            Properties.Settings.Default.Save();
+            SettingsFlush.RequestSave();
         }
 
         // True when a window of the given size at (left, top) would still be reachable on some

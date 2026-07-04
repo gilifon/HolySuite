@@ -4260,6 +4260,9 @@ namespace HolyLogger
         private void DoShutdownCleanup()
         {
             SaveAutosnapshot();
+            // Land any debounced settings write still waiting on its timer (window bounds saved
+            // moments before exit would otherwise be lost with the timer).
+            SettingsFlush.FlushNow();
             _isShutdownCleanupDone = true;
 
             // Stop all timers before shutdown to prevent pending async operations

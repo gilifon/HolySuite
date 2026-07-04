@@ -252,6 +252,7 @@
     </Compile>
     <Compile Include="Helper.cs" />
     <Compile Include="Log.cs" />
+    <Compile Include="SettingsFlush.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="SearchWindow.xaml.cs">
       <DependentUpon>SearchWindow.xaml</DependentUpon>

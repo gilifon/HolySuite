@@ -2122,7 +2122,7 @@ namespace HolyLogger
 
             Properties.Settings.Default.ClusterWindowLeft = clusterWindow.Left;
             Properties.Settings.Default.ClusterWindowTop = clusterWindow.Top;
-            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            SettingsFlush.RequestSave();   // fires per pixel while dragging; debounce the disk write
         }
 
         // Cluster settings window removed - settings now in cluster header and main User Interface settings
@@ -2398,7 +2398,7 @@ namespace HolyLogger
                 Properties.Settings.Default.ClusterWindowWidth = clusterWindow.Width;
             if (clusterWindow.Height >= 0)
                 Properties.Settings.Default.ClusterWindowHeight = clusterWindow.Height;
-            Properties.Settings.Default.Save();
+            SettingsFlush.RequestSave();   // fires per pixel while resizing; debounce the disk write
         }
 
         private static void AppendClusterLog(string message)

@@ -256,14 +256,14 @@ namespace HolyLogger
         {
             if (Left >= 0) Properties.Settings.Default.SearchWindowLeft = Left;
             if (Top  >= 0) Properties.Settings.Default.SearchWindowTop  = Top;
-            Properties.Settings.Default.Save();
+            SettingsFlush.RequestSave();   // fires per pixel while dragging; debounce the disk write
         }
 
         private void Window_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (Width  > 0) Properties.Settings.Default.SearchWindowWidth  = Width;
             if (Height > 0) Properties.Settings.Default.SearchWindowHeight = Height;
-            Properties.Settings.Default.Save();
+            SettingsFlush.RequestSave();
         }
     }
 
