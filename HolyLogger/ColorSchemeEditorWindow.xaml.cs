@@ -37,31 +37,14 @@ namespace HolyLogger
         {
             InitializeComponent();
 
-            // Decide WHAT is being edited, and say so explicitly in the header -- the one question
-            // every user asks here is "which scheme am I changing?". The answer is always: your own
-            // Custom scheme; the built-in schemes are never modified.
-            bool editExisting = ThemeManager.CurrentSchemeId == CustomSchemeStore.Id;
-
-            if (!editExisting && CustomSchemeStore.Exists)
-            {
-                // A Custom scheme exists but a built-in one is active. Editing must not silently
-                // overwrite the user's earlier work -- make the choice theirs.
-                string existingBase = ThemePalette.FindScheme(CustomSchemeStore.BaseId).DisplayName;
-                editExisting = HolyMessageBox.ShowConfirm(
-                    "You already have a Custom scheme (based on " + existingBase + ").\n\n" +
-                    "YES — continue editing your existing Custom scheme.\n" +
-                    "NO — start over from the current " + ThemeManager.CurrentScheme.DisplayName +
-                    " scheme (your first change will replace the existing Custom scheme).",
-                    "Customize Colors", HolyMsgType.Info, Application.Current.MainWindow);
-            }
-
-            if (editExisting)
+            // Dead simple model: you always edit whatever scheme is on screen right now. Under the
+            // hood, edits to a built-in scheme are stored as the "Custom" scheme (built-ins are
+            // never modified), but the user just sees: open, click, done.
+            bool editingCustom = ThemeManager.CurrentSchemeId == CustomSchemeStore.Id;
+            if (editingCustom)
             {
                 _base = ThemePalette.FindScheme(CustomSchemeStore.BaseId);
                 _colors = CustomSchemeStore.Load() ?? new Dictionary<string, string>();
-                // Make the scheme being edited the one on screen, so every click is seen live.
-                if (ThemeManager.CurrentSchemeId != CustomSchemeStore.Id)
-                    ThemeManager.Apply(CustomSchemeStore.Id);
             }
             else
             {
@@ -69,15 +52,11 @@ namespace HolyLogger
                 _colors = new Dictionary<string, string>();
             }
 
-            Title = "Customize Colors — based on " + _base.DisplayName;
+            Title = "Customize Current Color Scheme";
 
-            // The banner is the headline: WHAT is being edited (always the user's own Custom
-            // scheme, never a built-in) in large type nobody can miss. "A copy of X" is the
-            // wording that explains itself: X stays untouched, your copy is what changes.
-            TB_BannerPrefix.Text = editExisting
-                ? "You are editing your CUSTOM scheme — a copy of:"
-                : "You are editing a COPY of:";
-            TB_BannerScheme.Text = _base.DisplayName.ToUpperInvariant();
+            // The banner names the scheme being edited -- the one currently on screen.
+            TB_BannerPrefix.Text = "You are editing color scheme:";
+            TB_BannerScheme.Text = editingCustom ? "CUSTOM" : _base.DisplayName.ToUpperInvariant();
 
             TB_SubHeader.Text =
                 "Click a color square to change it — changes apply immediately to the whole application and are "

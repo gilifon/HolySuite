@@ -4931,8 +4931,8 @@ namespace HolyLogger
             ColorSchemeMenuItem.Items.Add(new Separator());
             var customize = new MenuItem
             {
-                Header = "Customize Colors…",
-                ToolTip = "Change individual colors; your changes are saved as the Custom scheme"
+                Header = "Customize Current Color Scheme",
+                ToolTip = "Change individual colors of the scheme you are using now; your changes are saved as the Custom scheme"
             };
             customize.Click += CustomizeColorsItem_Click;
             ColorSchemeMenuItem.Items.Add(customize);
