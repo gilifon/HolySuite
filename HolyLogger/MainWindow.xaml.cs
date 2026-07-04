@@ -8470,6 +8470,20 @@ namespace HolyLogger
             }
         }
 
+        // Shared client for scraping the QRZ profile page for the operator photo. Browser-like
+        // headers because qrz.com serves different (or no) content to unknown user agents.
+        private static readonly HttpClient _qrzPhotoHttpClient = CreateQrzPhotoHttpClient();
+
+        private static HttpClient CreateQrzPhotoHttpClient()
+        {
+            var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate };
+            var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(15) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36");
+            client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
+            client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+            return client;
+        }
+
         private async Task LoadQrzPhotoFromWebAsync(string bareCallsign)
         {
             if (string.IsNullOrWhiteSpace(bareCallsign))
@@ -8480,12 +8494,11 @@ namespace HolyLogger
 
             try
             {
-                using (var handler = new HttpClientHandler { AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate })
-                using (var client = new HttpClient(handler))
                 {
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36");
-                    client.DefaultRequestHeaders.Accept.ParseAdd("text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
-                    client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+                    // Shared static client (see _qrzPhotoHttpClient): this method runs on every
+                    // callsign lookup, and new HttpClient(+handler) per call leaks sockets into
+                    // TIME_WAIT during an active session.
+                    var client = _qrzPhotoHttpClient;
                     string html = string.Empty;
 
                     if (!string.IsNullOrWhiteSpace(SessionKey))
