@@ -1,9 +1,9 @@
 <Window x:Class="HolyLogger.DuplicatesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Remove Duplicates" SizeToContent="Width" Height="520" MinWidth="700"
+        Title="Remove Duplicates" Width="760" Height="520" MinWidth="480"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        Background="{DynamicResource WindowBg}">
+        Background="{DynamicResource WindowBg}" Loaded="Window_Loaded">
     <Grid Margin="14,10,14,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

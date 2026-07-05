@@ -78,6 +78,21 @@ namespace HolyLogger
             Btn_Delete.Content = $"Delete {extras:N0} Duplicate(s)";
         }
 
+        // Once the auto-width columns have measured against their content, shrink the window to the
+        // table's real width (plus borders/scrollbar/margins) so it hugs the table instead of being
+        // driven wide by the wrapping description line. Capped to the screen work area.
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            double columns = 0;
+            foreach (var c in DupsGrid.Columns) columns += c.ActualWidth;
+            if (columns <= 0) return;
+
+            // grid border (2) + vertical scrollbar (~20) + window margins (28) + frame (~4).
+            double target = columns + 54;
+            double max = SystemParameters.WorkArea.Width;
+            Width = System.Math.Max(MinWidth, System.Math.Min(target, max));
+        }
+
         // yyyyMMdd -> dd-MM-yyyy; unexpected values shown as-is.
         private static string FormatDate(string raw)
         {
