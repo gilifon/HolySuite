@@ -313,7 +313,8 @@
          painted over the frame there, breaking it top and bottom, while the middle rows, with no
          edge-to-edge fill, still showed it. Margin is now 0 so nothing overflows. -->
     <Border BorderBrush="White" BorderThickness="2" CornerRadius="8">
-    <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="0" TextElement.Foreground="{DynamicResource TextBrush}">
+    <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="0" TextElement.Foreground="{DynamicResource TextBrush}"
+          SizeChanged="AddLogGrid_SizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="70" />
             <RowDefinition x:Name="MainForm" Height="332" />

@@ -1101,6 +1101,15 @@ namespace HolyLogger
             }
         }
 
+        // Clips the whole window content to the same rounded rectangle as the white frame (radius 8,
+        // minus the 2px border => 6), so the top corners (title bar) follow the curve like the bottom
+        // ones instead of showing square over the rounded border.
+        private void AddLogGrid_SizeChanged(object sender, SizeChangedEventArgs e)
+        {
+            AddLogGrid.Clip = new System.Windows.Media.RectangleGeometry(
+                new Rect(0, 0, AddLogGrid.ActualWidth, AddLogGrid.ActualHeight), 6, 6);
+        }
+
         private void UTCTimer_Elapsed(object sender, EventArgs e)
         {
             this.Dispatcher.Invoke(() =>

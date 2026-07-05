@@ -493,6 +493,11 @@ namespace HolyLogger
             Grid.SetRow(layoutGrid, 1);
             clusterOuter.Children.Add(clusterTitleBar);
             clusterOuter.Children.Add(layoutGrid);
+            // Clip content to the frame's rounded rectangle so the top corners (title bar) follow
+            // the curve like the bottom ones (radius 8 minus the 2px border => 6).
+            clusterOuter.SizeChanged += (s, e) =>
+                clusterOuter.Clip = new RectangleGeometry(
+                    new Rect(0, 0, clusterOuter.ActualWidth, clusterOuter.ActualHeight), 6, 6);
 
             var clusterFrame = new Border
             {
