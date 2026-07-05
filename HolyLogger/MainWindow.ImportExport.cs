@@ -122,6 +122,9 @@ namespace HolyLogger
 
         private void ImportAdifMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            // Offer to save an in-progress new QSO before an import reloads the log.
+            GuardUnsavedQso("import the ADIF file");
+
             //CultureInfo provider = CultureInfo.InvariantCulture;
             OpenFileDialog openFileDialog = new OpenFileDialog();
             openFileDialog.Filter = "ADIF files (*.adi)|*.adi";

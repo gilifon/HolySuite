@@ -1608,8 +1608,37 @@ namespace HolyLogger
 
         // Makes the given log the active one: reloads the log table, refreshes counts/title and sets
         // Contest Mode to match the log. Used by Create New Log, the contest flow and View Logs -> Open.
+        // True if the entry form holds an in-progress QSO the user hasn't added yet: a new QSO
+        // (state New) with a DX callsign typed in. Editing an existing QSO (state Edit) is not
+        // treated as "unsaved" here -- that QSO already exists in the log.
+        private bool HasUnsavedQso()
+        {
+            return state == State.New && !string.IsNullOrWhiteSpace(TB_DXCallsign?.Text);
+        }
+
+        // Call before any action that would discard the in-progress QSO (switch log, exit, import,
+        // edit another QSO). If one is pending, offers to add (save) it first or discard it. Both
+        // choices let the action continue; there is no unsaved data left either way. actionText is
+        // a short phrase like "switch logs" or "close HolyLogger" for the prompt.
+        private void GuardUnsavedQso(string actionText)
+        {
+            if (!HasUnsavedQso()) return;
+            string call = (TB_DXCallsign.Text ?? string.Empty).Trim();
+            bool save = HolyMessageBox.ShowConfirm(
+                "You have started a QSO for \"" + call + "\" but have not added it to the log yet.\n\n" +
+                "YES — add (save) this QSO first, then " + actionText + ".\n" +
+                "NO — discard it and " + actionText + ".",
+                "Unsaved QSO", HolyMsgType.Warning, this);
+            if (save)
+                AddBtn_Click(null, null);   // add the QSO to the log before the action proceeds
+        }
+
         public void SwitchActiveLog(long logId)
         {
+            // Guard the in-progress QSO before the log changes: it is added to the CURRENT log
+            // (ActiveLogId not changed yet) or discarded, per the user's choice.
+            GuardUnsavedQso("switch logs");
+
             // Loading a large log freezes the UI thread while the grid binds/renders; show a busy
             // overlay + wait cursor so the user knows it is working, not hung.
             Mouse.OverrideCursor = Cursors.Wait;
@@ -2609,7 +2638,9 @@ namespace HolyLogger
         private void EditQsoFromContextMenu(QSO qso)
         {
             if (qso == null) return;
-            if (string.IsNullOrWhiteSpace(TB_DXCallsign.Text) || HolyMessageBox.ShowConfirm("Do you want to override current QSO?", "Edit QSO", HolyMsgType.Warning, this))
+            // Offer to save (or discard) an in-progress new QSO before loading this one for editing,
+            // so it isn't silently overwritten. Both choices proceed to the edit.
+            GuardUnsavedQso("edit the selected QSO");
             {
                 QsoToUpdate = qso;
                 try
@@ -4158,6 +4189,11 @@ namespace HolyLogger
                 e.Cancel = true;
                 return;
             }
+
+            // Offer to save an in-progress QSO before the app closes (unless Windows is ending the
+            // session, where we must not block with a dialog). Only runs once per close attempt.
+            if (!_uploadOnExitHandled && !App.IsWindowsSessionEnding)
+                GuardUnsavedQso("close HolyLogger");
 
             // Upload-on-exit: show ALL service dialogs in one pass before any uploading starts,
             // so we never call Close() from inside an async upload (which caused freezes when the
