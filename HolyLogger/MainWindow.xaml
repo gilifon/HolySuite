@@ -1055,13 +1055,13 @@
              Sized to fully cover the RST R + Serial cells (the first ~122px of ContestRxPanel) with
              an opaque white card, bold red text and a red border, so a duplicate is unmissable
              instead of a small italic word blending into the pale contest-frame background. -->
-        <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,126,0,0"
-               Padding="8,1,8,1" VerticalAlignment="Top" Grid.Row="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+        <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,129,0,0"
+               Padding="8,0,8,0" VerticalAlignment="Top" Grid.Row="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                Background="White" BorderBrush="Red" BorderThickness="2" Foreground="Red" FontWeight="Bold"
-               RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="20" Panel.ZIndex="10"/>
-        <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,126,0,0" Padding="8,2,8,2"
+               RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="15" Panel.ZIndex="10"/>
+        <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,129,0,0" Padding="8,0,8,0"
                    VerticalAlignment="Top" Grid.Row="1" TextAlignment="Center" Background="White" FontWeight="Bold"
-                   FontStyle="Italic" FontSize="16" Visibility="Hidden" Panel.ZIndex="10"><Run Text="Legal " Foreground="#2E7D32"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#2E7D32"/></TextBlock>
+                   FontStyle="Italic" FontSize="15" Visibility="Hidden" Panel.ZIndex="10"><Run Text="Legal " Foreground="#2E7D32"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#2E7D32"/></TextBlock>
         <Border HorizontalAlignment="Left" Margin="237,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
                 <ToolTip>
