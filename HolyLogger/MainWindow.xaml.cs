@@ -1622,6 +1622,8 @@ namespace HolyLogger
         // a short phrase like "switch logs" or "close HolyLogger" for the prompt.
         private void GuardUnsavedQso(string actionText)
         {
+            Log.Warn("GuardUnsavedQso('" + actionText + "'): state=" + state +
+                     ", dxCall='" + (TB_DXCallsign?.Text ?? "<null>") + "' -> unsaved=" + HasUnsavedQso());
             if (!HasUnsavedQso()) return;
             string call = (TB_DXCallsign.Text ?? string.Empty).Trim();
             bool save = HolyMessageBox.ShowConfirm(
@@ -3370,7 +3372,9 @@ namespace HolyLogger
 
         private void ExitMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            Application.Current.Shutdown();
+            // Close() runs the normal Window_Closing path (unsaved-QSO guard + upload-on-exit),
+            // unlike Application.Shutdown() which force-tears-down and can skip that flow.
+            this.Close();
         }
         private void OpenFolderItem_Click(object sender, RoutedEventArgs e)
         {
