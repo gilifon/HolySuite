@@ -16,7 +16,7 @@
                        Foreground="{DynamicResource AccentBrush}"/>
             <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
                        Foreground="{DynamicResource MutedTextBrush}"
-                       Text="QSOs are duplicates when ALL of these match: DX callsign, station callsign, operator, frequency, band, mode, date and time. Rows with the same background color belong to the same duplicate group. The first QSO of each group is KEPT; the others are deleted."/>
+                       Text="QSOs are duplicates when ALL of these match: DX callsign, station callsign, operator, frequency, band, mode, date and time (to the minute). Rows with the same background color belong to the same duplicate group. The first QSO of each group is KEPT; the others are deleted."/>
         </StackPanel>
 
         <DataGrid x:Name="DupsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"

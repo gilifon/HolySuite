@@ -87,12 +87,13 @@ namespace HolyLogger
             return raw;
         }
 
-        // HHmmss -> HH:mm:ss (seconds shown: time is part of the duplicate key).
+        // HHmmss -> HH:mm (time is matched to the minute, so seconds aren't shown).
         private static string FormatTime(string raw)
         {
-            if (!string.IsNullOrWhiteSpace(raw) && raw.Length == 6 &&
-                DateTime.TryParseExact(raw, "HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime t))
-                return t.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            if (!string.IsNullOrWhiteSpace(raw) && raw.Length >= 4 &&
+                DateTime.TryParseExact(raw.Substring(0, Math.Min(6, raw.Length)).PadRight(6, '0'),
+                    "HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime t))
+                return t.ToString("HH:mm", CultureInfo.InvariantCulture);
             return raw;
         }
 

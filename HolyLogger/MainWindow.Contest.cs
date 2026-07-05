@@ -161,6 +161,7 @@ namespace HolyLogger
                 if (ContestTxPanel != null) ContestTxPanel.Visibility = Visibility.Collapsed;
                 if (L_SendLabel != null) L_SendLabel.Visibility = Visibility.Collapsed;
                 ApplyContestLayout(false);
+                UpdateContestLabelContrast();   // label now on the plain form -> theme text color
                 return;
             }
 
@@ -222,6 +223,7 @@ namespace HolyLogger
 
             ContestRxPanel.Visibility = Visibility.Visible;
             ApplyContestLayout(true);
+            UpdateContestLabelContrast();   // labels now on the frames -> contrast per frame color
         }
 
         // Tracks the current received-field signature and the auto serial box so callsign changes can
@@ -411,13 +413,18 @@ namespace HolyLogger
             e.Handled = true;
         }
 
-        // The contest labels sit ON the user-editable frames, so neither black nor the theme text
-        // color is always right: recompute black-or-white from each frame's actual brightness.
+        // The contest labels sit ON the user-editable frames WHILE contesting; outside a contest
+        // the received-exchange label sits on the plain (themed) form instead. So its color must
+        // follow where it actually is: contrast against the frame in contest, the theme text color
+        // otherwise. The send label only ever shows in contest, always on its frame.
         // Called at startup and on every theme/scheme/color change (OnThemeChanged).
         internal void UpdateContestLabelContrast()
         {
-            if (L_ExchangeLabel != null) L_ExchangeLabel.Foreground = ContrastTextFor("ContestRxBg");
-            if (L_SendLabel != null) L_SendLabel.Foreground = ContrastTextFor("ContestTxBg");
+            bool inContest = Contests.ContestService.Active != null;
+            if (L_ExchangeLabel != null)
+                L_ExchangeLabel.Foreground = inContest ? ContrastTextFor("ContestRxBg") : ThemeManager.Brush("TextBrush");
+            if (L_SendLabel != null)
+                L_SendLabel.Foreground = ContrastTextFor("ContestTxBg");
         }
 
         private static Brush ContrastTextFor(string token)

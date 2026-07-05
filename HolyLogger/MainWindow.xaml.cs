@@ -8771,10 +8771,15 @@ namespace HolyLogger
             var groupOrder = new List<List<QSO>>();
             foreach (var q in all)
             {
+                // Time is matched to the MINUTE (HHmm), not the second: the log shows time to the
+                // minute, and two QSOs with the same station/band/mode/frequency in the same minute
+                // are the same contact even if their stored seconds differ.
+                string timeMin = (q.Time ?? "").Trim();
+                if (timeMin.Length > 4) timeMin = timeMin.Substring(0, 4);
                 string key = ((q.DXCall ?? "").Trim() + "|" + (q.MyCall ?? "").Trim() + "|" +
                               (q.Operator ?? "").Trim() + "|" + (q.Freq ?? "").Trim() + "|" +
                               (q.Band ?? "").Trim() + "|" + (q.Mode ?? "").Trim() + "|" +
-                              (q.Date ?? "").Trim() + "|" + (q.Time ?? "").Trim()).ToUpperInvariant();
+                              (q.Date ?? "").Trim() + "|" + timeMin).ToUpperInvariant();
                 if (!groupsByKey.TryGetValue(key, out var group))
                 {
                     group = new List<QSO>();
