@@ -38,14 +38,14 @@ namespace HolyLogger
             MaxWidth = SystemParameters.WorkArea.Width;
             DupsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
 
-            // Two clearly-different alternating group backgrounds (blue vs amber), so adjacent
-            // duplicate groups are easy to tell apart. A light pair for light schemes and a dark
-            // pair for dark schemes, both keeping the theme text color (black/white) readable.
+            // Strongly-contrasting alternating group backgrounds: near-black vs a bright blue, so
+            // adjacent duplicate groups are unmistakable. Light schemes use white vs light-blue.
             bool dark = ThemeManager.IsDark;
-            Brush bgEven = Frozen(dark ? "#18263F" : "#D6E4F7");   // blue
-            Brush bgOdd  = Frozen(dark ? "#3B2E17" : "#F6E7C7");   // amber
-            var keepBrush   = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32));   // green
-            var deleteBrush = ThemeManager.Brush("Danger");
+            Brush bgEven = Frozen(dark ? "#0C0E12" : "#FFFFFF");   // near-black / white
+            Brush bgOdd  = Frozen(dark ? "#1E64C8" : "#BBD6F7");   // bright blue / light blue
+            // Bright green so KEEP stays readable on both the black and the bright-blue rows.
+            var keepBrush   = Frozen("#54D66A");
+            var deleteBrush = Frozen(dark ? "#FF6B6B" : "#C62828");
 
             int extras = 0;
             var rows = new List<Row>();
