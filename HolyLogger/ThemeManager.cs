@@ -145,6 +145,12 @@ namespace HolyLogger
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE = 20;
         private const int DWMWA_USE_IMMERSIVE_DARK_MODE_OLD = 19;
 
+        // Windows 11 rounded window corners. Custom-chrome windows (WindowStyle=None) don't get the
+        // OS default rounding, so request it explicitly; the OS clips the window (content included)
+        // to the rounded outline, so nothing pokes out the corners. Ignored on Windows 10.
+        private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+        private const int DWMWCP_ROUND = 2;
+
         // Makes a window's OS-drawn title bar/border follow the current theme. Without this, the
         // native chrome stays light even when our own DynamicResource-themed content goes dark,
         // producing a jarring light-strip-over-dark-body look (see HolyMessageBox, ViewLogsWindow,
@@ -161,6 +167,10 @@ namespace HolyLogger
                 int hr = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, ref useDark, sizeof(int));
                 if (hr != 0)
                     DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE_OLD, ref useDark, sizeof(int));
+
+                // Rounded corners on Windows 11 (no-op / harmless on Windows 10).
+                int round = DWMWCP_ROUND;
+                DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
 
                 // DWM caches the non-client frame and does not repaint it just because the attribute
                 // changed -- without this, the title bar only picks up the new color after the next

@@ -422,7 +422,14 @@ namespace HolyLogger
         {
             bool inContest = Contests.ContestService.Active != null;
             if (L_ExchangeLabel != null)
-                L_ExchangeLabel.Foreground = inContest ? ContrastTextFor("ContestRxBg") : ThemeManager.Brush("TextBrush");
+            {
+                if (inContest)
+                    L_ExchangeLabel.Foreground = ContrastTextFor("ContestRxBg");
+                else
+                    // Re-establish the live theme binding (not a frozen snapshot) so the label keeps
+                    // following scheme changes while outside a contest.
+                    L_ExchangeLabel.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "TextBrush");
+            }
             if (L_SendLabel != null)
                 L_SendLabel.Foreground = ContrastTextFor("ContestTxBg");
         }

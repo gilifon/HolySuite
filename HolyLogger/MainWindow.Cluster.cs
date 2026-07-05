@@ -498,6 +498,7 @@ namespace HolyLogger
             {
                 BorderBrush = Brushes.White,
                 BorderThickness = new Thickness(2),
+                CornerRadius = new CornerRadius(8),
                 Child = clusterOuter
             };
 

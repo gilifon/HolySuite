@@ -4067,7 +4067,8 @@ namespace HolyLogger
             if (fe == L_SendLabel) return -16;              // "Exchange/send" 2-line label, centered in the band
             if (fe == ContestDividerLine) return 31;        // divider + DX Callsign row
 
-            if (fe == L_ExchangeLabel) return 27;           // "Exchange/received" 2-line label, centered in the frame
+            if (fe == L_ExchangeLabel) return 18;           // "Exchange/received" 2-line label, centered in the frame
+                                                            // (base y moved 141->150 to center on the box; shift cut 27->18 so contest position is unchanged)
 
             // The received exchange box gets a label above it, which lowers it. Drop the RST
             // labels+boxes and the Add(F1) button to that same line so the Exchange row aligns.

@@ -312,7 +312,7 @@
          Border's right edge; rows with a full-bleed Background (the title bar, the status bar) then
          painted over the frame there, breaking it top and bottom, while the middle rows, with no
          edge-to-edge fill, still showed it. Margin is now 0 so nothing overflows. -->
-    <Border BorderBrush="White" BorderThickness="2">
+    <Border BorderBrush="White" BorderThickness="2" CornerRadius="8">
     <Grid x:Name="AddLogGrid" ShowGridLines="false" Margin="0" TextElement.Foreground="{DynamicResource TextBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="70" />
@@ -1094,8 +1094,9 @@
                 ToolTip="Right-click to change the contest exchange colour"/>
         <!-- Foreground of both contest labels is set in code (UpdateContestLabelContrast): black or
              white depending on the brightness of the frame each one sits on, which is user-editable. -->
-        <TextBlock x:Name="L_ExchangeLabel" HorizontalAlignment="Left" Margin="12,141,0,0" VerticalAlignment="Top" Grid.Row="1"
+        <TextBlock x:Name="L_ExchangeLabel" HorizontalAlignment="Left" Margin="12,150,0,0" VerticalAlignment="Top" Grid.Row="1"
                    Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
+                   Foreground="{DynamicResource TextBrush}"
                    ToolTip="The exchange received from the DX station"><Run Text="Exchange" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
         <!-- Contest received-exchange boxes, built at runtime per the active contest (Phase 2). When a
