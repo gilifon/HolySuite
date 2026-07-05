@@ -38,9 +38,12 @@ namespace HolyLogger
             MaxWidth = SystemParameters.WorkArea.Width;
             DupsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
 
-            // Two alternating group backgrounds, both readable with the theme text color.
-            Brush bgEven = ThemeManager.Brush("GridRowBg");
-            Brush bgOdd  = ThemeManager.Brush("FilterRowBg");
+            // Two clearly-different alternating group backgrounds (blue vs amber), so adjacent
+            // duplicate groups are easy to tell apart. A light pair for light schemes and a dark
+            // pair for dark schemes, both keeping the theme text color (black/white) readable.
+            bool dark = ThemeManager.IsDark;
+            Brush bgEven = Frozen(dark ? "#18263F" : "#D6E4F7");   // blue
+            Brush bgOdd  = Frozen(dark ? "#3B2E17" : "#F6E7C7");   // amber
             var keepBrush   = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32));   // green
             var deleteBrush = ThemeManager.Brush("Danger");
 
@@ -76,6 +79,13 @@ namespace HolyLogger
             TB_Header.Text = $"Found {extras:N0} duplicate QSO(s) in {groups.Count:N0} group(s)";
             TB_Summary.Text = $"{rows.Count:N0} QSOs shown — {groups.Count:N0} will be kept, {extras:N0} deleted.";
             Btn_Delete.Content = $"Delete {extras:N0} Duplicate(s)";
+        }
+
+        private static Brush Frozen(string hex)
+        {
+            var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            b.Freeze();
+            return b;
         }
 
         // Once the auto-width columns have measured against their content, shrink the window to the
