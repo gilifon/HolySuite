@@ -4064,9 +4064,9 @@ namespace HolyLogger
             if (fe == FormFrame) return 0;                  // blue entry-form frame is fixed; must not shift
             if (fe == ContestExchangeFrame) return 0;       // frame is positioned for contest mode already
 
-            // Duplicate/Legal banner (now font-height, ~30px): vertically centered on
-            // ContestExchangeFrame's fixed 161-209 span (center 185) regardless of its own baseTop.
-            if (fe == L_Duplicate || fe == L_Legal) return 170 - baseTop;
+            // Duplicate/Legal banner: stays at its base y (just below the DX Callsign box, touching
+            // its lower rim) in contest mode too -- no shift.
+            if (fe == L_Duplicate || fe == L_Legal) return 0;
 
             if (fe.Margin.Left >= 670) return 0;            // right-hand map area never moves
 
