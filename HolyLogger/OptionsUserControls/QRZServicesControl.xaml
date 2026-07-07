@@ -55,14 +55,17 @@
         <Border Grid.Row="5" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,18,0,0"/>
 
         <!-- ── Section 2: QRZ.com Logbook ─────────────────────────────── -->
-        <StackPanel Grid.Row="6" Orientation="Horizontal" Margin="2,14,0,4">
-            <TextBlock Text="QRZ.com Logbook" FontSize="17" FontWeight="Bold" VerticalAlignment="Center"/>
+        <!-- Master switch on top, service name below it, matching the LoTW and eQSL panels. -->
+        <StackPanel Grid.Row="6" Margin="2,14,0,4">
             <!-- Master switch: when off, the Logbook upload service is out of use (no startup
                  configuration alert, no uploads) and its settings below are greyed out. The QRZ
                  Callsign Lookup above is a separate service and stays available. -->
-            <CheckBox x:Name="CBX_UseQrzLogbook" Content="Use QRZ Logbook for QSOs logging"
-                      FontSize="14" FontWeight="Bold" Margin="24,0,0,0" VerticalAlignment="Center"
-                      IsChecked="{Binding Default.UseQrzLogbook, Source={StaticResource Settings}, Mode=TwoWay}"/>
+            <Border HorizontalAlignment="Left" Background="#FFF59D" Margin="0,0,0,8" Padding="6,4,10,4">
+                <CheckBox x:Name="CBX_UseQrzLogbook" Content="Use QRZ Logbook for QSOs logging"
+                          FontSize="15" FontWeight="Bold" HorizontalAlignment="Left"
+                          IsChecked="{Binding Default.UseQrzLogbook, Source={StaticResource Settings}, Mode=TwoWay}"/>
+            </Border>
+            <TextBlock Text="QRZ.com Logbook" FontSize="17" FontWeight="Bold"/>
         </StackPanel>
 
         <Grid Grid.Row="7" Grid.RowSpan="11" IsEnabled="{Binding IsChecked, ElementName=CBX_UseQrzLogbook}">

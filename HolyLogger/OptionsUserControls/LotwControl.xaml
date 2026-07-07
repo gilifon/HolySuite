@@ -8,9 +8,11 @@
     <DockPanel>
         <!-- Master switch: when off, this service is out of use (no startup configuration alert,
              no uploads) and all its settings below are greyed out. -->
-        <CheckBox DockPanel.Dock="Top" x:Name="CBX_UseLotw" Content="Use LoTW for QSOs logging"
-                  FontSize="15" FontWeight="Bold" Margin="2,4,0,8"
-                  IsChecked="{Binding Default.UseLotwService, Source={StaticResource Settings}, Mode=TwoWay}"/>
+        <Border DockPanel.Dock="Top" HorizontalAlignment="Left" Background="#FFF59D" Margin="0,4,0,8" Padding="6,4,10,4">
+            <CheckBox x:Name="CBX_UseLotw" Content="Use LoTW for QSOs logging"
+                      FontSize="15" FontWeight="Bold"
+                      IsChecked="{Binding Default.UseLotwService, Source={StaticResource Settings}, Mode=TwoWay}"/>
+        </Border>
     <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
           IsEnabled="{Binding IsChecked, ElementName=CBX_UseLotw}">
         <Grid.Style>

@@ -11,9 +11,11 @@
     <DockPanel>
         <!-- Master switch: when off, this service is out of use (no startup configuration alert,
              no uploads) and all its settings below are greyed out. -->
-        <CheckBox DockPanel.Dock="Top" x:Name="CBX_UseEqsl" Content="Use eQSL for QSOs logging"
-                  FontSize="15" FontWeight="Bold" Margin="2,4,0,8"
-                  IsChecked="{Binding Default.UseEqslService, Source={StaticResource Settings}, Mode=TwoWay}"/>
+        <Border DockPanel.Dock="Top" HorizontalAlignment="Left" Background="#FFF59D" Margin="0,4,0,8" Padding="6,4,10,4">
+            <CheckBox x:Name="CBX_UseEqsl" Content="Use eQSL for QSOs logging"
+                      FontSize="15" FontWeight="Bold"
+                      IsChecked="{Binding Default.UseEqslService, Source={StaticResource Settings}, Mode=TwoWay}"/>
+        </Border>
     <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
           IsEnabled="{Binding IsChecked, ElementName=CBX_UseEqsl}">
         <Grid.Style>
@@ -38,9 +40,12 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Description -->
-        <TextBlock Grid.Row="0" Margin="2,6,0,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
-                   Text="Add a row for each callsign whose QSOs you want uploaded to eQSL, with its eQSL user name and password. Only callsigns listed here are uploaded — if a callsign is not in this table, its QSOs are never sent to eQSL."/>
+        <!-- Service name + description (title matches the LoTW panel's layout) -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="eQSL LogBook" FontSize="17" FontWeight="Bold" Margin="2,2,0,2"/>
+            <TextBlock Margin="2,0,8,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                       Text="Add a row for each callsign whose QSOs you want uploaded to eQSL, with its eQSL user name and password. Only callsigns listed here are uploaded — if a callsign is not in this table, its QSOs are never sent to eQSL."/>
+        </StackPanel>
 
         <!-- Add row + Show passwords -->
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="2,0,0,6" VerticalAlignment="Center">
