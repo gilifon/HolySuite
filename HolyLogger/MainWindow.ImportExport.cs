@@ -78,9 +78,16 @@ namespace HolyLogger
             catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export CSV", owner); }
         }
 
-        // Reusable Cabrillo export of a given QSO list.
-        public void ExportQsosToCabrillo(System.Collections.ObjectModel.ObservableCollection<QSO> qsos, Window owner)
+        // Reusable Cabrillo export of one log's QSOs. The CONTEST: header MUST name the contest that
+        // THIS log was collected under — its official Cabrillo name — not a global/last-used setting.
+        // logId identifies the log so its stored contest (event_type) can be resolved; a regular
+        // (non-contest) log or an unknown event type leaves CONTEST blank rather than claiming one.
+        public void ExportQsosToCabrillo(System.Collections.ObjectModel.ObservableCollection<QSO> qsos, long logId, Window owner)
         {
+            string eventType = null;
+            try { eventType = dal.GetLogEventType(logId); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            Contests.Contest logContest = Contests.ContestService.FindById(eventType);
+
             Contester c = new Contester
             {
                 Callsign = Properties.Settings.Default.PersonalInfoCallsign,
@@ -89,7 +96,7 @@ namespace HolyLogger
                 Category_Power = Properties.Settings.Default.selectedPower,
                 Category_Band = Properties.Settings.Default.selectedBand,
                 Category_Overlay = Properties.Settings.Default.selectedOverlay,
-                Contest = Properties.Settings.Default.selectedEvent,
+                Contest = logContest?.CabrilloName ?? string.Empty,
                 Email = Properties.Settings.Default.PersonalInfoEmail,
                 Grid = Properties.Settings.Default.my_locator,
                 Name = Properties.Settings.Default.PersonalInfoName,
@@ -484,7 +491,7 @@ namespace HolyLogger
         {
             // Export the ACTIVE log only (the "(Active Log)" menu label). Uses the same helper /
             // save dialog as the View Logs window's Export Cabrillo button.
-            ExportQsosToCabrillo(dal.GetQSOsForLog(dal.ActiveLogId), this);
+            ExportQsosToCabrillo(dal.GetQSOsForLog(dal.ActiveLogId), dal.ActiveLogId, this);
         }
 
         private async Task<string> UploadCabrilloToIARC(string callsign, string op, string mode, string band, string power, string overlay, string email, string name, string country, ObservableCollection<QSO> QSOList)

@@ -369,6 +369,7 @@ namespace HolyLogger
                 case "SERIAL": label = "Serial"; width = 60; break;
                 case "CQ_ZONE": label = "CQ Zone"; width = 52; break;
                 case "ITU_ZONE": label = "ITU"; width = 48; break;
+                case "CONTINENT": label = "Cont"; width = 52; break;
                 case "HOLYLAND_AREA": label = "Area"; width = 72; break;
                 case "STATE": case "STATE_PROVINCE": case "PROVINCE": label = "State/Prov"; width = 72; break;
                 case "NAME": label = "Name"; width = 90; break;

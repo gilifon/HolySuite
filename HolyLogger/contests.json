@@ -12,6 +12,7 @@
     "NAME": "Operator first name",
     "CQ_ZONE": "CQ zone number (1-40)",
     "ITU_ZONE": "ITU zone number (1-90)",
+    "CONTINENT": "Continent abbreviation (NA, SA, EU, AF, AS, OC)",
     "DXCC": "DXCC entity / country name or abbreviation",
     "STATE": "US State abbreviation (e.g. CA, TX)",
     "PROVINCE": "Canadian province abbreviation",
@@ -127,20 +128,32 @@
       "modes": [
         "RTTY"
       ],
-      "asymmetric": false,
+      "asymmetric": true,
       "exchange": {
-        "sent": [
+        "sent_W_VE": [
+          "RST",
+          "CQ_ZONE",
+          "STATE_PROVINCE"
+        ],
+        "sent_non_W_VE": [
           "RST",
           "CQ_ZONE"
         ],
-        "received": [
+        "received_W_VE": [
+          "RST",
+          "CQ_ZONE",
+          "STATE_PROVINCE"
+        ],
+        "received_non_W_VE": [
           "RST",
           "CQ_ZONE"
         ]
       },
+      "notes": "RST + CQ zone; US/Canada additionally send state/province after the zone (Cabrillo order: zone then state)",
       "multipliers": [
         "DXCC per band",
-        "CQ zones per band"
+        "CQ zones per band",
+        "US states + VE provinces per band"
       ],
       "qso_points": "1pt same country, 2pt same continent, 3pt diff continent",
       "dupe_rule": "Once per band",
@@ -464,7 +477,7 @@
       "multipliers": "None — bonus points instead",
       "qso_points": "1pt phone, 2pt CW/digital",
       "dupe_rule": "Once per band per mode",
-      "cabrillo_name": "ARRL-FIELD-DAY",
+      "cabrillo_name": "ARRL-FD",
       "rules_url": "https://www.arrl.org/field-day"
     },
     {
@@ -531,16 +544,14 @@
           "ARRL_SECTION"
         ],
         "sent_DX": [
-          "RST",
-          "DXCC"
+          "RST"
         ],
         "received_W_VE": [
           "RST",
           "ARRL_SECTION"
         ],
         "received_DX": [
-          "RST",
-          "DXCC"
+          "RST"
         ]
       },
       "multipliers": [
@@ -549,7 +560,7 @@
       ],
       "qso_points": "2pt W/VE QSO, 5pt DX QSO",
       "dupe_rule": "Once per contest",
-      "cabrillo_name": "ARRL-160M",
+      "cabrillo_name": "ARRL-160",
       "rules_url": "https://www.arrl.org/160-meter"
     },
     {
@@ -569,7 +580,7 @@
       "exchange": {
         "sent_W_VE": [
           "RST",
-          "STATE"
+          "STATE_PROVINCE"
         ],
         "sent_DX": [
           "RST",
@@ -577,21 +588,21 @@
         ],
         "received_W_VE": [
           "RST",
-          "STATE_or_SERIAL"
+          "STATE_PROVINCE"
         ],
         "received_DX": [
           "RST",
-          "STATE_or_SERIAL"
+          "SERIAL"
         ]
       },
-      "notes": "W/VE send State; DX sends serial number",
+      "notes": "W/VE (and Mexico) send State/Province; DX sends serial number; maritime mobile sends ITU region",
       "multipliers": [
         "US states per mode",
         "DXCC entities per mode"
       ],
       "qso_points": "SSB: 2pt, CW: 4pt",
       "dupe_rule": "Once per band per mode",
-      "cabrillo_name": "ARRL-10M",
+      "cabrillo_name": "ARRL-10",
       "rules_url": "https://www.arrl.org/10-meter"
     },
     {
@@ -711,7 +722,7 @@
       ],
       "qso_points": "1 point per QSO",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "WAE-SSB",
+      "cabrillo_name": "DARC-WAEDC-SSB",
       "rules_url": "https://www.darc.de/der-club/referate/dx/wae-dx-contest/en/"
     },
     {
@@ -747,7 +758,7 @@
       ],
       "qso_points": "1 point per QSO",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "WAE-CW",
+      "cabrillo_name": "DARC-WAEDC-CW",
       "rules_url": "https://www.darc.de/der-club/referate/dx/wae-dx-contest/en/"
     },
     {
@@ -782,7 +793,7 @@
       ],
       "qso_points": "1 point per QSO",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "WAE-RTTY",
+      "cabrillo_name": "DARC-WAEDC-RTTY",
       "rules_url": "https://www.darc.de/der-club/referate/dx/wae-dx-contest/en/"
     },
     {
@@ -898,7 +909,7 @@
         ],
         "sent_DX": [
           "RST",
-          "DXCC"
+          "CQ_ZONE"
         ],
         "received_W_VE": [
           "RST",
@@ -906,7 +917,7 @@
         ],
         "received_DX": [
           "RST",
-          "DXCC"
+          "CQ_ZONE"
         ]
       },
       "multipliers": [
@@ -939,7 +950,7 @@
         ],
         "sent_DX": [
           "RST",
-          "DXCC"
+          "CQ_ZONE"
         ],
         "received_W_VE": [
           "RST",
@@ -947,7 +958,7 @@
         ],
         "received_DX": [
           "RST",
-          "DXCC"
+          "CQ_ZONE"
         ]
       },
       "multipliers": [
@@ -997,7 +1008,7 @@
       ],
       "qso_points": "1pt same continent, 3pt different continent",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "ALL-ASIAN-DX-CW",
+      "cabrillo_name": "AADX-CW",
       "rules_url": "https://www.jarl.org/English/4_Library/A-4-3_Contests/allasian-e.htm"
     },
     {
@@ -1033,7 +1044,7 @@
       ],
       "qso_points": "1pt same continent, 3pt different continent",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "ALL-ASIAN-DX-PHONE",
+      "cabrillo_name": "AADX-SSB",
       "rules_url": "https://www.jarl.org/English/4_Library/A-4-3_Contests/allasian-e.htm"
     },
     {
@@ -1068,7 +1079,7 @@
       ],
       "qso_points": "1pt same continent, 3pt different continent",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "OCEANIA-DX-PHONE",
+      "cabrillo_name": "OCEANIA-DX-SSB",
       "rules_url": "https://ocdxc.com/rules/"
     },
     {
@@ -1187,7 +1198,7 @@
       "multipliers": "JA: CQ zones; non-JA: JA prefectures per band",
       "qso_points": "1pt same continent, 3pt different continent",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "JIDX-PHONE",
+      "cabrillo_name": "JIDX-SSB",
       "rules_url": "https://jidx.org/index-e.html"
     },
     {
@@ -1279,7 +1290,7 @@
       ],
       "qso_points": "1pt same continent, 3pt different continent",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "UKR-CHAMP",
+      "cabrillo_name": "UKRAINIAN-DX",
       "rules_url": "https://www.ucc.zp.ua/en/"
     },
     {
@@ -1373,7 +1384,7 @@
       ],
       "qso_points": "1pt same country, 2pt same continent, 3pt different continent",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "HEL",
+      "cabrillo_name": "HELVETIA",
       "rules_url": "https://www.uska.ch/aktivitaeten/contests/helvetia-contest/"
     },
     {
@@ -1419,7 +1430,7 @@
       ],
       "qso_points": "See rules",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "KOS-SSB",
+      "cabrillo_name": "EA-MAJESTAD-SSB",
       "rules_url": "https://concursos.ure.es"
     },
     {
@@ -1463,7 +1474,7 @@
         "DXCC entities per band"
       ],
       "dupe_rule": "Once per band",
-      "cabrillo_name": "KOS-CW",
+      "cabrillo_name": "EA-MAJESTAD-CW",
       "rules_url": "https://concursos.ure.es"
     },
     {
@@ -1554,7 +1565,7 @@
         "Polish districts per band"
       ],
       "dupe_rule": "Once per band",
-      "cabrillo_name": "SP-DX-RTTY",
+      "cabrillo_name": "SPDX",
       "rules_url": "https://www.pzk.org.pl/en/sp-dx-contest"
     },
     {
@@ -1744,7 +1755,7 @@
       ],
       "qso_points": "1pt per QSO",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "BARTG-HF-RTTY",
+      "cabrillo_name": "BARTG-RTTY",
       "rules_url": "https://www.bartg.org.uk/contests/"
     },
     {
@@ -1869,7 +1880,7 @@
       ],
       "qso_points": "1pt per QSO",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "CWT",
+      "cabrillo_name": "CW-OPS",
       "rules_url": "https://cwops.org/cwops-tests/"
     },
     {
@@ -1988,7 +1999,7 @@
       ],
       "qso_points": "1pt per QSO",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "RAC-CANADA-DAY",
+      "cabrillo_name": "CANADA-DAY",
       "rules_url": "https://www.rac.ca/canada-day-and-winter-contests/"
     },
     {
@@ -2016,18 +2027,18 @@
         ],
         "sent_non_LZ": [
           "RST",
-          "SERIAL"
+          "ITU_ZONE"
         ],
         "received_LZ": [
           "RST",
-          "SERIAL"
+          "DISTRICT"
         ],
         "received_non_LZ": [
           "RST",
-          "DISTRICT"
+          "ITU_ZONE"
         ]
       },
-      "notes": "LZ stations send their district code; others send serial",
+      "notes": "LZ stations send their 2-letter district code; others send their ITU zone",
       "multipliers": [
         "LZ districts per band per mode"
       ],
@@ -2076,7 +2087,7 @@
         "OK/OM districts per band"
       ],
       "dupe_rule": "Once per band",
-      "cabrillo_name": "OK-OM-DX-CW",
+      "cabrillo_name": "OK-OM-DX",
       "rules_url": "https://www.okomdx.radioamater.cz/"
     },
     {
@@ -2203,7 +2214,7 @@
       ],
       "qso_points": "1pt per QSO",
       "dupe_rule": "Once per band",
-      "cabrillo_name": "COMM-CW",
+      "cabrillo_name": "RSGB-COMMONWEALTH",
       "rules_url": "https://www.rsgbcc.org/hf/rules/"
     },
     {
@@ -2227,19 +2238,19 @@
       "exchange": {
         "sent": [
           "RST",
-          "CQ_ZONE"
+          "CONTINENT"
         ],
         "received": [
           "RST",
-          "CQ_ZONE"
+          "CONTINENT"
         ]
       },
       "multipliers": [
-        "CQ zones"
+        "Continents and countries"
       ],
-      "qso_points": "1-5pt depending on CQ zone difference",
+      "qso_points": "RST + continent (e.g. 599 SA). CWJF members append C.",
       "dupe_rule": "Once per band per mode",
-      "cabrillo_name": "CQMM",
+      "cabrillo_name": "CQMMDX",
       "rules_url": "https://www.cqmm.org/"
     },
     {
@@ -2260,14 +2271,14 @@
       "exchange": {
         "sent": [
           "FIELD_DAY_CLASS",
-          "STATE_PROVINCE_DXCC"
+          "FIELD_DAY_SECTION"
         ],
         "received": [
           "FIELD_DAY_CLASS",
-          "STATE_PROVINCE_DXCC"
+          "FIELD_DAY_SECTION"
         ]
       },
-      "notes": "Similar to ARRL Field Day. Class example: 1H = 1 transmitter, Home.",
+      "notes": "Category/Class + location: US/Canada send ARRL/RAC section, Mexico sends MX, all others send DX. Class example: 1O = 1 transmitter, Outdoor.",
       "multipliers": "None",
       "qso_points": "1pt phone, 2pt CW/digital",
       "dupe_rule": "Once per band per mode",

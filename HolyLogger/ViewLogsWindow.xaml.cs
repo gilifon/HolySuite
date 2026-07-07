@@ -179,7 +179,7 @@ namespace HolyLogger
                 HolyMessageBox.ShowWarning("Cabrillo export is for contest logs. This log is a normal (day-by-day) log — use Export ADIF instead.", "Export Cabrillo", this);
                 return;
             }
-            _main.ExportQsosToCabrillo(_dal.GetQSOsForLog(Selected.Id), this);
+            _main.ExportQsosToCabrillo(_dal.GetQSOsForLog(Selected.Id), Selected.Id, this);
         }
     }
 }
