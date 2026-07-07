@@ -49,16 +49,16 @@ namespace HolyLogger
     {
         public static readonly IReadOnlyList<ColorScheme> Schemes = new List<ColorScheme>
         {
-            new ColorScheme("light",    "Light",         isDarkChrome: false, column: 0),
-            new ColorScheme("dark",     "Dark",          isDarkChrome: true,  column: 1),
-            new ColorScheme("midnight", "Midnight Blue", isDarkChrome: true,  column: 2),
+            new ColorScheme("light",    "Light",     isDarkChrome: false, column: 0),
+            new ColorScheme("dark",     "Dark",      isDarkChrome: true,  column: 1),
+            new ColorScheme("myscheme", "My scheme", isDarkChrome: true,  column: 2),
         };
 
         // The scheme for an id, falling back to the first (light) for unknown/legacy values.
         public static ColorScheme FindScheme(string id)
             => Schemes.FirstOrDefault(s => s.Id == id) ?? Schemes[0];
 
-        //                                              Light        Dark         Midnight
+        //                                              Light        Dark         My scheme
         public static readonly Dictionary<string, string[]> Tokens = new Dictionary<string, string[]>
         {
             // ---- Surfaces -------------------------------------------------------------------------
@@ -95,6 +95,9 @@ namespace HolyLogger
             { "FilterRowBg",      new[] { "#C8F0D0", "#1E4030", "#1E4030" } }, // QSO grid: filtered-match row
             { "FilterRowAltBg",   new[] { "#A8D8B4", "#183328", "#183328" } }, // QSO grid: filtered-match alt row
 
+            // ---- Window chrome ----------------------------------------------------------------------
+            { "TitleBarBg",       new[] { "#F0F0F0", "#121316", "#0D1420" } }, // window title-bar background; drives the main + cluster custom title bars everywhere, and native dialog captions on Win11. Matches WindowBg by default.
+
             // ---- Designer accent surfaces (same in every scheme by design; user-overridable) -------
             { "LogHeaderBg",      new[] { "#DEB887", "#DEB887", "#DEB887" } }, // QSO log / cluster / Logs window header row (black text on it)
             { "ContestRxBg",      new[] { "#FFF6C8", "#FFF6C8", "#FFF6C8" } }, // contest mode: received-exchange frame
@@ -129,6 +132,8 @@ namespace HolyLogger
             new TokenInfo("FilterRowAltBg",   "Tables", "Filter match rows (alt.)",   "Every second filter-match row."),
             new TokenInfo("RowHoverBg",       "Tables", "Cluster: map-hovered spot",  "Cluster row highlighted while hovering its dot on the map."),
             new TokenInfo("RowOnFreqBg",      "Tables", "Cluster: on-frequency spot", "Cluster row whose frequency matches your radio."),
+
+            new TokenInfo("TitleBarBg",       "Window chrome", "Title bar",              "Background of the title bar on the main window and the Cluster window. Dialog title bars also follow it on Windows 11."),
 
             new TokenInfo("ContestRxBg",      "Contest mode", "Received exchange frame", "The frame behind the received-exchange boxes in contest mode. Also editable by right-clicking the frame itself."),
             new TokenInfo("ContestTxBg",      "Contest mode", "Send exchange band",      "The band behind the sent-exchange boxes in contest mode. Also editable by right-clicking the band itself."),

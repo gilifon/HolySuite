@@ -461,7 +461,7 @@ namespace HolyLogger
                 dlg.Color = System.Drawing.Color.FromArgb(current.R, current.G, current.B);
                 if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
                 {
-                    ThemeManager.SetCustomOverride(token,
+                    ThemeManager.SetOverride(token,
                         string.Format("#{0:X2}{1:X2}{2:X2}", dlg.Color.R, dlg.Color.G, dlg.Color.B));
                 }
             }

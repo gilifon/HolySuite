@@ -6,6 +6,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Input;
 using System.Windows.Threading;
@@ -17,6 +18,15 @@ namespace HolyLogger
     /// </summary>
     public partial class App : Application
     {
+        // Overrides the ~1s OS-default hover delay for every ToolTip in the app, so they all pop
+        // consistently instead of only the handful of controls that set ToolTipService.InitialShowDelay
+        // locally. Must run once, before any FrameworkElement is created, hence static ctor.
+        static App()
+        {
+            ToolTipService.InitialShowDelayProperty.OverrideMetadata(typeof(FrameworkElement), new FrameworkPropertyMetadata(400));
+            ToolTipService.BetweenShowDelayProperty.OverrideMetadata(typeof(FrameworkElement), new FrameworkPropertyMetadata(0));
+        }
+
         // True once Windows starts ending the session (logoff / shutdown / restart). Checked by
         // MainWindow.Window_Closing to skip the upload-on-exit dialogs: a modal dialog there would
         // stall the whole logoff, and WPF ignores e.Cancel during session end anyway, which used

@@ -11,11 +11,10 @@ namespace HolyLogger
     // "Customize Colors" (View > Color Scheme > Customize Colors): shows every color role from
     // ThemePalette.TokenCatalog with a friendly name, an explanation, and a clickable swatch.
     //
-    // Model: edits are layered on top of the built-in scheme that was active when editing began
-    // (the "base"). The first change creates the user's Custom scheme and activates it; every
-    // change applies to the whole application IMMEDIATELY (ThemeManager re-resolves all
-    // DynamicResource brushes) and is saved. Per-row Reset returns one color to the base scheme's
-    // value; Reset All discards the Custom scheme entirely and reactivates the base.
+    // Model: the selected scheme is edited IN PLACE. Every change applies to the whole application
+    // IMMEDIATELY (ThemeManager re-resolves all DynamicResource brushes) and is saved to that
+    // scheme, which keeps its name. Per-row Reset returns one color to the scheme's factory value;
+    // Reset All returns every color to factory. No separate "Custom" scheme is ever created.
     public partial class ColorSchemeEditorWindow : Window
     {
         // Everything the UI needs to keep one color row up to date after an edit or reset.
@@ -29,50 +28,42 @@ namespace HolyLogger
 
         private readonly List<Row> _rows = new List<Row>();
 
-        // The working copy of the custom colors (token -> hex) and the built-in base scheme.
+        // The working copy of the active scheme's user edits (token -> hex) and the scheme itself.
         private Dictionary<string, string> _colors;
-        private ColorScheme _base;
+        private ColorScheme _scheme;
 
         public ColorSchemeEditorWindow()
         {
             InitializeComponent();
 
-            // Dead simple model: you always edit whatever scheme is on screen right now. Under the
-            // hood, edits to a built-in scheme are stored as the "Custom" scheme (built-ins are
-            // never modified), but the user just sees: open, click, done.
-            bool editingCustom = ThemeManager.CurrentSchemeId == CustomSchemeStore.Id;
-            if (editingCustom)
-            {
-                _base = ThemePalette.FindScheme(CustomSchemeStore.BaseId);
-                _colors = CustomSchemeStore.Load() ?? new Dictionary<string, string>();
-            }
-            else
-            {
-                _base = ThemeManager.CurrentScheme;
-                _colors = new Dictionary<string, string>();
-            }
+            // Dead simple model: you edit whatever scheme is selected right now, in place. Your
+            // changes are saved to that scheme and remembered; the factory colors are always
+            // recoverable via Reset. Open, click, done.
+            _scheme = ThemeManager.CurrentScheme;
+            _colors = SchemeOverrides.For(_scheme.Id);
 
             Title = "Customize Current Color Scheme";
 
             // The banner names the scheme being edited -- the one currently on screen.
             TB_BannerPrefix.Text = "You are editing color scheme:";
-            TB_BannerScheme.Text = editingCustom ? "CUSTOM" : _base.DisplayName.ToUpperInvariant();
+            TB_BannerScheme.Text = _scheme.DisplayName.ToUpperInvariant();
 
             TB_SubHeader.Text =
                 "Click a color square to change it — changes apply immediately to the whole application and are "
-                + "saved automatically as \"Custom\" in the Color Scheme menu. The built-in schemes (Light, Dark, …) "
-                + "are never modified; you can always switch back to them.";
+                + "saved to the \"" + _scheme.DisplayName + "\" scheme. Use Reset (or Reset All) at any time to return "
+                + "a color to this scheme's original value.";
 
             BuildRows();
             UpdateFooter();
         }
 
-        // The hex a token should currently show: the user's override, or the base scheme's value.
+        // The hex a token should currently show: the user's edit, or the scheme's factory value.
         private string EffectiveHex(string token)
             => _colors.TryGetValue(token, out string hex) ? hex : BaseHex(token);
 
+        // The scheme's factory palette value -- what Reset returns the token to.
         private string BaseHex(string token)
-            => ThemePalette.Tokens.TryGetValue(token, out string[] row) ? row[_base.Column] : "#FF6600";
+            => ThemePalette.Tokens.TryGetValue(token, out string[] row) ? row[_scheme.Column] : "#FF6600";
 
         private void BuildRows()
         {
@@ -145,7 +136,7 @@ namespace HolyLogger
                 FontSize = 11,
                 Padding = new Thickness(6, 2, 6, 2),
                 VerticalAlignment = VerticalAlignment.Center,
-                ToolTip = "Return this color to the " + _base.DisplayName + " scheme's value"
+                ToolTip = "Return this color to the " + _scheme.DisplayName + " scheme's original value"
             };
             reset.Click += (s, e) => ResetOne(info);
             Grid.SetColumn(reset, 3);
@@ -193,36 +184,28 @@ namespace HolyLogger
             RefreshRow(_rows.First(r => r.Info.Key == info.Key));
         }
 
-        // Persist the working colors as the Custom scheme and apply them live everywhere. When the
-        // last override is removed, the Custom scheme is deleted and the base scheme reactivated,
-        // so an all-default "Custom" entry never lingers in the menu.
+        // Persist the working edits to the active scheme and apply them live everywhere. When the
+        // last edit is removed, the scheme's stored overrides are cleared, so it returns to its
+        // pristine factory colors with no leftover state.
         private void SaveAndApply()
         {
-            if (_colors.Count == 0)
-            {
-                CustomSchemeStore.Delete();
-                ThemeManager.Apply(_base.Id);
-            }
-            else
-            {
-                CustomSchemeStore.Save(_colors, _base.Id);
-                ThemeManager.Apply(CustomSchemeStore.Id);
-            }
+            SchemeOverrides.Save(_scheme.Id, _colors);
+            ThemeManager.Apply(_scheme.Id);
             UpdateFooter();
         }
 
         private void UpdateFooter()
         {
             TB_BaseInfo.Text = _colors.Count == 0
-                ? "No changes yet — showing the " + _base.DisplayName + " scheme."
-                : _colors.Count + " color(s) changed, based on the " + _base.DisplayName + " scheme.";
+                ? "No changes yet — showing the original " + _scheme.DisplayName + " colors."
+                : _colors.Count + " color(s) changed from the original " + _scheme.DisplayName + " colors.";
             Btn_ResetAll.IsEnabled = _colors.Count > 0;
         }
 
         private void Btn_ResetAll_Click(object sender, RoutedEventArgs e)
         {
             if (!HolyMessageBox.ShowConfirm(
-                    "Discard ALL your color changes and return to the " + _base.DisplayName + " scheme?",
+                    "Discard ALL your color changes to the " + _scheme.DisplayName + " scheme and return it to its original colors?",
                     "Reset All Colors", HolyMsgType.Warning, this))
                 return;
 

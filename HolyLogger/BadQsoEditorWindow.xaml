@@ -41,7 +41,6 @@
                 <DataGridTextColumn Header="ID" Binding="{Binding id}" Width="45" IsReadOnly="True">
                     <DataGridTextColumn.HeaderStyle>
                         <Style TargetType="DataGridColumnHeader">
-                            <Setter Property="ToolTipService.InitialShowDelay" Value="0"/>
                             <Setter Property="ToolTip" Value="Internal database record number — not a ham radio field"/>
                         </Style>
                     </DataGridTextColumn.HeaderStyle>

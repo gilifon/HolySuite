@@ -4971,8 +4971,8 @@ namespace HolyLogger
         }
 
         // Fills View > Color Scheme with one radio-checked item per scheme in ThemePalette.Schemes,
-        // plus the user's Custom scheme (when one exists) and the "Customize Colors" editor entry.
-        // Adding a scheme to the palette automatically shows up here -- no menu code to touch.
+        // plus the "Customize Colors" editor entry. Schemes are edited in place, so there is no
+        // separate "Custom" entry. Adding a scheme to the palette automatically shows up here.
         private void BuildColorSchemeMenu()
         {
             if (ColorSchemeMenuItem == null) return;
@@ -4981,14 +4981,11 @@ namespace HolyLogger
             foreach (var scheme in ThemePalette.Schemes)
                 ColorSchemeMenuItem.Items.Add(MakeSchemeItem(scheme.Id, scheme.DisplayName));
 
-            if (CustomSchemeStore.Exists)
-                ColorSchemeMenuItem.Items.Add(MakeSchemeItem(CustomSchemeStore.Id, "Custom"));
-
             ColorSchemeMenuItem.Items.Add(new Separator());
             var customize = new MenuItem
             {
                 Header = "Customize Current Color Scheme",
-                ToolTip = "Change individual colors of the scheme you are using now; your changes are saved as the Custom scheme"
+                ToolTip = "Change individual colors of the scheme you are using now; your changes are saved to that scheme and can be undone with Reset"
             };
             customize.Click += CustomizeColorsItem_Click;
             ColorSchemeMenuItem.Items.Add(customize);
@@ -5026,8 +5023,7 @@ namespace HolyLogger
         {
             var editor = new ColorSchemeEditorWindow { Owner = this };
             editor.ShowDialog();
-            // The editor may have created or deleted the Custom scheme; rebuild so the menu
-            // reflects it and the checkmark sits on whatever is active now.
+            // Edits stay on the active scheme; rebuild only to keep the checkmark correct.
             BuildColorSchemeMenu();
         }
 

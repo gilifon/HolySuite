@@ -326,7 +326,7 @@
                  frame border (bottom of this file) can wrap the whole window including the title bar.
                  Height must match shell:WindowChrome.CaptionHeight for drag/snap/double-click-maximize
                  to line up. Only the 3 buttons opt out of the draggable "caption" area. -->
-            <Border x:Name="CustomTitleBar" DockPanel.Dock="Top" Height="32" Background="{DynamicResource WindowBg}">
+            <Border x:Name="CustomTitleBar" DockPanel.Dock="Top" Height="32" Background="{DynamicResource TitleBarBg}">
                 <DockPanel LastChildFill="True">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <Button x:Name="TitleBar_MinimizeBtn" Content="&#xE921;" Style="{StaticResource CaptionButtonStyle}"
@@ -673,7 +673,7 @@
                     </StatusBarItem.ContextMenu>
                     <StackPanel Orientation="Horizontal">
                         <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}" Margin="0,0,0,0" FontSize="16" VerticalAlignment="Center"/>
-                        <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="30,0,0,0" Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1" ToolTipService.InitialShowDelay="200" ToolTipService.Placement="Top" Visibility="Visible" Cursor="Hand" Click="ShareStatusButton_Click">
+                        <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="30,0,0,0" Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1" ToolTipService.Placement="Top" Visibility="Visible" Cursor="Hand" Click="ShareStatusButton_Click">
                             <Button.ToolTip>
                                 <TextBlock TextAlignment="Center">
                                     <Run Text="Send heartbeat to"/>
@@ -711,8 +711,7 @@
                          active (gold trophy + contest name); completely hidden otherwise. Entering or
                          leaving a contest happens in exactly one place: File > Log Manager. -->
                     <StackPanel x:Name="ContestIndicatorPanel" Orientation="Horizontal" Visibility="Collapsed">
-                    <Border x:Name="ContestIndicator" Width="26" Height="24" Margin="5,0,0,0" CornerRadius="4" Background="Transparent"
-                            ToolTipService.InitialShowDelay="0">
+                    <Border x:Name="ContestIndicator" Width="26" Height="24" Margin="5,0,0,0" CornerRadius="4" Background="Transparent">
                         <Viewbox Width="20" Height="20" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Path x:Name="ContestIndicatorPath" Stretch="Uniform" Width="24" Height="24"
                                   Data="M19 5h-2V3H7v2H5c-1.1 0-2 .9-2 2v1c0 2.55 1.92 4.63 4.39 4.94.63 1.5 1.98 2.63 3.61 2.96V19H7v2h10v-2h-4v-3.1c1.63-.33 2.98-1.46 3.61-2.96C19.08 12.63 21 10.55 21 8V7c0-1.1-.9-2-2-2zM5 8V7h2v3.82C5.84 10.4 5 9.3 5 8zm14 0c0 1.3-.84 2.4-2 2.82V7h2v1z"
@@ -1062,7 +1061,7 @@
         <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,129,0,0" Padding="8,0,8,0"
                    VerticalAlignment="Top" Grid.Row="1" TextAlignment="Center" Background="White" FontWeight="Bold"
                    FontStyle="Italic" FontSize="15" Visibility="Hidden" Panel.ZIndex="10"><Run Text="Legal " Foreground="#2E7D32"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#2E7D32"/></TextBlock>
-        <Border HorizontalAlignment="Left" Margin="237,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.InitialShowDelay="100" ToolTipService.ShowDuration="15000">
+        <Border HorizontalAlignment="Left" Margin="237,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
                 <ToolTip>
                     <StackPanel>

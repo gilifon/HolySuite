@@ -619,7 +619,7 @@ namespace HolyLogger
             dock.Children.Add(titleText);
 
             var bar = new Border { Height = 32, Child = dock };
-            bar.SetResourceReference(Border.BackgroundProperty, "WindowBg");
+            bar.SetResourceReference(Border.BackgroundProperty, "TitleBarBg");
             return bar;
         }
 
@@ -843,7 +843,6 @@ namespace HolyLogger
             spotsGrid.SetBinding(FrameworkElement.MaxWidthProperty, dgMaxWidthBinding);
 
 
-            ToolTipService.SetInitialShowDelay(spotsGrid, 50);
             ToolTipService.SetShowDuration(spotsGrid, 3000);
 
             clusterHoverToolTip = new ToolTip

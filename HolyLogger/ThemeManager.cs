@@ -13,28 +13,30 @@ namespace HolyLogger
     // code subscribes to ThemeChanged and re-paints. The choice is persisted in Settings.
     public static class ThemeManager
     {
-        // The BASE built-in scheme currently in effect. When the user's Custom scheme is active,
-        // this is the scheme it was derived from (supplying chrome darkness and reset values);
-        // check CurrentSchemeId to know whether Custom itself is what's selected.
+        // The scheme currently in effect. Schemes are edited in place, so this is exactly what the
+        // user selected -- there is no separate "Custom" scheme layered on top of a base anymore.
         public static ColorScheme CurrentScheme { get; private set; } = ThemePalette.FindScheme("light");
 
-        // What the user actually selected: a built-in scheme id, or CustomSchemeStore.Id.
+        // The selected scheme's id ("light"/"dark"/"myscheme"). Kept as a distinct property because
+        // callers (menu checkmarks, the editor) key off it.
         public static string CurrentSchemeId { get; private set; } = "light";
 
-        // The user's custom token->hex overrides while the Custom scheme is active; null otherwise.
-        private static System.Collections.Generic.Dictionary<string, string> _customColors;
+        // The current scheme's user edits (token -> hex), layered on top of the factory palette
+        // column. Empty for an untouched scheme.
+        private static System.Collections.Generic.Dictionary<string, string> _overrides
+            = new System.Collections.Generic.Dictionary<string, string>();
 
         // True when the ACTIVE SCHEME declares dark chrome -- drives the DWM title-bar color and
         // any icon/asset choices. A property of the scheme, not of which scheme is selected, so
         // any number of dark-ish schemes work without touching this.
         public static bool IsDark => CurrentScheme.IsDarkChrome;
 
-        // The hex currently in effect for a token: the custom override when the Custom scheme is
-        // active and defines it, otherwise the base scheme's palette value. This is what the
-        // Customize Colors dialog shows in its swatches.
+        // The hex currently in effect for a token: the user's edit for the active scheme if it has
+        // one, otherwise the scheme's factory palette value. This is what the Customize Colors
+        // dialog shows in its swatches.
         public static string CurrentHex(string token)
         {
-            if (_customColors != null && _customColors.TryGetValue(token, out string custom)) return custom;
+            if (_overrides != null && _overrides.TryGetValue(token, out string edited)) return edited;
             return ThemePalette.Tokens.TryGetValue(token, out string[] row) ? row[CurrentScheme.Column] : "#FF6600";
         }
 
@@ -61,22 +63,10 @@ namespace HolyLogger
 
         public static void Apply(string schemeId)
         {
-            // The Custom scheme is not a palette column: it is the user's stored token->hex map,
-            // layered over the built-in scheme it was derived from (which also supplies the
-            // window-chrome darkness and any token added to the palette after it was saved).
-            if (schemeId == CustomSchemeStore.Id)
-            {
-                _customColors = CustomSchemeStore.Load();
-                if (_customColors == null) schemeId = "light";   // custom requested but none stored
-                else schemeId = CustomSchemeStore.BaseId;
-            }
-            else
-            {
-                _customColors = null;
-            }
-
             CurrentScheme = ThemePalette.FindScheme(schemeId);
-            CurrentSchemeId = _customColors != null ? CustomSchemeStore.Id : CurrentScheme.Id;
+            CurrentSchemeId = CurrentScheme.Id;
+            // Layer this scheme's saved user edits over its factory palette column.
+            _overrides = SchemeOverrides.For(CurrentSchemeId);
 
             var res = Application.Current.Resources;
             foreach (var kv in ThemePalette.Tokens)
@@ -115,17 +105,14 @@ namespace HolyLogger
         // Convenience overload kept for the old Light/Dark toggle call sites.
         public static void Apply(bool dark) => Apply(dark ? "dark" : "light");
 
-        // Sets one token in the user's Custom scheme and applies it immediately -- the programmatic
-        // twin of the Customize Colors dialog, used by in-place shortcuts like right-clicking the
-        // contest exchange frames. Creates the Custom scheme (based on the active scheme) if needed.
-        public static void SetCustomOverride(string token, string hex)
+        // Sets one token in the active scheme and applies it immediately -- the programmatic twin of
+        // the Customize Colors dialog, used by in-place shortcuts like right-clicking the contest
+        // exchange frames. The edit is saved to whichever scheme is selected and remembered for it.
+        public static void SetOverride(string token, string hex)
         {
-            var colors = (CurrentSchemeId == CustomSchemeStore.Id ? CustomSchemeStore.Load() : null)
-                         ?? new System.Collections.Generic.Dictionary<string, string>();
-            string baseId = CurrentSchemeId == CustomSchemeStore.Id ? CustomSchemeStore.BaseId : CurrentScheme.Id;
-            colors[token] = hex;
-            CustomSchemeStore.Save(colors, baseId);
-            Apply(CustomSchemeStore.Id);
+            _overrides[token] = hex;
+            SchemeOverrides.Save(CurrentSchemeId, _overrides);
+            Apply(CurrentSchemeId);
         }
 
         [DllImport("dwmapi.dll", PreserveSig = true)]
@@ -151,6 +138,15 @@ namespace HolyLogger
         private const int DWMWA_WINDOW_CORNER_PREFERENCE = 33;
         private const int DWMWCP_ROUND = 2;
 
+        // Windows 11 (build 22000+) only: paints the caption itself in an arbitrary color, instead
+        // of the plain dark/light the IMMERSIVE_DARK_MODE flag above gives you. Windows 10 rejects
+        // this attribute (DwmSetWindowAttribute returns a failure HRESULT), which we just ignore --
+        // the window keeps whatever IMMERSIVE_DARK_MODE already gave it.
+        private const int DWMWA_CAPTION_COLOR = 35;
+
+        // DWM wants a COLORREF (0x00BBGGRR), not the ARGB order WPF's Color uses.
+        private static int ToColorRef(Color c) => c.R | (c.G << 8) | (c.B << 16);
+
         // Makes a window's OS-drawn title bar/border follow the current theme. Without this, the
         // native chrome stays light even when our own DynamicResource-themed content goes dark,
         // producing a jarring light-strip-over-dark-body look (see HolyMessageBox, ViewLogsWindow,
@@ -172,6 +168,11 @@ namespace HolyLogger
                 int round = DWMWCP_ROUND;
                 DwmSetWindowAttribute(hwnd, DWMWA_WINDOW_CORNER_PREFERENCE, ref round, sizeof(int));
 
+                // Paint the title bar itself with the scheme's TitleBarBg token (Windows 11 only;
+                // silently ignored on Windows 10, leaving the plain dark/light chrome above).
+                int caption = ToColorRef((Color)ColorConverter.ConvertFromString(CurrentHex("TitleBarBg")));
+                DwmSetWindowAttribute(hwnd, DWMWA_CAPTION_COLOR, ref caption, sizeof(int));
+
                 // DWM caches the non-client frame and does not repaint it just because the attribute
                 // changed -- without this, the title bar only picks up the new color after the next
                 // resize/move, so it still shows light the first time a dialog opens. Forcing a
@@ -191,17 +192,35 @@ namespace HolyLogger
                 if (string.IsNullOrEmpty(id))
                     id = Properties.Settings.Default.DarkMode ? "dark" : "light";
 
+                id = MigrateLegacySchemeId(id);
                 id = MigrateLegacyItemColors(id);
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             Apply(id ?? "light");
         }
 
+        // Maps ids saved by earlier builds onto the current scheme set: the removed single "Custom"
+        // scheme resolves to the base it was derived from (its stored edits are folded onto that base
+        // by SchemeOverrides' own format migration), and the renamed "midnight" scheme becomes
+        // "myscheme".
+        private static string MigrateLegacySchemeId(string schemeId)
+        {
+            if (schemeId == "custom")
+            {
+                string baseId = null;
+                try { baseId = Properties.Settings.Default.CustomSchemeBaseId; }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                return string.IsNullOrWhiteSpace(baseId) ? "light" : baseId;
+            }
+            if (schemeId == "midnight") return "myscheme";
+            return schemeId;
+        }
+
         // One-time migration of the pre-palette per-item color settings (main form background,
         // table header row, contest exchange frames -- formerly edited in Options > User Interface)
-        // into Custom-scheme overrides, so nobody's chosen colors are lost by the consolidation.
-        // Afterward the legacy settings are reset to their defaults so this never re-triggers.
-        // Returns the scheme id to apply (switches to "custom" when anything was migrated).
+        // into the target scheme's overrides, so nobody's chosen colors are lost by the
+        // consolidation. Afterward the legacy settings are reset to their defaults so this never
+        // re-triggers. Returns the (unchanged) scheme id to apply.
         private static string MigrateLegacyItemColors(string schemeId)
         {
             var s = Properties.Settings.Default;
@@ -213,22 +232,19 @@ namespace HolyLogger
                 ("ContestTxBg",  s.ContestSendColor,              "#E1F5EE"),
             };
 
-            var overrides = new System.Collections.Generic.Dictionary<string, string>();
+            var found = new System.Collections.Generic.Dictionary<string, string>();
             foreach (var item in legacy)
                 if (!string.IsNullOrWhiteSpace(item.Value)
                     && !string.Equals(item.Value.Trim(), item.Default, StringComparison.OrdinalIgnoreCase))
-                    overrides[item.Token] = item.Value.Trim();
+                    found[item.Token] = item.Value.Trim();
 
-            if (overrides.Count == 0) return schemeId;
+            if (found.Count == 0) return schemeId;
 
-            var colors = CustomSchemeStore.Load() ?? new System.Collections.Generic.Dictionary<string, string>();
-            string baseId = CustomSchemeStore.Exists
-                ? CustomSchemeStore.BaseId
-                : (schemeId == CustomSchemeStore.Id ? "light" : schemeId);
-            foreach (var kv in overrides)
-                if (!colors.ContainsKey(kv.Key))   // never overwrite an explicit Customize Colors choice
-                    colors[kv.Key] = kv.Value;
-            CustomSchemeStore.Save(colors, baseId);
+            var overrides = SchemeOverrides.For(schemeId);
+            foreach (var kv in found)
+                if (!overrides.ContainsKey(kv.Key))   // never overwrite an explicit Customize Colors choice
+                    overrides[kv.Key] = kv.Value;
+            SchemeOverrides.Save(schemeId, overrides);
 
             s.MainFormBackgroundColor = "#BDDFFF";
             s.QsoTableHeaderBackgroundColor = "#DEB887";
@@ -236,8 +252,8 @@ namespace HolyLogger
             s.ContestSendColor = "#E1F5EE";
             try { s.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
-            Log.Warn("Migrated legacy item colors into the Custom scheme: " + string.Join(", ", overrides.Keys));
-            return CustomSchemeStore.Id;
+            Log.Warn("Migrated legacy item colors into the " + schemeId + " scheme: " + string.Join(", ", found.Keys));
+            return schemeId;
         }
 
         public static void Toggle() => Apply(IsDark ? "light" : "dark");
