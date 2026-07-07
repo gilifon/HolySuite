@@ -42,7 +42,15 @@
       "PowerShell(\"=== last 6 commits ===\")",
       "PowerShell(\"=== current branch ===\")",
       "Read(//c/Dropbox/My Documents/מצגת על StepSL/**)",
-      "PowerShell(Get-HotFix)"
+      "PowerShell(Get-HotFix)",
+      "Bash(grep -v -i \"/obj/\\\\|\\\\\\\\\\\\\\\\obj\\\\\\\\\\\\\\\\\")",
+      "Bash(find /c/dev/HolySuite -maxdepth 1 -iname \"VersionInfo.cs\")",
+      "Bash(where msbuild.exe)",
+      "Bash(dotnet --version)",
+      "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/**)",
+      "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe\" HolyLogger/HolyLogger.csproj /p:Configuration=Debug /t:Build /v:minimal /nologo)",
+      "Bash(cmd //c \"start HolyLogger.exe\")",
+      "PowerShell(Start-Process \"C:\\\\dev\\\\HolySuite\\\\HolyLogger\\\\bin\\\\x86\\\\Debug\\\\HolyLogger.exe\")"
     ]
   }
 }

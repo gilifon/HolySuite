@@ -5,7 +5,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
              mc:Ignorable="d" 
-             d:DesignHeight="530" d:DesignWidth="850">
+             d:DesignHeight="560" d:DesignWidth="850">
 
     <Grid ShowGridLines="false" HorizontalAlignment="Stretch">
         <CheckBox x:Name="CBX_IsShowMatrix" Content="Show matrix in main window" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.IsShowMatrixControl, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,0,0,0"/>
@@ -15,6 +15,7 @@
         <CheckBox x:Name="CBX_Lock" Content="Lock My Callsign" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isLocked, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,104,0,0"/>
         <CheckBox x:Name="CBX_DisplayLastQSOinGrid" Content="Highlight last QSO" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.DisplayLastQSOinGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,130,0,0"/>
         <CheckBox x:Name="CBX_UseDXCCDefaultGrid" Content="Use default grid for DXCC" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.UseDXCCDefaultGrid, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,156,0,0"/>
+        <Border HorizontalAlignment="Left" VerticalAlignment="Top" Margin="-4,174,0,0" Width="364" Height="76" BorderBrush="#888888" BorderThickness="1" CornerRadius="4"/>
         <CheckBox x:Name="CBX_ShowCallsignDropdown" Content="Show callsign autocomplete dropdown" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowCallsignDropdown, Source={StaticResource Settings}, Mode=TwoWay}" FontSize="16" Margin="0,182,0,0"/>
         <Label Content="Callsign autocomplete # of lines" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,210,0,0" FontSize="16"/>
         <ComboBox x:Name="CB_CallsignSuggestionRows" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="260,216,0,0" SelectionChanged="CB_CallsignSuggestionRows_SelectionChanged" FontSize="16">
@@ -24,8 +25,8 @@
             <ComboBoxItem Content="25"/>
             <ComboBoxItem Content="30"/>
         </ComboBox>
-        <Label Content="Auto Fit Radius % Increas by" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,240,0,0" FontSize="16"/>
-        <ComboBox x:Name="CB_MapAutoFitMargin" HorizontalAlignment="Left" VerticalAlignment="Top" Width="60" Height="28" Margin="260,246,0,0" SelectionChanged="CB_MapAutoFitMargin_SelectionChanged" FontSize="16">
+        <Label Content="Auto Fit Map Radius increase by" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,254,0,0" FontSize="16"/>
+        <ComboBox x:Name="CB_MapAutoFitMargin" HorizontalAlignment="Left" VerticalAlignment="Top" Width="60" Height="28" Margin="260,260,0,0" SelectionChanged="CB_MapAutoFitMargin_SelectionChanged" FontSize="16">
             <ComboBoxItem Content="0"/>
             <ComboBoxItem Content="5"/>
             <ComboBoxItem Content="10"/>
@@ -33,18 +34,19 @@
             <ComboBoxItem Content="20"/>
             <ComboBoxItem Content="25"/>
         </ComboBox>
-        <Label Content="DX station distance unit" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,270,0,0" FontSize="16"/>
-        <ComboBox x:Name="CB_MapDistanceUnit" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="260,276,0,0" SelectionChanged="CB_MapDistanceUnit_SelectionChanged" FontSize="16">
+        <Label Content="%" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="326,260,0,0" FontSize="16"/>
+        <Label Content="DX station distance unit" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,298,0,0" FontSize="16"/>
+        <ComboBox x:Name="CB_MapDistanceUnit" HorizontalAlignment="Left" VerticalAlignment="Top" Width="90" Height="28" Margin="260,304,0,0" SelectionChanged="CB_MapDistanceUnit_SelectionChanged" FontSize="16">
             <ComboBoxItem Content="KM"/>
             <ComboBoxItem Content="Miles"/>
         </ComboBox>
-        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="90" Margin="0,306,0,0" VerticalAlignment="Top" Width="360" FontSize="16" HorizontalAlignment="Left">
+        <GroupBox x:Name="groupBox" Header="When 'Enter' is pressed" Height="90" Margin="0,344,0,0" VerticalAlignment="Top" Width="360" FontSize="16" HorizontalAlignment="Left">
             <StackPanel>
                 <RadioButton x:Name="DoNothing_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Do Nothing" Click="HasChanged_Click" IsChecked="{Binding Default.DoNothing, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
-        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,404,0,0" Width="360" FontSize="16">
+        <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,442,0,0" Width="360" FontSize="16">
             <TextBlock Margin="6,8" FontSize="13" TextWrapping="Wrap"
                        Text="All application colors (form background, table headers, contest frames, …) are now edited in one place: View  ›  Color Scheme  ›  Customize Colors."/>
         </GroupBox>
