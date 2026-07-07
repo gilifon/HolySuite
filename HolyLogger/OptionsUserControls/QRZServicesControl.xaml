@@ -65,7 +65,6 @@
                           FontSize="15" FontWeight="Bold" HorizontalAlignment="Left"
                           IsChecked="{Binding Default.UseQrzLogbook, Source={StaticResource Settings}, Mode=TwoWay}"/>
             </Border>
-            <TextBlock Text="QRZ.com Logbook" FontSize="17" FontWeight="Bold"/>
         </StackPanel>
 
         <Grid Grid.Row="7" Grid.RowSpan="11" IsEnabled="{Binding IsChecked, ElementName=CBX_UseQrzLogbook}">
@@ -92,8 +91,13 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Margin="2,0,8,10" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
-                   Text="Each QSO you log is uploaded to your QRZ.com online logbook the moment you save it. Requires an active QRZ XML Logbook Data Subscription and your Logbook API Key (found on your QRZ.com logbook settings page)."/>
+        <!-- Service name + description inside the greyable grid, so both dim when the master
+             switch is off (matching the LoTW and eQSL panels). -->
+        <StackPanel Grid.Row="0">
+            <TextBlock Text="QRZ.com Logbook" FontSize="17" FontWeight="Bold" Margin="2,0,0,4"/>
+            <TextBlock Margin="2,0,8,10" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                       Text="Each QSO you log is uploaded to your QRZ.com online logbook the moment you save it. Requires an active QRZ XML Logbook Data Subscription and your Logbook API Key (found on your QRZ.com logbook settings page)."/>
+        </StackPanel>
 
         <Label Grid.Row="1" Content="Logbook API Key" HorizontalAlignment="Left" Margin="0,4,0,0"
                VerticalAlignment="Top" FontSize="14"/>
