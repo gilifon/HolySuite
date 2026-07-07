@@ -6633,11 +6633,29 @@ namespace HolyLogger
             return false;
         }
 
-        // Blocks non-English characters typed into any text box.
+        // Throttles the "wrong keyboard language" beep so a held-down key (auto-repeat) or fast
+        // mashing does not machine-gun the sound; a deliberate keystroke still beeps each time.
+        private DateTime _lastNonEnglishBeepUtc = DateTime.MinValue;
+
+        // Blocks non-English characters typed into any text box, and beeps so the operator notices
+        // their keyboard is in a non-English state (e.g. Hebrew) — otherwise the blocked keystroke
+        // is silent and looks like the field is broken.
         private void GlobalTextBox_EnglishOnly_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             if (!IsEnglishOnly(e.Text))
+            {
                 e.Handled = true;
+
+                if (Properties.Settings.Default.NonEnglishKeyBeep)
+                {
+                    var now = DateTime.UtcNow;
+                    if ((now - _lastNonEnglishBeepUtc).TotalMilliseconds > 200)
+                    {
+                        _lastNonEnglishBeepUtc = now;
+                        try { System.Media.SystemSounds.Beep.Play(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                    }
+                }
+            }
         }
 
         // Cancels a paste into any text box when the clipboard text contains non-English characters.

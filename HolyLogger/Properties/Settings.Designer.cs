@@ -1155,6 +1155,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool NonEnglishKeyBeep {
+            get {
+                return ((bool)(this["NonEnglishKeyBeep"]));
+            }
+            set {
+                this["NonEnglishKeyBeep"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string Operator {
             get {
