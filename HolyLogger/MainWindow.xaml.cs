@@ -798,18 +798,15 @@ namespace HolyLogger
 
         private void ToggleMatrixControl()
         {
-            if (Properties.Settings.Default.IsShowMatrixControl)
-            {
-                MatrixC.Visibility = Visibility.Visible;
-                MainForm.Height = new GridLength(325);
-                MapControl.Height = 325;
-            }
-            else
-            {
-                MatrixC.Visibility = Visibility.Hidden;
-                MainForm.Height = new GridLength(270);
-                MapControl.Height = 270;
-            }
+            // Only the matrix's own visibility changes with the setting. The form row and map keep
+            // their full height either way, so hiding the matrix leaves an empty area of the same
+            // size in its place and the rest of the GUI (log table below, map on the right) does not
+            // move.
+            MatrixC.Visibility = Properties.Settings.Default.IsShowMatrixControl
+                ? Visibility.Visible
+                : Visibility.Hidden;
+            MainForm.Height = new GridLength(325);
+            MapControl.Height = 325;
         }
 
         private void UpdateGraphicsBoxDisplay()

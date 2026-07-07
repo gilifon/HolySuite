@@ -333,6 +333,16 @@ namespace HolyLogger
                 ContestSendBand.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
             if (ContestExchangeFrame != null)
                 ContestExchangeFrame.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
+
+            // The log-row "Set Radio to Freq" undo icon: the generic row-shift above would drop it
+            // onto the packed contest exchange row. In contest mode park it just under the Spot (F3)
+            // button instead — horizontally centered to that button (button center x 619.5, icon
+            // 26 wide) and vertically centered on the send-exchange band (band center y 97). In
+            // normal (non-contest) mode leave it in its usual XAML spot.
+            if (MainUndoIconGrid != null)
+                MainUndoIconGrid.Margin = contest
+                    ? new Thickness(607, 84, 0, 0)
+                    : new Thickness(16, 164, 0, 0);
         }
 
         private void ContestRxBox_TextChanged(object sender, TextChangedEventArgs e)
