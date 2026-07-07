@@ -334,5 +334,18 @@ namespace HolyLogger
                 }
             }), DispatcherPriority.Background);
         }
+
+        // Colored vs. Black & White map: the flag is baked into the map HTML at generation time
+        // (like the day/night flag), so a full RefreshMap re-reads the setting and redraws.
+        public void UpdateMapColorMode()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (MapControl != null)
+                {
+                    MapControl.RefreshMap();
+                }
+            }), DispatcherPriority.Background);
+        }
     }
 }

@@ -452,15 +452,20 @@ var radiusMeters = " + radiusMeters.ToString(ic) + @";
 var radiusKm = radiusMeters / 1000;
 var useMiles = " + useMilesJs + @";
 var showDayNight = " + (Properties.Settings.Default.MapShowDayNight ? "true" : "false") + @";
+var mapBW = " + (Properties.Settings.Default.MapBlackWhite ? "true" : "false") + @";
 var clusterSpots = " + spotsJs.ToString() + @";
 var map = L.map('map', { zoomControl:false, attributionControl:false, zoomSnap:0 }).setView([homeLat, homeLon], 4);
-// Colored countries drawn from the same embedded data + palette as the polar map (offline),
-// on the ocean-colored background, instead of online OpenStreetMap tiles.
+// Countries drawn from the same embedded data + palette as the polar map (offline), on the
+// ocean-colored background, instead of online OpenStreetMap tiles. In Black & White mode the
+// countries are white with black borders (water stays light blue).
 try {
     var dxccFC = { type:'FeatureCollection', features: window.DXCC_DATA.features.map(function(f){ return { type:'Feature', properties:{ci:f.ci}, geometry:f.geometry }; }) };
     L.geoJSON(dxccFC, {
         interactive:false,
-        style: function(feat){ return { fillColor: window.DXCC_DATA.palette[feat.properties.ci] || '#e0e0e0', fillOpacity:0.92, color:'#777777', weight:0.4 }; }
+        style: function(feat){
+            if (mapBW) return { fillColor:'#ffffff', fillOpacity:1, color:'#000000', weight:0.6 };
+            return { fillColor: window.DXCC_DATA.palette[feat.properties.ci] || '#e0e0e0', fillOpacity:0.92, color:'#777777', weight:0.4 };
+        }
     }).addTo(map);
 } catch(eCountry) {}
 // Equator
@@ -927,6 +932,7 @@ var radiusKm = " + radiusKm.ToString() + @";
 var marginMultiplier = " + marginJs + @";
 var useMiles = " + useMilesJs + @";
 var showDayNight = " + (Properties.Settings.Default.MapShowDayNight ? "true" : "false") + @";
+var mapBW = " + (Properties.Settings.Default.MapBlackWhite ? "true" : "false") + @";
 var clusterSpots = " + spotsJs.ToString() + @"; // [[lon,lat],...]
 var autoZoomInitActive = " + (Properties.Settings.Default.MapAutoZoom ? "true" : "false") + @";
 var EARTH_KM = 6371;
@@ -1262,8 +1268,8 @@ try {
     var dxccPalette = window.DXCC_DATA.palette;
     countriesG.selectAll('path').data(dxccFeatures).enter().append('path')
         .attr('d', path)
-        .attr('fill', function(d) { return dxccPalette[d.properties.ci]; })
-        .attr('stroke', '#777777').attr('stroke-width', 0.4);
+        .attr('fill', function(d) { return mapBW ? '#ffffff' : dxccPalette[d.properties.ci]; })
+        .attr('stroke', mapBW ? '#000000' : '#777777').attr('stroke-width', mapBW ? 0.6 : 0.4);
 } catch(e) {}
 drawOverlays();
 drawDayNight();
@@ -2329,6 +2335,7 @@ function scaleToRadius() {
 var oceanFill = svg.append('circle').attr('class', 'ocean-fill')
     .attr('cx', cx).attr('cy', cy).attr('r', mapR)
     .attr('fill', '#b8e8ee').attr('stroke', '#000000').attr('stroke-width', 1.5);
+var mapBW = " + (Properties.Settings.Default.MapBlackWhite ? "true" : "false") + @";
 
 // Layer for countries (inserted before overlays)
 var countriesG = svg.append('g').attr('clip-path', 'url(#globe-clip)');
@@ -2476,8 +2483,8 @@ try {
     var dxccPalette = window.DXCC_DATA.palette;
     countriesG.selectAll('path').data(dxccFeatures).enter().append('path')
         .attr('d', path)
-        .attr('fill', function(d) { return dxccPalette[d.properties.ci]; })
-        .attr('stroke', '#777777').attr('stroke-width', 0.4);
+        .attr('fill', function(d) { return mapBW ? '#ffffff' : dxccPalette[d.properties.ci]; })
+        .attr('stroke', mapBW ? '#000000' : '#777777').attr('stroke-width', mapBW ? 0.6 : 0.4);
 } catch(e4) {}
 drawOverlays();
 drawRadiusRing(radiusKm);

@@ -373,6 +373,9 @@ namespace HolyLogger.OptionsUserControls
                     CBX_ClusterPopup.IsChecked = mainWindow.GetClusterHoverPopupEnabled();
                     CBX_ClusterPlotMap.IsChecked = Properties.Settings.Default.ClusterMapEnabled;
                     CBX_MapShowDayNight.IsChecked = Properties.Settings.Default.MapShowDayNight;
+                    bool mapBW = Properties.Settings.Default.MapBlackWhite;
+                    RB_MapColor_BW.IsChecked = mapBW;
+                    RB_MapColor_Colored.IsChecked = !mapBW;
                 }
                 finally
                 {
@@ -414,6 +417,21 @@ namespace HolyLogger.OptionsUserControls
             if (mainWindow != null)
             {
                 mainWindow.UpdateMapDayNightOverlay();
+            }
+        }
+
+        private void MapColorMode_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_isLoadingClusterSettings)
+                return;
+
+            Properties.Settings.Default.MapBlackWhite = RB_MapColor_BW.IsChecked == true;
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            var mainWindow = Application.Current.MainWindow as MainWindow;
+            if (mainWindow != null)
+            {
+                mainWindow.UpdateMapColorMode();
             }
         }
 
