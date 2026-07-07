@@ -352,6 +352,15 @@ namespace HolyLogger
                     _contestRxBoxes.Select(b => b.Text).Where(t => !string.IsNullOrWhiteSpace(t)));
         }
 
+        // Empties the contest received-exchange cells beside RST-R. Called from the form Clear (F9/F1)
+        // so those cells reset like every other QSO field; the RST-R cell is handled by the normal
+        // RST reset. No-op outside contest mode (the list is empty).
+        internal void ClearContestReceivedExchange()
+        {
+            foreach (var b in _contestRxBoxes)
+                b.Text = string.Empty;
+        }
+
         // Friendly label + box width for a contest exchange field name.
         private static void ContestFieldUi(string field, out string label, out double width)
         {

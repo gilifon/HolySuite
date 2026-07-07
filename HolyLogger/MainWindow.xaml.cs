@@ -1480,6 +1480,9 @@ namespace HolyLogger
             SetClusterRowMapHighlight(null);
             TB_DXCallsign.Clear();
             TB_Exchange.Clear();
+            // Contest mode: also empty the received-exchange cells beside RST-R (they mirror into
+            // TB_Exchange, which we just cleared, but the visible cells keep their own text).
+            ClearContestReceivedExchange();
             TB_DXLocator.Clear();
             TB_ITUZone.Text = "";
             TB_CQZone.Text = "";
@@ -6423,7 +6426,16 @@ namespace HolyLogger
             }
             else if (e.Key == Key.Space)
             {
-                e.Handled = true;
+                e.Handled = true;   // a space is never part of a callsign
+
+                // Contest mode: Space jumps straight to the first received-exchange cell (the one
+                // right after RST-R), skipping RST-R for fast entry. Tab still stops on RST-R first.
+                if (Properties.Settings.Default.ContestMode && _contestRxBoxes.Count > 0)
+                {
+                    TextBox target = _contestRxBoxes[0];
+                    target.Focus();
+                    target.SelectAll();
+                }
             }
         }
 
