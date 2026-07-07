@@ -23,6 +23,19 @@ namespace HolyLogger
         private static readonly Brush ClearActiveBrush = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
         private static readonly Brush ClearIdleBrush   = new SolidColorBrush(Color.FromRgb(0x75, 0x75, 0x75));
 
+        // A click on a callsign in the results opens that station's QRZ.com page in the default
+        // browser — the callsign acts like a web link (hand cursor + "QRZ" tooltip in the XAML).
+        // Gated on ClickCount==1 so a double-click opens the page once, not twice.
+        private void Callsign_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ClickCount != 1) return;
+            var qso = (sender as FrameworkElement)?.DataContext as QSO;
+            string call = (qso?.DXCall ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrWhiteSpace(call)) return;
+            try { System.Diagnostics.Process.Start("https://www.qrz.com/db/" + call); }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
         public SearchWindow(ObservableCollection<QSO> qsos)
         {
             InitializeComponent();

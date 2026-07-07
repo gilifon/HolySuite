@@ -3833,6 +3833,7 @@ namespace HolyLogger
             TB_State.Background = backgroundColor;
             TB_DXLocator.Background = backgroundColor;
             TB_Comment.Background = backgroundColor;
+            TB_DXCC.Background = backgroundColor;
             CB_Mode.Background = backgroundColor;
         }
         
@@ -8440,6 +8441,13 @@ namespace HolyLogger
 
         private async void GetQrzData()
         {
+            // Snapshot the lookup revision up front. Typing another character, and clearing the form
+            // with F9 or Add-with-F1 (both empty the DX-callsign box, which bumps this counter), all
+            // change it — so a QRZ response that comes back after the operator has moved on is
+            // discarded instead of writing stale ITU/CQ zones, name, etc. onto a cleared/different
+            // callsign. This mirrors the revision guard already used for the QRZ photo below.
+            int revisionAtStart = callsignLookupRevision;
+
             if (string.IsNullOrWhiteSpace(SessionKey) && isNetworkAvailable)
             {
                 // Await the login instead of blocking the UI thread on a synchronous web request.
@@ -8458,7 +8466,7 @@ namespace HolyLogger
                     XDocument xDoc = XDocument.Parse(responseFromServer);
                     XNamespace ns = xDoc.Root.GetDefaultNamespace();
 
-                    if (!string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && (dxcall == TB_DXCallsign.Text.Trim()))
+                    if (revisionAtStart == callsignLookupRevision && !string.IsNullOrWhiteSpace(SessionKey) && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text) && (dxcall == TB_DXCallsign.Text.Trim()))
                     {
                         IEnumerable<XElement> xref = xDoc.Root.Descendants(ns + "xref");
                         IEnumerable<XElement> call = xDoc.Root.Descendants(ns + "call");
