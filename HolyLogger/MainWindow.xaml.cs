@@ -999,6 +999,47 @@ namespace HolyLogger
                 TB_RSTSent.Text = "599";
                 TB_RSTRcvd.Text = "599";
             }
+
+            // One-time, skippable offer to set an off-machine backup folder. Deferred to ApplicationIdle
+            // so it appears only after the startup splash has closed (the splash is Topmost and would
+            // otherwise cover it) and never holds up the window finishing its load.
+            Dispatcher.BeginInvoke(new Action(MaybePromptForExtraBackupFolder),
+                System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+
+        // Shown once (to both new and existing users) so the extra-backup-folder feature gets
+        // discovered. The ExtraBackupPrompted flag guarantees it is never shown again, whatever the
+        // user chooses. If a folder is already set, we just mark it prompted and skip.
+        private void MaybePromptForExtraBackupFolder()
+        {
+            var s = Properties.Settings.Default;
+            if (s.ExtraBackupPrompted)
+                return;
+
+            // Mark as asked up front, so a crash/close mid-prompt can't make it reappear next launch.
+            s.ExtraBackupPrompted = true;
+            s.Save();
+
+            if (!string.IsNullOrWhiteSpace(s.ExtraBackupFolder))
+                return;   // already configured (e.g. via Backups & Restore) -- nothing to offer
+
+            bool wantsToSet = HolyMessageBox.ShowConfirm(
+                "HolyLogger keeps daily backups of your log on this computer.\n\n" +
+                "Would you like to also save a copy of each backup to another folder — for example a " +
+                "cloud folder (Dropbox / OneDrive / Google Drive) or an external drive? That gives you an " +
+                "off-machine copy in case something happens to this PC.\n\n" +
+                "You can always set or change this later in File → Backups & Restore.",
+                "Extra backup copy", HolyMsgType.Info, this);
+
+            if (!wantsToSet)
+                return;
+
+            if (BackupRestoreWindow.TryPickWritableFolder(this, null, out string chosen))
+            {
+                s.ExtraBackupFolder = chosen;
+                s.Save();
+                HolyMessageBox.ShowSuccess("Extra backups will be saved to:\n" + chosen, "Extra backup copy", this);
+            }
         }
 
         // Custom title bar button handlers (WindowStyle="None" -- see MainWindow.xaml). These call
@@ -4389,7 +4430,6 @@ namespace HolyLogger
         // owned by the dead window.
         private void DoShutdownCleanup()
         {
-            SaveAutosnapshot();
             // Land any debounced settings write still waiting on its timer (window bounds saved
             // moments before exit would otherwise be lost with the timer).
             SettingsFlush.FlushNow();
@@ -6171,20 +6211,20 @@ namespace HolyLogger
             return false;
         }
 
-        // Help -> Open Backups Folder: straight to the daily backups and their HOW TO RESTORE.txt,
-        // not the parent data folder full of internals (logDB.db, cty.dat, ...) the user must not
-        // touch by accident. The restore instructions handle the one step that needs the parent.
-        private void OpenDataFolderMenuItem_Click(object sender, RoutedEventArgs e)
+        // File -> Backups & Restore: shows the restore instructions in-app (the same text as
+        // HOW TO RESTORE.txt) with a button to open the daily-backups folder, so the user sees
+        // exactly what to do without having to hunt for and open the text file.
+        private void BackupRestoreMenuItem_Click(object sender, RoutedEventArgs e)
         {
             try
             {
-                System.IO.Directory.CreateDirectory(dal.BackupsFolder);   // first run: may not exist yet
-                System.Diagnostics.Process.Start("explorer.exe", dal.BackupsFolder);
+                var win = new BackupRestoreWindow(DataAccess.GetRestoreInstructions(), dal.BackupsFolder) { Owner = this };
+                win.ShowDialog();
             }
             catch (Exception ex)
             {
                 Log.Swallow(ex);
-                HolyMessageBox.ShowError("Could not open the backups folder:\n" + dal.BackupsFolder, "Open Backups Folder", this);
+                HolyMessageBox.ShowError("Could not open Backups & Restore:\n" + ex.Message, "Backups & Restore", this);
             }
         }
 

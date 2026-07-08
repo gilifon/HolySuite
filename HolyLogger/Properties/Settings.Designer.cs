@@ -2184,5 +2184,29 @@ namespace HolyLogger.Properties {
                 this["LotwWebPassword"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ExtraBackupFolder {
+            get {
+                return ((string)(this["ExtraBackupFolder"]));
+            }
+            set {
+                this["ExtraBackupFolder"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ExtraBackupPrompted {
+            get {
+                return ((bool)(this["ExtraBackupPrompted"]));
+            }
+            set {
+                this["ExtraBackupPrompted"] = value;
+            }
+        }
     }
 }

@@ -387,19 +387,20 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
+                    <MenuItem x:Name="BackupRestoreMenuItem" Header="Backups &amp; Restore" ToolTip="View restore instructions and open the daily-backups folder" Click="BackupRestoreMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- Material "folder_open" -->
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
+                                      Data="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <!--<MenuItem x:Name="OpenFolderItem" Header="Open application directory" Click="OpenFolderItem_Click" ToolTip="Open the upload report folder">
                                 <MenuItem.Icon>
                                     <Image Source="Images/folder.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
-                    <MenuItem x:Name="ImportAutosaveMenuItem" Header="Import Autosaved Log" ToolTip="Restore log from an autosaved backup file" Click="ImportAutosaveMenuItem_Click">
-                        <MenuItem.Icon>
-                            <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
-                                      Data="M13 3C8.03 3 4 7.03 4 12H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z"/>
-                            </Viewbox>
-                        </MenuItem.Icon>
-                    </MenuItem>
                     <Separator />
                     <MenuItem x:Name="ExitMenuItem" Header="Exit" Click="ExitMenuItem_Click" ToolTip="Close the program">
                         <MenuItem.Icon>
@@ -571,16 +572,6 @@
                     <MenuItem x:Name="OnTheAir" Header="HolyLogger On The Air" ToolTip="A cluster of HolyLogger user that are currently on the air" Click="OnTheAirMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator />
-                    <MenuItem x:Name="OpenDataFolderMenuItem" Header="Open Backups Folder" ToolTip="Open the folder with the daily backups of your log database and the restore instructions" Click="OpenDataFolderMenuItem_Click">
-                        <MenuItem.Icon>
-                            <!-- Material "folder_open" -->
-                            <Viewbox Width="16" Height="16">
-                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
-                                      Data="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"/>
-                            </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />

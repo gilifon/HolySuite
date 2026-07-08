@@ -77,7 +77,7 @@ namespace HolyLogger
         public string BackupsFolder => Path.Combine(DataFolder, "Backups");
 
         // How many daily backups to keep in the Backups folder; older ones are pruned.
-        private const int DailyBackupsToKeep = 7;
+        private const int DailyBackupsToKeep = 12;
 
         // Copies logDB.db to Backups\logDB-yyyy-MM-dd.db once per calendar day (extra app starts
         // on the same day are no-ops), then prunes to the newest DailyBackupsToKeep copies.
@@ -111,6 +111,12 @@ namespace HolyLogger
                 // so they are exactly where the user is looking when disaster strikes. Rewritten on
                 // every startup so they always match the current app version's behavior.
                 WriteRestoreInstructions(backupDir);
+
+                // Also mirror today's backup to the optional user-configured extra folder (e.g. a
+                // cloud or external-drive folder) for an off-machine copy. Runs in the background so
+                // a slow/offline destination never delays startup.
+                if (File.Exists(todays))
+                    CopyDailyBackupToExtraFolder(todays);
             }
             catch (Exception ex)
             {
@@ -118,11 +124,55 @@ namespace HolyLogger
             }
         }
 
+        // Copies today's daily backup to Settings.ExtraBackupFolder (if the user set one) and prunes
+        // that folder to the same retention. Backups are static files (never opened live by SQLite),
+        // so a cloud-synced or network destination is safe here — unlike the live database. Runs on a
+        // background thread and swallows every error: this is a bonus copy that must never block or
+        // crash startup, even if the destination is offline, unplugged, or read-only.
+        private void CopyDailyBackupToExtraFolder(string dailyBackupFile)
+        {
+            string extra = Properties.Settings.Default.ExtraBackupFolder;
+            if (string.IsNullOrWhiteSpace(extra)) return;
+
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    Directory.CreateDirectory(extra);
+
+                    string dest = Path.Combine(extra, Path.GetFileName(dailyBackupFile));
+                    if (!File.Exists(dest))
+                        File.Copy(dailyBackupFile, dest);
+
+                    var old = Directory.GetFiles(extra, "logDB-????-??-??.db")
+                                       .OrderByDescending(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                                       .Skip(DailyBackupsToKeep);
+                    foreach (string f in old)
+                    {
+                        try { File.Delete(f); } catch (Exception ex) { Log.Swallow(ex); }
+                    }
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            });
+        }
+
         private static void WriteRestoreInstructions(string backupDir)
         {
             try
             {
-                string text =
+                File.WriteAllText(Path.Combine(backupDir, "HOW TO RESTORE.txt"), GetRestoreInstructions());
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+            }
+        }
+
+        // The restore instructions, shown both in HOW TO RESTORE.txt and in the in-app
+        // "Backups & Restore" window, so the two can never drift apart.
+        public static string GetRestoreInstructions()
+        {
+            return
 "HOW TO RESTORE YOUR LOG FROM A BACKUP" + Environment.NewLine +
 "=====================================" + Environment.NewLine +
 Environment.NewLine +
@@ -144,12 +194,6 @@ Environment.NewLine +
 Environment.NewLine +
 "QSOs made after the backup date are not in the backup - re-enter them or" + Environment.NewLine +
 "re-import them from an ADIF export if you have one." + Environment.NewLine;
-                File.WriteAllText(Path.Combine(backupDir, "HOW TO RESTORE.txt"), text);
-            }
-            catch (Exception ex)
-            {
-                Log.Swallow(ex);
-            }
         }
 
         // Public static method to get the single instance of the class.
