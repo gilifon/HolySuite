@@ -1,0 +1,99 @@
+<UserControl x:Class="HolyLogger.OptionsUserControls.ClublogServiceControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
+             mc:Ignorable="d" Height="420" Width="660">
+    <DockPanel>
+        <!-- Master switch: when off, Club Log uploads are out of use and the settings below are greyed. -->
+        <Border DockPanel.Dock="Top" HorizontalAlignment="Left" Background="#FFF59D" Margin="0,4,0,8" Padding="6,4,10,4">
+            <CheckBox x:Name="CBX_UseClublog" Content="Use Club Log for QSOs logging"
+                      FontSize="15" FontWeight="Bold"
+                      IsChecked="{Binding Default.UseClublogService, Source={StaticResource Settings}, Mode=TwoWay}"
+                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+        </Border>
+        <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+              IsEnabled="{Binding IsChecked, ElementName=CBX_UseClublog}">
+            <Grid.Style>
+                <Style TargetType="Grid">
+                    <Style.Triggers>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </Grid.Style>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <!-- Service name + description -->
+            <StackPanel Grid.Row="0">
+                <TextBlock Text="Club Log" FontSize="17" FontWeight="Bold" Margin="2,2,0,2"/>
+                <TextBlock Margin="2,0,8,10" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                           Text="Each QSO you log is uploaded to your Club Log account in real time the moment you save it. Enter your Club Log account e-mail and password — a Club Log 'Application Password' is recommended instead of your main password. The station callsign is taken from each QSO, so a single account covers all your callsigns."/>
+            </StackPanel>
+
+            <Grid Grid.Row="1" Margin="0,2,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label Grid.Column="0" Content="Club Log e-mail" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="14"/>
+                <TextBox Grid.Column="1" x:Name="TB_Email" Height="26" Width="300" TextWrapping="NoWrap"
+                         VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                         TextChanged="TB_Email_TextChanged"/>
+            </Grid>
+
+            <Grid Grid.Row="2" Margin="0,8,0,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="150"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Label Grid.Column="0" Content="Club Log password" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="14"/>
+                <!-- The masked box and the plain box occupy the same cell; only one is visible. -->
+                <Grid Grid.Column="1">
+                    <PasswordBox x:Name="PB_Password" Height="26" Width="300"
+                                 VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                                 PasswordChanged="PB_Password_Changed"/>
+                    <TextBox x:Name="TB_PasswordPlain" Height="26" Width="300" TextWrapping="NoWrap"
+                             VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                             Visibility="Collapsed" TextChanged="TB_PasswordPlain_TextChanged"/>
+                </Grid>
+                <ToggleButton Grid.Column="2" x:Name="TG_ShowPassword" Width="32" Height="26" Margin="6,0,0,0"
+                              VerticalAlignment="Center" Checked="TG_ShowPassword_Changed" Unchecked="TG_ShowPassword_Changed"
+                              ToolTip="Show / hide the password">
+                    <Viewbox Width="18" Height="18">
+                        <Canvas Width="24" Height="24">
+                            <Path Fill="#444444" Data="M12,5 C5,5 1.7,11 1,12 C1.7,13 5,19 12,19 C19,19 22.3,13 23,12 C22.3,11 19,5 12,5 Z M12,16 C9.8,16 8,14.2 8,12 C8,9.8 9.8,8 12,8 C14.2,8 16,9.8 16,12 C16,14.2 14.2,16 12,16 Z M12,10 C10.9,10 10,10.9 10,12 C10,13.1 10.9,14 12,14 C13.1,14 14,13.1 14,12 C14,10.9 13.1,10 12,10 Z"/>
+                        </Canvas>
+                    </Viewbox>
+                </ToggleButton>
+                <Button Grid.Column="3" x:Name="TestBtn" Content="Test Connection" Height="26" Width="150"
+                        FontSize="13" Margin="12,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                        Click="TestBtn_Click"
+                        ToolTip="Verify your Club Log e-mail and password by logging in — this does NOT create a QSO"/>
+            </Grid>
+
+            <!-- Separator -->
+            <Border Grid.Row="3" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,14,0,0"/>
+
+            <CheckBox x:Name="CB_AutoUpload" Grid.Row="4" Content="Automatically upload each QSO to Club Log in real time"
+                      HorizontalAlignment="Left" Margin="2,12,0,0" VerticalAlignment="Top" FontSize="15"
+                      IsChecked="{Binding Default.ClublogAutoUpload, Source={StaticResource Settings}, Mode=TwoWay}"
+                      Checked="Setting_Changed" Unchecked="Setting_Changed"/>
+
+            <TextBlock Grid.Row="5" Margin="22,4,8,0" TextWrapping="Wrap" FontSize="11" Foreground="#888888"
+                       Text="When on, every QSO you add is sent to Club Log immediately. This is a real-time service — a QSO that fails to upload (e.g. no internet) is not queued or retried."/>
+        </Grid>
+    </DockPanel>
+</UserControl>

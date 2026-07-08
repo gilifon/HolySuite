@@ -50,7 +50,20 @@
       "Read(//c/Program Files \\(x86\\)/Microsoft Visual Studio/**)",
       "Bash(\"/c/Program Files/Microsoft Visual Studio/2022/Community/MSBuild/Current/Bin/amd64/MSBuild.exe\" HolyLogger/HolyLogger.csproj /p:Configuration=Debug /t:Build /v:minimal /nologo)",
       "Bash(cmd //c \"start HolyLogger.exe\")",
-      "PowerShell(Start-Process \"C:\\\\dev\\\\HolySuite\\\\HolyLogger\\\\bin\\\\x86\\\\Debug\\\\HolyLogger.exe\")"
+      "PowerShell(Start-Process \"C:\\\\dev\\\\HolySuite\\\\HolyLogger\\\\bin\\\\x86\\\\Debug\\\\HolyLogger.exe\")",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)",
+      "WebSearch",
+      "Bash(python -c \"import json; json.load\\(open\\('contests.json'\\)\\); print\\('JSON valid'\\)\")",
+      "WebFetch(domain:www.contestcalendar.com)",
+      "Bash(python -)",
+      "Bash(python tools/verify_contest_cabnames.py)",
+      "WebFetch(domain:clublog.freshdesk.com)",
+      "Read(//c/Users/danka/.claude/projects/C--dev-HolySuite/memory/**)",
+      "Bash(cat MEMORY.md)",
+      "Bash(grep -ril \"guess\\\\|verify\\\\|official\\\\|source\" .)",
+      "Bash(gh repo *)"
     ]
   }
 }

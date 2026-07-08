@@ -211,6 +211,7 @@
     <Compile Include="DataAccess.cs" />
     <Compile Include="EqslQueueWindow.cs" />
     <Compile Include="LotwUploader.cs" />
+    <Compile Include="ClublogService.cs" />
     <Compile Include="QrzLogbookService.cs" />
     <Compile Include="TqslStationData.cs" />
     <Compile Include="Enums.cs" />
@@ -240,6 +241,9 @@
     </Compile>
     <Compile Include="OptionsUserControls\EqslServiceControl.xaml.cs">
       <DependentUpon>EqslServiceControl.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="OptionsUserControls\ClublogServiceControl.xaml.cs">
+      <DependentUpon>ClublogServiceControl.xaml</DependentUpon>
     </Compile>
     <Compile Include="OptionsUserControls\LotwControl.xaml.cs">
       <DependentUpon>LotwControl.xaml</DependentUpon>
@@ -416,6 +420,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="OptionsUserControls\EqslServiceControl.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="OptionsUserControls\ClublogServiceControl.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

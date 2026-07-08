@@ -20,6 +20,7 @@
                 <TreeViewItem x:Name="UlItem" Header="User Interface" Selected="UserInterfaceItem_Selected" />
                 <TreeViewItem x:Name="QRZItem" Header="QRZ Services" Selected="QRZServicesItem_Selected" />
                 <TreeViewItem x:Name="EqslItem" Header="eQSL Service" Selected="EqslServiceItem_Selected" />
+                <TreeViewItem x:Name="ClublogItem" Header="Club Log Service" Selected="ClublogServiceItem_Selected" />
                 <TreeViewItem x:Name="LotwItem" Header="LoTW Upload" Selected="LotwItem_Selected" />
                 <TreeViewItem x:Name="ImportItem" Header="Import Settings" Selected="ImportItem_Selected"/>
                 <TreeViewItem x:Name="SatelliteItem" Header="Satellite Mode" Selected="SatelliteItem_Selected"/>
@@ -34,6 +35,7 @@
             <Grid>
                 <OptionsUserControls:QRZServicesControl x:Name="QRZServicesControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
                 <OptionsUserControls:EqslServiceControl x:Name="EqslServiceControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
+                <OptionsUserControls:ClublogServiceControl x:Name="ClublogServiceControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
                 <OptionsUserControls:LotwControl x:Name="LotwControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
                 <OptionsUserControls:UserInterfaceControl x:Name="UserInterfaceControlInstance" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="10,10,0,0" Visibility="Hidden"/>
                 <OptionsUserControls:GeneralSettingsControl x:Name="GeneralSettingsControlControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>

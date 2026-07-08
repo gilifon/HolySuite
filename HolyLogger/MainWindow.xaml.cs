@@ -1343,6 +1343,10 @@ namespace HolyLogger
                     // forget). Does nothing unless the feature is enabled and an API key is configured;
                     // a failed/offline push simply leaves the QSO pending for a later silent retry.
                     _ = SendOneQsoToQrz(qso);
+
+                    // Real-time push of THIS just-logged QSO to Club Log (fire and forget). Does
+                    // nothing unless the Club Log service is enabled with credentials configured.
+                    _ = SendOneQsoToClublog(qso);
                 }
                 catch (Exception ex)
                 {
@@ -2560,6 +2564,56 @@ namespace HolyLogger
             catch
             {
                 // Auto-upload must never crash the app; the QSO remains pending for a later retry.
+            }
+        }
+
+        // Club Log warns that a 403 (bad credentials) must stop real-time uploads at once or the IP
+        // may be blocked. Once we see one auth failure we suspend Club Log pushes for the rest of the
+        // session; the operator fixes their credentials and restarts. Reset only on app restart.
+        private bool _clublogAuthBlockedThisSession;
+
+        // True when Club Log real-time upload is switched on, HolyLogger's application API key is
+        // present, the user's credentials are set, and we have not been auth-blocked this session.
+        private bool ClublogPushEnabled
+        {
+            get
+            {
+                var s = Properties.Settings.Default;
+                return !_clublogAuthBlockedThisSession
+                       && ClublogService.HasApiKey
+                       && s.UseClublogService
+                       && s.ClublogAutoUpload
+                       && !string.IsNullOrWhiteSpace(s.ClublogEmail)
+                       && !string.IsNullOrWhiteSpace(s.ClublogPassword);
+            }
+        }
+
+        // Pushes a single just-logged QSO to Club Log in real time (fire and forget). The station
+        // callsign comes from the QSO, so one Club Log account serves all your callsigns. This is a
+        // real-time-only service: a failed upload is not queued or retried (by design). Never throws.
+        private async System.Threading.Tasks.Task SendOneQsoToClublog(QSO qso)
+        {
+            try
+            {
+                if (qso == null) return;
+                if (!ClublogPushEnabled) return;
+
+                var s = Properties.Settings.Default;
+                ClublogResult r = await ClublogService.UploadAsync(s.ClublogEmail, s.ClublogPassword, qso.MyCall, BuildQrzAdif(qso));
+
+                // 403 = authentication/prerequisite failure. Club Log requires us to stop immediately
+                // (continuing risks an IP block), so suspend Club Log auto-upload for this session.
+                if (!r.Ok && !r.NetworkError && r.StatusCode == 403)
+                {
+                    _clublogAuthBlockedThisSession = true;
+                    Log.Warn("Club Log rejected the upload (403). Suspending Club Log auto-upload for this session. "
+                             + "Check the e-mail / password / API key in Options -> Club Log Service. Response: "
+                             + (r.Message ?? string.Empty));
+                }
+            }
+            catch
+            {
+                // Auto-upload must never crash the app.
             }
         }
 
