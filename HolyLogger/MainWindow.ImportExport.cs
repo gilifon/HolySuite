@@ -103,7 +103,7 @@ namespace HolyLogger
                 Soapbox = "HolyLogger",
             };
             string cabrillo = Services.GenerateCabrillo(qsos, c);
-            var save = new SaveFileDialog { Filter = "Text File|*.txt|Cabrillo File|*.cbr|Log File|*.log", Title = "Export Cabrillo" };
+            var save = new SaveFileDialog { Filter = "Cabrillo File|*.cbr|Text File|*.txt|Log File|*.log", DefaultExt = "cbr", Title = "Export Cabrillo" };
             if (save.ShowDialog() != true) return;
             try
             {
