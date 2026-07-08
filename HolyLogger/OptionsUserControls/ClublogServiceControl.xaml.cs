@@ -11,6 +11,10 @@ namespace HolyLogger.OptionsUserControls
     {
         private bool _loading;
 
+        // Raised after the Club Log queue is cleared so the main window can refresh the
+        // "Upload Queue to Club Log (N)" menu count.
+        public event System.Action ClublogQueueChanged;
+
         public ClublogServiceControl()
         {
             InitializeComponent();
@@ -27,6 +31,31 @@ namespace HolyLogger.OptionsUserControls
         {
             if (_loading) return;
             Save();
+        }
+
+        // Removes all pending QSOs from the Club Log upload queue (marks them dismissed). Mirrors the
+        // Clear QRZ Queue button.
+        private void ClearQueueBtn_Click(object sender, RoutedEventArgs e)
+        {
+            var dal = DataAccess.GetInstance();
+            int pending = dal.GetPendingClublogCount();
+            if (pending == 0)
+            {
+                HolyMessageBox.Show("The Club Log queue is already empty.", "Clear Club Log Queue",
+                    HolyMsgType.Info, Window.GetWindow(this));
+                return;
+            }
+
+            bool confirmed = HolyMessageBox.ShowConfirm(
+                $"Remove all {pending} QSO(s) from the Club Log upload queue?\n\n" +
+                "They will no longer be included in the next upload.",
+                "Clear Club Log Queue", HolyMsgType.Warning, Window.GetWindow(this));
+            if (!confirmed) return;
+
+            int count = dal.ClearClublogQueue();
+            HolyMessageBox.ShowSuccess($"{count} QSO(s) removed from the Club Log queue.",
+                "Clear Club Log Queue", Window.GetWindow(this));
+            ClublogQueueChanged?.Invoke();
         }
 
         private void TB_Email_TextChanged(object sender, TextChangedEventArgs e)

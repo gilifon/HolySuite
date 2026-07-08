@@ -27,18 +27,16 @@ namespace HolyLogger
         public const string Endpoint = "https://clublog.org/realtime.php";
         // Used only to verify a user's account login without creating a QSO (see TestCredentialsAsync).
         public const string GetAdifEndpoint = "https://clublog.org/getadif.php";
+        // Bulk upload of a whole log as one ADIF file (see UploadFullLogAsync).
+        public const string PutLogsEndpoint = "https://clublog.org/putlogs.php";
 
         // Club Log's API key is per-APPLICATION, not per-user: Club Log issues one key for HolyLogger
-        // to the software author (email support@clublog.org with a short description of the use). Every
-        // user then authenticates with their own Club Log e-mail + password; they do NOT enter a key.
-        //   >>> Paste HolyLogger's Club Log API key here once Club Log issues it. <<<
-        // Until then Club Log upload stays disabled (HasApiKey is false) so nothing hammers the API.
-        private const string Placeholder = "PUT-HOLYLOGGER-CLUBLOG-API-KEY-HERE";
-        public const string ApiKey = Placeholder;
+        // to the software author. Every user then authenticates with their own Club Log e-mail +
+        // password; they do NOT enter a key. Hardcoded here so any build of the source has Club Log
+        // enabled — note this makes the key visible in the (public) source repo and in the binary.
+        public const string ApiKey = "d7864de21d8d17e9930bbfca7d437cfe863c1930";
 
-        // True once the real application key has been pasted in above.
-        public static bool HasApiKey =>
-            !string.IsNullOrWhiteSpace(ApiKey) && ApiKey != Placeholder;
+        public static bool HasApiKey => !string.IsNullOrWhiteSpace(ApiKey);
 
         private static readonly HttpClient _http = CreateClient();
 
@@ -86,6 +84,53 @@ namespace HolyLogger
                     try { result.Message = await resp.Content.ReadAsStringAsync(); }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                     result.Ok = resp.IsSuccessStatusCode;
+                }
+            }
+            catch
+            {
+                result.NetworkError = true;   // offline / timeout -> caller may retry later
+            }
+            return result;
+        }
+
+        // Bulk-uploads a whole log as ONE ADIF file (Club Log's putlogs.php). Club Log MERGES and
+        // de-duplicates, so re-running is safe. clear is always 0 here — we never flush the account's
+        // existing log. This is for the whole-log backlog; per-QSO live sends use UploadAsync instead
+        // (Club Log explicitly asks callers not to abuse putlogs.php with tiny repeated uploads).
+        // Authenticated by the user's e-mail + password + HolyLogger's application API key. Never throws.
+        public static async Task<ClublogResult> UploadFullLogAsync(string email, string password, string callsign, string adif)
+        {
+            var result = new ClublogResult();
+
+            if (!HasApiKey || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password)
+                || string.IsNullOrWhiteSpace(callsign) || string.IsNullOrWhiteSpace(adif))
+            {
+                result.Ok = false;
+                result.Message = "missing application key, credentials, or log";
+                return result;
+            }
+
+            try
+            {
+                using (var form = new MultipartFormDataContent())
+                {
+                    form.Add(new StringContent(email.Trim()), "email");
+                    form.Add(new StringContent(password), "password");
+                    form.Add(new StringContent(callsign.Trim().ToUpperInvariant()), "callsign");
+                    form.Add(new StringContent(ApiKey.Trim()), "api");
+                    form.Add(new StringContent("0"), "clear");   // 0 = merge; never flush the account's log
+
+                    var file = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(adif));
+                    file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
+                    form.Add(file, "file", "holylogger.adi");
+
+                    using (HttpResponseMessage resp = await _http.PostAsync(PutLogsEndpoint, form))
+                    {
+                        result.StatusCode = (int)resp.StatusCode;
+                        try { result.Message = await resp.Content.ReadAsStringAsync(); }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                        result.Ok = resp.IsSuccessStatusCode;
+                    }
                 }
             }
             catch

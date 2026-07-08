@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
-             mc:Ignorable="d" Height="420" Width="660">
+             mc:Ignorable="d" Height="490" Width="660">
     <DockPanel>
         <!-- Master switch: when off, Club Log uploads are out of use and the settings below are greyed. -->
         <Border DockPanel.Dock="Top" HorizontalAlignment="Left" Background="#FFF59D" Margin="0,4,0,8" Padding="6,4,10,4">
@@ -25,6 +25,7 @@
                 </Style>
             </Grid.Style>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -93,7 +94,11 @@
                       Checked="Setting_Changed" Unchecked="Setting_Changed"/>
 
             <TextBlock Grid.Row="5" Margin="22,4,8,0" TextWrapping="Wrap" FontSize="11" Foreground="#888888"
-                       Text="When on, every QSO you add is sent to Club Log immediately. This is a real-time service — a QSO that fails to upload (e.g. no internet) is not queued or retried."/>
+                       Text="When on, every QSO you add is sent to Club Log immediately. A QSO that can't be sent right away (no internet, or auto-upload off) waits in the Club Log queue and is uploaded later — from the main window's Tools → Upload Queue to Club Log, or automatically on the next start."/>
+
+            <Button Grid.Row="6" x:Name="ClearQueueBtn" Content="Clear Club Log Queue"
+                    HorizontalAlignment="Left" Margin="2,20,0,0" Width="180" FontSize="14"
+                    Padding="8,4,8,4" Click="ClearQueueBtn_Click"/>
         </Grid>
     </DockPanel>
 </UserControl>

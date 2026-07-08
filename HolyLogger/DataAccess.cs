@@ -276,7 +276,7 @@ Environment.NewLine +
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1," + ActiveLogId + ")", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1,1," + ActiveLogId + ")", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
@@ -329,7 +329,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -552,6 +552,7 @@ Environment.NewLine +
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                        if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
 
@@ -621,6 +622,8 @@ Environment.NewLine +
                             if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                             if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                             if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                            if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
+                        if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                             q.StandartizeQSO();
                             qso_list.Add(q);
 
@@ -683,6 +686,7 @@ Environment.NewLine +
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                        if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
                     }
@@ -1077,6 +1081,28 @@ Environment.NewLine +
             }
         }
 
+        // Adds the clublog_status column to an existing qso table the first time the user runs a build
+        // with the Club Log queue feature. Existing rows are back-filled to clublog_status = 1
+        // ("already handled") so upgrading does NOT suddenly queue the whole historical log; only QSOs
+        // logged after the upgrade (inserted with the default 0) become pending. The backlog can still
+        // be pushed in bulk via Tools -> Club Log (Upload Full Log), which Club Log de-duplicates.
+        private void AddClublogColumn()
+        {
+            string check = "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'clublog_status'";
+            using (var cmd = new SQLiteCommand(check, con))
+            {
+                int colCount = Convert.ToInt32(cmd.ExecuteScalar());
+                if (colCount == 0)
+                {
+                    using (var alter = new SQLiteCommand("ALTER TABLE qso ADD COLUMN [clublog_status] INTEGER NOT NULL DEFAULT 0", con))
+                        alter.ExecuteNonQuery();
+                    using (var backfill = new SQLiteCommand("UPDATE qso SET clublog_status = 1", con))
+                        backfill.ExecuteNonQuery();
+                    SchemaHasChanged = true;
+                }
+            }
+        }
+
         // Returns the QSOs still waiting to be uploaded to QRZ Logbook (status 0), oldest first so they
         // are pushed in the order they were logged. Unlike eQSL there is no per-callsign opt-in table:
         // the single account API key plus the feature toggle govern whether these are actually sent.
@@ -1148,6 +1174,81 @@ Environment.NewLine +
             {
                 cmd.Parameters.Add(new SQLiteParameter("@s", status));
                 cmd.Parameters.Add(new SQLiteParameter("@logid", (object)logId ?? DBNull.Value));
+                cmd.Parameters.Add(new SQLiteParameter("@id", id));
+                cmd.ExecuteNonQuery();
+            }
+            }
+        }
+
+        // Returns the QSOs still waiting to be uploaded to Club Log (status 0), oldest first so they
+        // are sent in the order they were logged. Like QRZ there is no per-callsign opt-in table: the
+        // single account (e-mail + password) plus the feature toggle govern whether these are sent.
+        public List<QSO> GetPendingClublogQsos()
+        {
+            lock (_dbLock)
+            {
+            var list = new List<QSO>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            string stm = "SELECT * FROM qso WHERE clublog_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
+            using (SQLiteDataReader rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    QSO q = new QSO();
+                    if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                    if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
+                    if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
+                    if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                    if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
+                    if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
+                    if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
+                    if (rdr["band"] != null) q.Band = rdr["band"].ToString();
+                    if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
+                    if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
+                    if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
+                    if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
+                    if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
+                    if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
+                    if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
+                    if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                    if (rdr["country"] != null) q.Country = rdr["country"].ToString();
+                    if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
+                    if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
+                    if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                    if (rdr["time"] != null) q.Time = rdr["time"].ToString();
+                    if (rdr["date"] != null) q.Date = rdr["date"].ToString();
+                    if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
+                    if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
+                    if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    q.ClublogStatus = 0;
+                    list.Add(q);
+                }
+            }
+            return list;
+            }
+        }
+
+        // Number of QSOs still waiting to be uploaded to Club Log.
+        public int GetPendingClublogCount()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand("SELECT count(Id) FROM qso WHERE clublog_status = 0", con))
+                return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        // Updates the Club Log upload state of a single QSO (0 pending, 1 uploaded, 2 rejected).
+        public void SetClublogStatus(int id, int status)
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return;
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET clublog_status = @s WHERE Id = @id", con))
+            {
+                cmd.Parameters.Add(new SQLiteParameter("@s", status));
                 cmd.Parameters.Add(new SQLiteParameter("@id", id));
                 cmd.ExecuteNonQuery();
             }
@@ -1268,6 +1369,17 @@ Environment.NewLine +
             try
             {
                 using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_qrz_status ON qso(qrz_status)", con))
+                    cmd.ExecuteNonQuery();
+            }
+            catch { /* an index is an optimization only; never block startup on it */ }
+        }
+
+        // Index that backs the Club Log pending-queue lookups (filter on clublog_status). Idempotent.
+        private void EnsureClublogIndex()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_clublog_status ON qso(clublog_status)", con))
                     cmd.ExecuteNonQuery();
             }
             catch { /* an index is an optimization only; never block startup on it */ }
@@ -1441,6 +1553,18 @@ Environment.NewLine +
             {
             if (con == null || con.State != ConnectionState.Open) return 0;
             using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET qrz_status = 2 WHERE qrz_status = 0", con))
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
+        // Removes all pending Club Log QSOs from the upload queue. Uses status 2 ("dismissed") rather
+        // than 1 ("confirmed sent"). Returns how many were cleared.
+        public int ClearClublogQueue()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (SQLiteCommand cmd = new SQLiteCommand("UPDATE qso SET clublog_status = 2 WHERE clublog_status = 0", con))
                 return cmd.ExecuteNonQuery();
             }
         }
@@ -1737,6 +1861,7 @@ Environment.NewLine +
             , [qrz_status] INTEGER NOT NULL DEFAULT 0
             , [qrz_logid] nvarchar(50) NULL
             , [lotw_status] INTEGER NOT NULL DEFAULT 0
+            , [clublog_status] INTEGER NOT NULL DEFAULT 0
             );";
 
             string createTable_categories = @"
@@ -1869,12 +1994,14 @@ Environment.NewLine +
             AddEqslStatusColumn();
             AddQrzColumns();
             AddLotwColumns();
+            AddClublogColumn();
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();
             EnsureEqslAccountsTable();
             EnsureEqslIndexes();
             EnsureQrzIndexes();
             EnsureLotwIndex();
+            EnsureClublogIndex();
             using (var command = new SQLiteCommand(createTable_categories, con))
             {
                 command.ExecuteNonQuery();

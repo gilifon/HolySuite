@@ -111,6 +111,10 @@ namespace HolyParser
         // Not serialized to the contest server.
         public int LotwStatus { get; set; }
 
+        // Club Log upload state: 0 = pending (waiting to be sent), 1 = uploaded (accepted by Club Log),
+        // 2 = permanently rejected. Not serialized to the contest server.
+        public int ClublogStatus { get; set; }
+
         public QSO()
         {
             IsAllowWARC = false;

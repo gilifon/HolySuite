@@ -988,6 +988,11 @@ namespace HolyLogger
             UpdateQrzMenuCount();
             _ = PumpQrzQueue();
 
+            // Club Log: same idea — show the pending count and silently drain the queue if the service
+            // is on and configured (e.g. QSOs logged while offline get pushed now).
+            UpdateClublogMenuCount();
+            _ = PumpClublogQueue();
+
             // Initialize RST fields based on the selected mode after window is fully loaded
             if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM" || CB_Mode.Text == "AM")
             {
@@ -2629,6 +2634,7 @@ namespace HolyLogger
         // may be blocked. Once we see one auth failure we suspend Club Log pushes for the rest of the
         // session; the operator fixes their credentials and restarts. Reset only on app restart.
         private bool _clublogAuthBlockedThisSession;
+        private readonly System.Threading.SemaphoreSlim _clublogPumpLock = new System.Threading.SemaphoreSlim(1, 1);
 
         // True when Club Log real-time upload is switched on, HolyLogger's application API key is
         // present, the user's credentials are set, and we have not been auth-blocked this session.
@@ -2656,23 +2662,230 @@ namespace HolyLogger
                 if (qso == null) return;
                 if (!ClublogPushEnabled) return;
 
-                var s = Properties.Settings.Default;
-                ClublogResult r = await ClublogService.UploadAsync(s.ClublogEmail, s.ClublogPassword, qso.MyCall, BuildQrzAdif(qso));
+                if (dal == null) return;
 
-                // 403 = authentication/prerequisite failure. Club Log requires us to stop immediately
-                // (continuing risks an IP block), so suspend Club Log auto-upload for this session.
-                if (!r.Ok && !r.NetworkError && r.StatusCode == 403)
+                // Serialize with the queue pump so a just-logged QSO and a running pump don't collide.
+                if (!await _clublogPumpLock.WaitAsync(TimeSpan.FromSeconds(30))) return;
+                try
                 {
-                    _clublogAuthBlockedThisSession = true;
-                    Log.Warn("Club Log rejected the upload (403). Suspending Club Log auto-upload for this session. "
-                             + "Check the e-mail / password / API key in Options -> Club Log Service. Response: "
-                             + (r.Message ?? string.Empty));
+                    var s = Properties.Settings.Default;
+                    ClublogResult r = await ClublogService.UploadAsync(s.ClublogEmail, s.ClublogPassword, qso.MyCall, BuildQrzAdif(qso));
+
+                    if (r.Ok)
+                    {
+                        dal.SetClublogStatus(qso.id, 1);   // uploaded
+                    }
+                    else if (r.NetworkError)
+                    {
+                        // offline / timeout -> leave pending (status stays 0) for a later retry
+                    }
+                    else if (r.StatusCode == 403)
+                    {
+                        // 403 = authentication failure. Club Log requires us to stop immediately
+                        // (continuing risks an IP block), so suspend auto-upload for this session. The
+                        // QSO stays pending (0) — it's a fixable credentials/key problem, not a bad record.
+                        _clublogAuthBlockedThisSession = true;
+                        Log.Warn("Club Log rejected the upload (403). Suspending Club Log auto-upload for this session. "
+                                 + "Check the e-mail / password / API key in Options -> Club Log Service. Response: "
+                                 + (r.Message ?? string.Empty));
+                    }
+                    else
+                    {
+                        dal.SetClublogStatus(qso.id, 2);   // definitive rejection of this record
+                    }
                 }
+                finally
+                {
+                    _clublogPumpLock.Release();
+                }
+                UpdateClublogMenuCount();
             }
             catch
             {
-                // Auto-upload must never crash the app.
+                // Auto-upload must never crash the app; the QSO remains pending for a later retry.
             }
+        }
+
+        // Drains the Club Log pending queue (status 0), pushing each QSO in real-time order. Networks
+        // errors stop the pass (the rest stays pending); definitive rejections are marked 2; a 403
+        // suspends Club Log for the session. Mirrors PumpQrzQueue.
+        private async System.Threading.Tasks.Task PumpClublogQueue(bool force = false)
+        {
+            try
+            {
+                if (dal == null) return;
+                if (!Properties.Settings.Default.UseClublogService) return;
+                if (!force && !ClublogPushEnabled) return;
+                if (!ClublogService.HasApiKey) return;
+
+                var s = Properties.Settings.Default;
+                if (string.IsNullOrWhiteSpace(s.ClublogEmail) || string.IsNullOrWhiteSpace(s.ClublogPassword)) return;
+
+                var lockTimeout = force ? TimeSpan.FromSeconds(30) : TimeSpan.Zero;
+                if (!await _clublogPumpLock.WaitAsync(lockTimeout)) return;
+                try
+                {
+                    System.Collections.Generic.List<QSO> pending = dal.GetPendingClublogQsos();
+                    foreach (var qso in pending)
+                    {
+                        ClublogResult r = await ClublogService.UploadAsync(s.ClublogEmail, s.ClublogPassword, qso.MyCall, BuildQrzAdif(qso));
+
+                        if (r.NetworkError)
+                            break;   // offline -> stop; the rest stays pending for next time
+
+                        if (r.Ok)
+                            dal.SetClublogStatus(qso.id, 1);
+                        else if (r.StatusCode == 403)
+                        {
+                            _clublogAuthBlockedThisSession = true;   // stop at once on auth failure
+                            break;
+                        }
+                        else
+                            dal.SetClublogStatus(qso.id, 2);   // definitive rejection
+                    }
+                }
+                finally
+                {
+                    _clublogPumpLock.Release();
+                }
+                UpdateClublogMenuCount();
+            }
+            catch
+            {
+                // Best effort; anything not confirmed sent simply stays pending.
+            }
+        }
+
+        // Refreshes the "Upload Queue to Club Log (N)" Tools-menu item: bold service name + live count.
+        private void UpdateClublogMenuCount()
+        {
+            try
+            {
+                int count = dal?.GetPendingClublogCount() ?? 0;
+                if (UploadQueueToClublogMenuItem == null) return;
+                var header = new System.Windows.Controls.TextBlock();
+                header.Inlines.Add(new System.Windows.Documents.Run("Upload Queue to "));
+                header.Inlines.Add(new System.Windows.Documents.Run("Club Log") { FontWeight = System.Windows.FontWeights.Bold });
+                header.Inlines.Add(new System.Windows.Documents.Run("  (" + count + ")"));
+                UploadQueueToClublogMenuItem.Header = header;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private async void UploadQueueToClublogMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ClublogService.HasApiKey)
+            {
+                HolyMessageBox.ShowError("This copy of HolyLogger has no Club Log application key.", "Club Log", this);
+                return;
+            }
+            var s = Properties.Settings.Default;
+            if (string.IsNullOrWhiteSpace(s.ClublogEmail) || string.IsNullOrWhiteSpace(s.ClublogPassword))
+            {
+                HolyMessageBox.ShowWarning("Set your Club Log e-mail and password first in Options → Club Log Service (and press Test).", "Club Log", this);
+                return;
+            }
+
+            int before = dal?.GetPendingClublogCount() ?? 0;
+            if (before == 0)
+            {
+                HolyMessageBox.Show("The Club Log queue is empty. Nothing to upload.", "Club Log", HolyMsgType.Info, this);
+                return;
+            }
+
+            UploadQueueToClublogMenuItem.IsEnabled = false;
+            var prevCursor = System.Windows.Input.Mouse.OverrideCursor;
+            System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+            try
+            {
+                await PumpClublogQueue(force: true);
+                int after = dal?.GetPendingClublogCount() ?? 0;
+                int uploaded = before - after;
+                UpdateClublogMenuCount();
+
+                if (uploaded > 0)
+                    HolyMessageBox.ShowSuccess(
+                        $"{uploaded} QSO{(uploaded == 1 ? "" : "s")} uploaded to Club Log successfully." +
+                        (after > 0 ? $"\n{after} QSO{(after == 1 ? "" : "s")} could not be uploaded (network error, rejected, or bad credentials)." : ""),
+                        "Club Log", this);
+                else
+                    HolyMessageBox.ShowWarning(
+                        "No QSOs were uploaded.\nCheck your internet connection and your Club Log e-mail/password in Options → Club Log Service.",
+                        "Club Log", this);
+            }
+            finally
+            {
+                System.Windows.Input.Mouse.OverrideCursor = prevCursor;
+                UploadQueueToClublogMenuItem.IsEnabled = true;
+            }
+        }
+
+        // Tools -> Upload Full Log to Club Log: bulk-uploads the whole active log as one ADIF file
+        // (putlogs.php). Club Log merges and de-duplicates, so it is safe to run again and is the way
+        // to seed a log made before Club Log was switched on. Distinct from the real-time per-QSO push.
+        private async void UploadFullLogToClublogMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            var s = Properties.Settings.Default;
+
+            if (!ClublogService.HasApiKey)
+            {
+                HolyMessageBox.ShowError("This copy of HolyLogger has no Club Log application key, so it can't upload to Club Log.", "Club Log", this);
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(s.ClublogEmail) || string.IsNullOrWhiteSpace(s.ClublogPassword))
+            {
+                HolyMessageBox.ShowWarning("Set your Club Log e-mail and password first in Options → Club Log Service (and press Test).", "Club Log", this);
+                return;
+            }
+
+            System.Collections.ObjectModel.ObservableCollection<QSO> qsos = null;
+            try { qsos = dal?.GetQSOsForLog(dal.ActiveLogId); }
+            catch (Exception ex) { Log.Swallow(ex); }
+            if (qsos == null || qsos.Count == 0)
+            {
+                HolyMessageBox.ShowWarning("The active log has no QSOs to upload.", "Club Log", this);
+                return;
+            }
+
+            string callsign = (TB_MyCallsign.Text ?? string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(callsign))
+                callsign = qsos[0].MyCall;
+            if (string.IsNullOrWhiteSpace(callsign))
+            {
+                HolyMessageBox.ShowWarning("No station callsign is set, so Club Log doesn't know which callsign to file these QSOs under.", "Club Log", this);
+                return;
+            }
+            callsign = callsign.Trim().ToUpperInvariant();
+
+            if (!HolyMessageBox.ShowConfirm(
+                    $"Upload all {qsos.Count} QSOs from the active log to Club Log under {callsign}?\n\n" +
+                    "Club Log merges and de-duplicates, so it is safe to run this again.",
+                    "Upload Full Log to Club Log", HolyMsgType.Info, this))
+                return;
+
+            string adif = Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName);
+
+            ClublogResult r;
+            var prevCursor = System.Windows.Input.Mouse.OverrideCursor;
+            System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+            try
+            {
+                r = await ClublogService.UploadFullLogAsync(s.ClublogEmail, s.ClublogPassword, callsign, adif);
+            }
+            finally
+            {
+                System.Windows.Input.Mouse.OverrideCursor = prevCursor;
+            }
+
+            if (r.Ok)
+                HolyMessageBox.ShowSuccess($"Uploaded {qsos.Count} QSOs to Club Log under {callsign}.", "Club Log", this);
+            else if (r.NetworkError)
+                HolyMessageBox.ShowError("Could not reach Club Log (offline or timed out). Please try again later.", "Club Log", this);
+            else
+                HolyMessageBox.ShowError("Club Log did not accept the upload"
+                    + (r.StatusCode > 0 ? $" (HTTP {r.StatusCode})" : "") + ":\n\n"
+                    + (string.IsNullOrWhiteSpace(r.Message) ? "No details returned." : r.Message.Trim()),
+                    "Club Log", this);
         }
 
         // Recompute the queue size whenever the Tools menu is opened, so the menu item's gray state
@@ -2680,6 +2893,7 @@ namespace HolyLogger
         private void ToolsMenu_SubmenuOpened(object sender, RoutedEventArgs e)
         {
             UpdateEqslQueueIndicator();
+            UpdateClublogMenuCount();
         }
 
         private void UpdateQrzMenuCount()
@@ -4966,6 +5180,7 @@ namespace HolyLogger
             options.LotwControlInstance.LotwQueueChanged += UpdateLotwMenuCount;
             options.EqslServiceControlInstance.EqslQueueChanged += UpdateEqslQueueIndicator;
             options.QRZServicesControlInstance.QrzQueueChanged += UpdateQrzMenuCount;
+            options.ClublogServiceControlInstance.ClublogQueueChanged += UpdateClublogMenuCount;
 
             options.Show();
         }
@@ -6619,7 +6834,8 @@ namespace HolyLogger
             bool useEqsl = Properties.Settings.Default.UseEqslService;
             bool useLotw = Properties.Settings.Default.UseLotwService;
             bool useQrz  = Properties.Settings.Default.UseQrzLogbook;
-            if (!useEqsl && !useLotw && !useQrz) return;
+            bool useClublog = Properties.Settings.Default.UseClublogService;
+            if (!useEqsl && !useLotw && !useQrz && !useClublog) return;
 
             // eQSL — per-callsign accounts table.
             bool eqslHasAccount = false;
@@ -6633,8 +6849,14 @@ namespace HolyLogger
             // QRZ — one logbook/API key for every callsign.
             bool qrzOn = useQrz && QrzPushEnabled;
 
-            // A disabled service counts as "nothing to warn about".
-            bool registered = (!useEqsl || eqslHasAccount) && (!useLotw || lotwOk);
+            // Club Log — account-level (e-mail + password + the app key), not per-callsign.
+            bool clublogConfigured = ClublogService.HasApiKey
+                && !string.IsNullOrWhiteSpace(Properties.Settings.Default.ClublogEmail)
+                && !string.IsNullOrWhiteSpace(Properties.Settings.Default.ClublogPassword);
+
+            // A disabled service counts as "nothing to warn about". Club Log joins eQSL/LoTW here so a
+            // Club-Log-only misconfiguration also opens this window on startup.
+            bool registered = (!useEqsl || eqslHasAccount) && (!useLotw || lotwOk) && (!useClublog || clublogConfigured);
             if (isStartup)
             {
                 // On startup only interrupt when the callsign is NOT registered for an eQSL/LoTW
@@ -6671,11 +6893,20 @@ namespace HolyLogger
                     ? $"QRZ uses ONE logbook for all callsigns. QSOs under {call} go into your configured QRZ logbook regardless of the call. Turn off QRZ auto-upload in Options → QRZ Services if that is not what you want."
                     : "QRZ auto-upload is off — nothing is sent automatically.";
 
+            string clublogMsg = !useClublog
+                ? "Not in use — switched off in Options → Club Log Service."
+                : !ClublogService.HasApiKey
+                    ? "This copy of HolyLogger has no Club Log application key — QSOs will NOT be sent to Club Log."
+                    : clublogConfigured
+                        ? "Configured — QSOs will be uploaded to Club Log."
+                        : "Club Log e-mail/password not set — QSOs will NOT be sent. Set them in Options → Club Log Service.";
+
             var alert = new StationServicesAlertWindow(
                 call,
                 !useEqsl || eqslHasAccount, eqslMsg,
                 !useLotw || lotwOk,         lotwMsg,
-                !qrzOn,                     qrzMsg)
+                !qrzOn,                     qrzMsg,
+                !useClublog || clublogConfigured, clublogMsg)
             { Owner = this };
             alert.ShowDialog();
         }

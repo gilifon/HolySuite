@@ -21,13 +21,14 @@ namespace HolyLogger
             string callsign,
             bool eqslOk, string eqslMsg,
             bool lotwOk, string lotwMsg,
-            bool qrzOk,  string qrzMsg)
+            bool qrzOk,  string qrzMsg,
+            bool clublogOk, string clublogMsg)
         {
             InitializeComponent();
 
             TB_Callsign.Text = callsign;
 
-            bool allOk = eqslOk && lotwOk && qrzOk;
+            bool allOk = eqslOk && lotwOk && qrzOk && clublogOk;
             TB_SubHeader.Text = allOk
                 ? "All services are configured for this callsign."
                 : "One or more services need attention for this callsign.";
@@ -37,7 +38,8 @@ namespace HolyLogger
 
             AddServiceRow("eQSL",        eqslOk, eqslMsg, isLast: false);
             AddServiceRow("LoTW",        lotwOk, lotwMsg, isLast: false);
-            AddServiceRow("QRZ Logbook", qrzOk,  qrzMsg,  isLast: true);
+            AddServiceRow("QRZ Logbook", qrzOk,  qrzMsg,  isLast: false);
+            AddServiceRow("Club Log",    clublogOk, clublogMsg, isLast: true);
 
             // Hook Win32 messages so WM_KEYDOWN/Escape is caught at the OS level,
             // bypassing any WPF focus-routing issues entirely.

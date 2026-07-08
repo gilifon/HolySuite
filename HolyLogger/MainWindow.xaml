@@ -521,6 +521,19 @@
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="UploadQueueToClublogMenuItem" Header="Upload Queue to Club Log  (0)" ToolTip="Upload pending QSOs to Club Log. Right-click for a full-log upload." Click="UploadQueueToClublogMenuItem_Click">
+                        <MenuItem.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Upload Full Log to Club Log" Click="UploadFullLogToClublogMenuItem_Click"/>
+                            </ContextMenu>
+                        </MenuItem.ContextMenu>
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
+                                      Data="M5 20h14v-2H5v2zm0-10h4v6h6v-6h4l-7-7-7 7z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <Separator />
                     <MenuItem x:Name="SearchMenuItem" Header="Search (Active Log)" ToolTip="Search the active log" Click="SearchMenuItem_Click">
                         <MenuItem.Icon>
