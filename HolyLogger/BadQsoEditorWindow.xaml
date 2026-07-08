@@ -5,7 +5,8 @@
         Height="500" Width="900"
         MinHeight="300" MinWidth="600"
         WindowStartupLocation="CenterOwner"
-        ResizeMode="CanResize">
+        ResizeMode="CanResize"
+        Background="{DynamicResource WindowBg}">
 
     <Grid>
         <Grid.RowDefinitions>
@@ -15,11 +16,11 @@
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <Border Grid.Row="0" Background="#FFF3E0" BorderBrush="#BB3300" BorderThickness="0,0,0,2" Padding="10,8">
+        <Border Grid.Row="0" Background="{DynamicResource PanelBg}" BorderBrush="#BB3300" BorderThickness="0,0,0,2" Padding="10,8">
             <StackPanel>
                 <TextBlock Text="Problem QSOs — Missing Band or Mode" FontSize="15" FontWeight="Bold"
                            Foreground="#BB3300"/>
-                <TextBlock x:Name="TB_Hint" FontSize="12" Foreground="#555555" Margin="0,3,0,0"
+                <TextBlock x:Name="TB_Hint" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,3,0,0"
                            Text="The first shaded row shows the expected format (read-only). Red cells need a value — click to pick from the list. Use Save to File / Load from File to edit in Excel. Save All writes changes to the database."/>
             </StackPanel>
         </Border>
@@ -30,6 +31,7 @@
                   CanUserAddRows="False" CanUserDeleteRows="False"
                   SelectionMode="Single" SelectionUnit="Cell"
                   HeadersVisibility="Column" GridLinesVisibility="All"
+                  Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource ThemeBorderBrush}"
                   FontSize="13" Margin="0"
                   ScrollViewer.VerticalScrollBarVisibility="Auto"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
@@ -40,7 +42,7 @@
                 <!-- Read-only identification columns -->
                 <DataGridTextColumn Header="ID" Binding="{Binding id}" Width="45" IsReadOnly="True">
                     <DataGridTextColumn.HeaderStyle>
-                        <Style TargetType="DataGridColumnHeader">
+                        <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
                             <Setter Property="ToolTip" Value="Internal database record number — not a ham radio field"/>
                         </Style>
                     </DataGridTextColumn.HeaderStyle>
@@ -116,6 +118,24 @@
                                     Width="*"/>
             </DataGrid.Columns>
 
+            <!-- Force dark cell text: the read-only columns otherwise inherit the theme's light
+                 foreground and become invisible on the light row backgrounds. The combobox columns
+                 (Band/Mode) have their own CellStyle, so this only affects the text columns. -->
+            <DataGrid.CellStyle>
+                <Style TargetType="DataGridCell">
+                    <Setter Property="Foreground" Value="#222222"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding IsHintRow}" Value="True">
+                            <Setter Property="Foreground" Value="#336699"/>
+                        </DataTrigger>
+                        <!-- Keep selected-cell text readable (white on the blue selection). -->
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Foreground" Value="White"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.CellStyle>
+
             <!-- Highlight rows that still have missing band or mode in red -->
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow">
@@ -138,7 +158,7 @@
         </DataGrid>
 
         <!-- Footer buttons -->
-        <Border Grid.Row="2" Background="#EEF2F7" BorderBrush="#1565C0" BorderThickness="0,2,0,0" Padding="8,8">
+        <Border Grid.Row="2" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,2,0,0" Padding="8,8">
             <DockPanel>
                 <!-- File export/import on the left -->
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">

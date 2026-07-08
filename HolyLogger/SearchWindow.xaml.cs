@@ -108,6 +108,20 @@ namespace HolyLogger
                 RunSearch();
         }
 
+        // Pre-fills the Country box and (optionally) runs the search (used when opened from a country
+        // row in the Statistics window). Clears the callsign so it is a pure country search.
+        public void SetCountry(string country, bool runSearch = false)
+        {
+            TB_Callsign.Text = "";
+            CB_Country.IsDropDownOpen = false;
+            CB_Country.SelectedItem = null;   // before Text= so WPF doesn't fight the assignment
+            CB_Country.Text = (country ?? string.Empty).Trim();
+            _countryFilter = CB_Country.Text;
+            UpdateClearButton();
+            if (runSearch)
+                RunSearch();
+        }
+
         // Keep filter in sync whenever text changes (from typing or selection)
         private void OnCountryTextChanged(object sender, TextChangedEventArgs e)
         {

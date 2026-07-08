@@ -38,6 +38,10 @@ namespace HolyLogger
         private WorkedSort  _workedSort  = WorkedSort.CountDesc;
         private MissingSort _missingSort = MissingSort.NameAsc;
 
+        // Raised when the user clicks a worked country; the main window opens the Search window
+        // filtered by that country.
+        public event Action<string> CountrySearchRequested;
+
         public StatisticsWindow(ObservableCollection<QSO> qsos)
         {
             InitializeComponent();
@@ -450,6 +454,13 @@ namespace HolyLogger
         {
             _workedSort = _workedSort == WorkedSort.NameAsc ? WorkedSort.NameDesc : WorkedSort.NameAsc;
             ApplyWorkedSort();
+        }
+
+        // Click a worked-country row -> ask the main window to open the Search window for that country.
+        private void WorkedCountry_Click(object sender, MouseButtonEventArgs e)
+        {
+            if ((sender as FrameworkElement)?.DataContext is CountryItem item && !string.IsNullOrWhiteSpace(item.Name))
+                CountrySearchRequested?.Invoke(item.Name);
         }
 
         private void SortWorkedByCount(object sender, MouseButtonEventArgs e)

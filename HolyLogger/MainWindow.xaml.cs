@@ -3406,6 +3406,34 @@ namespace HolyLogger
             pendingVoiceMessageDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
         }
 
+        // Aborts any message transmission in progress (SSB voice or CW) by sending the radio's stop
+        // CAT command and resetting the message state. Returns true if something was actually stopped.
+        // Best-effort: if the stop CAT command can't be sent we still reset state so the UI recovers.
+        // Called by Esc (which otherwise clears the entry form).
+        private bool StopActiveMessageTransmission()
+        {
+            int? current = activeVoiceMessageNumber ?? pendingVoiceMessageNumber;
+            if (!current.HasValue)
+                return false;
+
+            string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+
+            if (IsCwModeActive())
+            {
+                string stopCommand = BuildCwStopCommand(rigType);
+                if (!string.IsNullOrWhiteSpace(stopCommand))
+                    TrySendOmniRigCustomCommand(stopCommand);
+            }
+            else if (TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out _, out _)
+                     && !string.IsNullOrWhiteSpace(profile.StopCommand))
+            {
+                TrySendOmniRigCustomCommand(profile.StopCommand);
+            }
+
+            ClearVoiceMessageState();
+            return true;
+        }
+
         private bool TryGetVoiceCommandProfile(out RadioVoiceCommandProfile profile, out string rigType, out string errorMessage)
         {
             profile = null;
@@ -5103,6 +5131,23 @@ namespace HolyLogger
                 searchWindow.SetCallsign(presetCallsign, runSearch: true);
         }
 
+        // Opens the Search window filtered by a country and runs the search — used from the
+        // Statistics window's worked-countries list.
+        private void OpenSearchWindowForCountry(string country)
+        {
+            if (string.IsNullOrWhiteSpace(country)) return;
+            if (searchWindow != null && searchWindow.IsLoaded)
+            {
+                searchWindow.SetCountry(country, runSearch: true);
+                searchWindow.Activate();
+                return;
+            }
+            searchWindow = new SearchWindow(Qsos);
+            searchWindow.Closed += (s, _) => searchWindow = null;
+            searchWindow.Show();
+            searchWindow.SetCountry(country, runSearch: true);
+        }
+
         private void StatisticsMenuItem_Click(object sender, RoutedEventArgs e)
         {
             OpenStatisticsWindow();
@@ -5119,6 +5164,7 @@ namespace HolyLogger
             }
             statisticsWindow = new StatisticsWindow(Qsos);
             statisticsWindow.Dal = dal;
+            statisticsWindow.CountrySearchRequested += OpenSearchWindowForCountry;
             statisticsWindow.Closed += (s, _) => statisticsWindow = null;
             statisticsWindow.Show();
         }
@@ -6629,6 +6675,11 @@ namespace HolyLogger
             }
             if (key == Key.F9 || key == Key.Escape)
             {
+                // Esc also aborts a message transmission in progress (SSB voice or CW) — the same as
+                // pressing the sending F-key again. If nothing is being transmitted it clears the entry
+                // form as before. (F9 keeps its clear-only behaviour.)
+                if (key == Key.Escape && StopActiveMessageTransmission())
+                    return true;
                 ClearBtn_Click(null, null);
                 return true;
             }

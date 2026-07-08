@@ -158,7 +158,9 @@
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
-                                                                Background="{Binding RowBg}">
+                                                                Background="{Binding RowBg}"
+                                                                Cursor="Hand" MouseLeftButtonUp="WorkedCountry_Click"
+                                                                ToolTip="Click to search all QSOs with this country">
                                                             <StackPanel Orientation="Horizontal" Margin="4,1,4,1">
                                                                 <Image Source="{Binding FlagImage}"
                                                                        Width="24" Height="16"

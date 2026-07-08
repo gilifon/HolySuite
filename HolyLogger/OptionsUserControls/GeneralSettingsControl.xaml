@@ -11,16 +11,25 @@
         <CheckBox x:Name="CBX_IsAllowLiveLog" Content="Allow automatic upload during special events" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.isAllowLiveLog, Source={StaticResource Settings}, Mode=TwoWay}" Margin="0,26,0,0" FontSize="16"/>
         <CheckBox x:Name="CBX_ShowOnTheAir" Content="Send heartbeat to HolyLogger On The Air" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowOnTheAir, Source={StaticResource Settings}, Mode=TwoWay}" Margin="0,51,0,0" FontSize="16"/>
         <CheckBox x:Name="CBX_CallsignSyncVerboseLog" Content="Verbose callsign sync log" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.CallsignSyncVerboseLog, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,76,0,0"/>
-        <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,101,0,0" Click="CBX_EnableOmniRigCAT_Changed"/>
+        <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,126,0,0" Click="CBX_EnableOmniRigCAT_Changed"/>
 
-        <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,126,0,0" Click="HasChanged_Click">
+        <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,101,0,0" Click="HasChanged_Click">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="Beep when typing in a non-English keyboard" VerticalAlignment="Center"/>
-                <Viewbox Width="18" Height="18" Margin="6,0,0,0" VerticalAlignment="Center">
-                    <Canvas Width="24" Height="24">
-                        <Path Fill="#3B6EA5" Data="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                    </Canvas>
-                </Viewbox>
+                <!-- Clickable speaker: plays the beep so the user can check their speaker. Styled with
+                     real button chrome + a "Test" label so it's obviously pressable, not a flat icon. -->
+                <Button x:Name="BTN_TestBeep" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8,2"
+                        FontSize="12" Cursor="Hand" Click="BTN_TestBeep_Click"
+                        ToolTip="Click to test — plays the beep so you can check your speaker">
+                    <StackPanel Orientation="Horizontal">
+                        <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                            <Canvas Width="24" Height="24">
+                                <Path Fill="#3B6EA5" Data="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                            </Canvas>
+                        </Viewbox>
+                        <TextBlock Text="Test" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </Button>
             </StackPanel>
         </CheckBox>
 

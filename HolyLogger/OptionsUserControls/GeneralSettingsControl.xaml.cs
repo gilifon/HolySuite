@@ -75,6 +75,14 @@ namespace HolyLogger.OptionsUserControls
             }
         }
 
+        // Speaker button next to the "Beep when typing…" option: plays the same beep so the user can
+        // confirm their speaker works. e.Handled stops the click from also toggling the checkbox.
+        private void BTN_TestBeep_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            try { System.Media.SystemSounds.Beep.Play(); } catch (Exception ex) { Log.Swallow(ex); }
+        }
+
         private void HasChanged_Click(object sender, RoutedEventArgs e)
         {
             HasChanged = true;
