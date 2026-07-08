@@ -1545,8 +1545,25 @@ namespace HolyLogger
                 if (dal.GetLogCount() == 0)
                 {
                     int existing = dal.CountUnassignedQSOs();
+
+                    // The startup splash is Topmost and would hide this mandatory dialog behind it
+                    // (the splash only closes once the main window has rendered, which happens after
+                    // this call). Drop the splash's topmost so the setup window is sure to be on top
+                    // and clickable.
+                    foreach (var splash in Application.Current.Windows.OfType<SplashWindow>())
+                        splash.Topmost = false;
+
+                    // Startup shows an application-wide "wait" spinner (set while the splash is up and
+                    // only cleared once the main window renders — which is after this dialog). Clear it
+                    // while this interactive dialog is open so the pointer is a normal arrow and the user
+                    // doesn't think the app is still busy; restore it afterwards for the rest of startup.
+                    var savedCursor = System.Windows.Input.Mouse.OverrideCursor;
+                    System.Windows.Input.Mouse.OverrideCursor = null;
+
                     var setup = new LogSetupWindow(existing);   // no Owner: main window not shown yet
                     setup.ShowDialog();
+
+                    System.Windows.Input.Mouse.OverrideCursor = savedCursor;
                     if (!setup.Completed) return false;
 
                     long mainId = dal.CreateLog(setup.LogName, "");   // day-by-day log, no event type

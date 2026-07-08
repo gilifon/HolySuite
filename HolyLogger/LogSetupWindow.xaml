@@ -2,8 +2,8 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Set up your log" Width="520" SizeToContent="Height"
-        ResizeMode="NoResize" WindowStartupLocation="CenterOwner"
-        ShowInTaskbar="False" Background="{DynamicResource WindowBg}">
+        ResizeMode="NoResize" WindowStartupLocation="CenterScreen"
+        Topmost="True" ShowInTaskbar="True" Background="{DynamicResource WindowBg}">
     <Grid Margin="22,18,22,18">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>

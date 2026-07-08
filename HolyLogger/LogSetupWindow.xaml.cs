@@ -22,7 +22,16 @@ namespace HolyLogger
                 RB_ImportText.Text = "Bring my " + existingQsoCount.ToString("N0") + " existing QSOs into this log";
             }
 
-            Loaded += (s, e) => { TB_Name.Focus(); TB_Name.SelectAll(); };
+            Loaded += (s, e) =>
+            {
+                // The startup splash is Topmost and otherwise covers this mandatory dialog. Re-assert
+                // our own topmost and take activation so the window is guaranteed to be in front and
+                // ready for keyboard input the moment it appears.
+                Topmost = true;
+                Activate();
+                TB_Name.Focus();
+                TB_Name.SelectAll();
+            };
         }
 
         private void Btn_Ok_Click(object sender, RoutedEventArgs e)
