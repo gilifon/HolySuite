@@ -118,7 +118,7 @@ namespace HolyLogger
             Contester c = new Contester { Contest = logContest?.CabrilloName ?? string.Empty };
             Contests.ContestHeaderStore.PopulateContester(c, values);
             string cabrillo = Services.GenerateCabrillo(qsos, c);
-            var save = new SaveFileDialog { Filter = "Cabrillo File|*.cbr|Text File|*.txt|Log File|*.log", DefaultExt = "cbr", Title = "Export Cabrillo" };
+            var save = new SaveFileDialog { Filter = "Cabrillo File (*.cbr)|*.cbr|Cabrillo Log (*.log)|*.log", DefaultExt = "cbr", Title = "Export Cabrillo" };
             if (save.ShowDialog() != true) return;
             try
             {
