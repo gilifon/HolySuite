@@ -521,10 +521,11 @@
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <MenuItem x:Name="UploadQueueToClublogMenuItem" Header="Upload Queue to Club Log  (0)" ToolTip="Upload pending QSOs to Club Log. Right-click for a full-log upload." Click="UploadQueueToClublogMenuItem_Click">
+                    <MenuItem x:Name="UploadQueueToClublogMenuItem" Header="Upload Queue to Club Log  (0)" ToolTip="Upload pending QSOs to Club Log." Click="UploadQueueToClublogMenuItem_Click">
                         <MenuItem.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="Upload Full Log to Club Log" Click="UploadFullLogToClublogMenuItem_Click"/>
+                                <MenuItem Header="View Queue" Click="ViewClublogQueueContextMenuItem_Click"/>
+                                <MenuItem Header="Clear Club Log Queue" Click="ClearClublogQueueContextMenuItem_Click"/>
                             </ContextMenu>
                         </MenuItem.ContextMenu>
                         <MenuItem.Icon>

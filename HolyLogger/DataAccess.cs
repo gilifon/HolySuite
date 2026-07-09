@@ -1569,6 +1569,47 @@ Environment.NewLine +
             }
         }
 
+        // Returns QSOs dismissed from the Club Log queue (clublog_status = 2) — cleared or rejected,
+        // not uploaded. Mirrors GetDismissedQrzQsos.
+        public List<QSO> GetDismissedClublogQsos()
+        {
+            lock (_dbLock)
+            {
+            var list = new List<QSO>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency FROM qso WHERE clublog_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            using (var cmd = new SQLiteCommand(stm, con))
+            using (var rdr = cmd.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    var q = new QSO();
+                    q.id = Convert.ToInt32(rdr["Id"]);
+                    q.Date = rdr["date"]?.ToString() ?? string.Empty;
+                    q.Time = rdr["time"]?.ToString() ?? string.Empty;
+                    q.DXCall = rdr["dx_callsign"]?.ToString() ?? string.Empty;
+                    q.Band = rdr["band"]?.ToString() ?? string.Empty;
+                    q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
+                    q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
+                    q.ClublogStatus = 2;
+                    list.Add(q);
+                }
+            }
+            return list;
+            }
+        }
+
+        // Puts every dismissed Club Log QSO (clublog_status = 2) back into the pending queue (0).
+        public int RequeueAllClublogDismissed()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            using (var cmd = new SQLiteCommand("UPDATE qso SET clublog_status = 0 WHERE clublog_status = 2", con))
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
         // Returns QSOs dismissed from the LoTW queue (lotw_status = 2) — sent to the queue at some
         // point but explicitly cleared without being uploaded.
         public List<QSO> GetDismissedLotwQsos()

@@ -799,6 +799,67 @@ namespace HolyLogger
             ShowQrzQueueWindow();
         }
 
+        private EqslQueueWindow _clublogQueueWindow;
+
+        private void ShowClublogQueueWindow()
+        {
+            if (dal == null) return;
+
+            if (_clublogQueueWindow != null)
+            {
+                _clublogQueueWindow.Activate();
+                _clublogQueueWindow.RefreshList();
+                return;
+            }
+
+            _clublogQueueWindow = new EqslQueueWindow(
+                () => dal.GetPendingClublogQsos(),
+                async () =>
+                {
+                    if (!ClublogService.HasApiKey)
+                        throw new Exception("Club Log upload is not active in this build (the Club Log application API key has not been configured).");
+                    var s = Properties.Settings.Default;
+                    if (string.IsNullOrWhiteSpace(s.ClublogEmail) || string.IsNullOrWhiteSpace(s.ClublogPassword))
+                        throw new Exception("Club Log e-mail/password not configured. Please set them in Options → Club Log.");
+                    int before = dal?.GetPendingClublogCount() ?? 0;
+                    await PumpClublogQueue(force: true);
+                    int after = dal?.GetPendingClublogCount() ?? 0;
+                    UpdateClublogMenuCount();
+                    return before - after;
+                },
+                "Club Log",
+                () => dal.GetDismissedClublogQsos(),
+                () => { dal.RequeueAllClublogDismissed(); UpdateClublogMenuCount(); })
+            {
+                Owner = this
+            };
+            _clublogQueueWindow.Closed += (s, ev) => { _clublogQueueWindow = null; UpdateClublogMenuCount(); };
+            _clublogQueueWindow.Show();
+        }
+
+        private void ViewClublogQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            ShowClublogQueueWindow();
+        }
+
+        private void ClearClublogQueueContextMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            int pending = dal?.GetPendingClublogCount() ?? 0;
+            if (pending == 0)
+            {
+                HolyMessageBox.Show("The Club Log queue is already empty.", "Clear Club Log Queue", HolyMsgType.Info, this);
+                return;
+            }
+
+            bool confirmed = HolyMessageBox.ShowConfirm(
+                $"Remove all {pending:N0} QSO(s) from the Club Log upload queue?\n\nThey will no longer be included in the next upload.",
+                "Clear Club Log Queue", HolyMsgType.Warning, this);
+            if (!confirmed) return;
+
+            dal.ClearClublogQueue();
+            UpdateClublogMenuCount();
+        }
+
         // Uploads any confirmed services in sequence, showing per-QSO progress, then closes exactly once.
         // All confirmation dialogs were already shown in Window_Closing before this is called.
         private async void UploadAllAndCloseAsync(List<QSO> lotwPending, bool uploadEqsl, bool uploadQrz, bool uploadClublog)
