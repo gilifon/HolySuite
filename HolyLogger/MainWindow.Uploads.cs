@@ -97,8 +97,9 @@ namespace HolyLogger
                     }
 
                     if (outcome == 1) dal.SetEqslStatus(qso.id, 1);
-                    else if (outcome == 2) dal.SetEqslStatus(qso.id, 2);
-                    // outcome 0 -> leave pending
+                    // Anything short of an explicit "added" confirmation (outcome 2 rejected, or
+                    // outcome 0 unknown/offline) leaves the QSO pending, so it stays in the queue and
+                    // is retried. A QSO only leaves the queue when eQSL confirms it received it.
 
                     UpdateEqslQueueIndicator();
                 }
@@ -179,9 +180,10 @@ namespace HolyLogger
                         sentCount++;
                         progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, true);
                     }
-                    else if (outcome == 2)   // permanently rejected (bad record) - skip so it can't block the queue
+                    else if (outcome == 2)   // rejected by eQSL -> keep pending so it stays in the queue
                     {
-                        dal.SetEqslStatus(qso.id, 2);
+                        // Not confirmed received -> leave the QSO pending (stays in the queue) and just
+                        // report it as not-sent for this run. Only an explicit "added" clears it.
                         progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
                     }
                     // outcome 0 (unrecognized reply, e.g. one account's auth failed) -> leave this QSO
@@ -285,7 +287,8 @@ namespace HolyLogger
                         }
                         else if (r.IsPermanentFailure)
                         {
-                            dal.SetQrzStatus(qso.id, 2, null);
+                            // Rejected by QRZ -> keep the QSO pending (stays in the queue) and report
+                            // it as not-sent for this run. Only a confirmed upload clears it.
                             progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
                         }
                     }

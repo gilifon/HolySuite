@@ -2614,9 +2614,8 @@ namespace HolyLogger
 
                     if (r.Ok)
                         dal.SetQrzStatus(qso.id, 1, r.LogId);
-                    else if (r.IsPermanentFailure)
-                        dal.SetQrzStatus(qso.id, 2, null);
-                    // network error -> leave pending (status stays 0)
+                    // Anything else (rejection or network error) leaves the QSO pending so it stays in
+                    // the queue and is retried. A QSO only leaves the queue once QRZ confirms it.
                 }
                 finally
                 {
@@ -2691,7 +2690,8 @@ namespace HolyLogger
                     }
                     else
                     {
-                        dal.SetClublogStatus(qso.id, 2);   // definitive rejection of this record
+                        // Rejected by Club Log -> keep the QSO pending (stays in the queue) instead of
+                        // dropping it. Only a confirmed upload clears it.
                     }
                 }
                 finally
@@ -2754,7 +2754,8 @@ namespace HolyLogger
                         }
                         else
                         {
-                            dal.SetClublogStatus(qso.id, 2);   // definitive rejection
+                            // Rejected by Club Log -> keep the QSO pending (stays in the queue) and
+                            // report it as not-sent for this run. Only a confirmed upload clears it.
                             progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
                         }
                     }

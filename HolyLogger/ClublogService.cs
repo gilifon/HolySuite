@@ -6,7 +6,8 @@ using System.Threading.Tasks;
 
 namespace HolyLogger
 {
-    // The outcome of one Club Log real-time upload. Ok = the record was accepted (HTTP 2xx).
+    // The outcome of one Club Log real-time upload. Ok = the record was accepted (HTTP 2xx AND the
+    // reply body is a genuine acceptance, not a fake-200 HTML/error page -- see IsRealtimeAccepted).
     // NetworkError = the request never completed (offline / timeout) so the caller may retry later.
     // Otherwise it was a definitive rejection (bad credentials / bad record); StatusCode and Message
     // carry Club Log's response for diagnostics.
@@ -83,7 +84,12 @@ namespace HolyLogger
                     result.StatusCode = (int)resp.StatusCode;
                     try { result.Message = await resp.Content.ReadAsStringAsync(); }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
-                    result.Ok = resp.IsSuccessStatusCode;
+                    // Club Log signals acceptance with HTTP 200 and rejection with an error status, so
+                    // the code is the primary signal. But a 200 can be FAKE -- a captive-portal / proxy
+                    // login page, or Club Log's own "requires a valid API key" page -- both HTTP 200 with
+                    // an HTML body that is NOT a real acceptance. Only trust a 200 whose body is not one
+                    // of those pages, so a QSO is never falsely confirmed (and instead stays queued).
+                    result.Ok = resp.IsSuccessStatusCode && IsRealtimeAccepted(result.Message);
                 }
             }
             catch
@@ -91,6 +97,24 @@ namespace HolyLogger
                 result.NetworkError = true;   // offline / timeout -> caller may retry later
             }
             return result;
+        }
+
+        // Guards realtime.php's HTTP-200 accept signal against FAKE successes. A genuine acceptance is
+        // a short plain-text reply (often empty); it is never a full HTML document. A captive-portal or
+        // proxy login page, or Club Log's own "requires a valid API key" page, all come back as HTTP 200
+        // with an HTML body -- those must NOT count as accepted. Deliberately narrow: it only rejects
+        // clearly-HTML/known-error bodies, so a real success (empty or short text) is never mistaken for
+        // a failure (which would strand the QSO in the queue forever).
+        private static bool IsRealtimeAccepted(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body)) return true;   // empty 200 body = Club Log's normal accept
+            string trimmed = body.TrimStart();
+            if (trimmed.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
+                return false;   // an HTML page is never a realtime.php acceptance
+            if (body.IndexOf("requires a valid API key", StringComparison.OrdinalIgnoreCase) >= 0)
+                return false;   // Club Log's missing/invalid application-key page (served as 200)
+            return true;        // 200 with a non-HTML, non-error body -> genuine acceptance
         }
 
         // Bulk-uploads a whole log as ONE ADIF file (Club Log's putlogs.php). Club Log MERGES and
