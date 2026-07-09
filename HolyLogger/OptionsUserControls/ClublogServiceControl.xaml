@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:HolyLogger.OptionsUserControls"
-             mc:Ignorable="d" Height="490" Width="660">
+             mc:Ignorable="d" Height="620" Width="660">
     <DockPanel>
         <!-- Master switch: when off, Club Log uploads are out of use and the settings below are greyed. -->
         <Border DockPanel.Dock="Top" HorizontalAlignment="Left" Background="#FFF59D" Margin="0,4,0,8" Padding="6,4,10,4">
@@ -25,6 +25,10 @@
                 </Style>
             </Grid.Style>
             <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
@@ -99,6 +103,24 @@
             <Button Grid.Row="6" x:Name="ClearQueueBtn" Content="Clear Club Log Queue"
                     HorizontalAlignment="Left" Margin="2,20,0,0" Width="180" FontSize="14"
                     Padding="8,4,8,4" Click="ClearQueueBtn_Click"/>
+
+            <!-- Separator -->
+            <Border Grid.Row="7" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,14,0,0"/>
+
+            <!-- Upload-on-exit section -->
+            <TextBlock Grid.Row="8" Text="Upload Queue on Exit" FontSize="14" FontWeight="SemiBold"
+                       Margin="2,10,0,4"/>
+            <TextBlock Grid.Row="9" Margin="2,0,8,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                       Text="When you close HolyLogger, the pending Club Log queue can be uploaded automatically — only when an internet connection is available. Choose how this should behave."/>
+            <StackPanel Grid.Row="10" Orientation="Horizontal" Margin="2,2,0,8" VerticalAlignment="Center">
+                <TextBlock Text="On exit:" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <ComboBox x:Name="CB_OnExit" Width="320" FontSize="13"
+                          SelectionChanged="CB_OnExit_Changed">
+                    <ComboBoxItem Content="Do not upload on exit"/>
+                    <ComboBoxItem Content="Ask me before uploading on exit"/>
+                    <ComboBoxItem Content="Always upload on exit (no prompt)"/>
+                </ComboBox>
+            </StackPanel>
         </Grid>
     </DockPanel>
 </UserControl>

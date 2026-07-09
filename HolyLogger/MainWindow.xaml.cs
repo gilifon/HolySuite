@@ -2709,7 +2709,7 @@ namespace HolyLogger
         // Drains the Club Log pending queue (status 0), pushing each QSO in real-time order. Networks
         // errors stop the pass (the rest stays pending); definitive rejections are marked 2; a 403
         // suspends Club Log for the session. Mirrors PumpQrzQueue.
-        private async System.Threading.Tasks.Task PumpClublogQueue(bool force = false)
+        private async System.Threading.Tasks.Task PumpClublogQueue(bool force = false, UploadProgressWindow progressWindow = null)
         {
             try
             {
@@ -2726,6 +2726,15 @@ namespace HolyLogger
                 try
                 {
                     System.Collections.Generic.List<QSO> pending = dal.GetPendingClublogQsos();
+
+                    if (progressWindow != null)
+                    {
+                        if (pending.Count > 0)
+                            progressWindow.StartService("Club Log", pending.Count);
+                        else
+                            progressWindow.SkipService("Club Log", "nothing to upload — queue is empty");
+                    }
+
                     foreach (var qso in pending)
                     {
                         ClublogResult r = await ClublogService.UploadAsync(s.ClublogEmail, s.ClublogPassword, qso.MyCall, BuildQrzAdif(qso));
@@ -2734,14 +2743,20 @@ namespace HolyLogger
                             break;   // offline -> stop; the rest stays pending for next time
 
                         if (r.Ok)
+                        {
                             dal.SetClublogStatus(qso.id, 1);
+                            progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, true);
+                        }
                         else if (r.StatusCode == 403)
                         {
                             _clublogAuthBlockedThisSession = true;   // stop at once on auth failure
                             break;
                         }
                         else
+                        {
                             dal.SetClublogStatus(qso.id, 2);   // definitive rejection
+                            progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
+                        }
                     }
                 }
                 finally
@@ -4568,6 +4583,7 @@ namespace HolyLogger
                 List<QSO> lotwToUpload = null;
                 bool uploadEqsl = false;
                 bool uploadQrz = false;
+                bool uploadClublog = false;
 
                 // ── LoTW ─────────────────────────────────────────────────────────────────────
                 int lotwMode = Properties.Settings.Default.UseLotwService
@@ -4650,11 +4666,38 @@ namespace HolyLogger
                     }
                 }
 
-                if (lotwToUpload != null || uploadEqsl || uploadQrz)
+                // ── Club Log ─────────────────────────────────────────────────────────────────
+                int clublogMode = Properties.Settings.Default.UseClublogService
+                    ? Properties.Settings.Default.ClublogUploadOnExitMode
+                    : 0;   // service switched off in Options -> never prompt or upload on exit
+                if (clublogMode != 0)
+                {
+                    int clublogPending = 0;
+                    try { clublogPending = dal?.GetPendingClublogCount() ?? 0; } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                    if (clublogPending > 0)
+                    {
+                        bool doUpload = clublogMode == 2;
+                        if (clublogMode == 1)
+                        {
+                            var dlg = new ServiceUploadOnExitDialog("Club Log", clublogPending) { Owner = this };
+                            dlg.ShowDialog();
+                            if (dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Cancel)
+                            {
+                                _uploadOnExitHandled = false;
+                                e.Cancel = true;
+                                return;
+                            }
+                            doUpload = dlg.DialogResult2 == ServiceUploadOnExitDialog.Result.Yes;
+                        }
+                        uploadClublog = doUpload;
+                    }
+                }
+
+                if (lotwToUpload != null || uploadEqsl || uploadQrz || uploadClublog)
                 {
                     e.Cancel = true;
                     _uploadInFlight = true;
-                    UploadAllAndCloseAsync(lotwToUpload, uploadEqsl, uploadQrz);
+                    UploadAllAndCloseAsync(lotwToUpload, uploadEqsl, uploadQrz, uploadClublog);
                     return;
                 }
             }

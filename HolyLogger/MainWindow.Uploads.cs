@@ -801,7 +801,7 @@ namespace HolyLogger
 
         // Uploads any confirmed services in sequence, showing per-QSO progress, then closes exactly once.
         // All confirmation dialogs were already shown in Window_Closing before this is called.
-        private async void UploadAllAndCloseAsync(List<QSO> lotwPending, bool uploadEqsl, bool uploadQrz)
+        private async void UploadAllAndCloseAsync(List<QSO> lotwPending, bool uploadEqsl, bool uploadQrz, bool uploadClublog)
         {
             this.IsEnabled = false;
 
@@ -850,6 +850,21 @@ namespace HolyLogger
                 }
                 else
                     try { await PumpQrzQueue(force: true, progressWindow); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
+            if (uploadClublog)
+            {
+                bool clublogConfigured = ClublogService.HasApiKey
+                                         && !string.IsNullOrWhiteSpace(Properties.Settings.Default.ClublogEmail)
+                                         && !string.IsNullOrWhiteSpace(Properties.Settings.Default.ClublogPassword);
+                if (!online || !clublogConfigured)
+                {
+                    string why = !online ? "no internet connection"
+                        : "account not configured (set e-mail/password in Options → Club Log)";
+                    progressWindow.SkipService("Club Log", $"{why} — QSOs remain in queue");
+                }
+                else
+                    try { await PumpClublogQueue(force: true, progressWindow); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             }
 
             progressWindow.ShowComplete();

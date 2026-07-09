@@ -22,7 +22,17 @@ namespace HolyLogger.OptionsUserControls
             _loading = true;
             TB_Email.Text = Properties.Settings.Default.ClublogEmail ?? string.Empty;
             PB_Password.Password = Properties.Settings.Default.ClublogPassword ?? string.Empty;
+            CB_OnExit.SelectedIndex = Properties.Settings.Default.ClublogUploadOnExitMode;
             _loading = false;
+        }
+
+        // 0 = do not upload on exit, 1 = ask first, 2 = always upload. Mirrors the eQSL/QRZ panels;
+        // the actual exit-time upload is driven from MainWindow's Window_Closing.
+        private void CB_OnExit_Changed(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading) return;
+            Properties.Settings.Default.ClublogUploadOnExitMode = CB_OnExit.SelectedIndex;
+            Save();
         }
 
         // Master switch and auto-upload checkbox: their IsChecked bindings already wrote the value into
