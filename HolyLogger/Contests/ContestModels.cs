@@ -30,5 +30,13 @@ namespace HolyLogger.Contests
         [JsonProperty("dupe_rule")] public string DupeRule { get; set; }
         [JsonProperty("cabrillo_name")] public string CabrilloName { get; set; }
         [JsonProperty("rules_url")] public string RulesUrl { get; set; }
+
+        // Optional per-contest overrides for which Cabrillo header fields the operator must fill.
+        // Both are absent for most contests, which then use the default required set (see
+        // CabrilloHeader.RequiredFor). "cabrillo_required" adds contest-specific mandatory tags
+        // (e.g. CATEGORY-OVERLAY, CATEGORY-TRANSMITTER, LOCATION); "cabrillo_optional" drops
+        // default-required tags a given contest does not need.
+        [JsonProperty("cabrillo_required")] public List<string> CabrilloRequired { get; set; }
+        [JsonProperty("cabrillo_optional")] public List<string> CabrilloOptional { get; set; }
     }
 }

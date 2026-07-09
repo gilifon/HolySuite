@@ -37,6 +37,12 @@ namespace HolyParser
         [JsonProperty("overlay")]
         public string Category_Overlay { get; set; }
 
+        [JsonProperty("station")]
+        public string Category_Station { get; set; }
+
+        [JsonProperty("time")]
+        public string Category_Time { get; set; }
+
         [JsonProperty("location")]
         public string Location { get; set; }
 
@@ -45,6 +51,9 @@ namespace HolyParser
 
         [JsonProperty("transmitter")]
         public string Category_Transmitter { get; set; }
+
+        [JsonProperty("certificate")]
+        public string Certificate { get; set; }
 
         [JsonProperty("grid")]
         public string Grid { get; set; }
@@ -60,6 +69,12 @@ namespace HolyParser
 
         [JsonProperty("city")]
         public string City { get; set; }
+
+        [JsonProperty("state_province")]
+        public string StateProvince { get; set; }
+
+        [JsonProperty("postalcode")]
+        public string PostalCode { get; set; }
 
         [JsonProperty("country")]
         public string Country { get; set; }

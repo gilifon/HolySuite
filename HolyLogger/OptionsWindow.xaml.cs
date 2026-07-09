@@ -133,6 +133,12 @@ namespace HolyLogger
             HideAllControls();
             SatelliteControlInstance.Visibility = Visibility.Visible;
         }
+        private void PersonalInfoItem_Selected(object sender, RoutedEventArgs e)
+        {
+            HideAllControls();
+            PersonalInfoControlInstance.Reload();   // pick up a callsign changed since the window opened
+            PersonalInfoControlInstance.Visibility = Visibility.Visible;
+        }
 
         //ImportItem_Selected
 
@@ -146,6 +152,7 @@ namespace HolyLogger
             GeneralSettingsControlControlInstance.Visibility = Visibility.Hidden;
             ImportControlInstance.Visibility = Visibility.Hidden;
             SatelliteControlInstance.Visibility = Visibility.Hidden;
+            PersonalInfoControlInstance.Visibility = Visibility.Hidden;
         }
 
         /// <summary>

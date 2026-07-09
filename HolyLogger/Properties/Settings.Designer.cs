@@ -2208,5 +2208,17 @@ namespace HolyLogger.Properties {
                 this["ExtraBackupPrompted"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CabrilloHeaderStore {
+            get {
+                return ((string)(this["CabrilloHeaderStore"]));
+            }
+            set {
+                this["CabrilloHeaderStore"] = value;
+            }
+        }
     }
 }

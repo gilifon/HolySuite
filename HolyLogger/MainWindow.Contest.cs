@@ -111,6 +111,18 @@ namespace HolyLogger
             // Switch to the new (empty) log; this activates the contest via its Event Type and
             // refreshes the entry form, title bar, counts and dup check.
             SwitchActiveLog(id);
+
+            // Offer to fill this contest's Cabrillo header fields now (skippable). Whatever is entered
+            // is kept; anything still missing is enforced later at Cabrillo export.
+            try
+            {
+                var values = Contests.ContestHeaderStore.Load(c.Id);
+                var info = new ContestInfoWindow(c, values, exportMode: false) { Owner = this };
+                info.ShowDialog();
+                if (info.Values != null) Contests.ContestHeaderStore.Save(c.Id, info.Values);
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+
             return true;
         }
 

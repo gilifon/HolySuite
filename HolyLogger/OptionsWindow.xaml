@@ -18,6 +18,7 @@
             <TreeView x:Name="treeView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
                 <TreeViewItem x:Name="GeneralItem" Header="General" Selected="GeneralItem_Selected" />
                 <TreeViewItem x:Name="UlItem" Header="User Interface" Selected="UserInterfaceItem_Selected" />
+                <TreeViewItem x:Name="PersonalInfoItem" Header="Personal Info" Selected="PersonalInfoItem_Selected" />
                 <TreeViewItem x:Name="QRZItem" Selected="QRZServicesItem_Selected">
                     <TreeViewItem.Header><TextBlock><Run FontWeight="Bold" Text="QRZ"/><Run Text=" Services"/></TextBlock></TreeViewItem.Header>
                 </TreeViewItem>
@@ -49,6 +50,7 @@
                 <OptionsUserControls:GeneralSettingsControl x:Name="GeneralSettingsControlControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
                 <OptionsUserControls:ImportControl x:Name="ImportControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
                 <OptionsUserControls:SatelliteControl x:Name="SatelliteControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
+                <OptionsUserControls:PersonalInfoControl x:Name="PersonalInfoControlInstance" HorizontalAlignment="Left" Margin="10,10,0,0" VerticalAlignment="Top" Visibility="Hidden"/>
             </Grid>
         </ScrollViewer>
     </Grid>

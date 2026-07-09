@@ -88,20 +88,35 @@ namespace HolyLogger
             try { eventType = dal.GetLogEventType(logId); } catch (Exception swallowed) { Log.Swallow(swallowed); }
             Contests.Contest logContest = Contests.ContestService.FindById(eventType);
 
-            Contester c = new Contester
+            // Gather the Cabrillo header fields. For a real contest, the required fields MUST be filled
+            // or the file is non-standard: if anything is missing, force the info window (no skip) and
+            // abort the export if the operator cancels. For a non-contest log we don't enforce.
+            var values = Contests.ContestHeaderStore.Load(logContest?.Id);
+            if (logContest != null)
             {
-                Callsign = Properties.Settings.Default.PersonalInfoCallsign,
-                Category_Mode = Properties.Settings.Default.selectedMode,
-                Category_Operator = Properties.Settings.Default.selectedOperator,
-                Category_Power = Properties.Settings.Default.selectedPower,
-                Category_Band = Properties.Settings.Default.selectedBand,
-                Category_Overlay = Properties.Settings.Default.selectedOverlay,
-                Contest = logContest?.CabrilloName ?? string.Empty,
-                Email = Properties.Settings.Default.PersonalInfoEmail,
-                Grid = Properties.Settings.Default.my_locator,
-                Name = Properties.Settings.Default.PersonalInfoName,
-                Soapbox = "HolyLogger",
-            };
+                // The station callsign is read-only in the info window (it comes from the main-window
+                // Station callsign box), so it can only be fixed there — check it up front.
+                values.TryGetValue("CALLSIGN", out var stationCall);
+                if (string.IsNullOrWhiteSpace(stationCall))
+                {
+                    HolyMessageBox.ShowWarning(
+                        "Set your station callsign in the main window's \"Station callsign\" box before exporting a contest Cabrillo file.",
+                        "Station callsign", owner ?? this);
+                    return;
+                }
+
+                if (!Contests.ContestHeaderStore.IsComplete(logContest, values))
+                {
+                    var info = new ContestInfoWindow(logContest, values, exportMode: true) { Owner = owner ?? this };
+                    info.ShowDialog();
+                    if (!info.Completed) return;   // operator cancelled -> do not produce an incomplete file
+                    Contests.ContestHeaderStore.Save(logContest.Id, info.Values);
+                    values = Contests.ContestHeaderStore.Load(logContest.Id);
+                }
+            }
+
+            Contester c = new Contester { Contest = logContest?.CabrilloName ?? string.Empty };
+            Contests.ContestHeaderStore.PopulateContester(c, values);
             string cabrillo = Services.GenerateCabrillo(qsos, c);
             var save = new SaveFileDialog { Filter = "Cabrillo File|*.cbr|Text File|*.txt|Log File|*.log", DefaultExt = "cbr", Title = "Export Cabrillo" };
             if (save.ShowDialog() != true) return;
@@ -511,7 +526,6 @@ namespace HolyLogger
                 c.Grid = TB_MyLocator.Text.Trim();
                 c.Name = name.Trim();
                 c.Country = country.Trim();
-                c.Soapbox = "HolyLogger";
 
                 //generate cabrillo
                 string cabrillo = Services.GenerateCabrillo(dal.GetAllQSOs(), c);

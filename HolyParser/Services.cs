@@ -165,6 +165,7 @@ namespace HolyParser
 
             StringBuilder cbr = new StringBuilder(200);
             cbr.AppendLine("START-OF-LOG: 3.0");
+            cbr.AppendLine("CREATED-BY: HolyLogger " + version);
             if (!string.IsNullOrEmpty(participant.Contest)) { cbr.AppendFormat("CONTEST: {0}", participant.Contest); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Callsign)) {cbr.AppendFormat("CALLSIGN: {0}", participant.Callsign); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Email)) { cbr.AppendFormat("EMAIL: {0}", participant.Email); cbr.AppendLine(); }
@@ -175,13 +176,18 @@ namespace HolyParser
             if (!string.IsNullOrEmpty(participant.Category_Power)) {cbr.AppendFormat("CATEGORY-POWER: {0}", participant.Category_Power); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Category_Mode)) {cbr.AppendFormat("CATEGORY-MODE: {0}", participant.Category_Mode); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Category_Transmitter)) { cbr.AppendFormat("CATEGORY-TRANSMITTER: {0}", participant.Category_Transmitter); cbr.AppendLine(); }
-            //if (!string.IsNullOrEmpty(participant.Category_Overlay)) { cbr.AppendFormat("CATEGORY-OVERLAY: {0}", participant.Category_Overlay); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Station)) { cbr.AppendFormat("CATEGORY-STATION: {0}", participant.Category_Station); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Time)) { cbr.AppendFormat("CATEGORY-TIME: {0}", participant.Category_Time); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Category_Overlay)) { cbr.AppendFormat("CATEGORY-OVERLAY: {0}", participant.Category_Overlay); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.Certificate)) { cbr.AppendFormat("CERTIFICATE: {0}", participant.Certificate); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Grid)) {cbr.AppendFormat("GRID-LOCATOR: {0}", participant.Grid); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Score)) {cbr.AppendFormat("CLAIMED-SCORE: {0}", participant.Score); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Club)) {cbr.AppendFormat("CLUB: {0}", participant.Club); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Name)) {cbr.AppendFormat("NAME: {0}", participant.Name); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Address)) {cbr.AppendFormat("ADDRESS: {0}", participant.Address); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.City)) {cbr.AppendFormat("ADDRESS-CITY: {0}", participant.City); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.StateProvince)) {cbr.AppendFormat("ADDRESS-STATE-PROVINCE: {0}", participant.StateProvince); cbr.AppendLine(); }
+            if (!string.IsNullOrEmpty(participant.PostalCode)) {cbr.AppendFormat("ADDRESS-POSTALCODE: {0}", participant.PostalCode); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Country)) {cbr.AppendFormat("ADDRESS-COUNTRY: {0}", participant.Country); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Operators)) {cbr.AppendFormat("OPERATORS: {0}", participant.Operators); cbr.AppendLine(); }
             if (!string.IsNullOrEmpty(participant.Soapbox)) {cbr.AppendFormat("SOAPBOX: {0}", participant.Soapbox); cbr.AppendLine(); }
