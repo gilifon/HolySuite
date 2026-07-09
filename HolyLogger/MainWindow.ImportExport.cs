@@ -91,29 +91,35 @@ namespace HolyLogger
             // Gather the Cabrillo header fields. For a real contest, the required fields MUST be filled
             // or the file is non-standard: if anything is missing, force the info window (no skip) and
             // abort the export if the operator cancels. For a non-contest log we don't enforce.
-            var values = Contests.ContestHeaderStore.Load(logContest?.Id);
-            if (logContest != null)
-            {
-                // The station callsign is read-only in the info window (it comes from the main-window
-                // Station callsign box), so it can only be fixed there — check it up front.
-                values.TryGetValue("CALLSIGN", out var stationCall);
-                if (string.IsNullOrWhiteSpace(stationCall))
-                {
-                    HolyMessageBox.ShowWarning(
-                        "Set your station callsign in the main window's \"Station callsign\" box before exporting a contest Cabrillo file.",
-                        "Station callsign", owner ?? this);
-                    return;
-                }
+            // Storage key for this log's header values: the recognized contest id, else the raw log
+            // event type (so a legacy / unrecognized contest still persists what the operator enters),
+            // else null (in-memory only for this one export).
+            string storeKey = !string.IsNullOrWhiteSpace(logContest?.Id) ? logContest.Id
+                            : (!string.IsNullOrWhiteSpace(eventType) ? eventType : null);
 
-                if (!Contests.ContestHeaderStore.IsComplete(logContest, values))
-                {
-                    var info = new ContestInfoWindow(logContest, values, exportMode: true) { Owner = owner ?? this };
-                    info.ShowDialog();
-                    if (!info.Completed) return;   // operator cancelled -> do not produce an incomplete file
-                    Contests.ContestHeaderStore.Save(logContest.Id, info.Values);
-                    values = Contests.ContestHeaderStore.Load(logContest.Id);
-                }
+            var values = Contests.ContestHeaderStore.Load(storeKey);
+
+            // The station callsign is read-only in the info window (it comes from the main-window
+            // Station callsign box) and is always required for a valid Cabrillo file, so it can only be
+            // fixed there — check it up front before opening the window.
+            values.TryGetValue("CALLSIGN", out var stationCall);
+            if (string.IsNullOrWhiteSpace(stationCall))
+            {
+                HolyMessageBox.ShowWarning(
+                    "Set your station callsign in the main window's \"Station callsign\" box before exporting a Cabrillo file.",
+                    "Station callsign", owner ?? this);
+                return;
             }
+
+            // ALWAYS open the info window so the operator can review, edit and verify every header field
+            // before the file is written — even when the fields are already complete, and even when the
+            // log's contest can't be identified (a null contest falls back to the generic default field
+            // set). Cancelling aborts the export, so no unreviewed file is ever produced.
+            var info = new ContestInfoWindow(logContest, values, exportMode: true) { Owner = owner ?? this };
+            info.ShowDialog();
+            if (!info.Completed) return;
+            Contests.ContestHeaderStore.Save(storeKey, info.Values);
+            values = info.Values;   // export exactly what the operator just reviewed
 
             Contester c = new Contester { Contest = logContest?.CabrilloName ?? string.Empty };
             Contests.ContestHeaderStore.PopulateContester(c, values);
