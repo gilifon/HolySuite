@@ -26,6 +26,11 @@ namespace HolyLogger
             public int QsoCount { get; set; }
             public long Id { get; set; }
             public bool IsContest { get; set; }
+            public string Identity { get; set; }   // "callsign / operator" for the copy filter
+            public string CopiesTo { get; set; }    // target log name, or "—"
+            public long? CopyTargetLogId { get; set; }
+            public string Callsign { get; set; }
+            public string Operator { get; set; }
         }
 
         public ViewLogsWindow(MainWindow main, DataAccess dal)
@@ -47,14 +52,19 @@ namespace HolyLogger
 
         private void LoadLogs()
         {
+            var logs = _dal.GetLogs();
+            var nameById = logs.ToDictionary(l => l.Id, l => l.Name);
             var rows = new List<Row>();
             int n = 1;
-            foreach (var li in _dal.GetLogs())
+            foreach (var li in logs)
             {
                 bool isContest = !string.IsNullOrEmpty(li.EventType);
                 string eventDisplay = isContest
                     ? (Contests.ContestService.FindById(li.EventType)?.Name ?? li.EventType)
                     : "General";
+                string copiesTo = "—";
+                if (li.CopyTargetLogId.HasValue && nameById.TryGetValue(li.CopyTargetLogId.Value, out var tName))
+                    copiesTo = tName;
                 rows.Add(new Row
                 {
                     Num = n++,
@@ -65,6 +75,11 @@ namespace HolyLogger
                     QsoCount = li.QsoCount,
                     Id = li.Id,
                     IsContest = isContest,
+                    Identity = BuildIdentity(li.Callsign, li.Operator),
+                    CopiesTo = copiesTo,
+                    CopyTargetLogId = li.CopyTargetLogId,
+                    Callsign = li.Callsign,
+                    Operator = li.Operator,
                 });
             }
             LogsGrid.ItemsSource = rows;
@@ -84,7 +99,28 @@ namespace HolyLogger
             return yyyymmdd;   // unexpected format -> show as-is
         }
 
+        // "callsign / operator", or "—" when the log has no identity set yet.
+        private static string BuildIdentity(string call, string opr)
+        {
+            call = (call ?? string.Empty).Trim();
+            opr = (opr ?? string.Empty).Trim();
+            if (call.Length == 0 && opr.Length == 0) return "—";
+            return call + " / " + opr;
+        }
+
         private Row Selected => LogsGrid.SelectedItem as Row;
+
+        // Opens the per-log Copy settings dialog: set/change/stop the copy-target and edit identity.
+        private void Btn_CopySettings_Click(object sender, RoutedEventArgs e)
+        {
+            if (!RequireSelection()) return;
+            var dlg = new CopySettingsWindow(_dal, Selected.Id, Selected.Callsign, Selected.Operator,
+                                             Selected.CopyTargetLogId) { Owner = this };
+            if (dlg.ShowDialog() != true) return;
+            _dal.UpdateLogCopySettings(Selected.Id, dlg.CopyTargetLogId, dlg.LogCallsign, dlg.LogOperator);
+            _main.RefreshCopyIndicator();   // the active log's copy state may have changed
+            LoadLogs();
+        }
 
         // "Open Log" is only meaningful for a log that is NOT already the active one.
         private void LogsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -155,13 +191,23 @@ namespace HolyLogger
                 return;
             }
 
+            // Warn if OTHER logs copy their new QSOs INTO this one — deleting it turns their copying off.
+            var sources = (LogsGrid.ItemsSource as System.Collections.Generic.IEnumerable<Row>)
+                          ?.Where(r => r.CopyTargetLogId == id).Select(r => r.Name).ToList()
+                          ?? new System.Collections.Generic.List<string>();
+            string copyNote = sources.Count > 0
+                ? "\n\nNote: " + string.Join(", ", sources) + " " + (sources.Count == 1 ? "copies" : "copy") +
+                  " new QSOs into this log; that copying will be turned off. QSOs already copied elsewhere are not affected."
+                : string.Empty;
+
             if (!HolyMessageBox.ShowConfirm(
                     "Delete the log \"" + _dal.GetLogName(id) + "\" and ALL " + Selected.QsoCount.ToString("N0") +
-                    " QSO(s) in it?\n\nThis permanently removes those QSOs from the database and cannot be undone.",
+                    " QSO(s) in it?\n\nThis permanently removes those QSOs from the database and cannot be undone." + copyNote,
                     "Delete Log", HolyMsgType.Warning, this))
                 return;
 
             _dal.DeleteLog(id);
+            _main.RefreshCopyIndicator();
             LoadLogs();
         }
 

@@ -94,6 +94,8 @@ namespace HolyLogger
             { "RowOnFreqBg",      new[] { "#90EE90", "#1E4A2A", "#1E4A2A" } }, // cluster: on-frequency spot
             { "FilterRowBg",      new[] { "#C8F0D0", "#1E4030", "#1E4030" } }, // QSO grid: filtered-match row
             { "FilterRowAltBg",   new[] { "#A8D8B4", "#183328", "#183328" } }, // QSO grid: filtered-match alt row
+            { "WorkedElsewhereBg",    new[] { "#CFE3FF", "#183048", "#183048" } }, // QSO grid: same call found in the copy-target log (reference only)
+            { "WorkedElsewhereAltBg", new[] { "#B3D2F5", "#12263A", "#12263A" } }, // QSO grid: same-call target-log alt row
 
             // ---- Window chrome ----------------------------------------------------------------------
             { "TitleBarBg",       new[] { "#F0F0F0", "#121316", "#0D1420" } }, // window title-bar background; drives the main + cluster custom title bars everywhere, and native dialog captions on Win11. Matches WindowBg by default.
@@ -130,6 +132,8 @@ namespace HolyLogger
             new TokenInfo("SelectionBg",      "Tables", "Selected item",              "Background of the selected row, cell or menu item."),
             new TokenInfo("FilterRowBg",      "Tables", "Filter match rows",          "Log rows that match the active callsign filter."),
             new TokenInfo("FilterRowAltBg",   "Tables", "Filter match rows (alt.)",   "Every second filter-match row."),
+            new TokenInfo("WorkedElsewhereBg",    "Tables", "Worked-before (target log)",       "Same-callsign QSOs found in the copy-target log, shown for reference."),
+            new TokenInfo("WorkedElsewhereAltBg", "Tables", "Worked-before (target log, alt.)", "Every second reference row from the copy-target log."),
             new TokenInfo("RowHoverBg",       "Tables", "Cluster: map-hovered spot",  "Cluster row highlighted while hovering its dot on the map."),
             new TokenInfo("RowOnFreqBg",      "Tables", "Cluster: on-frequency spot", "Cluster row whose frequency matches your radio."),
 

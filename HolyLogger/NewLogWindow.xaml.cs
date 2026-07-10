@@ -1,23 +1,50 @@
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Windows;
 
 namespace HolyLogger
 {
     // Reusable dialog to name a log (Create New Log, contest log, Rename). Rejects a name that is
     // already used by another log. For rename, pass excludeId so the log can keep its own name.
+    // When showCopyOptions is true it also collects the log's identity (station callsign + operator)
+    // and an optional copy-target log; those extras are hidden for the plain name / rename uses.
     public partial class NewLogWindow : Window
     {
         private readonly DataAccess _dal;
         private readonly long _excludeId;
         public string LogName { get; private set; }
 
-        public NewLogWindow(DataAccess dal, string prompt = "Enter a name for the new log:", string initial = "", long excludeId = 0)
+        // Set only when showCopyOptions is true. CopyTargetLogId is null when "(don't copy)" is chosen.
+        public string LogCallsign { get; private set; }
+        public string LogOperator { get; private set; }
+        public long? CopyTargetLogId { get; private set; }
+
+        public NewLogWindow(DataAccess dal, string prompt = "Enter a name for the new log:", string initial = "",
+                            long excludeId = 0, bool showCopyOptions = false,
+                            string defaultCallsign = "", string defaultOperator = "")
         {
             InitializeComponent();
             _dal = dal;
             _excludeId = excludeId;
             Prompt.Text = prompt;
             TB_Name.Text = initial ?? string.Empty;
+
+            if (showCopyOptions)
+            {
+                CopyOptionsPanel.Visibility = Visibility.Visible;
+                TB_Callsign.Text = (defaultCallsign ?? string.Empty).Trim();
+                TB_Operator.Text = (defaultOperator ?? string.Empty).Trim();
+
+                // First item = "(don't copy)" sentinel (Id 0); then every REGULAR log as a target. Contest
+                // logs are excluded — a contest log must never receive copies (only contest operation fills it).
+                var items = new List<LogInfo> { new LogInfo { Id = 0, Name = "(don't copy)" } };
+                try { items.AddRange(_dal.GetLogs().Where(l => string.IsNullOrEmpty(l.EventType))); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                CB_CopyTarget.ItemsSource = items;
+                CB_CopyTarget.SelectedIndex = 0;
+            }
+
             Loaded += (s, e) => { TB_Name.Focus(); TB_Name.SelectAll(); };
         }
 
@@ -34,6 +61,17 @@ namespace HolyLogger
                 HolyMessageBox.ShowWarning("A log named \"" + name + "\" already exists. Please choose a different name.", "Name already used", this);
                 return;
             }
+
+            if (CopyOptionsPanel.Visibility == Visibility.Visible)
+            {
+                LogCallsign = (TB_Callsign.Text ?? string.Empty).Trim();
+                LogOperator = (TB_Operator.Text ?? string.Empty).Trim();
+                long tid = 0;
+                try { if (CB_CopyTarget.SelectedValue != null) tid = Convert.ToInt64(CB_CopyTarget.SelectedValue); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                CopyTargetLogId = tid > 0 ? (long?)tid : null;
+            }
+
             LogName = name;
             DialogResult = true;
             Close();

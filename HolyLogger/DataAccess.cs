@@ -267,6 +267,128 @@ Environment.NewLine +
             return null;
             }
         }
+        // Inserts a COPY of an existing QSO into another log, tagged with source_qso_id and inheriting the
+        // source's per-service upload status. Never triggers further copying. Returns the copy's Id.
+        // Caller holds _dbLock.
+        private long InsertQsoCopy(QSO qso, long targetLogId, long sourceQsoId)
+        {
+            int es = 0, qs = 0, ls = 0, cs = 0;
+            using (var sc = new SQLiteCommand("SELECT eqsl_status, qrz_status, lotw_status, clublog_status FROM qso WHERE Id = ?", con))
+            {
+                sc.Parameters.Add(new SQLiteParameter(null, sourceQsoId));
+                using (var rdr = sc.ExecuteReader())
+                    if (rdr.Read())
+                    {
+                        es = rdr["eqsl_status"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["eqsl_status"]);
+                        qs = rdr["qrz_status"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["qrz_status"]);
+                        ls = rdr["lotw_status"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["lotw_status"]);
+                        cs = rdr["clublog_status"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["clublog_status"]);
+                    }
+            }
+            using (var ins = new SQLiteCommand(
+                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
+                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@prop_mode,@sat_name,@soapbox,@es,@qs,@ls,@cs,@log_id,@src)", con))
+            {
+                ins.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
+                ins.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
+                ins.Parameters.Add(new SQLiteParameter("@my_square", qso.STX));
+                ins.Parameters.Add(new SQLiteParameter("@my_locator", qso.MyLocator));
+                ins.Parameters.Add(new SQLiteParameter("@dx_locator", qso.DXLocator));
+                ins.Parameters.Add(new SQLiteParameter("@frequency", qso.Freq));
+                ins.Parameters.Add(new SQLiteParameter("@band", qso.Band));
+                ins.Parameters.Add(new SQLiteParameter("@dx_callsign", qso.DXCall));
+                ins.Parameters.Add(new SQLiteParameter("@rst_rcvd", qso.RST_RCVD));
+                ins.Parameters.Add(new SQLiteParameter("@rst_sent", qso.RST_SENT));
+                ins.Parameters.Add(new SQLiteParameter("@date", qso.Date));
+                ins.Parameters.Add(new SQLiteParameter("@time", qso.Time));
+                ins.Parameters.Add(new SQLiteParameter("@mode", qso.Mode));
+                ins.Parameters.Add(new SQLiteParameter("@submode", qso.SUBMode));
+                ins.Parameters.Add(new SQLiteParameter("@exchange", qso.SRX));
+                ins.Parameters.Add(new SQLiteParameter("@comment", qso.Comment));
+                ins.Parameters.Add(new SQLiteParameter("@name", qso.Name));
+                ins.Parameters.Add(new SQLiteParameter("@country", qso.Country));
+                ins.Parameters.Add(new SQLiteParameter("@continent", qso.Continent));
+                ins.Parameters.Add(new SQLiteParameter("@cq_zone", qso.CQZone));
+                ins.Parameters.Add(new SQLiteParameter("@itu_zone", qso.ITUZone));
+                ins.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
+                ins.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
+                ins.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
+                ins.Parameters.Add(new SQLiteParameter("@es", es));
+                ins.Parameters.Add(new SQLiteParameter("@qs", qs));
+                ins.Parameters.Add(new SQLiteParameter("@ls", ls));
+                ins.Parameters.Add(new SQLiteParameter("@cs", cs));
+                ins.Parameters.Add(new SQLiteParameter("@log_id", targetLogId));
+                ins.Parameters.Add(new SQLiteParameter("@src", sourceQsoId));
+                ins.ExecuteNonQuery();
+            }
+            using (var idcmd = new SQLiteCommand("SELECT last_insert_rowid()", con))
+                return Convert.ToInt64(idcmd.ExecuteScalar());
+        }
+
+        // Called right after a QSO is logged. If the source log has a copy-target, and the QSO's station
+        // callsign AND operator both match the target log's identity, and the target doesn't already have
+        // this contact, inserts a linked copy into the target log. Returns the copy Id, or 0 if nothing
+        // was copied. Best-effort: never throws, so copying can't break logging.
+        public long CopyQsoToTargetIfConfigured(QSO qso, long sourceLogId)
+        {
+            try
+            {
+                lock (_dbLock)
+                {
+                    if (con == null || con.State != ConnectionState.Open || qso == null || qso.id <= 0) return 0;
+
+                    long targetId = 0;
+                    using (var tc = new SQLiteCommand("SELECT copy_target_log_id FROM logs WHERE Id = ?", con))
+                    {
+                        tc.Parameters.Add(new SQLiteParameter(null, sourceLogId));
+                        var o = tc.ExecuteScalar();
+                        if (o != null && o != DBNull.Value) targetId = Convert.ToInt64(o);
+                    }
+                    if (targetId <= 0 || targetId == sourceLogId) return 0;
+
+                    // Never copy INTO a contest log — a contest log's QSOs must come only from contest
+                    // operation (with its dupe-check / serial / Cabrillo logic), never as passive copies.
+                    using (var ec = new SQLiteCommand("SELECT event_type FROM logs WHERE Id = ?", con))
+                    {
+                        ec.Parameters.Add(new SQLiteParameter(null, targetId));
+                        var eo = ec.ExecuteScalar();
+                        if (eo != null && eo != DBNull.Value && !string.IsNullOrWhiteSpace(eo.ToString())) return 0;
+                    }
+
+                    string tcall = string.Empty, toper = string.Empty;
+                    using (var ic = new SQLiteCommand("SELECT log_callsign, log_operator FROM logs WHERE Id = ?", con))
+                    {
+                        ic.Parameters.Add(new SQLiteParameter(null, targetId));
+                        using (var rdr = ic.ExecuteReader())
+                            if (rdr.Read())
+                            {
+                                tcall = rdr["log_callsign"] == DBNull.Value ? string.Empty : rdr["log_callsign"].ToString();
+                                toper = rdr["log_operator"] == DBNull.Value ? string.Empty : rdr["log_operator"].ToString();
+                            }
+                    }
+                    // Identity filter: BOTH station callsign AND operator must match the target log's identity.
+                    if (string.IsNullOrWhiteSpace(tcall) || string.IsNullOrWhiteSpace(toper)) return 0;
+                    if (!string.Equals((qso.MyCall ?? string.Empty).Trim(), tcall.Trim(), StringComparison.OrdinalIgnoreCase)) return 0;
+                    if (!string.Equals((qso.Operator ?? string.Empty).Trim(), toper.Trim(), StringComparison.OrdinalIgnoreCase)) return 0;
+
+                    // Duplicate check in the target log (same worked call + band + mode + date + time).
+                    using (var dc = new SQLiteCommand("SELECT count(*) FROM qso WHERE log_id = @lid AND dx_callsign = @c AND band = @b AND mode = @m AND date = @d AND time = @t", con))
+                    {
+                        dc.Parameters.Add(new SQLiteParameter("@lid", targetId));
+                        dc.Parameters.Add(new SQLiteParameter("@c", (object)(qso.DXCall ?? string.Empty)));
+                        dc.Parameters.Add(new SQLiteParameter("@b", (object)(qso.Band ?? string.Empty)));
+                        dc.Parameters.Add(new SQLiteParameter("@m", (object)(qso.Mode ?? string.Empty)));
+                        dc.Parameters.Add(new SQLiteParameter("@d", (object)(qso.Date ?? string.Empty)));
+                        dc.Parameters.Add(new SQLiteParameter("@t", (object)(qso.Time ?? string.Empty)));
+                        if (Convert.ToInt32(dc.ExecuteScalar()) > 0) return 0;
+                    }
+
+                    return InsertQsoCopy(qso, targetId, qso.id);
+                }
+            }
+            catch { return 0; }
+        }
+
         public bool Insert(IEnumerable<QSO> qsos)
         {
             lock (_dbLock)
@@ -419,36 +541,61 @@ Environment.NewLine +
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox WHERE id = @id", con);
-                insertSQL.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
-                insertSQL.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
-                insertSQL.Parameters.Add(new SQLiteParameter("@my_square", qso.STX));
-                insertSQL.Parameters.Add(new SQLiteParameter("@my_locator", qso.MyLocator));
-                insertSQL.Parameters.Add(new SQLiteParameter("@dx_locator", qso.DXLocator));
-                insertSQL.Parameters.Add(new SQLiteParameter("@frequency", qso.Freq));
-                insertSQL.Parameters.Add(new SQLiteParameter("@band", qso.Band));
-                insertSQL.Parameters.Add(new SQLiteParameter("@dx_callsign", qso.DXCall));
-                insertSQL.Parameters.Add(new SQLiteParameter("@rst_rcvd", qso.RST_RCVD));
-                insertSQL.Parameters.Add(new SQLiteParameter("@rst_sent", qso.RST_SENT));
-                insertSQL.Parameters.Add(new SQLiteParameter("@date", qso.Date));
-                insertSQL.Parameters.Add(new SQLiteParameter("@time", qso.Time));
-                insertSQL.Parameters.Add(new SQLiteParameter("@mode", qso.Mode));
-                insertSQL.Parameters.Add(new SQLiteParameter("@submode", qso.SUBMode));
-                insertSQL.Parameters.Add(new SQLiteParameter("@exchange", qso.SRX));
-                insertSQL.Parameters.Add(new SQLiteParameter("@comment", qso.Comment));
-                insertSQL.Parameters.Add(new SQLiteParameter("@name", qso.Name));
-                insertSQL.Parameters.Add(new SQLiteParameter("@country", qso.Country));
-                insertSQL.Parameters.Add(new SQLiteParameter("@continent", qso.Continent));
-                insertSQL.Parameters.Add(new SQLiteParameter("@cq_zone", qso.CQZone));
-                insertSQL.Parameters.Add(new SQLiteParameter("@itu_zone", qso.ITUZone));
-                insertSQL.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
-                insertSQL.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
-                insertSQL.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
-                insertSQL.Parameters.Add(new SQLiteParameter("@id", qso.id));
-
+                // Copy-to-log: an edit must keep the linked partner (copy or original) identical. Collect
+                // this QSO plus any linked row (parent original + child copies) and apply the same DATA
+                // update to each. We never touch their log_id / source_qso_id / upload-status here, so a
+                // one-shot loop is safe and cannot ping-pong.
+                var ids = new List<long> { qso.id };
                 try
                 {
-                    insertSQL.ExecuteNonQuery();
+                    using (var pc = new SQLiteCommand("SELECT source_qso_id FROM qso WHERE Id = ?", con))
+                    {
+                        pc.Parameters.Add(new SQLiteParameter(null, (long)qso.id));
+                        var o = pc.ExecuteScalar();
+                        if (o != null && o != DBNull.Value) { long pid = Convert.ToInt64(o); if (pid > 0 && !ids.Contains(pid)) ids.Add(pid); }
+                    }
+                    using (var cc = new SQLiteCommand("SELECT Id FROM qso WHERE source_qso_id = ?", con))
+                    {
+                        cc.Parameters.Add(new SQLiteParameter(null, (long)qso.id));
+                        using (var rdr = cc.ExecuteReader())
+                            while (rdr.Read()) { long cid = Convert.ToInt64(rdr["Id"]); if (!ids.Contains(cid)) ids.Add(cid); }
+                    }
+                }
+                catch { /* best-effort; at minimum the QSO itself is updated below */ }
+
+                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox WHERE id = @id";
+                try
+                {
+                    foreach (var uid in ids)
+                    {
+                        SQLiteCommand insertSQL = new SQLiteCommand(sql, con);
+                        insertSQL.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@my_square", qso.STX));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@my_locator", qso.MyLocator));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@dx_locator", qso.DXLocator));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@frequency", qso.Freq));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@band", qso.Band));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@dx_callsign", qso.DXCall));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@rst_rcvd", qso.RST_RCVD));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@rst_sent", qso.RST_SENT));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@date", qso.Date));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@time", qso.Time));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@mode", qso.Mode));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@submode", qso.SUBMode));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@exchange", qso.SRX));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@comment", qso.Comment));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@name", qso.Name));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@country", qso.Country));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@continent", qso.Continent));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@cq_zone", qso.CQZone));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@itu_zone", qso.ITUZone));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@id", uid));
+                        insertSQL.ExecuteNonQuery();
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -463,11 +610,45 @@ Environment.NewLine +
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand deleteSQL = new SQLiteCommand("DELETE FROM qso WHERE Id = ?", con);
-                deleteSQL.Parameters.Add(new SQLiteParameter("Id", Id));
+                // Copy-to-log: a single-QSO delete removes the contact EVERYWHERE. Follow the copy link
+                // in BOTH directions — this QSO's copy (child: source_qso_id = Id), and, if this is itself
+                // a copy, its original (parent: Id = this row's source_qso_id) plus that original's other
+                // copies. Whole-log delete uses a different path (bulk by log_id) and does NOT cascade.
+                var ids = new List<long> { Id };
                 try
                 {
-                    deleteSQL.ExecuteNonQuery();
+                    long parent = 0;
+                    using (var pc = new SQLiteCommand("SELECT source_qso_id FROM qso WHERE Id = ?", con))
+                    {
+                        pc.Parameters.Add(new SQLiteParameter(null, (long)Id));
+                        var o = pc.ExecuteScalar();
+                        if (o != null && o != DBNull.Value) parent = Convert.ToInt64(o);
+                    }
+                    if (parent > 0 && !ids.Contains(parent)) ids.Add(parent);
+                    using (var cc = new SQLiteCommand("SELECT Id FROM qso WHERE source_qso_id = ?", con))
+                    {
+                        cc.Parameters.Add(new SQLiteParameter(null, (long)Id));
+                        using (var rdr = cc.ExecuteReader())
+                            while (rdr.Read()) { long cid = Convert.ToInt64(rdr["Id"]); if (!ids.Contains(cid)) ids.Add(cid); }
+                    }
+                    if (parent > 0)
+                        using (var sc = new SQLiteCommand("SELECT Id FROM qso WHERE source_qso_id = ?", con))
+                        {
+                            sc.Parameters.Add(new SQLiteParameter(null, parent));
+                            using (var rdr = sc.ExecuteReader())
+                                while (rdr.Read()) { long sid = Convert.ToInt64(rdr["Id"]); if (!ids.Contains(sid)) ids.Add(sid); }
+                        }
+                }
+                catch { /* best-effort link lookup; still delete the QSO itself below */ }
+
+                try
+                {
+                    foreach (var delId in ids)
+                        using (var del = new SQLiteCommand("DELETE FROM qso WHERE Id = ?", con))
+                        {
+                            del.Parameters.Add(new SQLiteParameter(null, delId));
+                            del.ExecuteNonQuery();
+                        }
                 }
                 catch (Exception ex)
                 {
@@ -643,6 +824,58 @@ Environment.NewLine +
                 return qso_list;
             }
         }
+        // Returns QSOs in a specific log whose worked-callsign CONTAINS the given fragment (case-
+        // insensitive), newest first, capped. Used to show "also worked in the copy-target log" rows in
+        // the live callsign filter — reference only, so a light cap keeps it snappy.
+        public List<QSO> GetQsosWithCallsignInLog(long logId, string dxCallsignFragment)
+        {
+            var list = new List<QSO>();
+            if (string.IsNullOrWhiteSpace(dxCallsignFragment)) return list;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return list;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT * FROM qso WHERE log_id = @lid AND dx_callsign LIKE @c COLLATE NOCASE ORDER BY date DESC, time DESC LIMIT 1000", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@lid", logId));
+                    cmd.Parameters.Add(new SQLiteParameter("@c", "%" + dxCallsignFragment.Trim() + "%"));
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            QSO q = new QSO();
+                            if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
+                            if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
+                            if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
+                            if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
+                            if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
+                            if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
+                            if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
+                            if (rdr["band"] != null) q.Band = rdr["band"].ToString();
+                            if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
+                            if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
+                            if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
+                            if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
+                            if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
+                            if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
+                            if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
+                            if (rdr["name"] != null) q.Name = rdr["name"].ToString();
+                            if (rdr["country"] != null) q.Country = rdr["country"].ToString();
+                            if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
+                            if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
+                            if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                            if (rdr["time"] != null) q.Time = rdr["time"].ToString();
+                            if (rdr["date"] != null) q.Date = rdr["date"].ToString();
+                            if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
+                            if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
+                            if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                            q.StandartizeQSO();
+                            list.Add(q);
+                        }
+                }
+            }
+            return list;
+        }
+
         public ObservableCollection<QSO> GetTopQSOs(int i)
         {
             lock (_dbLock)
@@ -929,6 +1162,83 @@ Environment.NewLine +
             }
         }
 
+        // Full create: also stores the log's identity (station callsign + operator) and an optional
+        // copy-target (another log this one's new QSOs are mirrored into).
+        public long CreateLog(string name, string eventType, string callsign, string opr, long? copyTargetLogId)
+        {
+            lock (_dbLock)
+            {
+                using (var cmd = new SQLiteCommand("INSERT INTO logs (name, event_type, created_utc, log_callsign, log_operator, copy_target_log_id) VALUES (?,?,?,?,?,?)", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, name));
+                    cmd.Parameters.Add(new SQLiteParameter(null, eventType ?? string.Empty));
+                    cmd.Parameters.Add(new SQLiteParameter(null, DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")));
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)(callsign ?? string.Empty)));
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)(opr ?? string.Empty)));
+                    cmd.Parameters.Add(new SQLiteParameter(null, copyTargetLogId.HasValue ? (object)copyTargetLogId.Value : DBNull.Value));
+                    cmd.ExecuteNonQuery();
+                }
+                using (var idcmd = new SQLiteCommand("SELECT last_insert_rowid()", con))
+                    return Convert.ToInt64(idcmd.ExecuteScalar());
+            }
+        }
+
+        // Updates a log's copy-target and identity (Log Manager "Copy settings" dialog). Pass null target
+        // to stop copying.
+        public void UpdateLogCopySettings(long id, long? copyTargetLogId, string callsign, string opr)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("UPDATE logs SET copy_target_log_id = ?, log_callsign = ?, log_operator = ? WHERE Id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, copyTargetLogId.HasValue ? (object)copyTargetLogId.Value : DBNull.Value));
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)(callsign ?? string.Empty)));
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)(opr ?? string.Empty)));
+                    cmd.Parameters.Add(new SQLiteParameter(null, id));
+                    cmd.ExecuteNonQuery();
+                }
+        }
+
+        // A log's copy-target, or null if it doesn't copy. Used on QSO insert and for the live indicator.
+        public long? GetCopyTargetLogId(long logId)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT copy_target_log_id FROM logs WHERE Id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    var o = cmd.ExecuteScalar();
+                    return o == null || o == DBNull.Value ? (long?)null : Convert.ToInt64(o);
+                }
+        }
+
+        // A log's (station callsign, operator) identity. Empty strings if unset.
+        public void GetLogIdentity(long logId, out string callsign, out string opr)
+        {
+            callsign = string.Empty; opr = string.Empty;
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("SELECT log_callsign, log_operator FROM logs WHERE Id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    using (var rdr = cmd.ExecuteReader())
+                        if (rdr.Read())
+                        {
+                            callsign = rdr["log_callsign"] == DBNull.Value ? string.Empty : rdr["log_callsign"].ToString();
+                            opr = rdr["log_operator"] == DBNull.Value ? string.Empty : rdr["log_operator"].ToString();
+                        }
+                }
+        }
+
+        // Turns off copying for every log that was copying INTO targetId (used when that log is deleted).
+        // Returns how many logs were affected so the caller can tell the user.
+        public int ClearCopyTargetsPointingTo(long targetId)
+        {
+            lock (_dbLock)
+                using (var cmd = new SQLiteCommand("UPDATE logs SET copy_target_log_id = NULL WHERE copy_target_log_id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, targetId));
+                    return cmd.ExecuteNonQuery();
+                }
+        }
+
         // Renames a log. Returns false (no change) if the new name is already used by another log.
         public bool RenameLog(long id, string newName)
         {
@@ -951,10 +1261,18 @@ Environment.NewLine +
         }
 
         // Deletes a log AND all QSOs stored under it. Caller must confirm with the user first.
+        // NOTE: copies this log made into OTHER logs are intentionally NOT deleted (they survive) —
+        // whole-log delete is archiving, not per-QSO correction. Any OTHER log that was copying INTO this
+        // one has its copy-target cleared so it doesn't dangle.
         public void DeleteLog(long id)
         {
             lock (_dbLock)
             {
+                using (var cc = new SQLiteCommand("UPDATE logs SET copy_target_log_id = NULL WHERE copy_target_log_id = ?", con))
+                {
+                    cc.Parameters.Add(new SQLiteParameter(null, id));
+                    cc.ExecuteNonQuery();
+                }
                 using (var dq = new SQLiteCommand("DELETE FROM qso WHERE log_id = ?", con))
                 {
                     dq.Parameters.Add(new SQLiteParameter(null, id));
@@ -1015,7 +1333,7 @@ Environment.NewLine +
             lock (_dbLock)
             {
                 string stm =
-                    "SELECT l.Id, l.name, l.event_type, l.created_utc, " +
+                    "SELECT l.Id, l.name, l.event_type, l.created_utc, l.copy_target_log_id, l.log_callsign, l.log_operator, " +
                     "(SELECT count(*) FROM qso q WHERE q.log_id = l.Id) AS qso_count, " +
                     "(SELECT min(q.date) FROM qso q WHERE q.log_id = l.Id) AS start_date, " +
                     "(SELECT max(q.date) FROM qso q WHERE q.log_id = l.Id) AS end_date " +
@@ -1031,6 +1349,9 @@ Environment.NewLine +
                             QsoCount = rdr["qso_count"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["qso_count"]),
                             StartDate = rdr["start_date"] == DBNull.Value ? string.Empty : rdr["start_date"].ToString(),
                             EndDate = rdr["end_date"] == DBNull.Value ? string.Empty : rdr["end_date"].ToString(),
+                            CopyTargetLogId = rdr["copy_target_log_id"] == DBNull.Value ? (long?)null : Convert.ToInt64(rdr["copy_target_log_id"]),
+                            Callsign = rdr["log_callsign"] == DBNull.Value ? string.Empty : rdr["log_callsign"].ToString(),
+                            Operator = rdr["log_operator"] == DBNull.Value ? string.Empty : rdr["log_operator"].ToString(),
                         });
             }
             return list;
@@ -2038,6 +2359,19 @@ Environment.NewLine +
             AddClublogColumn();
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();
+            // Real-time copy-to-log feature: a log may copy its new QSOs into another log.
+            AddColToTable("logs", "copy_target_log_id", "INTEGER NULL");   // where this log's new QSOs are copied (NULL = off)
+            AddColToTable("logs", "log_callsign", "nvarchar(50) NULL");    // this log's station-callsign identity
+            AddColToTable("logs", "log_operator", "nvarchar(50) NULL");    // this log's operator identity
+            AddColToTable("qso", "source_qso_id", "INTEGER NULL");         // on a copied QSO: Id of the original it came from
+            // A contest log must never be a copy TARGET; clear any setting that points at one.
+            try
+            {
+                using (var fixCopy = new SQLiteCommand(
+                    "UPDATE logs SET copy_target_log_id = NULL WHERE copy_target_log_id IN (SELECT Id FROM logs WHERE event_type IS NOT NULL AND event_type <> '')", con))
+                    fixCopy.ExecuteNonQuery();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
             EnsureEqslAccountsTable();
             EnsureEqslIndexes();
             EnsureQrzIndexes();
@@ -2089,5 +2423,8 @@ Environment.NewLine +
         public int QsoCount { get; set; }
         public string StartDate { get; set; }   // first QSO date in the log (min)
         public string EndDate { get; set; }     // last QSO date in the log (max)
+        public long? CopyTargetLogId { get; set; }  // this log copies its new QSOs into this log (null = off)
+        public string Callsign { get; set; }        // this log's station-callsign identity
+        public string Operator { get; set; }        // this log's operator identity
     }
 }

@@ -73,6 +73,17 @@ namespace HolyLogger
         public ObservableCollection<QSO> Qsos;
         public ObservableCollection<QSO> FilteredQsos;
 
+        // Rows in FilteredQsos that come from the ACTIVE log's copy-target (shown for reference, painted
+        // light blue, never counted or editable). Tracked by object reference — QSO.Equals compares by
+        // content-hash, so a copied contact would otherwise be mistaken for its original.
+        private HashSet<QSO> _foreignFilterRows;
+        private sealed class RefEq : IEqualityComparer<QSO>
+        {
+            public static readonly RefEq Instance = new RefEq();
+            public bool Equals(QSO a, QSO b) => ReferenceEquals(a, b);
+            public int GetHashCode(QSO o) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(o);
+        }
+
         private string _NumOfQSOs;
         public string NumOfQSOs
         {
@@ -656,6 +667,7 @@ namespace HolyLogger
                             Qsos.Insert(0, q);
                             Properties.Settings.Default.RecentQSOCounter++;
                             isValid = true;
+                            CopyLoggedQsoToTargetLog(q);
                         }
                     }
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
@@ -948,6 +960,9 @@ namespace HolyLogger
             // bare; doing it again here (dal + ActiveLogId are settled by now) makes it reliable.
             UpdateActiveLogTitle();
 
+            // Show the red "copying is live" dot if the active log already copies its QSOs elsewhere.
+            RefreshCopyIndicator();
+
             ApplyClusterWindowSetting();
 
             _stickyWindow = new StickyWindow(this);
@@ -1202,9 +1217,12 @@ namespace HolyLogger
                 UpdateNumOfQSOs();
                 UpdateLotwMenuCount();
                 UpdateQrzMenuCount();
+                UpdateClublogMenuCount();
 
                 // A deleted QSO is gone from the DB, so it drops out of the eQSL waiting list —
-                // refresh the "!" badge / menu count (and any open queue window) right away.
+                // refresh the "!" badge / menu count (and any open queue window) right away. (A
+                // single-QSO delete also removes its copy-to-log partner, which may free a queue slot
+                // in another log — the refreshed counts pick that up too.)
                 UpdateEqslQueueIndicator();
 
                 // The deleted QSO may have been the last one; refresh LastQSO to the
@@ -1361,6 +1379,9 @@ namespace HolyLogger
                     // back onto qso so the eQSL auto-upload can mark THIS row as sent (without it,
                     // SetEqslStatus would target Id 0 and the QSO would stay "pending" forever).
                     if (LastQSO != null) qso.id = LastQSO.id;
+
+                    // Copy-to-log: mirror this QSO into the active log's copy-target, if configured.
+                    CopyLoggedQsoToTargetLog(LastQSO);
 
                     if (QSODataGrid.Items != null && QSODataGrid.Items.Count > 0)
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
@@ -1576,6 +1597,7 @@ namespace HolyLogger
             if (Properties.Settings.Default.IsFilterQSOs)
             {
                 FilteredQsos = null;
+                _foreignFilterRows = null;
                 DataContext = Qsos;
             }
         }
@@ -1731,6 +1753,7 @@ namespace HolyLogger
                 UpdateNumOfQSOs();
                 UpdateEqslQueueIndicator();
                 UpdateQrzMenuCount();
+                RefreshCopyIndicator();           // show/hide the red "copying is live" dot for this log
                 // Recompute worked countries from the newly active log so the cluster's "new
                 // country" (red) flags reflect THIS log immediately -- e.g. a brand-new empty log
                 // makes every spotted entity needed. Without this they stayed stale until restart.
@@ -1770,9 +1793,16 @@ namespace HolyLogger
         // "Create Regular Log" button in ViewLogsWindow: name it (duplicates rejected), confirm, then
         // create an empty log and make it active. No QSOs are deleted — the previous log's QSOs stay
         // in the database. Returns true if a log was created and activated; false if cancelled.
+        // The station callsign / operator currently entered on the main form — used to pre-fill a new
+        // log's identity for the copy-to-log feature.
+        public string CurrentStationCallsign => (TB_MyCallsign.Text ?? string.Empty).Trim();
+        public string CurrentOperator => (TB_Operator.Text ?? string.Empty).Trim();
+
         public bool CreateNewRegularLog(Window owner)
         {
-            var dlg = new NewLogWindow(dal, "Enter a name for the new log:") { Owner = owner };
+            var dlg = new NewLogWindow(dal, "Enter a name for the new log:", string.Empty, 0,
+                                       showCopyOptions: true, defaultCallsign: CurrentStationCallsign,
+                                       defaultOperator: CurrentOperator) { Owner = owner };
             if (dlg.ShowDialog() != true) return false;
 
             if (!HolyMessageBox.ShowConfirm(
@@ -1782,7 +1812,7 @@ namespace HolyLogger
                     "Create New Log", HolyMsgType.Info, owner))
                 return false;
 
-            long id = dal.CreateLog(dlg.LogName, string.Empty);   // normal (day-by-day) log
+            long id = dal.CreateLog(dlg.LogName, string.Empty, dlg.LogCallsign, dlg.LogOperator, dlg.CopyTargetLogId);   // normal (day-by-day) log
             SwitchActiveLog(id);
             return true;
         }
@@ -1842,10 +1872,17 @@ namespace HolyLogger
 
             if (FilteredQsos != null && !isLastQso)
             {
-                // Filter active: green rows for matching QSOs (theme-aware light/dark green).
-                e.Row.Background = isAlternate
-                    ? ThemeManager.Brush("FilterRowAltBg")
-                    : ThemeManager.Brush("FilterRowBg");
+                // Filter active. A row from the ACTIVE log's copy-target (worked-before reference) is
+                // light blue; a match from the active log itself is light green. Both theme-aware.
+                bool foreign = _foreignFilterRows != null && (e.Row.Item is QSO qr) && _foreignFilterRows.Contains(qr);
+                if (foreign)
+                    e.Row.Background = isAlternate
+                        ? ThemeManager.Brush("WorkedElsewhereAltBg")
+                        : ThemeManager.Brush("WorkedElsewhereBg");
+                else
+                    e.Row.Background = isAlternate
+                        ? ThemeManager.Brush("FilterRowAltBg")
+                        : ThemeManager.Brush("FilterRowBg");
             }
             else
             {
@@ -1854,6 +1891,13 @@ namespace HolyLogger
                     ? ThemeManager.Brush("GridAltRowBg")
                     : ThemeManager.Brush("GridRowBg");
             }
+        }
+
+        // Reference rows shown from the copy-target log (blue) are for information only — block editing.
+        private void QSODataGrid_BeginningEdit(object sender, DataGridBeginningEditEventArgs e)
+        {
+            if (_foreignFilterRows != null && e.Row?.Item is QSO qr && _foreignFilterRows.Contains(qr))
+                e.Cancel = true;
         }
 
         private void UpdateSortArrows()
@@ -2769,6 +2813,85 @@ namespace HolyLogger
             catch
             {
                 // Best effort; anything not confirmed sent simply stays pending.
+            }
+        }
+
+        // ---- Copy-to-log "copying is live" indicator (red dot in the Date column header) ----------
+
+        private Visibility _copyDotVisibility = Visibility.Collapsed;
+        public Visibility CopyDotVisibility
+        {
+            get => _copyDotVisibility;
+            private set { _copyDotVisibility = value; OnPropertyChanged("CopyDotVisibility"); }
+        }
+
+        private string _copyTargetTooltip = string.Empty;
+        public string CopyTargetTooltip
+        {
+            get => _copyTargetTooltip;
+            private set { _copyTargetTooltip = value; OnPropertyChanged("CopyTargetTooltip"); }
+        }
+
+        // Shows/hides the red dot from the ACTIVE log's copy-target. Call when the active log changes or
+        // copy settings are edited.
+        public void RefreshCopyIndicator()
+        {
+            try
+            {
+                long? target = dal?.GetCopyTargetLogId(dal.ActiveLogId);
+                if (target.HasValue)
+                {
+                    string name = dal.GetLogName(target.Value) ?? "another log";
+                    CopyTargetTooltip = "Copying new QSOs → " + name + "   (click to stop)";
+                    CopyDotVisibility = Visibility.Visible;
+                }
+                else
+                {
+                    CopyTargetTooltip = string.Empty;
+                    CopyDotVisibility = Visibility.Collapsed;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); CopyDotVisibility = Visibility.Collapsed; }
+        }
+
+        // Clicking the dot stops the active log's copying (its identity is kept). Handled so the click
+        // doesn't also sort the Date column.
+        private void CopyLiveDot_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            try
+            {
+                if (dal == null) return;
+                long active = dal.ActiveLogId;
+                if (dal.GetCopyTargetLogId(active) == null) return;
+                if (!HolyMessageBox.ShowConfirm(
+                        "Stop copying new QSOs from this log into the other log?\n\nQSOs already copied are not affected.",
+                        "Stop copying", HolyMsgType.Info, this))
+                    return;
+                dal.GetLogIdentity(active, out string call, out string opr);
+                dal.UpdateLogCopySettings(active, null, call, opr);
+                RefreshCopyIndicator();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Copy-to-log: after a QSO is logged into the active log, mirror it into that log's copy-target
+        // (if one is configured and the QSO's station callsign + operator match the target's identity).
+        // If a copy was placed, it enters the target log's upload queues, so refresh the queue counts.
+        private void CopyLoggedQsoToTargetLog(QSO justLogged)
+        {
+            if (justLogged == null || dal == null) return;
+            long copyId = dal.CopyQsoToTargetIfConfigured(justLogged, dal.ActiveLogId);
+            if (copyId > 0)
+            {
+                try
+                {
+                    UpdateEqslQueueIndicator();
+                    UpdateQrzMenuCount();
+                    UpdateLotwMenuCount();
+                    UpdateClublogMenuCount();
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
         }
 
@@ -7599,6 +7722,21 @@ namespace HolyLogger
                         matchingQsos.Insert(0, capturedLastQSO);
                 }
 
+                // Also gather same-callsign QSOs from the ACTIVE log's copy-target log — shown in the
+                // grid for reference (painted blue), never counted or treated as a duplicate. Only when
+                // filtering and there is a callsign to match (an empty fragment would match everything).
+                List<QSO> foreignMatches = null;
+                if (isFilterQSOs && !string.IsNullOrWhiteSpace(capturedDxCall))
+                {
+                    try
+                    {
+                        long? tgt = dal.GetCopyTargetLogId(dal.ActiveLogId);
+                        if (tgt.HasValue)
+                            foreignMatches = dal.GetQsosWithCallsignInLog(tgt.Value, capturedDxCall);
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
                 // Return to UI thread for the actual UI updates (fast — no more LINQ here).
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
@@ -7624,7 +7762,16 @@ namespace HolyLogger
 
                     if (matchingQsos != null)
                     {
-                        FilteredQsos = new ObservableCollection<QSO>(matchingQsos);
+                        var combined = new ObservableCollection<QSO>(matchingQsos);
+                        var foreignSet = new HashSet<QSO>(RefEq.Instance);
+                        if (foreignMatches != null)
+                            foreach (var fq in foreignMatches)
+                            {
+                                foreignSet.Add(fq);
+                                combined.Add(fq);
+                            }
+                        _foreignFilterRows = foreignSet.Count > 0 ? foreignSet : null;
+                        FilteredQsos = combined;
                         DataContext = FilteredQsos;
                     }
 

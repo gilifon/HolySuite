@@ -23,6 +23,9 @@
                     Margin="0,0,8,0" IsEnabled="False" Click="Btn_Open_Click"/>
             <Button x:Name="Btn_Rename" Content="Rename" Width="90" Height="32" FontSize="13"
                     Margin="0,0,8,0" Click="Btn_Rename_Click"/>
+            <Button x:Name="Btn_CopySettings" Content="Copy settings…" Width="120" Height="32" FontSize="13"
+                    Margin="0,0,8,0" Click="Btn_CopySettings_Click"
+                    ToolTip="Set, change or stop copying this log's new QSOs into another log"/>
             <Button x:Name="Btn_Delete" Content="Delete" Width="90" Height="32" FontSize="13"
                     Margin="0,0,8,0" Click="Btn_Delete_Click"/>
             <Separator Width="1" Margin="6,4"/>
@@ -74,6 +77,15 @@
                 <DataGridTextColumn Header="Start Date" Binding="{Binding StartDate}" Width="Auto"/>
                 <DataGridTextColumn Header="End Date" Binding="{Binding EndDate}" Width="Auto"/>
                 <DataGridTextColumn Header="No. of QSOs" Binding="{Binding QsoCount}" Width="Auto"/>
+                <DataGridTextColumn Header="Identity" Binding="{Binding Identity}" Width="Auto"/>
+                <DataGridTextColumn Header="Copies to" Binding="{Binding CopiesTo}" Width="Auto">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            <Setter Property="ToolTip" Value="{Binding CopiesTo}"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
             </DataGrid.Columns>
         </DataGrid>
 

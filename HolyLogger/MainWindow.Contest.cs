@@ -96,10 +96,12 @@ namespace HolyLogger
             // export follow the log from now on. Cancelling the name dialog aborts entering.
             string suggested = UniqueLogName(c.Name + " " + DateTime.UtcNow.ToString("yyyy-MM-dd"));
             var dlg = new NewLogWindow(dal,
-                "Name the log for the contest \"" + c.Name + "\":", suggested) { Owner = this };
+                "Name the log for the contest \"" + c.Name + "\":", suggested, 0,
+                showCopyOptions: true, defaultCallsign: CurrentStationCallsign,
+                defaultOperator: CurrentOperator) { Owner = this };
             if (dlg.ShowDialog() != true) return false;   // cancelled -> do not enter the contest
 
-            long id = dal.CreateLog(dlg.LogName, c.Id);
+            long id = dal.CreateLog(dlg.LogName, c.Id, dlg.LogCallsign, dlg.LogOperator, dlg.CopyTargetLogId);
 
             // A freshly selected contest starts clean: serial back to 001 and no zone override (use
             // cty.dat). Set these before switching; ApplyContestModeForActiveLog won't reset them.

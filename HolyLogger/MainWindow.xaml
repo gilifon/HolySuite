@@ -336,6 +336,17 @@
                         <Button x:Name="TitleBar_CloseBtn" Content="&#xE8BB;" Style="{StaticResource CaptionCloseButtonStyle}"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBar_Close_Click" ToolTip="Close"/>
                     </StackPanel>
+                    <!-- "Copying is live" indicator: shown when the active log copies its new QSOs into
+                         another log. Click to stop. -->
+                    <StackPanel x:Name="CopyLivePanel" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="0,0,12,0" Cursor="Hand"
+                                shell:WindowChrome.IsHitTestVisibleInChrome="True"
+                                Visibility="{Binding CopyDotVisibility, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                ToolTip="{Binding CopyTargetTooltip, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                PreviewMouseLeftButtonUp="CopyLiveDot_Click">
+                        <Ellipse Width="11" Height="11" Fill="#E24B4A" VerticalAlignment="Center"/>
+                        <TextBlock Text="copying" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="12" FontWeight="Bold" Foreground="#E24B4A"/>
+                    </StackPanel>
                     <Image Source="Images/crown.png" Width="16" Height="16" Margin="10,0,6,0" VerticalAlignment="Center"/>
                     <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
                                VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
@@ -1186,7 +1197,7 @@
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <Rectangle Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="53" Margin="0,279,0,0" />
         <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,281,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
-        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
+        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" BeginningEdit="QSODataGrid_BeginningEdit" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
             <DataGrid.Resources>
                 <!-- Keep the selected row blue even when the grid loses focus (e.g. while the right-click
                      context menu is open), so the user clearly sees which row the menu refers to. -->

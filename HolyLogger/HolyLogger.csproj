@@ -197,6 +197,9 @@
     <Compile Include="NewLogWindow.xaml.cs">
       <DependentUpon>NewLogWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="CopySettingsWindow.xaml.cs">
+      <DependentUpon>CopySettingsWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ThemeManager.cs" />
     <Compile Include="ThemePalette.cs" />
     <Compile Include="ViewLogsWindow.xaml.cs">
@@ -347,6 +350,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="NewLogWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="CopySettingsWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
