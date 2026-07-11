@@ -720,7 +720,12 @@ namespace HolyLogger
                         double freq = 0;
                         if (double.TryParse(freq_str,out freq))
                         {
-                            TB_Frequency.Text = (freq / 100).ToString("F2");
+                            // N1MM+ sends TXFreq in units of 10 Hz (e.g. 352211 = 3.52210 MHz). TB_Frequency
+                            // holds MHz everywhere else (CAT / cluster setters and convertFreqToBand), so
+                            // convert 10-Hz -> MHz (÷100000). The old ÷100 produced kHz, which the MHz box
+                            // showed ~1000× too high.
+                            double freqMhz = freq / 100000.0;
+                            TB_Frequency.Text = freqMhz.ToString("0.0#####", System.Globalization.CultureInfo.InvariantCulture);
                         }
                     }
 
