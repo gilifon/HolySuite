@@ -186,6 +186,9 @@ namespace HolyLogger
                 SelectionMode = DataGridSelectionMode.Single,
                 FontSize = 14
             };
+            // Same column-header look as the main log table: background comes from the LogHeaderBg theme
+            // token, so it follows the "Customize Colors" scheme editor.
+            grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
             ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
             grid.Columns.Add(MakeColumn("Date", "Date", 1.2));
             grid.Columns.Add(MakeColumn("Time", "Time", 1.0));

@@ -365,12 +365,6 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="ImportMenuItem" Header="Import ADIF" ToolTip="Generates log from ADIF" Click="ImportAdifMenuItem_Click" >
-                        <MenuItem.Icon>
-                            <Image Source="Images/import.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator />
                     <MenuItem x:Name="ExportMenuItem" Header="Export ADIF (Active Log)" ToolTip="Export the active log to an ADIF file" Click="ExportMenuItem_Click" >
                         <MenuItem.Icon>
                             <Image Source="Images/exportA.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -1232,6 +1226,14 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Freq}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
+                                       FontWeight="Bold" HorizontalAlignment="Center" Padding="5,0,5,0" />
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Date" IsReadOnly="True" SortMemberPath="Date" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
@@ -1264,14 +1266,6 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5,0,5,0" />
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False" Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding Freq}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
-                                       FontWeight="Bold" HorizontalAlignment="Center" Padding="5,0,5,0" />
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

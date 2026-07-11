@@ -148,6 +148,9 @@ namespace HolyLogger
         }
         
 
+        // Public entry point so the Log Manager's "Import ADIF" button runs the same import flow.
+        public void ImportAdif() => ImportAdifMenuItem_Click(null, null);
+
         private void ImportAdifMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Offer to save an in-progress new QSO before an import reloads the log.

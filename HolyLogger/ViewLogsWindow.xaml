@@ -10,32 +10,50 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <!-- Toolbar -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <Button x:Name="Btn_NewRegularLog" Content="Create New Regular Log" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
-                    Margin="0,0,10,0" Click="Btn_NewRegularLog_Click"
-                    Background="#00E676" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
-            <Button x:Name="Btn_NewContestLog" Content="Create New Contest Log" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
-                    Margin="0,0,16,0" Click="Btn_NewContestLog_Click"
-                    Background="#FFC107" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
-            <Separator Width="1" Margin="0,4,10,4"/>
-            <Button x:Name="Btn_Open" Content="Open Log" Height="32" Padding="9,0" FontSize="14" FontWeight="Bold"
-                    Margin="0,0,8,0" IsEnabled="False" Click="Btn_Open_Click"/>
-            <Button x:Name="Btn_Rename" Content="Rename" Height="32" Padding="9,0" FontSize="14"
-                    Margin="0,0,8,0" Click="Btn_Rename_Click"/>
-            <Button x:Name="Btn_SetIdentity" Content="Set Identity" Height="32" Padding="9,0" FontSize="14"
-                    Margin="0,0,8,0" Click="Btn_SetIdentity_Click"
-                    ToolTip="Give this log its permanent station callsign + operator identity"/>
-            <Button x:Name="Btn_CopySettings" Content="Copy settings…" Height="32" Padding="9,0" FontSize="14"
-                    Margin="0,0,8,0" Click="Btn_CopySettings_Click"
-                    ToolTip="Set, change or stop copying this log's new QSOs into another log"/>
-            <Button x:Name="Btn_Delete" Content="Delete" Height="32" Padding="9,0" FontSize="14"
-                    Margin="0,0,8,0" Click="Btn_Delete_Click"/>
-            <Separator Width="1" Margin="6,4"/>
-            <Button x:Name="Btn_Adif" Content="Export ADIF" Height="32" Padding="9,0" FontSize="14"
-                    Margin="0,0,8,0" Click="Btn_Adif_Click"/>
-            <Button x:Name="Btn_Cabrillo" Content="Export Cabrillo" Height="32" Padding="9,0" FontSize="14"
-                    Click="Btn_Cabrillo_Click"/>
+        <!-- Toolbar (two rows). HorizontalAlignment=Left so the toolbar is only as wide as row 1's
+             buttons (not the much wider grid below) — that lets row 2's right-aligned export pair line
+             up with the end of "Activate & Open Log" rather than the window's right edge. -->
+        <StackPanel Grid.Row="0" HorizontalAlignment="Left" Margin="0,0,0,10">
+            <!-- Row 1: create / import / per-log actions -->
+            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                <Button x:Name="Btn_NewRegularLog" Content="Create New Regular Log" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
+                        Margin="0,0,8,0" Click="Btn_NewRegularLog_Click"
+                        Background="#00E676" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
+                <Button x:Name="Btn_NewContestLog" Content="Create New Contest Log" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
+                        Margin="0,0,8,0" Click="Btn_NewContestLog_Click"
+                        Background="#FFC107" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
+                <Button x:Name="Btn_Import" Content="Import ADIF" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
+                        Margin="0,0,8,0" Click="Btn_Import_Click"
+                        Background="#90CAF9" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"
+                        ToolTip="Import an ADIF file into a new log or the current log"/>
+                <!-- Bigger left gap separates the "generate a new log" group (Regular / Contest / Import)
+                     from the per-log actions. Widening row 1 also pushes the right-aligned export pair
+                     below, so Export Cabrillo stays lined up with "Activate & Open Log". -->
+                <Button x:Name="Btn_SetIdentity" Content="Set Identity" Height="34" Padding="9,0" FontSize="14"
+                        Margin="28,0,8,0" Click="Btn_SetIdentity_Click"
+                        ToolTip="Give this log its permanent station callsign + operator identity"/>
+                <Button x:Name="Btn_Open" Content="Activate &amp; Open Log" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
+                        IsEnabled="False" Click="Btn_Open_Click"/>
+            </StackPanel>
+            <!-- Row 2: rename / delete / copy settings on the left; the export pair right-aligned so
+                 Export Cabrillo lines up with the right edge of "Activate & Open Log" above. -->
+            <DockPanel LastChildFill="False">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="Btn_Adif" Content="Export ADIF" Height="32" Padding="9,0" FontSize="14"
+                            Margin="0,0,8,0" Click="Btn_Adif_Click"/>
+                    <Button x:Name="Btn_Cabrillo" Content="Export Cabrillo" Height="32" Padding="9,0" FontSize="14"
+                            Click="Btn_Cabrillo_Click"/>
+                </StackPanel>
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                    <Button x:Name="Btn_Rename" Content="Rename" Height="32" Padding="9,0" FontSize="14"
+                            Margin="0,0,8,0" Click="Btn_Rename_Click"/>
+                    <Button x:Name="Btn_Delete" Content="Delete" Height="32" Padding="9,0" FontSize="14"
+                            Margin="0,0,8,0" Click="Btn_Delete_Click"/>
+                    <Button x:Name="Btn_CopySettings" Content="Copy settings…" Height="32" Padding="9,0" FontSize="14"
+                            Click="Btn_CopySettings_Click"
+                            ToolTip="Set, change or stop copying this log's new QSOs into another log"/>
+                </StackPanel>
+            </DockPanel>
         </StackPanel>
 
         <DataGrid x:Name="LogsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
@@ -61,14 +79,28 @@
                      work area, so a long name grows the window rather than clipping, but the window
                      can never exceed the screen; the tooltip is a fallback for the rare case a
                      horizontal scrollbar appears anyway. -->
-                <DataGridTextColumn Header="Log Name" Binding="{Binding Name}" Width="Auto">
-                    <DataGridTextColumn.ElementStyle>
-                        <!-- No trimming: auto-size to the full name (tooltip is a fallback if the window is capped). -->
-                        <Style TargetType="TextBlock">
-                            <Setter Property="ToolTip" Value="{Binding Name}"/>
-                        </Style>
-                    </DataGridTextColumn.ElementStyle>
-                </DataGridTextColumn>
+                <DataGridTemplateColumn Header="Log Name" Width="Auto" SortMemberPath="Name">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" ToolTip="{Binding Name}">
+                                <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
+                                <!-- Bold, slightly larger "(Active)" shown only for the active log. -->
+                                <TextBlock Text="  (Active)" VerticalAlignment="Center" FontWeight="Bold" FontSize="15">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding IsActive}" Value="True">
+                                                    <Setter Property="Visibility" Value="Visible"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Event Type" Binding="{Binding EventType}" Width="Auto">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">

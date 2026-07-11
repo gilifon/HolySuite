@@ -26,6 +26,7 @@ namespace HolyLogger
             public int QsoCount { get; set; }
             public long Id { get; set; }
             public bool IsContest { get; set; }
+            public bool IsActive { get; set; }
             public string Identity { get; set; }   // "callsign / operator" for the copy filter
             public string CopiesTo { get; set; }    // target log name, or "—"
             public long? CopyTargetLogId { get; set; }
@@ -68,7 +69,8 @@ namespace HolyLogger
                 rows.Add(new Row
                 {
                     Num = n++,
-                    Name = li.Name + (li.Id == _dal.ActiveLogId ? "  (active)" : ""),
+                    Name = li.Name,
+                    IsActive = li.Id == _dal.ActiveLogId,
                     EventType = eventDisplay,
                     StartDate = FormatQsoDate(li.StartDate),
                     EndDate = FormatQsoDate(li.EndDate),
@@ -237,6 +239,15 @@ namespace HolyLogger
             _dal.DeleteLog(id);
             _main.RefreshCopyIndicator();
             LoadLogs();
+        }
+
+        // Import runs on the main window with its own dialogs, so close the Log Manager first (it's modal),
+        // then kick off the import once this window is gone. Reopen the Log Manager to see the new log.
+        private void Btn_Import_Click(object sender, RoutedEventArgs e)
+        {
+            Close();
+            _main.Dispatcher.BeginInvoke(new System.Action(() => _main.ImportAdif()),
+                System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void Btn_Adif_Click(object sender, RoutedEventArgs e)
