@@ -1229,6 +1229,16 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" CanUserSort="False" Width="Auto">
+                    <!-- Header content stays the string "Frequency" (column order/width persistence keys on
+                         it); the template just appends a small bold "MHz". -->
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding}" VerticalAlignment="Bottom"/>
+                                <TextBlock Text="MHz" FontSize="10" FontWeight="Bold" VerticalAlignment="Bottom" Margin="2,0,0,0"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Freq}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
