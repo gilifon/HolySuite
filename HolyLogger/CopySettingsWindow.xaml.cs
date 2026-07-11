@@ -9,16 +9,18 @@ namespace HolyLogger
     // copy-target and edit its identity (station callsign + operator). Never targets itself.
     public partial class CopySettingsWindow : Window
     {
-        public string LogCallsign { get; private set; }
-        public string LogOperator { get; private set; }
+        // Identity is display-only here (permanent); this dialog only changes the copy-target.
         public long? CopyTargetLogId { get; private set; }
 
         public CopySettingsWindow(DataAccess dal, long logId, string callsign, string opr, long? currentTarget)
         {
             InitializeComponent();
 
-            TB_Callsign.Text = (callsign ?? string.Empty).Trim();
-            TB_Operator.Text = (opr ?? string.Empty).Trim();
+            callsign = (callsign ?? string.Empty).Trim();
+            opr = (opr ?? string.Empty).Trim();
+            bool hasIdentity = callsign.Length > 0 && opr.Length > 0;
+            TB_Callsign.Text = hasIdentity ? callsign : "(not set yet)";
+            TB_Operator.Text = hasIdentity ? opr : "(not set yet)";
 
             // First item = "(don't copy)" sentinel (Id 0); then every OTHER REGULAR log. A log can't copy
             // to itself, and contest logs are excluded — they must never receive copies.
@@ -33,8 +35,6 @@ namespace HolyLogger
 
         private void Btn_Save_Click(object sender, RoutedEventArgs e)
         {
-            LogCallsign = (TB_Callsign.Text ?? string.Empty).Trim();
-            LogOperator = (TB_Operator.Text ?? string.Empty).Trim();
             long tid = 0;
             try { if (CB_CopyTarget.SelectedValue != null) tid = Convert.ToInt64(CB_CopyTarget.SelectedValue); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }

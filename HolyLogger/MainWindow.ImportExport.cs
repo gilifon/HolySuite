@@ -175,9 +175,79 @@ namespace HolyLogger
                         return; // backup cancelled or failed -> abort; the log is left untouched
                 }
 
+                // Identity handling before the import runs. Scan the ADIF for the callsign(s) / operator(s)
+                // it was made under.
+                if (dal != null)
+                {
+                    ScanAdifIdentity(openFileDialog.FileName, out var adifCalls, out var adifOps);
+                    string fileName = System.IO.Path.GetFileName(openFileDialog.FileName);
+
+                    if (!dal.LogHasIdentity(dal.ActiveLogId))
+                    {
+                        // No identity yet -> confirm (and let the user cancel) the identity the imported
+                        // log will get. Station callsign from the ADIF (not editable); operator editable.
+                        var idDlg = new ImportIdentityWindow(adifCalls, adifOps, fileName) { Owner = this };
+                        if (idDlg.ShowDialog() != true) return;   // cancel -> abort the whole import
+                        _pendingImportCallsign = idDlg.Callsign;
+                        _pendingImportOperator = idDlg.Operator;
+                    }
+                    else
+                    {
+                        // The log has a permanent identity. If the file was made under a different callsign
+                        // or operator, the user must knowingly approve mixing those QSOs in (any that don't
+                        // match the log's identity won't be copied to a copy-target).
+                        dal.GetLogIdentity(dal.ActiveLogId, out string idCall, out string idOp);
+                        bool callDiff = adifCalls.Any(c => !string.Equals(c, idCall, System.StringComparison.OrdinalIgnoreCase));
+                        bool opDiff = adifOps.Any(o => !string.Equals(o, idOp, System.StringComparison.OrdinalIgnoreCase));
+                        if (callDiff || opDiff)
+                        {
+                            string fileId = (adifCalls.Count > 0 ? string.Join(", ", adifCalls) : "(no station callsign)")
+                                          + "  /  " + (adifOps.Count > 0 ? string.Join(", ", adifOps) : "(no operator)");
+                            if (!HolyMessageBox.ShowConfirm(
+                                    "The file \"" + fileName + "\" was made under:\n    " + fileId + "\n\n" +
+                                    "That differs from this log's permanent identity:\n    " + idCall + " / " + idOp + "\n\n" +
+                                    "The QSOs will be added, but any that don't match this log's identity will NOT be copied to a copy-target. Import anyway?",
+                                    "Different callsign / operator", HolyMsgType.Warning, this))
+                                return;   // user declined -> abort the import
+                        }
+                    }
+                }
+
                 ImportFileQ.Add(openFileDialog.FileName);
                 StartAdifImportWorker();
             }
+        }
+
+        // Identity confirmed in the import dialog; applied to the log once the import finishes.
+        private string _pendingImportCallsign;
+        private string _pendingImportOperator;
+
+        // Peeks at an ADIF file for its station callsign(s) and operator(s) so the imported log's identity
+        // can be confirmed before importing. Distinct values, most-frequent first. Best-effort.
+        private static void ScanAdifIdentity(string filePath, out System.Collections.Generic.List<string> stationCallsigns, out System.Collections.Generic.List<string> operators)
+        {
+            stationCallsigns = ScanAdifField(filePath, "station_callsign");
+            operators = ScanAdifField(filePath, "operator");
+        }
+
+        private static System.Collections.Generic.List<string> ScanAdifField(string filePath, string field)
+        {
+            var counts = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+            try
+            {
+                string text = System.IO.File.ReadAllText(filePath);
+                var rx = new System.Text.RegularExpressions.Regex("<" + field + ":\\d+(?::[^>]*)?>([^<\\r\\n]*)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                foreach (System.Text.RegularExpressions.Match m in rx.Matches(text))
+                {
+                    string v = m.Groups[1].Value.Trim();
+                    if (v.Length == 0) continue;
+                    counts.TryGetValue(v, out int c);
+                    counts[v] = c + 1;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return counts.OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
         }
 
         private enum ImportLogChoice { Cancel, Merge, Replace }
@@ -314,6 +384,16 @@ namespace HolyLogger
                     HolyMessageBox.ShowSuccess($"Import completed successfully!\nImported QSOs: {result.ImportedQsoCount}\nTotal QSOs in log: {totalQsos}", "Import Complete", this);
                 }
             }
+            // Give the imported log the identity the user confirmed before the import (if it had none).
+            if (!string.IsNullOrWhiteSpace(_pendingImportCallsign))
+            {
+                try { dal.SetLogIdentity(dal.ActiveLogId, _pendingImportCallsign, _pendingImportOperator); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                _pendingImportCallsign = null;
+                _pendingImportOperator = null;
+                RefreshCopyIndicator();
+            }
+
             TB_Comment.Text = "";
             UpdateNumOfQSOs();
         }

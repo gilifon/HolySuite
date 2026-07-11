@@ -200,6 +200,12 @@
     <Compile Include="CopySettingsWindow.xaml.cs">
       <DependentUpon>CopySettingsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="SetIdentityWindow.xaml.cs">
+      <DependentUpon>SetIdentityWindow.xaml</DependentUpon>
+    </Compile>
+    <Compile Include="ImportIdentityWindow.xaml.cs">
+      <DependentUpon>ImportIdentityWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="ThemeManager.cs" />
     <Compile Include="ThemePalette.cs" />
     <Compile Include="ViewLogsWindow.xaml.cs">
@@ -354,6 +360,14 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="CopySettingsWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="SetIdentityWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="ImportIdentityWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

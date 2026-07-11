@@ -963,6 +963,10 @@ namespace HolyLogger
             // Show the red "copying is live" dot if the active log already copies its QSOs elsewhere.
             RefreshCopyIndicator();
 
+            // A log that already has QSOs but no identity (legacy log) gets prompted now, at startup. An
+            // empty log waits — its identity is set when you import into it or log the first QSO.
+            EnsureActiveLogHasIdentity(promptIfEmpty: false);
+
             ApplyClusterWindowSetting();
 
             _stickyWindow = new StickyWindow(this);
@@ -1320,6 +1324,14 @@ namespace HolyLogger
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
             if (!Validate()) return;
+            // A QSO can't be logged into a log that has no identity yet — enforce it here too (belt and
+            // suspenders; startup / log-switch already prompt).
+            if (!EnsureActiveLogHasIdentity())
+            {
+                HolyMessageBox.ShowWarning("Set this log's identity (station callsign + operator) before logging QSOs into it.",
+                    "Log identity required", this);
+                return;
+            }
             if (state == State.New)
             {
                 QSO qso = new QSO();
@@ -1754,6 +1766,7 @@ namespace HolyLogger
                 UpdateEqslQueueIndicator();
                 UpdateQrzMenuCount();
                 RefreshCopyIndicator();           // show/hide the red "copying is live" dot for this log
+                EnsureActiveLogHasIdentity(promptIfEmpty: false);   // legacy log with QSOs gets its identity now
                 // Recompute worked countries from the newly active log so the cluster's "new
                 // country" (red) flags reflect THIS log immediately -- e.g. a brand-new empty log
                 // makes every spotted entity needed. Without this they stayed stale until restart.
@@ -2868,11 +2881,39 @@ namespace HolyLogger
                         "Stop copying new QSOs from this log into the other log?\n\nQSOs already copied are not affected.",
                         "Stop copying", HolyMsgType.Info, this))
                     return;
-                dal.GetLogIdentity(active, out string call, out string opr);
-                dal.UpdateLogCopySettings(active, null, call, opr);
+                dal.SetCopyTarget(active, null);   // stop copying; identity is untouched (permanent)
                 RefreshCopyIndicator();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // A log must carry a permanent identity (station callsign + operator) before you can log into it.
+        // If the active log has none, prompt for it — pre-filled from the callsigns actually used in the
+        // log's QSOs (imported/legacy logs), or from the main-window callsign/operator if the log is empty.
+        // Returns true if the active log has an identity afterward. Called on startup and every log switch,
+        // and guards the logging button.
+        public bool EnsureActiveLogHasIdentity(bool promptIfEmpty = true)
+        {
+            try
+            {
+                if (dal == null) return true;
+                long id = dal.ActiveLogId;
+                if (dal.LogHasIdentity(id)) return true;
+
+                var candidates = dal.GetStationIdentitiesInLog(id);
+                // An empty log doesn't need an identity yet — it gets one when you import into it (from the
+                // ADIF) or log the first QSO. Only nag at startup/switch for logs that already have QSOs.
+                if (candidates.Count == 0 && !promptIfEmpty) return false;
+                string logName = dal.GetLogName(id) ?? "this log";
+                var dlg = new SetIdentityWindow(candidates, logName, CurrentStationCallsign, CurrentOperator) { Owner = this };
+                if (dlg.ShowDialog() == true)
+                {
+                    dal.SetLogIdentity(id, dlg.Callsign, dlg.Operator);
+                    return dal.LogHasIdentity(id);
+                }
+                return false;   // cancelled -> still no identity; caller blocks logging
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
         }
 
         // Copy-to-log: after a QSO is logged into the active log, mirror it into that log's copy-target

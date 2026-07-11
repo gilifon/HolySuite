@@ -117,7 +117,12 @@ namespace HolyLogger
             var dlg = new CopySettingsWindow(_dal, Selected.Id, Selected.Callsign, Selected.Operator,
                                              Selected.CopyTargetLogId) { Owner = this };
             if (dlg.ShowDialog() != true) return;
-            _dal.UpdateLogCopySettings(Selected.Id, dlg.CopyTargetLogId, dlg.LogCallsign, dlg.LogOperator);
+            _dal.SetCopyTarget(Selected.Id, dlg.CopyTargetLogId);   // identity is permanent; only the target changes here
+            // If the chosen target has no identity yet, copying can't start until that log gets one.
+            if (dlg.CopyTargetLogId.HasValue && !_dal.LogHasIdentity(dlg.CopyTargetLogId.Value))
+                HolyMessageBox.ShowWarning(
+                    "The target log has no identity yet, so copying won't start until you open it (make it active) and set its station callsign + operator.",
+                    "Copy settings", this);
             _main.RefreshCopyIndicator();   // the active log's copy state may have changed
             LoadLogs();
         }

@@ -20,7 +20,7 @@
         <TextBlock Grid.Row="1" Text="Copy new QSOs into:" FontSize="13" Margin="0,14,0,4"/>
         <ComboBox x:Name="CB_CopyTarget" Grid.Row="2" FontSize="14" DisplayMemberPath="Name" SelectedValuePath="Id"/>
 
-        <TextBlock Grid.Row="3" Text="This log's identity" FontSize="13" FontWeight="Bold"
+        <TextBlock Grid.Row="3" Text="This log's identity (permanent)" FontSize="13" FontWeight="Bold"
                    Foreground="{DynamicResource AccentBrush}" Margin="0,16,0,0"/>
         <Grid Grid.Row="4" Margin="0,8,0,0">
             <Grid.ColumnDefinitions>
@@ -33,11 +33,13 @@
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
             <TextBlock Grid.Row="0" Grid.Column="0" Text="Station callsign" VerticalAlignment="Center" FontSize="13"/>
-            <TextBox x:Name="TB_Callsign" Grid.Row="0" Grid.Column="1" Margin="0,0,0,6" FontSize="14" Padding="4,3"/>
+            <TextBox x:Name="TB_Callsign" Grid.Row="0" Grid.Column="1" Margin="0,0,0,6" FontSize="14" Padding="4,3"
+                     IsReadOnly="True" IsTabStop="False" Background="#EEEEEE" Foreground="#555555"/>
             <TextBlock Grid.Row="1" Grid.Column="0" Text="Operator" VerticalAlignment="Center" FontSize="13"/>
-            <TextBox x:Name="TB_Operator" Grid.Row="1" Grid.Column="1" FontSize="14" Padding="4,3"/>
+            <TextBox x:Name="TB_Operator" Grid.Row="1" Grid.Column="1" FontSize="14" Padding="4,3"
+                     IsReadOnly="True" IsTabStop="False" Background="#EEEEEE" Foreground="#555555"/>
             <TextBlock Grid.Row="2" Grid.ColumnSpan="2" TextWrapping="Wrap" FontSize="11" Foreground="#777777" Margin="0,8,0,0"
-                       Text="Only QSOs made with this station callsign AND operator are copied. Deleting a QSO in either log removes it from both; editing one updates the other."/>
+                       Text="A log's identity is set once (from its own QSOs or the main window) and cannot be changed here. Only QSOs made with this station callsign AND operator are copied."/>
         </Grid>
 
         <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,18,0,0">

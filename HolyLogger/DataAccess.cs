@@ -1183,19 +1183,80 @@ Environment.NewLine +
             }
         }
 
-        // Updates a log's copy-target and identity (Log Manager "Copy settings" dialog). Pass null target
-        // to stop copying.
-        public void UpdateLogCopySettings(long id, long? copyTargetLogId, string callsign, string opr)
+        // Sets a log's copy-target only (Log Manager "Copy settings"). Pass null to stop copying. The
+        // log's identity is never touched here — identity is set once and then frozen (see SetLogIdentity).
+        public void SetCopyTarget(long id, long? copyTargetLogId)
         {
             lock (_dbLock)
-                using (var cmd = new SQLiteCommand("UPDATE logs SET copy_target_log_id = ?, log_callsign = ?, log_operator = ? WHERE Id = ?", con))
+                using (var cmd = new SQLiteCommand("UPDATE logs SET copy_target_log_id = ? WHERE Id = ?", con))
                 {
                     cmd.Parameters.Add(new SQLiteParameter(null, copyTargetLogId.HasValue ? (object)copyTargetLogId.Value : DBNull.Value));
-                    cmd.Parameters.Add(new SQLiteParameter(null, (object)(callsign ?? string.Empty)));
-                    cmd.Parameters.Add(new SQLiteParameter(null, (object)(opr ?? string.Empty)));
                     cmd.Parameters.Add(new SQLiteParameter(null, id));
                     cmd.ExecuteNonQuery();
                 }
+        }
+
+        // True when a log has BOTH a station callsign and an operator identity.
+        public bool LogHasIdentity(long logId)
+        {
+            GetLogIdentity(logId, out string c, out string o);
+            return !string.IsNullOrWhiteSpace(c) && !string.IsNullOrWhiteSpace(o);
+        }
+
+        // Sets a log's identity ONCE. A log's identity is permanent: if it already has one this is a no-op.
+        public void SetLogIdentity(long logId, string callsign, string opr)
+        {
+            lock (_dbLock)
+            {
+                using (var chk = new SQLiteCommand("SELECT log_callsign, log_operator FROM logs WHERE Id = ?", con))
+                {
+                    chk.Parameters.Add(new SQLiteParameter(null, logId));
+                    using (var rdr = chk.ExecuteReader())
+                        if (rdr.Read())
+                        {
+                            string c = rdr["log_callsign"] == DBNull.Value ? string.Empty : rdr["log_callsign"].ToString();
+                            string o = rdr["log_operator"] == DBNull.Value ? string.Empty : rdr["log_operator"].ToString();
+                            if (!string.IsNullOrWhiteSpace(c) && !string.IsNullOrWhiteSpace(o)) return;   // already set -> frozen
+                        }
+                }
+                using (var cmd = new SQLiteCommand("UPDATE logs SET log_callsign = ?, log_operator = ? WHERE Id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)((callsign ?? string.Empty).Trim())));
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)((opr ?? string.Empty).Trim())));
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        // The distinct (station callsign, operator) pairs actually used in a log, most-frequent first —
+        // to pre-fill / offer choices when assigning that log's identity.
+        public List<LogIdentityCandidate> GetStationIdentitiesInLog(long logId)
+        {
+            var list = new List<LogIdentityCandidate>();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return list;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT my_callsign, operator, count(*) AS cnt FROM qso WHERE log_id = @lid GROUP BY my_callsign, operator ORDER BY cnt DESC", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@lid", logId));
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            string c = rdr["my_callsign"] == DBNull.Value ? string.Empty : rdr["my_callsign"].ToString();
+                            string o = rdr["operator"] == DBNull.Value ? string.Empty : rdr["operator"].ToString();
+                            if (string.IsNullOrWhiteSpace(c) && string.IsNullOrWhiteSpace(o)) continue;
+                            list.Add(new LogIdentityCandidate
+                            {
+                                Callsign = c.Trim(),
+                                Operator = o.Trim(),
+                                Count = rdr["cnt"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["cnt"])
+                            });
+                        }
+                }
+            }
+            return list;
         }
 
         // A log's copy-target, or null if it doesn't copy. Used on QSO insert and for the live indicator.
@@ -2426,5 +2487,15 @@ Environment.NewLine +
         public long? CopyTargetLogId { get; set; }  // this log copies its new QSOs into this log (null = off)
         public string Callsign { get; set; }        // this log's station-callsign identity
         public string Operator { get; set; }        // this log's operator identity
+    }
+
+    // A (station callsign, operator) pair found in a log's QSOs, with how many use it — used to pre-fill
+    // and offer choices when assigning a log's permanent identity.
+    public class LogIdentityCandidate
+    {
+        public string Callsign { get; set; }
+        public string Operator { get; set; }
+        public int Count { get; set; }
+        public string Display => Callsign + " / " + Operator + "   (" + Count.ToString("N0") + " QSOs)";
     }
 }
