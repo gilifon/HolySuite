@@ -327,7 +327,7 @@
                  Height must match shell:WindowChrome.CaptionHeight for drag/snap/double-click-maximize
                  to line up. Only the 3 buttons opt out of the draggable "caption" area. -->
             <Border x:Name="CustomTitleBar" DockPanel.Dock="Top" Height="32" Background="{DynamicResource TitleBarBg}">
-                <DockPanel LastChildFill="True">
+                <DockPanel LastChildFill="False">
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                         <Button x:Name="TitleBar_MinimizeBtn" Content="&#xE921;" Style="{StaticResource CaptionButtonStyle}"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBar_Minimize_Click" ToolTip="Minimize"/>
@@ -336,20 +336,20 @@
                         <Button x:Name="TitleBar_CloseBtn" Content="&#xE8BB;" Style="{StaticResource CaptionCloseButtonStyle}"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBar_Close_Click" ToolTip="Close"/>
                     </StackPanel>
-                    <!-- "Copying is live" indicator: shown when the active log copies its new QSOs into
-                         another log. Click to stop. -->
-                    <StackPanel x:Name="CopyLivePanel" DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center"
-                                Margin="0,0,12,0" Cursor="Hand"
+                    <Image Source="Images/crown.png" Width="16" Height="16" Margin="10,0,6,0" VerticalAlignment="Center" DockPanel.Dock="Left"/>
+                    <TextBlock DockPanel.Dock="Left" Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
+                               VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                    <!-- "Copying is live" indicator: shown right after the log name when the active log copies
+                         its new QSOs into another log. Click to stop. -->
+                    <StackPanel x:Name="CopyLivePanel" DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center"
+                                Margin="14,0,0,0" Cursor="Hand"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True"
                                 Visibility="{Binding CopyDotVisibility, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                                 ToolTip="{Binding CopyTargetTooltip, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                                 PreviewMouseLeftButtonUp="CopyLiveDot_Click">
-                        <Ellipse Width="11" Height="11" Fill="#E24B4A" VerticalAlignment="Center"/>
-                        <TextBlock Text="copying" Margin="6,0,0,0" VerticalAlignment="Center" FontSize="12" FontWeight="Bold" Foreground="#E24B4A"/>
+                        <Ellipse Width="12" Height="12" Fill="#E24B4A" VerticalAlignment="Center"/>
+                        <TextBlock Text="Copying" Margin="7,0,0,0" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="#E24B4A"/>
                     </StackPanel>
-                    <Image Source="Images/crown.png" Width="16" Height="16" Margin="10,0,6,0" VerticalAlignment="Center"/>
-                    <TextBlock Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
-                               VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
                 </DockPanel>
             </Border>
             <Grid DockPanel.Dock="Top">

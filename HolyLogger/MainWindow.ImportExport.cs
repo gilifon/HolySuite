@@ -160,19 +160,35 @@ namespace HolyLogger
 
             if (openFileDialog.ShowDialog() == true)
             {
-                // A log already exists: let the user choose to MERGE (add to it) or REPLACE it. An
-                // empty log is unambiguous, so no prompt is needed.
-                int existing = 0;
-                try { if (dal != null) existing = dal.GetQsoCount(); }
-                catch { existing = 0; }
+                // First: does this file become its OWN new log, or get added to the log open now?
+                ImportTarget target = AskImportTarget();
+                if (target == ImportTarget.Cancel) return;
 
-                if (existing > 0)
+                if (target == ImportTarget.NewLog)
                 {
-                    ImportLogChoice choice = AskImportMergeOrReplace(existing);
-                    if (choice == ImportLogChoice.Cancel)
-                        return;
-                    if (choice == ImportLogChoice.Replace && !BackupAndClearLogForReplace())
-                        return; // backup cancelled or failed -> abort; the log is left untouched
+                    // Create a new REGULAR log for the file and make it active so the import lands in it —
+                    // nothing touches the existing logs. Its identity comes from the ADIF (below).
+                    string suggested = UniqueLogName(System.IO.Path.GetFileNameWithoutExtension(openFileDialog.FileName));
+                    var nameDlg = new NewLogWindow(dal, "Name the new log for the imported file:", suggested) { Owner = this };
+                    if (nameDlg.ShowDialog() != true) return;   // cancelled -> abort
+                    long newId = dal.CreateLog(nameDlg.LogName, string.Empty);
+                    SwitchActiveLog(newId);
+                }
+                else
+                {
+                    // Into the current log: offer MERGE (add) or REPLACE if the ACTIVE log has QSOs.
+                    int existing = 0;
+                    try { if (dal != null) existing = dal.GetQsoCountForLog(dal.ActiveLogId); }
+                    catch { existing = 0; }
+
+                    if (existing > 0)
+                    {
+                        ImportLogChoice choice = AskImportMergeOrReplace(existing);
+                        if (choice == ImportLogChoice.Cancel)
+                            return;
+                        if (choice == ImportLogChoice.Replace && !BackupAndClearLogForReplace())
+                            return; // backup cancelled or failed -> abort; the log is left untouched
+                    }
                 }
 
                 // Identity handling before the import runs. Scan the ADIF for the callsign(s) / operator(s)
@@ -248,6 +264,59 @@ namespace HolyLogger
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             return counts.OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
+        }
+
+        private enum ImportTarget { Cancel, NewLog, CurrentLog }
+
+        // Asks whether an imported ADIF becomes its own NEW log or is added to the log open now.
+        private ImportTarget AskImportTarget()
+        {
+            ImportTarget result = ImportTarget.Cancel;
+            var dialog = new Window
+            {
+                Title = "Import ADIF",
+                SizeToContent = SizeToContent.WidthAndHeight,
+                ResizeMode = ResizeMode.NoResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Owner = this,
+                ShowInTaskbar = false
+            };
+            var root = new StackPanel { Margin = new Thickness(18, 14, 18, 16) };
+            root.Children.Add(new TextBlock
+            {
+                Text = "Where should the imported QSOs go?",
+                FontSize = 15, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 14)
+            });
+
+            string curName = null;
+            try { curName = dal?.GetLogName(dal.ActiveLogId); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            void AddOption(string label, string desc, Thickness margin)
+            {
+                var tb = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 14, MaxWidth = 440, Margin = margin };
+                tb.Inlines.Add(new System.Windows.Documents.Run(label) { FontWeight = FontWeights.Bold });
+                tb.Inlines.Add(new System.Windows.Documents.Run(" — " + desc));
+                root.Children.Add(tb);
+            }
+            AddOption("New log", "create a new log just for this file (recommended for a logbook from another program) — your existing logs are untouched.", new Thickness(0, 0, 0, 12));
+            AddOption("Current log", "add the file's QSOs to the log open now" + (string.IsNullOrWhiteSpace(curName) ? "" : " (" + curName + ")") + ".", new Thickness(0, 0, 0, 30));
+
+            var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            Button MakeButton(string text) => new Button { Content = text, MinWidth = 100, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 14 };
+            var newBtn = MakeButton("New log");
+            var curBtn = MakeButton("Current log");
+            var cancelBtn = MakeButton("Cancel"); cancelBtn.IsCancel = true;
+            newBtn.Click += (s, e) => { result = ImportTarget.NewLog; dialog.Close(); };
+            curBtn.Click += (s, e) => { result = ImportTarget.CurrentLog; dialog.Close(); };
+            cancelBtn.Click += (s, e) => { result = ImportTarget.Cancel; dialog.Close(); };
+            buttonRow.Children.Add(newBtn);
+            buttonRow.Children.Add(curBtn);
+            buttonRow.Children.Add(cancelBtn);
+            root.Children.Add(buttonRow);
+
+            dialog.Content = root;
+            dialog.ShowDialog();
+            return result;
         }
 
         private enum ImportLogChoice { Cancel, Merge, Replace }
