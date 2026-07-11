@@ -399,6 +399,7 @@ namespace HolyLogger
             
 
             this.Title = title;
+            TitlePrefix = title;   // custom title bar shows this until UpdateActiveLogTitle runs
             UpdateTitleClock();
 
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
@@ -1688,6 +1689,15 @@ namespace HolyLogger
             return name;
         }
 
+        // The custom title bar shows the title in three runs so just "Log:" can be bold: prefix, the bold
+        // "Log:" label, then the log name. (Window.Title stays a plain string for the taskbar.)
+        private string _titlePrefix = string.Empty;
+        public string TitlePrefix { get => _titlePrefix; private set { _titlePrefix = value; OnPropertyChanged("TitlePrefix"); } }
+        private string _titleLogLabel = string.Empty;
+        public string TitleLogLabel { get => _titleLogLabel; private set { _titleLogLabel = value; OnPropertyChanged("TitleLogLabel"); } }
+        private string _titleLogName = string.Empty;
+        public string TitleLogName { get => _titleLogName; private set { _titleLogName = value; OnPropertyChanged("TitleLogName"); } }
+
         // Shows the active log's name in the window title bar.
         public void UpdateActiveLogTitle()
         {
@@ -1704,7 +1714,20 @@ namespace HolyLogger
                 System.Diagnostics.Debug.WriteLine("UpdateActiveLogTitle failed: " + ex.Message);
                 return;
             }
-            this.Title = string.IsNullOrEmpty(name) ? title : (title + "  —  Log: " + name);
+            if (string.IsNullOrEmpty(name))
+            {
+                this.Title = title;
+                TitlePrefix = title;
+                TitleLogLabel = string.Empty;
+                TitleLogName = string.Empty;
+            }
+            else
+            {
+                this.Title = title + "  —  Log: " + name;
+                TitlePrefix = title + "  —  ";
+                TitleLogLabel = "Log: ";
+                TitleLogName = name;
+            }
         }
 
         // Makes the given log the active one: reloads the log table, refreshes counts/title and sets

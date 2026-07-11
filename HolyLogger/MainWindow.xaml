@@ -337,18 +337,20 @@
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBar_Close_Click" ToolTip="Close"/>
                     </StackPanel>
                     <Image Source="Images/crown.png" Width="16" Height="16" Margin="10,0,6,0" VerticalAlignment="Center" DockPanel.Dock="Left"/>
-                    <TextBlock DockPanel.Dock="Left" Text="{Binding Title, RelativeSource={RelativeSource AncestorType=Window}}"
-                               VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource TextBrush}"/>
+                    <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource TextBrush}"
+                               DataContext="{Binding RelativeSource={RelativeSource AncestorType=Window}}">
+                        <Run Text="{Binding TitlePrefix, Mode=OneWay}"/><Run Text="{Binding TitleLogLabel, Mode=OneWay}" FontWeight="Bold"/><Run Text="{Binding TitleLogName, Mode=OneWay}"/>
+                    </TextBlock>
                     <!-- "Copying is live" indicator: shown right after the log name when the active log copies
                          its new QSOs into another log. Click to stop. -->
                     <StackPanel x:Name="CopyLivePanel" DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center"
                                 Margin="14,0,0,0" Cursor="Hand"
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True"
                                 Visibility="{Binding CopyDotVisibility, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                ToolTip="{Binding CopyTargetTooltip, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
                                 PreviewMouseLeftButtonUp="CopyLiveDot_Click">
-                        <Ellipse Width="12" Height="12" Fill="#E24B4A" VerticalAlignment="Center"/>
-                        <TextBlock Text="Copying" Margin="7,0,0,0" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="#E24B4A"/>
+                        <Ellipse Width="12" Height="12" Fill="#E00000" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding CopyTargetTooltip, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
+                                   Margin="7,0,0,0" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="#E00000"/>
                     </StackPanel>
                 </DockPanel>
             </Border>
