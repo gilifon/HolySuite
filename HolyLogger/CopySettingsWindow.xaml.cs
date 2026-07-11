@@ -31,6 +31,14 @@ namespace HolyLogger
 
             CB_CopyTarget.SelectedValue = currentTarget.HasValue ? (object)currentTarget.Value : (object)0L;
             if (CB_CopyTarget.SelectedItem == null) CB_CopyTarget.SelectedIndex = 0;   // target was deleted -> off
+
+            // A copy-target can't be set on a log with no identity — it has no way to decide which QSOs
+            // are yours. Block the choice and explain how to fix it.
+            if (!hasIdentity)
+            {
+                CB_CopyTarget.IsEnabled = false;
+                Header.Text = "This log has no identity yet, so it can't copy its QSOs anywhere. Open the log — logging a QSO or importing one sets its identity — then set the copy-target here.";
+            }
         }
 
         private void Btn_Save_Click(object sender, RoutedEventArgs e)

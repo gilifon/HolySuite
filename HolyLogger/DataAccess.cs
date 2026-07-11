@@ -2433,6 +2433,16 @@ Environment.NewLine +
                     fixCopy.ExecuteNonQuery();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // A copy-target on a log that has no identity is meaningless (you can't even log into an
+            // identity-less log). Clear those so the Log Manager never shows "copies to X" without an identity.
+            try
+            {
+                using (var fixNoId = new SQLiteCommand(
+                    "UPDATE logs SET copy_target_log_id = NULL WHERE copy_target_log_id IS NOT NULL AND " +
+                    "(log_callsign IS NULL OR trim(log_callsign) = '' OR log_operator IS NULL OR trim(log_operator) = '')", con))
+                    fixNoId.ExecuteNonQuery();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
             EnsureEqslAccountsTable();
             EnsureEqslIndexes();
             EnsureQrzIndexes();

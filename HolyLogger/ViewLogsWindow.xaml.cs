@@ -110,6 +110,26 @@ namespace HolyLogger
 
         private Row Selected => LogsGrid.SelectedItem as Row;
 
+        // Gives an identity-less log its permanent identity (pre-filled from its own QSOs, or the main
+        // window if empty). A log's identity is set once and can't be changed.
+        private void Btn_SetIdentity_Click(object sender, RoutedEventArgs e)
+        {
+            if (!RequireSelection()) return;
+            if (_dal.LogHasIdentity(Selected.Id))
+            {
+                HolyMessageBox.Show("This log's identity is already set (" + Selected.Identity + ") and is permanent.",
+                    "Log identity", HolyMsgType.Info, this);
+                return;
+            }
+            var candidates = _dal.GetStationIdentitiesInLog(Selected.Id);
+            var dlg = new SetIdentityWindow(candidates, _dal.GetLogName(Selected.Id),
+                                            _main.CurrentStationCallsign, _main.CurrentOperator) { Owner = this };
+            if (dlg.ShowDialog() != true) return;
+            _dal.SetLogIdentity(Selected.Id, dlg.Callsign, dlg.Operator);
+            _main.RefreshCopyIndicator();
+            LoadLogs();
+        }
+
         // Opens the per-log Copy settings dialog: set/change/stop the copy-target and edit identity.
         private void Btn_CopySettings_Click(object sender, RoutedEventArgs e)
         {
@@ -131,6 +151,9 @@ namespace HolyLogger
         private void LogsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             Btn_Open.IsEnabled = Selected != null && Selected.Id != _dal.ActiveLogId;
+            // "Set Identity" only applies to a log that has no identity yet — grey it out once set (permanent).
+            Btn_SetIdentity.IsEnabled = Selected != null
+                && (string.IsNullOrEmpty(Selected.Callsign) || string.IsNullOrEmpty(Selected.Operator));
         }
 
         private bool RequireSelection()

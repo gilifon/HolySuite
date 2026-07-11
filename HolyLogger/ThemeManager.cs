@@ -71,10 +71,27 @@ namespace HolyLogger
             var res = Application.Current.Resources;
             foreach (var kv in ThemePalette.Tokens)
             {
-                string hex = CurrentHex(kv.Key);
-                var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
-                brush.Freeze();
-                res[kv.Key] = brush;   // set/replace directly => DynamicResource re-resolves live
+                try
+                {
+                    string hex = CurrentHex(kv.Key);
+                    var brush = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+                    brush.Freeze();
+                    res[kv.Key] = brush;   // set/replace directly => DynamicResource re-resolves live
+                }
+                catch (System.Exception ex)
+                {
+                    // A single unparseable color (e.g. a corrupt user override) must NOT abort the loop
+                    // and leave every later token — TitleBarBg included — unset and showing its default.
+                    // Fall back to this token's factory palette value and keep going.
+                    Log.Swallow(ex);
+                    try
+                    {
+                        var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(kv.Value[CurrentScheme.Column]));
+                        b.Freeze();
+                        res[kv.Key] = b;
+                    }
+                    catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                }
             }
 
             // The default WPF ComboBox template paints its dropdown popup with the system window

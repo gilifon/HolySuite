@@ -98,7 +98,7 @@ namespace HolyLogger
             { "WorkedElsewhereAltBg", new[] { "#B3D2F5", "#12263A", "#12263A" } }, // QSO grid: same-call target-log alt row
 
             // ---- Window chrome ----------------------------------------------------------------------
-            { "TitleBarBg",       new[] { "#F0F0F0", "#121316", "#0D1420" } }, // window title-bar background; drives the main + cluster custom title bars everywhere, and native dialog captions on Win11. Matches WindowBg by default.
+            { "TitleBarBg",       new[] { "#BDDFFF", "#121316", "#0D1420" } }, // window title-bar background; drives the main + cluster custom title bars everywhere, and native dialog captions on Win11. Light default matches the GUI entry-form background (FormBg #BDDFFF).
 
             // ---- Designer accent surfaces (same in every scheme by design; user-overridable) -------
             { "LogHeaderBg",      new[] { "#DEB887", "#DEB887", "#DEB887" } }, // QSO log / cluster / Logs window header row (black text on it)

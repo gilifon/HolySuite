@@ -12,26 +12,29 @@
 
         <!-- Toolbar -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
-            <Button x:Name="Btn_NewContestLog" Content="Create New Contest Log" Width="190" Height="34" FontSize="13" FontWeight="Bold"
-                    Margin="0,0,10,0" Click="Btn_NewContestLog_Click"
-                    Background="#FFC107" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
-            <Button x:Name="Btn_NewRegularLog" Content="Create Regular Log" Width="170" Height="34" FontSize="13" FontWeight="Bold"
-                    Margin="0,0,16,0" Click="Btn_NewRegularLog_Click"
+            <Button x:Name="Btn_NewRegularLog" Content="Create New Regular Log" Height="34" Padding="9,0" FontSize="13" FontWeight="Bold"
+                    Margin="0,0,10,0" Click="Btn_NewRegularLog_Click"
                     Background="#00E676" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
+            <Button x:Name="Btn_NewContestLog" Content="Create New Contest Log" Height="34" Padding="9,0" FontSize="13" FontWeight="Bold"
+                    Margin="0,0,16,0" Click="Btn_NewContestLog_Click"
+                    Background="#FFC107" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
             <Separator Width="1" Margin="0,4,10,4"/>
-            <Button x:Name="Btn_Open" Content="Open Log" Width="110" Height="32" FontSize="13" FontWeight="Bold"
+            <Button x:Name="Btn_Open" Content="Open Log" Height="32" Padding="9,0" FontSize="13" FontWeight="Bold"
                     Margin="0,0,8,0" IsEnabled="False" Click="Btn_Open_Click"/>
-            <Button x:Name="Btn_Rename" Content="Rename" Width="90" Height="32" FontSize="13"
+            <Button x:Name="Btn_Rename" Content="Rename" Height="32" Padding="9,0" FontSize="13"
                     Margin="0,0,8,0" Click="Btn_Rename_Click"/>
-            <Button x:Name="Btn_CopySettings" Content="Copy settings…" Width="120" Height="32" FontSize="13"
+            <Button x:Name="Btn_SetIdentity" Content="Set Identity" Height="32" Padding="9,0" FontSize="13"
+                    Margin="0,0,8,0" Click="Btn_SetIdentity_Click"
+                    ToolTip="Give this log its permanent station callsign + operator identity"/>
+            <Button x:Name="Btn_CopySettings" Content="Copy settings…" Height="32" Padding="9,0" FontSize="13"
                     Margin="0,0,8,0" Click="Btn_CopySettings_Click"
                     ToolTip="Set, change or stop copying this log's new QSOs into another log"/>
-            <Button x:Name="Btn_Delete" Content="Delete" Width="90" Height="32" FontSize="13"
+            <Button x:Name="Btn_Delete" Content="Delete" Height="32" Padding="9,0" FontSize="13"
                     Margin="0,0,8,0" Click="Btn_Delete_Click"/>
             <Separator Width="1" Margin="6,4"/>
-            <Button x:Name="Btn_Adif" Content="Export ADIF" Width="110" Height="32" FontSize="13"
+            <Button x:Name="Btn_Adif" Content="Export ADIF" Height="32" Padding="9,0" FontSize="13"
                     Margin="0,0,8,0" Click="Btn_Adif_Click"/>
-            <Button x:Name="Btn_Cabrillo" Content="Export Cabrillo" Width="120" Height="32" FontSize="13"
+            <Button x:Name="Btn_Cabrillo" Content="Export Cabrillo" Height="32" Padding="9,0" FontSize="13"
                     Click="Btn_Cabrillo_Click"/>
         </StackPanel>
 
@@ -78,10 +81,11 @@
                 <DataGridTextColumn Header="End Date" Binding="{Binding EndDate}" Width="Auto"/>
                 <DataGridTextColumn Header="No. of QSOs" Binding="{Binding QsoCount}" Width="Auto"/>
                 <DataGridTextColumn Header="Identity" Binding="{Binding Identity}" Width="Auto"/>
-                <DataGridTextColumn Header="Copies to" Binding="{Binding CopiesTo}" Width="Auto">
+                <DataGridTextColumn Header="Copy New Qso to…" Binding="{Binding CopiesTo}" Width="Auto">
                     <DataGridTextColumn.ElementStyle>
+                        <!-- No trimming: the column auto-sizes to the full target-log name so long names
+                             are always shown in full (the tooltip is a fallback if the window is capped). -->
                         <Style TargetType="TextBlock">
-                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
                             <Setter Property="ToolTip" Value="{Binding CopiesTo}"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>

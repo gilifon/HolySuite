@@ -43,6 +43,11 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
                 CB_CopyTarget.ItemsSource = items;
                 CB_CopyTarget.SelectedIndex = 0;
+
+                // The identity is captured from the main window. If it has no callsign/operator, this log
+                // would have no identity — so it can't be given a copy-target. Disable the choice.
+                if (TB_Callsign.Text.Length == 0 || TB_Operator.Text.Length == 0)
+                    CB_CopyTarget.IsEnabled = false;
             }
 
             Loaded += (s, e) => { TB_Name.Focus(); TB_Name.SelectAll(); };
