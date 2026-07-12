@@ -2091,7 +2091,7 @@ Environment.NewLine +
                     q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
                     q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
                     q.LogName = rdr["log_name"] == DBNull.Value ? string.Empty : rdr["log_name"].ToString();
-                    q.LotwStatus = 2;
+                    q.QrzStatus = 2;
                     list.Add(q);
                 }
             }
