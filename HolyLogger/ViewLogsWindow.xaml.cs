@@ -14,6 +14,7 @@ namespace HolyLogger
     {
         private readonly MainWindow _main;
         private readonly DataAccess _dal;
+        private readonly string _filterCallsign;   // when set, list only logs whose identity callsign matches
 
         // One grid row.
         public class Row
@@ -34,11 +35,12 @@ namespace HolyLogger
             public string Operator { get; set; }
         }
 
-        public ViewLogsWindow(MainWindow main, DataAccess dal)
+        public ViewLogsWindow(MainWindow main, DataAccess dal, string filterCallsign = null)
         {
             InitializeComponent();
             _main = main;
             _dal = dal;
+            _filterCallsign = (filterCallsign ?? string.Empty).Trim();
 
             // Columns are Auto-width (they size to their own content), and the window is
             // SizeToContent="Width" so it grows to fit -- but it must never grow past the screen's
@@ -48,13 +50,29 @@ namespace HolyLogger
             // Same header look as the QSO log table (user's chosen color, default burlywood).
             LogsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
 
+            // Opened because the operator changed the station callsign: show ONLY logs for that callsign
+            // (logs for other callsigns are irrelevant here and would confuse) and explain the view.
+            if (_filterCallsign.Length > 0)
+            {
+                Title = "Logs for " + _filterCallsign;
+                Hint.Text = "Showing only logs for station callsign " + _filterCallsign +
+                            ". Select one and Activate & Open it, or create a new log — its identity is " +
+                            "set to " + _filterCallsign + " automatically.";
+            }
+
             LoadLogs();
         }
 
         private void LoadLogs()
         {
-            var logs = _dal.GetLogs();
-            var nameById = logs.ToDictionary(l => l.Id, l => l.Name);
+            var allLogs = _dal.GetLogs();
+            // Target-name lookup uses ALL logs so a filtered view still resolves a copy-target that
+            // happens to belong to a different callsign.
+            var nameById = allLogs.ToDictionary(l => l.Id, l => l.Name);
+            var logs = allLogs.AsEnumerable();
+            if (_filterCallsign.Length > 0)
+                logs = logs.Where(l => string.Equals((l.Callsign ?? string.Empty).Trim(),
+                                                     _filterCallsign, StringComparison.OrdinalIgnoreCase));
             var rows = new List<Row>();
             int n = 1;
             foreach (var li in logs)

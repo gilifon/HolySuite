@@ -22,10 +22,18 @@ namespace HolyLogger
             TB_Callsign.Text = hasIdentity ? callsign : "(not set yet)";
             TB_Operator.Text = hasIdentity ? opr : "(not set yet)";
 
-            // First item = "(don't copy)" sentinel (Id 0); then every OTHER REGULAR log. A log can't copy
-            // to itself, and contest logs are excluded — they must never receive copies.
+            // First item = "(don't copy)" sentinel (Id 0); then only the OTHER REGULAR logs that SHARE THIS
+            // log's identity (same station callsign + operator). A log with a different identity would never
+            // actually receive a copy (the copy filter matches the target's identity), so listing it would
+            // mislead. A log can't copy to itself, and contest logs are excluded (never receive copies).
             var items = new List<LogInfo> { new LogInfo { Id = 0, Name = "(don't copy)" } };
-            try { items.AddRange(dal.GetLogs().Where(l => l.Id != logId && string.IsNullOrEmpty(l.EventType))); }
+            try
+            {
+                items.AddRange(dal.GetLogs().Where(l =>
+                    l.Id != logId && string.IsNullOrEmpty(l.EventType) &&
+                    string.Equals((l.Callsign ?? string.Empty).Trim(), callsign, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals((l.Operator ?? string.Empty).Trim(), opr, StringComparison.OrdinalIgnoreCase)));
+            }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             CB_CopyTarget.ItemsSource = items;
 

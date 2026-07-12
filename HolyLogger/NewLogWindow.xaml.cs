@@ -36,10 +36,21 @@ namespace HolyLogger
                 TB_Callsign.Text = (defaultCallsign ?? string.Empty).Trim();
                 TB_Operator.Text = (defaultOperator ?? string.Empty).Trim();
 
-                // First item = "(don't copy)" sentinel (Id 0); then every REGULAR log as a target. Contest
-                // logs are excluded — a contest log must never receive copies (only contest operation fills it).
+                // First item = "(don't copy)" sentinel (Id 0); then only the REGULAR logs that SHARE THIS
+                // log's identity (same station callsign + operator). Copying mirrors a QSO into the target
+                // only when the QSO matches the target's identity, so a log with a different identity would
+                // never actually receive a copy — offering it would just mislead. Contest logs are excluded
+                // too (a contest log must never receive copies).
+                string myCall = TB_Callsign.Text;   // already trimmed above
+                string myOp = TB_Operator.Text;
                 var items = new List<LogInfo> { new LogInfo { Id = 0, Name = "(don't copy)" } };
-                try { items.AddRange(_dal.GetLogs().Where(l => string.IsNullOrEmpty(l.EventType))); }
+                try
+                {
+                    items.AddRange(_dal.GetLogs().Where(l =>
+                        string.IsNullOrEmpty(l.EventType) &&
+                        string.Equals((l.Callsign ?? string.Empty).Trim(), myCall, StringComparison.OrdinalIgnoreCase) &&
+                        string.Equals((l.Operator ?? string.Empty).Trim(), myOp, StringComparison.OrdinalIgnoreCase)));
+                }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
                 CB_CopyTarget.ItemsSource = items;
                 CB_CopyTarget.SelectedIndex = 0;

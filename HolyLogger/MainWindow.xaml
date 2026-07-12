@@ -766,6 +766,22 @@
             <Run Text="Callsign" />
         </TextBlock>
         <TextBox x:Name="TB_MyCallsign" HorizontalAlignment="Left" Height="28" Margin="71,11,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="113" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.my_callsign, Source={StaticResource Settings}}" TextChanged="TB_MyCallsign_TextChanged" GotFocus="TB_MyCallsign_GotFocus" LostFocus="TB_MyCallsign_LostFocus" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" MaxLength="14" BorderBrush="#FFABADB3" TabIndex="1"/>
+        <!-- Shown OVER THE DX CALLSIGN box when the current station callsign has no log set for it (the
+             active log's identity is a different callsign). It masks the DX box and blocks typing a DX
+             callsign, so a QSO can't be started until a log is set for the current station callsign;
+             click it to open the Log Manager and open/create a log for that callsign. The station
+             callsign box itself stays editable. Kept exactly over TB_DXCallsign (same Grid.Row / margin
+             / size). -->
+        <Border x:Name="CallsignLockOverlay" Grid.Row="1"
+                HorizontalAlignment="Left" VerticalAlignment="Top"
+                Height="28" Width="130" Margin="101,101,0,0"
+                Background="#FFF3CD" BorderBrush="Red" BorderThickness="1"
+                Visibility="Collapsed" Panel.ZIndex="60" Cursor="Hand"
+                MouseLeftButtonDown="CallsignLockOverlay_MouseDown"
+                ToolTip="No log is set for your current station callsign. Click to open the Log Manager and open or create a log for it before logging QSOs.">
+            <TextBlock Text="Select Log" Foreground="Red" FontWeight="Bold" FontSize="13"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
                     Margin="192,52,0,0" Grid.Row="1">
             <!-- Both LED and no-CAT borders share one Grid so the kHz label never shifts.

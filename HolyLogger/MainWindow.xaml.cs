@@ -972,6 +972,7 @@ namespace HolyLogger
             // A log that already has QSOs but no identity (legacy log) gets prompted now, at startup. An
             // empty log waits — its identity is set when you import into it or log the first QSO.
             EnsureActiveLogHasIdentity(promptIfEmpty: false);
+            SyncCallsignToActiveLog();   // startup: box shows the active log's callsign (no stray lock)
 
             ApplyClusterWindowSetting();
 
@@ -1795,6 +1796,7 @@ namespace HolyLogger
                 UpdateQrzMenuCount();
                 RefreshCopyIndicator();           // show/hide the red "copying is live" dot for this log
                 EnsureActiveLogHasIdentity(promptIfEmpty: false);   // legacy log with QSOs gets its identity now
+                SyncCallsignToActiveLog();        // show this log's callsign; clears any "Select Log" lock
                 // Recompute worked countries from the newly active log so the cluster's "new
                 // country" (red) flags reflect THIS log immediately -- e.g. a brand-new empty log
                 // makes every spotted entity needed. Without this they stayed stale until restart.
@@ -1861,8 +1863,7 @@ namespace HolyLogger
         // File -> View Logs: open the log manager (list all logs; open / rename / delete / export).
         private void ViewLogsMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            var win = new ViewLogsWindow(this, dal) { Owner = this };
-            win.ShowDialog();
+            OpenLogManager();
         }
 
         // Default log ordering on load: newest QSO first (Date desc, then Time desc) so the operator
@@ -7039,7 +7040,114 @@ namespace HolyLogger
             if (string.IsNullOrEmpty(now)) return;
             if (string.Equals(now, _callsignOnFocus, StringComparison.OrdinalIgnoreCase)) return;
             _callsignOnFocus = now;
+
+            // Changing the station callsign so it no longer matches the active log's identity would put
+            // two different station callsigns in one log. Don't allow it: lock the box ("Select Log")
+            // and send the user to the Log Manager to open or create a log for this callsign. (The
+            // operator may vary within one log -- multi-op -- so only the callsign is enforced.)
+            if (HandleStationCallsignChange(now)) return;   // mismatch handled -> skip the services alert
+
             ShowStationCallsignServicesAlert(now);
+        }
+
+        // ── Station-callsign ↔ active-log identity guard ──────────────────────────────────────────
+        // A log holds QSOs for exactly one station callsign (its permanent identity). The callsign box
+        // must therefore always agree with the active log's identity. Changing it to something else is
+        // treated as "I want to operate as a different call" and routes the user to the Log Manager to
+        // open/create a log for that call, rather than silently mixing callsigns in the current log.
+
+        private bool _callsignLocked;
+        private string _pendingStationCallsign;   // the callsign typed while the box is locked
+
+        // Handles a deliberate change of the station callsign. Returns true (and locks the DX box) when
+        // the new callsign has no log set for it (differs from the active log's identity); false when
+        // there's nothing to enforce. The station callsign box itself stays editable throughout.
+        private bool HandleStationCallsignChange(string now)
+        {
+            if (dal == null || state != State.New) return false;   // only guard while logging new QSOs
+            string idCall = ActiveLogIdentityCallsign();
+            if (idCall.Length == 0) return false;                  // log has no identity yet -> this call becomes it
+            if (string.Equals(idCall, now, StringComparison.OrdinalIgnoreCase)) return false;  // matches -> fine
+
+            SetCallsignLocked(true, now);   // block DX entry until a log for this callsign is set
+            bool open = HolyMessageBox.ShowConfirm(
+                "The active log belongs to station callsign \"" + idCall + "\".\n\n" +
+                "A log holds QSOs for one station callsign only, so you can't log as \"" + now + "\" until a " +
+                "log is set for it. Open an existing log for this callsign or create a new one — its identity " +
+                "fills in automatically.\n\nOpen the Log Manager now?",
+                "Select a log for " + now, HolyMsgType.Warning, this);
+            if (open)
+                OpenLogManager(now);   // filter the list to logs for this callsign
+            // Opening/creating a matching log re-syncs the station box and unlocks; otherwise the DX box
+            // stays "Select Log" until a log for this callsign is chosen.
+            RefreshCallsignLockState();
+            return true;
+        }
+
+        private void CallsignLockOverlay_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            OpenLogManager(_pendingStationCallsign);   // still resolving this callsign -> keep the list filtered
+            RefreshCallsignLockState();
+        }
+
+        // Opens the Log Manager (same as File -> View Logs). When filterCallsign is given (the callsign-
+        // change flow), the list shows only logs for that callsign.
+        private void OpenLogManager(string filterCallsign = null)
+        {
+            var win = new ViewLogsWindow(this, dal, filterCallsign) { Owner = this };
+            win.ShowDialog();
+        }
+
+        // The active log's permanent identity callsign (empty if it has none / on error).
+        private string ActiveLogIdentityCallsign()
+        {
+            try
+            {
+                dal.GetLogIdentity(dal.ActiveLogId, out string idCall, out string _);
+                return (idCall ?? string.Empty).Trim();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
+        // Shows/hides the "Select Log" overlay over the DX callsign box and blocks/unblocks typing a DX
+        // callsign. The station callsign box stays editable; only starting a QSO is blocked until a log is
+        // set for the current station callsign. `pending` = the station callsign with no log yet, used to
+        // filter the Log Manager when the overlay is clicked.
+        private void SetCallsignLocked(bool locked, string pending)
+        {
+            _callsignLocked = locked;
+            _pendingStationCallsign = locked ? pending : null;
+            if (CallsignLockOverlay != null)
+                CallsignLockOverlay.Visibility = locked ? Visibility.Visible : Visibility.Collapsed;
+            if (TB_DXCallsign != null)
+                TB_DXCallsign.IsReadOnly = locked;
+        }
+
+        // Locks the box iff the current callsign differs from the active log's identity callsign.
+        private void RefreshCallsignLockState()
+        {
+            if (dal == null || TB_MyCallsign == null) return;
+            string idCall = ActiveLogIdentityCallsign();
+            string boxCall = (TB_MyCallsign.Text ?? string.Empty).Trim();
+            bool mismatch = idCall.Length > 0 && boxCall.Length > 0
+                            && !string.Equals(idCall, boxCall, StringComparison.OrdinalIgnoreCase);
+            SetCallsignLocked(mismatch, boxCall);
+        }
+
+        // Keeps the callsign box in step with the active log: switching to a log shows that log's
+        // identity callsign. Empty logs (no identity) keep whatever is typed -- it becomes their
+        // identity on the first QSO. Call after the active log changes.
+        private void SyncCallsignToActiveLog()
+        {
+            if (dal == null || TB_MyCallsign == null) return;
+            string idCall = ActiveLogIdentityCallsign();
+            if (idCall.Length > 0 &&
+                !string.Equals(idCall, (TB_MyCallsign.Text ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase))
+            {
+                TB_MyCallsign.Text = idCall;    // updates the box + the my_callsign setting
+                _callsignOnFocus = idCall;
+            }
+            RefreshCallsignLockState();
         }
 
         // When the operator switches to a different Station Callsign, summarise how each upload
