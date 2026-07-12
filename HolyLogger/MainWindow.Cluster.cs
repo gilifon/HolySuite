@@ -83,6 +83,19 @@ namespace HolyLogger
         // Stable key per cluster table column, used to persist/restore the column ORDER.
         Dictionary<DataGridColumn, string> clusterColumnKeys = new Dictionary<DataGridColumn, string>();
         ScrollViewer clusterSpotsScrollViewer = null;
+
+        // ── Live Scale (real-time frequency scale) ─────────────────────────────────────────────────
+        // When on, the spot list is sorted by frequency (highest at top), the grid auto-scrolls so the
+        // current radio frequency sits on a fixed center line, and manual scroll/sort are locked.
+        bool clusterLiveScaleOn = false;
+        Button clusterLiveScaleBtn = null;
+        FrameworkElement clusterCenterLine = null;    // overlay that hosts the reference line (fills the table area)
+        Grid clusterCenterLineBand = null;            // the movable strip (line + readout) positioned at the rows-area center
+        TextBlock clusterCenterLineFreqText = null;   // live VFO frequency shown on the line
+        string clusterPreLiveScaleBandFilterMode = null;  // band-filter mode to restore when Live Scale is turned off
+        string clusterPreLiveScaleSortMember = "UnixTime";
+        System.ComponentModel.ListSortDirection clusterPreLiveScaleSortDir = System.ComponentModel.ListSortDirection.Descending;
+
         bool clusterTableMarginInitialized = false;
         StackPanel clusterLastMinutesFilterPanel = null;
         StackPanel clusterBandSelectorPanel = null;
@@ -421,6 +434,7 @@ namespace HolyLogger
 
         private async void GenerateNewClusterWindow()
         {
+            clusterLiveScaleOn = false;   // Live Scale always starts off when the window opens
             clusterHoverPopupEnabled = LoadClusterHoverPopupSetting();
             clusterLastMinutesFilterValue = LoadClusterLastMinutesFilterSetting();
 
@@ -476,12 +490,23 @@ namespace HolyLogger
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             layoutGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
+            // The spots table is wrapped in a host Grid together with the Live Scale center line, so the
+            // line overlays the TABLE AREA only: it spans the table side to side and sits at exactly the
+            // table frame's middle height (VerticalAlignment=Center of the host that fills row 2).
+            var tableHost = new Grid();
+            tableHost.Children.Add(spotsGrid);
+            var centerLine = BuildClusterCenterLine();
+            Panel.SetZIndex(centerLine, 50);
+            tableHost.Children.Add(centerLine);
+            // Keep the line on the rows-area center through any window/table resize.
+            spotsGrid.SizeChanged += (s, e) => PositionClusterCenterLine();
+
             Grid.SetRow(headerGrid, 0);
             Grid.SetRow(headerCanvas, 1);
-            Grid.SetRow(spotsGrid, 2);
+            Grid.SetRow(tableHost, 2);
             layoutGrid.Children.Add(headerGrid);
             layoutGrid.Children.Add(headerCanvas);
-            layoutGrid.Children.Add(spotsGrid);
+            layoutGrid.Children.Add(tableHost);
 
             // Outer grid keeps the custom title bar flush with the frame edge (layoutGrid has its
             // own inset margin, above, so nesting the title bar inside it would push the bar in too).
@@ -682,6 +707,11 @@ namespace HolyLogger
             clusterModeColumn = null;
             clusterCommentColumn = null;
             clusterSpotsScrollViewer = null;
+            clusterLiveScaleOn = false;
+            clusterLiveScaleBtn = null;
+            clusterCenterLine = null;
+            clusterCenterLineBand = null;
+            clusterCenterLineFreqText = null;
             clusterLastMinutesFilterPanel = null;
             clusterBandSelectorPanel = null;
             clusterModeSelectorPanel = null;
@@ -1510,6 +1540,7 @@ namespace HolyLogger
                 Visibility = Visibility.Visible
             };
             clusterActiveBandIndicatorText = activeBandIndicator;
+            UpdateClusterActiveBandIndicatorText();   // band in green/gray, or red "out of band"
 
             var btnAllBands = new Button { Content = "All Bands", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "All", StringComparison.OrdinalIgnoreCase)) };
             var btnPreSelected = new Button { Content = "Selected", HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(4, 2, 2, 4), Style = MakeClusterBandFilterBtnStyle(string.Equals(currentFilterMode, "PreSelected", StringComparison.OrdinalIgnoreCase)) };
@@ -1529,9 +1560,23 @@ namespace HolyLogger
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(30) });
             grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(30) });
 
+            // Live Scale toggle: to the right of "All Bands", same key look as the band buttons;
+            // highlighted (pressed) while engaged.
+            var btnLiveScale = new Button
+            {
+                Content = "Live Scale",
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Margin = new Thickness(12, 2, 2, 4),
+                Style = MakeClusterBandFilterBtnStyle(clusterLiveScaleOn),
+                ToolTip = "Live frequency scale: the list scrolls so your current radio frequency stays on the center line, so you can see at a glance which way to turn the knob to reach a spot. Turns on Active band + frequency sort."
+            };
+            clusterLiveScaleBtn = btnLiveScale;
+            btnLiveScale.Click += (s, e) => ToggleClusterLiveScale();
+
             var topButtonsRow = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Center };
             topButtonsRow.Children.Add(btnPreSelected);
             topButtonsRow.Children.Add(btnAllBands);
+            topButtonsRow.Children.Add(btnLiveScale);
             Grid.SetRow(topButtonsRow, 0);
             grid.Children.Add(topButtonsRow);
 
@@ -1578,15 +1623,167 @@ namespace HolyLogger
                 clusterBandFilterPreSelectedBtn.Style = MakeClusterBandFilterBtnStyle(string.Equals(newMode, "PreSelected", StringComparison.OrdinalIgnoreCase));
             if (clusterBandFilterActiveBtn != null)
                 clusterBandFilterActiveBtn.Style = MakeClusterBandFilterBtnStyle(string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase));
-            bool isActive = string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase);
             if (clusterActiveBandIndicatorText != null)
             {
-                clusterActiveBandIndicatorText.Foreground = isActive
-                    ? new SolidColorBrush(Color.FromRgb(0, 190, 0))
-                    : (Brush)new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+                UpdateClusterActiveBandIndicatorText();
                 clusterActiveBandIndicatorText.Visibility = Visibility.Visible;
             }
             RefreshClusterVisibleSpots();
+        }
+
+        // ── Live Scale ─────────────────────────────────────────────────────────────────────────────
+
+        // The horizontal reference line (+ live frequency readout). The overlay fills the table area; the
+        // inner "band" strip is positioned by PositionClusterCenterLine at the exact vertical center of the
+        // ROWS viewport (excluding the column headers and scrollbars), and re-positioned on every resize.
+        // Non-hit-test so the spots underneath stay clickable. Hidden until Live Scale is engaged.
+        private FrameworkElement BuildClusterCenterLine()
+        {
+            var container = new Grid { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
+
+            var band = new Grid { Height = 24, VerticalAlignment = VerticalAlignment.Top };
+
+            var line = new Border
+            {
+                Height = 3,
+                Background = new SolidColorBrush(Color.FromRgb(0xE0, 0x00, 0x00)),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            band.Children.Add(line);
+
+            var freqText = new TextBlock
+            {
+                Text = string.Empty,
+                FontSize = 13,
+                FontWeight = FontWeights.Bold,
+                Foreground = Brushes.White,
+                Background = new SolidColorBrush(Color.FromRgb(0xE0, 0x00, 0x00)),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Right,
+                Margin = new Thickness(0, 0, 22, 0),   // clear of the vertical scrollbar
+                Padding = new Thickness(6, 1, 6, 1)
+            };
+            band.Children.Add(freqText);
+
+            container.Children.Add(band);
+
+            clusterCenterLine = container;
+            clusterCenterLineBand = band;
+            clusterCenterLineFreqText = freqText;
+            return container;
+        }
+
+        // Puts the line at exactly the middle height of the rows area (the frame where the spots are
+        // printed): finds the grid's ScrollContentPresenter — which excludes the column-header band and
+        // the scrollbars — and aligns the strip's center to its vertical center. Cheap; safe to call often.
+        private void PositionClusterCenterLine()
+        {
+            if (clusterCenterLine == null || clusterCenterLineBand == null || clusterSpotsGrid == null) return;
+            if (clusterCenterLine.Visibility != Visibility.Visible) return;
+            var rows = FindVisualChild<ScrollContentPresenter>(clusterSpotsGrid);
+            if (rows == null || rows.ActualHeight <= 0) return;
+            double centerY;
+            try { centerY = rows.TransformToVisual(clusterCenterLine).Transform(new Point(0, rows.ActualHeight / 2.0)).Y; }
+            catch { return; }
+            double top = Math.Max(0, centerY - clusterCenterLineBand.Height / 2.0);
+            if (Math.Abs(clusterCenterLineBand.Margin.Top - top) > 0.5)
+                clusterCenterLineBand.Margin = new Thickness(0, top, 0, 0);
+        }
+
+        // Toggles Live Scale on/off: engages Active band + frequency sort (highest at top), shows the
+        // center line and locks manual scroll/sort; turning off restores the previous mode + sort.
+        private void ToggleClusterLiveScale()
+        {
+            // Engaging needs a valid active band: out of band there are no active-band spots, so turning
+            // on would just present an empty list. Refuse with an explanation instead.
+            if (!clusterLiveScaleOn)
+            {
+                string band = TB_Band != null ? (TB_Band.Text ?? string.Empty).Trim() : string.Empty;
+                if (band.Length == 0)
+                {
+                    HolyMessageBox.ShowWarning(
+                        "Live Scale needs the radio on a valid ham band.\n\n" +
+                        "The current frequency is outside every band, so there is no active band to show. " +
+                        "Tune inside a band (e.g. 14.200) and press Live Scale again.",
+                        "Live Scale", clusterWindow);
+                    return;
+                }
+            }
+
+            clusterLiveScaleOn = !clusterLiveScaleOn;
+
+            if (clusterLiveScaleOn)
+            {
+                // Snapshot what to restore later: band-filter mode + the user's current sort.
+                clusterPreLiveScaleBandFilterMode = Properties.Settings.Default.ClusterBandFilterMode ?? "PreSelected";
+                var v0 = GetClusterSpotsView();
+                if (v0 != null)
+                    foreach (var sd in v0.SortDescriptions)
+                        if (sd.PropertyName != "IsNeededCountry")
+                        {
+                            clusterPreLiveScaleSortMember = sd.PropertyName;
+                            clusterPreLiveScaleSortDir = sd.Direction;
+                            break;
+                        }
+
+                ApplyClusterBandFilterMode("Active", false);   // engage Active band (don't overwrite the saved preference)
+                ApplyClusterLiveScaleSort();                    // frequency, highest at top
+                if (clusterCenterLine != null) clusterCenterLine.Visibility = Visibility.Visible;
+                UpdateClusterLiveScale();                       // set the readout on the line
+                // Position after the layout pass so the rows viewport is measured.
+                Dispatcher.BeginInvoke(new Action(PositionClusterCenterLine),
+                    System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+            else
+            {
+                if (clusterCenterLine != null) clusterCenterLine.Visibility = Visibility.Collapsed;
+                ApplyClusterBandFilterMode(clusterPreLiveScaleBandFilterMode ?? "PreSelected", false);
+                var v1 = GetClusterSpotsView();
+                if (v1 != null) ApplyClusterSort(v1, clusterPreLiveScaleSortMember, clusterPreLiveScaleSortDir);
+            }
+
+            if (clusterLiveScaleBtn != null)
+                clusterLiveScaleBtn.Style = MakeClusterBandFilterBtnStyle(clusterLiveScaleOn);
+        }
+
+        private System.Windows.Data.ListCollectionView GetClusterSpotsView()
+        {
+            if (clusterSpotsDataGrid == null) return null;
+            return System.Windows.Data.CollectionViewSource.GetDefaultView(clusterSpotsDataGrid.ItemsSource)
+                   as System.Windows.Data.ListCollectionView;
+        }
+
+        // Pure frequency order (highest at top). NO needed-country pin, since Live Scale's position -> frequency
+        // mapping requires a strictly monotonic frequency order.
+        private void ApplyClusterLiveScaleSort()
+        {
+            var view = GetClusterSpotsView();
+            if (view == null) return;
+            using (view.DeferRefresh())
+            {
+                view.SortDescriptions.Clear();
+                view.SortDescriptions.Add(new System.ComponentModel.SortDescription("FreqMhz", System.ComponentModel.ListSortDirection.Descending));
+            }
+            if (clusterSpotsDataGrid != null)
+            {
+                foreach (var col in clusterSpotsDataGrid.Columns) col.SortDirection = null;
+                if (clusterFreqColumn != null) clusterFreqColumn.SortDirection = System.ComponentModel.ListSortDirection.Descending;
+            }
+        }
+
+        // Updates the live frequency readout shown on the center line. (The scroll-to-center behavior on
+        // frequency change is the NEXT stage of this feature — deliberately not implemented yet.)
+        private void UpdateClusterLiveScale()
+        {
+            if (!clusterLiveScaleOn || clusterCenterLine == null) return;
+
+            double vfoMhz = 0;
+            double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out vfoMhz);
+            if (clusterCenterLineFreqText != null)
+                clusterCenterLineFreqText.Text = vfoMhz > 0
+                    ? vfoMhz.ToString("0.000", CultureInfo.InvariantCulture) + " MHz"
+                    : string.Empty;
         }
 
         private StackPanel BuildClusterLastMinutesPanel()
@@ -1807,7 +2004,19 @@ namespace HolyLogger
                 double tableTopInCanvas = ClusterTableTopGap;
                 if (clusterSpotCountBadge != null)
                 {
-                    double badgeLeft = panelLeft + panelWidth + ClusterBandGroupToCounterGap;
+                    // Anchor the badge to the right edge of the "Active Band + <band>" row so adding the
+                    // Live Scale button to the row above (which widens the whole panel) doesn't push it.
+                    double badgeLeft = panelLeft + panelWidth + ClusterBandGroupToCounterGap;   // fallback
+                    if (clusterActiveBandIndicatorText != null)
+                    {
+                        try
+                        {
+                            Point indRight = clusterActiveBandIndicatorText.TranslatePoint(
+                                new Point(clusterActiveBandIndicatorText.ActualWidth, 0), clusterHeaderCanvas);
+                            badgeLeft = indRight.X + ClusterBandGroupToCounterGap;
+                        }
+                        catch { }
+                    }
                     double badgeTop = tableTopInCanvas - ClusterControlsToTableGap - clusterSpotCountBadge.Height;
                     Canvas.SetLeft(clusterSpotCountBadge, badgeLeft);
                     Canvas.SetTop(clusterSpotCountBadge, badgeTop);
@@ -2951,6 +3160,8 @@ namespace HolyLogger
                     spot.IsOnFrequency = false;
                 }
             }
+
+            if (clusterLiveScaleOn) UpdateClusterLiveScale();
         }
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
@@ -3037,6 +3248,28 @@ namespace HolyLogger
                 return "SHF";
 
             return b;
+        }
+
+        // The label next to the Active Band button: the current band (green when Active mode is selected,
+        // gray otherwise), or a red "out of band" when the radio frequency is outside every ham band — so
+        // an empty Active-band table is always self-explanatory instead of looking like a bug.
+        private void UpdateClusterActiveBandIndicatorText()
+        {
+            if (clusterActiveBandIndicatorText == null) return;
+            string display = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty);
+            bool isActive = string.Equals(Properties.Settings.Default.ClusterBandFilterMode, "Active", StringComparison.OrdinalIgnoreCase);
+            if (display.Length > 0)
+            {
+                clusterActiveBandIndicatorText.Text = display;
+                clusterActiveBandIndicatorText.Foreground = isActive
+                    ? new SolidColorBrush(Color.FromRgb(0, 190, 0))
+                    : (Brush)new SolidColorBrush(Color.FromRgb(0xAA, 0xAA, 0xAA));
+            }
+            else
+            {
+                clusterActiveBandIndicatorText.Text = "out of band";
+                clusterActiveBandIndicatorText.Foreground = Brushes.Red;
+            }
         }
 
         private string FormatClusterBandDisplay(string bandText)

@@ -6020,11 +6020,18 @@ namespace HolyLogger
             string activeBand = TB_Band != null ? TB_Band.Text : string.Empty;
             bool bandIsValid = !string.IsNullOrWhiteSpace(activeBand);
 
-            // Hide only the button and label — never the row itself, so layout never shifts
-            var vis = bandIsValid ? Visibility.Visible : Visibility.Hidden;
-            clusterBandFilterActiveBtn.Visibility = vis;
+            // The button and label are ALWAYS visible and always look like the other mode buttons — blue
+            // when Active mode is selected, normal key-face otherwise (user 2026-07-12: never hidden and
+            // never greyed; they used to vanish whenever the radio was outside a ham band, which read as
+            // "the button was deleted").
+            clusterBandFilterActiveBtn.Visibility = Visibility.Visible;
+            clusterBandFilterActiveBtn.IsEnabled = true;
+            clusterBandFilterActiveBtn.Opacity = 1.0;
             if (clusterActiveBandIndicatorText != null)
-                clusterActiveBandIndicatorText.Visibility = vis;
+            {
+                clusterActiveBandIndicatorText.Visibility = Visibility.Visible;
+                clusterActiveBandIndicatorText.Opacity = 1.0;
+            }
 
             string preferred = Properties.Settings.Default.ClusterPreferredBandMode ?? "PreSelected";
             string current = Properties.Settings.Default.ClusterBandFilterMode ?? "PreSelected";
@@ -6328,6 +6335,21 @@ namespace HolyLogger
                     {
                         return Brushes.Transparent; // normal: shows the grid's themed background
                     }
+                }
+            }
+
+            // Numeric frequency in MHz, parsed from FreqText (the cluster sends kHz when the value is
+            // >= 1000, otherwise MHz). Used by the Live Scale feature to sort the list and to position the
+            // current-frequency scale. 0 when FreqText can't be parsed.
+            public double FreqMhz
+            {
+                get
+                {
+                    if (double.TryParse((FreqText ?? string.Empty).Trim(),
+                                        System.Globalization.NumberStyles.Float,
+                                        System.Globalization.CultureInfo.InvariantCulture, out double v) && v > 0)
+                        return v >= 1000 ? v / 1000.0 : v;
+                    return 0;
                 }
             }
 
@@ -7361,7 +7383,7 @@ namespace HolyLogger
             UpdateDup();
             if (clusterActiveBandIndicatorText != null)
             {
-                clusterActiveBandIndicatorText.Text = FormatClusterBandDisplay(TB_Band != null ? TB_Band.Text : string.Empty);
+                UpdateClusterActiveBandIndicatorText();   // band in green/gray, or red "out of band"
                 UpdateClusterActiveBandIndicatorPosition();
             }
 
