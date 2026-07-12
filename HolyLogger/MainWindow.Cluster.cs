@@ -2196,6 +2196,12 @@ namespace HolyLogger
                 double tableTopInCanvas = ClusterTableTopGap;
                 if (clusterSpotCountBadge != null)
                 {
+                    // Out of band the label reads "out of band" — wider than a band name, which pushed the
+                    // badge rightward into the Last dropdown. Simplest cure (user 2026-07-12): hide the
+                    // badge entirely while out of band.
+                    bool bandValid = TB_Band != null && !string.IsNullOrWhiteSpace(TB_Band.Text);
+                    clusterSpotCountBadge.Visibility = bandValid ? Visibility.Visible : Visibility.Collapsed;
+
                     // Anchor the badge to the right edge of the "Active Band + <band>" row so adding the
                     // Live Scale button to the row above (which widens the whole panel) doesn't push it.
                     double badgeLeft = panelLeft + panelWidth + ClusterBandGroupToCounterGap;   // fallback
