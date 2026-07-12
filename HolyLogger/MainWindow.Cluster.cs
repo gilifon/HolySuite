@@ -92,6 +92,8 @@ namespace HolyLogger
         FrameworkElement clusterCenterLine = null;    // overlay that hosts the reference line (fills the table area)
         Grid clusterCenterLineBand = null;            // the movable strip (line + readout) positioned at the rows-area center
         TextBlock clusterCenterLineFreqText = null;   // live VFO frequency shown on the line
+        System.Windows.Controls.Primitives.DataGridRowsPresenter clusterLiveScaleRowsHost = null;  // rows panel; carries the off-screen spacer margins
+        int clusterLiveScaleAlignRetries = 0;         // guards the layout-not-ready retry loop of the scroll engine
         string clusterPreLiveScaleBandFilterMode = null;  // band-filter mode to restore when Live Scale is turned off
         string clusterPreLiveScaleSortMember = "UnixTime";
         System.ComponentModel.ListSortDirection clusterPreLiveScaleSortDir = System.ComponentModel.ListSortDirection.Descending;
@@ -434,7 +436,7 @@ namespace HolyLogger
 
         private async void GenerateNewClusterWindow()
         {
-            clusterLiveScaleOn = false;   // Live Scale always starts off when the window opens
+            clusterLiveScaleOn = false;   // engaged below (after the window is built) if it was remembered on
             clusterHoverPopupEnabled = LoadClusterHoverPopupSetting();
             clusterLastMinutesFilterValue = LoadClusterLastMinutesFilterSetting();
 
@@ -498,8 +500,9 @@ namespace HolyLogger
             var centerLine = BuildClusterCenterLine();
             Panel.SetZIndex(centerLine, 50);
             tableHost.Children.Add(centerLine);
-            // Keep the line on the rows-area center through any window/table resize.
-            spotsGrid.SizeChanged += (s, e) => PositionClusterCenterLine();
+            // Keep the line on the rows-area center — and the table aligned to it — through any resize
+            // (the spacer margins and scroll target both depend on the viewport height).
+            spotsGrid.SizeChanged += (s, e) => { PositionClusterCenterLine(); ScrollClusterLiveScale(); };
 
             Grid.SetRow(headerGrid, 0);
             Grid.SetRow(headerCanvas, 1);
@@ -581,6 +584,14 @@ namespace HolyLogger
 
             clusterWorkedCountries = GetWorkedCountriesFromLog();
             clusterWindow.Show();
+
+            // Live Scale is a remembered state: if it was on when the cluster was last used, re-engage it
+            // now (after the window has laid out, so the grid/scroll measurements are real).
+            if (Properties.Settings.Default.ClusterLiveScaleOn)
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!clusterLiveScaleOn) ToggleClusterLiveScale(userInitiated: false);
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
 
             // Only start WebSocket if not already connected
             if (clusterWebSocketCts == null || clusterWebSocketCts.IsCancellationRequested)
@@ -712,6 +723,7 @@ namespace HolyLogger
             clusterCenterLine = null;
             clusterCenterLineBand = null;
             clusterCenterLineFreqText = null;
+            clusterLiveScaleRowsHost = null;
             clusterLastMinutesFilterPanel = null;
             clusterBandSelectorPanel = null;
             clusterModeSelectorPanel = null;
@@ -1641,16 +1653,32 @@ namespace HolyLogger
         {
             var container = new Grid { IsHitTestVisible = false, Visibility = Visibility.Collapsed };
 
+            // Two thin parallel lines, one row height apart (the strip's Height is kept at the measured
+            // row height by ScrollClusterLiveScale), framing the on-frequency row instead of striking
+            // through it — the station text between them stays fully readable.
             var band = new Grid { Height = 24, VerticalAlignment = VerticalAlignment.Top };
 
-            var line = new Border
+            var topLine = new Border
             {
-                Height = 3,
+                Height = 1,
                 Background = new SolidColorBrush(Color.FromRgb(0xE0, 0x00, 0x00)),
-                VerticalAlignment = VerticalAlignment.Center,
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true,
+                VerticalAlignment = VerticalAlignment.Top,
                 HorizontalAlignment = HorizontalAlignment.Stretch
             };
-            band.Children.Add(line);
+            band.Children.Add(topLine);
+
+            var bottomLine = new Border
+            {
+                Height = 1,
+                Background = new SolidColorBrush(Color.FromRgb(0xE0, 0x00, 0x00)),
+                SnapsToDevicePixels = true,
+                UseLayoutRounding = true,
+                VerticalAlignment = VerticalAlignment.Bottom,
+                HorizontalAlignment = HorizontalAlignment.Stretch
+            };
+            band.Children.Add(bottomLine);
 
             var freqText = new TextBlock
             {
@@ -1693,11 +1721,13 @@ namespace HolyLogger
 
         // Toggles Live Scale on/off: engages Active band + frequency sort (highest at top), shows the
         // center line and locks manual scroll/sort; turning off restores the previous mode + sort.
-        private void ToggleClusterLiveScale()
+        private void ToggleClusterLiveScale(bool userInitiated = true)
         {
             // Engaging needs a valid active band: out of band there are no active-band spots, so turning
-            // on would just present an empty list. Refuse with an explanation instead.
-            if (!clusterLiveScaleOn)
+            // on would just present an empty list. On a CLICK, refuse with an explanation. On the silent
+            // auto-restore of a remembered state, engage anyway — the red "out of band" label and the
+            // empty table explain themselves, and spots appear as soon as the radio re-enters a band.
+            if (!clusterLiveScaleOn && userInitiated)
             {
                 string band = TB_Band != null ? (TB_Band.Text ?? string.Empty).Trim() : string.Empty;
                 if (band.Length == 0)
@@ -1712,6 +1742,11 @@ namespace HolyLogger
             }
 
             clusterLiveScaleOn = !clusterLiveScaleOn;
+
+            // Live Scale is a remembered state: reopening the cluster (or restarting the program)
+            // restores it.
+            Properties.Settings.Default.ClusterLiveScaleOn = clusterLiveScaleOn;
+            SettingsFlush.RequestSave();
 
             if (clusterLiveScaleOn)
             {
@@ -1729,14 +1764,16 @@ namespace HolyLogger
 
                 ApplyClusterBandFilterMode("Active", false);   // engage Active band (don't overwrite the saved preference)
                 ApplyClusterLiveScaleSort();                    // frequency, highest at top
+                SetClusterLiveScaleScrollSetup(true);           // program owns the scroll from here
                 if (clusterCenterLine != null) clusterCenterLine.Visibility = Visibility.Visible;
-                UpdateClusterLiveScale();                       // set the readout on the line
-                // Position after the layout pass so the rows viewport is measured.
+                UpdateClusterLiveScale();                       // readout + first alignment
+                // Position the line after the layout pass so the rows viewport is measured.
                 Dispatcher.BeginInvoke(new Action(PositionClusterCenterLine),
                     System.Windows.Threading.DispatcherPriority.Loaded);
             }
             else
             {
+                SetClusterLiveScaleScrollSetup(false);          // unlock scroll/sort, drop the spacers
                 if (clusterCenterLine != null) clusterCenterLine.Visibility = Visibility.Collapsed;
                 ApplyClusterBandFilterMode(clusterPreLiveScaleBandFilterMode ?? "PreSelected", false);
                 var v1 = GetClusterSpotsView();
@@ -1772,8 +1809,9 @@ namespace HolyLogger
             }
         }
 
-        // Updates the live frequency readout shown on the center line. (The scroll-to-center behavior on
-        // frequency change is the NEXT stage of this feature — deliberately not implemented yet.)
+        // Refreshes the readout on the line and re-aligns the table to the current VFO. Runs on every
+        // frequency change AND after every spot refresh (both via UpdateClusterFrequencyHighlight), so
+        // knob turns and newly arriving spots both keep the line truthful.
         private void UpdateClusterLiveScale()
         {
             if (!clusterLiveScaleOn || clusterCenterLine == null) return;
@@ -1784,6 +1822,160 @@ namespace HolyLogger
                 clusterCenterLineFreqText.Text = vfoMhz > 0
                     ? vfoMhz.ToString("0.000", CultureInfo.InvariantCulture) + " MHz"
                     : string.Empty;
+
+            ScrollClusterLiveScale();
+        }
+
+        // Locks/unlocks the table for Live Scale: while on, the PROGRAM owns the scroll position — the
+        // wheel is blocked, the vertical scrollbar is hidden, and column sorting is disabled (the scale
+        // requires strict frequency order). Off restores everything, including virtualized scrolling.
+        private void SetClusterLiveScaleScrollSetup(bool on)
+        {
+            if (clusterSpotsDataGrid == null) return;
+            clusterSpotsDataGrid.CanUserSortColumns = !on;
+            ScrollViewer.SetVerticalScrollBarVisibility(clusterSpotsDataGrid, on ? ScrollBarVisibility.Hidden : ScrollBarVisibility.Auto);
+            clusterSpotsDataGrid.PreviewMouseWheel -= ClusterLiveScale_BlockWheel;
+            if (on)
+            {
+                clusterSpotsDataGrid.PreviewMouseWheel += ClusterLiveScale_BlockWheel;
+            }
+            else
+            {
+                if (clusterLiveScaleRowsHost != null) clusterLiveScaleRowsHost.Margin = new Thickness(0);
+                var sv = clusterSpotsScrollViewer ?? FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
+                if (sv != null) sv.CanContentScroll = true;   // back to normal virtualized scrolling
+            }
+        }
+
+        private void ClusterLiveScale_BlockWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            e.Handled = true;   // no manual scrolling while Live Scale is on
+        }
+
+        // The Live Scale engine: scrolls the table so the current VFO frequency sits exactly on the center
+        // line. Between two spots the position interpolates proportionally with frequency (so the table
+        // moves fast across a 1 kHz gap and slowly across a 20 kHz gap — every row is one row tall
+        // regardless of its frequency distance). Beyond the highest/lowest spot it extrapolates using the
+        // list's average spacing, letting the whole list slide away off-screen. Full-viewport spacer
+        // margins on the ROWS panel (never the grid itself — the column headers must not move) give the
+        // scroll range needed for all of that.
+        private void ScrollClusterLiveScale()
+        {
+            if (!clusterLiveScaleOn || clusterSpotsDataGrid == null) return;
+
+            if (clusterSpotsScrollViewer == null)
+                clusterSpotsScrollViewer = FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
+            var sv = clusterSpotsScrollViewer;
+            if (sv == null) return;
+
+            // Pixel-precise scrolling so the line can sit BETWEEN rows; needs a re-layout, so re-run after.
+            if (sv.CanContentScroll)
+            {
+                sv.CanContentScroll = false;
+                Dispatcher.BeginInvoke(new Action(ScrollClusterLiveScale), System.Windows.Threading.DispatcherPriority.Loaded);
+                return;
+            }
+
+            double vh = sv.ViewportHeight;
+            if (vh <= 0) return;
+
+            if (clusterLiveScaleRowsHost == null)
+                clusterLiveScaleRowsHost = FindVisualChild<System.Windows.Controls.Primitives.DataGridRowsPresenter>(clusterSpotsDataGrid);
+            if (clusterLiveScaleRowsHost == null) return;
+
+            double pad = vh;   // full viewport above and below -> any frequency can reach the line
+            var m = clusterLiveScaleRowsHost.Margin;
+            if (Math.Abs(m.Top - pad) > 1 || Math.Abs(m.Bottom - pad) > 1)
+            {
+                clusterLiveScaleRowsHost.Margin = new Thickness(0, pad, 0, pad);
+                Dispatcher.BeginInvoke(new Action(ScrollClusterLiveScale), System.Windows.Threading.DispatcherPriority.Loaded);
+                return;
+            }
+
+            int n = clusterSpotsDataGrid.Items.Count;
+            double vfo = 0;
+            double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out vfo);
+            if (n <= 0 || vfo <= 0) return;
+
+            double rowH = 0;
+            if (clusterSpotsDataGrid.ItemContainerGenerator.ContainerFromIndex(0) is DataGridRow r0 && r0.ActualHeight > 0)
+                rowH = r0.ActualHeight;
+            if (rowH <= 0)
+            {
+                // Rows exist but aren't laid out yet (e.g. Live Scale restored at window open, spots
+                // arriving right after). Without this retry the view stays parked on the blank top
+                // spacer — an "empty" table with all the spots scrolled out of sight.
+                if (clusterLiveScaleAlignRetries < 30)
+                {
+                    clusterLiveScaleAlignRetries++;
+                    Dispatcher.BeginInvoke(new Action(ScrollClusterLiveScale), System.Windows.Threading.DispatcherPriority.Loaded);
+                }
+                return;
+            }
+            clusterLiveScaleAlignRetries = 0;
+
+            // Keep the two frame lines exactly one row apart: strip height = row height + both line
+            // thicknesses, so the lines sit just OUTSIDE the row's edges and the row text is untouched.
+            if (clusterCenterLineBand != null)
+            {
+                double desired = rowH + 2;   // 1px top line + 1px bottom line outside the row
+                if (Math.Abs(clusterCenterLineBand.Height - desired) > 0.5)
+                {
+                    clusterCenterLineBand.Height = desired;
+                    Dispatcher.BeginInvoke(new Action(PositionClusterCenterLine),
+                        System.Windows.Threading.DispatcherPriority.Loaded);   // re-center for the new height
+                }
+            }
+
+            Func<int, double> freqAt = i => (clusterSpotsDataGrid.Items[i] as ClusterSpotViewItem)?.FreqMhz ?? 0;
+            double topF = freqAt(0);          // highest frequency (sorted descending)
+            double botF = freqAt(n - 1);      // lowest
+            // Average spacing (MHz per row) for extrapolating beyond the ends; 1 kHz fallback.
+            double avgGap = (n > 1 && topF > botF) ? (topF - botF) / (n - 1) : 0.001;
+            if (avgGap <= 0) avgGap = 0.001;
+
+            // Vertical position of the VFO in row units (row i's center = i + 0.5).
+            double rowsY;
+            if (vfo >= topF)
+                rowsY = 0.5 - (vfo - topF) / avgGap;              // above everything -> list slides down/away
+            else if (vfo <= botF)
+                rowsY = (n - 1) + 0.5 + (botF - vfo) / avgGap;    // below everything -> list slides up/away
+            else
+            {
+                rowsY = (n - 1) + 0.5;
+                for (int i = 0; i < n - 1; i++)
+                {
+                    double fi = freqAt(i), fj = freqAt(i + 1);
+                    if (fi >= vfo && vfo >= fj)
+                    {
+                        double span = fi - fj;
+                        double t = span > 0 ? (fi - vfo) / span : 0.0;   // 0 at spot i .. 1 at spot i+1
+                        rowsY = i + 0.5 + t;
+                        break;
+                    }
+                }
+            }
+
+            // Align that position (inside the padded content) with the line. Use the line's MEASURED
+            // position within the rows viewport — not an assumed "viewport center" — so the drawn line and
+            // the scroll target can never disagree (a half-row mismatch here put the line on the row's
+            // bottom edge instead of its center).
+            double lineY = vh / 2.0;
+            var rowsViewport = FindVisualChild<ScrollContentPresenter>(clusterSpotsDataGrid);
+            if (rowsViewport != null && clusterCenterLineBand != null)
+            {
+                try
+                {
+                    lineY = clusterCenterLineBand.TransformToVisual(rowsViewport)
+                        .Transform(new Point(0, clusterCenterLineBand.ActualHeight / 2.0)).Y;
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
+            double target = pad + rowsY * rowH - lineY;
+            double maxOffset = Math.Max(0, sv.ExtentHeight - vh);
+            if (target < 0) target = 0; else if (target > maxOffset) target = maxOffset;
+            sv.ScrollToVerticalOffset(target);
         }
 
         private StackPanel BuildClusterLastMinutesPanel()

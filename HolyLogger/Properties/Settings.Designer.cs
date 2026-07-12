@@ -1707,6 +1707,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ClusterLiveScaleOn {
+            get {
+                return ((bool)(this["ClusterLiveScaleOn"]));
+            }
+            set {
+                this["ClusterLiveScaleOn"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("PreSelected")]
         public string ClusterBandFilterMode {
             get {

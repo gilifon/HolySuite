@@ -6038,13 +6038,13 @@ namespace HolyLogger
 
             if (!bandIsValid)
             {
-                // Band invalid: if currently in Active mode, fall back. The user's preferred
-                // mode (persisted) is left untouched so Active can be restored later.
+                // Band invalid: STAY in Active mode (user 2026-07-12). The button keeps its focus, the
+                // label shows red "out of band", and the table is empty (the Active filter matches no
+                // spot without a valid band) until the radio returns to a band. The old auto-fallback to
+                // Selected silently changed the mode and flooded the (Live Scale) view with other bands'
+                // spots. Just refresh so the empty view applies.
                 if (string.Equals(current, "Active", StringComparison.OrdinalIgnoreCase))
-                {
-                    string fallback = GetEnabledClusterBands().Count > 0 ? "PreSelected" : "All";
-                    ApplyClusterBandFilterMode(fallback);
-                }
+                    RefreshClusterVisibleSpots();
             }
             else
             {

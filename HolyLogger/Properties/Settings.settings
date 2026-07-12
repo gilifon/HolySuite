@@ -413,6 +413,9 @@
     <Setting Name="ClusterUseActiveBand" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="ClusterLiveScaleOn" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="ClusterBandFilterMode" Type="System.String" Scope="User">
       <Value Profile="(Default)">PreSelected</Value>
     </Setting>
