@@ -115,6 +115,10 @@ namespace HolyParser
         // 2 = permanently rejected. Not serialized to the contest server.
         public int ClublogStatus { get; set; }
 
+        // Name of the log this QSO belongs to. Display-only: filled in by the upload-queue queries so the
+        // (global) queue window can show which log each pending/dismissed QSO came from. Not persisted.
+        public string LogName { get; set; }
+
         public QSO()
         {
             IsAllowWARC = false;

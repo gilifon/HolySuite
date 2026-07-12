@@ -23,11 +23,15 @@ namespace HolyLogger
         private readonly Func<Task<int>> _sendAll;
         private readonly Func<List<QSO>> _getDismissed;   // null = no dismissed section
         private readonly Action _requeueDismissed;
+        private readonly Action<QSO> _dismissOne;         // null = no per-QSO "Remove from queue" button
+        private readonly Action<QSO> _deleteFromLog;      // null = no per-QSO "Delete QSO" button
 
         private readonly TextBlock _pendingCountLabel;
         private readonly TextBlock _callsignLabel;
         private readonly DataGrid _pendingGrid;
         private readonly Button _uploadButton;
+        private readonly Button _removeButton;            // null unless _dismissOne was supplied
+        private readonly Button _deleteButton;            // null unless _deleteFromLog was supplied
         private readonly TextBlock _statusText;
 
         private readonly Border _dismissedSection;
@@ -40,18 +44,22 @@ namespace HolyLogger
             Func<Task<int>> sendAll,
             string serviceName = "eQSL",
             Func<List<QSO>> getDismissed = null,
-            Action requeueDismissed = null)
+            Action requeueDismissed = null,
+            Action<QSO> dismissOne = null,
+            Action<QSO> deleteFromLog = null)
         {
             _serviceName = serviceName;
             _getPending = getPending;
             _sendAll = sendAll;
             _getDismissed = getDismissed;
             _requeueDismissed = requeueDismissed;
+            _dismissOne = dismissOne;
+            _deleteFromLog = deleteFromLog;
 
             bool hasDismissed = getDismissed != null;
 
             Title = $"QSOs waiting for {serviceName}";
-            Width = 540;
+            Width = 680;
             Height = hasDismissed ? 580 : 460;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.CanResize;
@@ -88,6 +96,44 @@ namespace HolyLogger
             Grid.SetColumn(_callsignLabel, 1);
             headerPanel.Children.Add(_callsignLabel);
 
+            // Right side: an optional "Remove from queue" button (per-QSO dismiss) then the Upload button.
+            var rightButtons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            Grid.SetColumn(rightButtons, 2);
+            headerPanel.Children.Add(rightButtons);
+
+            if (_dismissOne != null)
+            {
+                _removeButton = new Button
+                {
+                    Content = "Remove from queue",
+                    Padding = new Thickness(12, 4, 12, 4),
+                    FontSize = 13,
+                    Margin = new Thickness(0, 0, 8, 0),
+                    IsEnabled = false,
+                    ToolTip = "Take the selected QSO out of this upload queue WITHOUT uploading it. " +
+                              "It moves to the Dismissed list below and can be re-queued. The QSO itself is not deleted."
+                };
+                _removeButton.Click += RemoveButton_Click;
+                rightButtons.Children.Add(_removeButton);
+            }
+
+            if (_deleteFromLog != null)
+            {
+                _deleteButton = new Button
+                {
+                    Content = "Delete QSO",
+                    Padding = new Thickness(12, 4, 12, 4),
+                    FontSize = 13,
+                    Margin = new Thickness(0, 0, 8, 0),
+                    IsEnabled = false,
+                    Foreground = new SolidColorBrush(Color.FromRgb(0xC0, 0x00, 0x00)),
+                    ToolTip = "Permanently DELETE the selected QSO from its log (not just from the queue). " +
+                              "This cannot be undone."
+                };
+                _deleteButton.Click += DeleteButton_Click;
+                rightButtons.Children.Add(_deleteButton);
+            }
+
             _uploadButton = new Button
             {
                 Content = "Upload",
@@ -97,14 +143,21 @@ namespace HolyLogger
                 FontWeight = FontWeights.Bold
             };
             _uploadButton.Click += UploadButton_Click;
-            Grid.SetColumn(_uploadButton, 2);
-            headerPanel.Children.Add(_uploadButton);
+            rightButtons.Children.Add(_uploadButton);
 
             Grid.SetRow(headerPanel, 0);
             root.Children.Add(headerPanel);
 
             // ── Pending DataGrid ─────────────────────────────────────────────
             _pendingGrid = MakeGrid();
+            // The per-QSO actions ("Remove from queue" / "Delete QSO") act on the selected pending QSO,
+            // so they're only enabled when one is picked.
+            _pendingGrid.SelectionChanged += (s, e) =>
+            {
+                bool hasSel = _pendingGrid.SelectedItem is QSO;
+                if (_removeButton != null) _removeButton.IsEnabled = hasSel;
+                if (_deleteButton != null) _deleteButton.IsEnabled = hasSel;
+            };
             Grid.SetRow(_pendingGrid, 1);
             root.Children.Add(_pendingGrid);
 
@@ -189,27 +242,44 @@ namespace HolyLogger
             // Same column-header look as the main log table: background comes from the LogHeaderBg theme
             // token, so it follows the "Customize Colors" scheme editor.
             grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+            // Every column auto-sizes to its own content/header, so nothing (especially long log names)
+            // is trimmed; a horizontal scrollbar appears if the total exceeds the window width.
             ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
-            grid.Columns.Add(MakeColumn("Date", "Date", 1.2));
-            grid.Columns.Add(MakeColumn("Time", "Time", 1.0));
-            grid.Columns.Add(MakeColumn("Callsign", "DXCall", 1.4));
-            grid.Columns.Add(MakeColumn("Band", "Band", 0.8));
-            grid.Columns.Add(MakeColumn("Mode", "Mode", 0.8));
-            grid.Columns.Add(MakeFreqColumn(1.1));
+            ScrollViewer.SetHorizontalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+            // Date/Time are shown in a friendly form ("11 Jul 2026", "19:30:43") via display-only
+            // converters; the QSO's stored Date/Time (yyyyMMdd / HHmmss) are untouched, so uploads are
+            // unaffected.
+            grid.Columns.Add(MakeColumn("Date", "Date", new QsoDateDisplayConverter()));
+            grid.Columns.Add(MakeColumn("Time", "Time", new QsoTimeDisplayConverter()));
+            grid.Columns.Add(MakeColumn("Callsign", "DXCall"));
+            grid.Columns.Add(MakeColumn("Band", "Band"));
+            grid.Columns.Add(MakeColumn("Mode", "Mode"));
+            grid.Columns.Add(MakeFreqColumn());
+            // Which log each QSO belongs to (the queue pools QSOs from every log). It's the last column and
+            // stretches to fill the remaining width (so there's no unused blank column on the right); the
+            // fixed columns above stay Auto so they're never trimmed, and the full name is on hover.
+            var logCol = MakeColumn("Log", "LogName");
+            logCol.Width = new DataGridLength(1, DataGridLengthUnitType.Star);
+            var logStyle = new Style(typeof(TextBlock));
+            logStyle.Setters.Add(new Setter(TextBlock.ToolTipProperty, new Binding("LogName")));
+            logCol.ElementStyle = logStyle;
+            grid.Columns.Add(logCol);
             return grid;
         }
 
-        private static DataGridTextColumn MakeColumn(string header, string path, double starWidth)
+        private static DataGridTextColumn MakeColumn(string header, string path, IValueConverter converter = null)
         {
+            var binding = new Binding(path);
+            if (converter != null) binding.Converter = converter;
             return new DataGridTextColumn
             {
                 Header = header,
-                Binding = new Binding(path),
-                Width = new DataGridLength(starWidth, DataGridLengthUnitType.Star)
+                Binding = binding,
+                Width = DataGridLength.Auto
             };
         }
 
-        private static DataGridTextColumn MakeFreqColumn(double starWidth)
+        private static DataGridTextColumn MakeFreqColumn()
         {
             var header = new TextBlock();
             header.Inlines.Add(new System.Windows.Documents.Run("Freq "));
@@ -218,7 +288,7 @@ namespace HolyLogger
             {
                 Header = header,
                 Binding = new Binding("Freq"),
-                Width = new DataGridLength(starWidth, DataGridLengthUnitType.Star)
+                Width = DataGridLength.Auto
             };
         }
 
@@ -279,6 +349,49 @@ namespace HolyLogger
             _statusText.Text = remaining == 0
                 ? $"All QSOs uploaded to {_serviceName}. ✓"
                 : $"{sent} uploaded, {remaining} still waiting.";
+        }
+
+        // Removes the selected pending QSO from THIS service's queue without uploading it (a per-QSO
+        // dismiss). It reappears in the Dismissed list and can be re-queued. Only this service is affected.
+        private void RemoveButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_dismissOne == null) return;
+            if (!(_pendingGrid.SelectedItem is QSO q)) return;
+            try { _dismissOne(q); }
+            catch (System.Exception ex)
+            {
+                _statusText.Text = "Remove failed: " + ex.Message;
+                return;
+            }
+            RefreshList();
+            _statusText.Text = $"QSO removed from the {_serviceName} queue (moved to Dismissed — not uploaded).";
+        }
+
+        // Permanently deletes the selected QSO from its LOG (not just this queue), after a clear warning.
+        // Deleting the QSO row removes it from every service's queue at once.
+        private void DeleteButton_Click(object sender, RoutedEventArgs e)
+        {
+            if (_deleteFromLog == null) return;
+            if (!(_pendingGrid.SelectedItem is QSO q)) return;
+
+            string when = ((q.Date ?? string.Empty) + " " + (q.Time ?? string.Empty)).Trim();
+            string logPart = string.IsNullOrWhiteSpace(q.LogName) ? "its log" : "the log \"" + q.LogName + "\"";
+            bool ok = HolyMessageBox.ShowConfirm(
+                "Delete this QSO — " + q.DXCall + " on " + q.Band + " " + q.Mode +
+                (when.Length > 0 ? " (" + when + ")" : string.Empty) + "?\n\n" +
+                "This permanently DELETES the QSO from " + logPart + " — not just from the upload queue — " +
+                "and cannot be undone.",
+                "Delete QSO from log", HolyMsgType.Warning, this);
+            if (!ok) return;
+
+            try { _deleteFromLog(q); }
+            catch (System.Exception ex)
+            {
+                _statusText.Text = "Delete failed: " + ex.Message;
+                return;
+            }
+            RefreshList();
+            _statusText.Text = "QSO deleted from the log (and removed from every upload queue).";
         }
 
         private void RequeueButton_Click(object sender, RoutedEventArgs e)

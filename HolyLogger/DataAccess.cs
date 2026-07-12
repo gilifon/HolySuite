@@ -267,24 +267,17 @@ Environment.NewLine +
             return null;
             }
         }
-        // Inserts a COPY of an existing QSO into another log, tagged with source_qso_id and inheriting the
-        // source's per-service upload status. Never triggers further copying. Returns the copy's Id.
-        // Caller holds _dbLock.
+        // Inserts a COPY of an existing QSO into another log, tagged with source_qso_id. Never triggers
+        // further copying. Returns the copy's Id. Caller holds _dbLock.
+        //
+        // A copy is NEVER uploaded on its own: the ORIGINAL is the single upload vehicle for the contact
+        // (the copy is a record-only mirror, e.g. so contest QSOs also count for awards in the main log).
+        // So every service is marked "already handled" (status 1 -- the same convention imported rows use)
+        // and the copy stays out of every upload queue. Otherwise a live QSO (source pending, 0) would put
+        // the SAME contact in the queue twice, once per log.
         private long InsertQsoCopy(QSO qso, long targetLogId, long sourceQsoId)
         {
-            int es = 0, qs = 0, ls = 0, cs = 0;
-            using (var sc = new SQLiteCommand("SELECT eqsl_status, qrz_status, lotw_status, clublog_status FROM qso WHERE Id = ?", con))
-            {
-                sc.Parameters.Add(new SQLiteParameter(null, sourceQsoId));
-                using (var rdr = sc.ExecuteReader())
-                    if (rdr.Read())
-                    {
-                        es = rdr["eqsl_status"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["eqsl_status"]);
-                        qs = rdr["qrz_status"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["qrz_status"]);
-                        ls = rdr["lotw_status"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["lotw_status"]);
-                        cs = rdr["clublog_status"] == DBNull.Value ? 0 : Convert.ToInt32(rdr["clublog_status"]);
-                    }
-            }
+            const int es = 1, qs = 1, ls = 1, cs = 1;
             using (var ins = new SQLiteCommand(
                 "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
                 "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@prop_mode,@sat_name,@soapbox,@es,@qs,@ls,@cs,@log_id,@src)", con))
@@ -1494,7 +1487,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT * FROM qso WHERE qrz_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE qrz_status = 0 ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -1526,6 +1519,7 @@ Environment.NewLine +
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                     if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                     if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    if (rdr["log_name"] != DBNull.Value) q.LogName = rdr["log_name"].ToString();
                     q.QrzStatus = 0;
                     list.Add(q);
                 }
@@ -1571,7 +1565,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT * FROM qso WHERE clublog_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE clublog_status = 0 ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -1603,6 +1597,7 @@ Environment.NewLine +
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                     if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                     if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    if (rdr["log_name"] != DBNull.Value) q.LogName = rdr["log_name"].ToString();
                     q.ClublogStatus = 0;
                     list.Add(q);
                 }
@@ -1648,7 +1643,7 @@ Environment.NewLine +
             // Not-yet-sent QSOs whose station callsign is in the eQSL accounts table (the opt-in list).
             // QSOs under a callsign that isn't in the table are intentionally left out (the user chose
             // not to upload them).
-            string stm = "SELECT * FROM qso WHERE eqsl_status = 0 AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date ASC, time ASC, Id ASC";
+            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE eqsl_status = 0 AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -1680,6 +1675,7 @@ Environment.NewLine +
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                     if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                     if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    if (rdr["log_name"] != DBNull.Value) q.LogName = rdr["log_name"].ToString();
                     q.EqslStatus = 0;
                     list.Add(q);
                 }
@@ -1805,7 +1801,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT * FROM qso WHERE lotw_status = 0 ORDER BY date ASC, time ASC, Id ASC";
+            string stm = "SELECT *, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE lotw_status = 0 ORDER BY date ASC, time ASC, Id ASC";
             using (SQLiteCommand cmd = new SQLiteCommand(stm, con))
             using (SQLiteDataReader rdr = cmd.ExecuteReader())
             {
@@ -1837,6 +1833,7 @@ Environment.NewLine +
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                     if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                     if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    if (rdr["log_name"] != DBNull.Value) q.LogName = rdr["log_name"].ToString();
                     q.LotwStatus = 0;
                     list.Add(q);
                 }
@@ -1959,7 +1956,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency FROM qso WHERE clublog_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE clublog_status = 2 ORDER BY date DESC, time DESC, Id DESC";
             using (var cmd = new SQLiteCommand(stm, con))
             using (var rdr = cmd.ExecuteReader())
             {
@@ -1973,6 +1970,7 @@ Environment.NewLine +
                     q.Band = rdr["band"]?.ToString() ?? string.Empty;
                     q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
                     q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
+                    q.LogName = rdr["log_name"] == DBNull.Value ? string.Empty : rdr["log_name"].ToString();
                     q.ClublogStatus = 2;
                     list.Add(q);
                 }
@@ -2000,7 +1998,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency FROM qso WHERE lotw_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE lotw_status = 2 ORDER BY date DESC, time DESC, Id DESC";
             using (var cmd = new SQLiteCommand(stm, con))
             using (var rdr = cmd.ExecuteReader())
             {
@@ -2014,6 +2012,7 @@ Environment.NewLine +
                     q.Band = rdr["band"]?.ToString() ?? string.Empty;
                     q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
                     q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
+                    q.LogName = rdr["log_name"] == DBNull.Value ? string.Empty : rdr["log_name"].ToString();
                     q.LotwStatus = 2;
                     list.Add(q);
                 }
@@ -2038,7 +2037,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency FROM qso WHERE eqsl_status = 2 AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date DESC, time DESC, Id DESC";
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE eqsl_status = 2 AND my_callsign IN (SELECT callsign FROM eqsl_accounts) ORDER BY date DESC, time DESC, Id DESC";
             using (var cmd = new SQLiteCommand(stm, con))
             using (var rdr = cmd.ExecuteReader())
             {
@@ -2052,6 +2051,7 @@ Environment.NewLine +
                     q.Band = rdr["band"]?.ToString() ?? string.Empty;
                     q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
                     q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
+                    q.LogName = rdr["log_name"] == DBNull.Value ? string.Empty : rdr["log_name"].ToString();
                     q.EqslStatus = 2;
                     list.Add(q);
                 }
@@ -2076,7 +2076,7 @@ Environment.NewLine +
             {
             var list = new List<QSO>();
             if (con == null || con.State != ConnectionState.Open) return list;
-            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency FROM qso WHERE qrz_status = 2 ORDER BY date DESC, time DESC, Id DESC";
+            string stm = "SELECT Id, date, time, dx_callsign, band, mode, frequency, (SELECT name FROM logs WHERE logs.Id = qso.log_id) AS log_name FROM qso WHERE qrz_status = 2 ORDER BY date DESC, time DESC, Id DESC";
             using (var cmd = new SQLiteCommand(stm, con))
             using (var rdr = cmd.ExecuteReader())
             {
@@ -2090,6 +2090,7 @@ Environment.NewLine +
                     q.Band = rdr["band"]?.ToString() ?? string.Empty;
                     q.Mode = rdr["mode"]?.ToString() ?? string.Empty;
                     q.Freq = rdr["frequency"]?.ToString() ?? string.Empty;
+                    q.LogName = rdr["log_name"] == DBNull.Value ? string.Empty : rdr["log_name"].ToString();
                     q.LotwStatus = 2;
                     list.Add(q);
                 }
@@ -2441,6 +2442,19 @@ Environment.NewLine +
                     "UPDATE logs SET copy_target_log_id = NULL WHERE copy_target_log_id IS NOT NULL AND " +
                     "(log_callsign IS NULL OR trim(log_callsign) = '' OR log_operator IS NULL OR trim(log_operator) = '')", con))
                     fixNoId.ExecuteNonQuery();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // A copied QSO (source_qso_id set) must never be uploaded on its own -- the original handles it.
+            // Earlier builds inherited the source's pending status, so copies of live QSOs sat in the upload
+            // queues alongside their originals (the SAME contact queued twice). Mark every still-pending copy
+            // "already handled" (1) so each contact is offered to each service exactly once (from the original).
+            try
+            {
+                using (var fixCopies = new SQLiteCommand(
+                    "UPDATE qso SET eqsl_status = 1, qrz_status = 1, lotw_status = 1, clublog_status = 1 " +
+                    "WHERE source_qso_id IS NOT NULL AND " +
+                    "(eqsl_status = 0 OR qrz_status = 0 OR lotw_status = 0 OR clublog_status = 0)", con))
+                    fixCopies.ExecuteNonQuery();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             EnsureEqslAccountsTable();

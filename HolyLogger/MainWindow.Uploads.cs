@@ -688,6 +688,31 @@ namespace HolyLogger
 
         private EqslQueueWindow _eqslQueueWindow;
 
+        // Deletes a QSO chosen in an upload-queue window from its LOG (the queue window already confirmed
+        // with the user). When the QSO is in the currently-active log, remove it through the Qsos collection
+        // so the main grid and all the Qsos_CollectionChanged bookkeeping run (dal.Delete, counts,
+        // worked-countries, and the copy-to-log cascade). When it belongs to a different (not-loaded) log,
+        // delete it directly and refresh the queue counts/indicators. Deleting the row clears it from every
+        // service's queue at once.
+        private void DeleteQsoFromQueueWindow(QSO q)
+        {
+            if (q == null || dal == null) return;
+            var inActive = Qsos?.FirstOrDefault(x => x.id == q.id);
+            if (inActive != null)
+            {
+                Qsos.Remove(inActive);   // -> Qsos_CollectionChanged: dal.Delete + refresh everything
+            }
+            else
+            {
+                dal.Delete(q.id);        // QSO belongs to a log that isn't loaded in the grid
+                UpdateNumOfQSOs();
+                UpdateEqslQueueIndicator();
+                UpdateLotwMenuCount();
+                UpdateQrzMenuCount();
+                UpdateClublogMenuCount();
+            }
+        }
+
         // Opens (or focuses) a window listing the QSOs still waiting for eQSL.
         private void ShowEqslQueueWindow()
         {
@@ -705,7 +730,9 @@ namespace HolyLogger
                 () => PumpEqslQueue(),
                 "eQSL",
                 () => dal.GetDismissedEqslQsos(),
-                () => { dal.RequeueAllEqslDismissed(); UpdateEqslQueueIndicator(); })
+                () => { dal.RequeueAllEqslDismissed(); UpdateEqslQueueIndicator(); },
+                q => { dal.SetEqslStatus(q.id, 2); UpdateEqslQueueIndicator(); },
+                DeleteQsoFromQueueWindow)
             {
                 Owner = this
             };
@@ -748,7 +775,9 @@ namespace HolyLogger
                 },
                 "LoTW",
                 () => dal.GetDismissedLotwQsos(),
-                () => { dal.RequeueAllLotwDismissed(); UpdateLotwMenuCount(); })
+                () => { dal.RequeueAllLotwDismissed(); UpdateLotwMenuCount(); },
+                q => { dal.SetLotwStatus(q.id, 2); UpdateLotwMenuCount(); },
+                DeleteQsoFromQueueWindow)
             {
                 Owner = this
             };
@@ -789,7 +818,9 @@ namespace HolyLogger
                 },
                 "QRZ Logbook",
                 () => dal.GetDismissedQrzQsos(),
-                () => { dal.RequeueAllQrzDismissed(); UpdateQrzMenuCount(); })
+                () => { dal.RequeueAllQrzDismissed(); UpdateQrzMenuCount(); },
+                q => { dal.SetQrzStatus(q.id, 2); UpdateQrzMenuCount(); },
+                DeleteQsoFromQueueWindow)
             {
                 Owner = this
             };
@@ -832,7 +863,9 @@ namespace HolyLogger
                 },
                 "Club Log",
                 () => dal.GetDismissedClublogQsos(),
-                () => { dal.RequeueAllClublogDismissed(); UpdateClublogMenuCount(); })
+                () => { dal.RequeueAllClublogDismissed(); UpdateClublogMenuCount(); },
+                q => { dal.SetClublogStatus(q.id, 2); UpdateClublogMenuCount(); },
+                DeleteQsoFromQueueWindow)
             {
                 Owner = this
             };
