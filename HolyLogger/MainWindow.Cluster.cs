@@ -3836,16 +3836,32 @@ namespace HolyLogger
             PlayClusterAlertSound(Properties.Settings.Default.ClusterNewCountrySound);
         }
 
-        // Maps the sound name from Options → General to a sound: a *.wav name plays from
-        // C:\Windows\Media, anything else is one of the five system sounds. Also used by the
-        // options page's Test button, hence static.
+        // Plays the alert sound named in Options → General. A *.wav name plays from C:\Windows\Media,
+        // anything else is one of the five system sounds. Also used by the options page's Test button,
+        // hence static. This overload uses the saved output device.
         static System.Media.SoundPlayer _clusterAlertWavPlayer;   // kept alive so playback isn't GC-cut
 
         internal static void PlayClusterAlertSound(string name)
+            => PlayClusterAlertSound(name, Properties.Settings.Default.SoundOutputDevice);
+
+        // deviceName empty/default -> the Windows default device (original behavior). A specific device
+        // (e.g. the speakers, chosen so alerts don't go down a USB radio codec) needs a WAV to target it,
+        // so a system-sound name is mapped to a comparable Windows\Media WAV in that case.
+        internal static void PlayClusterAlertSound(string name, string deviceName)
         {
             try
             {
                 string n = (name ?? string.Empty).Trim();
+                uint deviceId = WaveOutPlayer.ResolveDeviceId(deviceName);
+                bool specificDevice = !string.IsNullOrWhiteSpace(deviceName) && deviceId != 0xFFFFFFFF;
+
+                if (specificDevice)
+                {
+                    string wav = ResolveAlertWavPath(n);
+                    if (wav != null) { WaveOutPlayer.Play(wav, deviceId); return; }
+                    // No WAV available -> fall through to default-device playback below.
+                }
+
                 if (n.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
                 {
                     string path = System.IO.Path.Combine(
@@ -3868,6 +3884,29 @@ namespace HolyLogger
                 }
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // A playable WAV path for a sound name, or null if none exists. A *.wav name resolves in
+        // C:\Windows\Media; the five system-sound names map to a comparable Windows\Media WAV so they
+        // can still be routed to a chosen device (System.Media system sounds can't target a device).
+        static string ResolveAlertWavPath(string n)
+        {
+            string mediaDir = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media");
+            string file;
+            if (n.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                file = n;
+            else
+                switch (n)
+                {
+                    case "Beep": file = "Windows Ding.wav"; break;
+                    case "Exclamation": file = "Windows Exclamation.wav"; break;
+                    case "Question": file = "Windows Ding.wav"; break;
+                    case "Critical": file = "Windows Critical Stop.wav"; break;
+                    default: file = "Windows Notify.wav"; break;   // "Chime"
+                }
+            string path = System.IO.Path.Combine(mediaDir, file);
+            return System.IO.File.Exists(path) ? path : null;
         }
 
         public bool GetClusterHoverPopupEnabled()

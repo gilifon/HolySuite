@@ -2280,5 +2280,17 @@ namespace HolyLogger.Properties {
                 this["ClusterLatestPerCallsign"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SoundOutputDevice {
+            get {
+                return ((string)(this["SoundOutputDevice"]));
+            }
+            set {
+                this["SoundOutputDevice"] = value;
+            }
+        }
     }
 }

@@ -82,7 +82,33 @@ namespace HolyLogger.OptionsUserControls
                 ? sounds.First(n => string.Equals(n, saved, StringComparison.OrdinalIgnoreCase))
                 : "Chime";
 
+            // Shared output-device picker for both alert sounds: "System default" (Windows default
+            // device) + each real output device, so sounds can go to the speakers instead of a USB codec.
+            InitSoundDevicePicker(CB_SoundDevice, Properties.Settings.Default.SoundOutputDevice);
+
             HasChanged = false;
+        }
+
+        // Sentinel dropdown entry for "use the Windows default device"; stored as an empty setting.
+        const string SystemDefaultDevice = "System default";
+
+        static void InitSoundDevicePicker(System.Windows.Controls.ComboBox combo, string savedDev)
+        {
+            var devices = new List<string> { SystemDefaultDevice };
+            try { devices.AddRange(WaveOutPlayer.GetOutputDeviceNames()); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            combo.ItemsSource = devices;
+            combo.SelectedItem =
+                (!string.IsNullOrWhiteSpace(savedDev) && devices.Contains(savedDev, StringComparer.OrdinalIgnoreCase))
+                    ? devices.First(d => string.Equals(d, savedDev, StringComparison.OrdinalIgnoreCase))
+                    : SystemDefaultDevice;
+        }
+
+        // The saved device string for a picker: empty for "System default", else the device name.
+        static string DeviceSettingFrom(System.Windows.Controls.ComboBox combo)
+        {
+            string d = combo.SelectedItem as string;
+            return string.Equals(d, SystemDefaultDevice, StringComparison.Ordinal) ? string.Empty : (d ?? string.Empty);
         }
 
         private void CB_NewCountrySound_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -92,10 +118,16 @@ namespace HolyLogger.OptionsUserControls
             HasChanged = true;
         }
 
+        private void CB_SoundDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            Properties.Settings.Default.SoundOutputDevice = DeviceSettingFrom(CB_SoundDevice);
+            HasChanged = true;
+        }
+
         private void BTN_TestNewCountrySound_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
-            MainWindow.PlayClusterAlertSound(CB_NewCountrySound.SelectedItem as string);
+            MainWindow.PlayClusterAlertSound(CB_NewCountrySound.SelectedItem as string, DeviceSettingFrom(CB_SoundDevice));
         }
 
         private void CBX_EnableOmniRigCAT_Changed(object sender, RoutedEventArgs e)
@@ -110,12 +142,12 @@ namespace HolyLogger.OptionsUserControls
             }
         }
 
-        // Speaker button next to the "Beep when typing…" option: plays the same beep so the user can
-        // confirm their speaker works. e.Handled stops the click from also toggling the checkbox.
+        // Speaker button next to the "Beep when typing…" option: plays the beep on the selected device
+        // so the user can confirm it. e.Handled stops the click from also toggling the checkbox.
         private void BTN_TestBeep_Click(object sender, RoutedEventArgs e)
         {
             e.Handled = true;
-            try { System.Media.SystemSounds.Beep.Play(); } catch (Exception ex) { Log.Swallow(ex); }
+            MainWindow.PlayClusterAlertSound("Beep", DeviceSettingFrom(CB_SoundDevice));
         }
 
         private void HasChanged_Click(object sender, RoutedEventArgs e)

@@ -7431,7 +7431,8 @@ namespace HolyLogger
                     if ((now - _lastNonEnglishBeepUtc).TotalMilliseconds > 200)
                     {
                         _lastNonEnglishBeepUtc = now;
-                        try { System.Media.SystemSounds.Beep.Play(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                        // Route to the user's chosen device (e.g. speakers) so it doesn't go into a USB codec.
+                        PlayClusterAlertSound("Beep", Properties.Settings.Default.SoundOutputDevice);
                     }
                 }
             }

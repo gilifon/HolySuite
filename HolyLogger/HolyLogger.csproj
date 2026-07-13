@@ -230,6 +230,7 @@
     <Compile Include="LotwUploader.cs" />
     <Compile Include="ClublogService.cs" />
     <Compile Include="QrzLogbookService.cs" />
+    <Compile Include="WaveOutPlayer.cs" />
     <Compile Include="TqslStationData.cs" />
     <Compile Include="Enums.cs" />
     <Compile Include="LogInfoWindow.xaml.cs">
