@@ -7286,18 +7286,71 @@ namespace HolyLogger
             alert.ShowDialog();
         }
         
+        // Shared by the My Locator and My Holyland Square boxes (both wire TextChanged here).
         private void TB_MyHolyland_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (signboard != null)
             {
                 signboard.signboardData.Square = TB_MyHolyland.Text;
             }
-            ShowHomeMap();
+
+            // The home map is centered on the LOCATOR, not the square — ShowHomeMap re-renders the
+            // WebView map (and re-plots every cluster spot when the cluster map is on). Doing that on
+            // each Holyland-square keystroke made typing feel sluggish, for a value the map ignores.
+            // Only re-render when the change came from the locator box.
+            if (!ReferenceEquals(sender, TB_MyHolyland))
+            {
+                ShowHomeMap();
+            }
+        }
+
+        // The official Holyland squares (HolyLogParser.validSquares) are stored as "K-07-YZ"; the
+        // square is typed here without the dashes ("K07YZ"). Normalize both to dash-free uppercase
+        // for an O(1) membership check.
+        private static readonly HashSet<string> _validHolylandSquares = new HashSet<string>(
+            HolyParser.HolyLogParser.validSquares.Select(s => s.Replace("-", string.Empty).ToUpperInvariant()),
+            StringComparer.OrdinalIgnoreCase);
+
+        // Validates the operator's own Holyland square against the official list. Blank is fine (only
+        // Israeli 4X/4Z stations send a square). Only user edits fire this — programmatic changes don't.
+        private void TB_MyHolyland_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
+        {
+            if (TB_MyHolyland == null || _fieldWarningOpen)
+                return;
+
+            string typed = (TB_MyHolyland.Text ?? string.Empty).Trim().ToUpperInvariant();
+            if (string.IsNullOrEmpty(typed))
+                return;
+
+            string normalized = typed.Replace("-", string.Empty).Replace(" ", string.Empty);
+            if (!_validHolylandSquares.Contains(normalized))
+            {
+                e.Handled = true;
+                WarnInvalidField(TB_MyHolyland,
+                    "\"" + typed + "\" is not a valid Holyland square.\n\nA square is a letter + 2 digits + a 2-letter region (e.g. K07YZ). It must be one of the official Holyland squares — see https://tools.iarc.org/holysquare/",
+                    "Invalid Holyland Square");
+            }
+        }
+
+        // Guards field-validation warnings against re-entrancy. HolyMessageBox is modal, so opening it
+        // pulls keyboard focus off the field and fires PreviewLostKeyboardFocus AGAIN — without this
+        // guard that stacked dialogs endlessly (looked like a freeze). The dialog is deferred until the
+        // current focus change settles, then focus is returned to the field for correction.
+        private bool _fieldWarningOpen;
+        private void WarnInvalidField(System.Windows.Controls.TextBox box, string message, string title)
+        {
+            _fieldWarningOpen = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { HolyMessageBox.ShowWarning(message, title, this); }
+                finally { _fieldWarningOpen = false; }
+                if (box != null) { box.Focus(); box.SelectAll(); }
+            }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
         private void TB_MyLocator_PreviewLostKeyboardFocus(object sender, KeyboardFocusChangedEventArgs e)
         {
-            if (TB_MyLocator == null)
+            if (TB_MyLocator == null || _fieldWarningOpen)
                 return;
 
             string locator = (TB_MyLocator.Text ?? string.Empty).Trim().ToUpperInvariant();
@@ -7310,9 +7363,9 @@ namespace HolyLogger
             if (!MaidenheadLocator.IsValidLocator(locator))
             {
                 e.Handled = true;
-                HolyMessageBox.ShowWarning("\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72), optionally followed by 2 letters (e.g. KM72OR). The first pair is A–R, the 5th/6th characters are letters A–X (e.g. O), not zeros (0).", "Invalid My Locator", this);
-                TB_MyLocator.Focus();
-                TB_MyLocator.SelectAll();
+                WarnInvalidField(TB_MyLocator,
+                    "\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72), optionally followed by 2 letters (e.g. KM72OR). The first pair is A–R, the 5th/6th characters are letters A–X (e.g. O), not zeros (0).",
+                    "Invalid My Locator");
             }
         }
 
