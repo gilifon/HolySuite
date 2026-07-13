@@ -2268,5 +2268,17 @@ namespace HolyLogger.Properties {
                 this["ClusterNewCountrySound"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ClusterLatestPerCallsign {
+            get {
+                return ((bool)(this["ClusterLatestPerCallsign"]));
+            }
+            set {
+                this["ClusterLatestPerCallsign"] = value;
+            }
+        }
     }
 }

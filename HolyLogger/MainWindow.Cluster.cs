@@ -90,6 +90,11 @@ namespace HolyLogger
         // current radio frequency sits on a fixed center line, and manual scroll/sort are locked.
         bool clusterLiveScaleOn = false;
         Button clusterLiveScaleBtn = null;
+
+        // "Latest report" toggle: when on, the list keeps only the newest spot per callsign+band
+        // (collapsing repeated spots of the same station); off shows every spot in the time window.
+        bool clusterLatestPerCallsignOn = Properties.Settings.Default.ClusterLatestPerCallsign;
+        Button clusterLatestBtn = null;
         FrameworkElement clusterCenterLine = null;    // overlay that hosts the reference line (fills the table area)
         Grid clusterCenterLineBand = null;            // the movable strip (line + readout) positioned at the rows-area center
         TextBlock clusterCenterLineFreqText = null;   // live VFO frequency shown on the line
@@ -1278,6 +1283,34 @@ namespace HolyLogger
             clusterBandSelectorPanel = bandSelectorPanel;
 
             undoButton.VerticalAlignment = VerticalAlignment.Center;
+            undoButton.HorizontalAlignment = HorizontalAlignment.Center;
+
+            // "Latest" toggle sits directly UNDER the undo icon, at the per-band counter row level.
+            var btnLatest = new Button
+            {
+                Content = "Latest",
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 2, 0, 0),
+                Padding = new Thickness(6, 0, 6, 0),
+                Style = MakeClusterBandFilterBtnStyle(clusterLatestPerCallsignOn),
+                ToolTip = "Latest report per callsign: show only the newest spot for each callsign on each band, collapsing repeats. Off = every spot within the \"Last N min\" window."
+            };
+            clusterLatestBtn = btnLatest;
+            btnLatest.Click += (s, e) => ToggleClusterLatestPerCallsign();
+
+            // Undo icon on top (at the band-checkbox level), Latest toggle beneath it so it lands on
+            // the per-band counter row. Top-aligned so the pair tracks the band cells, not the row center.
+            undoButton.Margin = new Thickness(0, 0, 0, 0);   // was bottom 8; removed so Latest sits at the counter row
+            var undoColumn = new StackPanel
+            {
+                Orientation = Orientation.Vertical,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(2, 0, 0, 0)
+            };
+            undoColumn.Children.Add(undoButton);
+            undoColumn.Children.Add(btnLatest);
+
             var bandRow = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
@@ -1288,7 +1321,7 @@ namespace HolyLogger
                 Margin = new Thickness(0, -9, 0, 6)
             };
             bandRow.Children.Add(bandSelectorPanel);
-            bandRow.Children.Add(undoButton);
+            bandRow.Children.Add(undoColumn);
 
             // Left block: band row on top, then the legend block (lines + counter) — both start at
             // the same left edge, so the bands are left-justified with the New Country legend.
@@ -1579,7 +1612,8 @@ namespace HolyLogger
             {
                 Content = "Live Scale",
                 HorizontalAlignment = HorizontalAlignment.Left,
-                Margin = new Thickness(12, 2, 2, 4),
+                // left margin 4 (same as Selected/All Bands) so its gap matches the others
+                Margin = new Thickness(4, 2, 2, 4),
                 Style = MakeClusterBandFilterBtnStyle(clusterLiveScaleOn),
                 ToolTip = "Live frequency scale: the list scrolls so your current radio frequency stays on the center line, so you can see at a glance which way to turn the knob to reach a spot. Turns on Active band + frequency sort."
             };
@@ -1622,6 +1656,13 @@ namespace HolyLogger
 
         private void ApplyClusterBandFilterMode(string newMode, bool userInitiated = false)
         {
+            // Live Scale forces the Active-band view; choosing "Selected" or "All Bands" is incompatible
+            // with it, so a user click on those must first disengage Live Scale (Active Band is exempt —
+            // it IS Live Scale's band mode). Only on a real click; the internal restore call that turns
+            // Live Scale off passes userInitiated: false and must not recurse here.
+            if (userInitiated && clusterLiveScaleOn && !string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase))
+                ToggleClusterLiveScale(userInitiated: false);
+
             Properties.Settings.Default.ClusterBandFilterMode = newMode;
             Properties.Settings.Default.ClusterUseActiveBand = string.Equals(newMode, "Active", StringComparison.OrdinalIgnoreCase);
             // Only an explicit user click records the *preferred* mode. Automatic fallbacks
@@ -1718,6 +1759,26 @@ namespace HolyLogger
             double top = Math.Max(0, centerY - clusterCenterLineBand.Height / 2.0);
             if (Math.Abs(clusterCenterLineBand.Margin.Top - top) > 0.5)
                 clusterCenterLineBand.Margin = new Thickness(0, top, 0, 0);
+        }
+
+        // Toggles the "Latest report per callsign+band" view (remembered across sessions) and refreshes.
+        private void ToggleClusterLatestPerCallsign()
+        {
+            clusterLatestPerCallsignOn = !clusterLatestPerCallsignOn;
+            Properties.Settings.Default.ClusterLatestPerCallsign = clusterLatestPerCallsignOn;
+            try { Properties.Settings.Default.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (clusterLatestBtn != null)
+                clusterLatestBtn.Style = MakeClusterBandFilterBtnStyle(clusterLatestPerCallsignOn);
+            RefreshClusterVisibleSpots();
+
+            // The toggle rebuilds the ENTIRE row set at once, so under Live Scale every row has to
+            // re-layout before the scroll engine can measure a row height. Reset its retry budget and
+            // re-align after layout, or it parks on the blank top spacer (looks like "no spots").
+            if (clusterLiveScaleOn)
+            {
+                clusterLiveScaleAlignRetries = 0;
+                Dispatcher.BeginInvoke(new Action(UpdateClusterLiveScale), System.Windows.Threading.DispatcherPriority.Background);
+            }
         }
 
         // Toggles Live Scale on/off: engages Active band + frequency sort (highest at top), shows the
@@ -2030,9 +2091,9 @@ namespace HolyLogger
             // UpdateClusterActiveBandIndicatorPosition). The dropdown itself stays attached to UTC.
             clusterSpotCountBadge = new Border
             {
-                Width = 34,
-                Height = 34,
-                CornerRadius = new CornerRadius(17),
+                Width = 30,
+                Height = 30,
+                CornerRadius = new CornerRadius(15),
                 BorderBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)),
                 BorderThickness = new Thickness(2),
                 Background = Brushes.Transparent,
@@ -3556,11 +3617,25 @@ namespace HolyLogger
                 return;
             }
 
-            var filtered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
-                                          .Where(s => s.UnixTime > 0 && s.UnixTime >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
-                                          .OrderByDescending(s => s.UnixTime)
-                                          .Take(500)
-                                          .ToList();
+            var ordered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
+                                         .Where(s => s.UnixTime > 0 && s.UnixTime >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
+                                         .OrderByDescending(s => s.UnixTime);
+
+            List<ClusterSpotViewItem> filtered;
+            if (clusterLatestPerCallsignOn)
+            {
+                // Keep only the newest spot for each callsign+band. Source is newest-first, so the
+                // first item seen for a (call|band) key is the one to keep.
+                filtered = ordered
+                    .GroupBy(s => (s.DXCallsign ?? string.Empty).Trim().ToUpperInvariant() + "|" + NormalizeClusterBandKey(s.BandText))
+                    .Select(g => g.First())
+                    .Take(500)
+                    .ToList();
+            }
+            else
+            {
+                filtered = ordered.Take(500).ToList();
+            }
 
             foreach (var item in filtered)
             {
