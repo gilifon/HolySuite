@@ -1079,9 +1079,9 @@ namespace HolyLogger
             modeTemplate.VisualTree = modeTextFactory;
             var modeColumn = new DataGridTemplateColumn { Header = "Mode", HeaderStyle = modeHeaderStyle, CellTemplate = modeTemplate, Width = DataGridLength.Auto };
 
-            // Comment column
+            // Comment column (auto-width, so a centered header drifts with the widest comment — keep it left)
             var commentHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);
-            commentHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Center));
+            commentHeaderStyle.Setters.Add(new Setter(Control.HorizontalContentAlignmentProperty, HorizontalAlignment.Left));
             var commentColumn = new DataGridTextColumn { Header = "Comment", HeaderStyle = commentHeaderStyle, Binding = new System.Windows.Data.Binding("Comment"), MinWidth = 60, Width = DataGridLength.Auto };
 
             // Flag column
