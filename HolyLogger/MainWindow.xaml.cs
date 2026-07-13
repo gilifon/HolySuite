@@ -7310,7 +7310,7 @@ namespace HolyLogger
             if (!MaidenheadLocator.IsValidLocator(locator))
             {
                 e.Handled = true;
-                HolyMessageBox.ShowWarning("\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72), optionally followed by 2 letters (e.g. KM72OR). Note: the 5th/6th characters are letters (O), not zeros (0).", "Invalid My Locator", this);
+                HolyMessageBox.ShowWarning("\"" + locator + "\" is not a valid grid square.\n\nUse 2 letters + 2 digits (e.g. KM72), optionally followed by 2 letters (e.g. KM72OR). The first pair is A–R, the 5th/6th characters are letters A–X (e.g. O), not zeros (0).", "Invalid My Locator", this);
                 TB_MyLocator.Focus();
                 TB_MyLocator.SelectAll();
             }
