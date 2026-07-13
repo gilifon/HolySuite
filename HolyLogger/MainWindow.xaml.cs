@@ -1279,6 +1279,11 @@ namespace HolyLogger
             TB_Operator.IsReadOnly = Properties.Settings.Default.isLocked;
             //TB_MyGrid.IsEnabled = !Properties.Settings.Default.isLocked;
             setLockBtnState();
+
+            // Locking approves the callsign as typed, so it must pass the same identity guard as
+            // leaving the box (this image click doesn't move focus, so LostFocus won't run it).
+            if (Properties.Settings.Default.isLocked)
+                CommitStationCallsignEdit();
         }
 
         private void setLockBtnState()
@@ -7036,6 +7041,10 @@ namespace HolyLogger
         private void TB_MyCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
             if (TB_MyLocator == null || TB_MyCallsign == null) return;
+            // While the DX box is locked ("Select Log"), re-check on every keystroke so typing the
+            // log's callsign back unlocks immediately — LostFocus alone is unreliable (clicking a
+            // non-focusable element never fires it).
+            if (_callsignLocked) RefreshCallsignLockState();
             RestartHeartbeatTimer();
             //TB_MyLocator.Text = rem.GetDXCC(TB_MyCallsign.Text).Locator;
             if (signboard != null)
@@ -7058,6 +7067,15 @@ namespace HolyLogger
 
         private void TB_MyCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
+            CommitStationCallsignEdit();
+        }
+
+        // Runs the station-callsign change guard on a committed edit. Called on focus leave AND from
+        // the lock button: locking approves whatever is typed, and the lock is a plain image whose
+        // click never moves keyboard focus, so LostFocus alone would let a mismatched callsign be
+        // locked in without ever being checked against the active log's identity.
+        private void CommitStationCallsignEdit()
+        {
             string now = TB_MyCallsign.Text?.Trim();
             if (string.IsNullOrEmpty(now)) return;
             if (string.Equals(now, _callsignOnFocus, StringComparison.OrdinalIgnoreCase)) return;
@@ -7068,6 +7086,10 @@ namespace HolyLogger
             // and send the user to the Log Manager to open or create a log for this callsign. (The
             // operator may vary within one log -- multi-op -- so only the callsign is enforced.)
             if (HandleStationCallsignChange(now)) return;   // mismatch handled -> skip the services alert
+
+            // The callsign agrees with the active log again (e.g. a mismatch was typed and then
+            // reverted) -> clear a leftover "Select Log" lock.
+            RefreshCallsignLockState();
 
             ShowStationCallsignServicesAlert(now);
         }
@@ -7089,7 +7111,7 @@ namespace HolyLogger
             if (dal == null || state != State.New) return false;   // only guard while logging new QSOs
             string idCall = ActiveLogIdentityCallsign();
             if (idCall.Length == 0) return false;                  // log has no identity yet -> this call becomes it
-            if (string.Equals(idCall, now, StringComparison.OrdinalIgnoreCase)) return false;  // matches -> fine
+            if (CallsignIdentity.Same(idCall, now)) return false;  // same identity (stroke suffixes ignored) -> fine
 
             SetCallsignLocked(true, now);   // block DX entry until a log for this callsign is set
             bool open = HolyMessageBox.ShowConfirm(
@@ -7152,19 +7174,20 @@ namespace HolyLogger
             string idCall = ActiveLogIdentityCallsign();
             string boxCall = (TB_MyCallsign.Text ?? string.Empty).Trim();
             bool mismatch = idCall.Length > 0 && boxCall.Length > 0
-                            && !string.Equals(idCall, boxCall, StringComparison.OrdinalIgnoreCase);
+                            && !CallsignIdentity.Same(idCall, boxCall);
             SetCallsignLocked(mismatch, boxCall);
         }
 
         // Keeps the callsign box in step with the active log: switching to a log shows that log's
         // identity callsign. Empty logs (no identity) keep whatever is typed -- it becomes their
-        // identity on the first QSO. Call after the active log changes.
+        // identity on the first QSO. A stroke variant of the identity (4Z5SL/M for a 4Z5SL log)
+        // is the same identity, so it stays as typed. Call after the active log changes.
         private void SyncCallsignToActiveLog()
         {
             if (dal == null || TB_MyCallsign == null) return;
             string idCall = ActiveLogIdentityCallsign();
             if (idCall.Length > 0 &&
-                !string.Equals(idCall, (TB_MyCallsign.Text ?? string.Empty).Trim(), StringComparison.OrdinalIgnoreCase))
+                !CallsignIdentity.Same(idCall, (TB_MyCallsign.Text ?? string.Empty).Trim()))
             {
                 TB_MyCallsign.Text = idCall;    // updates the box + the my_callsign setting
                 _callsignOnFocus = idCall;

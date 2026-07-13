@@ -216,7 +216,7 @@ namespace HolyLogger
                         // or operator, the user must knowingly approve mixing those QSOs in (any that don't
                         // match the log's identity won't be copied to a copy-target).
                         dal.GetLogIdentity(dal.ActiveLogId, out string idCall, out string idOp);
-                        bool callDiff = adifCalls.Any(c => !string.Equals(c, idCall, System.StringComparison.OrdinalIgnoreCase));
+                        bool callDiff = adifCalls.Any(c => !CallsignIdentity.Same(c, idCall));
                         bool opDiff = adifOps.Any(o => !string.Equals(o, idOp, System.StringComparison.OrdinalIgnoreCase));
                         if (callDiff || opDiff)
                         {
@@ -556,7 +556,7 @@ namespace HolyLogger
                             .Distinct(StringComparer.OrdinalIgnoreCase)
                             .ToList();
 
-                        bool differentCall = fileCalls.Any(c => !string.Equals(c, myCallsign.Trim(), StringComparison.OrdinalIgnoreCase));
+                        bool differentCall = fileCalls.Any(c => !CallsignIdentity.Same(c, myCallsign));
                         if (differentCall)
                         {
                             string fileName = System.IO.Path.GetFileName(filename);

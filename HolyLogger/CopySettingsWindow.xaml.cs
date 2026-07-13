@@ -31,7 +31,7 @@ namespace HolyLogger
             {
                 items.AddRange(dal.GetLogs().Where(l =>
                     l.Id != logId && string.IsNullOrEmpty(l.EventType) &&
-                    string.Equals((l.Callsign ?? string.Empty).Trim(), callsign, StringComparison.OrdinalIgnoreCase) &&
+                    CallsignIdentity.Same(l.Callsign, callsign) &&
                     string.Equals((l.Operator ?? string.Empty).Trim(), opr, StringComparison.OrdinalIgnoreCase)));
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }

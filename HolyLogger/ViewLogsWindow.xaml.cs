@@ -71,8 +71,7 @@ namespace HolyLogger
             var nameById = allLogs.ToDictionary(l => l.Id, l => l.Name);
             var logs = allLogs.AsEnumerable();
             if (_filterCallsign.Length > 0)
-                logs = logs.Where(l => string.Equals((l.Callsign ?? string.Empty).Trim(),
-                                                     _filterCallsign, StringComparison.OrdinalIgnoreCase));
+                logs = logs.Where(l => CallsignIdentity.Same(l.Callsign, _filterCallsign));
             var rows = new List<Row>();
             int n = 1;
             foreach (var li in logs)

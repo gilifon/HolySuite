@@ -360,8 +360,9 @@ Environment.NewLine +
                             }
                     }
                     // Identity filter: BOTH station callsign AND operator must match the target log's identity.
+                    // Callsigns match per CallsignIdentity: stroke suffixes (/M, /2, ...) don't matter.
                     if (string.IsNullOrWhiteSpace(tcall) || string.IsNullOrWhiteSpace(toper)) return 0;
-                    if (!string.Equals((qso.MyCall ?? string.Empty).Trim(), tcall.Trim(), StringComparison.OrdinalIgnoreCase)) return 0;
+                    if (!CallsignIdentity.Same(qso.MyCall, tcall)) return 0;
                     if (!string.Equals((qso.Operator ?? string.Empty).Trim(), toper.Trim(), StringComparison.OrdinalIgnoreCase)) return 0;
 
                     // Duplicate check in the target log (same worked call + band + mode + date + time).
@@ -1156,7 +1157,8 @@ Environment.NewLine +
         }
 
         // Full create: also stores the log's identity (station callsign + operator) and an optional
-        // copy-target (another log this one's new QSOs are mirrored into).
+        // copy-target (another log this one's new QSOs are mirrored into). The identity callsign is
+        // stored in its base form (4Z5SL/M -> 4Z5SL): stroke variants are one identity.
         public long CreateLog(string name, string eventType, string callsign, string opr, long? copyTargetLogId)
         {
             lock (_dbLock)
@@ -1166,7 +1168,7 @@ Environment.NewLine +
                     cmd.Parameters.Add(new SQLiteParameter(null, name));
                     cmd.Parameters.Add(new SQLiteParameter(null, eventType ?? string.Empty));
                     cmd.Parameters.Add(new SQLiteParameter(null, DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss")));
-                    cmd.Parameters.Add(new SQLiteParameter(null, (object)(callsign ?? string.Empty)));
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)CallsignIdentity.Base(callsign)));
                     cmd.Parameters.Add(new SQLiteParameter(null, (object)(opr ?? string.Empty)));
                     cmd.Parameters.Add(new SQLiteParameter(null, copyTargetLogId.HasValue ? (object)copyTargetLogId.Value : DBNull.Value));
                     cmd.ExecuteNonQuery();
@@ -1197,6 +1199,7 @@ Environment.NewLine +
         }
 
         // Sets a log's identity ONCE. A log's identity is permanent: if it already has one this is a no-op.
+        // The identity callsign is stored in its base form (4Z5SL/M -> 4Z5SL): stroke variants are one identity.
         public void SetLogIdentity(long logId, string callsign, string opr)
         {
             lock (_dbLock)
@@ -1214,7 +1217,7 @@ Environment.NewLine +
                 }
                 using (var cmd = new SQLiteCommand("UPDATE logs SET log_callsign = ?, log_operator = ? WHERE Id = ?", con))
                 {
-                    cmd.Parameters.Add(new SQLiteParameter(null, (object)((callsign ?? string.Empty).Trim())));
+                    cmd.Parameters.Add(new SQLiteParameter(null, (object)CallsignIdentity.Base(callsign)));
                     cmd.Parameters.Add(new SQLiteParameter(null, (object)((opr ?? string.Empty).Trim())));
                     cmd.Parameters.Add(new SQLiteParameter(null, logId));
                     cmd.ExecuteNonQuery();
@@ -1249,7 +1252,22 @@ Environment.NewLine +
                         }
                 }
             }
-            return list;
+
+            // Collapse stroke variants into one identity (4Z5SL + 4Z5SL/M -> 4Z5SL): the candidate
+            // offered/stored is the base form, with the variants' counts combined.
+            var merged = new List<LogIdentityCandidate>();
+            foreach (var cand in list)
+            {
+                string baseCall = CallsignIdentity.Base(cand.Callsign);
+                var hit = merged.FirstOrDefault(m =>
+                    string.Equals(m.Callsign, baseCall, StringComparison.OrdinalIgnoreCase) &&
+                    string.Equals(m.Operator, cand.Operator, StringComparison.OrdinalIgnoreCase));
+                if (hit == null)
+                    merged.Add(new LogIdentityCandidate { Callsign = baseCall, Operator = cand.Operator, Count = cand.Count });
+                else
+                    hit.Count += cand.Count;
+            }
+            return merged.OrderByDescending(m => m.Count).ToList();
         }
 
         // A log's copy-target, or null if it doesn't copy. Used on QSO insert and for the live indicator.
@@ -2521,5 +2539,38 @@ Environment.NewLine +
         public string Operator { get; set; }
         public int Count { get; set; }
         public string Display => Callsign + " / " + Operator + "   (" + Count.ToString("N0") + " QSOs)";
+    }
+
+    // Station-callsign comparison for log identity. A stroke ADDED AFTER the call does not change the
+    // station's identity: 4Z5SL, 4Z5SL/M, 4Z5SL/2 and 4Z5SL/P are all the same station. A stroke BEFORE
+    // the call is a different station: 4X/OK1DL is OK1DL operating from Israel, not the same station
+    // callsign as OK1DL at home — so a leading country prefix stays part of the identity.
+    // (Not the same as Services.getBareCallsign, which strips the leading prefix too.)
+    public static class CallsignIdentity
+    {
+        // A complete amateur callsign (prefix letters/digits + digit + suffix ending in a letter),
+        // as opposed to a stroke modifier (M, P, QRP, 2, ...) or a bare country prefix (4X, OK, ...).
+        static readonly System.Text.RegularExpressions.Regex FullCall =
+            new System.Text.RegularExpressions.Regex("^[A-Za-z0-9]{1,3}[0-9][A-Za-z0-9]{0,3}[A-Za-z]$",
+                System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        // The identity base form: everything up to and including the first full-callsign segment;
+        // whatever follows is a stroke modifier and is dropped. "4Z5SL/M" -> "4Z5SL",
+        // "4X/OK1DL/P" -> "4X/OK1DL", "OK1DL" -> "OK1DL". Shapes with no recognizable full
+        // callsign compare as typed.
+        public static string Base(string callsign)
+        {
+            string s = (callsign ?? string.Empty).Trim();
+            if (s.IndexOf('/') < 0) return s;
+            string[] parts = s.Split('/');
+            for (int i = 0; i < parts.Length; i++)
+                if (FullCall.IsMatch(parts[i]))
+                    return string.Join("/", parts, 0, i + 1);
+            return s;
+        }
+
+        // True when two station callsigns are the same log identity.
+        public static bool Same(string a, string b)
+            => string.Equals(Base(a), Base(b), StringComparison.OrdinalIgnoreCase);
     }
 }
