@@ -2673,6 +2673,13 @@ namespace HolyLogger
         // double-send the same QSO.
         private readonly System.Threading.SemaphoreSlim _qrzPumpLock = new System.Threading.SemaphoreSlim(1, 1);
 
+        // The distinct rejection reasons QRZ gave during the last manual queue upload, so a failed run
+        // can tell the user WHY (duplicate, wrong callsign for the logbook, no subscription, ...) instead
+        // of a generic "check your connection". Set by PumpQrzQueue, read by the menu handler.
+        private readonly System.Collections.Generic.HashSet<string> _lastQrzFailReasons =
+            new System.Collections.Generic.HashSet<string>(System.StringComparer.OrdinalIgnoreCase);
+        private bool _lastQrzHadNetworkError;
+
         // True when the QRZ Logbook real-time push is switched on and an API key is present.
         private static bool QrzPushEnabled
         {
@@ -3008,28 +3015,20 @@ namespace HolyLogger
             }
 
             UploadQueueToClublogMenuItem.IsEnabled = false;
-            var prevCursor = System.Windows.Input.Mouse.OverrideCursor;
-            System.Windows.Input.Mouse.OverrideCursor = System.Windows.Input.Cursors.Wait;
+            this.IsEnabled = false;   // owned progress window stays live
+            var progressWindow = new UploadProgressWindow { Owner = this };
+            progressWindow.Show();
             try
             {
-                await PumpClublogQueue(force: true);
-                int after = dal?.GetPendingClublogCount() ?? 0;
-                int uploaded = before - after;
+                // force: explicit "upload now" click. Progress window shows a ✓/✗ row per QSO.
+                await PumpClublogQueue(force: true, progressWindow);
+                progressWindow.ShowComplete();
                 UpdateClublogMenuCount();
-
-                if (uploaded > 0)
-                    HolyMessageBox.ShowSuccess(
-                        $"{uploaded} QSO{(uploaded == 1 ? "" : "s")} uploaded to Club Log successfully." +
-                        (after > 0 ? $"\n{after} QSO{(after == 1 ? "" : "s")} could not be uploaded (network error, rejected, or bad credentials)." : ""),
-                        "Club Log", this);
-                else
-                    HolyMessageBox.ShowWarning(
-                        "No QSOs were uploaded.\nCheck your internet connection and your Club Log e-mail/password in Options → Club Log Service.",
-                        "Club Log", this);
+                await progressWindow.WaitForOkAsync();
             }
             finally
             {
-                System.Windows.Input.Mouse.OverrideCursor = prevCursor;
+                this.IsEnabled = true;
                 UploadQueueToClublogMenuItem.IsEnabled = true;
             }
         }

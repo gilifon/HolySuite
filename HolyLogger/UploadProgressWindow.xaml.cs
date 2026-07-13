@@ -122,6 +122,21 @@ namespace HolyLogger
             ScrollToEnd();
         }
 
+        // Adds a neutral informational note (e.g. a service's rejection reason). Doesn't affect the
+        // success/failure counters. Gray so it reads on both light and dark themes.
+        public void AddNote(string text)
+        {
+            LogPanel.Children.Add(new TextBlock
+            {
+                Text = text,
+                FontSize = 12.5,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(6, 4, 0, 2)
+            });
+            ScrollToEnd();
+        }
+
         // Hides the progress spinner and shows the summary + OK button. Call after all uploads finish.
         public void ShowComplete()
         {

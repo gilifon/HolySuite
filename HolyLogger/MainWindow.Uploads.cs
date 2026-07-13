@@ -264,6 +264,8 @@ namespace HolyLogger
                 {
                     string key = Properties.Settings.Default.qrz_api_key.Trim();
                     System.Collections.Generic.List<QSO> pending = dal.GetPendingQrzQsos();
+                    _lastQrzFailReasons.Clear();
+                    _lastQrzHadNetworkError = false;
 
                     if (progressWindow != null)
                     {
@@ -278,7 +280,10 @@ namespace HolyLogger
                         QrzLogbookResult r = await QrzLogbookService.InsertAsync(key, BuildQrzAdif(qso));
 
                         if (r.NetworkError)
+                        {
+                            _lastQrzHadNetworkError = true;
                             break;   // offline -> stop; the rest stays pending for next time
+                        }
 
                         if (r.Ok)
                         {
@@ -288,7 +293,10 @@ namespace HolyLogger
                         else if (r.IsPermanentFailure)
                         {
                             // Rejected by QRZ -> keep the QSO pending (stays in the queue) and report
-                            // it as not-sent for this run. Only a confirmed upload clears it.
+                            // it as not-sent for this run. Only a confirmed upload clears it. Remember
+                            // WHY so the caller can tell the user (duplicate, wrong call, ...).
+                            if (!string.IsNullOrWhiteSpace(r.Reason))
+                                _lastQrzFailReasons.Add(r.Reason.Trim());
                             progressWindow?.ReportQso(qso.DXCall, qso.Band, qso.Mode, false);
                         }
                     }
@@ -332,9 +340,34 @@ namespace HolyLogger
                 _eqslQueueWindow.RefreshList();
         }
 
-        private void SendQueueToEqslMenuItem_Click(object sender, RoutedEventArgs e)
+        private async void SendQueueToEqslMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            ShowEqslQueueWindow();
+            int before = dal?.GetPendingEqslCount() ?? 0;
+            if (before == 0)
+            {
+                HolyMessageBox.Show("The eQSL queue is empty. Nothing to upload.\n\n(Only QSOs whose station callsign has an eQSL account are queued.)",
+                    "eQSL", HolyMsgType.Info, this);
+                return;
+            }
+
+            SendQueueToEqslMenuItem.IsEnabled = false;
+            this.IsEnabled = false;   // owned progress window stays live
+            var progressWindow = new UploadProgressWindow { Owner = this };
+            progressWindow.Show();
+            try
+            {
+                // Progress window shows a ✓/✗ row per QSO. (eQSL has no auto-push gate; force only
+                // sets the longer lock-wait so a concurrent pump doesn't make this silently skip.)
+                await PumpEqslQueue(force: true, progressWindow);
+                progressWindow.ShowComplete();
+                UpdateEqslQueueIndicator();
+                await progressWindow.WaitForOkAsync();
+            }
+            finally
+            {
+                this.IsEnabled = true;
+                SendQueueToEqslMenuItem.IsEnabled = true;
+            }
         }
 
         private void UpdateLotwMenuCount()
@@ -371,25 +404,30 @@ namespace HolyLogger
             }
 
             UploadQueueToQrzMenuItem.IsEnabled = false;
+            this.IsEnabled = false;   // block the main window while the upload runs (owned progress window stays live)
+            var progressWindow = new UploadProgressWindow { Owner = this };
+            progressWindow.Show();
             try
             {
-                await PumpQrzQueue();
-                int after = dal?.GetPendingQrzCount() ?? 0;
-                int uploaded = before - after;
-                UpdateQrzMenuCount();
+                // force: this is an explicit "upload now" click, so run even when the auto-push
+                // checkbox is off (QrzPushEnabled == false). Without force the pump silently no-ops.
+                // The progress window shows a ✓/✗ row per QSO as each one is sent.
+                await PumpQrzQueue(force: true, progressWindow);
 
-                if (uploaded > 0)
-                    HolyMessageBox.ShowSuccess(
-                        $"{uploaded} QSO{(uploaded == 1 ? "" : "s")} uploaded to QRZ Logbook successfully." +
-                        (after > 0 ? $"\n{after} QSO{(after == 1 ? "" : "s")} could not be uploaded (network error or rejected)." : ""),
-                        "QRZ Logbook", this);
-                else
-                    HolyMessageBox.ShowWarning(
-                        "No QSOs were uploaded.\nCheck your internet connection and API key.",
-                        "QRZ Logbook", this);
+                // Per-QSO rows only show ✓/✗, so add QRZ's reason as a note when something failed.
+                if (_lastQrzHadNetworkError)
+                    progressWindow.AddNote("Could not reach QRZ.com — check your internet connection. Unsent QSOs stay in the queue.");
+                else if (_lastQrzFailReasons.Count > 0)
+                    progressWindow.AddNote("QRZ reason: " + string.Join("; ", _lastQrzFailReasons) +
+                        "   (\"duplicate\" = already in your logbook; \"wrong station_callsign\" = the QSO's call doesn't match this logbook's call.)");
+
+                progressWindow.ShowComplete();
+                UpdateQrzMenuCount();
+                await progressWindow.WaitForOkAsync();
             }
             finally
             {
+                this.IsEnabled = true;
                 UploadQueueToQrzMenuItem.IsEnabled = true;
             }
         }
@@ -484,8 +522,22 @@ namespace HolyLogger
                 return;
 
             SendQueueToLotwMenuItem.IsEnabled = false;
-            try { await UploadLotwQueueCoreAsync(pending, tqslPath, password); }
-            finally { SendQueueToLotwMenuItem.IsEnabled = true; }
+            this.IsEnabled = false;   // owned progress window stays live
+            var progressWindow = new UploadProgressWindow { Owner = this };
+            progressWindow.Show();
+            try
+            {
+                // LoTW signs each callsign group with TQSL as one batch, so the window shows a
+                // per-service summary line rather than per-QSO rows.
+                await UploadLotwQueueCoreAsync(pending, tqslPath, password, progressWindow);
+                progressWindow.ShowComplete();
+                await progressWindow.WaitForOkAsync();
+            }
+            finally
+            {
+                this.IsEnabled = true;
+                SendQueueToLotwMenuItem.IsEnabled = true;
+            }
         }
 
         // Core LoTW queue upload — writes the ADIF, signs+uploads via TQSL, clears the queue on
