@@ -194,6 +194,7 @@ namespace HolyLogger
             int tab = 9;
 
             TextBox rstr = AddContestCell("RST R", 52, tab++, ContestRxPanel);
+            _contestRstRcvdBox = rstr;
             rstr.Text = TB_RSTRcvd != null ? TB_RSTRcvd.Text : "59";
             rstr.TextChanged += (s, e2) => { if (TB_RSTRcvd != null) TB_RSTRcvd.Text = rstr.Text; };
 
@@ -243,6 +244,7 @@ namespace HolyLogger
         // Tracks the current received-field signature and the auto serial box so callsign changes can
         // rebuild the received frame, and Add can advance the serial, without a full re-render otherwise.
         private string _contestRxSig = string.Empty;
+        private TextBox _contestRstRcvdBox;   // the RST-R cell in ContestRxPanel (edit-highlight follows the form)
         private TextBox _contestSendSerialBox;
         private readonly List<TextBox> _contestSendBoxes = new List<TextBox>();
 
@@ -312,6 +314,13 @@ namespace HolyLogger
                 HorizontalContentAlignment = HorizontalAlignment.Center
             };
             if (tabIndex.HasValue) box.TabIndex = tabIndex.Value; else box.IsTabStop = false;
+            // Match the plain form: the received (tab-stop) exchange boxes highlight with the
+            // "Field being edited" color (EditFieldBg token, editable in the Color Scheme editor)
+            // while editing an existing QSO; otherwise the normal input surface. Send boxes are
+            // auto-filled, so they keep the plain surface.
+            box.Background = (state == State.Edit && tabIndex.HasValue)
+                ? ThemeManager.Brush("EditFieldBg")
+                : ThemeManager.Brush("ControlBg");
             col.Children.Add(box);
             target.Children.Add(col);
             return box;
@@ -384,7 +393,7 @@ namespace HolyLogger
                 case "CQ_ZONE": label = "CQ Zone"; width = 52; break;
                 case "ITU_ZONE": label = "ITU"; width = 48; break;
                 case "CONTINENT": label = "Cont"; width = 52; break;
-                case "HOLYLAND_AREA": label = "Area"; width = 72; break;
+                case "HOLYLAND_AREA": label = "Holyland Square"; width = 100; break;
                 case "STATE": case "STATE_PROVINCE": case "PROVINCE": label = "State/Prov"; width = 72; break;
                 case "NAME": label = "Name"; width = 90; break;
                 case "AGE": label = "Age"; width = 44; break;

@@ -4247,6 +4247,13 @@ namespace HolyLogger
                 TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
                 TB_RSTSent.Text = QsoToUpdate.RST_SENT;
                 TB_DX_Name.Text = QsoToUpdate.Name;
+
+                // In a contest the received exchange (RST-R + e.g. Holyland Square) lives in the
+                // ContestRxPanel boxes, not the now-hidden TB_RSTRcvd/TB_Exchange. Setting the DX
+                // callsign above was suppressed, so the received frame was NOT rebuilt for this QSO —
+                // do it now so the correct field shows, populated from the loaded values, and editable.
+                if (Contests.ContestService.Active != null)
+                    ApplyContestExchangeUI();
                 // Country/Continent are normally filled by the (now-suppressed) callsign lookup, so
                 // load the QSO's saved values directly into the bound properties, and show the
                 // country flag the same way the lookup does (falls back to the text label if there
@@ -4337,6 +4344,12 @@ namespace HolyLogger
             TB_Comment.Background = backgroundColor;
             TB_DXCC.Background = backgroundColor;
             CB_Mode.Background = backgroundColor;
+
+            // Contest mode replaces TB_RSTRcvd/TB_Exchange with the ContestRxPanel cells (RST-R +
+            // e.g. Holyland Square). Highlight/reset those the same way, so leaving edit mode clears
+            // their yellow like every other field.
+            if (_contestRstRcvdBox != null) _contestRstRcvdBox.Background = backgroundColor;
+            foreach (var b in _contestRxBoxes) b.Background = backgroundColor;
         }
         
         private bool Validate()
