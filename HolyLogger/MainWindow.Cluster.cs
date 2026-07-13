@@ -3533,6 +3533,23 @@ namespace HolyLogger
                 clusterActiveBandIndicatorText.Text = "out of band";
                 clusterActiveBandIndicatorText.Foreground = Brushes.Red;
             }
+
+            // Out of band only empties the list in Active-band mode (Live Scale forces Active). Tint the
+            // whole spots area red then, so it's obvious at a glance WHY the table is empty — not a bug.
+            UpdateClusterOutOfBandTint(isActive && display.Length == 0);
+        }
+
+        // Pale-red wash over the spots grid while out of band; otherwise the normal themed row bg.
+        private static readonly SolidColorBrush ClusterOutOfBandBrush =
+            new SolidColorBrush(Color.FromRgb(0xFF, 0xD6, 0xD6));
+
+        private void UpdateClusterOutOfBandTint(bool outOfBand)
+        {
+            if (clusterSpotsDataGrid == null) return;
+            if (outOfBand)
+                clusterSpotsDataGrid.Background = ClusterOutOfBandBrush;
+            else
+                clusterSpotsDataGrid.SetResourceReference(Control.BackgroundProperty, "GridRowBg");
         }
 
         private string FormatClusterBandDisplay(string bandText)
