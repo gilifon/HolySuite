@@ -72,6 +72,7 @@ namespace HolyLogger
         DateTime _clusterNewCountryBlinkStopTime;
         bool _clusterNewCountryBlinkOn = true;
         int _lastNewCountryCount = 0;
+        DateTime _lastNewCountryAlertUtc = DateTime.MinValue;   // throttles the new-country alert sound
         StackPanel clusterOnMyFreqLegendItem = null;
         FrameworkElement clusterLegendPanel = null;
         Canvas clusterHeaderCanvas = null;
@@ -3177,6 +3178,9 @@ namespace HolyLogger
                         clusterAllSpots.RemoveAt(clusterAllSpots.Count - 1);
                     }
 
+                    if (newItems.Any(ClusterSpotQualifiesForNewCountryAlert))
+                        PlayNewCountrySpotAlert();
+
                     RefreshClusterVisibleSpots();
                 }));
             }
@@ -3715,6 +3719,80 @@ namespace HolyLogger
                     StartNewCountryBlink();
                 _lastNewCountryCount = newCountry;
             }
+        }
+
+        // ── New-country spot sound alert ───────────────────────────────────────────────────────────
+        // A "New Country" spot can arrive invisibly: Live Scale narrows the table to the active band
+        // and sorts strictly by frequency (no top pin), so a rare one on another band — or far from
+        // the VFO — never catches the eye. The sound alert fires on ARRIVAL, judged against the
+        // user's OWN band/mode preferences (never Live Scale's temporary Active-band narrowing).
+
+        private bool ClusterSpotQualifiesForNewCountryAlert(ClusterSpotViewItem item)
+        {
+            if (item == null || !item.IsNeededCountry) return false;
+            if (!Properties.Settings.Default.ClusterNewCountrySoundOn) return false;
+            if (!IsClusterModeEnabled(item.Mode)) return false;
+
+            // Ignore stale spots (e.g. the backlog replayed on connect) outside the "Last N min" window.
+            if (item.UnixTime <= 0 ||
+                item.UnixTime < DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
+                return false;
+
+            // Band gate: the user's preference, not Live Scale's forced Active mode.
+            string mode = clusterLiveScaleOn
+                ? (clusterPreLiveScaleBandFilterMode ?? "PreSelected")
+                : (Properties.Settings.Default.ClusterBandFilterMode ?? "PreSelected");
+            if (string.Equals(mode, "All", StringComparison.OrdinalIgnoreCase)) return true;
+            string band = NormalizeClusterBandKey(item.BandText);
+            if (string.Equals(mode, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                string active = NormalizeClusterBandKey(TB_Band != null ? TB_Band.Text : string.Empty);
+                return !string.IsNullOrWhiteSpace(active) && string.Equals(active, band, StringComparison.OrdinalIgnoreCase);
+            }
+            return GetEnabledClusterBands().Contains(band);
+        }
+
+        // One ring per burst: a batch (or reconnect backlog) with several needed spots plays once.
+        private void PlayNewCountrySpotAlert()
+        {
+            var now = DateTime.UtcNow;
+            if ((now - _lastNewCountryAlertUtc).TotalSeconds < 3) return;
+            _lastNewCountryAlertUtc = now;
+            PlayClusterAlertSound(Properties.Settings.Default.ClusterNewCountrySound);
+        }
+
+        // Maps the sound name from Options → General to a sound: a *.wav name plays from
+        // C:\Windows\Media, anything else is one of the five system sounds. Also used by the
+        // options page's Test button, hence static.
+        static System.Media.SoundPlayer _clusterAlertWavPlayer;   // kept alive so playback isn't GC-cut
+
+        internal static void PlayClusterAlertSound(string name)
+        {
+            try
+            {
+                string n = (name ?? string.Empty).Trim();
+                if (n.EndsWith(".wav", StringComparison.OrdinalIgnoreCase))
+                {
+                    string path = System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media", n);
+                    if (System.IO.File.Exists(path))
+                    {
+                        _clusterAlertWavPlayer = new System.Media.SoundPlayer(path);
+                        _clusterAlertWavPlayer.Play();   // async; no blocking of the UI thread
+                        return;
+                    }
+                    // fall through to the default chime if the file vanished
+                }
+                switch (n)
+                {
+                    case "Beep": System.Media.SystemSounds.Beep.Play(); break;
+                    case "Exclamation": System.Media.SystemSounds.Exclamation.Play(); break;
+                    case "Question": System.Media.SystemSounds.Question.Play(); break;
+                    case "Critical": System.Media.SystemSounds.Hand.Play(); break;
+                    default: System.Media.SystemSounds.Asterisk.Play(); break;   // "Chime"
+                }
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         public bool GetClusterHoverPopupEnabled()

@@ -2244,5 +2244,29 @@ namespace HolyLogger.Properties {
                 this["CabrilloHeaderStore"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ClusterNewCountrySoundOn {
+            get {
+                return ((bool)(this["ClusterNewCountrySoundOn"]));
+            }
+            set {
+                this["ClusterNewCountrySoundOn"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Chime")]
+        public string ClusterNewCountrySound {
+            get {
+                return ((string)(this["ClusterNewCountrySound"]));
+            }
+            set {
+                this["ClusterNewCountrySound"] = value;
+            }
+        }
     }
 }

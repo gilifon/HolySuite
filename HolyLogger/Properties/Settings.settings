@@ -557,5 +557,11 @@
     <Setting Name="CabrilloHeaderStore" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="ClusterNewCountrySoundOn" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="ClusterNewCountrySound" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Chime</Value>
+    </Setting>
   </Settings>
 </SettingsFile>

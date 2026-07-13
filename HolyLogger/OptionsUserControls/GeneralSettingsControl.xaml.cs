@@ -57,10 +57,45 @@ namespace HolyLogger.OptionsUserControls
             }
         }
 
+        // Choices for the new-country spot alert: the five Windows system sounds (always available,
+        // no files) plus every .wav that ships in C:\Windows\Media (tada, chimes, Alarm01…, Ring01…).
+        // A name ending in .wav is played from that folder; the rest map to system sounds in
+        // MainWindow.PlayClusterAlertSound.
+        static readonly string[] NewCountrySoundOptions = { "Chime", "Beep", "Exclamation", "Question", "Critical" };
+
         public GeneralSettingsControl()
         {
             InitializeComponent();
+
+            var sounds = new List<string>(NewCountrySoundOptions);
+            try
+            {
+                string mediaDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media");
+                sounds.AddRange(Directory.GetFiles(mediaDir, "*.wav")
+                                         .Select(Path.GetFileName)
+                                         .OrderBy(n => n, StringComparer.OrdinalIgnoreCase));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }   // no Media folder -> system sounds only
+            CB_NewCountrySound.ItemsSource = sounds;
+            string saved = Properties.Settings.Default.ClusterNewCountrySound;
+            CB_NewCountrySound.SelectedItem = sounds.Contains(saved, StringComparer.OrdinalIgnoreCase)
+                ? sounds.First(n => string.Equals(n, saved, StringComparison.OrdinalIgnoreCase))
+                : "Chime";
+
             HasChanged = false;
+        }
+
+        private void CB_NewCountrySound_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CB_NewCountrySound.SelectedItem is string s)
+                Properties.Settings.Default.ClusterNewCountrySound = s;
+            HasChanged = true;
+        }
+
+        private void BTN_TestNewCountrySound_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            MainWindow.PlayClusterAlertSound(CB_NewCountrySound.SelectedItem as string);
         }
 
         private void CBX_EnableOmniRigCAT_Changed(object sender, RoutedEventArgs e)
