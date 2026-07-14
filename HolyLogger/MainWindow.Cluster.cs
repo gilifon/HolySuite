@@ -1959,6 +1959,11 @@ namespace HolyLogger
             double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out vfo);
             if (n <= 0 || vfo <= 0) return;
 
+            // Out of band: position the list as if the radio were sitting exactly on the nearest band
+            // edge, ignoring the real (out-of-band) frequency — so it parks stably at the edge.
+            if (IsClusterOutOfBand() && TryClusterNearestBandEdge(vfo, out double edgeMhz, out _))
+                vfo = edgeMhz;
+
             double rowH = 0;
             if (clusterSpotsDataGrid.ItemContainerGenerator.ContainerFromIndex(0) is DataGridRow r0 && r0.ActualHeight > 0)
                 rowH = r0.ActualHeight;
@@ -3581,14 +3586,54 @@ namespace HolyLogger
 
             if (string.Equals(mode, "Active", StringComparison.OrdinalIgnoreCase))
             {
-                string activeBand = TB_Band != null ? TB_Band.Text : string.Empty;
-                string active = NormalizeClusterBandKey(activeBand);
+                string active = NormalizeClusterBandKey(TB_Band != null ? TB_Band.Text : string.Empty);
+                // Out of band under Live Scale: keep showing the NEAREST band's spots (so the list can
+                // park at that band's edge) instead of emptying.
+                if (string.IsNullOrWhiteSpace(active) && clusterLiveScaleOn
+                    && TryClusterNearestBandEdge(ClusterVfoMhz(), out _, out string edgeBand))
+                    active = NormalizeClusterBandKey(edgeBand);
                 return !string.IsNullOrWhiteSpace(active) && string.Equals(active, normalized, StringComparison.OrdinalIgnoreCase);
             }
 
             // PreSelected
             var enabled = GetEnabledClusterBands();
             return enabled.Contains(normalized);
+        }
+
+        // The HF/6m band edges the program already recognizes (MHz), for parking Live Scale at the band
+        // edge when the radio tunes just out of a band.
+        private static readonly (double Lo, double Hi, string Band)[] ClusterBandLimits =
+        {
+            (1.8, 2.0, "160M"), (3.5, 4.0, "80M"), (5.0, 5.4, "60M"), (7.0, 7.3, "40M"),
+            (10.0, 10.15, "30M"), (14.0, 14.35, "20M"), (18.0, 18.168, "17M"), (21.0, 21.45, "15M"),
+            (24.89, 24.99, "12M"), (28.0, 29.7, "10M"), (50.0, 54.0, "6M")
+        };
+
+        // The current VFO in MHz (0 when unparseable).
+        private double ClusterVfoMhz()
+        {
+            double.TryParse((TB_Frequency != null ? (TB_Frequency.Text ?? string.Empty) : string.Empty).Trim(),
+                NumberStyles.Float, CultureInfo.InvariantCulture, out double v);
+            return v;
+        }
+
+        // True when the radio is outside every ham band (the frequency handler blanks TB_Band then).
+        private bool IsClusterOutOfBand()
+            => string.IsNullOrWhiteSpace(TB_Band != null ? TB_Band.Text : null);
+
+        // For an out-of-band VFO, the nearest band edge (MHz) and that band's name. false if vfo <= 0.
+        private bool TryClusterNearestBandEdge(double vfoMhz, out double edgeMhz, out string band)
+        {
+            edgeMhz = 0; band = null;
+            if (vfoMhz <= 0) return false;
+            double best = double.MaxValue;
+            foreach (var b in ClusterBandLimits)
+            {
+                double e = vfoMhz < b.Lo ? b.Lo : (vfoMhz > b.Hi ? b.Hi : vfoMhz);
+                double d = Math.Abs(vfoMhz - e);
+                if (d < best) { best = d; edgeMhz = e; band = b.Band; }
+            }
+            return band != null;
         }
 
         private HashSet<string> GetEnabledClusterModes()
@@ -3686,6 +3731,9 @@ namespace HolyLogger
             var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             if (clusterAllSpots != null)
             {
+                // When "Latest" is on the visible list keeps one row per callsign+band, so these
+                // per-band counters must match it — count DISTINCT callsigns per band, not every spot.
+                var seen = clusterLatestPerCallsignOn ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : null;
                 foreach (var s in clusterAllSpots)
                 {
                     if (s.UnixTime <= 0 || s.UnixTime < cutoff)
@@ -3694,6 +3742,9 @@ namespace HolyLogger
                         continue;
                     if (string.IsNullOrWhiteSpace(s.BandText))
                         continue;
+                    if (seen != null &&
+                        !seen.Add((s.DXCallsign ?? string.Empty).Trim().ToUpperInvariant() + "|" + s.BandText.Trim().ToUpperInvariant()))
+                        continue;   // already counted this callsign on this band
                     counts.TryGetValue(s.BandText, out int c);
                     counts[s.BandText] = c + 1;
                 }
