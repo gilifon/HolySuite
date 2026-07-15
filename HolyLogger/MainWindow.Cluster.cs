@@ -3387,6 +3387,8 @@ namespace HolyLogger
 
             const double toleranceKhz = 0.5; // 0.5 kHz tolerance
 
+            var onFreqSig = new System.Text.StringBuilder();     // which spots are on frequency right now
+            var onFreqCalls = new System.Text.StringBuilder();   // their callsigns, for the in-place map restyle
             foreach (var spot in clusterVisibleSpots)
             {
                 string spotFreqText = spot.FreqText?.Trim();
@@ -3404,10 +3406,29 @@ namespace HolyLogger
                 {
                     spot.IsOnFrequency = false;
                 }
+                if (spot.IsOnFrequency)
+                {
+                    onFreqSig.Append(spot.SpotKey).Append('|');
+                    onFreqCalls.Append((spot.DXCallsign ?? string.Empty).Trim()).Append(',');
+                }
+            }
+
+            // The map highlights on-frequency spots too (green ring). Restyle those dots IN PLACE
+            // (reusing the hover-highlight mechanism) only when the SET actually changed — never a
+            // full re-render, never per knob tick.
+            string sig = onFreqSig.ToString();
+            if (!string.Equals(sig, _lastMapOnFreqSig, StringComparison.Ordinal))
+            {
+                _lastMapOnFreqSig = sig;
+                if (MapControl != null && Properties.Settings.Default.ClusterMapEnabled)
+                    MapControl.SetOnFreqSpots(onFreqCalls.ToString().TrimEnd(','));
             }
 
             if (clusterLiveScaleOn) UpdateClusterLiveScale();
         }
+
+        // Signature of the spots last reported to the map as on-frequency (see above).
+        private string _lastMapOnFreqSig = string.Empty;
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
         private static readonly string[] ClusterModeOptions = new[] { "CW", "DIGI", "SSB", "FM", "FT8", "RTTY", "AM" };
@@ -3804,7 +3825,8 @@ namespace HolyLogger
                             Freq = freqMhz > 0 ? freqMhz.ToString("0.###", CultureInfo.InvariantCulture) : (spot.FreqText ?? string.Empty),
                             Mode = spot.Mode ?? string.Empty,
                             Color = GetBandColor(spot.BandText ?? string.Empty),
-                            Band = NormalizeClusterBandKey(spot.BandText)
+                            Band = NormalizeClusterBandKey(spot.BandText),
+                            IsOnFrequency = spot.IsOnFrequency
                         });
                     }
                 }

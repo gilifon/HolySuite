@@ -20,6 +20,7 @@ namespace HolyLogger.ToolsUserControls
         public string Mode;   // e.g. "CW"
         public string Color;  // e.g. "#DC2828"
         public string Band;   // e.g. "40"
+        public bool IsOnFrequency;   // spot is on the radio's current frequency -> highlighted dot
     }
 
     /// <summary>Exposes methods callable from JavaScript via window.external</summary>
@@ -238,11 +239,11 @@ namespace HolyLogger.ToolsUserControls
                         : "[" + s.SpotterLat.Value.ToString(ic) + "," + s.SpotterLon.Value.ToString(ic) + "]")
                     : "null";
                 if (isPolar)
-                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\"}}",
-                        s.Lon, s.Lat, spStr, callsign, freq, mode, color, band);
+                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\",\"of\":{8}}}",
+                        s.Lon, s.Lat, spStr, callsign, freq, mode, color, band, s.IsOnFrequency ? 1 : 0);
                 else
-                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\"}}",
-                        s.Lat, s.Lon, spStr, callsign, freq, mode, color, band);
+                    sb.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\",\"of\":{8}}}",
+                        s.Lat, s.Lon, spStr, callsign, freq, mode, color, band, s.IsOnFrequency ? 1 : 0);
             }
             sb.Append("]");
             try
@@ -267,6 +268,15 @@ namespace HolyLogger.ToolsUserControls
         {
             if (!_isClusterMode || !_clusterMapLoaded) return;
             try { MapBrowser.InvokeScript("clearSpotHighlight", new object[] { }); }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Marks the given callsigns' dots as on-frequency (light-green ring), restyling IN PLACE
+        // like the hover highlight — so tuning the radio never forces a full spot re-render.
+        public void SetOnFreqSpots(string callsignsCsv)
+        {
+            if (!_isClusterMode || !_clusterMapLoaded) return;
+            try { MapBrowser.InvokeScript("setOnFreqSpots", new object[] { callsignsCsv ?? string.Empty }); }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
@@ -354,8 +364,8 @@ namespace HolyLogger.ToolsUserControls
                 string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
                     ? "[" + s.SpotterLat.Value.ToString(ic) + "," + s.SpotterLon.Value.ToString(ic) + "]"
                     : "null";
-                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\"}}",
-                    s.Lat, s.Lon, spStr, callsign, freq, mode, color, band);
+                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\",\"of\":{8}}}",
+                    s.Lat, s.Lon, spStr, callsign, freq, mode, color, band, s.IsOnFrequency ? 1 : 0);
             }
             spotsJs.Append("]");
 
@@ -667,10 +677,12 @@ function renderSpots() {
             // Spotter dot (black)
             ref.spDot = L.circleMarker(sp.sp, { radius: 2, color: '#000000', fillColor: '#000000', fillOpacity: 1, weight: 0, interactive: false }).addTo(spotsLayer);
         }
-        // Band-colored DX dot with tooltip and click.
+        // Band-colored DX dot with tooltip and click. On-frequency spots (sp.of) get a light-green
+        // ring + bigger dot, matching the list's green 'On My Radio Freq' highlight.
         var dotColor = sp.k || '#FF6600';
         var m = L.circleMarker(sp.c, { radius: 5, color: dotColor, fillColor: dotColor, fillOpacity: 1, weight: 0, interactive: true });
         m._dotColor = dotColor;
+        m._of = (sp.of === 1);   // on-frequency ring applied by applyFlatHighlight, identical to hover
         m.bindTooltip('<b>' + sp.cs + '</b><br/>' + sp.f + '<span style=""font-size:9px;font-weight:normal""> MHz</span>&nbsp;' + sp.m, {
             permanent: false, sticky: true, direction: 'top', className: 'spot-tip'
         });
@@ -699,7 +711,12 @@ function applyFlatHighlight(cs) {
         var on = (cs !== null && r.cs === cs);
         if (r.arc) { r.arc.setStyle({ weight: on ? 2.5 : 0.8, opacity: on ? 1 : 0.7 }); if (on) r.arc.bringToFront(); }
         if (r.spDot) { r.spDot.setRadius(on ? 4 : 2); r.spDot.setStyle({ color: on ? '#FFFFFF' : '#000000', weight: on ? 1 : 0 }); if (on) r.spDot.bringToFront(); }
-        if (r.dxDot) { r.dxDot.setRadius(on ? 12 : 5); r.dxDot.setStyle({ color: on ? '#FFFFFF' : r.dxDot._dotColor, weight: on ? 2 : 0 }); }
+        if (r.dxDot) {
+            // On-frequency looks EXACTLY like a hover: white ring AND enlarged dot.
+            var hl = on || (r.dxDot._of === true);
+            r.dxDot.setRadius(hl ? 12 : 5);
+            r.dxDot.setStyle({ color: hl ? '#FFFFFF' : r.dxDot._dotColor, weight: hl ? 2 : 0 });
+        }
     }
 }
 renderSpots();
@@ -711,6 +728,13 @@ function updateClusterSpots(json) {
 }
 function highlightSpot(cs, f) { hlF = f; applyFlatHighlight(cs); }
 function clearSpotHighlight() { hlF = null; applyFlatHighlight(null); }
+// On-frequency dots (green ring) — updated IN PLACE like the hover highlight, so tuning the radio
+// never forces a full spot re-render. csv = comma-separated callsigns currently on frequency.
+function setOnFreqSpots(csv) {
+    var set = {}; if (csv) { csv.split(',').forEach(function(c){ if (c) set[c] = 1; }); }
+    for (var i = 0; i < flatSpotRefs.length; i++) { var r = flatSpotRefs[i]; if (r.dxDot) r.dxDot._of = !!set[r.cs]; }
+    applyFlatHighlight(hlCs);   // restyle in place, preserving any current hover
+}
 function onRadiusChange(km) {
     radiusKm = parseInt(km, 10);
     radiusMeters = radiusKm * 1000;
@@ -822,8 +846,8 @@ window.addEventListener('resize', function() { if (map) { map.invalidateSize(); 
                 string spStr = (s.SpotterLat.HasValue && s.SpotterLon.HasValue)
                     ? "[" + s.SpotterLon.Value.ToString(ic) + "," + s.SpotterLat.Value.ToString(ic) + "]"
                     : "null";
-                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\"}}",
-                    s.Lon, s.Lat, spStr, callsign, freq, mode, color, band);
+                spotsJs.AppendFormat(ic, "{{\"c\":[{0},{1}],\"sp\":{2},\"cs\":\"{3}\",\"f\":\"{4}\",\"m\":\"{5}\",\"k\":\"{6}\",\"b\":\"{7}\",\"of\":{8}}}",
+                    s.Lon, s.Lat, spStr, callsign, freq, mode, color, band, s.IsOnFrequency ? 1 : 0);
             }
             spotsJs.Append("]");
 
@@ -1225,12 +1249,13 @@ function drawOverlays() {
                     .attr('fill', '#000000').attr('stroke', 'none')
                     .attr('clip-path', 'url(#globe-clip)');
             }
-            // Band-colored DX dot with tooltip and click
+            // Band-colored DX dot with tooltip and click. On-frequency spots (sp.of) get a light-green
+            // ring + bigger dot, matching the list's green 'On My Radio Freq' highlight.
             if (pt && isFinite(pt[0]) && isFinite(pt[1])) {
                 (function(spot, px, py) {
                     var dotColor = spot.k || '#FF6600';
                     dxG.append('circle')
-                        .attr('class', 'spot-dx').attr('data-cs', spot.cs)
+                        .attr('class', 'spot-dx').attr('data-cs', spot.cs).attr('data-of', spot.of === 1 ? '1' : '0')
                         .attr('cx', px).attr('cy', py).attr('r', 4)
                         .attr('fill', dotColor).attr('stroke', 'none').attr('stroke-width', 0)
                         .attr('clip-path', 'url(#globe-clip)')
@@ -1278,7 +1303,11 @@ function applyHighlight(cs) {
     });
     overlaysG.selectAll('.spot-dx').each(function() {
         var el = d3.select(this); var on = (cs !== null && el.attr('data-cs') === cs);
-        el.attr('r', on ? 9 : 4).attr('stroke', on ? '#FFFFFF' : 'none').attr('stroke-width', on ? 2 : 0);
+        // On-frequency looks EXACTLY like a hover: white ring AND enlarged dot.
+        var hl = on || (el.attr('data-of') === '1');
+        el.attr('r', hl ? 9 : 4)
+          .attr('stroke', hl ? '#FFFFFF' : 'none')
+          .attr('stroke-width', hl ? 2 : 0);
     });
 }
 drawOverlays();
@@ -1386,6 +1415,15 @@ function updateClusterSpots(json) {
 }
 function highlightSpot(cs, f) { hlF = f; applyHighlight(cs); }
 function clearSpotHighlight() { hlF = null; applyHighlight(null); }
+// On-frequency dots (green ring) — updated IN PLACE like the hover highlight, so tuning the radio
+// never forces a full spot re-render. csv = comma-separated callsigns currently on frequency.
+function setOnFreqSpots(csv) {
+    var set = {}; if (csv) { csv.split(',').forEach(function(c){ if (c) set[c] = 1; }); }
+    if (overlaysG) overlaysG.selectAll('.spot-dx').each(function() {
+        var el = d3.select(this); el.attr('data-of', set[el.attr('data-cs')] ? '1' : '0');
+    });
+    applyHighlight(hlCs);   // restyle in place, preserving any current hover
+}
 function haversineKm(lat1, lon1, lat2, lon2) {
     var R = 6371, toR = Math.PI/180;
     var dLat = (lat2-lat1)*toR, dLon = (lon2-lon1)*toR;
