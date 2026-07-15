@@ -936,6 +936,30 @@ namespace HolyLogger.Properties {
                 this["HolyClusterUDPPort"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ClusterShowLotw {
+            get {
+                return ((bool)(this["ClusterShowLotw"]));
+            }
+            set {
+                this["ClusterShowLotw"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ClusterLotwOnly {
+            get {
+                return ((bool)(this["ClusterLotwOnly"]));
+            }
+            set {
+                this["ClusterLotwOnly"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

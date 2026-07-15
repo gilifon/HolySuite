@@ -225,6 +225,7 @@
     <EmbeddedResource Include="MapAssets\d3.v5.min.js" />
     <EmbeddedResource Include="MapAssets\dxcc_colored.json" />
     <Compile Include="CtyDatService.cs" />
+    <Compile Include="LotwUserService.cs" />
     <Compile Include="DataAccess.cs" />
     <Compile Include="EqslQueueWindow.cs" />
     <Compile Include="LotwUploader.cs" />

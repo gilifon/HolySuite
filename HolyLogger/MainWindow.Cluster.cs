@@ -660,7 +660,25 @@ namespace HolyLogger
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(closeBtn, true);
             closeBtn.Click += (s, e) => System.Windows.SystemCommands.CloseWindow(clusterWindow);
 
+            // Cluster display-options gear: sits in the empty title-bar gap, just left of the window
+            // buttons. Clicking it opens a small popup of quick toggles (LoTW highlight, LoTW only, and
+            // room for more later). Placed inside the caption-button group so nothing else in the bar
+            // moves — it only fills space that was previously empty.
+            var gearBtn = new Button
+            {
+                Content = "",   // Segoe MDL2 "Settings" gear glyph (same font as the caption buttons)
+                Style = Application.Current.Resources["CaptionButtonStyle"] as Style,
+                ToolTip = "Cluster display options",
+                FontSize = 18,        // larger than the window glyphs so the gear stands out
+                FontWeight = FontWeights.Bold
+            };
+            System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(gearBtn, true);
+            var optionsPopup = BuildClusterOptionsPopup();
+            optionsPopup.PlacementTarget = gearBtn;
+            gearBtn.Click += (s, e) => optionsPopup.IsOpen = !optionsPopup.IsOpen;
+
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
+            buttons.Children.Add(gearBtn);
             buttons.Children.Add(minimizeBtn);
             buttons.Children.Add(clusterMaxRestoreBtn);
             buttons.Children.Add(closeBtn);
@@ -670,17 +688,92 @@ namespace HolyLogger
             // Resource references (not brush snapshots) so the title bar follows a live scheme
             // switch -- a snapshot froze whatever theme was active when the window opened, leaving
             // a dark bar on a light scheme after toggling.
-            var titleText = new TextBlock { Text = "Cluster", FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+            var titleText = new TextBlock { Text = "Cluster", FontSize = 15, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center };
             titleText.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
 
             var dock = new DockPanel { LastChildFill = true };
             dock.Children.Add(buttons);
+            dock.Children.Add(optionsPopup);   // zero-size, floats when opened; keep before the fill child
             dock.Children.Add(icon);
             dock.Children.Add(titleText);
 
             var bar = new Border { Height = 32, Child = dock };
             bar.SetResourceReference(Border.BackgroundProperty, "TitleBarBg");
             return bar;
+        }
+
+        // The gear's fast-select popup: quick per-view cluster toggles. Built as a simple checkbox list
+        // so more options can be added later without touching the title-bar layout.
+        private System.Windows.Controls.Primitives.Popup BuildClusterOptionsPopup()
+        {
+            var panel = new StackPanel();
+
+            var header = new TextBlock { Text = "Cluster options", FontSize = 15, FontWeight = FontWeights.Bold, Margin = new Thickness(14, 10, 14, 6) };
+            header.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+            panel.Children.Add(header);
+
+            var divider = new Border { Height = 1, Margin = new Thickness(0, 0, 0, 2) };
+            divider.SetResourceReference(Border.BackgroundProperty, "ThemeBorderBrush");
+            panel.Children.Add(divider);
+
+            var showLotw = new CheckBox
+            {
+                Content = "Show LoTW (yellow)",
+                IsChecked = Properties.Settings.Default.ClusterShowLotw,
+                Margin = new Thickness(14, 8, 14, 8),
+                FontSize = 16
+            };
+            showLotw.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+            showLotw.Checked += (s, e) => SetClusterShowLotw(true);
+            showLotw.Unchecked += (s, e) => SetClusterShowLotw(false);
+            panel.Children.Add(showLotw);
+
+            var lotwOnly = new CheckBox
+            {
+                Content = "LoTW only",
+                IsChecked = Properties.Settings.Default.ClusterLotwOnly,
+                Margin = new Thickness(14, 8, 14, 12),
+                FontSize = 16
+            };
+            lotwOnly.SetResourceReference(Control.ForegroundProperty, "TextBrush");
+            lotwOnly.Checked += (s, e) => SetClusterLotwOnly(true);
+            lotwOnly.Unchecked += (s, e) => SetClusterLotwOnly(false);
+            panel.Children.Add(lotwOnly);
+
+            var border = new Border
+            {
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                MinWidth = 220,
+                Child = panel
+            };
+            border.SetResourceReference(Border.BackgroundProperty, "MenuBg");
+            border.SetResourceReference(Border.BorderBrushProperty, "MenuBorder");
+
+            return new System.Windows.Controls.Primitives.Popup
+            {
+                Child = border,
+                StaysOpen = false,
+                AllowsTransparency = true,
+                Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom
+            };
+        }
+
+        // "Show LoTW" toggle: turn the yellow LoTW row highlight on/off. Repaint the grid so every
+        // visible row re-reads RowBackground (which is gated on this setting).
+        private void SetClusterShowLotw(bool on)
+        {
+            Properties.Settings.Default.ClusterShowLotw = on;
+            Properties.Settings.Default.Save();
+            try { clusterSpotsGrid?.Items.Refresh(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // "LoTW only" toggle: show only LoTW spots. Re-run the visible-spot filter (which now honors it).
+        private void SetClusterLotwOnly(bool on)
+        {
+            Properties.Settings.Default.ClusterLotwOnly = on;
+            Properties.Settings.Default.Save();
+            RefreshClusterVisibleSpots();
         }
 
         // Keeps the Cluster window's maximize/restore glyph in sync, same reasoning as MainWindow_StateChanged.
@@ -3213,6 +3306,7 @@ namespace HolyLogger
                         IsInLog = !string.IsNullOrWhiteSpace(dx) && loggedDxCalls.Contains(dx.Trim()),
                         IsMyCallsign = IsMyStationCallsign(dx),
                         IsNeededCountry = IsNeededCountry(dx, workedCountries),
+                        IsLotwUser = LotwUserService.IsLotwUser(dx),
                         SpotKey = key
                     };
 
@@ -3801,7 +3895,9 @@ namespace HolyLogger
                 return;
             }
 
+            bool lotwOnly = Properties.Settings.Default.ClusterLotwOnly;
             var ordered = clusterAllSpots.Where(s => IsClusterBandEnabled(s.BandText) && IsClusterModeEnabled(s.Mode))
+                                         .Where(s => !lotwOnly || s.IsLotwUser)
                                          .Where(s => s.UnixTime > 0 && s.UnixTime >= DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
                                          .OrderByDescending(s => s.UnixTime);
 

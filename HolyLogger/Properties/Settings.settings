@@ -227,6 +227,12 @@
     <Setting Name="EnableHolyClusterUDP" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">False</Value>
     </Setting>
+    <Setting Name="ClusterShowLotw" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
+    </Setting>
+    <Setting Name="ClusterLotwOnly" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
     <Setting Name="HolyClusterUDPPort" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">2237</Value>
     </Setting>

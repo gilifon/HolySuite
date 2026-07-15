@@ -357,6 +357,11 @@ namespace HolyLogger
             // disk and is picked up on the next launch; failures (offline etc.) are ignored.
             CheckCtyDatUpdateFireAndForget();
 
+            // Load the cached LoTW user list (for the yellow cluster highlight) and refresh it in the
+            // background if it's missing or more than a week old. Failures are ignored.
+            LotwUserService.Initialize();
+            CheckLotwUpdateFireAndForget();
+
             if (Properties.Settings.Default.EnableUDPClient)
             {
                 try
@@ -6379,6 +6384,23 @@ namespace HolyLogger
                 }
             }
 
+            private bool _isLotwUser;
+            // True when this spot's DX callsign is a Logbook of The World (LoTW) uploader, so the row
+            // gets a yellow background. Set once when the spot is built (see the cluster spot list).
+            public bool IsLotwUser
+            {
+                get => _isLotwUser;
+                set
+                {
+                    if (_isLotwUser != value)
+                    {
+                        _isLotwUser = value;
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLotwUser)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowBackground)));
+                    }
+                }
+            }
+
             public Brush RowBackground
             {
                 get
@@ -6390,6 +6412,10 @@ namespace HolyLogger
                     if (IsOnFrequency)
                     {
                         return ThemeManager.Brush("RowOnFreqBg"); // on-frequency green, theme-aware
+                    }
+                    if (IsLotwUser && Properties.Settings.Default.ClusterShowLotw)
+                    {
+                        return ThemeManager.Brush("RowLotwBg"); // LoTW user (yellow), theme-aware
                     }
                     else
                     {
@@ -8243,6 +8269,15 @@ namespace HolyLogger
             Task.Run(async () =>
             {
                 try { await CtyDatService.CheckForUpdateAsync(_sharedHttpClient, isNetworkAvailable); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            });
+        }
+
+        private void CheckLotwUpdateFireAndForget()
+        {
+            Task.Run(async () =>
+            {
+                try { await LotwUserService.RefreshIfStaleAsync(_sharedHttpClient); }
                 catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             });
         }

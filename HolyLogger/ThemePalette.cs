@@ -92,6 +92,7 @@ namespace HolyLogger
             { "SelectionBg",      new[] { "#3399FF", "#2C4C7A", "#2F5490" } }, // selected row/cell, menu hover
             { "RowHoverBg",       new[] { "#90CAF9", "#26456B", "#2A4A78" } }, // cluster: map-hovered spot
             { "RowOnFreqBg",      new[] { "#90EE90", "#1E4A2A", "#1E4A2A" } }, // cluster: on-frequency spot
+            { "RowLotwBg",        new[] { "#FFF176", "#4A4416", "#4A4416" } }, // cluster: LoTW user spot (yellow)
             { "FilterRowBg",      new[] { "#C8F0D0", "#1E4030", "#1E4030" } }, // QSO grid: filtered-match row
             { "FilterRowAltBg",   new[] { "#A8D8B4", "#183328", "#183328" } }, // QSO grid: filtered-match alt row
             { "WorkedElsewhereBg",    new[] { "#CFE3FF", "#183048", "#183048" } }, // QSO grid: same call found in the copy-target log (reference only)
@@ -136,6 +137,7 @@ namespace HolyLogger
             new TokenInfo("WorkedElsewhereAltBg", "Tables", "Worked-before (target log, alt.)", "Every second reference row from the copy-target log."),
             new TokenInfo("RowHoverBg",       "Tables", "Cluster: map-hovered spot",  "Cluster row highlighted while hovering its dot on the map."),
             new TokenInfo("RowOnFreqBg",      "Tables", "Cluster: on-frequency spot", "Cluster row whose frequency matches your radio."),
+            new TokenInfo("RowLotwBg",        "Tables", "Cluster: LoTW user spot",    "Cluster row whose DX callsign uploads to Logbook of The World (LoTW)."),
 
             new TokenInfo("TitleBarBg",       "Window chrome", "Title bar",              "Background of the title bar on the main window and the Cluster window. Dialog title bars also follow it on Windows 11."),
 
