@@ -1781,6 +1781,19 @@ Environment.NewLine +
             catch { /* an index is an optimization only; never block startup on it */ }
         }
 
+        // Index that backs every per-log query (load, counts, dup checks, copy-dedupe — the qso table
+        // is always filtered by log_id). Without it each of those scans the whole table, which is felt
+        // on every log switch once the table holds thousands of QSOs. Idempotent.
+        private void EnsureLogIdIndex()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_log_id ON qso(log_id)", con))
+                    cmd.ExecuteNonQuery();
+            }
+            catch { /* an index is an optimization only; never block startup on it */ }
+        }
+
         // Adds the lotw_status column the first time the user runs a build that has the LoTW upload
         // feature. Existing rows are back-filled to 1 ("already handled") so upgrading does NOT
         // suddenly queue the user's whole historical log for upload to LoTW.
@@ -2480,6 +2493,7 @@ Environment.NewLine +
             EnsureQrzIndexes();
             EnsureLotwIndex();
             EnsureClublogIndex();
+            EnsureLogIdIndex();
             using (var command = new SQLiteCommand(createTable_categories, con))
             {
                 command.ExecuteNonQuery();

@@ -55,7 +55,25 @@ namespace HolyLogger
         List<ClusterSpotViewItem> clusterAllSpots = new List<ClusterSpotViewItem>();
         // Per-band spot-count label shown under each band checkbox, keyed by band name.
         Dictionary<string, TextBlock> clusterBandSpotCountTexts = new Dictionary<string, TextBlock>(StringComparer.OrdinalIgnoreCase);
-        ObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
+        BulkObservableCollection<ClusterSpotViewItem> clusterVisibleSpots = null;
+
+        // ObservableCollection whose ReplaceAll swaps the whole content with ONE Reset notification.
+        // The spot list is rebuilt on every arrival batch; Clear()+Add() per item fired hundreds of
+        // CollectionChanged events into the live-sorted DataGrid per refresh — this makes it one.
+        internal sealed class BulkObservableCollection<T> : ObservableCollection<T>
+        {
+            public void ReplaceAll(IEnumerable<T> items)
+            {
+                CheckReentrancy();
+                Items.Clear();
+                if (items != null)
+                    foreach (T item in items) Items.Add(item);
+                OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("Count"));
+                OnPropertyChanged(new System.ComponentModel.PropertyChangedEventArgs("Item[]"));
+                OnCollectionChanged(new System.Collections.Specialized.NotifyCollectionChangedEventArgs(
+                    System.Collections.Specialized.NotifyCollectionChangedAction.Reset));
+            }
+        }
         // While the mouse hovers a band checkbox, the cluster temporarily shows ONLY that band's
         // spots (table + map), as if it were the active band; cleared when the mouse leaves.
         string _clusterHoverBandOverride = null;
@@ -1140,7 +1158,7 @@ namespace HolyLogger
 
             if (clusterVisibleSpots == null)
             {
-                clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
+                clusterVisibleSpots = new BulkObservableCollection<ClusterSpotViewItem>();
             }
             spotsGrid.ItemsSource = clusterVisibleSpots;
             // Pin "New Country" (needed) spots to the top regardless of the active column sort:
@@ -2250,9 +2268,7 @@ namespace HolyLogger
                         double delta = onMyFreqCenterInCanvas - (showTop + activeBtnCenterInPanel);
                         showTop += delta;
                     }
-                    catch
-                    {
-                    }
+                    catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
                 Canvas.SetTop(clusterShowBandsPanel, showTop);
@@ -2280,7 +2296,7 @@ namespace HolyLogger
                                 new Point(clusterActiveBandIndicatorText.ActualWidth, 0), clusterHeaderCanvas);
                             badgeLeft = indRight.X + ClusterBandGroupToCounterGap;
                         }
-                        catch { }
+                        catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     }
                     double badgeTop = tableTopInCanvas - ClusterControlsToTableGap - clusterSpotCountBadge.Height;
                     Canvas.SetLeft(clusterSpotCountBadge, badgeLeft);
@@ -2305,9 +2321,7 @@ namespace HolyLogger
                         Canvas.SetLeft(clusterModeSelectorPanel, modesLeft);
                         Canvas.SetTop(clusterModeSelectorPanel, modesTop);
                     }
-                    catch
-                    {
-                    }
+                    catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
                 // The Last/dropdown stays anchored to UTC horizontally (set below), but its bottom is
@@ -2594,9 +2608,7 @@ namespace HolyLogger
             {
                 Process.Start(url);
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void ClusterWindow_LocationChanged(object sender, EventArgs e)
@@ -2647,9 +2659,7 @@ namespace HolyLogger
 
                 File.WriteAllText(path, enabled.ToString(CultureInfo.InvariantCulture));
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private string GetClusterHoverPopupSettingPath()
@@ -2675,9 +2685,7 @@ namespace HolyLogger
                     return value;
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             return 60;
         }
@@ -2700,9 +2708,7 @@ namespace HolyLogger
 
                 File.WriteAllText(path, minutes.ToString(CultureInfo.InvariantCulture));
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private double LoadClusterCountryColumnWidthSetting()
@@ -2721,9 +2727,7 @@ namespace HolyLogger
                     return value;
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             return 100;
         }
@@ -2746,9 +2750,7 @@ namespace HolyLogger
 
                 File.WriteAllText(path, width.ToString(CultureInfo.InvariantCulture));
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private int LoadClusterCountryColumnDisplayIndexSetting()
@@ -2767,9 +2769,7 @@ namespace HolyLogger
                     return value;
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             return 2;
         }
@@ -2792,9 +2792,7 @@ namespace HolyLogger
 
                 File.WriteAllText(path, displayIndex.ToString(CultureInfo.InvariantCulture));
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private string GetClusterCountryColumnWidthSettingPath()
@@ -2839,9 +2837,7 @@ namespace HolyLogger
                     Directory.CreateDirectory(dir);
                 File.WriteAllText(path, content);
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void ApplyClusterColumnOrder(DataGrid grid)
@@ -2868,9 +2864,7 @@ namespace HolyLogger
                     }
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void ClusterWindow_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -3250,9 +3244,7 @@ namespace HolyLogger
                     RefreshClusterVisibleSpots();
                 }));
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void DisposeClusterWebSocket()
@@ -3279,9 +3271,7 @@ namespace HolyLogger
                     clusterWebSocketCts = null;
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             try
             {
@@ -3291,20 +3281,7 @@ namespace HolyLogger
                     clusterWebSocket = null;
                 }
             }
-            catch
-            {
-            }
-        }
-
-        private bool IsClusterCallsignInLog(string dxCallsign)
-        {
-            string target = (dxCallsign ?? string.Empty).Trim();
-            if (string.IsNullOrWhiteSpace(target) || Qsos == null)
-            {
-                return false;
-            }
-
-            return Qsos.Any(q => string.Equals((q.DXCall ?? string.Empty).Trim(), target, StringComparison.OrdinalIgnoreCase));
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void RefreshClusterMyCallsignHighlight()
@@ -3461,9 +3438,18 @@ namespace HolyLogger
             clusterBandSelectorPanel = newPanel;
         }
 
+        // Memoized on the raw settings string: these getters are called PER SPOT in the refresh and
+        // count loops (1500 spots per batch), and re-splitting the string + allocating a HashSet each
+        // time was pure churn. A plain string compare serves the cached set until the setting changes.
+        private string _enabledBandsRaw;
+        private HashSet<string> _enabledBandsCache;
+
         private HashSet<string> GetEnabledClusterBands()
         {
             string raw = Properties.Settings.Default.ClusterEnabledBands ?? string.Empty;
+            if (_enabledBandsCache != null && string.Equals(raw, _enabledBandsRaw, StringComparison.Ordinal))
+                return _enabledBandsCache;
+
             var values = raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                             .Select(v => v.Trim().ToUpperInvariant())
                             .Where(v => !string.IsNullOrWhiteSpace(v));
@@ -3476,6 +3462,8 @@ namespace HolyLogger
                     set.Add(band);
                 }
             }
+            _enabledBandsRaw = raw;
+            _enabledBandsCache = set;
             return set;
         }
 
@@ -3636,15 +3624,23 @@ namespace HolyLogger
             return band != null;
         }
 
+        private string _enabledModesRaw;
+        private HashSet<string> _enabledModesCache;
+
         private HashSet<string> GetEnabledClusterModes()
         {
             string raw = Properties.Settings.Default.ClusterEnabledModes ?? string.Empty;
+            if (_enabledModesCache != null && string.Equals(raw, _enabledModesRaw, StringComparison.Ordinal))
+                return _enabledModesCache;
+
             var values = raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
                             .Select(v => v.Trim().ToUpperInvariant())
                             .Where(v => !string.IsNullOrWhiteSpace(v));
 
             var set = new HashSet<string>(values, StringComparer.OrdinalIgnoreCase);
             // Don't auto-fill here - let the save function handle empty sets
+            _enabledModesRaw = raw;
+            _enabledModesCache = set;
             return set;
         }
 
@@ -3699,16 +3695,15 @@ namespace HolyLogger
                 filtered = ordered.Take(500).ToList();
             }
 
+            // One pass over the log builds an O(1) lookup set; the old per-spot IsClusterCallsignInLog
+            // scanned the whole log for EVERY spot (500 spots x 11k QSOs per refresh, on the UI thread).
+            var loggedDxCalls = BuildLoggedDxCallSet();
             foreach (var item in filtered)
             {
-                item.IsInLog = IsClusterCallsignInLog(item.DXCallsign);
+                item.IsInLog = loggedDxCalls.Contains((item.DXCallsign ?? string.Empty).Trim());
             }
 
-            clusterVisibleSpots.Clear();
-            foreach (var item in filtered)
-            {
-                clusterVisibleSpots.Add(item);
-            }
+            clusterVisibleSpots.ReplaceAll(filtered);   // one Reset event, one DataGrid layout pass
 
             UpdateClusterFrequencyHighlight();
             UpdateClusterSpotCountIndicator();
@@ -3816,9 +3811,7 @@ namespace HolyLogger
 
                 MapControl.ShowClusterSpots(spots, homell.Lat, homell.Long, GetMapRadiusKm());
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void ClearClusterSpotsFromMap()
@@ -3835,9 +3828,7 @@ namespace HolyLogger
                     MapControl.ShowClusterSpots(emptySpots, homell.Lat, homell.Long, GetMapRadiusKm());
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void UpdateClusterSpotCountIndicator()
@@ -4032,7 +4023,7 @@ namespace HolyLogger
                 // Initialize cluster data structures if needed
                 if (clusterVisibleSpots == null)
                 {
-                    clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
+                    clusterVisibleSpots = new BulkObservableCollection<ClusterSpotViewItem>();
                 }
                 if (clusterWorkedCountries == null)
                 {
@@ -4060,7 +4051,7 @@ namespace HolyLogger
         {
             if (clusterVisibleSpots == null)
             {
-                clusterVisibleSpots = new ObservableCollection<ClusterSpotViewItem>();
+                clusterVisibleSpots = new BulkObservableCollection<ClusterSpotViewItem>();
             }
 
             await ConnectClusterWebSocketAsync(null, clusterVisibleSpots);
@@ -4167,9 +4158,7 @@ namespace HolyLogger
                 Azimuth = MaidenheadLocator.Azimuth(homell, dxLatLng);
                 MapControl.ShowMap(dxLat, dxLon, GetMapRadiusKm(), Azimuth, homell.Lat, homell.Long);
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private async void TuneToClusterSpot(ClusterSpotViewItem spot)
@@ -4480,3 +4469,4 @@ namespace HolyLogger
         // Customize Colors edits repaint it without any re-apply.)
     }
 }
+

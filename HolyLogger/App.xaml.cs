@@ -38,6 +38,7 @@ namespace HolyLogger
         private DispatcherTimer _splashCloseTimer;
         private Window _realMainWindow;
         private bool _mainWindowRendered;
+        private DateTime _lastDispatcherException = DateTime.MinValue;   // cascade guard for the handler below
 
         public App()
         {
@@ -46,13 +47,28 @@ namespace HolyLogger
 
         private void Application_Startup(object sender, StartupEventArgs e)
         {
-            // Last-chance diagnostics. These hooks change NO behavior (nothing is marked handled;
-            // a crash still crashes) -- they only make sure every unhandled exception lands in
-            // holylogger.log with a stack trace before the process dies. This matters most for the
-            // codebase's many "async void" handlers: an exception escaping one of those never
-            // surfaces through normal call-stack error handling, so without these hooks the app
-            // just vanishes with nothing to debug.
-            DispatcherUnhandledException += (s, args) => Log.Fatal("Dispatcher", args.Exception);
+            // Last-chance handling. Every unhandled exception lands in holylogger.log with a stack
+            // trace. A UI (dispatcher) exception is additionally MARKED HANDLED so one bad click
+            // doesn't kill a logging session mid-contest: the user is told it was recorded and the
+            // app keeps running. Two escapes within 10 seconds mean something is systemically broken
+            // (an error loop) -- then let it crash rather than limp on as a zombie. AppDomain /
+            // task exceptions can't be recovered and stay log-only.
+            DispatcherUnhandledException += (s, args) =>
+            {
+                Log.Fatal("Dispatcher", args.Exception);
+                var now = DateTime.UtcNow;
+                if ((now - _lastDispatcherException).TotalSeconds < 10) return;   // cascading -> crash
+                _lastDispatcherException = now;
+                args.Handled = true;
+                try
+                {
+                    HolyMessageBox.ShowError(
+                        "An unexpected error occurred. It was recorded in holylogger.log.\n\n" +
+                        "You can keep working; if the program misbehaves, restart it.\n\nDetails: " +
+                        args.Exception?.Message, "Unexpected Error");
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
             AppDomain.CurrentDomain.UnhandledException += (s, args) => Log.Fatal("AppDomain", args.ExceptionObject as Exception);
             TaskScheduler.UnobservedTaskException += (s, args) => Log.Fatal("UnobservedTask", args.Exception);
 

@@ -144,16 +144,30 @@ namespace HolyLogger.ToolsUserControls
             this.SizeChanged += MapUserControl_SizeChanged;
         }
 
+        // One reusable debounce timer for resize: dragging a window edge fires SizeChanged dozens of
+        // times per second, and allocating a fresh DispatcherTimer per event was pure churn. Restarting
+        // this one also debounces — only the LAST resize in a burst triggers the browser redraw.
+        private System.Windows.Threading.DispatcherTimer _resizeRedrawTimer;
+
         private void MapUserControl_SizeChanged(object sender, System.Windows.SizeChangedEventArgs e)
         {
             // Trigger map redraw after resize with a small delay to ensure browser layout is updated
-            var timer = new System.Windows.Threading.DispatcherTimer
+            if (_resizeRedrawTimer == null)
             {
-                Interval = TimeSpan.FromMilliseconds(100)
-            };
-            timer.Tick += (s, args) =>
+                _resizeRedrawTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(100)
+                };
+                _resizeRedrawTimer.Tick += ResizeRedrawTimer_Tick;
+            }
+            _resizeRedrawTimer.Stop();    // restart on every resize -> fires once, after the burst
+            _resizeRedrawTimer.Start();
+        }
+
+        private void ResizeRedrawTimer_Tick(object sender, EventArgs args)
+        {
             {
-                timer.Stop();
+                _resizeRedrawTimer.Stop();
                 try
                 {
                     // Force the browser to recalculate and trigger resize by dispatching event
@@ -186,8 +200,19 @@ namespace HolyLogger.ToolsUserControls
                     });
                 }
                 catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            };
-            timer.Start();
+            }
+        }
+
+        // Releases the underlying IE WebBrowser ActiveX control (a known memory/resource hog that is
+        // not collected by GC alone). Call once at application shutdown.
+        public void DisposeBrowser()
+        {
+            try
+            {
+                if (_resizeRedrawTimer != null) _resizeRedrawTimer.Stop();
+                MapBrowser.Dispose();
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Updates only spot markers on the already-loaded map via JS — no page reload

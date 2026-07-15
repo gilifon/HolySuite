@@ -141,9 +141,7 @@ namespace HolyLogger
             {
                 File.AppendAllText(_serverLogPath, line + Environment.NewLine);
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             try
             {
@@ -158,15 +156,11 @@ namespace HolyLogger
                         {
                             HolyMessageBox.Show(line, "Callsign Upload");
                         }
-                        catch
-                        {
-                        }
+                        catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     }));
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         public void Dispose()

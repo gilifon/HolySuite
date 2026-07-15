@@ -289,7 +289,8 @@ namespace HolyParser
 
         public override string ToString()
         {
-            return Long.ToString("#.###") + (Long >= 0 ? "N" : "S") + " " + Lat.ToString("#.###") + (Lat >= 0 ? "E" : "W");
+            // Latitude is N/S, longitude is E/W (the labels were swapped for years; display-only).
+            return Lat.ToString("#.###") + (Lat >= 0 ? "N" : "S") + " " + Long.ToString("#.###") + (Long >= 0 ? "E" : "W");
         }
 
         public int CompareTo(object to)

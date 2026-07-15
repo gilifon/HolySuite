@@ -2148,6 +2148,7 @@ namespace HolyLogger
                 case 2: Properties.Settings.Default.CwMsgText2 = text; break;
                 case 3: Properties.Settings.Default.CwMsgText3 = text; break;
                 case 4: Properties.Settings.Default.CwMsgText4 = text; break;
+                default: Log.Warn("SetCwMessageText: unsupported message number " + messageNumber); return;
             }
 
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -4291,9 +4292,12 @@ namespace HolyLogger
                 }
                 catch (Exception e)
                 {
+                    // Malformed stored date/time (old import, corrupt row): recover with NOW and keep
+                    // loading — throwing here aborted the rest of the edit-load (ShowRigParams etc.)
+                    // and scared the user with an error box over a value we already fixed.
+                    Log.Swallow(e);
                     TP_Date.Value = DateTime.UtcNow;
                     TP_Time.Value = DateTime.UtcNow;
-                    throw new Exception("Failed to parse QSO date. Value set to NOW");
                 }
             }
             finally
@@ -4344,6 +4348,8 @@ namespace HolyLogger
             TB_Comment.Background = backgroundColor;
             TB_DXCC.Background = backgroundColor;
             CB_Mode.Background = backgroundColor;
+            TB_ITUZone.Background = backgroundColor;
+            TB_CQZone.Background = backgroundColor;
 
             // Contest mode replaces TB_RSTRcvd/TB_Exchange with the ContestRxPanel cells (RST-R +
             // e.g. Holyland Square). Highlight/reset those the same way, so leaving edit mode clears
@@ -4959,6 +4965,7 @@ namespace HolyLogger
             if (_cwName     != null) Properties.Settings.Default.ColWidthName     = _cwName.ActualWidth;
             if (_cwCountry  != null) Properties.Settings.Default.ColWidthCountry  = _cwCountry.ActualWidth;
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { MapControl?.DisposeBrowser(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             if (dal != null) dal.Close();
         }
 
@@ -6172,7 +6179,26 @@ namespace HolyLogger
         {
             public long UnixTime { get; set; }
             public string TimeUtc { get; set; }
-            public string FreqText { get; set; }
+
+            // The parsed MHz value is cached when FreqText is set: FreqMhz is the Live Scale sort key
+            // AND is read per row on every scroll tick, so parsing the string on each access burned
+            // CPU exactly where smooth knob-tracking needs it most.
+            private string _freqText;
+            private double _freqMhz;
+            public string FreqText
+            {
+                get => _freqText;
+                set
+                {
+                    _freqText = value;
+                    if (double.TryParse((value ?? string.Empty).Trim(),
+                                        System.Globalization.NumberStyles.Float,
+                                        System.Globalization.CultureInfo.InvariantCulture, out double v) && v > 0)
+                        _freqMhz = v >= 1000 ? v / 1000.0 : v;
+                    else
+                        _freqMhz = 0;
+                }
+            }
             public string FreqDisplayText { get; set; }
             public string BandText { get; set; }
             public string Mode { get; set; }
@@ -6358,17 +6384,7 @@ namespace HolyLogger
             // Numeric frequency in MHz, parsed from FreqText (the cluster sends kHz when the value is
             // >= 1000, otherwise MHz). Used by the Live Scale feature to sort the list and to position the
             // current-frequency scale. 0 when FreqText can't be parsed.
-            public double FreqMhz
-            {
-                get
-                {
-                    if (double.TryParse((FreqText ?? string.Empty).Trim(),
-                                        System.Globalization.NumberStyles.Float,
-                                        System.Globalization.CultureInfo.InvariantCulture, out double v) && v > 0)
-                        return v >= 1000 ? v / 1000.0 : v;
-                    return 0;
-                }
-            }
+            public double FreqMhz => _freqMhz;   // cached by the FreqText setter
 
             public event PropertyChangedEventHandler PropertyChanged;
         }
@@ -6636,9 +6652,7 @@ namespace HolyLogger
                 {
                     Rig.Mode = mode;
                 }
-                catch
-                {
-                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
                 if (freqWritable)
                 {
@@ -6653,9 +6667,7 @@ namespace HolyLogger
                     await TryGetRigReadbackAsync(frequencyHz);
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private async Task<bool> TryGetRigReadbackAsync(int targetHz)
@@ -7669,9 +7681,7 @@ namespace HolyLogger
                     qrzPhotoHeight = height;
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void PersistQrzPhotoWindowBoundsToDisk()
@@ -7696,9 +7706,7 @@ namespace HolyLogger
 
                 File.WriteAllText(filePath, line);
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void ShowQrzPhotoWindow(string imageUrl)
@@ -9451,9 +9459,7 @@ namespace HolyLogger
                     }
                 }
             }
-            catch
-            {
-            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             ClearQrzPhoto();
         }
