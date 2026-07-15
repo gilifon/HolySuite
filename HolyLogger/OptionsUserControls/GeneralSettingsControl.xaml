@@ -31,9 +31,23 @@
         <Label x:Name="label2" Content="Port" HorizontalAlignment="Left" Margin="199,249,0,0" VerticalAlignment="Top" FontSize="16"/>
         <TextBox x:Name="textBox2" HorizontalAlignment="Left" Height="23" Margin="243,254,0,0" TextWrapping="Wrap" Text="{Binding Default.N1MMUDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
 
+        <!-- HolyCluster spot listener: catches the WSJT-X-format UDP datagram HolyCluster sends when
+             you select a spot (the same one it sends to Log4OM) and fills the DX callsign. -->
+        <GroupBox Header="HolyCluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,285,0,0" Width="580" FontSize="16">
+            <StackPanel Margin="4,4,4,4">
+                <CheckBox x:Name="CBX_EnableHolyClusterUDP" Content="Fill DX callsign from HolyCluster spots" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableHolyClusterUDP, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Click="HasChanged_Click"/>
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <Label Content="Port" VerticalAlignment="Center" FontSize="16" Padding="0"/>
+                    <TextBox x:Name="TB_HolyClusterUDPPort" Width="80" Height="23" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding Default.HolyClusterUDPPort, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5"/>
+                </StackPanel>
+                <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12" Foreground="Gray"
+                           Text="Set this to the UDP port HolyCluster sends on (its default is 2237). When you select a station in HolyCluster it sends the callsign here and it is placed in the DX Callsign field. If CAT is not connected, the spot's frequency is filled in too."/>
+            </StackPanel>
+        </GroupBox>
+
         <!-- Audio Alerts: both sound options plus a single shared output-device picker, so alerts can
              go to the speakers instead of a USB radio codec. Left-justified with the checkboxes. -->
-        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,288,0,0" Width="580" FontSize="16">
+        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,435,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <!-- Beep when typing -->
                 <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,2,0,0" Click="HasChanged_Click">

@@ -912,6 +912,30 @@ namespace HolyLogger.Properties {
                 this["UDPPort"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool EnableHolyClusterUDP {
+            get {
+                return ((bool)(this["EnableHolyClusterUDP"]));
+            }
+            set {
+                this["EnableHolyClusterUDP"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2237")]
+        public int HolyClusterUDPPort {
+            get {
+                return ((int)(this["HolyClusterUDPPort"]));
+            }
+            set {
+                this["HolyClusterUDPPort"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

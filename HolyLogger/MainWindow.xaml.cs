@@ -385,6 +385,8 @@ namespace HolyLogger
                 }
             }
 
+            ApplyHolyClusterListener();
+
             isNetworkAvailable = Helper.CheckForInternetConnection();
             HeartbeatTimer.Tick += HeartbeatTimer_Tick;
             CallsignLookupDebounceTimer.Interval = TimeSpan.FromMilliseconds(CallsignLookupDebounceMs);
@@ -4900,15 +4902,26 @@ namespace HolyLogger
             } 
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
-            try 
-            { 
+            try
+            {
                 if (N1MMClient != null)
                 {
                     N1MMClient.Close();
                     N1MMClient.Dispose();
                     N1MMClient = null;
                 }
-            } 
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            try
+            {
+                if (HolyClusterClient != null)
+                {
+                    HolyClusterClient.Close();
+                    HolyClusterClient.Dispose();
+                    HolyClusterClient = null;
+                }
+            }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Close cluster WebSocket
@@ -5520,6 +5533,10 @@ namespace HolyLogger
                     N1MMClient = null;
                 }
             }
+
+            // Open/close the HolyCluster listener to match the (possibly just-changed) setting/port.
+            ApplyHolyClusterListener();
+
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             // Lock via IsReadOnly (not IsEnabled) so the field keeps full opacity — a disabled TextBox
             // dims to ~56%, which washed out the lock-blue background and greyed the text.
@@ -7817,6 +7834,7 @@ namespace HolyLogger
                 if (TB_DXCallsign != null && TB_DXCallsign.IsFocused && !_clusterFillingDXCall)
                 {
                     _clusterAutoFilledDXCall = false;
+                    _holyClusterSelectedCall = null;   // operator took over the DX field; forget the HolyCluster selection
                 }
             }
             catch { }
@@ -7850,6 +7868,10 @@ namespace HolyLogger
 
             if (string.IsNullOrWhiteSpace(dxCallText))
             {
+                // The DX box was emptied (F9/clear, a logged QSO, or manual delete) — release any held
+                // HolyCluster selection so it isn't re-applied and normal auto-fill can resume.
+                _holyClusterSelectedCall = null;
+
                 CallsignLookupDebounceTimer.Stop();
                 CallsignSuggestionsPopup.IsOpen = false;
                 LB_DXCallsignSuggestions.ItemsSource = null;

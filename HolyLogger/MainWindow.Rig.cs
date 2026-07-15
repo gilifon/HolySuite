@@ -283,14 +283,22 @@ namespace HolyLogger
         }
         private void StopOmniRig()
         {
+            // Detach only — do NOT kill OmniRig.exe. OmniRig is a shared automation server that other
+            // apps (e.g. HolyCluster's CAT server) also use to control the same radio; killing the
+            // process would yank the rig out from under them. Unsubscribing and releasing our COM
+            // references lets go of OmniRig cleanly while leaving the process running for others; if
+            // nothing else is using it, OmniRig shuts itself down on its own.
             UnsubscribeFromEvents();
-            Process[] workers = Process.GetProcessesByName("OmniRig");
-            foreach (Process worker in workers)
+            try
             {
-                worker.Kill();
-                worker.WaitForExit();
-                worker.Dispose();
+                if (Rig != null) System.Runtime.InteropServices.Marshal.ReleaseComObject(Rig);
             }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            try
+            {
+                if (OmniRigEngine != null) System.Runtime.InteropServices.Marshal.ReleaseComObject(OmniRigEngine);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
             OmniRigEngine = null;
             Rig = null;
             UpdateStatus();

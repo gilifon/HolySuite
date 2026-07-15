@@ -3387,6 +3387,25 @@ namespace HolyLogger
 
             const double toleranceKhz = 0.5; // 0.5 kHz tolerance
 
+            // A station selected in HolyCluster (received over UDP) is authoritative: while its call is
+            // held, the frequency-based auto-fill below neither overwrites nor clears the DX box, so the
+            // exact clicked callsign stands even when that spot isn't in HolyLogger's own (filtered) feed.
+            // Release the hold once the radio clearly moves off that spot's frequency (a wider tolerance
+            // than the on-frequency ring, so a CW pitch offset or small drift doesn't drop it), letting
+            // normal auto-fill resume.
+            const double holyClusterReleaseKhz = 3.0;
+            if (!string.IsNullOrWhiteSpace(_holyClusterSelectedCall) && _holyClusterSelectedFreqMhz > 0)
+            {
+                double diffKhz = Math.Abs(currentFreqMhz - _holyClusterSelectedFreqMhz) * 1000.0;
+                if (diffKhz <= holyClusterReleaseKhz)
+                    _holyClusterReachedFreq = true;    // the radio has landed on the selected spot's frequency
+                else if (_holyClusterReachedFreq)
+                    _holyClusterSelectedCall = null;   // ...and has since moved away -> release the hold
+                // If it hasn't reached the frequency yet (CAT still slewing the radio), keep holding so a
+                // stale-frequency recompute in that window doesn't drop the selection prematurely.
+            }
+            bool holdingHolyClusterCall = !string.IsNullOrWhiteSpace(_holyClusterSelectedCall);
+
             var onFreqSig = new System.Text.StringBuilder();     // which spots are on frequency right now
             var onFreqCalls = new System.Text.StringBuilder();   // their callsigns, for the in-place map restyle
             foreach (var spot in clusterVisibleSpots)
@@ -3427,7 +3446,7 @@ namespace HolyLogger
 
                 // If we just lost all on-frequency spots (was non-empty, now empty), clear the
                 // DX callsign only if it was auto-filled by the cluster (avoid erasing a user-typed value).
-                if (string.IsNullOrEmpty(sig) && !string.IsNullOrEmpty(prevOnFreqSig))
+                if (string.IsNullOrEmpty(sig) && !string.IsNullOrEmpty(prevOnFreqSig) && !holdingHolyClusterCall)
                 {
                     try
                     {
@@ -3449,7 +3468,9 @@ namespace HolyLogger
             }
 
             // Always attempt to auto-fill the DX callsign when there is at least one on-frequency spot.
-            if (!string.IsNullOrWhiteSpace(onFreqCallsStr) && TB_DXCallsign != null)
+            // While a HolyCluster selection is held, leave the DX box alone — it already shows the exact
+            // clicked callsign, which must not be overwritten by a different on-frequency spot.
+            if (!holdingHolyClusterCall && !string.IsNullOrWhiteSpace(onFreqCallsStr) && TB_DXCallsign != null)
             {
                 string firstCall = onFreqCallsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
                 if (!string.IsNullOrWhiteSpace(firstCall))
