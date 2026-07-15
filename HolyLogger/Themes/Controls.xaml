@@ -207,13 +207,15 @@
                         <ContentPresenter/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <!-- Exactly ONE blue row, tracking the mouse/keyboard (IsHighlighted). The
+                             currently-selected value is marked in bold only — filling it blue too made
+                             TWO rows light up whenever the dropdown opened. -->
                         <Trigger Property="IsHighlighted" Value="True">
                             <Setter TargetName="bd" Property="Background" Value="{DynamicResource SelectionBg}"/>
                             <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="bd" Property="Background" Value="{DynamicResource SelectionBg}"/>
-                            <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
+                            <Setter Property="FontWeight" Value="Bold"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
