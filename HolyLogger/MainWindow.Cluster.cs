@@ -3417,11 +3417,84 @@ namespace HolyLogger
             // (reusing the hover-highlight mechanism) only when the SET actually changed — never a
             // full re-render, never per knob tick.
             string sig = onFreqSig.ToString();
+            string onFreqCallsStr = onFreqCalls.ToString().TrimEnd(',');
+            string prevOnFreqSig = _lastMapOnFreqSig;
             if (!string.Equals(sig, _lastMapOnFreqSig, StringComparison.Ordinal))
             {
                 _lastMapOnFreqSig = sig;
                 if (MapControl != null && Properties.Settings.Default.ClusterMapEnabled)
-                    MapControl.SetOnFreqSpots(onFreqCalls.ToString().TrimEnd(','));
+                    MapControl.SetOnFreqSpots(onFreqCallsStr);
+
+                // If we just lost all on-frequency spots (was non-empty, now empty), clear the
+                // DX callsign only if it was auto-filled by the cluster (avoid erasing a user-typed value).
+                if (string.IsNullOrEmpty(sig) && !string.IsNullOrEmpty(prevOnFreqSig))
+                {
+                    try
+                    {
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            try
+                            {
+                                if (_clusterAutoFilledDXCall)
+                                {
+                                    _clusterAutoFilledDXCall = false;
+                                    HandleGlobalFunctionKey(System.Windows.Input.Key.F9, false);
+                                }
+                            }
+                            catch (Exception swallowed) { Log.Swallow(swallowed); }
+                        }));
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+            }
+
+            // Always attempt to auto-fill the DX callsign when there is at least one on-frequency spot.
+            if (!string.IsNullOrWhiteSpace(onFreqCallsStr) && TB_DXCallsign != null)
+            {
+                string firstCall = onFreqCallsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+                if (!string.IsNullOrWhiteSpace(firstCall))
+                {
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        try
+                        {
+                            string current = (TB_DXCallsign.Text ?? string.Empty).Trim();
+
+                            // Don't clobber a callsign the user is actively typing. But focus alone is
+                            // NOT "typing": F9/Clear (which is what the leave-frequency auto-clear calls)
+                            // parks keyboard focus in this now-empty box, so a focused-but-empty box must
+                            // still accept the auto-fill. Otherwise, after leaving a spot and tuning back
+                            // onto its frequency, the callsign would never be re-filled.
+                            bool userEditing = TB_DXCallsign.IsFocused && !string.IsNullOrEmpty(current);
+                            if (userEditing)
+                                return;
+
+                            bool shouldOverwrite = string.IsNullOrEmpty(current) || _clusterAutoFilledDXCall ||
+                                                   !string.Equals(current, firstCall, StringComparison.OrdinalIgnoreCase);
+                            if (shouldOverwrite)
+                            {
+                                // Suppress the "focused edit = manual change" handling in
+                                // TB_DXCallsign_TextChanged while WE are the ones setting the text; the
+                                // box may legitimately hold focus here (see note above).
+                                _clusterFillingDXCall = true;
+                                try
+                                {
+                                    TB_DXCallsign.Text = firstCall;
+                                    TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
+                                    _clusterAutoFilledDXCall = true;
+                                    TB_DXCallsign_TextChanged(TB_DXCallsign, null);
+                                    TB_DXCallsign_LostFocus(TB_DXCallsign, new RoutedEventArgs());
+                                }
+                                finally { _clusterFillingDXCall = false; }
+                            }
+                            else if (_clusterAutoFilledDXCall)
+                            {
+                                TB_DXCallsign_LostFocus(TB_DXCallsign, new RoutedEventArgs());
+                            }
+                        }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }), DispatcherPriority.Background);
+                }
             }
 
             if (clusterLiveScaleOn) UpdateClusterLiveScale();
@@ -3429,6 +3502,17 @@ namespace HolyLogger
 
         // Signature of the spots last reported to the map as on-frequency (see above).
         private string _lastMapOnFreqSig = string.Empty;
+
+        // Whether the DX callsign was auto-filled by the cluster on-frequency feature. If true,
+        // clearing on-frequency spots should clear that auto-filled textbox (F9). False when the
+        // user manually typed/changed the DX callsign.
+        private bool _clusterAutoFilledDXCall = false;
+
+        // Reentrancy guard: true only while the cluster auto-fill is programmatically setting the DX
+        // callsign. TB_DXCallsign_TextChanged treats any change made while the box has focus as a
+        // manual edit and drops _clusterAutoFilledDXCall; this flag suppresses that during our own
+        // fill, because F9/Clear parks focus in the (empty) box before we re-fill it.
+        private bool _clusterFillingDXCall = false;
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
         private static readonly string[] ClusterModeOptions = new[] { "CW", "DIGI", "SSB", "FM", "FT8", "RTTY", "AM" };

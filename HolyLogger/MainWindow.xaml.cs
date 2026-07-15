@@ -7810,6 +7810,17 @@ namespace HolyLogger
 
         private void TB_DXCallsign_TextChanged(object sender, TextChangedEventArgs e)
         {
+            // If the user is actively editing the DX textbox, consider this a manual edit and
+            // clear the cluster auto-fill flag so the cluster no longer overwrites/clears it.
+            try
+            {
+                if (TB_DXCallsign != null && TB_DXCallsign.IsFocused && !_clusterFillingDXCall)
+                {
+                    _clusterAutoFilledDXCall = false;
+                }
+            }
+            catch { }
+
             // While loading a QSO into the form for editing, the callsign is set programmatically and
             // we must NOT run the typing lookup (it would clear/overwrite the QSO's saved fields).
             if (_suppressCallsignLookupForEdit)
