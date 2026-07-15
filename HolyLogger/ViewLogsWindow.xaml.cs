@@ -188,9 +188,16 @@ namespace HolyLogger
         private void OpenSelected()
         {
             if (!RequireSelection()) return;
-            if (Selected.Id == _dal.ActiveLogId) return;   // already the active log
+            if (Selected.Id == _dal.ActiveLogId)
+            {
+                // Already active: just close the manager and bring main window to foreground
+                Close();
+                try { _main.Activate(); _main.Focus(); } catch { }
+                return;
+            }
             _main.SwitchActiveLog(Selected.Id);
             Close();
+            try { _main.Activate(); _main.Focus(); } catch { }
         }
 
         private void Btn_Open_Click(object sender, RoutedEventArgs e) => OpenSelected();

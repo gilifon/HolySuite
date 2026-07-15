@@ -124,7 +124,10 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <TextBlock x:Name="Hint" Grid.Row="2" Margin="0,8,0,0" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"
-                   Text="Select a log, then Open / Rename / Delete / Export. Double-click a row to open it."/>
+        <TextBlock x:Name="Hint" Grid.Row="2" Margin="0,8,0,0" FontSize="15" Foreground="Black" TextWrapping="Wrap">
+            <Run Text="Select a log, then Open / Rename / Delete / Export.  " />
+            <Run Text="Double-click" FontWeight="Bold" />
+            <Run Text=" to Activate and Open it." />
+        </TextBlock>
     </Grid>
 </Window>
