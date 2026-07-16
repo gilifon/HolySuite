@@ -574,7 +574,16 @@
                     <MenuItem x:Name="MyQrzMenuItem" Header="QRZ.com" ToolTip="Open your QRZ.com account in the browser" Click="MyQrzMenuItem_Click"/>
                     <MenuItem x:Name="MyClublogMenuItem" Header="Club Log" ToolTip="Open your Club Log account in the browser" Click="MyClublogMenuItem_Click"/>
                     <Separator />
-                    <MenuItem x:Name="MyChannelsMenuItem" Header="Channels" ToolTip="Channels" Click="MyChannelsMenuItem_Click"/>
+                    <MenuItem x:Name="MyChannelsMenuItem" ToolTip="Channels" Click="MyChannelsMenuItem_Click">
+                        <MenuItem.Header>
+                            <TextBlock Text="Channels" FontWeight="Bold" FontSize="16" Foreground="#FF8C00"/>
+                        </MenuItem.Header>
+                        <MenuItem.Icon>
+                            <Viewbox Width="16" Height="16">
+                                <Path Fill="#FF8C00" Data="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7-6.2-3.8L5.8 22l1.6-7L2 10.3l7.1-.6z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                 </MenuItem>
                 <MenuItem Header="Help" FontSize="16">
                     <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
@@ -1174,8 +1183,11 @@
         </Button>
         <!-- Undo icon for log-row "Set Radio to Freq" (independent of the cluster undo). Hidden when nothing to undo. -->
         <!-- Centered vertically between the Exchange (y=141) and Name (y=185) labels; horizontally centered to the Name label. -->
-        <Grid x:Name="MainUndoIconGrid" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,164,0,0" Width="26" Height="26" Visibility="Collapsed" Panel.ZIndex="30">
-            <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" PreviewMouseLeftButtonDown="MainUndoButton_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MainUndoButton_PreviewMouseLeftButtonUp" MouseLeave="MainUndoButton_MouseLeave" ToolTip="Click to undo radio frequency/mode change • Hold to clear all">
+        <Grid x:Name="MainUndoIconGrid" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,164,0,0" Width="26" Height="26" Visibility="Collapsed" Panel.ZIndex="30" RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform>
+                <ScaleTransform x:Name="MainUndoIconScale" ScaleX="1" ScaleY="1"/>
+            </Grid.RenderTransform>
+            <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" PreviewMouseLeftButtonDown="MainUndoButton_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MainUndoButton_PreviewMouseLeftButtonUp" MouseLeave="MainUndoButton_MouseLeave" PreviewMouseRightButtonUp="MainUndoButton_RightClick" ToolTip="Click to undo radio frequency/mode change • Hold to clear all">
                 <Grid>
                     <Image Source="Images/UNDO_Icon.png" Width="22" Height="22" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock x:Name="MainUndoCountText" FontSize="10" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>

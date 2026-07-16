@@ -960,6 +960,18 @@ namespace HolyLogger.Properties {
                 this["ClusterLotwOnly"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ChannelsJson {
+            get {
+                return ((string)(this["ChannelsJson"]));
+            }
+            set {
+                this["ChannelsJson"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

@@ -3933,10 +3933,17 @@ namespace HolyLogger
             if (clusterLatestPerCallsignOn)
             {
                 // Keep only the newest spot for each callsign+band. Source is newest-first, so the
-                // first item seen for a (call|band) key is the one to keep.
+                // first item seen for a (call|band) key is the one to keep. Then collapse again by
+                // FREQUENCY: when two different stations sit on the same frequency, show only the newest
+                // one (an older spot on that frequency is stale — the frequency is now the newer station's).
                 filtered = ordered
                     .GroupBy(s => (s.DXCallsign ?? string.Empty).Trim().ToUpperInvariant() + "|" + NormalizeClusterBandKey(s.BandText))
                     .Select(g => g.First())
+                    .GroupBy(s => s.FreqMhz > 0
+                        ? s.FreqMhz.ToString("F5", CultureInfo.InvariantCulture)   // one entry per exact frequency
+                        : "_" + s.SpotKey)                                          // no freq -> never collapse
+                    .Select(g => g.OrderByDescending(x => x.UnixTime).First())
+                    .OrderByDescending(s => s.UnixTime)
                     .Take(500)
                     .ToList();
             }
@@ -3976,10 +3983,15 @@ namespace HolyLogger
             var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             if (clusterAllSpots != null)
             {
-                // When "Latest" is on the visible list keeps one row per callsign+band, so these
-                // per-band counters must match it — count DISTINCT callsigns per band, not every spot.
+                // When "Latest" is on the visible list keeps one row per callsign+band AND one row per
+                // frequency (newest wins), so these per-band counters must apply the SAME collapse to
+                // match the table. Iterate newest-first so "first seen = the one kept".
                 var seen = clusterLatestPerCallsignOn ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : null;
-                foreach (var s in clusterAllSpots)
+                var seenFreq = clusterLatestPerCallsignOn ? new HashSet<string>(StringComparer.OrdinalIgnoreCase) : null;
+                IEnumerable<ClusterSpotViewItem> source = clusterLatestPerCallsignOn
+                    ? clusterAllSpots.OrderByDescending(s => s.UnixTime)
+                    : (IEnumerable<ClusterSpotViewItem>)clusterAllSpots;
+                foreach (var s in source)
                 {
                     if (s.UnixTime <= 0 || s.UnixTime < cutoff)
                         continue;
@@ -3990,6 +4002,9 @@ namespace HolyLogger
                     if (seen != null &&
                         !seen.Add((s.DXCallsign ?? string.Empty).Trim().ToUpperInvariant() + "|" + s.BandText.Trim().ToUpperInvariant()))
                         continue;   // already counted this callsign on this band
+                    if (seenFreq != null &&
+                        !seenFreq.Add(s.FreqMhz > 0 ? s.FreqMhz.ToString("F5", CultureInfo.InvariantCulture) : ("_" + s.SpotKey)))
+                        continue;   // a newer station already occupies this frequency
                     counts.TryGetValue(s.BandText, out int c);
                     counts[s.BandText] = c + 1;
                 }
@@ -4467,6 +4482,13 @@ namespace HolyLogger
                 return "CW";
             }
 
+            // USB/LSB are user-chosen sidebands (Channels). The logged mode is SSB; the rig mapping
+            // (MapClusterModeToRigMode) keeps the exact sideband.
+            if (mode == "USB" || mode == "LSB")
+            {
+                return "SSB";
+            }
+
             if (mode == "SSB" || mode == "FM" || mode == "AM")
             {
                 return mode;
@@ -4487,6 +4509,10 @@ namespace HolyLogger
             {
                 case "CW":
                     return PM_CW_U;
+                case "USB":
+                    return PM_SSB_U;   // explicit sideband (Channels) — honor the operator's choice
+                case "LSB":
+                    return PM_SSB_L;
                 case "SSB":
                     return freqMhz < 10.0 ? PM_SSB_L : PM_SSB_U;
                 case "FM":

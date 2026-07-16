@@ -53,6 +53,39 @@ namespace HolyLogger
             }
         }
 
+        // CAT is "live" only when OmniRig is enabled AND the selected rig is actually online.
+        internal bool IsCatLive()
+            => Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+
+        // Set the radio to a Channels-window entry (frequency in MHz + mode). Mirrors SetRadioToQsoFreq:
+        // captures the current freq/mode onto the log-radio undo stack (which pops the undo icon), reflects
+        // the values in the logger fields, and tunes the rig when CAT is live.
+        internal async void SetRadioToChannel(double freqMhz, string mode)
+        {
+            if (freqMhz <= 0) return;
+
+            string normalizedMode = NormalizeClusterModeForLogger(mode);
+            CaptureLogRadioUndoState();
+
+            // A channel carries no callsign, so wipe any leftover DX entry (call, name, locator, QRZ
+            // photo…) before we move. Setting the frequency below re-runs the on-frequency auto-fill,
+            // which repopulates the DX callsign if a cluster spot sits on this frequency, or leaves it
+            // blank if none does. Undo (captured above) restores the previous call + frequency.
+            TB_DXCallsign.Text = string.Empty;
+
+            TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
+            SelectLoggerMode(normalizedMode);
+
+            if (!IsCatLive()) return;
+
+            int freqHz = (int)Math.Round(freqMhz * 1000000.0, MidpointRounding.AwayFromZero);
+            // Map from the RAW channel mode (not the SSB-normalized one) so an explicit USB/LSB choice
+            // sets that exact sideband on the rig.
+            int? rigMode = MapClusterModeToRigMode(mode, freqMhz);
+            var modeToSend = (OmniRig.RigParamX)(rigMode ?? PM_DIG_U);
+            await TryTuneRigFrequencyAsync(freqHz, modeToSend);
+        }
+
         private async void SetRadioToQsoFreq(QSO qso)
         {
             if (qso == null) return;
@@ -111,6 +144,85 @@ namespace HolyLogger
 
             logRadioUndoStates.Push((frequencyText, modeText, dxCallsignText));
             UpdateLogRadioUndoButtonState();
+            PulseUndoIcon();   // a new undo state was added — make the icon jump so it's not missed
+        }
+
+        // Right-click the undo icon -> a small "Reset undo list" popup, mirroring the cluster undo icon.
+        private void MainUndoButton_RightClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (logRadioUndoStates.Count == 0) return;
+            e.Handled = true;
+
+            var resetBtn = new System.Windows.Controls.Button
+            {
+                Content = "Reset undo list",
+                Padding = new Thickness(14, 7, 14, 7),
+                FontSize = 13,
+                Cursor = System.Windows.Input.Cursors.Hand,
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x8B, 0x22, 0x22)),
+                Foreground = System.Windows.Media.Brushes.White,
+                BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE5, 0x73, 0x73)),
+                BorderThickness = new Thickness(1)
+            };
+
+            var popup = new System.Windows.Controls.Primitives.Popup
+            {
+                PlacementTarget = MainUndoButton,
+                Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom,
+                StaysOpen = false,
+                AllowsTransparency = true,
+                Child = new System.Windows.Controls.Border
+                {
+                    Background = System.Windows.Media.Brushes.White,
+                    BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xAA, 0xAA, 0xAA)),
+                    BorderThickness = new Thickness(1),
+                    CornerRadius = new CornerRadius(4),
+                    Padding = new Thickness(6),
+                    Child = resetBtn
+                }
+            };
+
+            resetBtn.Click += (s, ev) =>
+            {
+                popup.IsOpen = false;
+                ResetLogRadioUndo();
+            };
+
+            popup.PreviewKeyDown += (s, ev) =>
+            {
+                if (ev.Key == System.Windows.Input.Key.Escape)
+                {
+                    popup.IsOpen = false;
+                    ev.Handled = true;
+                }
+            };
+
+            popup.IsOpen = true;
+        }
+
+        // Briefly bounces the undo icon so the operator notices it appear/increment (e.g. after tuning
+        // to a channel or a spot). Purely visual; the icon settles back to its normal size.
+        private void PulseUndoIcon()
+        {
+            if (MainUndoIconGrid == null || MainUndoIconScale == null) return;
+            try
+            {
+                var pulse = new System.Windows.Media.Animation.DoubleAnimation
+                {
+                    From = 1.0,
+                    To = 1.7,
+                    Duration = TimeSpan.FromMilliseconds(200),
+                    AutoReverse = true,
+                    RepeatBehavior = new System.Windows.Media.Animation.RepeatBehavior(3),
+                    EasingFunction = new System.Windows.Media.Animation.SineEase
+                    {
+                        EasingMode = System.Windows.Media.Animation.EasingMode.EaseInOut
+                    }
+                };
+                MainUndoIconScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleXProperty, pulse);
+                MainUndoIconScale.BeginAnimation(System.Windows.Media.ScaleTransform.ScaleYProperty, pulse);
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Clears the entire log-radio undo stack (the "reset" action triggered by a long press).

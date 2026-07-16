@@ -5421,9 +5421,18 @@ namespace HolyLogger
         private void MyQrzMenuItem_Click(object sender, RoutedEventArgs e)     => OpenLoggerPersonalArea(OnlineLogger.Qrz);
         private void MyClublogMenuItem_Click(object sender, RoutedEventArgs e) => OpenLoggerPersonalArea(OnlineLogger.Clublog);
 
+        private ChannelsWindow _channelsWindow;
+
         private void MyChannelsMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            HolyMessageBox.Show("Channels is coming soon.", "Channels", HolyMsgType.Info, this);
+            if (_channelsWindow != null)
+            {
+                try { _channelsWindow.Activate(); return; }
+                catch { _channelsWindow = null; }
+            }
+            _channelsWindow = new ChannelsWindow(this);
+            _channelsWindow.Closed += (s, ev) => _channelsWindow = null;
+            _channelsWindow.Show();
         }
 
         private void OpenLoggerPersonalArea(OnlineLogger logger)
