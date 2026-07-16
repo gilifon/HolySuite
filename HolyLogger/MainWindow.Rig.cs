@@ -65,6 +65,16 @@ namespace HolyLogger
             if (freqMhz <= 0) return;
 
             string normalizedMode = NormalizeClusterModeForLogger(mode);
+
+            // Already on this channel's frequency and mode? Do nothing — no radio change, so don't
+            // capture an identical undo state or bump the undo counter.
+            if (double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out double currentMhz)
+                && Math.Abs(currentMhz - freqMhz) * 1000.0 < 0.1   // within 0.1 kHz
+                && string.Equals((CB_Mode.Text ?? string.Empty).Trim(), normalizedMode, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
             CaptureLogRadioUndoState();
 
             // A channel carries no callsign, so wipe any leftover DX entry (call, name, locator, QRZ
