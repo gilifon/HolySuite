@@ -402,9 +402,13 @@ namespace HolyLogger
         {
             // Group by the entity RESOLVED live from each callsign (not the stored country string), so the
             // worked/missing DXCC counts always match the current cty.dat entity list and can never drift.
+            // Drop "Unknown" — GetDXCC returns that placeholder name (never null) for a callsign no prefix
+            // matches, e.g. a retired prefix like T9/4N or an O-for-zero typo. It is not a DXCC entity, and
+            // GetAllEntityNames() excludes it, so letting it through would list a 266th "country" while the
+            // worked/total box — derived as total minus missing — correctly stayed at 265.
             var workedCounts = _allQsos
                 .Select(q => Resolve(q.DXCall)?.Name)
-                .Where(n => !string.IsNullOrEmpty(n))
+                .Where(n => !string.IsNullOrEmpty(n) && !string.Equals(n, "Unknown", StringComparison.OrdinalIgnoreCase))
                 .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
