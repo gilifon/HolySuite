@@ -3612,8 +3612,12 @@ namespace HolyLogger
                             if (userEditing)
                                 return;
 
-                            bool shouldOverwrite = string.IsNullOrEmpty(current) || _clusterAutoFilledDXCall ||
-                                                   !string.Equals(current, firstCall, StringComparison.OrdinalIgnoreCase);
+                            // Only (re)fill when the callsign actually differs. Re-setting the same call
+                            // used to re-run TB_DXCallsign_TextChanged every refresh, which clears the
+                            // name/locator/zones and re-queries QRZ — so the Name blinked out and back on
+                            // every Live Scale / spot update. (Empty and user-typed-different are covered
+                            // by "differs"; a focused edit already returned above.)
+                            bool shouldOverwrite = !string.Equals(current, firstCall, StringComparison.OrdinalIgnoreCase);
                             if (shouldOverwrite)
                             {
                                 // Suppress the "focused edit = manual change" handling in
@@ -4034,6 +4038,12 @@ namespace HolyLogger
             _mapUpdateDebounceTimer.Start();
         }
 
+        // Signature of the spot overlay last drawn on the map, so an unchanged set is not redrawn every
+        // cycle. On-frequency status is applied separately (SetOnFreqSpots), so it's intentionally not
+        // part of the signature. Reset to null wherever the base map is re-rendered (see the RefreshMap
+        // wrappers) so the overlay is re-added onto the fresh map.
+        private string _lastMapSpotsSig;
+
         private void DoUpdateClusterSpotsOnMap()
         {
             if (MapControl == null || MapControl.Visibility != Visibility.Visible)
@@ -4075,7 +4085,25 @@ namespace HolyLogger
                     }
                 }
 
-                MapControl.ShowClusterSpots(spots, homell.Lat, homell.Long, GetMapRadiusKm());
+                int radiusKm = GetMapRadiusKm();
+
+                // Skip the redraw when nothing that affects the overlay changed (same spots, same home,
+                // same radius). This stops the pointless periodic "map refresh" when the spot set is idle.
+                var sig = new System.Text.StringBuilder(spots.Count * 24);
+                sig.Append(homell.Lat.ToString("F4", CultureInfo.InvariantCulture)).Append(',')
+                   .Append(homell.Long.ToString("F4", CultureInfo.InvariantCulture)).Append(',')
+                   .Append(radiusKm.ToString(CultureInfo.InvariantCulture)).Append('|');
+                foreach (var sp in spots)
+                    sig.Append(sp.Callsign).Append(',')
+                       .Append(sp.Lat.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
+                       .Append(sp.Lon.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
+                       .Append(sp.Band).Append(',').Append(sp.Freq).Append(';');
+                string sigStr = sig.ToString();
+                if (string.Equals(sigStr, _lastMapSpotsSig, StringComparison.Ordinal))
+                    return;   // nothing changed — leave the map as-is
+                _lastMapSpotsSig = sigStr;
+
+                MapControl.ShowClusterSpots(spots, homell.Lat, homell.Long, radiusKm);
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }

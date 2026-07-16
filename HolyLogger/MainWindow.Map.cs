@@ -321,6 +321,8 @@ namespace HolyLogger
                 }
 
                 MapControl.RefreshMap();
+                _lastMapSpotsSig = null;   // base map re-rendered — force the spot overlay to redraw
+                UpdateClusterSpotsOnMap();
             }), DispatcherPriority.Background);
         }
 
@@ -331,6 +333,8 @@ namespace HolyLogger
                 if (MapControl != null)
                 {
                     MapControl.RefreshMap();
+                    _lastMapSpotsSig = null;   // base map re-rendered — force the spot overlay to redraw
+                    UpdateClusterSpotsOnMap();
                 }
             }), DispatcherPriority.Background);
         }
@@ -344,6 +348,8 @@ namespace HolyLogger
                 if (MapControl != null)
                 {
                     MapControl.RefreshMap();
+                    _lastMapSpotsSig = null;   // base map re-rendered — force the spot overlay to redraw
+                    UpdateClusterSpotsOnMap();
                 }
             }), DispatcherPriority.Background);
         }
