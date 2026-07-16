@@ -6362,6 +6362,10 @@ namespace HolyLogger
                     {
                         return new SolidColorBrush(Color.FromRgb(0x00, 0x33, 0x99));
                     }
+                    if (IsLotwUser && Properties.Settings.Default.ClusterShowLotw)
+                    {
+                        return ThemeManager.Brush("RowLotwBg"); // LoTW user: mark only the callsign cell (yellow)
+                    }
 
                     return Brushes.Transparent;
                 }
@@ -6385,8 +6389,8 @@ namespace HolyLogger
             }
 
             private bool _isLotwUser;
-            // True when this spot's DX callsign is a Logbook of The World (LoTW) uploader, so the row
-            // gets a yellow background. Set once when the spot is built (see the cluster spot list).
+            // True when this spot's DX callsign is a Logbook of The World (LoTW) uploader, so the DX
+            // callsign cell gets a yellow background. Set once when the spot is built (see the spot list).
             public bool IsLotwUser
             {
                 get => _isLotwUser;
@@ -6396,7 +6400,7 @@ namespace HolyLogger
                     {
                         _isLotwUser = value;
                         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsLotwUser)));
-                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(RowBackground)));
+                        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DXBackground)));
                     }
                 }
             }
@@ -6412,10 +6416,6 @@ namespace HolyLogger
                     if (IsOnFrequency)
                     {
                         return ThemeManager.Brush("RowOnFreqBg"); // on-frequency green, theme-aware
-                    }
-                    if (IsLotwUser && Properties.Settings.Default.ClusterShowLotw)
-                    {
-                        return ThemeManager.Brush("RowLotwBg"); // LoTW user (yellow), theme-aware
                     }
                     else
                     {

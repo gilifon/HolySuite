@@ -706,6 +706,14 @@ namespace HolyLogger
         // so more options can be added later without touching the title-bar layout.
         private System.Windows.Controls.Primitives.Popup BuildClusterOptionsPopup()
         {
+            // The two options are mutually exclusive. A stale config (or an older build) can have both
+            // saved as on; if so, keep the mark and drop the filter so they never load both-checked.
+            if (Properties.Settings.Default.ClusterShowLotw && Properties.Settings.Default.ClusterLotwOnly)
+            {
+                Properties.Settings.Default.ClusterLotwOnly = false;
+                Properties.Settings.Default.Save();
+            }
+
             var panel = new StackPanel();
 
             var header = new TextBlock { Text = "Cluster options", FontSize = 15, FontWeight = FontWeights.Bold, Margin = new Thickness(14, 10, 14, 6) };
@@ -718,26 +726,46 @@ namespace HolyLogger
 
             var showLotw = new CheckBox
             {
-                Content = "Show LoTW (yellow)",
+                Content = "Mark LOTW User (yellow)",
                 IsChecked = Properties.Settings.Default.ClusterShowLotw,
-                Margin = new Thickness(14, 8, 14, 8),
                 FontSize = 16
             };
             showLotw.SetResourceReference(Control.ForegroundProperty, "TextBrush");
             showLotw.Checked += (s, e) => SetClusterShowLotw(true);
             showLotw.Unchecked += (s, e) => SetClusterShowLotw(false);
-            panel.Children.Add(showLotw);
+
+            // Give this row the same yellow as the mark itself, so the popup previews what it does.
+            var showLotwRow = new Border
+            {
+                CornerRadius = new CornerRadius(3),
+                Margin = new Thickness(10, 6, 10, 6),
+                Padding = new Thickness(6, 6, 6, 6),
+                Child = showLotw
+            };
+            showLotwRow.SetResourceReference(Border.BackgroundProperty, "RowLotwBg");
+            panel.Children.Add(showLotwRow);
 
             var lotwOnly = new CheckBox
             {
-                Content = "LoTW only",
+                Content = "LOTW Users Only",
                 IsChecked = Properties.Settings.Default.ClusterLotwOnly,
                 Margin = new Thickness(14, 8, 14, 12),
                 FontSize = 16
             };
             lotwOnly.SetResourceReference(Control.ForegroundProperty, "TextBrush");
-            lotwOnly.Checked += (s, e) => SetClusterLotwOnly(true);
+            lotwOnly.Checked += (s, e) =>
+            {
+                SetClusterLotwOnly(true);
+                // When only LoTW spots are shown, marking them is redundant — turn the mark off.
+                if (showLotw.IsChecked == true) showLotw.IsChecked = false;
+            };
             lotwOnly.Unchecked += (s, e) => SetClusterLotwOnly(false);
+
+            // ...and vice versa: turning the mark on exits "users only" mode (the two are exclusive).
+            showLotw.Checked += (s, e) =>
+            {
+                if (lotwOnly.IsChecked == true) lotwOnly.IsChecked = false;
+            };
             panel.Children.Add(lotwOnly);
 
             var border = new Border
