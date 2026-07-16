@@ -5408,6 +5408,108 @@ namespace HolyLogger
             options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
         }
 
+        // ===== "My" menu: open each online service's personal area in the browser =====
+        // We deliberately do NOT submit the operator's credentials to the site's web login (fragile and a
+        // security risk). We just open the personal-area URL; the site authenticates via the browser
+        // session or its own login page. The stored username/password only decide whether the service is
+        // configured yet -- if not, we offer to jump straight to its settings section.
+
+        private enum OnlineLogger { Lotw, Eqsl, Qrz, Clublog }
+
+        private void MyLotwMenuItem_Click(object sender, RoutedEventArgs e)    => OpenLoggerPersonalArea(OnlineLogger.Lotw);
+        private void MyEqslMenuItem_Click(object sender, RoutedEventArgs e)    => OpenLoggerPersonalArea(OnlineLogger.Eqsl);
+        private void MyQrzMenuItem_Click(object sender, RoutedEventArgs e)     => OpenLoggerPersonalArea(OnlineLogger.Qrz);
+        private void MyClublogMenuItem_Click(object sender, RoutedEventArgs e) => OpenLoggerPersonalArea(OnlineLogger.Clublog);
+
+        private void MyChannelsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            HolyMessageBox.Show("Channels is coming soon.", "Channels", HolyMsgType.Info, this);
+        }
+
+        private void OpenLoggerPersonalArea(OnlineLogger logger)
+        {
+            string name, url;
+            bool configured;
+            switch (logger)
+            {
+                case OnlineLogger.Lotw:
+                    name = "LoTW";
+                    url = "https://lotw.arrl.org/lotwuser/default";
+                    // Uploads use a TQSL certificate (not the web login), so treat LoTW as configured if
+                    // EITHER the web credentials or a TQSL path is set -- don't nag someone who already
+                    // uploads to LoTW but never entered web credentials.
+                    configured = (!string.IsNullOrWhiteSpace(Properties.Settings.Default.LotwWebUser)
+                                  && !string.IsNullOrWhiteSpace(Properties.Settings.Default.LotwWebPassword))
+                                 || !string.IsNullOrWhiteSpace(Properties.Settings.Default.LotwTqslPath);
+                    break;
+                case OnlineLogger.Eqsl:
+                    name = "eQSL";
+                    url = "https://www.eqsl.cc/qslcard/";
+                    // eQSL isn't a single login — it's the per-callsign accounts table (eqsl_accounts).
+                    // "Configured" means at least one account row exists.
+                    configured = HasEqslAccount();
+                    break;
+                case OnlineLogger.Qrz:
+                    name = "QRZ.com";
+                    url = "https://www.qrz.com/";
+                    // QRZ can be set up as a lookup login (username/password) or a logbook API key.
+                    configured = (!string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_username)
+                                  && !string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_password))
+                                 || !string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_api_key);
+                    break;
+                default: // Clublog
+                    name = "Club Log";
+                    url = "https://clublog.org/";
+                    configured = !string.IsNullOrWhiteSpace(Properties.Settings.Default.ClublogEmail)
+                                 && !string.IsNullOrWhiteSpace(Properties.Settings.Default.ClublogPassword);
+                    break;
+            }
+
+            if (configured)
+            {
+                OpenUrlInBrowser(url);
+                return;
+            }
+
+            bool goToSettings = HolyMessageBox.ShowConfirm(
+                $"Your {name} username and password are not set yet.\n\nWould you like to open the {name} settings to enter them?",
+                name + " not configured", HolyMsgType.Info, this);
+            if (goToSettings)
+                OpenLoggerSettings(logger);
+        }
+
+        // eQSL is configured when at least one per-callsign account exists in the eqsl_accounts table.
+        private bool HasEqslAccount()
+        {
+            try { return dal != null && dal.GetEqslAccounts().Count > 0; }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
+        private void OpenLoggerSettings(OnlineLogger logger)
+        {
+            OptionsMenuItemMenuItem_Click(null, null);
+            if (options == null) return;
+            switch (logger)
+            {
+                case OnlineLogger.Lotw:    options.LotwItem.IsSelected = true;    break;
+                case OnlineLogger.Eqsl:    options.EqslItem.IsSelected = true;    break;
+                case OnlineLogger.Qrz:     options.QRZItem.IsSelected = true;     break;
+                case OnlineLogger.Clublog: options.ClublogItem.IsSelected = true; break;
+            }
+        }
+
+        private void OpenUrlInBrowser(string url)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(url) { UseShellExecute = true });
+            }
+            catch (System.Exception ex)
+            {
+                HolyMessageBox.ShowError("Could not open the browser: " + ex.Message, "Open Link", this);
+            }
+        }
+
         private void GenerateNewOptionsWindow()
         {
             options = new OptionsWindow();

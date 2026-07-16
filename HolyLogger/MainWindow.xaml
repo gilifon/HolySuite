@@ -568,6 +568,14 @@
                     </MenuItem>
                     <Separator />
                 </MenuItem>
+                <MenuItem Header="My" FontSize="16">
+                    <MenuItem x:Name="MyLotwMenuItem" Header="LoTW" ToolTip="Open your LoTW (Logbook of The World) personal area in the browser" Click="MyLotwMenuItem_Click"/>
+                    <MenuItem x:Name="MyEqslMenuItem" Header="eQSL" ToolTip="Open your eQSL.cc member area in the browser" Click="MyEqslMenuItem_Click"/>
+                    <MenuItem x:Name="MyQrzMenuItem" Header="QRZ.com" ToolTip="Open your QRZ.com account in the browser" Click="MyQrzMenuItem_Click"/>
+                    <MenuItem x:Name="MyClublogMenuItem" Header="Club Log" ToolTip="Open your Club Log account in the browser" Click="MyClublogMenuItem_Click"/>
+                    <Separator />
+                    <MenuItem x:Name="MyChannelsMenuItem" Header="Channels" ToolTip="Channels" Click="MyChannelsMenuItem_Click"/>
+                </MenuItem>
                 <MenuItem Header="Help" FontSize="16">
                     <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
                         <MenuItem.Icon>
