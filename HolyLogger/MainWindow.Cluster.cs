@@ -118,6 +118,8 @@ namespace HolyLogger
         TextBlock clusterCenterLineFreqText = null;   // live VFO frequency shown on the line
         System.Windows.Controls.Primitives.DataGridRowsPresenter clusterLiveScaleRowsHost = null;  // rows panel; carries the off-screen spacer margins
         int clusterLiveScaleAlignRetries = 0;         // guards the layout-not-ready retry loop of the scroll engine
+        System.Windows.Threading.DispatcherTimer _centerLineRevealTimer = null;  // debounces revealing the Live Scale readout band until the table layout settles
+        bool _centerLineRevealed = false;             // the band is shown only after its centered position has stabilized (no startup flash)
         string clusterPreLiveScaleBandFilterMode = null;  // band-filter mode to restore when Live Scale is turned off
         string clusterPreLiveScaleSortMember = "UnixTime";
         System.ComponentModel.ListSortDirection clusterPreLiveScaleSortDir = System.ComponentModel.ListSortDirection.Descending;
@@ -526,7 +528,15 @@ namespace HolyLogger
             tableHost.Children.Add(centerLine);
             // Keep the line on the rows-area center — and the table aligned to it — through any resize
             // (the spacer margins and scroll target both depend on the viewport height).
-            spotsGrid.SizeChanged += (s, e) => { PositionClusterCenterLine(); ScrollClusterLiveScale(); };
+            spotsGrid.SizeChanged += (s, e) =>
+            {
+                PositionClusterCenterLine();
+                ScrollClusterLiveScale();
+                // While the band is still hidden on startup, keep pushing the reveal out until the table
+                // stops resizing — so it's only shown once at its final centered position.
+                if (clusterLiveScaleOn && !_centerLineRevealed)
+                    StartCenterLineRevealDebounce();
+            };
 
             Grid.SetRow(headerGrid, 0);
             Grid.SetRow(headerCanvas, 1);
@@ -1900,6 +1910,40 @@ namespace HolyLogger
                 clusterCenterLineBand.Margin = new Thickness(0, top, 0, 0);
         }
 
+        // Restart the debounce that reveals the Live Scale readout band. The band stays HIDDEN until the
+        // table has stopped resizing for the interval, so it is only ever shown already-centered — no
+        // startup flash at the top of the table while the window is still laying out.
+        private void StartCenterLineRevealDebounce()
+        {
+            if (_centerLineRevealTimer == null)
+            {
+                _centerLineRevealTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(400)
+                };
+                _centerLineRevealTimer.Tick += (s, e) => { _centerLineRevealTimer.Stop(); RevealCenterLineNow(); };
+            }
+            _centerLineRevealTimer.Stop();
+            _centerLineRevealTimer.Start();
+        }
+
+        private void RevealCenterLineNow()
+        {
+            if (!clusterLiveScaleOn || clusterCenterLineBand == null) return;
+
+            var rows = FindVisualChild<ScrollContentPresenter>(clusterSpotsGrid);
+            if (rows == null || rows.ActualHeight <= 0)
+            {
+                StartCenterLineRevealDebounce();   // layout still not ready — wait a little longer
+                return;
+            }
+
+            PositionClusterCenterLine();   // final centered position
+            ScrollClusterLiveScale();      // align the VFO row to it
+            clusterCenterLineBand.Visibility = Visibility.Visible;
+            _centerLineRevealed = true;
+        }
+
         // Toggles the "Latest report per callsign+band" view (remembered across sessions) and refreshes.
         private void ToggleClusterLatestPerCallsign()
         {
@@ -1967,13 +2011,19 @@ namespace HolyLogger
                 ApplyClusterLiveScaleSort();                    // frequency, highest at top
                 SetClusterLiveScaleScrollSetup(true);           // program owns the scroll from here
                 if (clusterCenterLine != null) clusterCenterLine.Visibility = Visibility.Visible;
+                // Keep the readout band HIDDEN until the table layout has settled, so it never flashes at
+                // the top of the table while the window is still growing on startup.
+                if (clusterCenterLineBand != null) clusterCenterLineBand.Visibility = Visibility.Hidden;
+                _centerLineRevealed = false;
                 UpdateClusterLiveScale();                       // readout + first alignment
-                // Position the line after the layout pass so the rows viewport is measured.
                 Dispatcher.BeginInvoke(new Action(PositionClusterCenterLine),
                     System.Windows.Threading.DispatcherPriority.Loaded);
+                StartCenterLineRevealDebounce();                // reveal the band only once sizes stop changing
             }
             else
             {
+                _centerLineRevealTimer?.Stop();
+                _centerLineRevealed = false;
                 SetClusterLiveScaleScrollSetup(false);          // unlock scroll/sort, drop the spacers
                 if (clusterCenterLine != null) clusterCenterLine.Visibility = Visibility.Collapsed;
                 ApplyClusterBandFilterMode(clusterPreLiveScaleBandFilterMode ?? "PreSelected", false);
@@ -3528,6 +3578,14 @@ namespace HolyLogger
             }
             bool holdingHolyClusterCall = !string.IsNullOrWhiteSpace(_holyClusterSelectedCall);
 
+            // Release an F9-dismissed callsign once the radio moves off the frequency it was on, so
+            // returning to that frequency later fills normally again.
+            if (!string.IsNullOrEmpty(_clusterDismissedCall) && _clusterDismissedFreqMhz > 0
+                && Math.Abs(currentFreqMhz - _clusterDismissedFreqMhz) * 1000.0 > toleranceKhz)
+            {
+                _clusterDismissedCall = null;
+            }
+
             var onFreqSig = new System.Text.StringBuilder();     // which spots are on frequency right now
             var onFreqCalls = new System.Text.StringBuilder();   // their callsigns, for the in-place map restyle
             foreach (var spot in clusterVisibleSpots)
@@ -3612,6 +3670,13 @@ namespace HolyLogger
                             if (userEditing)
                                 return;
 
+                            // The user cleared this exact call with F9 — don't put it back while we're
+                            // still on its frequency. (Released when the radio leaves the frequency;
+                            // double-clicking the spot fills it explicitly.)
+                            if (!string.IsNullOrEmpty(_clusterDismissedCall)
+                                && string.Equals(firstCall, _clusterDismissedCall, StringComparison.OrdinalIgnoreCase))
+                                return;
+
                             // Only (re)fill when the callsign actually differs. Re-setting the same call
                             // used to re-run TB_DXCallsign_TextChanged every refresh, which clears the
                             // name/locator/zones and re-queries QRZ — so the Name blinked out and back on
@@ -3660,6 +3725,13 @@ namespace HolyLogger
         // manual edit and drops _clusterAutoFilledDXCall; this flag suppresses that during our own
         // fill, because F9/Clear parks focus in the (empty) box before we re-fill it.
         private bool _clusterFillingDXCall = false;
+
+        // A callsign the user cleared with F9 while it was auto-filled by the on-frequency feature, plus
+        // the frequency it was on. While set, the on-frequency auto-fill will NOT put this call back —
+        // the user dismissed it on purpose. Released when the radio leaves that frequency (see
+        // UpdateClusterFrequencyHighlight); a double-click on the spot still fills it explicitly.
+        private string _clusterDismissedCall;
+        private double _clusterDismissedFreqMhz;
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
         private static readonly string[] ClusterModeOptions = new[] { "CW", "DIGI", "SSB", "FM", "FT8", "RTTY", "AM" };
@@ -4038,12 +4110,6 @@ namespace HolyLogger
             _mapUpdateDebounceTimer.Start();
         }
 
-        // Signature of the spot overlay last drawn on the map, so an unchanged set is not redrawn every
-        // cycle. On-frequency status is applied separately (SetOnFreqSpots), so it's intentionally not
-        // part of the signature. Reset to null wherever the base map is re-rendered (see the RefreshMap
-        // wrappers) so the overlay is re-added onto the fresh map.
-        private string _lastMapSpotsSig;
-
         private void DoUpdateClusterSpotsOnMap()
         {
             if (MapControl == null || MapControl.Visibility != Visibility.Visible)
@@ -4085,25 +4151,7 @@ namespace HolyLogger
                     }
                 }
 
-                int radiusKm = GetMapRadiusKm();
-
-                // Skip the redraw when nothing that affects the overlay changed (same spots, same home,
-                // same radius). This stops the pointless periodic "map refresh" when the spot set is idle.
-                var sig = new System.Text.StringBuilder(spots.Count * 24);
-                sig.Append(homell.Lat.ToString("F4", CultureInfo.InvariantCulture)).Append(',')
-                   .Append(homell.Long.ToString("F4", CultureInfo.InvariantCulture)).Append(',')
-                   .Append(radiusKm.ToString(CultureInfo.InvariantCulture)).Append('|');
-                foreach (var sp in spots)
-                    sig.Append(sp.Callsign).Append(',')
-                       .Append(sp.Lat.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
-                       .Append(sp.Lon.ToString("F3", CultureInfo.InvariantCulture)).Append(',')
-                       .Append(sp.Band).Append(',').Append(sp.Freq).Append(';');
-                string sigStr = sig.ToString();
-                if (string.Equals(sigStr, _lastMapSpotsSig, StringComparison.Ordinal))
-                    return;   // nothing changed — leave the map as-is
-                _lastMapSpotsSig = sigStr;
-
-                MapControl.ShowClusterSpots(spots, homell.Lat, homell.Long, radiusKm);
+                MapControl.ShowClusterSpots(spots, homell.Lat, homell.Long, GetMapRadiusKm());
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -4461,6 +4509,9 @@ namespace HolyLogger
             {
                 return;
             }
+
+            // Explicitly selecting a spot cancels any earlier F9 dismissal — the user wants it filled.
+            _clusterDismissedCall = null;
 
             // If in edit mode, exit to new mode first before applying cluster spot
             if (state == State.Edit)

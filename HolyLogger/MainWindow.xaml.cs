@@ -1577,6 +1577,18 @@ namespace HolyLogger
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
         {
+            // If the user (F9) is clearing a callsign the cluster auto-filled from the current frequency,
+            // remember it so the on-frequency auto-fill doesn't immediately put it back. (An automatic
+            // leave-the-frequency clear resets _clusterAutoFilledDXCall to false BEFORE calling here, so
+            // this only records a genuine user dismissal.) Released when the radio leaves the frequency.
+            if (_clusterAutoFilledDXCall && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            {
+                _clusterDismissedCall = TB_DXCallsign.Text.Trim().ToUpperInvariant();
+                _clusterDismissedFreqMhz = double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(),
+                    System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture,
+                    out double dmf) ? dmf : 0;
+            }
+
             //TB_Frequency.Text = string.Empty;
             // Drop any stuck map-hover blue highlight on the cluster rows.
             SetClusterRowMapHighlight(null);

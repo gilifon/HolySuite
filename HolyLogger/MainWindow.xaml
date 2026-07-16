@@ -1103,9 +1103,12 @@
                Padding="8,0,8,0" VerticalAlignment="Top" Grid.Row="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                Background="White" BorderBrush="Red" BorderThickness="2" Foreground="Red" FontWeight="Bold"
                RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="15" Panel.ZIndex="10"/>
-        <TextBlock x:Name="L_Legal" HorizontalAlignment="Left" Margin="101,129,0,0" Padding="8,0,8,0"
-                   VerticalAlignment="Top" Grid.Row="1" TextAlignment="Center" Background="White" FontWeight="Bold"
-                   FontStyle="Italic" FontSize="15" Visibility="Hidden" Panel.ZIndex="10"><Run Text="Legal " Foreground="#2E7D32"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#2E7D32"/></TextBlock>
+        <Border x:Name="L_LegalFrame" HorizontalAlignment="Left" Margin="101,128,0,0" VerticalAlignment="Top"
+                Grid.Row="1" Panel.ZIndex="10" Background="White" BorderBrush="#2E7D32" BorderThickness="1"
+                CornerRadius="2" Visibility="{Binding Visibility, ElementName=L_Legal}">
+            <TextBlock x:Name="L_Legal" Padding="8,1,8,1" TextAlignment="Center" Background="Transparent"
+                       FontWeight="Bold" FontStyle="Italic" FontSize="15" Visibility="Hidden"><Run Text="Legal " Foreground="#2E7D32"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#2E7D32"/></TextBlock>
+        </Border>
         <Border HorizontalAlignment="Left" Margin="237,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
                 <ToolTip>
