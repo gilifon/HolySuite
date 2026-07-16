@@ -160,7 +160,7 @@ namespace HolyLogger
         {
             try
             {
-                File.WriteAllText(Path.Combine(backupDir, "HOW TO RESTORE.txt"), GetRestoreInstructions());
+                File.WriteAllText(Path.Combine(backupDir, "HOW TO RESTORE.txt"), GetRestoreInstructions(backupDir));
             }
             catch (Exception ex)
             {
@@ -170,26 +170,45 @@ namespace HolyLogger
 
         // The restore instructions, shown both in HOW TO RESTORE.txt and in the in-app
         // "Backups & Restore" window, so the two can never drift apart.
-        public static string GetRestoreInstructions()
+        // inApp: true when shown in the Backups & Restore window (which has an "Open Backups Folder"
+        // button, so step 4 points at it); false for the HOW TO RESTORE.txt saved in the backups folder,
+        // where there is no button, so it gives the path instead.
+        public static string GetRestoreInstructions(string backupsFolder, bool inApp = false)
         {
+            string backups = backupsFolder;   // ...\Backups
+            string logFolder = Path.GetDirectoryName(backupsFolder.TrimEnd('\\', '/')) ?? backupsFolder;   // parent = folder holding logDB.db
+
+            string step4 = inApp
+                ? "4. Click the \"Open Backups Folder\" button below to open your backups folder," + Environment.NewLine +
+                  "   then pick the backup with the most recent date from BEFORE the problem" + Environment.NewLine +
+                  "   happened, e.g.  logDB-2026-07-03.db" + Environment.NewLine
+                : "4. Open your backups folder:" + Environment.NewLine +
+                  "      " + backups + Environment.NewLine +
+                  "   and pick the backup with the most recent date from BEFORE the problem" + Environment.NewLine +
+                  "   happened, e.g.  logDB-2026-07-03.db" + Environment.NewLine;
+
             return
 "HOW TO RESTORE YOUR LOG FROM A BACKUP" + Environment.NewLine +
 "=====================================" + Environment.NewLine +
 Environment.NewLine +
-"HolyLogger saves a backup copy of your entire log database here every day" + Environment.NewLine +
-"(one file per day, the last " + DailyBackupsToKeep + " days are kept)." + Environment.NewLine +
+"Your daily backups are saved in this folder (one file per day, the last" + Environment.NewLine +
+DailyBackupsToKeep + " days are kept):" + Environment.NewLine +
+"   " + backups + Environment.NewLine +
+Environment.NewLine +
+"Your live log database (the file  logDB.db ) is in this folder:" + Environment.NewLine +
+"   " + logFolder + Environment.NewLine +
 Environment.NewLine +
 "If your log is damaged or QSOs were lost by mistake, do this:" + Environment.NewLine +
 Environment.NewLine +
 "1. Close HolyLogger completely." + Environment.NewLine +
-"2. Go to the folder ABOVE this one. It contains your log database, the" + Environment.NewLine +
-"   file:  logDB.db" + Environment.NewLine +
-"3. Protect the damaged file first: rename logDB.db to logDB.damaged" + Environment.NewLine +
+"2. Open your log-database folder (copy-paste this path into the address bar" + Environment.NewLine +
+"   of File Explorer):" + Environment.NewLine +
+"      " + logFolder + Environment.NewLine +
+"3. Protect the damaged file first: rename  logDB.db  to  logDB.damaged" + Environment.NewLine +
 "   (right-click -> Rename). Do NOT delete it - it may still be useful." + Environment.NewLine +
-"4. In THIS folder, pick the backup with the most recent date from BEFORE" + Environment.NewLine +
-"   the problem happened, e.g.  logDB-2026-07-03.db" + Environment.NewLine +
-"5. COPY that file into the folder above, and rename the copy to exactly:" + Environment.NewLine +
-"   logDB.db" + Environment.NewLine +
+step4 +
+"5. COPY that backup file into your log-database folder (from step 2), and" + Environment.NewLine +
+"   rename the copy to exactly:  logDB.db" + Environment.NewLine +
 "6. Start HolyLogger. Your log is back to how it was on that day." + Environment.NewLine +
 Environment.NewLine +
 "QSOs made after the backup date are not in the backup - re-enter them or" + Environment.NewLine +
