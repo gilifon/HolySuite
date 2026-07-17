@@ -568,27 +568,27 @@
                     </MenuItem>
                     <Separator />
                 </MenuItem>
-                <MenuItem Header="My" FontSize="16">
-                    <MenuItem x:Name="MyLotwMenuItem" Header="LoTW" ToolTip="Open your LoTW (Logbook of The World) personal area in the browser" Click="MyLotwMenuItem_Click"/>
-                    <MenuItem x:Name="MyEqslMenuItem" Header="eQSL" ToolTip="Open your eQSL.cc member area in the browser" Click="MyEqslMenuItem_Click"/>
-                    <MenuItem x:Name="MyQrzMenuItem" Header="QRZ.com" ToolTip="Open your QRZ.com account in the browser" Click="MyQrzMenuItem_Click"/>
-                    <MenuItem x:Name="MyClublogMenuItem" Header="Club Log" ToolTip="Open your Club Log account in the browser" Click="MyClublogMenuItem_Click"/>
-                    <Separator />
-                    <MenuItem x:Name="MyChannelsMenuItem" ToolTip="Channels" Click="MyChannelsMenuItem_Click">
-                        <MenuItem.Header>
-                            <TextBlock Text="Channels" FontWeight="Bold" FontSize="16" Foreground="#FF8C00"/>
-                        </MenuItem.Header>
+                <MenuItem Header="Links" FontSize="16">
+                    <MenuItem x:Name="MyLotwMenuItem" Header="LoTW" ToolTip="Open your LoTW (Logbook of The World) personal area in the browser" Click="MyLotwMenuItem_Click">
                         <MenuItem.Icon>
-                            <Viewbox Width="16" Height="16">
-                                <Path Fill="#FF8C00" Data="M12 2l2.9 6.9 7.1.6-5.4 4.7 1.6 7-6.2-3.8L5.8 22l1.6-7L2 10.3l7.1-.6z"/>
-                            </Viewbox>
+                            <!-- The LoTW logo is a 2.33:1 banner, so it gets the icon column's full
+                                 width (22px) rather than a 16px square, which would waste half of it. -->
+                            <Image Source="Images/lotw.png" Stretch="Uniform" Width="20" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                </MenuItem>
-                <MenuItem Header="Help" FontSize="16">
-                    <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
+                    <MenuItem x:Name="MyEqslMenuItem" Header="eQSL" ToolTip="Open your eQSL.cc member area in the browser" Click="MyEqslMenuItem_Click">
                         <MenuItem.Icon>
-                            <Image Source="Images/update.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                            <Image Source="Images/eqsl.png" Stretch="Uniform" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="MyQrzMenuItem" Header="QRZ.com" ToolTip="Open your QRZ.com account in the browser" Click="MyQrzMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/qrz.png" Stretch="Uniform" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <MenuItem x:Name="MyClublogMenuItem" Header="Club Log" ToolTip="Open your Club Log account in the browser" Click="MyClublogMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/clublog.png" Stretch="Uniform" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
@@ -610,6 +610,24 @@
                     <MenuItem x:Name="OnTheAir" Header="HolyLogger On The Air" ToolTip="A cluster of HolyLogger user that are currently on the air" Click="OnTheAirMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                </MenuItem>
+                <!-- Channels: opens the channels window directly (no submenu). The menu template
+                     collapses the Icon column for top-level roles, so the tower goes in the Header. -->
+                <MenuItem x:Name="MyChannelsMenuItem" ToolTip="Channels" Click="MyChannelsMenuItem_Click">
+                    <MenuItem.Header>
+                        <Viewbox Width="20" Height="20">
+                            <Path Stretch="Uniform" Stroke="#FF8C00" StrokeThickness="1.5"
+                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                  Data="M7.47,12.53 A6.4,6.4 0 1 1 16.53,12.53 M9.45,10.55 A3.6,3.6 0 1 1 14.55,10.55 M12,6.5 A1.5,1.5 0 1 0 12,9.5 A1.5,1.5 0 1 0 12,6.5 M12,9.6 L7.6,21.4 M12,9.6 L16.4,21.4 M10.14,14.6 L13.86,14.6 M8.87,18 L15.13,18 M10.14,14.6 L15.13,18 M8.87,18 L16.4,21.4 M6.5,21.4 L7.6,21.4 M16.4,21.4 L17.5,21.4"/>
+                        </Viewbox>
+                    </MenuItem.Header>
+                </MenuItem>
+                <MenuItem Header="Help" FontSize="16">
+                    <MenuItem x:Name="UpdatesMenuItem" Header="Check for updates" ToolTip="Check for updates" Click="UpdatesMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/update.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />

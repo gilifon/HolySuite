@@ -600,6 +600,15 @@
     <Resource Include="Images\qrz.png" />
   </ItemGroup>
   <ItemGroup>
+    <Resource Include="Images\lotw.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\eqsl.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <Resource Include="Images\clublog.png" />
+  </ItemGroup>
+  <ItemGroup>
     <Resource Include="Images\crown.png" />
   </ItemGroup>
   <ItemGroup>
