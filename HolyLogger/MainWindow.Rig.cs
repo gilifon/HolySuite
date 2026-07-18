@@ -281,6 +281,8 @@ namespace HolyLogger
 
                 TB_Frequency.Text = freqMhz.ToString("0.0###", CultureInfo.InvariantCulture);
                 SelectLoggerMode(modeText);
+                // Restored callsign is a complete call, not typing — don't pop the suggestions dropdown.
+                suppressNextCallsignSuggestions = true;
                 TB_DXCallsign.Text = dxCallsignText;
 
                 if (Properties.Settings.Default.EnableOmniRigCAT && Rig != null && Rig.Status == OmniRig.RigStatusX.ST_ONLINE)
