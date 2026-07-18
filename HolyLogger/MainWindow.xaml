@@ -566,7 +566,7 @@
                             <Image Source="Images/properties.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
+                    
                 </MenuItem>
                 <MenuItem Header="Links" FontSize="16">
                     <MenuItem x:Name="MyLotwMenuItem" Header="LoTW" ToolTip="Open your LoTW (Logbook of The World) personal area in the browser" Click="MyLotwMenuItem_Click">
