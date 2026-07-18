@@ -236,6 +236,15 @@
     <Setting Name="ChannelsJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="LotwConfirmedEntities" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="LotwLastQsl" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="LotwConfirmedQsoCount" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
     <Setting Name="HolyClusterUDPPort" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">2237</Value>
     </Setting>

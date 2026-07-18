@@ -70,6 +70,16 @@
                             </StackPanel>
                         </Border>
 
+                        <!-- Confirmed on LoTW: entities confirmed / worked, plus total confirmed QSOs.
+                             Blank until the user runs Check LoTW confirmations (or from cache). -->
+                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="#2E9E4F" BorderThickness="1">
+                            <StackPanel>
+                                <TextBlock Text="Confirmed (LoTW)" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_ConfirmedDxcc" FontSize="30" FontWeight="Bold" Foreground="#2E9E4F" HorizontalAlignment="Center"/>
+                                <TextBlock x:Name="TB_ConfirmedQsos" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Date Range — dates stacked with Start / End labels -->
                         <Border Padding="14,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                             <StackPanel>
@@ -107,8 +117,10 @@
 
                         <!-- Pivot table section -->
                         <StackPanel VerticalAlignment="Top">
-                            <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Band × Mode" FontSize="16" FontWeight="Bold"
-                                       Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                            <!-- Same fixed 54px header height as the country/zone columns, so the pivot
+                                 table (and the data-quality text + button below it) line up with them. -->
+                            <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Band × Mode" Height="54" FontSize="16" FontWeight="Bold"
+                                       Foreground="{DynamicResource AccentBrush}"/>
                             <!--
                                 Inner PivotBorder: left+top edge in blue (1px).
                                 Outer PivotOuterBorder: right+bottom edge in black (2px).
@@ -134,8 +146,21 @@
 
                             <!-- Worked Countries -->
                             <StackPanel Margin="0,0,10,0" VerticalAlignment="Top">
-                                <TextBlock x:Name="TB_WorkedHeader" Text="Worked Countries"
-                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" Margin="0,0,0,6"/>
+                                <!-- Fixed-height header block so this table lines up with the Missing /
+                                     Zones tables, which have their own fixed-height headers. Header + LoTW
+                                     button on one row; the status wraps on its own line below. -->
+                                <StackPanel Height="54">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,2" VerticalAlignment="Center">
+                                        <TextBlock x:Name="TB_WorkedHeader" Text="Worked Countries"
+                                                   FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
+                                                   VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                        <Button x:Name="BTN_CheckLotw" Content="Check LoTW" FontSize="12" Padding="8,3"
+                                                VerticalAlignment="Center" Click="BTN_CheckLotw_Click"
+                                                ToolTip="Download your LoTW confirmations and mark the confirmed countries"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="TB_LotwStatus" FontSize="16" FontWeight="Bold" MaxWidth="345"
+                                               HorizontalAlignment="Left" TextWrapping="Wrap" Foreground="#2E9E4F"/>
+                                </StackPanel>
                                 <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
                                     <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>
@@ -144,11 +169,14 @@
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortWorkedName" Text="Country ▲"
-                                                           Width="130" FontSize="13" FontWeight="Bold"
+                                                           Width="160" FontSize="13" FontWeight="Bold"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                                 <TextBlock x:Name="TB_SortWorkedCount" Text="Count ▼"
-                                                           FontSize="13" FontWeight="Bold"
+                                                           Width="50" FontSize="13" FontWeight="Bold"
                                                            Cursor="Hand" TextAlignment="Right" Foreground="{DynamicResource TextBrush}"/>
+                                                <TextBlock x:Name="TB_SortWorkedConfirmed" Text="Conf."
+                                                           Width="70" FontSize="13" FontWeight="Bold" Margin="10,0,0,0"
+                                                           Cursor="Hand" TextAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
                                         </Border>
                                         <ScrollViewer x:Name="SV_WorkedCountries"
@@ -169,13 +197,19 @@
                                                                 <TextBlock Text="{Binding Name}" FontSize="13"
                                                                            Foreground="{DynamicResource TextBrush}"
                                                                            VerticalAlignment="Center"
-                                                                           Width="130"
+                                                                           Width="160"
                                                                            TextTrimming="CharacterEllipsis"/>
                                                                 <TextBlock Text="{Binding CountStr}" FontSize="13"
                                                                            FontWeight="Bold"
                                                                            VerticalAlignment="Center"
-                                                                           TextAlignment="Right" Width="40"
+                                                                           TextAlignment="Right" Width="50"
                                                                            Foreground="{DynamicResource AccentBrush}"/>
+                                                                <TextBlock Text="{Binding ConfirmedMark}" FontSize="16"
+                                                                           FontWeight="Bold" Margin="10,0,0,0"
+                                                                           VerticalAlignment="Center"
+                                                                           TextAlignment="Center" Width="70"
+                                                                           Foreground="{Binding ConfirmedBrush}"
+                                                                           ToolTip="{Binding ConfirmedTip}"/>
                                                             </StackPanel>
                                                         </Border>
                                                     </DataTemplate>
@@ -189,8 +223,8 @@
 
                             <!-- Missing Countries -->
                             <StackPanel VerticalAlignment="Top">
-                                <TextBlock x:Name="TB_MissingHeader" Text="Missing Countries"
-                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}" Margin="0,0,0,6"/>
+                                <TextBlock x:Name="TB_MissingHeader" Text="Missing Countries" Height="54"
+                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}"/>
                                 <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
                                     <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>
@@ -234,8 +268,8 @@
 
                             <!-- Missing CQ Zones (1..40) -->
                             <StackPanel Margin="10,0,0,0" VerticalAlignment="Top">
-                                <TextBlock x:Name="TB_MissingCQHeader" Text="Missing CQ Zones"
-                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}" Margin="0,0,0,6"/>
+                                <TextBlock x:Name="TB_MissingCQHeader" Text="Missing CQ Zones" Height="54"
+                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}"/>
                                 <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
                                     <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>
@@ -266,8 +300,8 @@
 
                             <!-- Missing ITU Zones (1..90) -->
                             <StackPanel Margin="10,0,0,0" VerticalAlignment="Top">
-                                <TextBlock x:Name="TB_MissingITUHeader" Text="Missing ITU Zones"
-                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}" Margin="0,0,0,6"/>
+                                <TextBlock x:Name="TB_MissingITUHeader" Text="Missing ITU Zones" Height="54"
+                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}"/>
                                 <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
                                     <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>

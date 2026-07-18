@@ -6437,6 +6437,9 @@ namespace HolyLogger
                 }
             }
 
+            // Worked, but not yet confirmed on LoTW — drives the cluster's "Unconfirmed" legend counter.
+            public bool IsUnconfirmedCountry { get; set; }
+
             private bool _isOnFrequency;
             public bool IsOnFrequency
             {
@@ -6629,6 +6632,33 @@ namespace HolyLogger
             }
 
             return !workedCountries.Contains(dxcc.Entity);
+        }
+
+        // Worked but NOT confirmed on LoTW. Worked is keyed by entity prefix (dxcc.Entity); the LoTW
+        // confirmed cache is keyed by entity NAME (dxcc.Name), so we bridge via the resolved DXCC.
+        // Returns false when there's no LoTW data yet (empty set) — the feature stays inert until the
+        // user runs Check LoTW confirmations in Statistics.
+        private bool IsUnconfirmedCountry(string dxCallsign, HashSet<string> workedCountries, HashSet<string> confirmedNames)
+        {
+            if (confirmedNames == null || confirmedNames.Count == 0) return false;
+            if (string.IsNullOrWhiteSpace(dxCallsign) || workedCountries == null) return false;
+
+            var dxcc = rem.GetDXCC(dxCallsign.Trim());
+            if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || dxcc.Entity == "-1") return false;
+
+            if (!workedCountries.Contains(dxcc.Entity)) return false;   // not worked -> that's a New Country, not unconfirmed
+            return !string.IsNullOrWhiteSpace(dxcc.Name) && !confirmedNames.Contains(dxcc.Name);
+        }
+
+        // The LoTW-confirmed entity NAMES, from the Statistics download cache (Settings.LotwConfirmedEntities).
+        private HashSet<string> GetClusterConfirmedEntities()
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string cached = Properties.Settings.Default.LotwConfirmedEntities;
+            if (!string.IsNullOrWhiteSpace(cached))
+                foreach (var n in cached.Split('|'))
+                    if (!string.IsNullOrWhiteSpace(n)) set.Add(n.Trim());
+            return set;
         }
 
         private static readonly Dictionary<string, string> DefaultBandColors = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

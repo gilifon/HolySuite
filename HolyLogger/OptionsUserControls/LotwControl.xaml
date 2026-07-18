@@ -13,50 +13,66 @@
                       FontSize="15" FontWeight="Bold"
                       IsChecked="{Binding Default.UseLotwService, Source={StaticResource Settings}, Mode=TwoWay}"/>
         </Border>
-    <Grid VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
-          IsEnabled="{Binding IsChecked, ElementName=CBX_UseLotw}">
-        <Grid.Style>
-            <Style TargetType="Grid">
+    <StackPanel VerticalAlignment="Stretch" HorizontalAlignment="Stretch"
+                IsEnabled="{Binding IsChecked, ElementName=CBX_UseLotw}">
+        <StackPanel.Style>
+            <Style TargetType="StackPanel">
                 <Style.Triggers>
                     <Trigger Property="IsEnabled" Value="False">
                         <Setter Property="Opacity" Value="0.45"/>
                     </Trigger>
                 </Style.Triggers>
             </Style>
-        </Grid.Style>
-        <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
+        </StackPanel.Style>
 
-        <TextBlock Grid.Row="0" Text="ARRL Logbook of the World (LoTW)" FontSize="17" FontWeight="Bold"
+        <TextBlock Text="ARRL Logbook of the World (LoTW)" FontSize="17" FontWeight="Bold"
                    Margin="2,2,0,2"/>
 
-        <TextBlock Grid.Row="1" Margin="2,0,8,6" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+        <!-- Web Login section — first, so the credentials the confirmation download needs are up top
+             (mirrors the QRZ.com settings layout, which leads with its credentials). -->
+        <TextBlock Text="LoTW Web Login" FontSize="14" FontWeight="SemiBold"
+                   Margin="2,8,0,2"/>
+        <TextBlock Margin="2,0,8,4" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                   Text="This is your LoTW website login (lotw.arrl.org) — NOT the TQSL certificate password below. Needed to download your confirmed QSOs (used for the Statistics 'Confirmed countries' highlight and to fill missing Band / Mode). Uploads do not use this login."/>
+
+        <Grid Margin="0,2,0,0" HorizontalAlignment="Left">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <Label Grid.Column="0" Content="LoTW Username" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="14"/>
+            <TextBox Grid.Column="1" x:Name="TB_WebUser" Height="26" Width="200" TextWrapping="NoWrap"
+                     VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                     TextChanged="TB_WebUser_TextChanged"/>
+            <Label Grid.Column="2" Content="Password" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="14" Margin="16,0,0,0"/>
+            <!-- Password + eye toggle: the PasswordBox (masked) and a TextBox (plain) share this cell;
+                 the eye button swaps which is shown so the operator can verify what they typed. -->
+            <Grid Grid.Column="3" Width="200">
+                <PasswordBox x:Name="PB_WebPassword" Height="26"
+                             VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                             PasswordChanged="PB_WebPassword_Changed"/>
+                <TextBox x:Name="TB_WebPasswordVisible" Height="26" Visibility="Collapsed"
+                         VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                         TextChanged="TB_WebPasswordVisible_TextChanged"/>
+            </Grid>
+            <ToggleButton Grid.Column="4" x:Name="BTN_ShowWebPassword" Width="30" Height="26" Margin="4,0,0,0"
+                          FontFamily="Segoe MDL2 Assets" FontSize="14" Content="&#xE7B3;"
+                          ToolTip="Show / hide the password"
+                          Checked="ShowWebPassword_Checked" Unchecked="ShowWebPassword_Unchecked"/>
+        </Grid>
+
+        <!-- Separator -->
+        <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,12,0,0"/>
+
+        <!-- TQSL upload (certificate) -->
+        <TextBlock Margin="2,10,8,6" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
                    Text="QSOs are signed and uploaded with your local TQSL program. TQSL must be installed with a valid callsign certificate. Use Tools → Upload Queue to LoTW from the main window to run the upload."/>
 
         <!-- TQSL path -->
-        <Grid Grid.Row="2" Margin="0,0,0,0">
+        <Grid Margin="0,0,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150"/>
                 <ColumnDefinition Width="*"/>
@@ -71,7 +87,7 @@
         </Grid>
 
         <!-- Certificate password -->
-        <Grid Grid.Row="3" Margin="0,6,0,0">
+        <Grid Margin="0,6,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="150"/>
                 <ColumnDefinition Width="Auto"/>
@@ -86,17 +102,17 @@
         </Grid>
 
         <!-- Separator -->
-        <Border Grid.Row="4" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,10,0,0"/>
+        <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,10,0,0"/>
 
         <!-- Station location (auto-selected) -->
-        <TextBlock Grid.Row="5" Text="Station Location — selected automatically by callsign" FontSize="14"
+        <TextBlock Text="Station Location — selected automatically by callsign" FontSize="14"
                    FontWeight="SemiBold" Margin="2,10,0,2"/>
-        <TextBlock Grid.Row="6" x:Name="TB_LocationsHelp" Margin="2,0,8,6" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+        <TextBlock x:Name="TB_LocationsHelp" Margin="2,0,8,6" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
                    Text="HolyLogger reads your TQSL station locations (read-only) and signs each callsign with its own location. Nothing to type — just keep your locations set up in TQSL."/>
 
         <!-- Current-callsign resolution line -->
-        <Border Grid.Row="7" Background="#F4F8FC" BorderBrush="#CBD9E6" BorderThickness="1" CornerRadius="3"
-                Padding="8,5,8,5" Margin="2,0,8,6">
+        <Border Background="#F4F8FC" BorderBrush="#CBD9E6" BorderThickness="1" CornerRadius="3"
+                Padding="8,5,8,5" Margin="2,0,8,6" HorizontalAlignment="Left">
             <StackPanel Orientation="Horizontal">
                 <TextBlock Text="Current Station Callsign: " FontSize="13" VerticalAlignment="Center"/>
                 <TextBlock x:Name="TB_CurrentCallsign" Text="—" FontSize="13" FontWeight="Bold" VerticalAlignment="Center"/>
@@ -108,7 +124,7 @@
         </Border>
 
         <!-- Read-only table of TQSL station locations -->
-        <DataGrid Grid.Row="8" x:Name="DG_Locations" Margin="2,0,8,0" Height="118"
+        <DataGrid x:Name="DG_Locations" Margin="2,0,8,0" Height="118"
                   AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
                   FontSize="13" ScrollViewer.VerticalScrollBarVisibility="Auto">
@@ -131,7 +147,7 @@
         </DataGrid>
 
         <!-- Refresh from TQSL -->
-        <Grid Grid.Row="9" Margin="0,6,0,0">
+        <Grid Margin="0,6,0,0">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -144,40 +160,14 @@
         </Grid>
 
         <!-- Separator -->
-        <Border Grid.Row="10" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,10,0,0"/>
-
-        <!-- Web Login section -->
-        <TextBlock Grid.Row="11" Text="LoTW Web Login" FontSize="14" FontWeight="SemiBold"
-                   Margin="2,8,0,2"/>
-        <TextBlock Grid.Row="12" Margin="2,0,8,4" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
-                   Text="Required only for downloading confirmed QSOs from LoTW (to fill missing Band / Mode). This is your LoTW website login — not the TQSL certificate password. Uploads do not use this login."/>
-
-        <Grid Grid.Row="13" Margin="0,2,0,0">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="150"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="Auto"/>
-            </Grid.ColumnDefinitions>
-            <Label Grid.Column="0" Content="LoTW Username" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="14"/>
-            <TextBox Grid.Column="1" x:Name="TB_WebUser" Height="26" Width="200" TextWrapping="NoWrap"
-                     VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
-                     TextChanged="TB_WebUser_TextChanged"/>
-            <Label Grid.Column="2" Content="Password" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="14" Margin="16,0,0,0"/>
-            <PasswordBox Grid.Column="3" x:Name="PB_WebPassword" Height="26" Width="200"
-                         VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
-                         PasswordChanged="PB_WebPassword_Changed"/>
-        </Grid>
-
-        <!-- Separator -->
-        <Border Grid.Row="14" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,10,0,0"/>
+        <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,10,0,0"/>
 
         <!-- Reset pending from date section -->
-        <TextBlock Grid.Row="15" Text="Reset Upload Queue" FontSize="14" FontWeight="SemiBold"
+        <TextBlock Text="Reset Upload Queue" FontSize="14" FontWeight="SemiBold"
                    Margin="2,8,0,2"/>
-        <TextBlock Grid.Row="16" Margin="2,0,8,4" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+        <TextBlock Margin="2,0,8,4" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
                    Text="Mark QSOs from a chosen date onwards as pending so they are included in the next upload. LoTW ignores duplicates, so re-uploading is safe."/>
-        <StackPanel Grid.Row="17" Orientation="Horizontal" Margin="2,2,0,0" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Margin="2,2,0,0" VerticalAlignment="Center">
             <TextBlock Text="From date:" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
             <DatePicker x:Name="DP_FromDate" FontSize="13" Width="140" VerticalAlignment="Center"/>
             <Button x:Name="ResetFromDateBtn" Content="Mark as Pending" Width="140" FontSize="13"
@@ -188,7 +178,7 @@
                     Margin="20,0,0,0" Padding="8,4,8,4" Click="TestBtn_Click"/>
         </StackPanel>
 
-        <Border x:Name="StatusBadge" Grid.Row="18" Background="#E6F4EA" BorderBrush="#34A853"
+        <Border x:Name="StatusBadge" Background="#E6F4EA" BorderBrush="#34A853"
                 BorderThickness="1" CornerRadius="3" Padding="8,4,8,4"
                 Margin="2,8,8,0" HorizontalAlignment="Left" Visibility="Collapsed">
             <TextBlock x:Name="StatusText" Foreground="#1E7E34" FontSize="13" FontWeight="SemiBold"
@@ -196,12 +186,12 @@
         </Border>
 
         <!-- Separator -->
-        <Border Grid.Row="19" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,10,0,0"/>
+        <Border BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,10,0,0"/>
 
         <!-- Upload-on-exit section -->
-        <TextBlock Grid.Row="20" Text="Upload Queue on Exit" FontSize="14" FontWeight="SemiBold"
+        <TextBlock Text="Upload Queue on Exit" FontSize="14" FontWeight="SemiBold"
                    Margin="2,8,0,2"/>
-        <StackPanel Grid.Row="21" Orientation="Horizontal" Margin="2,2,0,0" VerticalAlignment="Center">
+        <StackPanel Orientation="Horizontal" Margin="2,2,0,0" VerticalAlignment="Center">
             <TextBlock Text="On exit:" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
             <ComboBox x:Name="CB_UploadOnExit" Width="320" FontSize="13"
                       SelectionChanged="CB_UploadOnExit_SelectionChanged">
@@ -210,6 +200,6 @@
                 <ComboBoxItem Content="Always upload on exit (no prompt)"/>
             </ComboBox>
         </StackPanel>
-    </Grid>
+    </StackPanel>
     </DockPanel>
 </UserControl>

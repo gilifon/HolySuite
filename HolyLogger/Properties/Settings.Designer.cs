@@ -972,6 +972,42 @@ namespace HolyLogger.Properties {
                 this["ChannelsJson"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwConfirmedEntities {
+            get {
+                return ((string)(this["LotwConfirmedEntities"]));
+            }
+            set {
+                this["LotwConfirmedEntities"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwLastQsl {
+            get {
+                return ((string)(this["LotwLastQsl"]));
+            }
+            set {
+                this["LotwLastQsl"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int LotwConfirmedQsoCount {
+            get {
+                return ((int)(this["LotwConfirmedQsoCount"]));
+            }
+            set {
+                this["LotwConfirmedQsoCount"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

@@ -33,7 +33,11 @@ namespace HolyLogger
         private List<CountryItem> _workedList;
         private List<CountryItem> _missingList;
 
-        private enum WorkedSort { CountDesc, CountAsc, NameAsc, NameDesc }
+        // DXCC entity names confirmed on LoTW. Populated from the LoTW confirmation download (or the
+        // cached result); drives the Confirmed column (green check / red minus) in the worked list.
+        private HashSet<string> _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        private enum WorkedSort { CountDesc, CountAsc, NameAsc, NameDesc, ConfirmedDesc, ConfirmedAsc }
         private enum MissingSort { NameAsc, NameDesc }
         private WorkedSort  _workedSort  = WorkedSort.CountDesc;
         private MissingSort _missingSort = MissingSort.NameAsc;
@@ -69,6 +73,7 @@ namespace HolyLogger
                 Top  = SystemParameters.WorkArea.Top  + 60;
             }
 
+            LoadConfirmedCache();
             ComputeStats();
 
             // Match country-table scroll heights to the pivot table height whenever the pivot resizes.
@@ -422,7 +427,8 @@ namespace HolyLogger
                     FlagImage = GetFlagImage(name),
                 }).ToList();
 
-            TB_WorkedHeader.Text = $"Worked Countries\n({_workedList.Count})";
+            // Single line now — the LoTW button sits beside it on the same row.
+            TB_WorkedHeader.Text = $"Worked Countries ({_workedList.Count})";
 
             var allDxccEntities = _masterResolver.GetAllEntityNames();
             _missingList = allDxccEntities
@@ -447,11 +453,213 @@ namespace HolyLogger
             TB_SortWorkedName.MouseLeftButtonUp  += SortWorkedByName;
             TB_SortWorkedCount.MouseLeftButtonUp -= SortWorkedByCount;
             TB_SortWorkedCount.MouseLeftButtonUp += SortWorkedByCount;
+            TB_SortWorkedConfirmed.MouseLeftButtonUp -= SortWorkedByConfirmed;
+            TB_SortWorkedConfirmed.MouseLeftButtonUp += SortWorkedByConfirmed;
             TB_SortMissingName.MouseLeftButtonUp -= SortMissingByName;
             TB_SortMissingName.MouseLeftButtonUp += SortMissingByName;
 
+            ApplyConfirmedHighlight();   // color rows from the (possibly cached) LoTW-confirmed set
             ApplyWorkedSort();
             ApplyMissingSort();
+        }
+
+        // ---- LoTW "confirmed countries" (confirmed on LoTW) ----
+
+        // Restore the last downloaded confirmed-entity set so the colors/count show immediately on open
+        // without re-downloading. Stored as a '|'-joined list of DXCC entity names.
+        private void LoadConfirmedCache()
+        {
+            _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            string cached = Properties.Settings.Default.LotwConfirmedEntities;
+            if (string.IsNullOrWhiteSpace(cached)) return;
+            foreach (var n in cached.Split('|'))
+                if (!string.IsNullOrWhiteSpace(n)) _confirmedEntities.Add(n.Trim());
+        }
+
+        // Green-highlight the worked rows whose entity is in the confirmed set, and update the count line.
+        // Does not re-sort; the caller refreshes the list (BuildCountryTables / the button both do).
+        private void ApplyConfirmedHighlight()
+        {
+            if (_workedList == null) return;
+            int confirmed = 0;
+            foreach (var item in _workedList)
+            {
+                item.IsConfirmed = _confirmedEntities.Contains(item.Name);
+                if (item.IsConfirmed) confirmed++;
+            }
+
+            TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
+            TB_LotwStatus.Text = _confirmedEntities.Count == 0
+                ? string.Empty
+                : $"Confirmed (LoTW): {confirmed} of {_workedList.Count}";
+
+            // Summary box: confirmed / worked entities, and total confirmed QSOs (from the last download).
+            TB_ConfirmedDxcc.Text = _confirmedEntities.Count == 0
+                ? "—"
+                : $"{confirmed} / {_workedList.Count}";
+            int qsl = Properties.Settings.Default.LotwConfirmedQsoCount;
+            TB_ConfirmedQsos.Text = qsl > 0 ? $"{qsl} QSLs" : string.Empty;
+        }
+
+        private async void BTN_CheckLotw_Click(object sender, RoutedEventArgs e)
+        {
+            var s = Properties.Settings.Default;
+            string user = s.LotwWebUser?.Trim();
+            string pass = s.LotwWebPassword;
+            if (string.IsNullOrWhiteSpace(user) || string.IsNullOrWhiteSpace(pass))
+            {
+                // Same discoverable flow as the Bad-QSO editor: offer to open Options → LoTW rather than
+                // leaving the operator wondering why nothing happens. (The download needs the LoTW website
+                // login, which is separate from the TQSL certificate used for uploads.)
+                bool openOptions = HolyMessageBox.ShowConfirm(
+                    "Your LoTW website username and password aren't set, so confirmations can't be downloaded.\n\n" +
+                    "(These are separate from the TQSL certificate used for uploading.)\n\n" +
+                    "Open Options → LoTW to enter them now?",
+                    "LoTW login needed", HolyMsgType.Warning, this);
+                if (openOptions)
+                {
+                    var opts = new OptionsWindow();
+                    opts.LotwControlInstance.Dal = Dal;
+                    opts.Owner = this;
+                    opts.LotwItem.IsSelected = true;
+                    opts.ShowDialog();
+                }
+                return;
+            }
+
+            // Incremental sync: qso_qsl=yes is incremental by design (returns QSLs received since the given
+            // date). The FIRST run has no saved marker, so it pulls everything from 1970 (slow, one time);
+            // later runs pass the last-QSL date we saved and get only what's new (fast). We union new
+            // confirmations into the cached set. A full re-pull only happens when there's no cache yet.
+            bool incremental = _confirmedEntities.Count > 0 && !string.IsNullOrWhiteSpace(s.LotwLastQsl);
+            string sinceDate = incremental
+                ? SafeQslSinceDate(s.LotwLastQsl)   // date part of the saved APP_LoTW_LASTQSL marker
+                : "1970-01-01";
+
+            BTN_CheckLotw.IsEnabled = false;
+            TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;   // clear any prior error red
+            TB_LotwStatus.Text = incremental
+                ? "Checking LoTW for new confirmations…"
+                : "Downloading all confirmations from LoTW… (one-time; can take a minute for a large log)";
+            try
+            {
+                // We do NOT request qso_qsldetail: we match by callsign, so the extra per-record fields
+                // would only bloat and slow the download.
+                string url = "https://lotw.arrl.org/lotwuser/lotwreport.adi"
+                           + "?login=" + Uri.EscapeDataString(user)
+                           + "&password=" + Uri.EscapeDataString(pass)
+                           + "&qso_query=1&qso_qsl=yes&qso_qslsince=" + Uri.EscapeDataString(sinceDate);
+
+                string adif;
+                // Decompress gzip/deflate — otherwise a compressed response reads back as binary garbage.
+                using (var handler = new System.Net.Http.HttpClientHandler
+                {
+                    AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+                })
+                using (var http = new System.Net.Http.HttpClient(handler))
+                {
+                    http.Timeout = TimeSpan.FromSeconds(300);   // large accounts can take a while server-side
+                    adif = await http.GetStringAsync(url);
+                }
+
+                if (adif.IndexOf("Invalid password", StringComparison.OrdinalIgnoreCase) >= 0
+                    || adif.IndexOf("login incorrect", StringComparison.OrdinalIgnoreCase) >= 0
+                    || adif.IndexOf("<Error>", StringComparison.OrdinalIgnoreCase) >= 0)
+                {
+                    TB_LotwStatus.Foreground = System.Windows.Media.Brushes.IndianRed;
+                    TB_LotwStatus.Text = "LoTW rejected the login — check your username and password.";
+                    return;
+                }
+
+                // Sanity-check the payload really is the ADIF report (not an error/login web page, and
+                // not unreadable compressed bytes). Catches auth failures whose wording we didn't match.
+                bool looksAdif = adif.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase) >= 0
+                              || adif.IndexOf("<eor>", StringComparison.OrdinalIgnoreCase) >= 0
+                              || adif.IndexOf("<call:", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (!looksAdif)
+                {
+                    bool looksHtml = adif.IndexOf("<html", StringComparison.OrdinalIgnoreCase) >= 0
+                                  || adif.IndexOf("<!doctype", StringComparison.OrdinalIgnoreCase) >= 0;
+                    TB_LotwStatus.Foreground = System.Windows.Media.Brushes.IndianRed;
+                    TB_LotwStatus.Text = looksHtml
+                        ? "LoTW returned a web page, not data — the login was likely rejected. Check your username and password."
+                        : $"LoTW returned no usable data ({adif.Length} chars). Check your LoTW login and try again.";
+                    return;
+                }
+
+                // Walk the QSL records, resolving each callsign to a DXCC entity via the SAME resolver the
+                // worked list uses, so the names line up for highlighting.
+                var records = System.Text.RegularExpressions.Regex.Split(
+                    adif, "<eor>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                int qslCount = 0;
+                var resolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var rec in records)
+                {
+                    string call = ExtractAdifField(rec, "call");
+                    if (string.IsNullOrWhiteSpace(call)) continue;
+                    qslCount++;
+
+                    string name = _masterResolver.GetDXCC(call)?.Name;
+                    if (!string.IsNullOrEmpty(name)
+                        && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                        resolvedNames.Add(name);
+                }
+
+                // Full run replaces the set; incremental run adds the new confirmations to the cached set.
+                if (incremental)
+                    _confirmedEntities.UnionWith(resolvedNames);
+                else
+                    _confirmedEntities = resolvedNames;
+
+                // Save the confirmed set and LoTW's last-QSL marker for the next incremental run. The
+                // total confirmed-QSO count is cumulative: a full run replaces it, an incremental adds
+                // the new QSLs (a slight same-day overlap is harmless for this informational figure).
+                s.LotwConfirmedEntities = string.Join("|", _confirmedEntities);
+                s.LotwConfirmedQsoCount = incremental ? s.LotwConfirmedQsoCount + qslCount : qslCount;
+                string lastQsl = ExtractAdifField(adif, "app_lotw_lastqsl");
+                if (!string.IsNullOrWhiteSpace(lastQsl)) s.LotwLastQsl = lastQsl.Trim();
+                s.Save();
+
+                ApplyConfirmedHighlight();
+                ApplyWorkedSort();   // rebuild the list so the new row colors show
+
+                TB_LotwStatus.Text = incremental
+                    ? $"Confirmed (LoTW): {_confirmedEntities.Count} of {_workedList?.Count ?? 0}  ·  {qslCount} new QSL{(qslCount == 1 ? "" : "s")}"
+                    : $"Confirmed (LoTW): {_confirmedEntities.Count} of {_workedList?.Count ?? 0}  ·  {qslCount} QSLs downloaded";
+            }
+            catch (Exception ex)
+            {
+                TB_LotwStatus.Foreground = System.Windows.Media.Brushes.IndianRed;
+                TB_LotwStatus.Text = "LoTW download failed: " + ex.Message;
+            }
+            finally
+            {
+                BTN_CheckLotw.IsEnabled = true;
+            }
+        }
+
+        // The saved APP_LoTW_LASTQSL marker looks like "2026-07-14 10:23:45"; qso_qslsince wants a date.
+        // Take the date part (re-including that whole day is harmless — merging the set is idempotent).
+        // Fall back to a full pull if the marker isn't a recognizable date.
+        private static string SafeQslSinceDate(string marker)
+        {
+            var m = System.Text.RegularExpressions.Regex.Match(
+                (marker ?? string.Empty).Trim(), @"^\d{4}-\d{2}-\d{2}");
+            return m.Success ? m.Value : "1970-01-01";
+        }
+
+        // Read one ADIF field's value out of a single record. Handles <field:len> and <field:len:type>.
+        private static string ExtractAdifField(string record, string field)
+        {
+            if (string.IsNullOrEmpty(record)) return null;
+            var m = System.Text.RegularExpressions.Regex.Match(
+                record, "<" + field + @":(\d+)(?::[^>]*)?>",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            if (!m.Success) return null;
+            int len = int.Parse(m.Groups[1].Value);
+            int start = m.Index + m.Length;
+            if (len <= 0 || start + len > record.Length) return null;
+            return record.Substring(start, len).Trim();
         }
 
         private void SortWorkedByName(object sender, MouseButtonEventArgs e)
@@ -473,6 +681,12 @@ namespace HolyLogger
             ApplyWorkedSort();
         }
 
+        private void SortWorkedByConfirmed(object sender, MouseButtonEventArgs e)
+        {
+            _workedSort = _workedSort == WorkedSort.ConfirmedDesc ? WorkedSort.ConfirmedAsc : WorkedSort.ConfirmedDesc;
+            ApplyWorkedSort();
+        }
+
         private void SortMissingByName(object sender, MouseButtonEventArgs e)
         {
             _missingSort = _missingSort == MissingSort.NameAsc ? MissingSort.NameDesc : MissingSort.NameAsc;
@@ -485,6 +699,8 @@ namespace HolyLogger
             if      (_workedSort == WorkedSort.NameAsc)  sorted = _workedList.OrderBy(c => c.Name).ToList();
             else if (_workedSort == WorkedSort.NameDesc) sorted = _workedList.OrderByDescending(c => c.Name).ToList();
             else if (_workedSort == WorkedSort.CountAsc) sorted = _workedList.OrderBy(c => c.Count).ThenBy(c => c.Name).ToList();
+            else if (_workedSort == WorkedSort.ConfirmedDesc) sorted = _workedList.OrderByDescending(c => c.IsConfirmed).ThenByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
+            else if (_workedSort == WorkedSort.ConfirmedAsc)  sorted = _workedList.OrderBy(c => c.IsConfirmed).ThenByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
             else                                         sorted = _workedList.OrderByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
 
             for (int i = 0; i < sorted.Count; i++)
@@ -515,6 +731,9 @@ namespace HolyLogger
             TB_SortWorkedCount.Text = _workedSort == WorkedSort.CountDesc ? "Count ▼"
                                     : _workedSort == WorkedSort.CountAsc  ? "Count ▲"
                                     :                                        "Count";
+            TB_SortWorkedConfirmed.Text = _workedSort == WorkedSort.ConfirmedDesc ? "Conf. ▼"
+                                        : _workedSort == WorkedSort.ConfirmedAsc  ? "Conf. ▲"
+                                        :                                            "Conf.";
         }
 
         private void UpdateMissingSortHeaders()
@@ -676,5 +895,14 @@ namespace HolyLogger
         public int Count { get; set; }
         public string CountStr => Count > 0 ? Count.ToString() : "";
         public Brush RowBg { get; set; }
+
+        // LoTW confirmation state, shown in the Confirmed column: green check when confirmed, bold red
+        // cross when not. ✓ = check mark, ✗ = ballot X (clearer than a thin minus).
+        public bool IsConfirmed { get; set; }
+        public string ConfirmedMark => IsConfirmed ? "✓" : "✗";
+        public Brush ConfirmedBrush => IsConfirmed
+            ? System.Windows.Media.Brushes.ForestGreen
+            : (Brush)new SolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F));   // vivid red, far more visible
+        public string ConfirmedTip => IsConfirmed ? "Confirmed on LoTW" : "Not confirmed on LoTW";
     }
 }

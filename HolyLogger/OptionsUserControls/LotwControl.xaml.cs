@@ -230,6 +230,29 @@ namespace HolyLogger.OptionsUserControls
             Properties.Settings.Default.Save();
         }
 
+        // Eye toggle for the LoTW web password: reveal the masked PasswordBox by swapping in a plain
+        // TextBox (and back), keeping the two in sync so the saved setting is always current.
+        private void ShowWebPassword_Checked(object sender, RoutedEventArgs e)
+        {
+            TB_WebPasswordVisible.Text = PB_WebPassword.Password;
+            TB_WebPasswordVisible.Visibility = Visibility.Visible;
+            PB_WebPassword.Visibility = Visibility.Collapsed;
+        }
+
+        private void ShowWebPassword_Unchecked(object sender, RoutedEventArgs e)
+        {
+            PB_WebPassword.Password = TB_WebPasswordVisible.Text;
+            PB_WebPassword.Visibility = Visibility.Visible;
+            TB_WebPasswordVisible.Visibility = Visibility.Collapsed;
+        }
+
+        private void TB_WebPasswordVisible_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_loading) return;
+            Properties.Settings.Default.LotwWebPassword = TB_WebPasswordVisible.Text;
+            Properties.Settings.Default.Save();
+        }
+
         private void BrowseBtn_Click(object sender, RoutedEventArgs e)
         {
             var dlg = new System.Windows.Forms.OpenFileDialog

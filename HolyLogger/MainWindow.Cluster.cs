@@ -86,6 +86,7 @@ namespace HolyLogger
         TextBlock clusterShowBandsLabelText = null;
         TextBlock clusterNewCountryLegendText = null;
         TextBlock clusterNewCountryCountText = null;
+        TextBlock clusterUnconfirmedCountText = null;   // counter for the "Unconfirmed" legend line
         DispatcherTimer _clusterNewCountryBlinkTimer = null;
         DateTime _clusterNewCountryBlinkStopTime;
         bool _clusterNewCountryBlinkOn = true;
@@ -1383,7 +1384,9 @@ namespace HolyLogger
                 Orientation = Orientation.Vertical,
                 HorizontalAlignment = HorizontalAlignment.Left,
                 VerticalAlignment = VerticalAlignment.Top,
-                Margin = new Thickness(0, -1, 4, 0)
+                // Nudged up 5px (was -1) to make room for the extra "Unconfirmed" line without pushing
+                // the rest of the header/table down.
+                Margin = new Thickness(0, -6, 4, 0)
             };
             clusterLegendPanel = legendPanel;
 
@@ -1409,10 +1412,36 @@ namespace HolyLogger
             newCountryRow.Children.Add(newCountryCountText);
             legendPanel.Children.Add(newCountryRow);
 
-            legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before", false, new Thickness(0, 5, 0, 0)));
-            legendPanel.Children.Add(BuildClusterLegendItem(ThemeManager.Brush("TextBrush"), "Worked Country", false, new Thickness(0, 5, 0, 0)));
+            // "Unconfirmed" (worked but not confirmed on LoTW) sits directly below New Country, with its
+            // own big counter, mirroring the New Country line. Amber to distinguish from red New Country.
+            var unconfirmedCountText = new TextBlock
+            {
+                Text = "0",
+                Foreground = ThemeManager.Brush("TextBrush"),   // 0 → theme text; turns amber when >0
+                FontWeight = FontWeights.Bold,
+                FontSize = 22,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(4, -7, 0, -7)   // negative top/bottom keep the tall glyph from growing the line
+            };
+            clusterUnconfirmedCountText = unconfirmedCountText;
 
-            var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Freq", true, new Thickness(0, 5, 0, 0));
+            var unconfirmedRow = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Left,
+                VerticalAlignment = VerticalAlignment.Top,
+                Margin = new Thickness(0, 3, 0, 0)
+            };
+            unconfirmedRow.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)), "Unconfirmed", false, new Thickness(0, 0, 0, 0)));
+            unconfirmedRow.Children.Add(unconfirmedCountText);
+            legendPanel.Children.Add(unconfirmedRow);
+
+            // Slightly tighter gaps (3 instead of 5) on the remaining lines so the new line barely moves
+            // anything below the legend.
+            legendPanel.Children.Add(BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)), "Worked Before", false, new Thickness(0, 3, 0, 0)));
+            legendPanel.Children.Add(BuildClusterLegendItem(ThemeManager.Brush("TextBrush"), "Worked Country", false, new Thickness(0, 3, 0, 0)));
+
+            var onMyFreqLegend = BuildClusterLegendItem(new SolidColorBrush(Color.FromRgb(0x90, 0xEE, 0x90)), "On My Radio Freq", true, new Thickness(0, 3, 0, 0));
             onMyFreqLegend.HorizontalAlignment = HorizontalAlignment.Left;
             onMyFreqLegend.VerticalAlignment = VerticalAlignment.Top;
             clusterOnMyFreqLegendItem = onMyFreqLegend;
@@ -3283,6 +3312,7 @@ namespace HolyLogger
                 // of a linear scan of the entire log for every single spot. With a big log this is the
                 // difference between the UI thread freezing on each spot batch and staying responsive.
                 var workedCountries = clusterWorkedCountries ?? GetWorkedCountriesFromLog();
+                var confirmedEntities = GetClusterConfirmedEntities();   // LoTW-confirmed names (empty if never fetched)
                 var loggedDxCalls = BuildLoggedDxCallSet();
 
                 var newItems = new System.Collections.Generic.List<ClusterSpotViewItem>();
@@ -3391,6 +3421,7 @@ namespace HolyLogger
                         IsInLog = !string.IsNullOrWhiteSpace(dx) && loggedDxCalls.Contains(dx.Trim()),
                         IsMyCallsign = IsMyStationCallsign(dx),
                         IsNeededCountry = IsNeededCountry(dx, workedCountries),
+                        IsUnconfirmedCountry = IsUnconfirmedCountry(dx, workedCountries, confirmedEntities),
                         IsLotwUser = LotwUserService.IsLotwUser(dx),
                         SpotKey = key
                     };
@@ -4204,6 +4235,18 @@ namespace HolyLogger
                 if (newCountry > _lastNewCountryCount)
                     StartNewCountryBlink();
                 _lastNewCountryCount = newCountry;
+            }
+
+            if (clusterUnconfirmedCountText != null)
+            {
+                int unconfirmed = clusterVisibleSpots != null
+                    ? clusterVisibleSpots.Count(s => s.IsUnconfirmedCountry)
+                    : 0;
+                clusterUnconfirmedCountText.Text = unconfirmed.ToString(CultureInfo.InvariantCulture);
+                // Theme text at 0, amber when there are worked-but-unconfirmed spots on view.
+                clusterUnconfirmedCountText.Foreground = unconfirmed > 0
+                    ? (Brush)new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00))
+                    : ThemeManager.Brush("TextBrush");
             }
         }
 
