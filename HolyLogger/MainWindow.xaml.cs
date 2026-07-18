@@ -1577,18 +1577,17 @@ namespace HolyLogger
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
         {
-            // If the user (F9) is clearing the callsign that's currently on our frequency, remember it so
-            // the on-frequency auto-fill doesn't immediately put it back. This must fire however the call
-            // reached the box: auto-filled (_clusterAutoFilledDXCall), a double-clicked spot, or typing
-            // that matches the spot -- the latter two don't set _clusterAutoFilledDXCall, so gating on it
-            // alone let those calls get refilled after F9 (the intermittent "it came back" bug). We also
-            // match against _onFreqFirstCall, the call the auto-fill would use right now. The automatic
-            // leave-frequency clear runs with nothing on frequency (_onFreqFirstCall == null) and
-            // _clusterAutoFilledDXCall reset to false first, so it still records no dismissal.
+            // Remember whatever F9 clears, keyed to the current frequency, so the on-frequency auto-fill
+            // won't put it straight back while we're still on that frequency -- and so it can't sneak back
+            // into the DX box and get captured into the undo history (the "undo brought back a call I'd
+            // F9'd" bug). Recorded UNCONDITIONALLY for any non-empty callsign: earlier versions gated this
+            // on on-frequency detection, which momentarily flickers (e.g. while hovering a band checkbox),
+            // and in that window F9 recorded nothing and the call reappeared. Released when the radio
+            // leaves the frequency (see UpdateClusterFrequencyHighlight); a double-click on the spot fills
+            // it again explicitly (TuneToClusterSpot clears this first). Harmless for a user-typed call
+            // that isn't a spot -- there's simply no on-frequency spot for it to block.
             string clearedCall = (TB_DXCallsign.Text ?? string.Empty).Trim();
-            bool clearedIsOnFreq = !string.IsNullOrEmpty(_onFreqFirstCall)
-                && string.Equals(clearedCall, _onFreqFirstCall, StringComparison.OrdinalIgnoreCase);
-            if ((_clusterAutoFilledDXCall || clearedIsOnFreq) && !string.IsNullOrWhiteSpace(clearedCall))
+            if (!string.IsNullOrWhiteSpace(clearedCall))
             {
                 _clusterDismissedCall = clearedCall.ToUpperInvariant();
                 _clusterDismissedFreqMhz = double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(),
