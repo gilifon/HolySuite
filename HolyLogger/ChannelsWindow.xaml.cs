@@ -123,17 +123,11 @@ namespace HolyLogger
             // Reserve double-click for tuning, not for entering cell edit (edit via click / F2 instead).
             e.Handled = true;
 
-            if (_owner == null || !_owner.IsCatLive())
-            {
-                HolyMessageBox.ShowWarning(
-                    "Radio control (CAT) is not active, so the radio can't be tuned to this channel.\n\n" +
-                    "You can still add, edit and delete channels.",
-                    "CAT not active", this);
+            if (_owner == null)
                 return;
-            }
 
-            // Tuning needs BOTH a valid frequency and a mode. If either is missing, send nothing to
-            // the radio and tell the user exactly what to fill in first.
+            // Applying a channel needs BOTH a valid frequency and a mode. If either is missing, do
+            // nothing and say which one to fill.
             bool freqOk = double.TryParse((ch.FreqKhz ?? string.Empty).Trim(),
                                           NumberStyles.Float, CultureInfo.InvariantCulture, out double khz) && khz > 0;
             var missing = new List<string>();
@@ -145,16 +139,20 @@ namespace HolyLogger
                     ? $"its {missing[0]} is missing"
                     : $"its {string.Join(" and ", missing)} are missing";
                 HolyMessageBox.ShowWarning(
-                    $"This channel can't be sent to the radio because {what}.\n\n" +
+                    $"This channel can't be applied because {what}.\n\n" +
                     "Fill in the missing column, then double-click again.",
                     "My Channels", this);
                 return;
             }
 
+            // Apply the channel to the main window. SetRadioToChannel fills the Frequency and Mode
+            // fields, and ALSO tunes the radio when CAT is active. With no CAT it still fills the fields
+            // (it returns before the tune step), so a double-click is useful whether or not CAT is
+            // connected -- which is exactly the requested behavior.
             _owner.SetRadioToChannel(khz / 1000.0, ch.Mode);
 
-            // The channel has been applied -- close the window so the action feels complete (otherwise,
-            // when the channel's frequency is already the current one, nothing visibly happens).
+            // Applied -- close so the action feels complete (otherwise, when the channel's frequency is
+            // already the current one, nothing visibly happens).
             Close();
         }
 
