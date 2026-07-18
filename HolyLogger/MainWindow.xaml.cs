@@ -1577,13 +1577,20 @@ namespace HolyLogger
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
         {
-            // If the user (F9) is clearing a callsign the cluster auto-filled from the current frequency,
-            // remember it so the on-frequency auto-fill doesn't immediately put it back. (An automatic
-            // leave-the-frequency clear resets _clusterAutoFilledDXCall to false BEFORE calling here, so
-            // this only records a genuine user dismissal.) Released when the radio leaves the frequency.
-            if (_clusterAutoFilledDXCall && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+            // If the user (F9) is clearing the callsign that's currently on our frequency, remember it so
+            // the on-frequency auto-fill doesn't immediately put it back. This must fire however the call
+            // reached the box: auto-filled (_clusterAutoFilledDXCall), a double-clicked spot, or typing
+            // that matches the spot -- the latter two don't set _clusterAutoFilledDXCall, so gating on it
+            // alone let those calls get refilled after F9 (the intermittent "it came back" bug). We also
+            // match against _onFreqFirstCall, the call the auto-fill would use right now. The automatic
+            // leave-frequency clear runs with nothing on frequency (_onFreqFirstCall == null) and
+            // _clusterAutoFilledDXCall reset to false first, so it still records no dismissal.
+            string clearedCall = (TB_DXCallsign.Text ?? string.Empty).Trim();
+            bool clearedIsOnFreq = !string.IsNullOrEmpty(_onFreqFirstCall)
+                && string.Equals(clearedCall, _onFreqFirstCall, StringComparison.OrdinalIgnoreCase);
+            if ((_clusterAutoFilledDXCall || clearedIsOnFreq) && !string.IsNullOrWhiteSpace(clearedCall))
             {
-                _clusterDismissedCall = TB_DXCallsign.Text.Trim().ToUpperInvariant();
+                _clusterDismissedCall = clearedCall.ToUpperInvariant();
                 _clusterDismissedFreqMhz = double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(),
                     System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture,
                     out double dmf) ? dmf : 0;

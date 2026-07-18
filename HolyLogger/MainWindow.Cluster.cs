@@ -3647,6 +3647,13 @@ namespace HolyLogger
                 }
             }
 
+            // Remember the on-frequency callsign the auto-fill would use (or null when none), so F9 can
+            // record a dismissal for it however it reached the DX box -- not only when it was auto-filled.
+            {
+                var onFreqFc = onFreqCallsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);
+                _onFreqFirstCall = onFreqFc.Length > 0 ? onFreqFc[0].Trim() : null;
+            }
+
             // Always attempt to auto-fill the DX callsign when there is at least one on-frequency spot.
             // While a HolyCluster selection is held, leave the DX box alone — it already shows the exact
             // clicked callsign, which must not be overwritten by a different on-frequency spot.
@@ -3735,6 +3742,12 @@ namespace HolyLogger
         // UpdateClusterFrequencyHighlight); a double-click on the spot still fills it explicitly.
         private string _clusterDismissedCall;
         private double _clusterDismissedFreqMhz;
+
+        // The callsign the on-frequency auto-fill would currently use (the first on-frequency spot), or
+        // null when nothing is on frequency. F9 keys its dismissal on this so it works no matter how the
+        // call reached the DX box -- auto-fill, a double-clicked spot, or typing that matches the spot --
+        // not only when _clusterAutoFilledDXCall happens to be set.
+        private string _onFreqFirstCall;
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
         private static readonly string[] ClusterModeOptions = new[] { "CW", "DIGI", "SSB", "FM", "FT8", "RTTY", "AM" };
