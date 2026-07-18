@@ -4627,6 +4627,14 @@ namespace HolyLogger
             suppressNextCallsignSuggestions = true;
             TB_DXCallsign.Text = (spot.DXCallsign ?? string.Empty).Trim().ToUpperInvariant();
 
+            // Mark this as a cluster-originated fill (like the on-frequency auto-fill does), so that when
+            // the radio later tunes off this spot's frequency, the existing "left the frequency" logic in
+            // UpdateClusterFrequencyHighlight clears the DX box (and its name/country/locator/QRZ photo).
+            // Without this flag a double-clicked spot was treated like a hand-typed call and never cleared,
+            // so stale info lingered after tuning away (e.g. re-engaging Live Scale off the spot's freq).
+            // Set AFTER the assignment above: setting .Text runs TB_DXCallsign_TextChanged first.
+            _clusterAutoFilledDXCall = true;
+
             string normalizedMode = NormalizeClusterModeForLogger(spot.Mode);
             SelectLoggerMode(normalizedMode);
 
