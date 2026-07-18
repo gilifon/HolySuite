@@ -20,22 +20,35 @@ namespace HolyLogger
     {
         public class RadioChannel : INotifyPropertyChanged
         {
-            public string Name { get; set; } = "";
+            private string _name = "";
+            public string Name
+            {
+                get => _name;
+                set { if (_name != value) { _name = value; Raise(nameof(Name)); Raise(nameof(IsFilled)); } }
+            }
 
             private string _freqKhz = "";
             public string FreqKhz
             {
                 get => _freqKhz;
-                set
-                {
-                    if (_freqKhz == value) return;
-                    _freqKhz = value;
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FreqKhz)));
-                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FreqBrush)));
-                }
+                set { if (_freqKhz != value) { _freqKhz = value; Raise(nameof(FreqKhz)); Raise(nameof(FreqBrush)); Raise(nameof(IsFilled)); } }
             }
 
-            public string Mode { get; set; } = "";
+            private string _mode = "";
+            public string Mode
+            {
+                get => _mode;
+                set { if (_mode != value) { _mode = value; Raise(nameof(Mode)); Raise(nameof(IsFilled)); } }
+            }
+
+            // True once the row has any content — drives the row cursor (hand on a filled row for the
+            // click/double-click tune; text cursor on an empty row for typing). Not persisted.
+            [JsonIgnore]
+            public bool IsFilled => !string.IsNullOrWhiteSpace(Name)
+                                 || !string.IsNullOrWhiteSpace(FreqKhz)
+                                 || !string.IsNullOrWhiteSpace(Mode);
+
+            private void Raise(string prop) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(prop));
 
             // Freq text is colored by band, from the same band-color source as the cluster's Freq
             // column and the band checkboxes (convertFreqToBand accepts kHz directly, our unit).
