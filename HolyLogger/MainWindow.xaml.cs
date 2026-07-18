@@ -6480,6 +6480,8 @@ namespace HolyLogger
                         return Brushes.White;
                     if (IsNeededCountry)
                         return Brushes.Red;
+                    if (IsUnconfirmedCountry)
+                        return new SolidColorBrush(Color.FromRgb(0xFF, 0x8C, 0x00)); // amber: worked, not confirmed on LoTW
                     if (IsInLog)
                         return new SolidColorBrush(Color.FromRgb(0x00, 0x7A, 0xCC)); // Bold blue (not too dark)
                     return ThemeManager.Brush("TextBrush"); // normal: theme text (black light / light dark)
