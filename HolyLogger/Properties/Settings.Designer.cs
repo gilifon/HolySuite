@@ -1023,6 +1023,42 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int LotwLastNewQsls {
+            get {
+                return ((int)(this["LotwLastNewQsls"]));
+            }
+            set {
+                this["LotwLastNewQsls"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int LotwLastNewCountries {
+            get {
+                return ((int)(this["LotwLastNewCountries"]));
+            }
+            set {
+                this["LotwLastNewCountries"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwLastCheckSince {
+            get {
+                return ((string)(this["LotwLastCheckSince"]));
+            }
+            set {
+                this["LotwLastCheckSince"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("Chime")]
         public string ClusterUnconfirmedSound {
             get {
@@ -2410,6 +2446,78 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["SoundOutputDevice"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double MsgBoxWindowLeft {
+            get {
+                return ((double)(this["MsgBoxWindowLeft"]));
+            }
+            set {
+                this["MsgBoxWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double MsgBoxWindowTop {
+            get {
+                return ((double)(this["MsgBoxWindowTop"]));
+            }
+            set {
+                this["MsgBoxWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double ChannelsWindowLeft {
+            get {
+                return ((double)(this["ChannelsWindowLeft"]));
+            }
+            set {
+                this["ChannelsWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double ChannelsWindowTop {
+            get {
+                return ((double)(this["ChannelsWindowTop"]));
+            }
+            set {
+                this["ChannelsWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double ChannelsWindowWidth {
+            get {
+                return ((double)(this["ChannelsWindowWidth"]));
+            }
+            set {
+                this["ChannelsWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double ChannelsWindowHeight {
+            get {
+                return ((double)(this["ChannelsWindowHeight"]));
+            }
+            set {
+                this["ChannelsWindowHeight"] = value;
             }
         }
     }

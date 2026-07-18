@@ -474,6 +474,17 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(cached)) return;
             foreach (var n in cached.Split('|'))
                 if (!string.IsNullOrWhiteSpace(n)) _confirmedEntities.Add(n.Trim());
+
+            // Self-heal a bogus total left over from earlier broken-download testing: the confirmed-QSO
+            // count can never be below the number of confirmed countries (each country has >=1 confirmed
+            // QSO). If it is, drop the incremental marker so the next Check LoTW does a one-time full
+            // re-download that recomputes the true total. The cached colors stay until then.
+            var s = Properties.Settings.Default;
+            if (s.LotwConfirmedQsoCount < _confirmedEntities.Count && !string.IsNullOrWhiteSpace(s.LotwLastQsl))
+            {
+                s.LotwLastQsl = string.Empty;
+                s.Save();
+            }
         }
 
         // Green-highlight the worked rows whose entity is in the confirmed set, and update the count line.
@@ -493,12 +504,49 @@ namespace HolyLogger
                 ? string.Empty
                 : $"Confirmed (LoTW): {confirmed} of {_workedList.Count}";
 
-            // Summary box: confirmed / worked entities, and total confirmed QSOs (from the last download).
+            // Top summary box: confirmed / worked entities (countries).
             TB_ConfirmedDxcc.Text = _confirmedEntities.Count == 0
                 ? "—"
                 : $"{confirmed} / {_workedList.Count}";
-            int qsl = Properties.Settings.Default.LotwConfirmedQsoCount;
-            TB_ConfirmedQsos.Text = qsl > 0 ? $"{qsl} QSLs" : string.Empty;
+
+            PopulateConfirmedSummary();
+        }
+
+        // The 3-row summary under the worked table: total confirmations, what the LAST check added
+        // (new QSLs, and since when), and — the number that matters — new countries.
+        private void PopulateConfirmedSummary()
+        {
+            if (ConfirmSummaryPanel == null) return;
+            var s = Properties.Settings.Default;
+            if (_confirmedEntities.Count == 0 && s.LotwConfirmedQsoCount == 0)
+            {
+                ConfirmSummaryPanel.Visibility = Visibility.Collapsed;
+                return;
+            }
+            ConfirmSummaryPanel.Visibility = Visibility.Visible;
+
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            // Never show a bogus total: it can't be below the confirmed-country count (each country has
+            // >=1 confirmed QSO). If it is (stale value from earlier broken downloads), show "—" until a
+            // full Check LoTW recomputes it, rather than the misleading small number.
+            bool totalKnown = s.LotwConfirmedQsoCount > 0 && s.LotwConfirmedQsoCount >= _confirmedEntities.Count;
+            TB_SumTotalQsls.Text = totalKnown ? s.LotwConfirmedQsoCount.ToString("N0", inv) : "—";
+
+            // A full/baseline download has no meaningful "new since last check" delta — everything is
+            // pulled at once. Showing the whole set as "new" just duplicates the total, so the two "New"
+            // rows show "—" for a full download and only display real deltas after an incremental check.
+            bool fullDownload = string.IsNullOrWhiteSpace(s.LotwLastCheckSince);
+            var muted = (Brush)ThemeManager.Brush("MutedTextBrush");
+
+            TB_SumNewQsls.Text = fullDownload ? "—" : s.LotwLastNewQsls.ToString(inv);
+            TB_SumSince.Text = fullDownload
+                ? "   (full download)"
+                : $"   (since {s.LotwLastCheckSince})";
+
+            TB_SumNewCountries.Text = fullDownload ? "—" : s.LotwLastNewCountries.ToString(inv);
+            TB_SumNewCountries.Foreground = (!fullDownload && s.LotwLastNewCountries > 0)
+                ? System.Windows.Media.Brushes.ForestGreen
+                : muted;
         }
 
         private async void BTN_CheckLotw_Click(object sender, RoutedEventArgs e)
@@ -527,20 +575,26 @@ namespace HolyLogger
                 return;
             }
 
-            // Incremental sync: qso_qsl=yes is incremental by design (returns QSLs received since the given
-            // date). The FIRST run has no saved marker, so it pulls everything from 1970 (slow, one time);
-            // later runs pass the last-QSL date we saved and get only what's new (fast). We union new
-            // confirmations into the cached set. A full re-pull only happens when there's no cache yet.
+            // Incremental sync: the FIRST run has no saved marker, so it pulls everything from 1970 (slow,
+            // one time); later runs pass LoTW's EXACT last-QSL timestamp (APP_LoTW_LASTQSL, e.g.
+            // "2026-07-17 17:41:36") as qso_qslsince, so LoTW returns only QSLs received AFTER that
+            // moment -- no whole-day re-count. New confirmations union into the cached set; a full
+            // re-pull only happens when there's no cache yet.
             bool incremental = _confirmedEntities.Count > 0 && !string.IsNullOrWhiteSpace(s.LotwLastQsl);
-            string sinceDate = incremental
-                ? SafeQslSinceDate(s.LotwLastQsl)   // date part of the saved APP_LoTW_LASTQSL marker
-                : "1970-01-01";
+            string sinceQuery = incremental ? QslSinceValue(s.LotwLastQsl) : "1970-01-01";
+            string sinceDisplay = incremental ? PrettySince(s.LotwLastQsl) : string.Empty;
 
             BTN_CheckLotw.IsEnabled = false;
             TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;   // clear any prior error red
             TB_LotwStatus.Text = incremental
                 ? "Checking LoTW for new confirmations…"
                 : "Downloading all confirmations from LoTW… (one-time; can take a minute for a large log)";
+
+            // Cover the table with the spinner overlay so the wait doesn't look frozen.
+            TB_LotwLoadingText.Text = incremental
+                ? "Checking LoTW for new confirmations…"
+                : "Downloading confirmations from LoTW…";
+            ShowLotwSpinner(true);
             try
             {
                 // We do NOT request qso_qsldetail: we match by callsign, so the extra per-record fields
@@ -548,7 +602,7 @@ namespace HolyLogger
                 string url = "https://lotw.arrl.org/lotwuser/lotwreport.adi"
                            + "?login=" + Uri.EscapeDataString(user)
                            + "&password=" + Uri.EscapeDataString(pass)
-                           + "&qso_query=1&qso_qsl=yes&qso_qslsince=" + Uri.EscapeDataString(sinceDate);
+                           + "&qso_query=1&qso_qsl=yes&qso_qslsince=" + Uri.EscapeDataString(sinceQuery);
 
                 string adif;
                 // Decompress gzip/deflate — otherwise a compressed response reads back as binary garbage.
@@ -605,27 +659,36 @@ namespace HolyLogger
                         resolvedNames.Add(name);
                 }
 
+                // How many NEW countries this check added = growth of the entity set. This is the number
+                // that actually matters (unlike raw QSL count, which re-counts same-day confirmations).
+                int countriesBefore = _confirmedEntities.Count;
+
                 // Full run replaces the set; incremental run adds the new confirmations to the cached set.
                 if (incremental)
                     _confirmedEntities.UnionWith(resolvedNames);
                 else
                     _confirmedEntities = resolvedNames;
 
+                int newCountries = incremental
+                    ? Math.Max(0, _confirmedEntities.Count - countriesBefore)
+                    : _confirmedEntities.Count;   // a full (re)build treats the whole set as "found"
+
                 // Save the confirmed set and LoTW's last-QSL marker for the next incremental run. The
                 // total confirmed-QSO count is cumulative: a full run replaces it, an incremental adds
                 // the new QSLs (a slight same-day overlap is harmless for this informational figure).
                 s.LotwConfirmedEntities = string.Join("|", _confirmedEntities);
                 s.LotwConfirmedQsoCount = incremental ? s.LotwConfirmedQsoCount + qslCount : qslCount;
+                s.LotwLastNewQsls = qslCount;
+                s.LotwLastNewCountries = newCountries;
+                s.LotwLastCheckSince = sinceDisplay;   // empty = a full download
                 string lastQsl = ExtractAdifField(adif, "app_lotw_lastqsl");
                 if (!string.IsNullOrWhiteSpace(lastQsl)) s.LotwLastQsl = lastQsl.Trim();
                 s.Save();
 
+                // ApplyConfirmedHighlight sets the "Confirmed (LoTW): N of M" status, colors the rows, and
+                // fills the 3-row summary (total / new QSLs since date / new countries) from what we saved.
                 ApplyConfirmedHighlight();
                 ApplyWorkedSort();   // rebuild the list so the new row colors show
-
-                TB_LotwStatus.Text = incremental
-                    ? $"Confirmed (LoTW): {_confirmedEntities.Count} of {_workedList?.Count ?? 0}  ·  {qslCount} new QSL{(qslCount == 1 ? "" : "s")}"
-                    : $"Confirmed (LoTW): {_confirmedEntities.Count} of {_workedList?.Count ?? 0}  ·  {qslCount} QSLs downloaded";
             }
             catch (Exception ex)
             {
@@ -634,18 +697,55 @@ namespace HolyLogger
             }
             finally
             {
+                ShowLotwSpinner(false);
                 BTN_CheckLotw.IsEnabled = true;
             }
         }
 
-        // The saved APP_LoTW_LASTQSL marker looks like "2026-07-14 10:23:45"; qso_qslsince wants a date.
-        // Take the date part (re-including that whole day is harmless — merging the set is idempotent).
-        // Fall back to a full pull if the marker isn't a recognizable date.
-        private static string SafeQslSinceDate(string marker)
+        // Show/hide the download overlay and run (or stop) the spinner's continuous rotation.
+        private void ShowLotwSpinner(bool show)
         {
-            var m = System.Text.RegularExpressions.Regex.Match(
-                (marker ?? string.Empty).Trim(), @"^\d{4}-\d{2}-\d{2}");
-            return m.Success ? m.Value : "1970-01-01";
+            if (show)
+            {
+                LotwLoadingOverlay.Visibility = Visibility.Visible;
+                var spin = new System.Windows.Media.Animation.DoubleAnimation(0, 360,
+                    new Duration(TimeSpan.FromSeconds(0.9)))
+                {
+                    RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+                };
+                SpinnerRotate.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, spin);
+            }
+            else
+            {
+                SpinnerRotate.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, null);
+                LotwLoadingOverlay.Visibility = Visibility.Collapsed;
+            }
+        }
+
+        // The exact value to send as qso_qslsince, from LoTW's own APP_LoTW_LASTQSL marker. For a full
+        // timestamp we send the moment + 1 second, so the boundary QSL itself is NOT returned again
+        // (LoTW's qso_qslsince is inclusive) -- this guarantees "0 new" when nothing arrived since the
+        // last check, even if you check twice in a row. Falls back to a full pull (1970) if unrecognized.
+        private static string QslSinceValue(string marker)
+        {
+            marker = (marker ?? string.Empty).Trim();
+            if (System.DateTime.TryParseExact(marker, "yyyy-MM-dd HH:mm:ss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.None, out var dt))
+                return dt.AddSeconds(1).ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
+            if (System.Text.RegularExpressions.Regex.IsMatch(marker, @"^\d{4}-\d{2}-\d{2}$"))
+                return marker;   // legacy date-only marker: use as-is
+            return "1970-01-01";
+        }
+
+        // Friendly "since" for the summary: date + HH:MM (drop seconds); date-only markers stay as-is.
+        private static string PrettySince(string marker)
+        {
+            marker = (marker ?? string.Empty).Trim();
+            var m = System.Text.RegularExpressions.Regex.Match(marker, @"^(\d{4}-\d{2}-\d{2})( \d{2}:\d{2})");
+            if (m.Success) return m.Groups[1].Value + m.Groups[2].Value;
+            var d = System.Text.RegularExpressions.Regex.Match(marker, @"^\d{4}-\d{2}-\d{2}");
+            return d.Success ? d.Value : marker;
         }
 
         // Read one ADIF field's value out of a single record. Handles <field:len> and <field:len:type>.

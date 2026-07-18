@@ -84,6 +84,20 @@ namespace HolyLogger
             Owner = owner;
             ModeColumn.ItemsSource = Modes;
 
+            // Restore the last size + position. Size first, so the on-screen test uses the real window
+            // size. Position only if it still lands on a visible monitor (a spot saved on a monitor that
+            // was since removed/rearranged would otherwise open the window in unreachable dead space);
+            // otherwise the XAML default (centered on owner) stands.
+            var cfg = Properties.Settings.Default;
+            if (cfg.ChannelsWindowWidth  >= MinWidth)  Width  = cfg.ChannelsWindowWidth;
+            if (cfg.ChannelsWindowHeight >= MinHeight) Height = cfg.ChannelsWindowHeight;
+            if (IsPositionOnScreen(cfg.ChannelsWindowLeft, cfg.ChannelsWindowTop, Width, Height))
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = cfg.ChannelsWindowLeft;
+                Top  = cfg.ChannelsWindowTop;
+            }
+
             foreach (var ch in LoadChannels())
                 _channels.Add(ch);
             ChannelsGrid.ItemsSource = _channels;
@@ -92,7 +106,7 @@ namespace HolyLogger
             // the LogHeaderBg token from View > Color Scheme > Customize Colors, via the shared style.
             ChannelsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
 
-            Closing += (s, e) => SaveChannels();
+            Closing += (s, e) => { SaveChannels(); SaveWindowBounds(); };
         }
 
         // Restrict the frequency cell's editor to digits and a single decimal point.
@@ -292,6 +306,49 @@ namespace HolyLogger
                 Properties.Settings.Default.Save();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Persist the window's size + position on close, so it reopens where the user left it. Uses
+        // RestoreBounds when maximized so the saved corner is the real (un-maximized) one, not 0,0.
+        private void SaveWindowBounds()
+        {
+            try
+            {
+                var b = WindowState == WindowState.Normal
+                    ? new Rect(Left, Top, Width, Height)
+                    : RestoreBounds;
+                var cfg = Properties.Settings.Default;
+                if (!double.IsNaN(b.Left) && !double.IsInfinity(b.Left) &&
+                    !double.IsNaN(b.Top)  && !double.IsInfinity(b.Top))
+                {
+                    cfg.ChannelsWindowLeft = b.Left;
+                    cfg.ChannelsWindowTop  = b.Top;
+                }
+                if (b.Width > 0 && b.Height > 0)
+                {
+                    cfg.ChannelsWindowWidth  = b.Width;
+                    cfg.ChannelsWindowHeight = b.Height;
+                }
+                cfg.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // True when a window of the given size at (left, top) would still be reachable on some monitor
+        // of the current virtual desktop. NaN/Infinity (never-saved) returns false → use the default.
+        private static bool IsPositionOnScreen(double left, double top, double width, double height)
+        {
+            if (double.IsNaN(left) || double.IsNaN(top) ||
+                double.IsInfinity(left) || double.IsInfinity(top))
+                return false;
+
+            double vsLeft   = SystemParameters.VirtualScreenLeft;
+            double vsTop    = SystemParameters.VirtualScreenTop;
+            double vsRight  = vsLeft + SystemParameters.VirtualScreenWidth;
+            double vsBottom = vsTop  + SystemParameters.VirtualScreenHeight;
+
+            return left >= vsLeft - 10 && top >= vsTop - 10 &&
+                   left <= vsRight - 100 && top <= vsBottom - 60;
         }
     }
 }

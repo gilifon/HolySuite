@@ -70,13 +70,12 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- Confirmed on LoTW: entities confirmed / worked, plus total confirmed QSOs.
-                             Blank until the user runs Check LoTW confirmations (or from cache). -->
+                        <!-- Confirmed on LoTW: countries confirmed / worked. Blank until the user runs
+                             Check LoTW confirmations (or from cache). -->
                         <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="#2E9E4F" BorderThickness="1">
                             <StackPanel>
                                 <TextBlock Text="Confirmed (LoTW)" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
                                 <TextBlock x:Name="TB_ConfirmedDxcc" FontSize="30" FontWeight="Bold" Foreground="#2E9E4F" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_ConfirmedQsos" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
                             </StackPanel>
                         </Border>
 
@@ -161,6 +160,8 @@
                                     <TextBlock x:Name="TB_LotwStatus" FontSize="16" FontWeight="Bold" MaxWidth="345"
                                                HorizontalAlignment="Left" TextWrapping="Wrap" Foreground="#2E9E4F"/>
                                 </StackPanel>
+                                <!-- Grid so the loading overlay can sit on top of the worked table. -->
+                                <Grid>
                                 <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
                                     <Border BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1,1,0,0">
                                         <DockPanel>
@@ -219,6 +220,82 @@
                                         </DockPanel>
                                     </Border>
                                 </Border>
+
+                                <!-- Loading overlay: dims the table and shows an indeterminate (marquee)
+                                     progress bar while confirmations download. LoTW streams a dynamically
+                                     generated report with no total size, so a true percentage isn't
+                                     possible; the marquee shows live activity so the wait doesn't look
+                                     frozen. Collapsed except during a download. -->
+                                <Border x:Name="LotwLoadingOverlay" Visibility="Collapsed"
+                                        Background="{DynamicResource WindowBg}" Opacity="0.9"
+                                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                                    <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="20">
+                                        <TextBlock x:Name="TB_LotwLoadingText" Text="Downloading confirmations from LoTW…"
+                                                   FontSize="15" FontWeight="Bold" TextAlignment="Center"
+                                                   TextWrapping="Wrap" Foreground="{DynamicResource TextBrush}"/>
+                                        <TextBlock Text="This one-time full download can take a minute."
+                                                   FontSize="12" TextAlignment="Center" Margin="0,4,0,0"
+                                                   TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <!-- Spinner: a faint full ring with a brighter arc on top that
+                                             rotates (animated from code in show/hide). -->
+                                        <Grid Width="46" Height="46" Margin="0,16,0,0" HorizontalAlignment="Center">
+                                            <Ellipse Width="46" Height="46" StrokeThickness="5" Opacity="0.2"
+                                                     Stroke="{DynamicResource AccentBrush}"/>
+                                            <Ellipse x:Name="SpinnerArc" Width="46" Height="46" StrokeThickness="5"
+                                                     Stroke="{DynamicResource AccentBrush}" StrokeStartLineCap="Round"
+                                                     StrokeEndLineCap="Round" StrokeDashArray="7 30"
+                                                     RenderTransformOrigin="0.5,0.5">
+                                                <Ellipse.RenderTransform>
+                                                    <RotateTransform x:Name="SpinnerRotate" Angle="0"/>
+                                                </Ellipse.RenderTransform>
+                                            </Ellipse>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                                </Grid>
+
+                                <!-- LoTW confirmations summary, right under the worked table. Hidden until
+                                     a confirmations download has run. Larger/bold so the numbers read at a
+                                     glance. A GroupBox so the "LoTW info" label sits on the top frame line
+                                     (the line breaks around it), vertically centered on it. -->
+                                <GroupBox x:Name="ConfirmSummaryPanel" Margin="0,4,0,0" Padding="10,3"
+                                          BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                                          Background="{DynamicResource GridAltRowBg}" Visibility="Collapsed">
+                                    <GroupBox.Header>
+                                        <TextBlock Text="LoTW info" FontSize="13" FontWeight="Bold"
+                                                   Foreground="{DynamicResource AccentBrush}"/>
+                                    </GroupBox.Header>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Confirmed QSOs" FontSize="15"
+                                                   Margin="0,0,18,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="18"
+                                                   FontWeight="Bold" Margin="0,0" VerticalAlignment="Center"
+                                                   Foreground="#2E9E4F"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="New confirmations" FontSize="15"
+                                                   Margin="0,0,18,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" FontSize="18" Margin="0,0"
+                                                   VerticalAlignment="Center"><Run x:Name="TB_SumNewQsls" FontWeight="Bold"/><Run x:Name="TB_SumSince" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"/></TextBlock>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="New countries" FontSize="15"
+                                                   Margin="0,0,18,0" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TB_SumNewCountries" FontSize="18"
+                                                   FontWeight="Bold" Margin="0,0" VerticalAlignment="Center"/>
+                                    </Grid>
+                                </GroupBox>
                             </StackPanel>
 
                             <!-- Missing Countries -->

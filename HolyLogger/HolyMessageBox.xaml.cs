@@ -30,6 +30,20 @@ namespace HolyLogger
             if (width > 0) Width = width;
             ApplyType(type);
 
+            // Remember where the user last placed any of these popups: restore that spot if it still
+            // lands on a visible monitor, otherwise fall back to the XAML default (centered on owner).
+            // The dialog is NoResize + SizeToContent, so only the position is persisted, not the size.
+            var cfg = Properties.Settings.Default;
+            if (IsPositionOnScreen(cfg.MsgBoxWindowLeft, cfg.MsgBoxWindowTop, Width, 160))
+            {
+                WindowStartupLocation = WindowStartupLocation.Manual;
+                Left = cfg.MsgBoxWindowLeft;
+                Top  = cfg.MsgBoxWindowTop;
+            }
+
+            // Save the position the moment this popup closes, so the next one opens in the same place.
+            Closing += (s, e) => SavePosition();
+
             if (confirm)
             {
                 OkBtn.Visibility = Visibility.Collapsed;
@@ -161,6 +175,36 @@ namespace HolyLogger
 
         private static SolidColorBrush Brush(string hex) =>
             new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+
+        // Persist this popup's on-screen corner (shared by all HolyMessageBox popups).
+        private void SavePosition()
+        {
+            if (double.IsNaN(Left) || double.IsNaN(Top) ||
+                double.IsInfinity(Left) || double.IsInfinity(Top))
+                return;
+            Properties.Settings.Default.MsgBoxWindowLeft = Left;
+            Properties.Settings.Default.MsgBoxWindowTop  = Top;
+            try { Properties.Settings.Default.Save(); }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // True when a window at (left, top) would still be reachable on some monitor of the current
+        // virtual desktop — so a position saved on a monitor that's since been removed/rearranged
+        // doesn't strand the popup off-screen. NaN/Infinity (never-saved) returns false → use default.
+        private static bool IsPositionOnScreen(double left, double top, double width, double height)
+        {
+            if (double.IsNaN(left) || double.IsNaN(top) ||
+                double.IsInfinity(left) || double.IsInfinity(top))
+                return false;
+
+            double vsLeft   = SystemParameters.VirtualScreenLeft;
+            double vsTop    = SystemParameters.VirtualScreenTop;
+            double vsRight  = vsLeft + SystemParameters.VirtualScreenWidth;
+            double vsBottom = vsTop  + SystemParameters.VirtualScreenHeight;
+
+            return left >= vsLeft - 10 && top >= vsTop - 10 &&
+                   left <= vsRight - 100 && top <= vsBottom - 60;
+        }
 
         private void OkBtn_Click(object sender, RoutedEventArgs e) => Close();
         private void YesBtn_Click(object sender, RoutedEventArgs e) { Confirmed = true; Close(); }
