@@ -1008,6 +1008,30 @@ namespace HolyLogger.Properties {
                 this["LotwConfirmedQsoCount"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ClusterUnconfirmedSoundOn {
+            get {
+                return ((bool)(this["ClusterUnconfirmedSoundOn"]));
+            }
+            set {
+                this["ClusterUnconfirmedSoundOn"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Chime")]
+        public string ClusterUnconfirmedSound {
+            get {
+                return ((string)(this["ClusterUnconfirmedSound"]));
+            }
+            set {
+                this["ClusterUnconfirmedSound"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

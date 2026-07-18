@@ -82,6 +82,13 @@ namespace HolyLogger.OptionsUserControls
                 ? sounds.First(n => string.Equals(n, saved, StringComparison.OrdinalIgnoreCase))
                 : "Chime";
 
+            // Same sound choices for the Unconfirmed-spot alert (its own separate list instance).
+            CB_UnconfirmedSound.ItemsSource = new List<string>(sounds);
+            string savedUnconf = Properties.Settings.Default.ClusterUnconfirmedSound;
+            CB_UnconfirmedSound.SelectedItem = sounds.Contains(savedUnconf, StringComparer.OrdinalIgnoreCase)
+                ? sounds.First(n => string.Equals(n, savedUnconf, StringComparison.OrdinalIgnoreCase))
+                : "Chime";
+
             // Shared output-device picker for both alert sounds: "System default" (Windows default
             // device) + each real output device, so sounds can go to the speakers instead of a USB codec.
             InitSoundDevicePicker(CB_SoundDevice, Properties.Settings.Default.SoundOutputDevice);
@@ -128,6 +135,19 @@ namespace HolyLogger.OptionsUserControls
         {
             e.Handled = true;
             MainWindow.PlayClusterAlertSound(CB_NewCountrySound.SelectedItem as string, DeviceSettingFrom(CB_SoundDevice));
+        }
+
+        private void CB_UnconfirmedSound_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (CB_UnconfirmedSound.SelectedItem is string s)
+                Properties.Settings.Default.ClusterUnconfirmedSound = s;
+            HasChanged = true;
+        }
+
+        private void BTN_TestUnconfirmedSound_Click(object sender, RoutedEventArgs e)
+        {
+            e.Handled = true;
+            MainWindow.PlayClusterAlertSound(CB_UnconfirmedSound.SelectedItem as string, DeviceSettingFrom(CB_SoundDevice));
         }
 
         private void CBX_EnableOmniRigCAT_Changed(object sender, RoutedEventArgs e)

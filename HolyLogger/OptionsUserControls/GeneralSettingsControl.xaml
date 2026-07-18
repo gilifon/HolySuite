@@ -91,6 +91,28 @@
                               IsEnabled="{Binding ElementName=CBX_NewCountrySound, Path=IsChecked}" SelectionChanged="CB_NewCountrySound_SelectionChanged"/>
                 </StackPanel>
 
+                <!-- Sound alert on a new Unconfirmed cluster spot (worked but not confirmed on LoTW) -->
+                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                    <CheckBox x:Name="CBX_UnconfirmedSound" VerticalAlignment="Center" IsChecked="{Binding Default.ClusterUnconfirmedSoundOn, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Click="HasChanged_Click">
+                        <TextBlock Text="Sound alert on a new Unconfirmed cluster spot" VerticalAlignment="Center" Width="315"/>
+                    </CheckBox>
+                    <Button x:Name="BTN_TestUnconfirmedSound" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8,2"
+                            FontSize="12" Cursor="Hand" Click="BTN_TestUnconfirmedSound_Click"
+                            IsEnabled="{Binding ElementName=CBX_UnconfirmedSound, Path=IsChecked}"
+                            ToolTip="Click to test — plays the selected alert sound on the selected audio device">
+                        <StackPanel Orientation="Horizontal">
+                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
+                                <Canvas Width="24" Height="24">
+                                    <Path Fill="#3B6EA5" Data="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+                                </Canvas>
+                            </Viewbox>
+                            <TextBlock Text="Test" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                    <ComboBox x:Name="CB_UnconfirmedSound" Margin="8,0,0,0" Width="130" VerticalAlignment="Center" FontSize="14"
+                              IsEnabled="{Binding ElementName=CBX_UnconfirmedSound, Path=IsChecked}" SelectionChanged="CB_UnconfirmedSound_SelectionChanged"/>
+                </StackPanel>
+
                 <!-- Shared output device for BOTH sounds above. Fixed label width + combo width so the
                      combo's right edge lines up under the word "spot" on the sound-alert row above. -->
                 <StackPanel Orientation="Horizontal" Margin="0,12,0,2">

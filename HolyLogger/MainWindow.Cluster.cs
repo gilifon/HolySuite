@@ -92,6 +92,7 @@ namespace HolyLogger
         bool _clusterNewCountryBlinkOn = true;
         int _lastNewCountryCount = 0;
         DateTime _lastNewCountryAlertUtc = DateTime.MinValue;   // throttles the new-country alert sound
+        DateTime _lastUnconfirmedAlertUtc = DateTime.MinValue;  // throttles the unconfirmed-spot alert sound
         StackPanel clusterOnMyFreqLegendItem = null;
         FrameworkElement clusterLegendPanel = null;
         Canvas clusterHeaderCanvas = null;
@@ -3450,6 +3451,8 @@ namespace HolyLogger
 
                     if (newItems.Any(ClusterSpotQualifiesForNewCountryAlert))
                         PlayNewCountrySpotAlert();
+                    else if (newItems.Any(ClusterSpotQualifiesForUnconfirmedAlert))
+                        PlayUnconfirmedSpotAlert();
 
                     RefreshClusterVisibleSpots();
                 }));
@@ -4288,6 +4291,38 @@ namespace HolyLogger
             if ((now - _lastNewCountryAlertUtc).TotalSeconds < 3) return;
             _lastNewCountryAlertUtc = now;
             PlayClusterAlertSound(Properties.Settings.Default.ClusterNewCountrySound);
+        }
+
+        // Same arrival test as the new-country alert, but for a worked-but-unconfirmed-on-LoTW spot.
+        private bool ClusterSpotQualifiesForUnconfirmedAlert(ClusterSpotViewItem item)
+        {
+            if (item == null || !item.IsUnconfirmedCountry) return false;
+            if (!Properties.Settings.Default.ClusterUnconfirmedSoundOn) return false;
+            if (!IsClusterModeEnabled(item.Mode)) return false;
+
+            if (item.UnixTime <= 0 ||
+                item.UnixTime < DateTimeOffset.UtcNow.ToUnixTimeSeconds() - (clusterLastMinutesFilterValue * 60L))
+                return false;
+
+            string mode = clusterLiveScaleOn
+                ? (clusterPreLiveScaleBandFilterMode ?? "PreSelected")
+                : (Properties.Settings.Default.ClusterBandFilterMode ?? "PreSelected");
+            if (string.Equals(mode, "All", StringComparison.OrdinalIgnoreCase)) return true;
+            string band = NormalizeClusterBandKey(item.BandText);
+            if (string.Equals(mode, "Active", StringComparison.OrdinalIgnoreCase))
+            {
+                string active = NormalizeClusterBandKey(TB_Band != null ? TB_Band.Text : string.Empty);
+                return !string.IsNullOrWhiteSpace(active) && string.Equals(active, band, StringComparison.OrdinalIgnoreCase);
+            }
+            return GetEnabledClusterBands().Contains(band);
+        }
+
+        private void PlayUnconfirmedSpotAlert()
+        {
+            var now = DateTime.UtcNow;
+            if ((now - _lastUnconfirmedAlertUtc).TotalSeconds < 3) return;
+            _lastUnconfirmedAlertUtc = now;
+            PlayClusterAlertSound(Properties.Settings.Default.ClusterUnconfirmedSound);
         }
 
         // Plays the alert sound named in Options → General. A *.wav name plays from C:\Windows\Media,

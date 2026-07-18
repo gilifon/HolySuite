@@ -245,6 +245,12 @@
     <Setting Name="LotwConfirmedQsoCount" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">0</Value>
     </Setting>
+    <Setting Name="ClusterUnconfirmedSoundOn" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">False</Value>
+    </Setting>
+    <Setting Name="ClusterUnconfirmedSound" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Chime</Value>
+    </Setting>
     <Setting Name="HolyClusterUDPPort" Type="System.Int32" Scope="User">
       <Value Profile="(Default)">2237</Value>
     </Setting>
