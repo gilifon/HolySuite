@@ -1,33 +1,68 @@
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
 using System.Windows.Input;
-using System.Windows.Threading;
+using System.Windows.Media;
+using HolyParser;
 using Newtonsoft.Json;
 
 namespace HolyLogger
 {
     // A user-defined list of radio channels (name / frequency in kHz / mode). Double-clicking a channel
     // asks the main window to set the radio to it (which captures the undo state and pops the undo icon,
-    // reusing the same mechanism as "Set Radio to QSO freq"). Tuning is disabled — with a banner — when
-    // CAT is not active, but the list stays editable. The list persists as JSON in settings.
+    // reusing the same mechanism as "Set Radio to QSO freq"). When CAT is not active a double-click
+    // explains why with a message box; the list stays editable regardless. Persists as JSON in settings.
     public partial class ChannelsWindow : Window
     {
-        public class RadioChannel
+        public class RadioChannel : INotifyPropertyChanged
         {
             public string Name { get; set; } = "";
-            public string FreqKhz { get; set; } = "";
+
+            private string _freqKhz = "";
+            public string FreqKhz
+            {
+                get => _freqKhz;
+                set
+                {
+                    if (_freqKhz == value) return;
+                    _freqKhz = value;
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FreqKhz)));
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(FreqBrush)));
+                }
+            }
+
             public string Mode { get; set; } = "";
+
+            // Freq text is colored by band, from the same band-color source as the cluster's Freq
+            // column and the band checkboxes (convertFreqToBand accepts kHz directly, our unit).
+            // JsonIgnore: it's derived from FreqKhz, so it must not round-trip through settings.
+            [JsonIgnore]
+            public Brush FreqBrush
+            {
+                get
+                {
+                    try
+                    {
+                        string band = HolyLogParser.convertFreqToBand((FreqKhz ?? string.Empty).Trim());
+                        return string.IsNullOrEmpty(band)
+                            ? ThemeManager.Brush("TextBrush")
+                            : MainWindow.GetBandBrush(band);
+                    }
+                    catch { return ThemeManager.Brush("TextBrush"); }
+                }
+            }
+
+            public event PropertyChangedEventHandler PropertyChanged;
         }
 
         private static readonly string[] Modes = { "USB", "LSB", "CW", "FT8", "DIGI", "RTTY", "FM", "AM" };
 
         private readonly MainWindow _owner;
         private readonly ObservableCollection<RadioChannel> _channels = new ObservableCollection<RadioChannel>();
-        private readonly DispatcherTimer _catTimer;
 
         public ChannelsWindow(MainWindow owner)
         {
@@ -40,19 +75,11 @@ namespace HolyLogger
                 _channels.Add(ch);
             ChannelsGrid.ItemsSource = _channels;
 
-            UpdateCatState();
-            // CAT can come online / drop while the window is open; keep the banner in sync.
-            _catTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1000) };
-            _catTimer.Tick += (s, e) => UpdateCatState();
-            _catTimer.Start();
+            // Same header look as every other log-style table (QSO grid, cluster, Logs window):
+            // the LogHeaderBg token from View > Color Scheme > Customize Colors, via the shared style.
+            ChannelsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
 
-            Closing += (s, e) => { _catTimer.Stop(); SaveChannels(); };
-        }
-
-        private void UpdateCatState()
-        {
-            bool live = _owner != null && _owner.IsCatLive();
-            CatBanner.Visibility = live ? Visibility.Collapsed : Visibility.Visible;
+            Closing += (s, e) => SaveChannels();
         }
 
         // Restrict the frequency cell's editor to digits and a single decimal point.
@@ -85,7 +112,10 @@ namespace HolyLogger
 
             if (_owner == null || !_owner.IsCatLive())
             {
-                UpdateCatState();   // the banner explains why nothing happened
+                HolyMessageBox.ShowWarning(
+                    "Radio control (CAT) is not active, so the radio can't be tuned to this channel.\n\n" +
+                    "You can still add, edit and delete channels.",
+                    "CAT not active", this);
                 return;
             }
 
@@ -98,7 +128,7 @@ namespace HolyLogger
 
             _owner.SetRadioToChannel(khz / 1000.0, ch.Mode);
 
-            // The channel has been applied — close the window so the action feels complete (otherwise,
+            // The channel has been applied ׳’ג‚¬ג€ close the window so the action feels complete (otherwise,
             // when the channel's frequency is already the current one, nothing visibly happens).
             Close();
         }
@@ -110,6 +140,26 @@ namespace HolyLogger
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
+
+        // Custom title-bar caption buttons (the window uses WindowStyle=None, so it draws its own).
+        private void TitleBar_Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);
+
+        private void TitleBar_MaxRestore_Click(object sender, RoutedEventArgs e)
+        {
+            if (WindowState == WindowState.Maximized) SystemCommands.RestoreWindow(this);
+            else SystemCommands.MaximizeWindow(this);
+        }
+
+        private void TitleBar_Close_Click(object sender, RoutedEventArgs e) => Close();
+
+        // Keep the maximize/restore glyph in sync with the window state.
+        private void Window_StateChanged(object sender, EventArgs e)
+        {
+            if (TitleBar_MaxRestoreBtn == null) return;
+            bool maximized = WindowState == WindowState.Maximized;
+            TitleBar_MaxRestoreBtn.Content = maximized ? "" : "";
+            TitleBar_MaxRestoreBtn.ToolTip = maximized ? "Restore Down" : "Maximize";
+        }
 
         private static List<RadioChannel> LoadChannels()
         {
