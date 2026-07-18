@@ -141,9 +141,12 @@ namespace HolyLogger
         TextBlock clusterUndoCountText = null;
         TextBlock clusterSpotCountText = null;
         Border clusterSpotCountBadge = null;
-        Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
-        // Independent undo stack for the log-row "Set Radio to Freq" action — kept separate from the cluster undo.
+        // ONE shared radio-undo history. Selecting a station in the cluster OR in the log table pushes
+        // to this single stack, and both undo controls act on it: the cluster title-bar button and the
+        // main-GUI icon. The main icon is shown only while the list is non-empty.
         Stack<(string FrequencyText, string ModeText, string DxCallsignText)> logRadioUndoStates = new Stack<(string FrequencyText, string ModeText, string DxCallsignText)>();
+        // Alias so the existing cluster-undo code drives the same shared list (never a separate stack).
+        Stack<(string FrequencyText, string ModeText, string DxCallsignText)> clusterUndoStates => logRadioUndoStates;
         bool clusterHeaderAlignmentRefreshPending = false;
         Action _clusterWidthHandlerCleanup = null;
 
@@ -601,7 +604,8 @@ namespace HolyLogger
             EnsureClusterWindowOnScreen();
 
             clusterUndoButton = undoButton;
-            clusterUndoStates.Clear();
+            // Don't clear the shared history when the cluster window opens — it may already hold undo
+            // states from the log table. Just sync the freshly-built button to the current count.
             UpdateClusterUndoButtonState();
 
             undoButton.Click += ClusterUndoButton_Click;
@@ -897,8 +901,11 @@ namespace HolyLogger
             clusterPendingQrzCallsign = null;
             clusterLastHoverToolTipColumn = null;
             clusterHoverToolTip = null;
-            clusterUndoStates.Clear();
+            // Keep the shared undo history when the cluster window closes — the main-GUI undo icon still
+            // uses it. (Previously this stack was cluster-only and was cleared here.) Refresh the main
+            // icon so it reflects the history now that the cluster button is going away.
             clusterWindow = null;
+            UpdateLogRadioUndoButtonState();
         }
 
         private void EnsureClusterWindowOnScreen()
@@ -4649,7 +4656,8 @@ namespace HolyLogger
             }
 
             clusterUndoStates.Push((frequencyText, modeText, dxCallsignText));
-            UpdateClusterUndoButtonState();
+            UpdateRadioUndoButtons();
+            PulseUndoIcon();   // make the main-GUI icon appear/jump too, so a cluster undo isn't missed
         }
 
         // Long-press support for the cluster undo button: holding it ~700 ms clears the whole cluster
@@ -4688,12 +4696,13 @@ namespace HolyLogger
             _clusterUndoResetTimer?.Stop();
         }
 
-        // Clears the entire cluster undo stack (the "reset" action triggered by a long press).
+        // Clears the entire shared undo history (the "reset" action triggered by a long press on the
+        // cluster button). Refreshes both controls since the list is shared.
         private void ResetClusterUndo()
         {
             if (clusterUndoStates.Count == 0) return;
             clusterUndoStates.Clear();
-            UpdateClusterUndoButtonState();
+            UpdateRadioUndoButtons();
         }
 
         private void ClusterUndoButton_RightClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
@@ -4770,7 +4779,7 @@ namespace HolyLogger
                 }
 
                 var undoState = clusterUndoStates.Pop();
-                UpdateClusterUndoButtonState();
+                UpdateRadioUndoButtons();
 
                 string freqText = undoState.FrequencyText;
                 string modeText = undoState.ModeText;
@@ -4796,6 +4805,15 @@ namespace HolyLogger
                 }
             }
             catch { /* never crash the app from the undo button */ }
+        }
+
+        // Both undo controls reflect the one shared history, so every push/pop/clear refreshes both:
+        // the main-GUI icon (visible only when non-empty) and the cluster title-bar button (a no-op
+        // when the cluster window is closed).
+        private void UpdateRadioUndoButtons()
+        {
+            UpdateLogRadioUndoButtonState();
+            UpdateClusterUndoButtonState();
         }
 
         private void UpdateClusterUndoButtonState()

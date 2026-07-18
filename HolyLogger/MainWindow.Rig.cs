@@ -153,7 +153,7 @@ namespace HolyLogger
             }
 
             logRadioUndoStates.Push((frequencyText, modeText, dxCallsignText));
-            UpdateLogRadioUndoButtonState();
+            UpdateRadioUndoButtons();   // shared list — refresh the cluster button too
             PulseUndoIcon();   // a new undo state was added — make the icon jump so it's not missed
         }
 
@@ -240,7 +240,7 @@ namespace HolyLogger
         {
             if (logRadioUndoStates.Count == 0) return;
             logRadioUndoStates.Clear();
-            UpdateLogRadioUndoButtonState();
+            UpdateRadioUndoButtons();   // shared list — refresh the cluster button too
             if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
                 QSODataGrid.UnselectAll();
         }
@@ -264,7 +264,7 @@ namespace HolyLogger
                 }
 
                 var undoState = logRadioUndoStates.Pop();
-                UpdateLogRadioUndoButtonState();
+                UpdateRadioUndoButtons();   // shared list — refresh the cluster button too
 
                 // Clear the log-row blue highlight once an undo step is taken.
                 if (QSODataGrid != null && QSODataGrid.SelectedItem != null)
