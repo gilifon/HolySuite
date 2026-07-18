@@ -17,6 +17,9 @@
                              ResizeBorderThickness="6" UseAeroCaptionButtons="False"/>
     </shell:WindowChrome.WindowChrome>
 
+    <!-- Frame around the whole window in the Channels menu icon's color (the orange tower).
+         WindowStyle=None removed the OS border, so this Border is the window's visible edge. -->
+    <Border BorderBrush="#FF8C00" BorderThickness="3">
     <DockPanel LastChildFill="True">
         <!-- Same custom title bar as the Cluster window: title at FontSize 15, bold. -->
         <Border x:Name="CustomTitleBar" DockPanel.Dock="Top" Height="32" Background="{DynamicResource TitleBarBg}">
@@ -52,7 +55,9 @@
                   GridLinesVisibility="All" FontSize="15"
                   Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}"
                   RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}"
-                  PreviewMouseDoubleClick="ChannelsGrid_PreviewMouseDoubleClick">
+                  PreviewMouseDoubleClick="ChannelsGrid_PreviewMouseDoubleClick"
+                  CellEditEnding="ChannelsGrid_CellEditEnding"
+                  CurrentCellChanged="ChannelsGrid_CurrentCellChanged">
             <DataGrid.Resources>
                 <!-- Scoped to this grid: a very light blue selection so band-colored frequency text
                      (e.g. green) stays visible. The app-wide SelectionBg is a dark blue that hid it.
@@ -62,7 +67,10 @@
             </DataGrid.Resources>
             <DataGrid.Columns>
                 <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                <DataGridTextColumn Header="Frequency (kHz)" Binding="{Binding FreqKhz}" Width="140">
+                <!-- Text column (native tab-to-type editing). Color updates live because
+                     ChannelsGrid_CellEditEnding pushes the value to the item the moment the cell
+                     commits, firing FreqBrush's change notification before the row commits. -->
+                <DataGridTextColumn x:Name="FreqColumn" Header="Frequency (kHz)" Binding="{Binding FreqKhz}" Width="140">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
                             <Setter Property="HorizontalAlignment" Value="Center"/>
@@ -87,16 +95,25 @@
                     <DataGridComboBoxColumn.EditingElementStyle>
                         <Style TargetType="ComboBox">
                             <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                            <!-- Drop the list open as soon as the editor appears (see CurrentCellChanged,
+                                 which enters edit mode the moment the Mode cell gets focus). -->
+                            <EventSetter Event="Loaded" Handler="ModeCombo_Loaded"/>
                         </Style>
                     </DataGridComboBoxColumn.EditingElementStyle>
                 </DataGridComboBoxColumn>
             </DataGrid.Columns>
         </DataGrid>
 
-        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
-            <Button x:Name="BtnDelete" Content="Delete Selected" Padding="12,4" Margin="0,0,8,0" FontSize="14" Click="BtnDelete_Click"/>
-            <Button x:Name="BtnClose" Content="Close" Padding="18,4" FontSize="14" Click="BtnClose_Click"/>
-        </StackPanel>
+        <DockPanel Grid.Row="2" Margin="0,10,0,0" LastChildFill="False">
+            <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
+                <Button x:Name="BtnDelete" Content="Delete Selected" Padding="12,4" Margin="0,0,8,0" FontSize="14" Click="BtnDelete_Click"/>
+                <Button x:Name="BtnClose" Content="Close" Padding="18,4" FontSize="14" Click="BtnClose_Click"/>
+            </StackPanel>
+            <!-- OK on the right: same effect as Close (approve + close; Closing saves), but first
+                 checks that no channel is half-filled and warns if so. Close and the X stay unvalidated. -->
+            <Button x:Name="BtnOk" Content="OK" DockPanel.Dock="Right" Padding="24,4" FontSize="14" Click="BtnOk_Click"/>
+        </DockPanel>
         </Grid>
     </DockPanel>
+    </Border>
 </Window>

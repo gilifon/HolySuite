@@ -119,18 +119,63 @@ namespace HolyLogger
                 return;
             }
 
-            if (!double.TryParse((ch.FreqKhz ?? string.Empty).Trim(),
-                                 NumberStyles.Float, CultureInfo.InvariantCulture, out double khz) || khz <= 0)
+            // Tuning needs BOTH a valid frequency and a mode. If either is missing, send nothing to
+            // the radio and tell the user exactly what to fill in first.
+            bool freqOk = double.TryParse((ch.FreqKhz ?? string.Empty).Trim(),
+                                          NumberStyles.Float, CultureInfo.InvariantCulture, out double khz) && khz > 0;
+            var missing = new List<string>();
+            if (!freqOk) missing.Add("Frequency");
+            if (string.IsNullOrWhiteSpace(ch.Mode)) missing.Add("Mode");
+            if (missing.Count > 0)
             {
-                HolyMessageBox.ShowWarning("This channel has no valid frequency (kHz).", "Channels", this);
+                string what = missing.Count == 1
+                    ? $"its {missing[0]} is missing"
+                    : $"its {string.Join(" and ", missing)} are missing";
+                HolyMessageBox.ShowWarning(
+                    $"This channel can't be sent to the radio because {what}.\n\n" +
+                    "Fill in the missing column, then double-click again.",
+                    "My Channels", this);
                 return;
             }
 
             _owner.SetRadioToChannel(khz / 1000.0, ch.Mode);
 
-            // The channel has been applied ׳’ג‚¬ג€ close the window so the action feels complete (otherwise,
+            // The channel has been applied -- close the window so the action feels complete (otherwise,
             // when the channel's frequency is already the current one, nothing visibly happens).
             Close();
+        }
+
+        // When a frequency cell commits (tab/enter/click away), push the new text to the item right
+        // away. That fires FreqBrush's change notification at cell-commit time, so the band color
+        // appears the moment focus leaves the cell -- without waiting for the whole row to commit.
+        private void ChannelsGrid_CellEditEnding(object sender, System.Windows.Controls.DataGridCellEditEndingEventArgs e)
+        {
+            if (e.EditAction != System.Windows.Controls.DataGridEditAction.Commit) return;
+            if (e.Column != FreqColumn) return;
+            if (e.Row?.Item is RadioChannel ch && e.EditingElement is System.Windows.Controls.TextBox tb)
+                ch.FreqKhz = (tb.Text ?? string.Empty).Trim();
+        }
+
+        // The moment the Mode cell becomes current (e.g. tabbing out of Frequency), enter edit mode so
+        // the combo editor appears; ModeCombo_Loaded then drops its list open. Deferred to Background
+        // priority so it runs after the grid has finished the current-cell change.
+        private void ChannelsGrid_CurrentCellChanged(object sender, EventArgs e)
+        {
+            if (ChannelsGrid.CurrentColumn != ModeColumn) return;
+            if (!(ChannelsGrid.CurrentItem is RadioChannel)) return;
+            ChannelsGrid.Dispatcher.BeginInvoke(
+                new Action(() => ChannelsGrid.BeginEdit()),
+                System.Windows.Threading.DispatcherPriority.Background);
+        }
+
+        // Open the mode list as soon as the editor is shown, and focus it so a click/arrow picks a mode.
+        private void ModeCombo_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (sender is System.Windows.Controls.ComboBox cb)
+            {
+                cb.Focus();
+                cb.IsDropDownOpen = true;
+            }
         }
 
         private void BtnDelete_Click(object sender, RoutedEventArgs e)
@@ -140,6 +185,57 @@ namespace HolyLogger
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();
+
+        // OK approves the current channels and closes (Closing saves, exactly like Close). Unlike Close,
+        // it first checks that no channel is half-filled: a channel needs all three columns to be usable,
+        // so a row with some (but not all) of Name / Frequency / Mode is flagged and the window stays
+        // open. Wholly-empty rows are ignored -- they're dropped on save.
+        private void BtnOk_Click(object sender, RoutedEventArgs e)
+        {
+            // Commit any in-progress edit so a value just typed is included in the check.
+            ChannelsGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Cell, true);
+            ChannelsGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true);
+
+            var problems = new List<string>();
+            int rowNum = 0;
+            foreach (var ch in _channels)
+            {
+                rowNum++;
+                bool anyFilled = !string.IsNullOrWhiteSpace(ch.Name)
+                              || !string.IsNullOrWhiteSpace(ch.FreqKhz)
+                              || !string.IsNullOrWhiteSpace(ch.Mode);
+                if (!anyFilled)
+                    continue;   // an empty row, not a half-filled one
+
+                var missing = new List<string>();
+                if (string.IsNullOrWhiteSpace(ch.Name)) missing.Add("Name");
+                if (string.IsNullOrWhiteSpace(ch.FreqKhz)) missing.Add("Frequency");
+                if (string.IsNullOrWhiteSpace(ch.Mode)) missing.Add("Mode");
+                if (missing.Count == 0)
+                    continue;
+
+                // Identify the row by number, and by name when it has one, so the user never has to
+                // guess which channel the message is about. Then spell out the empty columns by name.
+                string who = string.IsNullOrWhiteSpace(ch.Name)
+                    ? $"Row {rowNum}"
+                    : $"Row {rowNum} (Name: \"{ch.Name.Trim()}\")";
+                string cols = missing.Count == 1
+                    ? $"the {missing[0]} column is empty"
+                    : $"these columns are empty: {string.Join(", ", missing)}";
+                problems.Add($"• {who} — {cols}");
+            }
+
+            if (problems.Count > 0)
+            {
+                HolyMessageBox.ShowWarning(
+                    "A channel needs all three columns (Name, Frequency, Mode) filled in.\n\n" +
+                    "Please complete or delete:\n\n" + string.Join("\n", problems),
+                    "My Channels", this);
+                return;   // keep the window open so the user can fix them
+            }
+
+            Close();   // all channels complete -> approve and close
+        }
 
         // Custom title-bar caption buttons (the window uses WindowStyle=None, so it draws its own).
         private void TitleBar_Minimize_Click(object sender, RoutedEventArgs e) => SystemCommands.MinimizeWindow(this);

@@ -4599,7 +4599,13 @@ namespace HolyLogger
                 case "AM":
                     return PM_AM;
                 case "DIGI":
-                    return PM_DIG_U;
+                case "FT8":
+                    return PM_DIG_U;   // data-USB: FT8/PSK/etc. The rig's OmniRig .ini maps DIG_U to
+                                       // the actual DATA command.
+                case "RTTY":
+                    return PM_DIG_L;   // separate slot from FT8/data so the .ini can route RTTY to a
+                                       // RTTY/FSK command (RTTY is traditionally lower). OmniRig has no
+                                       // native RTTY mode; DIG_L is the closest, per how Log4OM/OmniRig work.
                 default:
                     return null;
             }
