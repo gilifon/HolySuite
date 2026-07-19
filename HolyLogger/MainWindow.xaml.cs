@@ -1577,23 +1577,18 @@ namespace HolyLogger
 
         private void ClearBtn_Click(object sender, RoutedEventArgs e)
         {
-            // Remember whatever F9 clears, keyed to the current frequency, so the on-frequency auto-fill
-            // won't put it straight back while we're still on that frequency -- and so it can't sneak back
-            // into the DX box and get captured into the undo history (the "undo brought back a call I'd
-            // F9'd" bug). Recorded UNCONDITIONALLY for any non-empty callsign: earlier versions gated this
-            // on on-frequency detection, which momentarily flickers (e.g. while hovering a band checkbox),
-            // and in that window F9 recorded nothing and the call reappeared. Released when the radio
-            // leaves the frequency (see UpdateClusterFrequencyHighlight); a double-click on the spot fills
-            // it again explicitly (TuneToClusterSpot clears this first). Harmless for a user-typed call
-            // that isn't a spot -- there's simply no on-frequency spot for it to block.
+            // Remember whatever F9 clears so the on-frequency auto-fill won't put it straight back -- and
+            // so it can't sneak back into the DX box and get captured into the undo history (the "undo
+            // brought back a call I'd F9'd" bug). Recorded UNCONDITIONALLY for any non-empty callsign:
+            // earlier versions gated this on on-frequency detection, which momentarily flickers (e.g.
+            // while hovering a band checkbox), and in that window F9 recorded nothing and the call
+            // reappeared. The dismissal is released only when the radio moves to ANOTHER filled spot, or
+            // when the spot is double-clicked (both in UpdateClusterFrequencyHighlight / TuneToClusterSpot)
+            // -- NOT by merely tuning off and back, so a dismissed spot stays dismissed. Harmless for a
+            // user-typed call that isn't a spot -- there's simply no on-frequency spot for it to block.
             string clearedCall = (TB_DXCallsign.Text ?? string.Empty).Trim();
             if (!string.IsNullOrWhiteSpace(clearedCall))
-            {
                 _clusterDismissedCall = clearedCall.ToUpperInvariant();
-                _clusterDismissedFreqMhz = double.TryParse((TB_Frequency.Text ?? string.Empty).Trim(),
-                    System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture,
-                    out double dmf) ? dmf : 0;
-            }
 
             //TB_Frequency.Text = string.Empty;
             // Drop any stuck map-hover blue highlight on the cluster rows.
@@ -6164,17 +6159,13 @@ namespace HolyLogger
             bandIndicator.MouseEnter += (s, e) =>
             {
                 hoverCircle.Visibility = Visibility.Visible;
-                _clusterHoverBandOverride = band;
-                RefreshClusterVisibleSpots();
+                EnterClusterBandHoverPreview(band);
             };
             bandIndicator.MouseLeave += (s, e) =>
             {
+                // Only hide this checkbox's ring. The preview itself ends on the whole-row MouseLeave
+                // (see BuildClusterBandSelectorPanel) so moving across checkboxes/gaps keeps it alive.
                 hoverCircle.Visibility = Visibility.Hidden;
-                if (string.Equals(_clusterHoverBandOverride, band, StringComparison.OrdinalIgnoreCase))
-                {
-                    _clusterHoverBandOverride = null;
-                    RefreshClusterVisibleSpots();
-                }
             };
 
             // Add right-click handler for color editing

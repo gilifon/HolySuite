@@ -77,6 +77,13 @@ namespace HolyLogger
         // While the mouse hovers a band checkbox, the cluster temporarily shows ONLY that band's
         // spots (table + map), as if it were the active band; cleared when the mouse leaves.
         string _clusterHoverBandOverride = null;
+
+        // While hovering a band checkbox, the DX GUI is hidden so the map/table preview that band
+        // instead of the filled station's path. True for the whole time the mouse is over any band
+        // checkbox; while true the on-frequency auto-fill/clear leave the DX box alone. The station that
+        // was showing before the hover is snapshotted here and restored when the mouse leaves.
+        bool _clusterBandHoverActive = false;
+        string _clusterBandHoverSavedCall = null;
         HashSet<string> clusterWorkedCountries = null;
         TextBlock clusterActiveBandIndicatorText = null;
         Button clusterBandFilterAllBtn = null;
@@ -1641,8 +1648,15 @@ namespace HolyLogger
                 Orientation = Orientation.Horizontal,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center,
-                Margin = new Thickness(0, 0, 0, 0)
+                Margin = new Thickness(0, 0, 0, 0),
+                // Transparent (not null) so the whole row — including the gaps between checkboxes — is a
+                // hit-test target, and MouseLeave fires only when the mouse leaves the entire band group.
+                Background = Brushes.Transparent
             };
+
+            // End the hover preview only when the mouse leaves the WHOLE band row. Per-checkbox MouseLeave
+            // must NOT end it (that fired in the gaps between checkboxes and briefly restored the station).
+            row.MouseLeave += (s, e) => EndClusterBandHoverPreview();
 
             // All bands in order from left to right: SHF, UHF, VHF, 6, 10, 12, 15, 17, 20, 30, 40, 60, 80, 160
             string[] allBands = { "SHF", "UHF", "VHF", "6", "10", "12", "15", "17", "20", "30", "40", "60", "80", "160" };
@@ -2149,7 +2163,9 @@ namespace HolyLogger
         // scroll range needed for all of that.
         private void ScrollClusterLiveScale()
         {
-            if (!clusterLiveScaleOn || clusterSpotsDataGrid == null) return;
+            // Paused while a band-hover preview owns the table (it shows that band as a normal list, not
+            // the VFO-centered Live Scale view). The scroll is re-established when the hover ends.
+            if (!clusterLiveScaleOn || _clusterBandHoverActive || clusterSpotsDataGrid == null) return;
 
             if (clusterSpotsScrollViewer == null)
                 clusterSpotsScrollViewer = FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
@@ -3619,13 +3635,10 @@ namespace HolyLogger
             }
             bool holdingHolyClusterCall = !string.IsNullOrWhiteSpace(_holyClusterSelectedCall);
 
-            // Release an F9-dismissed callsign once the radio moves off the frequency it was on, so
-            // returning to that frequency later fills normally again.
-            if (!string.IsNullOrEmpty(_clusterDismissedCall) && _clusterDismissedFreqMhz > 0
-                && Math.Abs(currentFreqMhz - _clusterDismissedFreqMhz) * 1000.0 > toleranceKhz)
-            {
-                _clusterDismissedCall = null;
-            }
+            // An F9-dismissed callsign stays dismissed until the operator moves to ANOTHER filled spot
+            // (a different on-frequency call gets filled -- see the auto-fill below) or double-clicks it.
+            // It is NOT released merely by tuning off the frequency (e.g. to empty space and back), so a
+            // dismissed spot doesn't quietly re-fill when you return to it.
 
             var onFreqSig = new System.Text.StringBuilder();     // which spots are on frequency right now
             var onFreqCalls = new System.Text.StringBuilder();   // their callsigns, for the in-place map restyle
@@ -3665,9 +3678,14 @@ namespace HolyLogger
                 if (MapControl != null && Properties.Settings.Default.ClusterMapEnabled)
                     MapControl.SetOnFreqSpots(onFreqCallsStr);
 
-                // If we just lost all on-frequency spots (was non-empty, now empty), clear the
-                // DX callsign only if it was auto-filled by the cluster (avoid erasing a user-typed value).
-                if (string.IsNullOrEmpty(sig) && !string.IsNullOrEmpty(prevOnFreqSig) && !holdingHolyClusterCall)
+                // If we just lost all on-frequency spots (was non-empty, now empty), clear the DX callsign
+                // only if it was auto-filled by the cluster (avoid erasing a user-typed value) AND the
+                // radio has actually moved off the frequency it was filled at. The on-frequency set also
+                // empties transiently when the visible spots change (e.g. hovering a band checkbox
+                // re-filters the list) while the VFO stays put -- that must NOT clear the filled call.
+                if (string.IsNullOrEmpty(sig) && !string.IsNullOrEmpty(prevOnFreqSig) && !holdingHolyClusterCall
+                    && !_clusterBandHoverActive   // a band-hover preview owns the DX box; don't clear here
+                    && Math.Abs(currentFreqMhz - _clusterAutoFilledFreqMhz) * 1000.0 > toleranceKhz)
                 {
                     try
                     {
@@ -3690,8 +3708,10 @@ namespace HolyLogger
 
             // Always attempt to auto-fill the DX callsign when there is at least one on-frequency spot.
             // While a HolyCluster selection is held, leave the DX box alone — it already shows the exact
-            // clicked callsign, which must not be overwritten by a different on-frequency spot.
-            if (!holdingHolyClusterCall && !string.IsNullOrWhiteSpace(onFreqCallsStr) && TB_DXCallsign != null)
+            // clicked callsign, which must not be overwritten by a different on-frequency spot. While a
+            // band-hover preview is active the DX box is intentionally hidden, so don't refill it either.
+            if (!holdingHolyClusterCall && !_clusterBandHoverActive
+                && !string.IsNullOrWhiteSpace(onFreqCallsStr) && TB_DXCallsign != null)
             {
                 string firstCall = onFreqCallsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
                 if (!string.IsNullOrWhiteSpace(firstCall))
@@ -3711,12 +3731,17 @@ namespace HolyLogger
                             if (userEditing)
                                 return;
 
-                            // The user cleared this exact call with F9 — don't put it back while we're
-                            // still on its frequency. (Released when the radio leaves the frequency;
-                            // double-clicking the spot fills it explicitly.)
+                            // The user cleared this exact call with F9 — don't put it back. It stays
+                            // dismissed until the radio lands on a DIFFERENT filled spot (below) or the
+                            // spot is double-clicked (TuneToClusterSpot clears the dismissal explicitly).
                             if (!string.IsNullOrEmpty(_clusterDismissedCall)
                                 && string.Equals(firstCall, _clusterDismissedCall, StringComparison.OrdinalIgnoreCase))
                                 return;
+
+                            // Reaching here with a DIFFERENT on-frequency call means the operator moved to
+                            // another filled spot — so any earlier F9 dismissal no longer applies, and
+                            // returning to the old spot later will fill it normally again.
+                            _clusterDismissedCall = null;
 
                             // Only (re)fill when the callsign actually differs. Re-setting the same call
                             // used to re-run TB_DXCallsign_TextChanged every refresh, which clears the
@@ -3738,6 +3763,7 @@ namespace HolyLogger
                                     TB_DXCallsign.Text = firstCall;
                                     TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
                                     _clusterAutoFilledDXCall = true;
+                                    _clusterAutoFilledFreqMhz = currentFreqMhz;   // remember where we filled
                                     TB_DXCallsign_TextChanged(TB_DXCallsign, null);
                                     TB_DXCallsign_LostFocus(TB_DXCallsign, new RoutedEventArgs());
                                 }
@@ -3753,7 +3779,76 @@ namespace HolyLogger
                 }
             }
 
-            if (clusterLiveScaleOn) UpdateClusterLiveScale();
+            if (clusterLiveScaleOn && !_clusterBandHoverActive) UpdateClusterLiveScale();
+        }
+
+        // Enter/leave the band-checkbox hover preview: show ONLY the hovered band's spots in the table and
+        // on the map (in every state, Live Scale included), and hide the filled DX station so the map shows
+        // the band instead of the DX path. The pre-hover station is restored on leave (Case 5 of the spec).
+        private void EnterClusterBandHoverPreview(string band)
+        {
+            if (!_clusterBandHoverActive)
+            {
+                _clusterBandHoverActive = true;
+                _clusterBandHoverSavedCall = (_clusterAutoFilledDXCall && TB_DXCallsign != null
+                                              && !string.IsNullOrWhiteSpace(TB_DXCallsign.Text))
+                    ? TB_DXCallsign.Text.Trim()
+                    : null;
+                if (!string.IsNullOrEmpty(_clusterBandHoverSavedCall))
+                    TB_DXCallsign.Clear();   // ClearAzimuth restores the cluster-spots map view
+
+                // In Live Scale the table is locked to the VFO-centered view; unlock it so the hovered
+                // band shows as a normal top-down list (otherwise it centers on the VFO, which isn't in
+                // this band, and looks empty). Hide the center line while previewing.
+                if (clusterLiveScaleOn)
+                {
+                    SetClusterLiveScaleScrollSetup(false);
+                    if (clusterCenterLineBand != null) clusterCenterLineBand.Visibility = Visibility.Hidden;
+                }
+            }
+            _clusterHoverBandOverride = band;
+            RefreshClusterVisibleSpots();
+
+            // In Live Scale the table kept the VFO-centered scroll offset; show the previewed band from
+            // the top so its spots are visible (otherwise the leftover offset can leave it looking empty).
+            if (clusterLiveScaleOn && clusterSpotsDataGrid != null)
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    var sv = clusterSpotsScrollViewer ?? FindVisualChild<ScrollViewer>(clusterSpotsDataGrid);
+                    sv?.ScrollToTop();
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
+        // Ends the preview when the mouse leaves the WHOLE band-checkbox row (wired to the row's
+        // MouseLeave, not each checkbox — so moving between checkboxes or across the gaps between them
+        // keeps the preview alive and doesn't briefly restore the station).
+        private void EndClusterBandHoverPreview()
+        {
+            if (!_clusterBandHoverActive) return;
+
+            _clusterHoverBandOverride = null;
+            string restoreCall = _clusterBandHoverSavedCall;
+            _clusterBandHoverSavedCall = null;
+            _clusterBandHoverActive = false;
+
+            if (clusterLiveScaleOn)
+            {
+                // Re-establish Live Scale: re-lock the scroll, re-sort by frequency, re-center on the VFO.
+                SetClusterLiveScaleScrollSetup(true);
+                ApplyClusterLiveScaleSort();
+                if (clusterCenterLineBand != null && _centerLineRevealed)
+                    clusterCenterLineBand.Visibility = Visibility.Visible;
+            }
+            RefreshClusterVisibleSpots();
+
+            if (!string.IsNullOrEmpty(restoreCall) && TB_DXCallsign != null)
+            {
+                // Re-show exactly what was filled before the hover (the re-lookup restores the
+                // name/country/locator/QRZ/map path). Keep it flagged as a cluster fill so the normal
+                // tune-away clear still applies afterwards.
+                TB_DXCallsign.Text = restoreCall;
+                _clusterAutoFilledDXCall = true;
+            }
         }
 
         // Signature of the spots last reported to the map as on-frequency (see above).
@@ -3764,18 +3859,22 @@ namespace HolyLogger
         // user manually typed/changed the DX callsign.
         private bool _clusterAutoFilledDXCall = false;
 
+        // The VFO frequency (MHz) at which the DX callsign was auto-filled (on-frequency auto-fill or a
+        // cluster double-click). The leave-frequency auto-clear only fires once the radio moves off THIS
+        // frequency, so a band-filter/hover refresh that transiently empties the on-frequency set while
+        // the VFO stays put does not wrongly clear the filled call.
+        private double _clusterAutoFilledFreqMhz = 0;
+
         // Reentrancy guard: true only while the cluster auto-fill is programmatically setting the DX
         // callsign. TB_DXCallsign_TextChanged treats any change made while the box has focus as a
         // manual edit and drops _clusterAutoFilledDXCall; this flag suppresses that during our own
         // fill, because F9/Clear parks focus in the (empty) box before we re-fill it.
         private bool _clusterFillingDXCall = false;
 
-        // A callsign the user cleared with F9 while it was auto-filled by the on-frequency feature, plus
-        // the frequency it was on. While set, the on-frequency auto-fill will NOT put this call back —
-        // the user dismissed it on purpose. Released when the radio leaves that frequency (see
-        // UpdateClusterFrequencyHighlight); a double-click on the spot still fills it explicitly.
+        // A callsign the user cleared with F9. While set, the on-frequency auto-fill will NOT put this
+        // call back — the user dismissed it on purpose. Released when the radio moves to another filled
+        // spot (see UpdateClusterFrequencyHighlight); a double-click on the spot still fills it explicitly.
         private string _clusterDismissedCall;
-        private double _clusterDismissedFreqMhz;
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
         private static readonly string[] ClusterModeOptions = new[] { "CW", "DIGI", "SSB", "FM", "FT8", "RTTY", "AM" };
@@ -4634,6 +4733,7 @@ namespace HolyLogger
             // so stale info lingered after tuning away (e.g. re-engaging Live Scale off the spot's freq).
             // Set AFTER the assignment above: setting .Text runs TB_DXCallsign_TextChanged first.
             _clusterAutoFilledDXCall = true;
+            _clusterAutoFilledFreqMhz = freqMhz;   // clear only once the radio moves off THIS frequency
 
             string normalizedMode = NormalizeClusterModeForLogger(spot.Mode);
             SelectLoggerMode(normalizedMode);
