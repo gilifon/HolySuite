@@ -99,7 +99,19 @@ namespace HolyLogger
             }
 
             foreach (var ch in LoadChannels())
+            {
+                HookChannel(ch);
                 _channels.Add(ch);
+            }
+            EnsureTrailingEmptyRow();
+            // Deleting rows (Delete key or the button) must never leave the list without a blank row.
+            // Deferred for the same reentrancy reason as Channel_PropertyChanged.
+            _channels.CollectionChanged += (s, e) =>
+            {
+                if (e.Action == System.Collections.Specialized.NotifyCollectionChangedAction.Remove)
+                    Dispatcher.BeginInvoke(new Action(EnsureTrailingEmptyRow),
+                        System.Windows.Threading.DispatcherPriority.Background);
+            };
             ChannelsGrid.ItemsSource = _channels;
 
             // Same header look as every other log-style table (QSO grid, cluster, Logs window):
@@ -206,7 +218,42 @@ namespace HolyLogger
         private void BtnDelete_Click(object sender, RoutedEventArgs e)
         {
             if (ChannelsGrid.SelectedItem is RadioChannel ch)
+            {
+                ch.PropertyChanged -= Channel_PropertyChanged;
                 _channels.Remove(ch);
+                EnsureTrailingEmptyRow();   // never leave the list without a blank row to type in
+            }
+        }
+
+        // Keep exactly one empty row at the bottom at all times, so it's always obvious how to add
+        // another channel. WPF's built-in "new item placeholder" isn't enough: the moment you start
+        // typing in it, it BECOMES the row you're editing and no empty row is left below, which reads
+        // as "there's no way to add more lines". Wholly-empty rows are dropped on save.
+        private void EnsureTrailingEmptyRow()
+        {
+            if (_channels.Count == 0 || _channels[_channels.Count - 1].IsFilled)
+            {
+                var blank = new RadioChannel();
+                HookChannel(blank);
+                _channels.Add(blank);
+            }
+        }
+
+        private void HookChannel(RadioChannel ch)
+        {
+            if (ch == null) return;
+            ch.PropertyChanged -= Channel_PropertyChanged;   // never double-subscribe
+            ch.PropertyChanged += Channel_PropertyChanged;
+        }
+
+        // A row just got content -> open a fresh blank row after it. Deferred: we're inside a property
+        // notification raised during a cell commit, and mutating the bound collection right then can
+        // upset the DataGrid (and ObservableCollection forbids reentrant changes).
+        private void Channel_PropertyChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != nameof(RadioChannel.IsFilled)) return;
+            Dispatcher.BeginInvoke(new Action(EnsureTrailingEmptyRow),
+                System.Windows.Threading.DispatcherPriority.Background);
         }
 
         private void BtnClose_Click(object sender, RoutedEventArgs e) => Close();

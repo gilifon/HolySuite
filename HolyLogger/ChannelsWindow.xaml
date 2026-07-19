@@ -50,7 +50,7 @@
                    Text="Double-click a channel to set the radio to its frequency and mode. Click a cell to edit; type in the empty last row to add a channel."/>
 
         <DataGrid x:Name="ChannelsGrid" Grid.Row="1" AutoGenerateColumns="False"
-                  CanUserAddRows="True" CanUserDeleteRows="True" CanUserReorderColumns="False"
+                  CanUserAddRows="False" CanUserDeleteRows="True" CanUserReorderColumns="False"
                   HeadersVisibility="Column" SelectionMode="Single" SelectionUnit="FullRow"
                   GridLinesVisibility="All" FontSize="15"
                   Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}"
