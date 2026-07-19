@@ -536,6 +536,7 @@ namespace HolyLogger
                         }
                     });
                     List<QSO> rawQSOList = parser.GetRawQSO();
+                    RawAdif = null;   // large file string no longer needed; free it before the save phase
                     int count = rawQSOList.Count;
 
                     if (count == 0)

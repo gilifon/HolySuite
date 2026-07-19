@@ -135,19 +135,24 @@ namespace HolyParser
         private void PopulateQSOList(Action<int> progressCallback = null)
         {
             m_qsoList.Clear();
-            //Remove Line breakers
-            string oneLiner = Regex.Replace(m_fileText, "\r\n", "");
-            oneLiner = Regex.Replace(oneLiner, "\r", "");
-            oneLiner = Regex.Replace(oneLiner, "\n", "");
 
-            //Splite the Header
-            string[] spliteHeader = Regex.Split(oneLiner, "<EOH>", RegexOptions.IgnoreCase);
-
-            //Get the body
-            string body = spliteHeader[1];
+            // Split into records WITHOUT first building a newline-stripped copy of the ENTIRE file. The
+            // old code made three full-file copies (to strip \r\n, \r, \n) plus the header/body/rows
+            // copies -- that multiplied peak memory and OutOfMemory'd on large files in this 32-bit
+            // process (giant strings also fragment the Large Object Heap). Newlines are stripped per
+            // record instead, which yields identical records because ADIF tags (<EOH>/<EOR>/<FIELD:len>)
+            // never contain line breaks. Also tolerates a missing <EOH> (headerless ADIF) instead of
+            // throwing IndexOutOfRange as the old spliteHeader[1] did.
+            const string eohTag = "<EOH>";
+            int eohIndex = m_fileText.IndexOf(eohTag, StringComparison.OrdinalIgnoreCase);
+            string body = eohIndex >= 0 ? m_fileText.Substring(eohIndex + eohTag.Length) : m_fileText;
 
             //Splite body to lines
             string[] rows = Regex.Split(body, "<EOR>", RegexOptions.IgnoreCase);
+            // Release the big whole-file strings so they can be collected while we parse the rows
+            // (Substring above already produced an independent 'body', so this frees the original).
+            body = null;
+            m_fileText = null;
 
             int debugCounter = 0;
             int totalRows = rows.Count(row => !string.IsNullOrWhiteSpace(row));
@@ -160,7 +165,12 @@ namespace HolyParser
                 if (string.IsNullOrWhiteSpace(row)) continue;
                 try
                 {
-                    QSO qso_row = ParseRawQSO(row);
+                    // Strip line breaks from THIS record (the old code stripped them from the whole file
+                    // up front). Small per-record work; only touched when the record actually has breaks.
+                    string cleanRow = (row.IndexOf('\n') >= 0 || row.IndexOf('\r') >= 0)
+                        ? row.Replace("\r", string.Empty).Replace("\n", string.Empty)
+                        : row;
+                    QSO qso_row = ParseRawQSO(cleanRow);
                     m_qsoList.Add(qso_row);
                     //if (IsParseDuplicates)
                     //{
