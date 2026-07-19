@@ -1,5 +1,6 @@
 using DXCCManager;
 using HolyParser;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -543,10 +544,87 @@ namespace HolyLogger
                 ? "   (full download)"
                 : $"   (since {s.LotwLastCheckSince})";
 
+            // The "New confirmations" number is a link that opens the list of new QSOs — but only when
+            // there actually are some to show. Otherwise it's plain, non-clickable text.
+            bool hasNew = !fullDownload && s.LotwLastNewQsls > 0
+                          && !string.IsNullOrWhiteSpace(s.LotwLastNewJson);
+            LNK_NewQsls.IsEnabled = hasNew;
+            if (hasNew)
+            {
+                LNK_NewQsls.Foreground = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));   // link blue
+                LNK_NewQsls.TextDecorations = TextDecorations.Underline;
+                LNK_NewQsls.Cursor = Cursors.Hand;
+            }
+            else
+            {
+                LNK_NewQsls.Foreground = (Brush)ThemeManager.Brush("TextBrush");
+                LNK_NewQsls.TextDecorations = null;
+                LNK_NewQsls.Cursor = Cursors.Arrow;
+            }
+
             TB_SumNewCountries.Text = fullDownload ? "—" : s.LotwLastNewCountries.ToString(inv);
             TB_SumNewCountries.Foreground = (!fullDownload && s.LotwLastNewCountries > 0)
                 ? System.Windows.Media.Brushes.ForestGreen
                 : muted;
+        }
+
+        // Click the "New confirmations" count -> show the new QSOs (from the last incremental check) with
+        // full details, so the operator can see exactly what was just confirmed.
+        private void NewQsls_Click(object sender, RoutedEventArgs e)
+        {
+            List<LotwNewQso> list = null;
+            try
+            {
+                var json = Properties.Settings.Default.LotwLastNewJson;
+                if (!string.IsNullOrWhiteSpace(json))
+                    list = JsonConvert.DeserializeObject<List<LotwNewQso>>(json);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (list == null || list.Count == 0)
+            {
+                HolyMessageBox.Show("There are no new confirmations to show.", "LoTW", HolyMsgType.Info, this);
+                return;
+            }
+            ShowNewConfirmationsWindow(list);
+        }
+
+        // A small themed grid of the new confirmations (built in code, like the eQSL-queue window). The
+        // app's window-chrome hook themes the plain Window automatically.
+        private void ShowNewConfirmationsWindow(List<LotwNewQso> list)
+        {
+            var grid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                CanUserReorderColumns = false,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.All,
+                SelectionMode = DataGridSelectionMode.Single,
+                FontSize = 14,
+                ItemsSource = list
+            };
+            grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+            ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+            grid.Columns.Add(new DataGridTextColumn { Header = "Callsign", Binding = new System.Windows.Data.Binding("Call"), Width = 130 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Country"), Width = 180 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Date", Binding = new System.Windows.Data.Binding("DateStr"), Width = 90 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "UTC", Binding = new System.Windows.Data.Binding("TimeStr"), Width = 60 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Band", Binding = new System.Windows.Data.Binding("Band"), Width = 70 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Mode", Binding = new System.Windows.Data.Binding("Mode"), Width = 70 });
+
+            var win = new Window
+            {
+                Title = $"New LoTW confirmations ({list.Count})",
+                Owner = this,
+                Width = 640,
+                Height = 440,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                ResizeMode = ResizeMode.CanResize,
+                Content = new Border { Padding = new Thickness(10), Child = grid }
+            };
+            win.ShowDialog();
         }
 
         private async void BTN_CheckLotw_Click(object sender, RoutedEventArgs e)
@@ -647,6 +725,10 @@ namespace HolyLogger
                     adif, "<eor>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 int qslCount = 0;
                 var resolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                // On an incremental check, every returned record is a confirmation newer than the marker,
+                // so capture their details for the "see the new QSOs" viewer. Skipped on a full download
+                // (thousands of records, and they're all "new" — the summary shows them as a baseline).
+                var newList = incremental ? new List<LotwNewQso>() : null;
                 foreach (var rec in records)
                 {
                     string call = ExtractAdifField(rec, "call");
@@ -657,6 +739,17 @@ namespace HolyLogger
                     if (!string.IsNullOrEmpty(name)
                         && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                         resolvedNames.Add(name);
+
+                    if (newList != null)
+                        newList.Add(new LotwNewQso
+                        {
+                            Call = call.Trim().ToUpperInvariant(),
+                            Country = name ?? string.Empty,
+                            DateStr = FormatAdifDateDMY(ExtractAdifField(rec, "qso_date")),
+                            TimeStr = FormatAdifTime(ExtractAdifField(rec, "time_on")),
+                            Band = (ExtractAdifField(rec, "band") ?? string.Empty).ToUpperInvariant(),
+                            Mode = (ExtractAdifField(rec, "mode") ?? string.Empty).ToUpperInvariant()
+                        });
                 }
 
                 // How many NEW countries this check added = growth of the entity set. This is the number
@@ -681,6 +774,8 @@ namespace HolyLogger
                 s.LotwLastNewQsls = qslCount;
                 s.LotwLastNewCountries = newCountries;
                 s.LotwLastCheckSince = sinceDisplay;   // empty = a full download
+                // The list of new confirmations, for the viewer. Cleared on a full download (no delta).
+                s.LotwLastNewJson = newList != null ? JsonConvert.SerializeObject(newList) : string.Empty;
                 string lastQsl = ExtractAdifField(adif, "app_lotw_lastqsl");
                 if (!string.IsNullOrWhiteSpace(lastQsl)) s.LotwLastQsl = lastQsl.Trim();
                 s.Save();
@@ -738,14 +833,34 @@ namespace HolyLogger
             return "1970-01-01";
         }
 
-        // Friendly "since" for the summary: date + HH:MM (drop seconds); date-only markers stay as-is.
+        // Friendly "since" for the summary: just the date as d.M.yyyy (e.g. 17.7.2026), no time. The
+        // marker (LotwLastQsl) keeps its full timestamp internally; only this display is shortened.
         private static string PrettySince(string marker)
         {
             marker = (marker ?? string.Empty).Trim();
-            var m = System.Text.RegularExpressions.Regex.Match(marker, @"^(\d{4}-\d{2}-\d{2})( \d{2}:\d{2})");
-            if (m.Success) return m.Groups[1].Value + m.Groups[2].Value;
-            var d = System.Text.RegularExpressions.Regex.Match(marker, @"^\d{4}-\d{2}-\d{2}");
-            return d.Success ? d.Value : marker;
+            var m = System.Text.RegularExpressions.Regex.Match(marker, @"^(\d{4})-(\d{2})-(\d{2})");
+            if (!m.Success) return marker;
+            return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}.{1}.{2}",
+                int.Parse(m.Groups[3].Value), int.Parse(m.Groups[2].Value), int.Parse(m.Groups[1].Value));
+        }
+
+        // Format an ADIF date ("yyyymmdd") as d.M.yyyy for display; passes anything else through.
+        private static string FormatAdifDateDMY(string adifDate)
+        {
+            adifDate = (adifDate ?? string.Empty).Trim();
+            if (System.Text.RegularExpressions.Regex.IsMatch(adifDate, @"^\d{8}$"))
+                return string.Format(System.Globalization.CultureInfo.InvariantCulture, "{0}.{1}.{2}",
+                    int.Parse(adifDate.Substring(6, 2)), int.Parse(adifDate.Substring(4, 2)), adifDate.Substring(0, 4));
+            return adifDate;
+        }
+
+        // Format an ADIF time ("hhmm" or "hhmmss") as HH:MM.
+        private static string FormatAdifTime(string adifTime)
+        {
+            adifTime = (adifTime ?? string.Empty).Trim();
+            if (System.Text.RegularExpressions.Regex.IsMatch(adifTime, @"^\d{4,6}$"))
+                return adifTime.Substring(0, 2) + ":" + adifTime.Substring(2, 2);
+            return adifTime;
         }
 
         // Read one ADIF field's value out of a single record. Handles <field:len> and <field:len:type>.
@@ -1004,5 +1119,17 @@ namespace HolyLogger
             ? System.Windows.Media.Brushes.ForestGreen
             : (Brush)new SolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F));   // vivid red, far more visible
         public string ConfirmedTip => IsConfirmed ? "Confirmed on LoTW" : "Not confirmed on LoTW";
+    }
+
+    // One newly-confirmed QSO, captured from the last incremental LoTW check for the "see the new
+    // QSOs" viewer. Persisted as JSON in Settings.LotwLastNewJson.
+    public class LotwNewQso
+    {
+        public string Call { get; set; }
+        public string Country { get; set; }
+        public string DateStr { get; set; }
+        public string TimeStr { get; set; }
+        public string Band { get; set; }
+        public string Mode { get; set; }
     }
 }

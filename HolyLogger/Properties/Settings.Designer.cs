@@ -2451,6 +2451,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwLastNewJson {
+            get {
+                return ((string)(this["LotwLastNewJson"]));
+            }
+            set {
+                this["LotwLastNewJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
         public double MsgBoxWindowLeft {
             get {

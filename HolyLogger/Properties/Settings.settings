@@ -608,6 +608,9 @@
     <Setting Name="SoundOutputDevice" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>
+    <Setting Name="LotwLastNewJson" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
     <Setting Name="MsgBoxWindowLeft" Type="System.Double" Scope="User">
       <Value Profile="(Default)">NaN</Value>
     </Setting>
