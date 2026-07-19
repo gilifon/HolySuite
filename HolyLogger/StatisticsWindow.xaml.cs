@@ -562,10 +562,24 @@ namespace HolyLogger
                 LNK_NewQsls.Cursor = Cursors.Arrow;
             }
 
+            // "New countries" is likewise a link — it opens the same table filtered to just the QSOs
+            // that gave a new country. Clickable only when there are new countries with a captured list.
             TB_SumNewCountries.Text = fullDownload ? "—" : s.LotwLastNewCountries.ToString(inv);
-            TB_SumNewCountries.Foreground = (!fullDownload && s.LotwLastNewCountries > 0)
-                ? System.Windows.Media.Brushes.ForestGreen
-                : muted;
+            bool hasNewCountry = !fullDownload && s.LotwLastNewCountries > 0
+                                 && !string.IsNullOrWhiteSpace(s.LotwLastNewJson);
+            LNK_NewCountries.IsEnabled = hasNewCountry;
+            if (hasNewCountry)
+            {
+                LNK_NewCountries.Foreground = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));   // link blue
+                LNK_NewCountries.TextDecorations = TextDecorations.Underline;
+                LNK_NewCountries.Cursor = Cursors.Hand;
+            }
+            else
+            {
+                LNK_NewCountries.Foreground = muted;
+                LNK_NewCountries.TextDecorations = null;
+                LNK_NewCountries.Cursor = Cursors.Arrow;
+            }
         }
 
         // Click the "New confirmations" count -> show the new QSOs (from the last incremental check) with
@@ -586,40 +600,98 @@ namespace HolyLogger
                 HolyMessageBox.Show("There are no new confirmations to show.", "LoTW", HolyMsgType.Info, this);
                 return;
             }
-            ShowNewConfirmationsWindow(list);
+            ShowNewConfirmationsWindow(list, $"New LoTW confirmations ({list.Count})");
         }
 
-        // A small themed grid of the new confirmations (built in code, like the eQSL-queue window). The
-        // app's window-chrome hook themes the plain Window automatically.
-        private void ShowNewConfirmationsWindow(List<LotwNewQso> list)
+        // Click the "New countries" count -> show only the QSOs that gave a new country (same table).
+        private void NewCountries_Click(object sender, RoutedEventArgs e)
         {
+            List<LotwNewQso> list = null;
+            try
+            {
+                var json = Properties.Settings.Default.LotwLastNewJson;
+                if (!string.IsNullOrWhiteSpace(json))
+                    list = JsonConvert.DeserializeObject<List<LotwNewQso>>(json);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            var newCountryQsos = list?.Where(q => q.IsNewCountry).ToList() ?? new List<LotwNewQso>();
+            if (newCountryQsos.Count == 0)
+            {
+                HolyMessageBox.Show("There are no new-country QSOs to show.", "LoTW", HolyMsgType.Info, this);
+                return;
+            }
+            ShowNewConfirmationsWindow(newCountryQsos, $"New countries ({newCountryQsos.Count})");
+        }
+
+        // The new confirmations as a regular table: one row per QSO, every ADIF field a column, in the
+        // order LoTW sent them (matching a raw ADIF viewer). Built in code; the app's window-chrome hook
+        // themes the plain Window automatically.
+        private void ShowNewConfirmationsWindow(List<LotwNewQso> list, string title)
+        {
+            // Ordered union of every ADIF field across the records (first-seen == ADIF order).
+            var columns = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var q in list)
+                if (q.Fields != null)
+                    foreach (var f in q.Fields)
+                        if (seen.Add(f.Field)) columns.Add(f.Field);
+
             var grid = new DataGrid
             {
                 AutoGenerateColumns = false,
                 IsReadOnly = true,
                 CanUserAddRows = false,
-                CanUserReorderColumns = false,
-                HeadersVisibility = DataGridHeadersVisibility.Column,
+                CanUserReorderColumns = true,
+                HeadersVisibility = DataGridHeadersVisibility.All,   // row-number headers too, like a "Line" column
                 GridLinesVisibility = DataGridGridLinesVisibility.All,
                 SelectionMode = DataGridSelectionMode.Single,
-                FontSize = 14,
-                ItemsSource = list
+                FontSize = 13
             };
             grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
             ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
-            grid.Columns.Add(new DataGridTextColumn { Header = "Callsign", Binding = new System.Windows.Data.Binding("Call"), Width = 130 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Country"), Width = 180 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Date", Binding = new System.Windows.Data.Binding("DateStr"), Width = 90 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "UTC", Binding = new System.Windows.Data.Binding("TimeStr"), Width = 60 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Band", Binding = new System.Windows.Data.Binding("Band"), Width = 70 });
-            grid.Columns.Add(new DataGridTextColumn { Header = "Mode", Binding = new System.Windows.Data.Binding("Mode"), Width = 70 });
+            ScrollViewer.SetHorizontalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+            grid.LoadingRow += (s, ev) => ev.Row.Header = (ev.Row.GetIndex() + 1).ToString();
+
+            if (columns.Count > 0)
+            {
+                // One dictionary per row; every column pre-filled so indexer bindings never KeyNotFound.
+                var rows = new List<Dictionary<string, string>>();
+                foreach (var q in list)
+                {
+                    var d = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    if (q.Fields != null)
+                        foreach (var f in q.Fields) d[f.Field] = f.Value;
+                    foreach (var c in columns) if (!d.ContainsKey(c)) d[c] = string.Empty;
+                    rows.Add(d);
+                }
+                foreach (var c in columns)
+                    grid.Columns.Add(new DataGridTextColumn
+                    {
+                        Header = c,
+                        Binding = new System.Windows.Data.Binding("[" + c + "]"),
+                        Width = DataGridLength.Auto
+                    });
+                grid.ItemsSource = rows;
+            }
+            else
+            {
+                // Older cached list (captured before full-field support): fall back to the summary columns.
+                grid.Columns.Add(new DataGridTextColumn { Header = "Callsign", Binding = new System.Windows.Data.Binding("Call"), Width = 130 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Country"), Width = 180 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Date", Binding = new System.Windows.Data.Binding("DateStr"), Width = 90 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "UTC", Binding = new System.Windows.Data.Binding("TimeStr"), Width = 60 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Band", Binding = new System.Windows.Data.Binding("Band"), Width = 70 });
+                grid.Columns.Add(new DataGridTextColumn { Header = "Mode", Binding = new System.Windows.Data.Binding("Mode"), Width = 70 });
+                grid.ItemsSource = list;
+            }
 
             var win = new Window
             {
-                Title = $"New LoTW confirmations ({list.Count})",
+                Title = title,
                 Owner = this,
-                Width = 640,
-                Height = 440,
+                Width = 920,
+                Height = 360,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ResizeMode = ResizeMode.CanResize,
                 Content = new Border { Padding = new Thickness(10), Child = grid }
@@ -654,12 +726,19 @@ namespace HolyLogger
             }
 
             // Incremental sync: the FIRST run has no saved marker, so it pulls everything from 1970 (slow,
-            // one time); later runs pass LoTW's EXACT last-QSL timestamp (APP_LoTW_LASTQSL, e.g.
-            // "2026-07-17 17:41:36") as qso_qslsince, so LoTW returns only QSLs received AFTER that
-            // moment -- no whole-day re-count. New confirmations union into the cached set; a full
-            // re-pull only happens when there's no cache yet.
-            bool incremental = _confirmedEntities.Count > 0 && !string.IsNullOrWhiteSpace(s.LotwLastQsl);
-            string sinceQuery = incremental ? QslSinceValue(s.LotwLastQsl) : "1970-01-01";
+            // one time); later runs pass the DATE of the last QSL received (LotwLastQsl) as qso_qslsince.
+            // IMPORTANT: LoTW's qso_qslsince honors only the DATE, not the time -- so it re-returns every
+            // QSL received on that same day. We therefore query FROM that date (inclusive) and de-dupe
+            // same-day repeats against LotwSeenKeysJson below, instead of trusting a timestamp+1s (which
+            // a date-only filter silently ignores, causing the same QSLs to be re-counted every check).
+            // Require the de-dupe key set too: its absence means either a first-ever run or an upgrade
+            // from the old timestamp scheme (whose total may be inflated by same-day re-counts). Either
+            // way, do one full re-download to reset the total cleanly and seed the de-dupe set; every
+            // check after that is incremental.
+            bool incremental = _confirmedEntities.Count > 0
+                               && !string.IsNullOrWhiteSpace(s.LotwLastQsl)
+                               && !string.IsNullOrWhiteSpace(s.LotwSeenKeysJson);
+            string sinceQuery = incremental ? MarkerDate(s.LotwLastQsl) : "1970-01-01";
             string sinceDisplay = incremental ? PrettySince(s.LotwLastQsl) : string.Empty;
 
             BTN_CheckLotw.IsEnabled = false;
@@ -720,15 +799,36 @@ namespace HolyLogger
                 }
 
                 // Walk the QSL records, resolving each callsign to a DXCC entity via the SAME resolver the
-                // worked list uses, so the names line up for highlighting.
+                // worked list uses, so the names line up for highlighting. Strip the ADIF header (up to
+                // <eoh>) first, so the header's own fields (PROGRAMID, APP_LoTW_LASTQSL, …) don't leak
+                // into the first record's captured field list.
+                int eohIdx = adif.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase);
+                string recordsBody = eohIdx >= 0 ? adif.Substring(eohIdx + 5) : adif;
                 var records = System.Text.RegularExpressions.Regex.Split(
-                    adif, "<eor>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                int qslCount = 0;
+                    recordsBody, "<eor>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                int qslCount = 0;   // total records with a call (the confirmed-QSO total after a full run)
                 var resolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                // On an incremental check, every returned record is a confirmation newer than the marker,
-                // so capture their details for the "see the new QSOs" viewer. Skipped on a full download
-                // (thousands of records, and they're all "new" — the summary shows them as a baseline).
+
+                // De-dupe same-day re-fetches. Because qso_qslsince is date-only, an incremental query
+                // FROM the boundary date re-returns every QSL received that day. We remember the QSO keys
+                // already counted on that date (LotwSeenKeysJson) and treat a record as NEW only when its
+                // QSL-received date is LATER than the boundary, or it's a same-date QSO we haven't seen.
+                string boundaryDate = incremental ? MarkerDate(s.LotwLastQsl) : string.Empty;
+                var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                if (incremental && !string.IsNullOrWhiteSpace(s.LotwSeenKeysJson))
+                {
+                    try
+                    {
+                        foreach (var k in JsonConvert.DeserializeObject<List<string>>(s.LotwSeenKeysJson) ?? new List<string>())
+                            seenKeys.Add(k);
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                // Genuinely-new confirmations only (details captured for the viewer on incremental runs).
                 var newList = incremental ? new List<LotwNewQso>() : null;
+                int newCount = 0;
+                string maxRxDate = boundaryDate;   // latest QSL-received date seen this run
                 foreach (var rec in records)
                 {
                     string call = ExtractAdifField(rec, "call");
@@ -740,20 +840,44 @@ namespace HolyLogger
                         && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                         resolvedNames.Add(name);
 
-                    if (newList != null)
-                        newList.Add(new LotwNewQso
-                        {
-                            Call = call.Trim().ToUpperInvariant(),
-                            Country = name ?? string.Empty,
-                            DateStr = FormatAdifDateDMY(ExtractAdifField(rec, "qso_date")),
-                            TimeStr = FormatAdifTime(ExtractAdifField(rec, "time_on")),
-                            Band = (ExtractAdifField(rec, "band") ?? string.Empty).ToUpperInvariant(),
-                            Mode = (ExtractAdifField(rec, "mode") ?? string.Empty).ToUpperInvariant()
-                        });
+                    string rxDate = QslRcvdDate(rec);
+                    string key = QsoKey(rec);
+                    if (string.Compare(rxDate, maxRxDate, StringComparison.Ordinal) > 0) maxRxDate = rxDate;
+
+                    bool isNew = !incremental
+                              || string.Compare(rxDate, boundaryDate, StringComparison.Ordinal) > 0
+                              || (string.Equals(rxDate, boundaryDate, StringComparison.Ordinal) && !seenKeys.Contains(key));
+                    if (isNew)
+                    {
+                        newCount++;
+                        if (newList != null)
+                            newList.Add(new LotwNewQso
+                            {
+                                Call = call.Trim().ToUpperInvariant(),
+                                Country = name ?? string.Empty,
+                                DateStr = FormatAdifDateDMY(ExtractAdifField(rec, "qso_date")),
+                                TimeStr = FormatAdifTime(ExtractAdifField(rec, "time_on")),
+                                Band = (ExtractAdifField(rec, "band") ?? string.Empty).ToUpperInvariant(),
+                                Mode = (ExtractAdifField(rec, "mode") ?? string.Empty).ToUpperInvariant(),
+                                // _confirmedEntities isn't unioned until after this loop, so it still holds
+                                // the pre-check set — a country absent from it is a NEW country.
+                                IsNewCountry = !string.IsNullOrEmpty(name) && !_confirmedEntities.Contains(name),
+                                Fields = ParseAdifFields(rec)   // every ADIF field, for the details table
+                            });
+                    }
                 }
 
-                // How many NEW countries this check added = growth of the entity set. This is the number
-                // that actually matters (unlike raw QSL count, which re-counts same-day confirmations).
+                // Rebuild the boundary-day key set from THIS run's records on the latest QSL-received date,
+                // so the next check can skip these same-day QSLs.
+                var newSeenKeys = new List<string>();
+                foreach (var rec in records)
+                {
+                    if (string.IsNullOrWhiteSpace(ExtractAdifField(rec, "call"))) continue;
+                    if (string.Equals(QslRcvdDate(rec), maxRxDate, StringComparison.Ordinal))
+                        newSeenKeys.Add(QsoKey(rec));
+                }
+
+                // How many NEW countries this check added = growth of the entity set.
                 int countriesBefore = _confirmedEntities.Count;
 
                 // Full run replaces the set; incremental run adds the new confirmations to the cached set.
@@ -766,18 +890,18 @@ namespace HolyLogger
                     ? Math.Max(0, _confirmedEntities.Count - countriesBefore)
                     : _confirmedEntities.Count;   // a full (re)build treats the whole set as "found"
 
-                // Save the confirmed set and LoTW's last-QSL marker for the next incremental run. The
-                // total confirmed-QSO count is cumulative: a full run replaces it, an incremental adds
-                // the new QSLs (a slight same-day overlap is harmless for this informational figure).
+                // Persist. The total adds only genuinely-new QSLs on an incremental run (no same-day
+                // re-count), or the whole set on a full run. The marker is a DATE (matching qso_qslsince),
+                // plus the de-dupe key set for that date.
                 s.LotwConfirmedEntities = string.Join("|", _confirmedEntities);
-                s.LotwConfirmedQsoCount = incremental ? s.LotwConfirmedQsoCount + qslCount : qslCount;
-                s.LotwLastNewQsls = qslCount;
+                s.LotwConfirmedQsoCount = incremental ? s.LotwConfirmedQsoCount + newCount : qslCount;
+                s.LotwLastNewQsls = incremental ? newCount : qslCount;
                 s.LotwLastNewCountries = newCountries;
                 s.LotwLastCheckSince = sinceDisplay;   // empty = a full download
                 // The list of new confirmations, for the viewer. Cleared on a full download (no delta).
                 s.LotwLastNewJson = newList != null ? JsonConvert.SerializeObject(newList) : string.Empty;
-                string lastQsl = ExtractAdifField(adif, "app_lotw_lastqsl");
-                if (!string.IsNullOrWhiteSpace(lastQsl)) s.LotwLastQsl = lastQsl.Trim();
+                if (!string.IsNullOrWhiteSpace(maxRxDate)) s.LotwLastQsl = maxRxDate;   // stored as a date
+                s.LotwSeenKeysJson = JsonConvert.SerializeObject(newSeenKeys);
                 s.Save();
 
                 // ApplyConfirmedHighlight sets the "Confirmed (LoTW): N of M" status, colors the rows, and
@@ -817,20 +941,33 @@ namespace HolyLogger
             }
         }
 
-        // The exact value to send as qso_qslsince, from LoTW's own APP_LoTW_LASTQSL marker. For a full
-        // timestamp we send the moment + 1 second, so the boundary QSL itself is NOT returned again
-        // (LoTW's qso_qslsince is inclusive) -- this guarantees "0 new" when nothing arrived since the
-        // last check, even if you check twice in a row. Falls back to a full pull (1970) if unrecognized.
-        private static string QslSinceValue(string marker)
+        // The date (yyyy-MM-dd) to send as qso_qslsince, from the stored marker (which may be a legacy
+        // full timestamp "yyyy-MM-dd HH:mm:ss" or a bare date). qso_qslsince is date-only, so we send
+        // the date and de-dupe same-day repeats in the caller. Falls back to a full pull if unrecognized.
+        private static string MarkerDate(string marker)
         {
             marker = (marker ?? string.Empty).Trim();
-            if (System.DateTime.TryParseExact(marker, "yyyy-MM-dd HH:mm:ss",
-                    System.Globalization.CultureInfo.InvariantCulture,
-                    System.Globalization.DateTimeStyles.None, out var dt))
-                return dt.AddSeconds(1).ToString("yyyy-MM-dd HH:mm:ss", System.Globalization.CultureInfo.InvariantCulture);
-            if (System.Text.RegularExpressions.Regex.IsMatch(marker, @"^\d{4}-\d{2}-\d{2}$"))
-                return marker;   // legacy date-only marker: use as-is
-            return "1970-01-01";
+            var m = System.Text.RegularExpressions.Regex.Match(marker, @"^(\d{4}-\d{2}-\d{2})");
+            return m.Success ? m.Groups[1].Value : "1970-01-01";
+        }
+
+        // The QSL-received date (yyyy-MM-dd) of one record — QSLRDATE ("yyyymmdd"), falling back to the
+        // date part of APP_LoTW_RXQSL. This is what qso_qslsince filters on, so it's the de-dupe boundary.
+        private static string QslRcvdDate(string record)
+        {
+            string q = ExtractAdifField(record, "qslrdate");
+            if (!string.IsNullOrWhiteSpace(q) && System.Text.RegularExpressions.Regex.IsMatch(q, @"^\d{8}$"))
+                return q.Substring(0, 4) + "-" + q.Substring(4, 2) + "-" + q.Substring(6, 2);
+            string rx = ExtractAdifField(record, "app_lotw_rxqsl");
+            var m = System.Text.RegularExpressions.Regex.Match(rx ?? string.Empty, @"^(\d{4}-\d{2}-\d{2})");
+            return m.Success ? m.Groups[1].Value : string.Empty;
+        }
+
+        // A stable identity for one QSO, so a same-day QSL isn't counted twice across checks.
+        private static string QsoKey(string record)
+        {
+            string U(string f) => (ExtractAdifField(record, f) ?? string.Empty).Trim().ToUpperInvariant();
+            return string.Join("|", U("call"), U("qso_date"), U("time_on"), U("band"), U("mode"));
         }
 
         // Friendly "since" for the summary: just the date as d.M.yyyy (e.g. 17.7.2026), no time. The
@@ -877,6 +1014,29 @@ namespace HolyLogger
             return record.Substring(start, len).Trim();
         }
 
+        // Every ADIF field in one record, in the order they appear (uppercased names), for the
+        // "all details" drill-down. Uses the same length-prefixed <field:len[:type]> parsing as
+        // ExtractAdifField, so it's exactly what LoTW sent — nothing dropped.
+        private static List<AdifFieldRow> ParseAdifFields(string record)
+        {
+            var rows = new List<AdifFieldRow>();
+            if (string.IsNullOrEmpty(record)) return rows;
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(
+                         record, @"<([A-Za-z0-9_]+):(\d+)(?::[^>]*)?>",
+                         System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            {
+                int len = int.Parse(m.Groups[2].Value);
+                int start = m.Index + m.Length;
+                if (len <= 0 || start + len > record.Length) continue;
+                rows.Add(new AdifFieldRow
+                {
+                    Field = m.Groups[1].Value.ToUpperInvariant(),
+                    Value = record.Substring(start, len).Trim()
+                });
+            }
+            return rows;
+        }
+
         private void SortWorkedByName(object sender, MouseButtonEventArgs e)
         {
             _workedSort = _workedSort == WorkedSort.NameAsc ? WorkedSort.NameDesc : WorkedSort.NameAsc;
@@ -914,8 +1074,17 @@ namespace HolyLogger
             if      (_workedSort == WorkedSort.NameAsc)  sorted = _workedList.OrderBy(c => c.Name).ToList();
             else if (_workedSort == WorkedSort.NameDesc) sorted = _workedList.OrderByDescending(c => c.Name).ToList();
             else if (_workedSort == WorkedSort.CountAsc) sorted = _workedList.OrderBy(c => c.Count).ThenBy(c => c.Name).ToList();
-            else if (_workedSort == WorkedSort.ConfirmedDesc) sorted = _workedList.OrderByDescending(c => c.IsConfirmed).ThenByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
-            else if (_workedSort == WorkedSort.ConfirmedAsc)  sorted = _workedList.OrderBy(c => c.IsConfirmed).ThenByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
+            else if (_workedSort == WorkedSort.ConfirmedDesc || _workedSort == WorkedSort.ConfirmedAsc)
+            {
+                // Group by confirmed state. The UNCONFIRMED group (the countries you still need) is
+                // sub-sorted alphabetically by country name so it's easy to scan; the confirmed group
+                // keeps its count order.
+                var confirmed   = _workedList.Where(c => c.IsConfirmed).OrderByDescending(c => c.Count).ThenBy(c => c.Name);
+                var unconfirmed = _workedList.Where(c => !c.IsConfirmed).OrderBy(c => c.Name);
+                sorted = _workedSort == WorkedSort.ConfirmedDesc
+                    ? confirmed.Concat(unconfirmed).ToList()    // confirmed first, unconfirmed (A–Z) below
+                    : unconfirmed.Concat(confirmed).ToList();   // unconfirmed (A–Z) first
+            }
             else                                         sorted = _workedList.OrderByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
 
             for (int i = 0; i < sorted.Count; i++)
@@ -1122,7 +1291,8 @@ namespace HolyLogger
     }
 
     // One newly-confirmed QSO, captured from the last incremental LoTW check for the "see the new
-    // QSOs" viewer. Persisted as JSON in Settings.LotwLastNewJson.
+    // QSOs" viewer. The top-level fields drive the overview grid; Fields holds EVERY ADIF field from
+    // the record for the drill-down. Persisted as JSON in Settings.LotwLastNewJson.
     public class LotwNewQso
     {
         public string Call { get; set; }
@@ -1131,5 +1301,15 @@ namespace HolyLogger
         public string TimeStr { get; set; }
         public string Band { get; set; }
         public string Mode { get; set; }
+        // True when this QSO's DXCC entity wasn't confirmed before this check — i.e. it gave a new country.
+        public bool IsNewCountry { get; set; }
+        public List<AdifFieldRow> Fields { get; set; }
+    }
+
+    // One ADIF field (name + value) for the "all details" grid.
+    public class AdifFieldRow
+    {
+        public string Field { get; set; }
+        public string Value { get; set; }
     }
 }

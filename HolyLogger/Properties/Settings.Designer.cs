@@ -2463,6 +2463,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwSeenKeysJson {
+            get {
+                return ((string)(this["LotwSeenKeysJson"]));
+            }
+            set {
+                this["LotwSeenKeysJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
         public double MsgBoxWindowLeft {
             get {
