@@ -370,8 +370,7 @@ namespace HolyLogger.OptionsUserControls
                 _isLoadingClusterSettings = true;
                 try
                 {
-                    CBX_ClusterPopup.IsChecked = mainWindow.GetClusterHoverPopupEnabled();
-                    CBX_ClusterPlotMap.IsChecked = Properties.Settings.Default.ClusterMapEnabled;
+                    // The hover-popup and "plot spots on map" toggles moved to the Cluster window's gear.
                     CBX_MapShowDayNight.IsChecked = Properties.Settings.Default.MapShowDayNight;
                     bool mapBW = Properties.Settings.Default.MapBlackWhite;
                     RB_MapColor_BW.IsChecked = mapBW;
@@ -380,27 +379,6 @@ namespace HolyLogger.OptionsUserControls
                 finally
                 {
                     _isLoadingClusterSettings = false;
-                }
-            }
-        }
-
-        private void ClusterMapSetting_Changed(object sender, RoutedEventArgs e)
-        {
-            if (_isLoadingClusterSettings)
-                return;
-
-            var mainWindow = Application.Current.MainWindow as MainWindow;
-            if (mainWindow != null)
-            {
-                if (sender == CBX_ClusterPopup)
-                {
-                    mainWindow.SetClusterHoverPopupEnabled(CBX_ClusterPopup.IsChecked == true);
-                }
-                else if (sender == CBX_ClusterPlotMap)
-                {
-                    Properties.Settings.Default.ClusterMapEnabled = CBX_ClusterPlotMap.IsChecked == true;
-                    try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-                    mainWindow.UpdateClusterMapFromSettings();
                 }
             }
         }
@@ -508,13 +486,6 @@ namespace HolyLogger.OptionsUserControls
 
             CBX_ClusterVisible.IsEnabled = isActive;
             CBX_ClusterVisible.Opacity = isActive ? 1.0 : 0.5;
-
-            // The hover/map popup only makes sense while the cluster is active, so gray it out too.
-            if (CBX_ClusterPopup != null)
-            {
-                CBX_ClusterPopup.IsEnabled = isActive;
-                CBX_ClusterPopup.Opacity = isActive ? 1.0 : 0.5;
-            }
         }
 
         /// <summary>

@@ -435,16 +435,16 @@
       <Value Profile="(Default)">60</Value>
     </Setting>
     <Setting Name="ClusterSettingsWindowLeft" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">140</Value>
+      <Value Profile="(Default)">NaN</Value>
     </Setting>
     <Setting Name="ClusterSettingsWindowTop" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">140</Value>
+      <Value Profile="(Default)">NaN</Value>
     </Setting>
     <Setting Name="ClusterSettingsWindowWidth" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">380</Value>
+      <Value Profile="(Default)">NaN</Value>
     </Setting>
     <Setting Name="ClusterSettingsWindowHeight" Type="System.Double" Scope="User">
-      <Value Profile="(Default)">260</Value>
+      <Value Profile="(Default)">NaN</Value>
     </Setting>
     <Setting Name="ClusterEnabledBands" Type="System.String" Scope="User">
       <Value Profile="(Default)">160,80,60,40,30,20,17,15,12,10,6,VHF,UHF,SHF</Value>
@@ -466,6 +466,9 @@
     </Setting>
     <Setting Name="ClusterBandColors" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="ClusterAutoFillDxCall" Type="System.Boolean" Scope="User">
+      <Value Profile="(Default)">True</Value>
     </Setting>
     <Setting Name="ClusterMapEnabled" Type="System.Boolean" Scope="User">
       <Value Profile="(Default)">True</Value>

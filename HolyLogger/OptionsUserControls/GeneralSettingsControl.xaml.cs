@@ -57,39 +57,13 @@ namespace HolyLogger.OptionsUserControls
             }
         }
 
-        // Choices for the new-country spot alert: the five Windows system sounds (always available,
-        // no files) plus every .wav that ships in C:\Windows\Media (tada, chimes, Alarm01…, Ring01…).
-        // A name ending in .wav is played from that folder; the rest map to system sounds in
-        // MainWindow.PlayClusterAlertSound.
-        static readonly string[] NewCountrySoundOptions = { "Chime", "Beep", "Exclamation", "Question", "Critical" };
-
         public GeneralSettingsControl()
         {
             InitializeComponent();
 
-            var sounds = new List<string>(NewCountrySoundOptions);
-            try
-            {
-                string mediaDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Media");
-                sounds.AddRange(Directory.GetFiles(mediaDir, "*.wav")
-                                         .Select(Path.GetFileName)
-                                         .OrderBy(n => n, StringComparer.OrdinalIgnoreCase));
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }   // no Media folder -> system sounds only
-            CB_NewCountrySound.ItemsSource = sounds;
-            string saved = Properties.Settings.Default.ClusterNewCountrySound;
-            CB_NewCountrySound.SelectedItem = sounds.Contains(saved, StringComparer.OrdinalIgnoreCase)
-                ? sounds.First(n => string.Equals(n, saved, StringComparison.OrdinalIgnoreCase))
-                : "Chime";
-
-            // Same sound choices for the Unconfirmed-spot alert (its own separate list instance).
-            CB_UnconfirmedSound.ItemsSource = new List<string>(sounds);
-            string savedUnconf = Properties.Settings.Default.ClusterUnconfirmedSound;
-            CB_UnconfirmedSound.SelectedItem = sounds.Contains(savedUnconf, StringComparer.OrdinalIgnoreCase)
-                ? sounds.First(n => string.Equals(n, savedUnconf, StringComparison.OrdinalIgnoreCase))
-                : "Chime";
-
-            // Shared output-device picker for both alert sounds: "System default" (Windows default
+            // The cluster alert sounds (new-country / Unconfirmed spot) moved to the Cluster window's
+            // gear; only the app-wide output device is configured here.
+            // Output-device picker: "System default" (Windows default
             // device) + each real output device, so sounds can go to the speakers instead of a USB codec.
             InitSoundDevicePicker(CB_SoundDevice, Properties.Settings.Default.SoundOutputDevice);
 
@@ -118,11 +92,40 @@ namespace HolyLogger.OptionsUserControls
             return string.Equals(d, SystemDefaultDevice, StringComparison.Ordinal) ? string.Empty : (d ?? string.Empty);
         }
 
-        private void CB_NewCountrySound_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        [DllImport("user32.dll")] private static extern bool SetCursorPos(int X, int Y);
+
+        // Land the operator directly on the audio-output-device picker: scroll it into view, give it
+        // keyboard focus, and park the MOUSE POINTER on it so it doesn't have to be hunted for. Used by
+        // the Cluster Settings window's "Sounds" link.
+        //
+        // Deferred to Loaded priority (and retried) because the General page may only just have been
+        // switched in: before layout the control has no size and PointToScreen would be meaningless.
+        public void FocusSoundDevicePicker(int attempt = 0)
         {
-            if (CB_NewCountrySound.SelectedItem is string s)
-                Properties.Settings.Default.ClusterNewCountrySound = s;
-            HasChanged = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (CB_SoundDevice == null) return;
+
+                    // Not laid out / not on screen yet -> try again shortly (bounded, so we never spin).
+                    if (!CB_SoundDevice.IsVisible || CB_SoundDevice.ActualWidth <= 0 || CB_SoundDevice.ActualHeight <= 0)
+                    {
+                        if (attempt < 10) FocusSoundDevicePicker(attempt + 1);
+                        return;
+                    }
+
+                    CB_SoundDevice.BringIntoView();
+                    CB_SoundDevice.Focus();
+                    Keyboard.Focus(CB_SoundDevice);
+
+                    // PointToScreen gives physical screen pixels, which is what SetCursorPos wants.
+                    Point centre = CB_SoundDevice.PointToScreen(
+                        new Point(CB_SoundDevice.ActualWidth / 2.0, CB_SoundDevice.ActualHeight / 2.0));
+                    SetCursorPos((int)centre.X, (int)centre.Y);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         private void CB_SoundDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -131,24 +134,6 @@ namespace HolyLogger.OptionsUserControls
             HasChanged = true;
         }
 
-        private void BTN_TestNewCountrySound_Click(object sender, RoutedEventArgs e)
-        {
-            e.Handled = true;
-            MainWindow.PlayClusterAlertSound(CB_NewCountrySound.SelectedItem as string, DeviceSettingFrom(CB_SoundDevice));
-        }
-
-        private void CB_UnconfirmedSound_SelectionChanged(object sender, SelectionChangedEventArgs e)
-        {
-            if (CB_UnconfirmedSound.SelectedItem is string s)
-                Properties.Settings.Default.ClusterUnconfirmedSound = s;
-            HasChanged = true;
-        }
-
-        private void BTN_TestUnconfirmedSound_Click(object sender, RoutedEventArgs e)
-        {
-            e.Handled = true;
-            MainWindow.PlayClusterAlertSound(CB_UnconfirmedSound.SelectedItem as string, DeviceSettingFrom(CB_SoundDevice));
-        }
 
         private void CBX_EnableOmniRigCAT_Changed(object sender, RoutedEventArgs e)
         {

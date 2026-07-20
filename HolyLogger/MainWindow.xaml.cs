@@ -5421,6 +5421,24 @@ namespace HolyLogger
             options.GeneralSettingsControlControlInstance.Rig2 = Rig2;
         }
 
+        // Open Options on the General page — where the app-wide Sounds settings live. Used by the
+        // "Sounds" link in the Cluster Settings window so the operator can jump straight there.
+        internal void OpenOptionsOnGeneralPage()
+        {
+            try
+            {
+                OptionsMenuItemMenuItem_Click(null, null);
+                if (options != null)
+                {
+                    options.GeneralItem.IsSelected = true;
+                    options.Activate();
+                    // Put the caret on the audio-device picker so it doesn't have to be hunted for.
+                    options.GeneralSettingsControlControlInstance?.FocusSoundDevicePicker();
+                }
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // ===== "My" menu: open each online service's personal area in the browser =====
         // We deliberately do NOT submit the operator's credentials to the site's web login (fragile and a
         // security risk). We just open the personal-area URL; the site authenticates via the browser

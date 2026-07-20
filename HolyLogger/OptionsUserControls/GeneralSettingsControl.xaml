@@ -69,57 +69,47 @@
                     </StackPanel>
                 </CheckBox>
 
-                <!-- Sound alert on a new-country cluster spot -->
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <CheckBox x:Name="CBX_NewCountrySound" VerticalAlignment="Center" IsChecked="{Binding Default.ClusterNewCountrySoundOn, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Click="HasChanged_Click">
-                        <TextBlock Text="Sound alert on a new-country cluster spot" VerticalAlignment="Center" Width="315"/>
-                    </CheckBox>
-                    <Button x:Name="BTN_TestNewCountrySound" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8,2"
-                            FontSize="12" Cursor="Hand" Click="BTN_TestNewCountrySound_Click"
-                            IsEnabled="{Binding ElementName=CBX_NewCountrySound, Path=IsChecked}"
-                            ToolTip="Click to test — plays the selected alert sound on the selected audio device">
-                        <StackPanel Orientation="Horizontal">
-                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
-                                <Canvas Width="24" Height="24">
-                                    <Path Fill="#3B6EA5" Data="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                                </Canvas>
-                            </Viewbox>
-                            <TextBlock Text="Test" Margin="5,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                    <ComboBox x:Name="CB_NewCountrySound" Margin="8,0,0,0" Width="130" VerticalAlignment="Center" FontSize="14"
-                              IsEnabled="{Binding ElementName=CBX_NewCountrySound, Path=IsChecked}" SelectionChanged="CB_NewCountrySound_SelectionChanged"/>
-                </StackPanel>
+                <!-- The two cluster sound alerts (new-country / Unconfirmed spot) moved to the Cluster
+                     window's gear (Cluster Settings). The output DEVICE picker below stays here: it is
+                     app-wide, not cluster-specific, and those alerts use it. -->
 
-                <!-- Sound alert on a new Unconfirmed cluster spot (worked but not confirmed on LoTW) -->
-                <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <CheckBox x:Name="CBX_UnconfirmedSound" VerticalAlignment="Center" IsChecked="{Binding Default.ClusterUnconfirmedSoundOn, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Click="HasChanged_Click">
-                        <TextBlock Text="Sound alert on a new Unconfirmed cluster spot" VerticalAlignment="Center" Width="315"/>
-                    </CheckBox>
-                    <Button x:Name="BTN_TestUnconfirmedSound" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8,2"
-                            FontSize="12" Cursor="Hand" Click="BTN_TestUnconfirmedSound_Click"
-                            IsEnabled="{Binding ElementName=CBX_UnconfirmedSound, Path=IsChecked}"
-                            ToolTip="Click to test — plays the selected alert sound on the selected audio device">
-                        <StackPanel Orientation="Horizontal">
-                            <Viewbox Width="16" Height="16" VerticalAlignment="Center">
-                                <Canvas Width="24" Height="24">
-                                    <Path Fill="#3B6EA5" Data="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
-                                </Canvas>
-                            </Viewbox>
-                            <TextBlock Text="Test" Margin="5,0,0,0" VerticalAlignment="Center"/>
-                        </StackPanel>
-                    </Button>
-                    <ComboBox x:Name="CB_UnconfirmedSound" Margin="8,0,0,0" Width="130" VerticalAlignment="Center" FontSize="14"
-                              IsEnabled="{Binding ElementName=CBX_UnconfirmedSound, Path=IsChecked}" SelectionChanged="CB_UnconfirmedSound_SelectionChanged"/>
-                </StackPanel>
-
-                <!-- Shared output device for BOTH sounds above. Fixed label width + combo width so the
-                     combo's right edge lines up under the word "spot" on the sound-alert row above. -->
+                <!-- App-wide output device, used by every alert sound (including the cluster alerts,
+                     which are configured in the Cluster window's gear). -->
                 <StackPanel Orientation="Horizontal" Margin="0,12,0,2">
                     <TextBlock Text="Select audio device:" Width="150" VerticalAlignment="Center" FontSize="16" Margin="0,0,8,0"/>
                     <ComboBox x:Name="CB_SoundDevice" Width="175" VerticalAlignment="Center" FontSize="14"
-                              SelectionChanged="CB_SoundDevice_SelectionChanged"
-                              ToolTip="Output device for the alert sounds above. Pick your speakers so alerts are NOT sent into a USB radio codec. 'System default' uses the Windows default device (only WAV sounds can target a specific device)."/>
+                              SelectionChanged="CB_SoundDevice_SelectionChanged">
+                        <!-- Spelled out as a wrapping TextBlock rather than a plain ToolTip="..." string:
+                             as a string it rendered as one very long single line across the screen. -->
+                        <ComboBox.ToolTip>
+                            <ToolTip>
+                                <TextBlock MaxWidth="330" TextWrapping="Wrap" FontSize="13"
+                                           Text="Output device for the alert sounds above. Pick your speakers so alerts are NOT sent into a USB radio codec.&#x0a;&#x0a;'System default' uses the Windows default device (only WAV sounds can target a specific device)."/>
+                            </ToolTip>
+                        </ComboBox.ToolTip>
+                        <!-- Device names are long ("Speakers (Realtek(R) Audio) - High Definition Audio..."),
+                             which made every dropdown row one very long line. In the DROPDOWN they now wrap
+                             to a readable width; in the CLOSED box (where there is no ComboBoxItem ancestor,
+                             so the trigger fires) they stay one line with an ellipsis, and the full name is
+                             on hover. -->
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding}" MaxWidth="300" ToolTip="{Binding}">
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock">
+                                            <Setter Property="TextWrapping" Value="Wrap"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding RelativeSource={RelativeSource AncestorType=ComboBoxItem}}" Value="{x:Null}">
+                                                    <Setter Property="TextWrapping" Value="NoWrap"/>
+                                                    <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                 </StackPanel>
             </StackPanel>
         </GroupBox>

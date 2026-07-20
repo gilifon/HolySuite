@@ -1791,7 +1791,19 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("140")]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ClusterAutoFillDxCall {
+            get {
+                return ((bool)(this["ClusterAutoFillDxCall"]));
+            }
+            set {
+                this["ClusterAutoFillDxCall"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
         public double ClusterSettingsWindowLeft {
             get {
                 return ((double)(this["ClusterSettingsWindowLeft"]));
@@ -1803,7 +1815,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("140")]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
         public double ClusterSettingsWindowTop {
             get {
                 return ((double)(this["ClusterSettingsWindowTop"]));
@@ -1815,7 +1827,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("380")]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
         public double ClusterSettingsWindowWidth {
             get {
                 return ((double)(this["ClusterSettingsWindowWidth"]));
@@ -1827,7 +1839,7 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
-        [global::System.Configuration.DefaultSettingValueAttribute("260")]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
         public double ClusterSettingsWindowHeight {
             get {
                 return ((double)(this["ClusterSettingsWindowHeight"]));

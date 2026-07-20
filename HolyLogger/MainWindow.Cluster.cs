@@ -84,6 +84,10 @@ namespace HolyLogger
         // was showing before the hover is snapshotted here and restored when the mouse leaves.
         bool _clusterBandHoverActive = false;
         string _clusterBandHoverSavedCall = null;
+        // The band-checkbox row + a watchdog that ends the preview if its MouseLeave is ever missed
+        // (otherwise the preview sticks and silently kills the on-frequency auto-fill).
+        StackPanel clusterBandRowPanel = null;
+        System.Windows.Threading.DispatcherTimer _clusterBandHoverWatchdog = null;
         HashSet<string> clusterWorkedCountries = null;
         TextBlock clusterActiveBandIndicatorText = null;
         Button clusterBandFilterAllBtn = null;
@@ -683,22 +687,21 @@ namespace HolyLogger
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(closeBtn, true);
             closeBtn.Click += (s, e) => System.Windows.SystemCommands.CloseWindow(clusterWindow);
 
-            // Cluster display-options gear: sits in the empty title-bar gap, just left of the window
-            // buttons. Clicking it opens a small popup of quick toggles (LoTW highlight, LoTW only, and
-            // room for more later). Placed inside the caption-button group so nothing else in the bar
-            // moves — it only fills space that was previously empty.
+            // Cluster settings gear: sits in the empty title-bar gap, just left of the window buttons.
+            // Clicking it opens the Cluster Settings window — the single home for the cluster's
+            // display/behaviour settings (they used to be split between a small gear popup and two
+            // different Options pages). Placed inside the caption-button group so nothing else in the
+            // bar moves — it only fills space that was previously empty.
             var gearBtn = new Button
             {
                 Content = "",   // Segoe MDL2 "Settings" gear glyph (same font as the caption buttons)
                 Style = Application.Current.Resources["CaptionButtonStyle"] as Style,
-                ToolTip = "Cluster display options",
+                ToolTip = "Cluster settings",
                 FontSize = 18,        // larger than the window glyphs so the gear stands out
                 FontWeight = FontWeights.Bold
             };
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(gearBtn, true);
-            var optionsPopup = BuildClusterOptionsPopup();
-            optionsPopup.PlacementTarget = gearBtn;
-            gearBtn.Click += (s, e) => optionsPopup.IsOpen = !optionsPopup.IsOpen;
+            gearBtn.Click += (s, e) => OpenClusterSettingsWindow();
 
             var buttons = new StackPanel { Orientation = Orientation.Horizontal };
             buttons.Children.Add(gearBtn);
@@ -716,7 +719,6 @@ namespace HolyLogger
 
             var dock = new DockPanel { LastChildFill = true };
             dock.Children.Add(buttons);
-            dock.Children.Add(optionsPopup);   // zero-size, floats when opened; keep before the fill child
             dock.Children.Add(icon);
             dock.Children.Add(titleText);
 
@@ -725,94 +727,33 @@ namespace HolyLogger
             return bar;
         }
 
-        // The gear's fast-select popup: quick per-view cluster toggles. Built as a simple checkbox list
-        // so more options can be added later without touching the title-bar layout.
-        private System.Windows.Controls.Primitives.Popup BuildClusterOptionsPopup()
+        // The gear opens the Cluster Settings window: one home for the cluster's display/behaviour
+        // settings. Single instance -- clicking the gear again focuses the open window.
+        private void OpenClusterSettingsWindow()
         {
-            // The two options are mutually exclusive. A stale config (or an older build) can have both
-            // saved as on; if so, keep the mark and drop the filter so they never load both-checked.
+            // The two LoTW options are mutually exclusive. A stale config (or an older build) can have
+            // both saved as on; if so, keep the mark and drop the filter so they never load both-checked.
             if (Properties.Settings.Default.ClusterShowLotw && Properties.Settings.Default.ClusterLotwOnly)
             {
                 Properties.Settings.Default.ClusterLotwOnly = false;
                 Properties.Settings.Default.Save();
             }
 
-            var panel = new StackPanel();
-
-            var header = new TextBlock { Text = "Cluster options", FontSize = 15, FontWeight = FontWeights.Bold, Margin = new Thickness(14, 10, 14, 6) };
-            header.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-            panel.Children.Add(header);
-
-            var divider = new Border { Height = 1, Margin = new Thickness(0, 0, 0, 2) };
-            divider.SetResourceReference(Border.BackgroundProperty, "ThemeBorderBrush");
-            panel.Children.Add(divider);
-
-            var showLotw = new CheckBox
+            if (clusterSettingsWindow != null)
             {
-                Content = "Mark LOTW User (yellow)",
-                IsChecked = Properties.Settings.Default.ClusterShowLotw,
-                FontSize = 16
-            };
-            showLotw.SetResourceReference(Control.ForegroundProperty, "TextBrush");
-            showLotw.Checked += (s, e) => SetClusterShowLotw(true);
-            showLotw.Unchecked += (s, e) => SetClusterShowLotw(false);
+                clusterSettingsWindow.Activate();
+                return;
+            }
 
-            // Give this row the same yellow as the mark itself, so the popup previews what it does.
-            var showLotwRow = new Border
-            {
-                CornerRadius = new CornerRadius(3),
-                Margin = new Thickness(10, 6, 10, 6),
-                Padding = new Thickness(6, 6, 6, 6),
-                Child = showLotw
-            };
-            showLotwRow.SetResourceReference(Border.BackgroundProperty, "RowLotwBg");
-            panel.Children.Add(showLotwRow);
-
-            var lotwOnly = new CheckBox
-            {
-                Content = "LOTW Users Only",
-                IsChecked = Properties.Settings.Default.ClusterLotwOnly,
-                Margin = new Thickness(14, 8, 14, 12),
-                FontSize = 16
-            };
-            lotwOnly.SetResourceReference(Control.ForegroundProperty, "TextBrush");
-            lotwOnly.Checked += (s, e) =>
-            {
-                SetClusterLotwOnly(true);
-                // When only LoTW spots are shown, marking them is redundant — turn the mark off.
-                if (showLotw.IsChecked == true) showLotw.IsChecked = false;
-            };
-            lotwOnly.Unchecked += (s, e) => SetClusterLotwOnly(false);
-
-            // ...and vice versa: turning the mark on exits "users only" mode (the two are exclusive).
-            showLotw.Checked += (s, e) =>
-            {
-                if (lotwOnly.IsChecked == true) lotwOnly.IsChecked = false;
-            };
-            panel.Children.Add(lotwOnly);
-
-            var border = new Border
-            {
-                BorderThickness = new Thickness(1),
-                CornerRadius = new CornerRadius(6),
-                MinWidth = 220,
-                Child = panel
-            };
-            border.SetResourceReference(Border.BackgroundProperty, "MenuBg");
-            border.SetResourceReference(Border.BorderBrushProperty, "MenuBorder");
-
-            return new System.Windows.Controls.Primitives.Popup
-            {
-                Child = border,
-                StaysOpen = false,
-                AllowsTransparency = true,
-                Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom
-            };
+            var win = new ClusterSettingsWindow(this);
+            clusterSettingsWindow = win;
+            win.Closed += (s, e) => clusterSettingsWindow = null;
+            win.Show();
         }
 
         // "Show LoTW" toggle: turn the yellow LoTW row highlight on/off. Repaint the grid so every
         // visible row re-reads RowBackground (which is gated on this setting).
-        private void SetClusterShowLotw(bool on)
+        internal void SetClusterShowLotw(bool on)
         {
             Properties.Settings.Default.ClusterShowLotw = on;
             Properties.Settings.Default.Save();
@@ -820,7 +761,7 @@ namespace HolyLogger
         }
 
         // "LoTW only" toggle: show only LoTW spots. Re-run the visible-spot filter (which now honors it).
-        private void SetClusterLotwOnly(bool on)
+        internal void SetClusterLotwOnly(bool on)
         {
             Properties.Settings.Default.ClusterLotwOnly = on;
             Properties.Settings.Default.Save();
@@ -1657,6 +1598,7 @@ namespace HolyLogger
             // End the hover preview only when the mouse leaves the WHOLE band row. Per-checkbox MouseLeave
             // must NOT end it (that fired in the gaps between checkboxes and briefly restored the station).
             row.MouseLeave += (s, e) => EndClusterBandHoverPreview();
+            clusterBandRowPanel = row;   // the watchdog polls this to detect a MISSED MouseLeave
 
             // All bands in order from left to right: SHF, UHF, VHF, 6, 10, 12, 15, 17, 20, 30, 40, 60, 80, 160
             string[] allBands = { "SHF", "UHF", "VHF", "6", "10", "12", "15", "17", "20", "30", "40", "60", "80", "160" };
@@ -3706,11 +3648,14 @@ namespace HolyLogger
                 }
             }
 
-            // Always attempt to auto-fill the DX callsign when there is at least one on-frequency spot.
+            // Auto-fill the DX callsign when there is at least one on-frequency spot -- unless the
+            // operator turned that off in Cluster Settings ("Auto fill DX callsign while - On My Radio
+            // Freq"), in which case only a double-click ever fills the box.
             // While a HolyCluster selection is held, leave the DX box alone — it already shows the exact
             // clicked callsign, which must not be overwritten by a different on-frequency spot. While a
             // band-hover preview is active the DX box is intentionally hidden, so don't refill it either.
             if (!holdingHolyClusterCall && !_clusterBandHoverActive
+                && Properties.Settings.Default.ClusterAutoFillDxCall
                 && !string.IsNullOrWhiteSpace(onFreqCallsStr) && TB_DXCallsign != null)
             {
                 string firstCall = onFreqCallsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
@@ -3807,6 +3752,7 @@ namespace HolyLogger
                 }
             }
             _clusterHoverBandOverride = band;
+            StartClusterBandHoverWatchdog();
             RefreshClusterVisibleSpots();
 
             // In Live Scale the table kept the VFO-centered scroll offset; show the previewed band from
@@ -3822,8 +3768,32 @@ namespace HolyLogger
         // Ends the preview when the mouse leaves the WHOLE band-checkbox row (wired to the row's
         // MouseLeave, not each checkbox — so moving between checkboxes or across the gaps between them
         // keeps the preview alive and doesn't briefly restore the station).
+        // Safety net for a MISSED MouseLeave. The row's MouseLeave is not guaranteed to fire -- e.g. the
+        // pointer leaves straight onto another window, or a window opens under it. If that happened the
+        // preview stayed active forever, which BOTH kept the DX box cleared and suppressed the
+        // on-frequency auto-fill (it looked like "auto fill just stopped working"). This polls whether
+        // the pointer is really still over the band row and ends the preview as soon as it isn't.
+        private void StartClusterBandHoverWatchdog()
+        {
+            if (_clusterBandHoverWatchdog == null)
+            {
+                _clusterBandHoverWatchdog = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(250)
+                };
+                _clusterBandHoverWatchdog.Tick += (s, e) =>
+                {
+                    if (!_clusterBandHoverActive) { _clusterBandHoverWatchdog.Stop(); return; }
+                    if (clusterBandRowPanel == null || !clusterBandRowPanel.IsMouseOver)
+                        EndClusterBandHoverPreview();   // stops the timer itself
+                };
+            }
+            _clusterBandHoverWatchdog.Start();
+        }
+
         private void EndClusterBandHoverPreview()
         {
+            _clusterBandHoverWatchdog?.Stop();
             if (!_clusterBandHoverActive) return;
 
             _clusterHoverBandOverride = null;
