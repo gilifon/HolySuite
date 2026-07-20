@@ -615,7 +615,7 @@
                 </MenuItem>
                 <!-- Channels: opens the channels window directly (no submenu). The menu template
                      collapses the Icon column for top-level roles, so the tower goes in the Header. -->
-                <MenuItem x:Name="MyChannelsMenuItem" ToolTip="Channels" Click="MyChannelsMenuItem_Click">
+                <MenuItem x:Name="MyChannelsMenuItem" ToolTip="My Favorite Channels" Click="MyChannelsMenuItem_Click">
                     <MenuItem.Header>
                         <Viewbox Width="20" Height="20">
                             <Path Stretch="Uniform" Stroke="#FF8C00" StrokeThickness="1.5"

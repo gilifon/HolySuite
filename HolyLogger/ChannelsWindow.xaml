@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="My Channels" Height="430" Width="540" MinHeight="300" MinWidth="440"
+        Title="My Favorite Channels" Height="430" Width="540" MinHeight="300" MinWidth="440"
         WindowStartupLocation="CenterOwner"
         WindowStyle="None" ResizeMode="CanResize" StateChanged="Window_StateChanged"
         Icon="Images/crown.png"
@@ -34,7 +34,7 @@
                 </StackPanel>
                 <Image Source="Images/crown.png" Width="16" Height="16" Margin="10,0,6,0" VerticalAlignment="Center" DockPanel.Dock="Left"/>
                 <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="15" FontWeight="Bold"
-                           Foreground="{DynamicResource TextBrush}" Text="My Channels"/>
+                           Foreground="{DynamicResource TextBrush}" Text="My Favorite Channels"/>
             </DockPanel>
         </Border>
 
@@ -88,11 +88,13 @@
                 </Style>
             </DataGrid.CellStyle>
             <DataGrid.Columns>
-                <DataGridTextColumn Header="Name" Binding="{Binding Name}" Width="*"/>
-                <!-- Text column (native tab-to-type editing). Color updates live because
-                     ChannelsGrid_CellEditEnding pushes the value to the item the moment the cell
-                     commits, firing FreqBrush's change notification before the row commits. -->
-                <DataGridTextColumn x:Name="FreqColumn" Header="Frequency (kHz)" Binding="{Binding FreqKhz}" Width="140">
+                <!-- UpdateSourceTrigger=PropertyChanged: the item is updated on every KEYSTROKE, not only
+                     when the cell commits. That makes IsFilled flip as soon as you start typing, so the
+                     next blank row opens immediately instead of waiting until the row (Mode) is done. -->
+                <DataGridTextColumn Header="Name" Binding="{Binding Name, UpdateSourceTrigger=PropertyChanged}" Width="*"/>
+                <!-- Text column (native tab-to-type editing). The band color also updates live, since
+                     each keystroke pushes the value and fires FreqBrush's change notification. -->
+                <DataGridTextColumn x:Name="FreqColumn" Header="Frequency (kHz)" Binding="{Binding FreqKhz, UpdateSourceTrigger=PropertyChanged}" Width="140">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
                             <Setter Property="HorizontalAlignment" Value="Center"/>

@@ -167,7 +167,7 @@ namespace HolyLogger
                 HolyMessageBox.ShowWarning(
                     $"This channel can't be applied because {what}.\n\n" +
                     "Fill in the missing column, then double-click again.",
-                    "My Channels", this);
+                    "My Favorite Channels", this);
                 return;
             }
 
@@ -302,7 +302,7 @@ namespace HolyLogger
                 HolyMessageBox.ShowWarning(
                     "A channel needs all three columns (Name, Frequency, Mode) filled in.\n\n" +
                     "Please complete or delete:\n\n" + string.Join("\n", problems),
-                    "My Channels", this);
+                    "My Favorite Channels", this);
                 return;   // keep the window open so the user can fix them
             }
 
