@@ -70,6 +70,7 @@ namespace HolyLogger
             { "EditFieldBg",      new[] { "#FFFF00", "#4A3D12", "#4A3D12" } }, // QSO fields while editing
             { "ButtonBg",         new[] { "#E1E1E1", "#2A2E35", "#1F2D47" } }, // default push buttons
             { "ButtonHoverBg",    new[] { "#D0D0D0", "#363C45", "#2A3B5C" } }, // default push buttons (hover)
+            { "ResetButtonBg",    new[] { "#7CD992", "#2F6B3F", "#2F6B3F" } }, // "restore defaults" button (green)
             { "GridRowBg",        new[] { "#FFFFFF", "#121316", "#0D1420" } }, // table rows
             { "GridAltRowBg",     new[] { "#F5F5F5", "#17191D", "#121C2E" } }, // alternating rows
             { "GridHeaderBg",     new[] { "#E6E6E6", "#23262C", "#1B2740" } }, // column headers
@@ -119,6 +120,7 @@ namespace HolyLogger
             new TokenInfo("EditFieldBg",      "Surfaces", "Field being edited",       "Highlight of the QSO fields while editing an existing QSO."),
             new TokenInfo("ButtonBg",         "Surfaces", "Buttons",                  "Background of standard buttons."),
             new TokenInfo("ButtonHoverBg",    "Surfaces", "Buttons (mouse over)",     "Button background when the mouse is over it."),
+            new TokenInfo("ResetButtonBg",    "Surfaces", "Restore-defaults button",  "Background of the green 'Restore factory defaults' button in the Profile Manager."),
 
             new TokenInfo("TextBrush",        "Text", "Main text",                    "Almost all text in the application."),
             new TokenInfo("MutedTextBrush",   "Text", "Secondary text",               "Hints, notes and less important labels."),

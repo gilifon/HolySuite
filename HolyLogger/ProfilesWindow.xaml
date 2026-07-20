@@ -99,8 +99,12 @@
 
         <!-- Sits on the Close row, left-aligned with the profiles list above it: it acts on the whole
              program rather than on the selected profile, so it is kept away from the profile buttons. -->
+        <!-- ResetButtonBg is this button's OWN palette token (View > Color Scheme > Customize Colors >
+             Surfaces), so recolouring the cluster's greens does not drag this along. Light green under
+             the light scheme with dark text, dark green under the dark ones with light text. -->
         <Button Grid.Row="3" Grid.Column="0" x:Name="BTN_Factory" Content="Restore factory defaults"
-                HorizontalAlignment="Left" Padding="12,6" FontSize="14" Margin="0,16,0,0"
+                HorizontalAlignment="Left" Padding="12,6" FontSize="14" FontWeight="Bold" Margin="0,16,0,0"
+                Background="{DynamicResource ResetButtonBg}"
                 Click="BTN_Factory_Click"
                 ToolTip="Put every setting back to how HolyLogger ships. Your logs and QSOs are not touched."/>
 
