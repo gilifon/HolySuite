@@ -34,6 +34,30 @@ namespace HolyLogger
         internal static bool IsWindowsSessionEnding;
 
         Mutex myMutex;
+
+        const string SingleInstanceMutexName = "HolyLoggerApplication";
+
+        // Set at startup when the active profile's file was missing and factory defaults were loaded
+        // instead. MainWindow reports it once it exists, so the message has a proper owner window.
+        internal static string MissingProfileAtStartup { get; private set; }
+
+        // Hands back the single-instance mutex so a RELAUNCH can start before this process has finished
+        // exiting. The Profile Manager restarts the app to apply a profile; without this the new instance
+        // starts while the old one still holds the mutex and refuses with "Holyland logger is already
+        // open." Only called on that deliberate restart path.
+        internal static void ReleaseSingleInstanceMutex()
+        {
+            try
+            {
+                var app = Current as App;
+                if (app?.myMutex == null) return;
+                try { app.myMutex.ReleaseMutex(); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }   // not owned -> Dispose still frees it
+                app.myMutex.Dispose();
+                app.myMutex = null;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
         private SplashWindow _splash;
         private DispatcherTimer _splashCloseTimer;
         private Window _realMainWindow;
@@ -73,6 +97,12 @@ namespace HolyLogger
             TaskScheduler.UnobservedTaskException += (s, args) => Log.Fatal("UnobservedTask", args.Exception);
 
             SessionEnding += (s, args) => { IsWindowsSessionEnding = true; Log.Warn("Windows session ending: " + args.ReasonSessionEnding); };
+
+            // Load the active profile FIRST: it is the source of truth at startup, and everything below
+            // (theme, then every window) reads the settings it writes. A missing profile falls back to
+            // factory defaults; tell the operator rather than letting the setup silently change.
+            try { MissingProfileAtStartup = ProfileManager.ApplyActiveProfileAtStartup(); }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Apply the saved Light/Dark theme before the main window loads.
             try { ThemeManager.ApplyFromSettings(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -121,7 +151,7 @@ namespace HolyLogger
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             bool aIsNewInstance = false;
-            myMutex = new Mutex(true, "HolyLoggerApplication", out aIsNewInstance);
+            myMutex = new Mutex(true, SingleInstanceMutexName, out aIsNewInstance);
             if (!aIsNewInstance)
             {
                 HolyMessageBox.ShowWarning("Holyland logger is already open.", "HolyLogger");

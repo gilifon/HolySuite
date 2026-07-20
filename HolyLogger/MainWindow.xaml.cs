@@ -976,6 +976,20 @@ namespace HolyLogger
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            // The active profile's file was gone at startup, so factory defaults were loaded. Say so
+            // once the main window exists (it owns the dialog) instead of letting the whole setup
+            // change without explanation.
+            if (!string.IsNullOrWhiteSpace(App.MissingProfileAtStartup))
+            {
+                string missing = App.MissingProfileAtStartup;
+                Dispatcher.BeginInvoke(new Action(() =>
+                    HolyMessageBox.ShowWarning(
+                        $"The profile \"{missing}\" could not be found, so HolyLogger started with the " +
+                        "factory default settings.\n\n" +
+                        "Your logs and QSOs are not affected.",
+                        "Profile not found", this)), DispatcherPriority.ApplicationIdle);
+            }
+
             // Re-assert the log name in the title bar once the window is fully loaded. The constructor
             // already sets it, but if that early call hit a transient DB hiccup the title would be left
             // bare; doing it again here (dal + ActiveLogId are settled by now) makes it reliable.
@@ -4724,6 +4738,32 @@ namespace HolyLogger
             }
         }
 
+        // Guards against asking about the profile twice in one close attempt.
+        private bool _profileSaveOnExitHandled = false;
+
+        // Asks whether to keep this session's changes in the active profile. Returns false when the
+        // operator cancelled the close. Startup reloads the profile from its file, so "No" genuinely
+        // discards the changes - the wording says so rather than leaving it to be discovered.
+        private bool GuardUnsavedProfile(System.ComponentModel.CancelEventArgs e)
+        {
+            try
+            {
+                if (!ProfileManager.CurrentDiffersFromActive()) return true;
+
+                string name = ProfileManager.ActiveProfile;
+                bool save = HolyMessageBox.ShowConfirm(
+                    $"You changed settings since the profile \"{name}\" was saved.\n\n" +
+                    $"YES - save the changes into \"{name}\".\n" +
+                    "NO  - discard them; HolyLogger will start from the profile as it was saved.",
+                    "Unsaved profile changes", HolyMsgType.Warning, this);
+
+                if (save && !ProfileManager.Save(name))
+                    HolyMessageBox.ShowError($"Could not save the profile \"{name}\".", "Profile Manager", this);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return true;
+        }
+
         private void Window_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
             if (_isShutdownCleanupDone)
@@ -4748,6 +4788,15 @@ namespace HolyLogger
             // session, where we must not block with a dialog). Only runs once per close attempt.
             if (!_uploadOnExitHandled && !App.IsWindowsSessionEnding)
                 GuardUnsavedQso("close HolyLogger");
+
+            // The program starts from whatever the active profile holds, so anything changed this
+            // session and not saved into it would be lost. Say so and let the operator decide. Skipped
+            // during Windows logoff/shutdown, where a modal dialog would stall the whole session.
+            if (!_profileSaveOnExitHandled && !App.IsWindowsSessionEnding)
+            {
+                _profileSaveOnExitHandled = true;
+                if (!GuardUnsavedProfile(e)) return;   // cancelled -> stop closing
+            }
 
             // Upload-on-exit: show ALL service dialogs in one pass before any uploading starts,
             // so we never call Close() from inside an async upload (which caused freezes when the
@@ -5991,6 +6040,12 @@ namespace HolyLogger
             matrix.Left = Properties.Settings.Default.MatrixWindowLeft < 0 ? 0 : Properties.Settings.Default.MatrixWindowLeft;
             matrix.Top = Properties.Settings.Default.MatrixWindowTop < 0 ? 0 : Properties.Settings.Default.MatrixWindowTop;
             matrix.Show();
+        }
+
+        // File > Profile Manager
+        private void ProfilesMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            new ProfilesWindow(this).ShowDialog();
         }
 
         private void GenerateNewLogInfoWindow()

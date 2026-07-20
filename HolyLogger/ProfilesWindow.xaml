@@ -1,0 +1,111 @@
+<Window x:Class="HolyLogger.ProfilesWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Profile Manager" Height="500" Width="640" MinHeight="460" MinWidth="560"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Icon="Images/crown.png"
+        Background="{DynamicResource WindowBg}"
+        Foreground="{DynamicResource TextBrush}">
+    <Grid Margin="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*"/>
+            <ColumnDefinition Width="Auto"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2" TextWrapping="Wrap" FontSize="15"
+                   Foreground="{DynamicResource MutedTextBrush}"
+                   Text="A profile is a complete setup: every setting, every window's position and size, and which windows are open. Save your current setup as a profile, then switch between them."/>
+
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Margin="0,12,0,6" FontSize="16">
+            <Run Text="Active profile: "/><Run x:Name="TB_Active" FontWeight="Bold"/>
+        </TextBlock>
+
+        <!-- Each profile is drawn as a bordered cell so the rows are clearly separated. The border sits
+             in the ItemTemplate (not the item container) and has no background of its own, so the normal
+             selection highlight still shows through and the theme's selection colours are untouched. -->
+        <ListBox Grid.Row="2" Grid.Column="0" x:Name="LB_Profiles" FontSize="16"
+                 HorizontalContentAlignment="Stretch"
+                 SelectionChanged="LB_Profiles_SelectionChanged"
+                 MouseDoubleClick="LB_Profiles_MouseDoubleClick">
+            <ListBox.ItemTemplate>
+                <DataTemplate>
+                    <!-- GridRowBg is the same scheme token the channel table uses for its row background,
+                         so the profile rows follow View > Color Scheme like every other table. -->
+                    <Border x:Name="Cell" Background="{DynamicResource GridRowBg}"
+                            BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                            CornerRadius="3" Padding="10,8" Margin="1,2">
+                        <TextBlock x:Name="CellText" Text="{Binding}" FontSize="16" VerticalAlignment="Center"/>
+                    </Border>
+                    <DataTemplate.Triggers>
+                        <!-- Hover: a light blue so it is obvious the row is pointable, and clearly
+                             DIFFERENT from the selected state below (the two used to look identical,
+                             which made an unselected list look selected). -->
+                        <Trigger SourceName="Cell" Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Cell" Property="Background" Value="#CFE8FF"/>
+                            <Setter TargetName="Cell" Property="BorderBrush" Value="#A6D2F5"/>
+                        </Trigger>
+                        <!-- Selected wins: declared last, so it overrides the hover setters above.
+                             The default selection wash is barely visible behind this cell, so the selected
+                             profile paints its own filled background, accent border and bold text. -->
+                        <DataTrigger Binding="{Binding IsSelected, RelativeSource={RelativeSource AncestorType=ListBoxItem}}" Value="True">
+                            <!-- The same light blues the channel table uses (#A6D2F5 highlight over the
+                                 #CFE8FF hover above), with dark text - white would be unreadable on these.
+                                 They are literals there too, so there is no scheme token to bind to. -->
+                            <Setter TargetName="Cell" Property="Background" Value="#A6D2F5"/>
+                            <Setter TargetName="Cell" Property="BorderBrush" Value="#5B9BD5"/>
+                            <Setter TargetName="Cell" Property="BorderThickness" Value="2"/>
+                            <Setter TargetName="CellText" Property="Foreground" Value="#1A1A1A"/>
+                            <Setter TargetName="CellText" Property="FontWeight" Value="Bold"/>
+                        </DataTrigger>
+                    </DataTemplate.Triggers>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Import/Export are docked to the BOTTOM so the Export button's lower edge always lines up
+             with the bottom of the profiles list, at any window size, while the list still grows when
+             the window is resized. It also reads well: managing profiles on top, file actions below. -->
+        <DockPanel Grid.Row="2" Grid.Column="1" Margin="12,0,0,0" MinWidth="170" LastChildFill="False">
+            <StackPanel DockPanel.Dock="Top">
+                <Button x:Name="BTN_Switch" Content="Switch to this profile" Padding="10,7" FontSize="15"
+                        Margin="0,0,0,10" Click="BTN_Switch_Click"
+                        ToolTip="Apply this profile. HolyLogger restarts so the whole setup is rebuilt."/>
+                <Button x:Name="BTN_SaveAs" Content="Save current setup as..." Padding="10,6" FontSize="14"
+                        Margin="0,0,0,6" Click="BTN_SaveAs_Click"
+                        ToolTip="Create a new profile from how HolyLogger is set up right now."/>
+                <Button x:Name="BTN_Update" Content="Update from current" Padding="10,6" FontSize="14"
+                        Margin="0,0,0,6" Click="BTN_Update_Click"
+                        ToolTip="Overwrite the selected profile with the current setup."/>
+                <Button x:Name="BTN_Rename" Content="Rename..." Padding="10,6" FontSize="14"
+                        Margin="0,0,0,6" Click="BTN_Rename_Click"/>
+                <Button x:Name="BTN_Delete" Content="Delete" Padding="10,6" FontSize="14"
+                        Click="BTN_Delete_Click"/>
+            </StackPanel>
+            <StackPanel DockPanel.Dock="Bottom">
+                <Button x:Name="BTN_Import" Content="Import..." Padding="10,6" FontSize="14"
+                        Margin="0,0,0,6" Click="BTN_Import_Click"
+                        ToolTip="Load a profile file shared from another machine."/>
+                <Button x:Name="BTN_Export" Content="Export..." Padding="10,6" FontSize="14"
+                        Click="BTN_Export_Click"
+                        ToolTip="Save this profile to a file you can share or back up."/>
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Sits on the Close row, left-aligned with the profiles list above it: it acts on the whole
+             program rather than on the selected profile, so it is kept away from the profile buttons. -->
+        <Button Grid.Row="3" Grid.Column="0" x:Name="BTN_Factory" Content="Restore factory defaults"
+                HorizontalAlignment="Left" Padding="12,6" FontSize="14" Margin="0,16,0,0"
+                Click="BTN_Factory_Click"
+                ToolTip="Put every setting back to how HolyLogger ships. Your logs and QSOs are not touched."/>
+
+        <Button Grid.Row="3" Grid.ColumnSpan="2" x:Name="BtnClose" Content="Close"
+                HorizontalAlignment="Center" Padding="28,6" FontSize="16" Margin="0,16,0,0"
+                Click="BtnClose_Click"/>
+    </Grid>
+</Window>

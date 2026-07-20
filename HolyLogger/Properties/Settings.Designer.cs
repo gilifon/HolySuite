@@ -1792,6 +1792,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ActiveProfile {
+            get {
+                return ((string)(this["ActiveProfile"]));
+            }
+            set {
+                this["ActiveProfile"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string WindowBoundsJson {
             get {
                 return ((string)(this["WindowBoundsJson"]));
