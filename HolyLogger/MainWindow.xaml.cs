@@ -412,16 +412,21 @@ namespace HolyLogger
             NetworkFlagItem.Visibility = Properties.Settings.Default.ShowNetworkFlag ? Visibility.Visible : Visibility.Collapsed;
             UpdateShareIconVisibility();
 
+            // Runs ONCE per newly-installed version: user.config lives in a per-version folder, so a new
+            // build starts with UpdateSettings=true, pulls the previous settings forward, then clears it.
             if (Properties.Settings.Default.UpdateSettings)
             {
                 Properties.Settings.Default.Upgrade();
+                // AFTER Upgrade (which would otherwise carry the operator's old value forward): put the
+                // settings listed below back to their defined defaults.
+                ForceSettingsToDefault(SettingsForcedToDefaultOnUpgrade);
                 Properties.Settings.Default.UpdateSettings = false;
-                try 
-                { 
-                    Properties.Settings.Default.Save(); 
-                } 
-                catch (Exception ex) 
-                { 
+                try
+                {
+                    Properties.Settings.Default.Save();
+                }
+                catch (Exception ex)
+                {
                     System.Diagnostics.Debug.WriteLine($"Failed to save settings after upgrade: {ex.Message}");
                 }
             }
@@ -5547,6 +5552,45 @@ namespace HolyLogger
             catch (System.Exception ex)
             {
                 HolyMessageBox.ShowError("Could not open the browser: " + ex.Message, "Open Link", this);
+            }
+        }
+
+        // ── settings forced back to default on a new install ──────────────
+        //
+        // user.config SURVIVES an upgrade, so a setting the operator switched off stays off forever on
+        // their machine. A tester reported "the cluster does not show up" when in fact ShowClusterWindowOption
+        // had simply been unchecked and was carried forward by the upgrade.
+        //
+        // ADD A SETTING'S NAME HERE to make it return to its declared default on every newly-installed
+        // version. Use the exact name from Settings.settings. Note this triggers on a VERSION CHANGE
+        // (user.config is per-version) — reinstalling the SAME version resets nothing, so bump the
+        // version for each build handed out.
+        private static readonly string[] SettingsForcedToDefaultOnUpgrade =
+        {
+            "ClusterActive",           // Options > User Interface > Cluster > Active   (default True)
+            "ShowClusterWindowOption", // Options > User Interface > Cluster > Visible  (default True)
+        };
+
+        // Puts each named setting back to the DefaultSettingValue declared in Settings.Designer.cs.
+        // Unknown names are skipped, so renaming or removing a setting can never crash startup.
+        private static void ForceSettingsToDefault(params string[] names)
+        {
+            var s = Properties.Settings.Default;
+            foreach (string name in names)
+            {
+                try
+                {
+                    var prop = s.Properties[name];
+                    if (prop == null) continue;
+
+                    // DefaultValue comes from the attribute as a string; convert it to the real type.
+                    object def = prop.DefaultValue;
+                    s[name] = def is string text
+                        ? System.ComponentModel.TypeDescriptor.GetConverter(prop.PropertyType)
+                                .ConvertFromInvariantString(text)
+                        : def;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
         }
 
