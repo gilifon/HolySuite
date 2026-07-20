@@ -286,6 +286,7 @@
     <Compile Include="Log.cs" />
     <Compile Include="SettingsFlush.cs" />
     <Compile Include="SchemeOverrides.cs" />
+    <Compile Include="WindowBounds.cs" />
     <Compile Include="ColorSchemeEditorWindow.xaml.cs">
       <DependentUpon>ColorSchemeEditorWindow.xaml</DependentUpon>
       <SubType>Code</SubType>

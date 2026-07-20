@@ -1791,6 +1791,138 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string WindowBoundsJson {
+            get {
+                return ((string)(this["WindowBoundsJson"]));
+            }
+            set {
+                this["WindowBoundsJson"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool LegacyFileSettingsMigrated {
+            get {
+                return ((bool)(this["LegacyFileSettingsMigrated"]));
+            }
+            set {
+                this["LegacyFileSettingsMigrated"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ClusterHoverPopupEnabled {
+            get {
+                return ((bool)(this["ClusterHoverPopupEnabled"]));
+            }
+            set {
+                this["ClusterHoverPopupEnabled"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("60")]
+        public int ClusterLastMinutesFilter {
+            get {
+                return ((int)(this["ClusterLastMinutesFilter"]));
+            }
+            set {
+                this["ClusterLastMinutesFilter"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("100")]
+        public double ClusterCountryColumnWidth {
+            get {
+                return ((double)(this["ClusterCountryColumnWidth"]));
+            }
+            set {
+                this["ClusterCountryColumnWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("2")]
+        public int ClusterCountryColumnDisplayIndex {
+            get {
+                return ((int)(this["ClusterCountryColumnDisplayIndex"]));
+            }
+            set {
+                this["ClusterCountryColumnDisplayIndex"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ClusterColumnOrder {
+            get {
+                return ((string)(this["ClusterColumnOrder"]));
+            }
+            set {
+                this["ClusterColumnOrder"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double QrzPhotoWindowLeft {
+            get {
+                return ((double)(this["QrzPhotoWindowLeft"]));
+            }
+            set {
+                this["QrzPhotoWindowLeft"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double QrzPhotoWindowTop {
+            get {
+                return ((double)(this["QrzPhotoWindowTop"]));
+            }
+            set {
+                this["QrzPhotoWindowTop"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double QrzPhotoWindowWidth {
+            get {
+                return ((double)(this["QrzPhotoWindowWidth"]));
+            }
+            set {
+                this["QrzPhotoWindowWidth"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("NaN")]
+        public double QrzPhotoWindowHeight {
+            get {
+                return ((double)(this["QrzPhotoWindowHeight"]));
+            }
+            set {
+                this["QrzPhotoWindowHeight"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]
         public bool ClusterAutoFillDxCall {
             get {

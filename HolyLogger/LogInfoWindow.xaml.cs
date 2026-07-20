@@ -37,6 +37,7 @@ namespace HolyLogger
         public LogInfoWindow()
         {
             InitializeComponent();
+            WindowBounds.Attach(this, "LogInfo");   // remember position + size
 
             Band6 = new ObservableValue();
             Band10 = new ObservableValue();

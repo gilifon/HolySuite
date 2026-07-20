@@ -38,6 +38,7 @@ namespace HolyLogger
         public ViewLogsWindow(MainWindow main, DataAccess dal, string filterCallsign = null)
         {
             InitializeComponent();
+            WindowBounds.Attach(this, "ViewLogs");   // remember position + size
             _main = main;
             _dal = dal;
             _filterCallsign = (filterCallsign ?? string.Empty).Trim();

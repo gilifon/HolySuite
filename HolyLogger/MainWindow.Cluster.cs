@@ -2792,110 +2792,34 @@ namespace HolyLogger
         // Cluster settings window removed - settings now in cluster header and main User Interface settings
         // private void OpenClusterSettingsWindow() { ... }
 
-        private bool LoadClusterHoverPopupSetting()
-        {
-            try
-            {
-                string path = GetClusterHoverPopupSettingPath();
-                if (!File.Exists(path))
-                {
-                    return true;
-                }
-
-                string raw = File.ReadAllText(path).Trim();
-                bool enabled;
-                return bool.TryParse(raw, out enabled) ? enabled : true;
-            }
-            catch
-            {
-                return true;
-            }
-        }
+        // These settings used to live in loose .txt files under AppData. They now live in
+        // Properties.Settings like everything else, so a profile (which snapshots Properties.Settings)
+        // captures them too. MigrateLegacyFileSettings imports any old file once.
+        private bool LoadClusterHoverPopupSetting() => Properties.Settings.Default.ClusterHoverPopupEnabled;
 
         private void SaveClusterHoverPopupSetting(bool enabled)
         {
-            try
-            {
-                string path = GetClusterHoverPopupSettingPath();
-                string directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllText(path, enabled.ToString(CultureInfo.InvariantCulture));
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        private string GetClusterHoverPopupSettingPath()
-        {
-            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
-            return Path.Combine(baseDir, "cluster-hover-popup-enabled.txt");
+            Properties.Settings.Default.ClusterHoverPopupEnabled = enabled;
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private int LoadClusterLastMinutesFilterSetting()
         {
-            try
-            {
-                string path = GetClusterLastMinutesFilterSettingPath();
-                if (!File.Exists(path))
-                {
-                    return 60;
-                }
-
-                int value;
-                if (int.TryParse(File.ReadAllText(path).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value)
-                    && (value == 5 || value == 15 || value == 30 || value == 60))
-                {
-                    return value;
-                }
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-            return 60;
+            int value = Properties.Settings.Default.ClusterLastMinutesFilter;
+            return (value == 5 || value == 15 || value == 30 || value == 60) ? value : 60;
         }
 
         private void SaveClusterLastMinutesFilterSetting(int minutes)
         {
-            if (!(minutes == 5 || minutes == 15 || minutes == 30 || minutes == 60))
-            {
-                return;
-            }
-
-            try
-            {
-                string path = GetClusterLastMinutesFilterSettingPath();
-                string directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllText(path, minutes.ToString(CultureInfo.InvariantCulture));
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            if (!(minutes == 5 || minutes == 15 || minutes == 30 || minutes == 60)) return;
+            Properties.Settings.Default.ClusterLastMinutesFilter = minutes;
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private double LoadClusterCountryColumnWidthSetting()
         {
-            try
-            {
-                string path = GetClusterCountryColumnWidthSettingPath();
-                if (!File.Exists(path))
-                {
-                    return 100;
-                }
-
-                double value;
-                if (double.TryParse(File.ReadAllText(path).Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out value) && value >= 40)
-                {
-                    return value;
-                }
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-            return 100;
+            double value = Properties.Settings.Default.ClusterCountryColumnWidth;
+            return (!double.IsNaN(value) && !double.IsInfinity(value) && value >= 40) ? value : 100;
         }
 
         private void SaveClusterCountryColumnWidthSetting(double width)
@@ -2907,82 +2831,23 @@ namespace HolyLogger
 
             try
             {
-                string path = GetClusterCountryColumnWidthSettingPath();
-                string directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllText(path, width.ToString(CultureInfo.InvariantCulture));
+                Properties.Settings.Default.ClusterCountryColumnWidth = width;
+                Properties.Settings.Default.Save();
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private int LoadClusterCountryColumnDisplayIndexSetting()
         {
-            try
-            {
-                string path = GetClusterCountryColumnDisplayIndexSettingPath();
-                if (!File.Exists(path))
-                {
-                    return 2;
-                }
-
-                int value;
-                if (int.TryParse(File.ReadAllText(path).Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value) && value >= 0)
-                {
-                    return value;
-                }
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
-            return 2;
+            int value = Properties.Settings.Default.ClusterCountryColumnDisplayIndex;
+            return value >= 0 ? value : 2;
         }
 
         private void SaveClusterCountryColumnDisplayIndexSetting(int displayIndex)
         {
-            if (displayIndex < 0)
-            {
-                return;
-            }
-
-            try
-            {
-                string path = GetClusterCountryColumnDisplayIndexSettingPath();
-                string directory = Path.GetDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-
-                File.WriteAllText(path, displayIndex.ToString(CultureInfo.InvariantCulture));
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
-        private string GetClusterCountryColumnWidthSettingPath()
-        {
-            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
-            return Path.Combine(baseDir, "cluster-country-col-width.txt");
-        }
-
-        private string GetClusterCountryColumnDisplayIndexSettingPath()
-        {
-            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
-            return Path.Combine(baseDir, "cluster-country-col-display-index.txt");
-        }
-
-        private string GetClusterLastMinutesFilterSettingPath()
-        {
-            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
-            return Path.Combine(baseDir, "cluster-last-minutes-filter.txt");
-        }
-
-        private string GetClusterColumnOrderSettingPath()
-        {
-            string baseDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
-            return Path.Combine(baseDir, "cluster-col-order.txt");
+            if (displayIndex < 0) return;
+            Properties.Settings.Default.ClusterCountryColumnDisplayIndex = displayIndex;
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Persists ONLY the column order (comma-separated stable keys, left-to-right). Column widths
@@ -2996,12 +2861,8 @@ namespace HolyLogger
                     .Where(c => clusterColumnKeys.ContainsKey(c))
                     .OrderBy(c => c.DisplayIndex)
                     .Select(c => clusterColumnKeys[c]);
-                string content = string.Join(",", order);
-                string path = GetClusterColumnOrderSettingPath();
-                string dir = Path.GetDirectoryName(path);
-                if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
-                File.WriteAllText(path, content);
+                Properties.Settings.Default.ClusterColumnOrder = string.Join(",", order);
+                Properties.Settings.Default.Save();
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -3011,9 +2872,7 @@ namespace HolyLogger
             if (grid == null) return;
             try
             {
-                string path = GetClusterColumnOrderSettingPath();
-                if (!File.Exists(path)) return;
-                string content = File.ReadAllText(path).Trim();
+                string content = (Properties.Settings.Default.ClusterColumnOrder ?? string.Empty).Trim();
                 if (string.IsNullOrWhiteSpace(content)) return;
 
                 var keys = content.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries);

@@ -63,6 +63,8 @@ namespace HolyLogger
             Height = hasDismissed ? 580 : 460;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
             ResizeMode = ResizeMode.CanResize;
+            // Per service, so the eQSL / LoTW / QRZ queues each keep their own placement.
+            WindowBounds.Attach(this, "Queue_" + serviceName);
 
             var root = new Grid { Margin = new Thickness(10) };
             root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });          // 0: pending header

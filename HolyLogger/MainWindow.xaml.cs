@@ -291,6 +291,9 @@ namespace HolyLogger
         public MainWindow()
         {
             MachineName = Environment.MachineName;
+            // Must run before ANYTHING reads the settings that used to be loose files (the QRZ photo
+            // bounds right below, the cluster ones when the cluster is built later).
+            MigrateLegacyFileSettings();
             LoadQrzPhotoWindowBoundsFromDisk();
 
             Qsos = new ObservableCollection<QSO>();
@@ -5571,6 +5574,64 @@ namespace HolyLogger
             "ShowClusterWindowOption", // Options > User Interface > Cluster > Visible  (default True)
         };
 
+        // A handful of settings used to be stored as loose .txt files under AppData instead of in
+        // Properties.Settings. They have been moved in with the rest so a PROFILE (a snapshot of
+        // Properties.Settings) captures them. This imports any old file once, so nobody loses the value
+        // they had, then deletes it. Safe to run repeatedly; gated by LegacyFileSettingsMigrated.
+        private void MigrateLegacyFileSettings()
+        {
+            var s = Properties.Settings.Default;
+            if (s.LegacyFileSettingsMigrated) return;
+
+            string appData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "HolyLogger");
+            string localData = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HolyLogger");
+
+            ImportLegacyFile(Path.Combine(appData, "cluster-hover-popup-enabled.txt"), text =>
+            { if (bool.TryParse(text, out bool v)) s.ClusterHoverPopupEnabled = v; });
+
+            ImportLegacyFile(Path.Combine(appData, "cluster-last-minutes-filter.txt"), text =>
+            { if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int v)) s.ClusterLastMinutesFilter = v; });
+
+            ImportLegacyFile(Path.Combine(appData, "cluster-country-col-width.txt"), text =>
+            { if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out double v)) s.ClusterCountryColumnWidth = v; });
+
+            ImportLegacyFile(Path.Combine(appData, "cluster-country-col-display-index.txt"), text =>
+            { if (int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out int v)) s.ClusterCountryColumnDisplayIndex = v; });
+
+            ImportLegacyFile(Path.Combine(appData, "cluster-col-order.txt"), text => { s.ClusterColumnOrder = text; });
+
+            ImportLegacyFile(Path.Combine(localData, "qrz_photo_window_bounds.txt"), text =>
+            {
+                string[] p = text.Split('|');
+                if (p.Length == 4 &&
+                    double.TryParse(p[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double l) &&
+                    double.TryParse(p[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double t) &&
+                    double.TryParse(p[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double w) &&
+                    double.TryParse(p[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double h))
+                {
+                    s.QrzPhotoWindowLeft = l; s.QrzPhotoWindowTop = t;
+                    s.QrzPhotoWindowWidth = w; s.QrzPhotoWindowHeight = h;
+                }
+            });
+
+            s.LegacyFileSettingsMigrated = true;
+            try { s.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Reads one legacy setting file into Properties.Settings, then removes it. Any failure is
+        // ignored: the setting simply keeps its default, which is never worse than crashing at startup.
+        private static void ImportLegacyFile(string path, Action<string> apply)
+        {
+            try
+            {
+                if (!File.Exists(path)) return;
+                string text = File.ReadAllText(path).Trim();
+                if (!string.IsNullOrWhiteSpace(text)) apply(text);
+                File.Delete(path);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Puts each named setting back to the DefaultSettingValue declared in Settings.Designer.cs.
         // Unknown names are skipped, so renaming or removing a setting can never crash startup.
         private static void ForceSettingsToDefault(params string[] names)
@@ -5934,9 +5995,10 @@ namespace HolyLogger
 
         private void GenerateNewLogInfoWindow()
         {
+            // Placement is handled by WindowBounds inside LogInfoWindow itself. It used to be restored
+            // here from LogInfoWindowLeft/Top, but nothing ever WROTE those, so the window never actually
+            // remembered where it was put.
             loginfo = new LogInfoWindow();
-            loginfo.Left = Properties.Settings.Default.LogInfoWindowLeft < 0 ? 0 : Properties.Settings.Default.LogInfoWindowLeft;
-            loginfo.Top = Properties.Settings.Default.LogInfoWindowTop < 0 ? 0 : Properties.Settings.Default.LogInfoWindowTop;
 
             if (_holyLogParser != null)
             {
@@ -7905,38 +7967,21 @@ namespace HolyLogger
             PersistQrzPhotoWindowBoundsToDisk();
         }
 
-        private string GetQrzPhotoBoundsPath()
-        {
-            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "HolyLogger");
-            return Path.Combine(dir, "qrz_photo_window_bounds.txt");
-        }
-
+        // Now stored in Properties.Settings (it used to be a "left|top|width|height" text file) so a
+        // profile captures the QRZ Photo window's placement too. NaN means "never saved".
         private void LoadQrzPhotoWindowBoundsFromDisk()
         {
             try
             {
-                string filePath = GetQrzPhotoBoundsPath();
-                if (!File.Exists(filePath))
-                {
+                var s = Properties.Settings.Default;
+                if (double.IsNaN(s.QrzPhotoWindowLeft) || double.IsNaN(s.QrzPhotoWindowTop) ||
+                    double.IsNaN(s.QrzPhotoWindowWidth) || double.IsNaN(s.QrzPhotoWindowHeight))
                     return;
-                }
 
-                string[] parts = File.ReadAllText(filePath).Split('|');
-                if (parts.Length != 4)
-                {
-                    return;
-                }
-
-                if (double.TryParse(parts[0], NumberStyles.Float, CultureInfo.InvariantCulture, out double left) &&
-                    double.TryParse(parts[1], NumberStyles.Float, CultureInfo.InvariantCulture, out double top) &&
-                    double.TryParse(parts[2], NumberStyles.Float, CultureInfo.InvariantCulture, out double width) &&
-                    double.TryParse(parts[3], NumberStyles.Float, CultureInfo.InvariantCulture, out double height))
-                {
-                    qrzPhotoLeft = left;
-                    qrzPhotoTop = top;
-                    qrzPhotoWidth = width;
-                    qrzPhotoHeight = height;
-                }
+                qrzPhotoLeft = s.QrzPhotoWindowLeft;
+                qrzPhotoTop = s.QrzPhotoWindowTop;
+                qrzPhotoWidth = s.QrzPhotoWindowWidth;
+                qrzPhotoHeight = s.QrzPhotoWindowHeight;
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -7950,18 +7995,12 @@ namespace HolyLogger
                     return;
                 }
 
-                string filePath = GetQrzPhotoBoundsPath();
-                Directory.CreateDirectory(Path.GetDirectoryName(filePath));
-
-                string line = string.Format(
-                    CultureInfo.InvariantCulture,
-                    "{0}|{1}|{2}|{3}",
-                    qrzPhotoLeft.Value,
-                    qrzPhotoTop.Value,
-                    qrzPhotoWidth.Value,
-                    qrzPhotoHeight.Value);
-
-                File.WriteAllText(filePath, line);
+                var s = Properties.Settings.Default;
+                s.QrzPhotoWindowLeft = qrzPhotoLeft.Value;
+                s.QrzPhotoWindowTop = qrzPhotoTop.Value;
+                s.QrzPhotoWindowWidth = qrzPhotoWidth.Value;
+                s.QrzPhotoWindowHeight = qrzPhotoHeight.Value;
+                s.Save();
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }

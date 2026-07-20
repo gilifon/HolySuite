@@ -35,6 +35,7 @@ namespace HolyLogger
         public DuplicatesWindow(List<List<QSO>> groups)
         {
             InitializeComponent();
+            WindowBounds.Attach(this, "Duplicates");   // remember position + size
             MaxWidth = SystemParameters.WorkArea.Width;
             DupsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
 

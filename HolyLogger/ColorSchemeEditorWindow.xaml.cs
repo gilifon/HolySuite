@@ -35,6 +35,7 @@ namespace HolyLogger
         public ColorSchemeEditorWindow()
         {
             InitializeComponent();
+            WindowBounds.Attach(this, "ColorSchemeEditor");   // remember position + size
 
             // Dead simple model: you edit whatever scheme is selected right now, in place. Your
             // changes are saved to that scheme and remembered; the factory colors are always

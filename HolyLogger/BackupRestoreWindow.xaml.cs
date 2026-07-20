@@ -14,6 +14,7 @@ namespace HolyLogger
         public BackupRestoreWindow(string instructions, string backupsFolder)
         {
             InitializeComponent();
+            WindowBounds.Attach(this, "BackupRestore");   // remember position + size
             _backupsFolder = backupsFolder;
             TB_Instructions.Text = instructions;
             RefreshExtraFolder();

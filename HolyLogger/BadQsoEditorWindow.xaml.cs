@@ -128,6 +128,7 @@ namespace HolyLogger
         public BadQsoEditorWindow(List<QSO> badQsos, DataAccess dal)
         {
             InitializeComponent();
+            WindowBounds.Attach(this, "BadQsoEditor");   // remember position + size
             _dal = dal;
             var items = new[] { BadQsoViewModel.CreateHint() }
                         .Concat(badQsos.Select(q => new BadQsoViewModel(q)));
