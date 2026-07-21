@@ -1,10 +1,10 @@
-<Window x:Class="HolyLogger.SearchWindow"
+﻿<Window x:Class="HolyLogger.SearchWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:HolyLogger"
         Title="Log Search"
-        Height="500" Width="900"
-        MinHeight="300" MinWidth="600"
+        Height="620" Width="980"
+        MinHeight="440" MinWidth="600"
         ResizeMode="CanResize"
         WindowStartupLocation="Manual"
         PreviewKeyDown="Window_PreviewKeyDown"
@@ -32,12 +32,18 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
+                <!-- Every label is inside the SAME StackPanel as the control it names, so the WrapPanel
+                     can only ever break BETWEEN filters. Loose labels could wrap to the end of one line
+                     while their box started the next, leaving a box with no visible name. -->
                 <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                     <TextBlock Text="Callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <TextBox x:Name="TB_Callsign" Width="140" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
+                    <TextBox x:Name="TB_Callsign" Width="140" FontSize="14" VerticalAlignment="Center"
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                     <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <ComboBox x:Name="CB_Country" Width="220" FontSize="14" VerticalAlignment="Center" Margin="0,0,20,0"
+                    <ComboBox x:Name="CB_Country" Width="220" FontSize="14" VerticalAlignment="Center"
                               IsEditable="True" StaysOpenOnEdit="True" IsTextSearchEnabled="False" MaxDropDownHeight="280"
                               IsSynchronizedWithCurrentItem="False"
                               PreviewKeyDown="CB_Country_PreviewKeyDown"
@@ -54,7 +60,51 @@
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
-                    <Button x:Name="Btn_Search" FontSize="14" Padding="16,4"
+                  </StackPanel>
+
+                  <!-- Second filter row. The WrapPanel flows these onto their own line at the
+                       default width; the window's Height/MinHeight were raised to match. -->
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+                    <TextBlock Text="Band:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="CB_Band" Width="90" FontSize="14" VerticalAlignment="Center"
+                              SelectionChanged="Filter_Changed"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+                    <TextBlock Text="Mode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="CB_Mode" Width="90" FontSize="14" VerticalAlignment="Center"
+                              SelectionChanged="Filter_Changed"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+                    <TextBlock Text="My callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"/>
+                    <ComboBox x:Name="CB_MyCall" Width="130" FontSize="14" VerticalAlignment="Center"
+                              ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"
+                              SelectionChanged="Filter_Changed"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+                    <TextBlock Text="From:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <DatePicker x:Name="DP_From" Width="125" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"
+                                SelectedDateChanged="Filter_Changed"/>
+                    <TextBlock Text="To:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <DatePicker x:Name="DP_To" Width="125" FontSize="13" VerticalAlignment="Center"
+                                SelectedDateChanged="Filter_Changed"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+                    <TextBlock Text="Locator:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="The worked station's grid square, e.g. KM72"/>
+                    <TextBox x:Name="TB_Locator" Width="90" FontSize="14" VerticalAlignment="Center"
+                             ToolTip="The worked station's grid square, e.g. KM72"
+                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+                    <TextBlock Text="Square:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="Holyland square received (the Exchange column)"/>
+                    <TextBox x:Name="TB_Square" Width="90" FontSize="14" VerticalAlignment="Center"
+                             ToolTip="Holyland square received (the Exchange column)"
+                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                  </StackPanel>
+
+                    <Button x:Name="Btn_Search" FontSize="14" Padding="16,4" Margin="0,6,0,0"
                             Click="Btn_Search_Click" Background="#1565C0" Foreground="White"
                             BorderBrush="#0D47A1" Cursor="Hand">
                         <StackPanel Orientation="Horizontal">
@@ -67,7 +117,7 @@
                     </Button>
                     <Button x:Name="Btn_Clear" Content="Clear" FontSize="14" Padding="12,4"
                             Click="Btn_Clear_Click" Background="#757575" Foreground="White"
-                            BorderBrush="#616161" Cursor="Hand" Margin="8,0,0,0"/>
+                            BorderBrush="#616161" Cursor="Hand" Margin="8,6,0,0"/>
                 </WrapPanel>
                 <!-- QSO count, right-justified so it tracks the right edge on resize -->
                 <TextBlock x:Name="TB_Count" Grid.Column="1" VerticalAlignment="Center"
@@ -88,6 +138,8 @@
                   IsReadOnly="True"
                   FontSize="16"
                   BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3"
+                  MouseDoubleClick="ResultsGrid_MouseDoubleClick"
+                  Sorting="ResultsGrid_Sorting"
                   VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}">
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
@@ -99,24 +151,98 @@
                     <!-- Tan header keeps its light-mode look in both modes, so the text on it must
                          stay dark even when the dark theme's TextBrush turns white. -->
                     <Setter Property="Foreground" Value="#1A1A1A"/>
+                    <!-- Sort arrow on the column currently sorted, the same triangle and placement as
+                         the cluster table's headers, so the two tables read alike. -->
+                    <Setter Property="Template">
+                        <Setter.Value>
+                            <ControlTemplate TargetType="DataGridColumnHeader">
+                                <Grid>
+                                    <Border Background="{TemplateBinding Background}"
+                                            BorderBrush="{TemplateBinding BorderBrush}"
+                                            BorderThickness="{TemplateBinding BorderThickness}">
+                                        <Grid>
+                                            <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                              VerticalAlignment="{TemplateBinding VerticalContentAlignment}"
+                                                              Margin="{TemplateBinding Padding}"/>
+                                            <Path x:Name="SortArrow"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Top"
+                                                  Fill="#000000" Stretch="Uniform" Width="8" Height="6"
+                                                  Data="M 0,0 L 1,1 L 2,0 Z"
+                                                  Visibility="Collapsed" RenderTransformOrigin="0.5,0.5">
+                                                <Path.RenderTransform>
+                                                    <ScaleTransform ScaleY="1"/>
+                                                </Path.RenderTransform>
+                                            </Path>
+                                        </Grid>
+                                    </Border>
+                                    <Thumb x:Name="PART_LeftHeaderGripper" HorizontalAlignment="Left" Width="4" Cursor="SizeWE">
+                                        <Thumb.Style>
+                                            <Style TargetType="Thumb">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Thumb">
+                                                            <Border Background="{TemplateBinding Background}" Padding="0"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Thumb.Style>
+                                    </Thumb>
+                                    <Thumb x:Name="PART_RightHeaderGripper" HorizontalAlignment="Right" Width="4" Cursor="SizeWE">
+                                        <Thumb.Style>
+                                            <Style TargetType="Thumb">
+                                                <Setter Property="Background" Value="Transparent"/>
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Thumb">
+                                                            <Border Background="{TemplateBinding Background}" Padding="0"/>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Thumb.Style>
+                                    </Thumb>
+                                </Grid>
+                                <ControlTemplate.Triggers>
+                                    <Trigger Property="SortDirection" Value="Ascending">
+                                        <Setter TargetName="SortArrow" Property="Visibility" Value="Visible"/>
+                                        <Setter TargetName="SortArrow" Property="RenderTransform">
+                                            <Setter.Value>
+                                                <ScaleTransform ScaleY="1"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                    <Trigger Property="SortDirection" Value="Descending">
+                                        <Setter TargetName="SortArrow" Property="Visibility" Value="Visible"/>
+                                        <Setter TargetName="SortArrow" Property="RenderTransform">
+                                            <Setter.Value>
+                                                <ScaleTransform ScaleY="-1"/>
+                                            </Setter.Value>
+                                        </Setter>
+                                    </Trigger>
+                                </ControlTemplate.Triggers>
+                            </ControlTemplate>
+                        </Setter.Value>
+                    </Setter>
                 </Style>
             </DataGrid.ColumnHeaderStyle>
             <DataGrid.Columns>
-                <DataGridTemplateColumn Header="Date" IsReadOnly="True">
+                <DataGridTemplateColumn x:Name="Col_Date" Header="Date" IsReadOnly="True" SortMemberPath="Date">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Date, Converter={StaticResource QsoDateDisplayConverter}}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Time" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Time" IsReadOnly="True" SortMemberPath="Time">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Time, Converter={StaticResource QsoTimeDisplayConverter}}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Callsign" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Callsign" IsReadOnly="True" SortMemberPath="DXCall">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,0,5,0" FontWeight="Bold"
@@ -124,21 +250,21 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Name" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Name" IsReadOnly="True" SortMemberPath="Name">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Country" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Country" IsReadOnly="True" SortMemberPath="Country">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" SortMemberPath="Freq">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Freq}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
@@ -146,7 +272,7 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Band" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Band" IsReadOnly="True" SortMemberPath="Band">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Band}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
@@ -154,35 +280,35 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="RST-R" IsReadOnly="True">
+                <DataGridTemplateColumn Header="RST-R" IsReadOnly="True" SortMemberPath="RST_RCVD">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding RST_RCVD}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="RST-S" IsReadOnly="True">
+                <DataGridTemplateColumn Header="RST-S" IsReadOnly="True" SortMemberPath="RST_SENT">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding RST_SENT}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Mode" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Mode" IsReadOnly="True" SortMemberPath="Mode">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Mode}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Exchange" IsReadOnly="True">
+                <DataGridTemplateColumn Header="Exchange" IsReadOnly="True" SortMemberPath="SRX">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding SRX}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" Width="*">
+                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" SortMemberPath="Comment" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,0,5,0"/>

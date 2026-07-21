@@ -2302,6 +2302,115 @@ Environment.NewLine +
             }
         }
 
+        // Bands where a stored number of 1000 or more can only be kHz, never MHz. 13CM is deliberately
+        // absent: 2400 is a plausible reading BOTH as kHz and as MHz (2.4 GHz), so those rows are left
+        // alone rather than silently reinterpreted. Same for anything above 70CM.
+        private static readonly HashSet<string> UnambiguousKhzBands =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "160M", "80M", "60M", "40M", "30M", "20M", "17M", "15M", "12M", "10M", "6M", "4M", "2M", "70CM" };
+
+        // One QSO whose frequency looks like kHz, and what it would become in MHz.
+        public class FreqFix
+        {
+            public long Id { get; set; }
+            public string Callsign { get; set; }
+            public string Date { get; set; }
+            public string Time { get; set; }
+            public string Band { get; set; }
+            public string OldFreq { get; set; }
+            public string NewFreq { get; set; }
+        }
+
+        // Finds QSOs whose frequency was stored in kHz ("14200") and should read MHz ("14.200000").
+        // Finds only - nothing is written. The caller shows the operator what would change and applies
+        // it with ApplyFrequencyFixes only if they agree.
+        //
+        // convertBandToFreq used to hand back kHz while the rest of the program speaks MHz, so every
+        // QSO logged with a band but no frequency got a value a thousand times too high. It shows in
+        // the log grid next to proper MHz values, and went out in ADIF uploads as a frequency thousands
+        // of MHz outside its own band.
+        //
+        // Deliberately timid, because this is the operator's logged data:
+        //   * the QSO must already carry a band, and that band must be one where kHz is unambiguous;
+        //   * dividing by 1000 must land the QSO inside that same band.
+        // Anything else - a band-less row, an odd value, a microwave contact - is never offered.
+        public List<FreqFix> FindKhzFrequencyFixes()
+        {
+            var fixes = new List<FreqFix>();
+            try
+            {
+                using (var read = new SQLiteCommand(
+                    "SELECT Id, dx_callsign, date, time, band, frequency FROM qso " +
+                    "WHERE CAST(frequency AS REAL) >= 1000 ORDER BY date, time", con))
+                using (var rdr = read.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        string band = rdr["band"]?.ToString()?.Trim();
+                        string freq = rdr["frequency"]?.ToString()?.Trim();
+                        if (string.IsNullOrWhiteSpace(band) || string.IsNullOrWhiteSpace(freq)) continue;
+                        if (!UnambiguousKhzBands.Contains(band)) continue;
+
+                        string mhz = HolyParser.HolyLogParser.NormalizeFreqToMhz(freq);
+                        if (string.IsNullOrWhiteSpace(mhz)) continue;
+
+                        // The rewritten value has to agree with the band the operator logged.
+                        if (!string.Equals(HolyParser.HolyLogParser.convertFreqToBand(mhz), band,
+                                           StringComparison.OrdinalIgnoreCase)) continue;
+
+                        // Stored with six decimals ("14.200000") to match how frequencies already look
+                        // in the log, so a repaired row is indistinguishable from an untouched one in
+                        // the grid. The trimmed form the normaliser returns is only for ADIF output.
+                        double value;
+                        if (!double.TryParse(mhz, System.Globalization.NumberStyles.Float,
+                                             System.Globalization.CultureInfo.InvariantCulture, out value))
+                            continue;
+
+                        fixes.Add(new FreqFix
+                        {
+                            Id = Convert.ToInt64(rdr["Id"]),
+                            Callsign = rdr["dx_callsign"]?.ToString() ?? string.Empty,
+                            Date = rdr["date"]?.ToString() ?? string.Empty,
+                            Time = rdr["time"]?.ToString() ?? string.Empty,
+                            Band = band,
+                            OldFreq = freq,
+                            NewFreq = value.ToString("0.000000",
+                                                     System.Globalization.CultureInfo.InvariantCulture)
+                        });
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return fixes;
+        }
+
+        // Writes the frequencies found by FindKhzFrequencyFixes. Returns how many rows were changed.
+        public int ApplyFrequencyFixes(IList<FreqFix> fixes)
+        {
+            if (fixes == null || fixes.Count == 0) return 0;
+            try
+            {
+                using (var tx = con.BeginTransaction())
+                {
+                    using (var upd = new SQLiteCommand("UPDATE qso SET frequency = @f WHERE Id = @id", con, tx))
+                    {
+                        upd.Parameters.Add(new SQLiteParameter("@f"));
+                        upd.Parameters.Add(new SQLiteParameter("@id"));
+                        foreach (var fix in fixes)
+                        {
+                            upd.Parameters["@f"].Value = fix.NewFreq;
+                            upd.Parameters["@id"].Value = fix.Id;
+                            upd.ExecuteNonQuery();
+                        }
+                    }
+                    tx.Commit();
+                }
+                Log.Warn($"Frequency repair: {fixes.Count} QSO(s) stored in kHz were rewritten as MHz.");
+                return fixes.Count;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
         private void UpdateSchema()
         {
             string createTable_qso = @"

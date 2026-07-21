@@ -975,6 +975,81 @@ namespace HolyLogger
             }
         }
 
+        // Offers to correct QSOs whose frequency was stored in kHz instead of MHz (see
+        // DataAccess.FindKhzFrequencyFixes). Nothing is written without the operator saying yes: this
+        // is their logged data, and a program that quietly rewrites a log is a program you cannot trust.
+        //
+        // The full before/after list is written to the Desktop BEFORE the question is asked, so the
+        // answer can be given with the actual QSOs in front of you rather than on the word of a dialog.
+        private void OfferFrequencyRepair()
+        {
+            try
+            {
+                if (dal == null) return;
+
+                var fixes = dal.FindKhzFrequencyFixes();
+                if (fixes.Count == 0) return;
+
+                // "Not now" is remembered as the number of QSOs it was said about, rather than a plain
+                // yes/no. Nothing changes -> the question stays away; but import a log that brings in
+                // more of them and the count differs, so the offer comes back for the new ones.
+                if (Properties.Settings.Default.FreqRepairDeclinedCount == fixes.Count) return;
+
+                string reportPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    "holylogger_frequency_changes.txt");
+
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine($"HolyLogger — frequency corrections — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                sb.AppendLine();
+                sb.AppendLine("These QSOs have their frequency stored in kHz. HolyLogger works in MHz,");
+                sb.AppendLine("so they show wrongly in the log and are uploaded wrongly to LoTW, eQSL,");
+                sb.AppendLine("QRZ and Club Log. Listed below is exactly what would change.");
+                sb.AppendLine();
+                sb.AppendLine($"{"DATE",-12}{"TIME",-8}{"CALLSIGN",-14}{"BAND",-8}{"WAS",-16}{"BECOMES",-16}");
+                sb.AppendLine(new string('-', 74));
+                foreach (var f in fixes)
+                    sb.AppendLine($"{f.Date,-12}{f.Time,-8}{f.Callsign,-14}{f.Band,-8}{f.OldFreq,-16}{f.NewFreq,-16}");
+                sb.AppendLine();
+                sb.AppendLine($"Total: {fixes.Count} QSO(s).");
+                sb.AppendLine();
+                sb.AppendLine("QSOs with no band, and any value that would not land back inside the band");
+                sb.AppendLine("it is logged on, are never touched — they are not in this list.");
+                System.IO.File.WriteAllText(reportPath, sb.ToString(), System.Text.Encoding.UTF8);
+
+                bool confirmed = HolyMessageBox.ShowConfirm(
+                    $"{fixes.Count} QSO(s) in your log have the frequency stored in kHz (for example " +
+                    $"\"{fixes[0].OldFreq}\" instead of \"{fixes[0].NewFreq}\").\n\n" +
+                    "This is an old HolyLogger fault, not something you did. Those QSOs are uploaded to " +
+                    "LoTW, eQSL, QRZ and Club Log with a wrong frequency.\n\n" +
+                    "The full list of what would change was saved to your Desktop:\n" +
+                    "holylogger_frequency_changes.txt\n\n" +
+                    "Correct them now?",
+                    "Correct QSO frequencies", HolyMsgType.Warning, this);
+
+                if (!confirmed)
+                {
+                    Properties.Settings.Default.FreqRepairDeclinedCount = fixes.Count;
+                    Properties.Settings.Default.Save();
+                    return;
+                }
+
+                int changed = dal.ApplyFrequencyFixes(fixes);
+                Properties.Settings.Default.FreqRepairDeclinedCount = 0;
+                Properties.Settings.Default.Save();
+
+                if (changed > 0)
+                {
+                    Qsos = dal.GetQSOsForLog(dal.ActiveLogId);
+                    HolyMessageBox.ShowSuccess(
+                        $"{changed} QSO(s) corrected.\n\n" +
+                        "The list of changes is on your Desktop:\nholylogger_frequency_changes.txt",
+                        "Frequencies corrected", this);
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
             // The active profile's file was gone at startup, so factory defaults were loaded. Say so
@@ -990,6 +1065,10 @@ namespace HolyLogger
                         "Your logs and QSOs are not affected.",
                         "Profile not found", this)), DispatcherPriority.ApplicationIdle);
             }
+
+            // Old logs can hold frequencies in kHz; offer to correct them. Deferred to idle so it lands
+            // after the window is on screen rather than in the middle of the startup sequence.
+            Dispatcher.BeginInvoke(new Action(OfferFrequencyRepair), DispatcherPriority.ApplicationIdle);
 
             // Pinned My Favorite Channels: reopen it as part of the setup, at its saved position and size
             // (the window restores those itself). Done HERE rather than in the constructor because
@@ -3165,6 +3244,17 @@ namespace HolyLogger
             if ((t.Length == 6 || t.Length == 4) && t.All(char.IsDigit))
                 return t.Substring(0, 2) + ":" + t.Substring(2, 2);
             return t;
+        }
+
+        // Double-clicking a row in the Search window loads that QSO for editing here. Same path as the
+        // log's own right-click "Edit", plus bringing this window to the front - the QSO fields are
+        // here, so leaving the Search window on top would look like nothing had happened.
+        public void EditQsoFromSearch(QSO qso)
+        {
+            if (qso == null) return;
+            EditQsoFromContextMenu(qso);
+            try { Activate(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void EditQsoFromContextMenu(QSO qso)
@@ -5504,7 +5594,7 @@ namespace HolyLogger
                 searchWindow.Activate();
                 return;
             }
-            searchWindow = new SearchWindow(Qsos);
+            searchWindow = new SearchWindow(Qsos) { Owner = this };
             searchWindow.Closed += (s, _) => searchWindow = null;
             searchWindow.Show();
             if (!string.IsNullOrWhiteSpace(presetCallsign))
@@ -5522,7 +5612,7 @@ namespace HolyLogger
                 searchWindow.Activate();
                 return;
             }
-            searchWindow = new SearchWindow(Qsos);
+            searchWindow = new SearchWindow(Qsos) { Owner = this };
             searchWindow.Closed += (s, _) => searchWindow = null;
             searchWindow.Show();
             searchWindow.SetCountry(country, runSearch: true);

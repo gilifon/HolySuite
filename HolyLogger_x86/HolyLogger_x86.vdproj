@@ -5650,7 +5650,7 @@
         "RemovePreviousVersions" = "11:TRUE"
         "DetectNewerInstalledVersion" = "11:TRUE"
         "InstallAllUsers" = "11:TRUE"
-        "ProductVersion" = "8:8.8.0"
+        "ProductVersion" = "8:8.8.1"
         "Manufacturer" = "8:4Z1KD"
         "ARPHELPTELEPHONE" = "8:+972547828077"
         "ARPHELPLINK" = "8:https://4z1kd.github.io/HolyLogger/"

@@ -2,6 +2,7 @@ using HolyParser;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Text;
 using System.Threading.Tasks;
@@ -199,6 +200,7 @@ namespace HolyLogger
                     WriteField(sw, "QSO_DATE", q.Date?.Replace("-", ""));
                     WriteField(sw, "TIME_ON", q.Time?.Replace(":", ""));
                     WriteField(sw, "BAND", q.Band);
+                    WriteField(sw, "FREQ", FreqForLotw(q));
                     WriteField(sw, "MODE", q.Mode);
                     if (!string.IsNullOrWhiteSpace(q.SUBMode))
                         WriteField(sw, "SUBMODE", q.SUBMode);
@@ -218,6 +220,27 @@ namespace HolyLogger
             }
             progress?.Report($"Preparing QSO {written:N0} / {total:N0}");
             return skipped;
+        }
+
+        // The QSO's frequency as TQSL wants it: MHz, via the shared normaliser.
+        //
+        // LoTW is stricter than the other services: TQSL rejects a contact whose FREQ contradicts its
+        // BAND. So if the normalised number does not land inside the QSO's own band, FREQ is dropped
+        // rather than guessed at - losing the frequency is much better than losing the QSO, and BAND
+        // alone is what LoTW matches on.
+        private static string FreqForLotw(QSO q)
+        {
+            if (q == null) return null;
+
+            string text = HolyLogParser.NormalizeFreqToMhz(q.Freq);
+            if (text == null) return null;
+
+            if (!string.IsNullOrWhiteSpace(q.Band) &&
+                !string.Equals(HolyLogParser.convertFreqToBand(text), q.Band.Trim(),
+                               StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            return text;
         }
 
         private static void WriteField(StreamWriter sw, string tag, string value)

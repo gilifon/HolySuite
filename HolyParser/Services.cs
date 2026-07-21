@@ -112,7 +112,10 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.Country)) adif.AppendFormat("<country:{0}>{1}", qso.Country.Length, qso.Country);
                 if (!string.IsNullOrWhiteSpace(qso.CQZone)) adif.AppendFormat("<cqz:{0}>{1}", qso.CQZone.Length, qso.CQZone);
                 if (!string.IsNullOrWhiteSpace(qso.ITUZone)) adif.AppendFormat("<ituz:{0}>{1}", qso.ITUZone.Length, qso.ITUZone);
-                if (!string.IsNullOrWhiteSpace(qso.Freq)) adif.AppendFormat("<freq:{0}>{1}", qso.Freq.Length, qso.Freq);
+                // ADIF <freq> is MHz. Fall back to the stored text if it cannot be parsed at all, so a
+                // value we simply don't understand is passed through rather than silently dropped.
+                string freqMhz = HolyLogParser.NormalizeFreqToMhz(qso.Freq) ?? qso.Freq;
+                if (!string.IsNullOrWhiteSpace(freqMhz)) adif.AppendFormat("<freq:{0}>{1}", freqMhz.Length, freqMhz);
                 if (!string.IsNullOrWhiteSpace(qso.Band)) adif.AppendFormat("<band:{0}>{1}", qso.Band.Length, qso.Band);
                 if (!string.IsNullOrWhiteSpace(qso.Mode)) adif.AppendFormat("<mode:{0}>{1}", qso.Mode.Length, qso.Mode);
                 if (!string.IsNullOrWhiteSpace(qso.SUBMode)) adif.AppendFormat("<submode:{0}>{1}", qso.SUBMode.Length, qso.SUBMode);

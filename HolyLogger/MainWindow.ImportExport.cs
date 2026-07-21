@@ -243,31 +243,60 @@ namespace HolyLogger
 
         // Peeks at an ADIF file for its station callsign(s) and operator(s) so the imported log's identity
         // can be confirmed before importing. Distinct values, most-frequent first. Best-effort.
+        // Reads the file ONCE, line by line, collecting both fields together.
+        //
+        // This runs on the UI thread before the import worker starts. It used to call ScanAdifField
+        // twice, and each call did File.ReadAllText on the whole log - so a 70 MB ADIF meant two
+        // 140 MB strings plus two match collections of ~28,000 Match objects each, before a single QSO
+        // had been parsed. In a 32-bit process capped at 2 GB that was a large part of what made a big
+        // logbook fail to import at all. Streaming keeps only one line in memory.
+        //
+        // Reading by line is safe here because an ADIF tag never contains a line break, and neither a
+        // station callsign nor an operator ever does.
         private static void ScanAdifIdentity(string filePath, out System.Collections.Generic.List<string> stationCallsigns, out System.Collections.Generic.List<string> operators)
         {
-            stationCallsigns = ScanAdifField(filePath, "station_callsign");
-            operators = ScanAdifField(filePath, "operator");
-        }
-
-        private static System.Collections.Generic.List<string> ScanAdifField(string filePath, string field)
-        {
-            var counts = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+            var callCounts = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
+            var opCounts = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
             try
             {
-                string text = System.IO.File.ReadAllText(filePath);
-                var rx = new System.Text.RegularExpressions.Regex("<" + field + ":\\d+(?::[^>]*)?>([^<\\r\\n]*)",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                foreach (System.Text.RegularExpressions.Match m in rx.Matches(text))
+                var callRx = AdifFieldRegex("station_callsign");
+                var opRx = AdifFieldRegex("operator");
+
+                using (var reader = new System.IO.StreamReader(filePath, System.Text.Encoding.UTF8))
                 {
-                    string v = m.Groups[1].Value.Trim();
-                    if (v.Length == 0) continue;
-                    counts.TryGetValue(v, out int c);
-                    counts[v] = c + 1;
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        CollectAdifFieldValues(callRx, line, callCounts);
+                        CollectAdifFieldValues(opRx, line, opCounts);
+                    }
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-            return counts.OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
+
+            stationCallsigns = MostFrequentFirst(callCounts);
+            operators = MostFrequentFirst(opCounts);
         }
+
+        private static System.Text.RegularExpressions.Regex AdifFieldRegex(string field) =>
+            new System.Text.RegularExpressions.Regex("<" + field + ":\\d+(?::[^>]*)?>([^<\\r\\n]*)",
+                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+        private static void CollectAdifFieldValues(System.Text.RegularExpressions.Regex rx, string text,
+                                                   System.Collections.Generic.Dictionary<string, int> counts)
+        {
+            foreach (System.Text.RegularExpressions.Match m in rx.Matches(text))
+            {
+                string v = m.Groups[1].Value.Trim();
+                if (v.Length == 0) continue;
+                counts.TryGetValue(v, out int c);
+                counts[v] = c + 1;
+            }
+        }
+
+        private static System.Collections.Generic.List<string> MostFrequentFirst(
+            System.Collections.Generic.Dictionary<string, int> counts) =>
+            counts.OrderByDescending(kv => kv.Value).Select(kv => kv.Key).ToList();
 
         private enum ImportTarget { Cancel, NewLog, CurrentLog }
 

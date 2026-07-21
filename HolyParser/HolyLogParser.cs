@@ -143,60 +143,63 @@ namespace HolyParser
             // record instead, which yields identical records because ADIF tags (<EOH>/<EOR>/<FIELD:len>)
             // never contain line breaks. Also tolerates a missing <EOH> (headerless ADIF) instead of
             // throwing IndexOutOfRange as the old spliteHeader[1] did.
+            // Walk the records IN PLACE rather than cutting the file into pieces first. The old code
+            // took a Substring for the body (a second full-size copy) and then Regex.Split'ed that into
+            // an array holding a third copy, one string per record - so a 70 MB log needed ~3x its own
+            // size in strings all alive at once, in a process with a 2 GB ceiling, and the huge arrays
+            // shredded the Large Object Heap. Indexing into the original text costs nothing extra and
+            // materialises exactly ONE record at a time.
             const string eohTag = "<EOH>";
+            const string eorTag = "<EOR>";
             int eohIndex = m_fileText.IndexOf(eohTag, StringComparison.OrdinalIgnoreCase);
-            string body = eohIndex >= 0 ? m_fileText.Substring(eohIndex + eohTag.Length) : m_fileText;
-
-            //Splite body to lines
-            string[] rows = Regex.Split(body, "<EOR>", RegexOptions.IgnoreCase);
-            // Release the big whole-file strings so they can be collected while we parse the rows
-            // (Substring above already produced an independent 'body', so this frees the original).
-            body = null;
-            m_fileText = null;
+            int pos = eohIndex >= 0 ? eohIndex + eohTag.Length : 0;
+            int total = m_fileText.Length;
 
             int debugCounter = 0;
-            int totalRows = rows.Count(row => !string.IsNullOrWhiteSpace(row));
-            int parsedRows = 0;
             int lastReportedProgress = -1;
 
-            foreach (string row in rows)
+            // Progress is measured by position in the file instead of by record count, which also drops
+            // the extra full pass the old code made just to count the rows up front.
+            while (pos < total)
             {
-                //skip empty rows
-                if (string.IsNullOrWhiteSpace(row)) continue;
-                try
-                {
-                    // Strip line breaks from THIS record (the old code stripped them from the whole file
-                    // up front). Small per-record work; only touched when the record actually has breaks.
-                    string cleanRow = (row.IndexOf('\n') >= 0 || row.IndexOf('\r') >= 0)
-                        ? row.Replace("\r", string.Empty).Replace("\n", string.Empty)
-                        : row;
-                    QSO qso_row = ParseRawQSO(cleanRow);
-                    m_qsoList.Add(qso_row);
-                    //if (IsParseDuplicates)
-                    //{
-                    //    m_qsoList.Add(qso_row);
-                    //}
-                    //else if (!IsParseDuplicates && !m_qsoList.Contains(qso_row))
-                    //{
-                    //    m_qsoList.Add(qso_row);
-                    //}
-                }
-                catch (Exception)
-                {
-                    debugCounter++;
-                }
+                int eor = m_fileText.IndexOf(eorTag, pos, StringComparison.OrdinalIgnoreCase);
+                int end = eor >= 0 ? eor : total;
 
-                parsedRows++;
-                if (totalRows > 0)
+                if (end > pos)
                 {
-                    int progress = (int)Math.Floor((double)parsedRows * 100 / totalRows);
-                    if (progress > lastReportedProgress)
+                    string row = m_fileText.Substring(pos, end - pos);
+                    if (!string.IsNullOrWhiteSpace(row))
                     {
-                        lastReportedProgress = progress;
-                        progressCallback?.Invoke(progress);
+                        try
+                        {
+                            // Strip line breaks from THIS record (the old code stripped them from the
+                            // whole file up front). Only touched when the record actually has breaks.
+                            string cleanRow = (row.IndexOf('\n') >= 0 || row.IndexOf('\r') >= 0)
+                                ? row.Replace("\r", string.Empty).Replace("\n", string.Empty)
+                                : row;
+                            QSO qso_row = ParseRawQSO(cleanRow);
+                            m_qsoList.Add(qso_row);
+                        }
+                        catch (Exception)
+                        {
+                            debugCounter++;
+                        }
                     }
                 }
+
+                if (eor < 0) break;
+                pos = eor + eorTag.Length;
+
+                int progress = (int)Math.Floor((double)pos * 100 / total);
+                if (progress > lastReportedProgress)
+                {
+                    lastReportedProgress = progress;
+                    progressCallback?.Invoke(progress);
+                }
             }
+
+            // Done with the raw text; the caller may still hold its own reference to it.
+            m_fileText = null;
             if (!IsParseDuplicates)
             {
                 m_qsoList= m_qsoList.DistinctBy(p => p.HASH).ToList();
@@ -950,24 +953,51 @@ namespace HolyParser
             return string.Empty;
         }
 
+        // A representative frequency for a band, in MHz.
+        //
+        // These used to be returned in kHz ("14200" for 20M) while the rest of the program - the CAT
+        // and cluster setters, TB_Frequency, convertFreqToBand - all speak MHz. Since this fills in
+        // QSO.Freq whenever a QSO has a band but no frequency, every such QSO was stored a thousand
+        // times too high, and was then written into ADIF uploads as if it were MHz.
         public static string convertBandToFreq(string band)
         {
 
-            if (band.ToLower() == "160m") return "1800";
-            if (band.ToLower() == "80m") return "3600";
-            if (band.ToLower() == "60m") return "5360";
-            if (band.ToLower() == "40m") return "7100";
-            if (band.ToLower() == "30m") return "10000";
-            if (band.ToLower() == "20m") return "14200";
-            if (band.ToLower() == "17m") return "18100";
-            if (band.ToLower() == "15m") return "21300";
-            if (band.ToLower() == "12m") return "24900";
-            if (band.ToLower() == "10m") return "28400";
-            if (band.ToLower() == "6m") return "50000";
-            if (band.ToLower() == "7m") return "70000";
-            if (band.ToLower() == "2m") return "145000";
-            if (band.ToLower() == "70cm") return "433000";
+            if (band.ToLower() == "160m") return "1.8";
+            if (band.ToLower() == "80m") return "3.6";
+            if (band.ToLower() == "60m") return "5.36";
+            if (band.ToLower() == "40m") return "7.1";
+            if (band.ToLower() == "30m") return "10.1";
+            if (band.ToLower() == "20m") return "14.2";
+            if (band.ToLower() == "17m") return "18.1";
+            if (band.ToLower() == "15m") return "21.3";
+            if (band.ToLower() == "12m") return "24.9";
+            if (band.ToLower() == "10m") return "28.4";
+            if (band.ToLower() == "6m") return "50";
+            if (band.ToLower() == "7m") return "70";
+            if (band.ToLower() == "2m") return "145";
+            if (band.ToLower() == "70cm") return "433";
             return string.Empty;
+        }
+
+        // A frequency string as ADIF wants it: MHz, plain decimal, invariant culture.
+        //
+        // Every upload path (eQSL, QRZ, Club Log, LoTW) and the ADIF export ultimately write QSO.Freq
+        // into a <freq:> tag, which the spec defines as MHz. Logs imported from other programs - and
+        // QSOs stored back when convertBandToFreq above returned kHz - can carry values like "14200",
+        // which as MHz puts the contact thousands of MHz outside its own band. Those are scaled down.
+        // Returns null when the text is not a usable number, so the caller can decide what to do.
+        public static string NormalizeFreqToMhz(string freq)
+        {
+            if (string.IsNullOrWhiteSpace(freq)) return null;
+
+            double mhz;
+            if (!double.TryParse(freq.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out mhz))
+                return null;
+            if (mhz <= 0) return null;
+            if (mhz >= 1000) mhz /= 1000.0;     // kHz -> MHz
+            if (mhz >= 1000) return null;       // Hz, or nonsense - do not guess
+
+            return mhz.ToString("0.######", CultureInfo.InvariantCulture);
         }
 
         public static bool IsIsraeliStation(string callsign)

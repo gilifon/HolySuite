@@ -1,3 +1,4 @@
+using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -94,7 +95,12 @@ namespace HolyLogger
         }
 
         // Adds a single result line for a batch service like LoTW (TQSL signs the whole file at once).
-        public void ReportBatchResult(string text, bool ok)
+        //
+        // succeeded/failed are QSO counts, NOT row counts. A batch service draws one line on screen but
+        // that line stands for many QSOs, while the summary at the bottom talks about QSOs - so counting
+        // the row as a single unit is what made a 7-QSO LoTW upload announce "All 1 QSO uploaded
+        // successfully". The ok flag still decides the tick/cross on the row itself.
+        public void ReportBatchResult(string text, bool ok, int succeeded, int failed)
         {
             var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 2, 0, 2) };
             var okColor = ok ? Color.FromRgb(0x1E, 0x7E, 0x34) : Color.FromRgb(0xCC, 0x00, 0x00);
@@ -118,9 +124,15 @@ namespace HolyLogger
             });
 
             LogPanel.Children.Add(row);
-            if (ok) _success++; else _failed++;
+            _success += Math.Max(0, succeeded);
+            _failed += Math.Max(0, failed);
             ScrollToEnd();
         }
+
+        // Convenience for a batch line that stands for exactly one unit of work (e.g. an upload that
+        // threw before any QSO count was known).
+        public void ReportBatchResult(string text, bool ok) =>
+            ReportBatchResult(text, ok, ok ? 1 : 0, ok ? 0 : 1);
 
         // Adds a neutral informational note (e.g. a service's rejection reason). Doesn't affect the
         // success/failure counters. Gray so it reads on both light and dark themes.

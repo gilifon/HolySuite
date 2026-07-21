@@ -31,6 +31,10 @@ namespace HolyLogger
             "LotwConfirmedEntities", "LotwSeenKeysJson", "LotwLastNewJson", "LotwLastQsl",
             "LotwConfirmedQsoCount", "LotwLastNewQsls", "LotwLastNewCountries", "LotwLastCheckSince",
             "RecentQSOCounter",
+
+            // "I already said not now" about the kHz frequency repair. That answer is about the LOG,
+            // so switching profile must neither re-ask nor silently inherit someone else's refusal.
+            "FreqRepairDeclinedCount",
         };
 
         // Window geometry: everything that describes WHERE the windows are, as opposed to how the

@@ -638,17 +638,6 @@ namespace HolyLogger
                 if (progressWindow == null) ToggleUploadProgress(Visibility.Hidden);
                 UpdateLotwMenuCount();
 
-                // Save the combined TQSL report to the Desktop for inspection.
-                string reportPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "lotw_last_upload.txt");
-                try
-                {
-                    string detail = reportSb.ToString();
-                    if (detail.Length > 500000) detail = detail.Substring(0, 500000) + "\r\n…(truncated)";
-                    System.IO.File.WriteAllText(reportPath, detail, System.Text.Encoding.UTF8);
-                }
-                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-
                 // Build the user-facing summary.
                 var summary = new System.Text.StringBuilder();
                 summary.AppendLine(totalUploaded > 0
@@ -666,6 +655,33 @@ namespace HolyLogger
                     summary.AppendLine("\nNot uploaded:");
                     foreach (var f in failures) summary.AppendLine("  • " + f);
                 }
+
+                // Save the report to the Desktop, SUMMARY FIRST.
+                //
+                // A big upload's per-QSO TQSL output runs to megabytes, and the file is capped from the
+                // FRONT - so writing the summary last meant the raw dump ate the cap and the "left in
+                // the queue" list was thrown away, the one time somebody needed to read it. Only the
+                // TQSL output is truncated now; the summary is always at the top.
+                string reportPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "lotw_last_upload.txt");
+                try
+                {
+                    string detail = reportSb.ToString();
+                    if (detail.Length > 500000) detail = detail.Substring(0, 500000) + "\r\n…(truncated)";
+                    var file = new System.Text.StringBuilder();
+                    file.AppendLine($"LoTW upload summary — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                    file.AppendLine(new string('=', 70));
+                    file.AppendLine(summary.ToString().TrimEnd());
+                    file.AppendLine();
+                    file.AppendLine(new string('=', 70));
+                    file.AppendLine("Full TQSL output");
+                    file.AppendLine(new string('=', 70));
+                    file.AppendLine();
+                    file.Append(detail);
+                    System.IO.File.WriteAllText(reportPath, file.ToString(), System.Text.Encoding.UTF8);
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
                 summary.AppendLine("\nThe full TQSL report was saved to lotw_last_upload.txt on your Desktop.");
 
                 bool clean = failures.Count == 0 && unresolved.Count == 0;
@@ -676,7 +692,20 @@ namespace HolyLogger
                         : "No QSOs uploaded to LoTW";
                     int leftover = unresolved.Count + failures.Count;
                     if (leftover > 0) line += $" ({leftover} callsign group(s) left in queue)";
-                    progressWindow.ReportBatchResult(line, clean);
+                    // Counts are in QSOs so the window's summary line adds up: everything that was
+                    // pending and did not reach LoTW (unresolved, failed, or no band/frequency) is a
+                    // miss, whatever grouping it was skipped by.
+                    progressWindow.ReportBatchResult(
+                        line, clean, totalUploaded, Math.Max(0, pending.Count - totalUploaded));
+
+                    // Name the callsigns that did not go, and why, right here in the window. "8 callsign
+                    // group(s) left in queue" tells the operator that something is wrong but not what to
+                    // do about it - the reasons were already in hand, they were just never shown.
+                    foreach (var u in unresolved) progressWindow.AddNote("• " + u);
+                    foreach (var f in failures) progressWindow.AddNote("• " + f);
+                    if (totalSkippedNoBand > 0)
+                        progressWindow.AddNote(
+                            $"• {totalSkippedNoBand:N0} QSO(s) skipped — no band or frequency recorded.");
                 }
                 else if (clean)
                     HolyMessageBox.ShowSuccess(summary.ToString().TrimEnd(), "LoTW Upload", this);
@@ -698,7 +727,8 @@ namespace HolyLogger
                 }
                 catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 if (progressWindow != null)
-                    progressWindow.ReportBatchResult($"Upload failed: {ex.Message}", false);
+                    progressWindow.ReportBatchResult($"Upload failed: {ex.Message}", false,
+                        totalUploaded, Math.Max(0, pending.Count - totalUploaded));
                 else
                     HolyMessageBox.ShowError(
                         "LoTW upload failed:\n\n" + ex.Message +
