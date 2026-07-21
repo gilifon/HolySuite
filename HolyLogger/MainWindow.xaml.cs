@@ -562,6 +562,8 @@ namespace HolyLogger
             {
                 GenerateNewTimerWindow();
             }
+            // (Pinned My Favorite Channels is reopened in MainWindow_Loaded, not here: ChannelsWindow
+            //  sets Owner = this, and WPF refuses to take an owner that has not been shown yet.)
 
             List<KeyValuePair<string, int>> gridColumnOrder = new List<KeyValuePair<string, int>>();
             gridColumnOrder.Add(new KeyValuePair<string, int>("Date", Properties.Settings.Default.Date_index));
@@ -987,6 +989,18 @@ namespace HolyLogger
                         "factory default settings.\n\n" +
                         "Your logs and QSOs are not affected.",
                         "Profile not found", this)), DispatcherPriority.ApplicationIdle);
+            }
+
+            // Pinned My Favorite Channels: reopen it as part of the setup, at its saved position and size
+            // (the window restores those itself). Done HERE rather than in the constructor because
+            // ChannelsWindow sets Owner = this, and WPF throws "Cannot set Owner property to a Window
+            // that has not been shown previously" while the main window is still being built.
+            if (Properties.Settings.Default.ChannelsWindowPinned)
+            {
+                // ShowChannelsWindow, NOT the menu handler: the menu handler deliberately unpins, and
+                // this window is opening precisely BECAUSE it is pinned.
+                try { ShowChannelsWindow(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
 
             // Re-assert the log name in the title bar once the window is fully loaded. The constructor
@@ -5014,6 +5028,14 @@ namespace HolyLogger
         // owned by the dead window.
         private void DoShutdownCleanup()
         {
+            // Windows still OPEN at shutdown never run their own Closing save - the program tears them
+            // down instead - so a window left open lost the position it had been moved to. Persist them
+            // here, BEFORE the flush below, so their placement lands in the same write.
+            try { WindowBounds.SaveAllOpen(); }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { _channelsWindow?.PersistNow(); }   // same exposure for the channel list itself
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
             // Land any debounced settings write still waiting on its timer (window bounds saved
             // moments before exit would otherwise be lost with the timer).
             SettingsFlush.FlushNow();
@@ -5585,7 +5607,25 @@ namespace HolyLogger
 
         private ChannelsWindow _channelsWindow;
 
+        // Opening from the menu ALWAYS starts unpinned. Pinning is a deliberate act that means "bring
+        // this back next time"; it must never be inherited just because the window was opened again.
+        // Only the pin button itself turns it on, and only the startup path below opens it still pinned.
         private void MyChannelsMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            if (Properties.Settings.Default.ChannelsWindowPinned)
+            {
+                Properties.Settings.Default.ChannelsWindowPinned = false;
+                try { Properties.Settings.Default.Save(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                // Already open (and pinned): just refresh its pin icon to the new state.
+                try { _channelsWindow?.RefreshPinButton(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            ShowChannelsWindow();
+        }
+
+        // Opens (or focuses) the window WITHOUT touching the pinned state.
+        private void ShowChannelsWindow()
         {
             if (_channelsWindow != null)
             {

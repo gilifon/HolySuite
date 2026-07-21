@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -32,6 +32,25 @@ namespace HolyLogger
             "LotwConfirmedQsoCount", "LotwLastNewQsls", "LotwLastNewCountries", "LotwLastCheckSince",
             "RecentQSOCounter",
         };
+
+        // Window geometry: everything that describes WHERE the windows are, as opposed to how the
+        // program behaves.
+        //
+        // It is EXCLUDED from profiles entirely (see Excluded below). Profiles are re-applied on every
+        // startup, so holding geometry in them meant the profile's old positions overwrote wherever the
+        // operator had actually left the windows -- the window genuinely stopped remembering its place.
+        // Geometry now lives only in user.config, written when each window closes, which is the one
+        // store nothing else competes with. The trade-off, deliberately taken: switching profile no
+        // longer rearranges the windows.
+        private static bool IsWindowLayoutSetting(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return false;
+            if (string.Equals(name, "WindowBoundsJson", StringComparison.OrdinalIgnoreCase)) return true;
+            return name.EndsWith("WindowLeft", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("WindowTop", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("WindowWidth", StringComparison.OrdinalIgnoreCase)
+                || name.EndsWith("WindowHeight", StringComparison.OrdinalIgnoreCase);
+        }
 
         public static string ProfilesFolder
         {
@@ -81,7 +100,7 @@ namespace HolyLogger
             var values = new Dictionary<string, string>();
             foreach (System.Configuration.SettingsPropertyValue v in Properties.Settings.Default.PropertyValues)
             {
-                if (Excluded.Contains(v.Name)) continue;
+                if (Excluded.Contains(v.Name) || IsWindowLayoutSetting(v.Name)) continue;
                 values[v.Name] = v.SerializedValue?.ToString() ?? string.Empty;
             }
             return values;
@@ -139,6 +158,10 @@ namespace HolyLogger
 
                 foreach (var kv in CaptureCurrent())
                 {
+                    // Window geometry is auto-saved on exit, so it is never an "unsaved change" to ask
+                    // about. Without this, moving any window would prompt on every single close.
+                    if (IsWindowLayoutSetting(kv.Key)) continue;
+
                     saved.TryGetValue(kv.Key, out string old);
                     if (!string.Equals(old ?? string.Empty, kv.Value ?? string.Empty, StringComparison.Ordinal))
                         return true;
@@ -162,7 +185,7 @@ namespace HolyLogger
                 var s = Properties.Settings.Default;
                 foreach (var kv in values)
                 {
-                    if (Excluded.Contains(kv.Key)) continue;
+                    if (Excluded.Contains(kv.Key) || IsWindowLayoutSetting(kv.Key)) continue;
                     try
                     {
                         var prop = s.Properties[kv.Key];
@@ -194,7 +217,7 @@ namespace HolyLogger
                 var s = Properties.Settings.Default;
                 foreach (System.Configuration.SettingsProperty prop in s.Properties)
                 {
-                    if (Excluded.Contains(prop.Name)) continue;
+                    if (Excluded.Contains(prop.Name) || IsWindowLayoutSetting(prop.Name)) continue;
                     try
                     {
                         object def = prop.DefaultValue;

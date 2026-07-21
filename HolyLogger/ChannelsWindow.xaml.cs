@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -84,19 +84,11 @@ namespace HolyLogger
             Owner = owner;
             ModeColumn.ItemsSource = Modes;
 
-            // Restore the last size + position. Size first, so the on-screen test uses the real window
-            // size. Position only if it still lands on a visible monitor (a spot saved on a monitor that
-            // was since removed/rearranged would otherwise open the window in unreachable dead space);
-            // otherwise the XAML default (centered on owner) stands.
-            var cfg = Properties.Settings.Default;
-            if (cfg.ChannelsWindowWidth  >= MinWidth)  Width  = cfg.ChannelsWindowWidth;
-            if (cfg.ChannelsWindowHeight >= MinHeight) Height = cfg.ChannelsWindowHeight;
-            if (IsPositionOnScreen(cfg.ChannelsWindowLeft, cfg.ChannelsWindowTop, Width, Height))
-            {
-                WindowStartupLocation = WindowStartupLocation.Manual;
-                Left = cfg.ChannelsWindowLeft;
-                Top  = cfg.ChannelsWindowTop;
-            }
+            // Position/size handled by the SAME shared helper every other window uses, so this
+            // window cannot drift from the rest. WindowBoundsJson is excluded from profiles, so nothing
+            // overwrites it at startup.
+            WindowBounds.Attach(this, "Channels");
+
 
             foreach (var ch in LoadChannels())
             {
@@ -118,7 +110,9 @@ namespace HolyLogger
             // the LogHeaderBg token from View > Color Scheme > Customize Colors, via the shared style.
             ChannelsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
 
-            Closing += (s, e) => { SaveChannels(); SaveWindowBounds(); };
+            UpdatePinButton();
+
+            Closing += (s, e) => SaveChannels();
         }
 
         // Restrict the frequency cell's editor to digits and a single decimal point.
@@ -355,47 +349,43 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // Persist the window's size + position on close, so it reopens where the user left it. Uses
-        // RestoreBounds when maximized so the saved corner is the real (un-maximized) one, not 0,0.
-        private void SaveWindowBounds()
+        // Pin: keep this window as part of the setup, so it reopens automatically on the next run at the
+        // exact position and size it was left. Unpinned, it only opens when asked for from the menu.
+        private void TitleBar_Pin_Click(object sender, RoutedEventArgs e)
         {
-            try
-            {
-                var b = WindowState == WindowState.Normal
-                    ? new Rect(Left, Top, Width, Height)
-                    : RestoreBounds;
-                var cfg = Properties.Settings.Default;
-                if (!double.IsNaN(b.Left) && !double.IsInfinity(b.Left) &&
-                    !double.IsNaN(b.Top)  && !double.IsInfinity(b.Top))
-                {
-                    cfg.ChannelsWindowLeft = b.Left;
-                    cfg.ChannelsWindowTop  = b.Top;
-                }
-                if (b.Width > 0 && b.Height > 0)
-                {
-                    cfg.ChannelsWindowWidth  = b.Width;
-                    cfg.ChannelsWindowHeight = b.Height;
-                }
-                cfg.Save();
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            var s = Properties.Settings.Default;
+            s.ChannelsWindowPinned = !s.ChannelsWindowPinned;
+            try { s.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            UpdatePinButton();
         }
 
-        // True when a window of the given size at (left, top) would still be reachable on some monitor
-        // of the current virtual desktop. NaN/Infinity (never-saved) returns false → use the default.
-        private static bool IsPositionOnScreen(double left, double top, double width, double height)
+        // Lit accent + filled pin glyph when pinned, muted outline when not, so the state is visible
+        // without hovering for the tooltip.
+        // Called by the main window during shutdown: a window still open when the PROGRAM closes does
+        // not get its Closing save, so the channel list would lose edits made in that last session.
+        internal void PersistNow() => SaveChannels();
+
+        // Lets the main window re-sync the icon when it unpins on a menu-open.
+        internal void RefreshPinButton() => UpdatePinButton();
+
+        private void UpdatePinButton()
         {
-            if (double.IsNaN(left) || double.IsNaN(top) ||
-                double.IsInfinity(left) || double.IsInfinity(top))
-                return false;
-
-            double vsLeft   = SystemParameters.VirtualScreenLeft;
-            double vsTop    = SystemParameters.VirtualScreenTop;
-            double vsRight  = vsLeft + SystemParameters.VirtualScreenWidth;
-            double vsBottom = vsTop  + SystemParameters.VirtualScreenHeight;
-
-            return left >= vsLeft - 10 && top >= vsTop - 10 &&
-                   left <= vsRight - 100 && top <= vsBottom - 60;
+            if (TitleBar_PinBtn == null) return;
+            bool pinned = Properties.Settings.Default.ChannelsWindowPinned;
+            // Segoe MDL2 pin glyphs. Pinned shows the UPRIGHT pin (U+E840 "Pinned"); unpinned the angled
+            // one (U+E718 "Pin", i.e. "click to pin"). Upright = held in place.
+            TitleBar_PinBtn.Content = pinned ? "" : "";
+            TitleBar_PinBtn.Foreground = pinned
+                ? ThemeManager.Brush("AccentBrush")
+                : ThemeManager.Brush("MutedTextBrush");
+            TitleBar_PinBtn.ToolTip = pinned
+                ? "Pinned: this window reopens automatically next time, in this position and size. Click to unpin."
+                : "Click to pin: this window will reopen automatically next time, in this position and size.";
         }
+
+
+
+
+
     }
 }

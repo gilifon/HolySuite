@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Windows;
 using Newtonsoft.Json;
@@ -23,12 +23,32 @@ namespace HolyLogger
             public double H { get; set; }
         }
 
+        // Every window currently using this helper, so the placement of windows still OPEN at
+        // shutdown can be saved too (see SaveAllOpen).
+        private static readonly Dictionary<Window, string> _attached = new Dictionary<Window, string>();
+
         // Restores the saved placement now and saves it again when the window closes.
         public static void Attach(Window window, string key)
         {
             if (window == null || string.IsNullOrWhiteSpace(key)) return;
             Restore(window, key);
+            _attached[window] = key;
             window.Closing += (s, e) => Save(window, key);
+            window.Closed += (s, e) => _attached.Remove(window);
+        }
+
+        // Saves the placement of every attached window that is still open.
+        //
+        // Closing a window yourself saves it, but when the PROGRAM closes the child windows are torn
+        // down without that handler doing the work - so a window left open at exit lost the position it
+        // had been moved to. The main window calls this during shutdown, before settings are flushed.
+        public static void SaveAllOpen()
+        {
+            foreach (var pair in new List<KeyValuePair<Window, string>>(_attached))
+            {
+                try { Save(pair.Key, pair.Value); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
         }
 
         private static void Restore(Window window, string key)
@@ -38,19 +58,61 @@ namespace HolyLogger
                 var all = Load();
                 if (!all.TryGetValue(key, out Box b) || b == null) return;
 
-                // Size first, so the on-screen test below uses the real window size. Anything below the
-                // window's own minimum is ignored, which also self-heals a stale too-small saved value.
+                // Size first, so the visibility net below measures the real window. Anything below the
+                // window's own minimum is ignored, which self-heals a stale too-small saved value.
                 if (b.W > 0 && b.W >= window.MinWidth) window.Width = b.W;
                 if (b.H > 0 && b.H >= window.MinHeight) window.Height = b.H;
 
-                // Only take the position if it still lands on a visible monitor: a spot saved on a screen
-                // that has since been unplugged would otherwise open the window where it can't be reached.
-                if (IsPositionOnScreen(b.L, b.T))
+                // Apply the saved corner whenever it is a real number - including on a second monitor.
+                // This used to be gated on a test against SystemParameters.VirtualScreen*, which WPF
+                // reports in device-independent units; on a scaled multi-monitor desktop that rejected
+                // perfectly good positions and silently re-centred the window, which is exactly what
+                // "it does not remember where I put it" looked like.
+                if (IsRealNumber(b.L) && IsRealNumber(b.T))
                 {
                     window.WindowStartupLocation = WindowStartupLocation.Manual;
                     window.Left = b.L;
                     window.Top = b.T;
                 }
+
+                window.Loaded += (s, e) => EnsureVisibleOnSomeScreen(window);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private static bool IsRealNumber(double v) => !double.IsNaN(v) && !double.IsInfinity(v);
+
+        // Safety net, after layout: if the restored position leaves the title bar on NO monitor (the
+        // screen it was on has been unplugged), bring the window back so it can still be reached.
+        // Measured against the real monitor rectangles, converted into the same device-independent units
+        // the window's Left/Top use, so a scaled multi-monitor desktop is judged correctly.
+        private static void EnsureVisibleOnSomeScreen(Window window)
+        {
+            try
+            {
+                if (!IsRealNumber(window.Left) || !IsRealNumber(window.Top)) return;
+
+                var src = PresentationSource.FromVisual(window);
+                double sx = src?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                double sy = src?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+                if (sx <= 0) sx = 1.0;
+                if (sy <= 0) sy = 1.0;
+
+                // A grab handle's worth of title bar has to land inside some monitor.
+                var handle = new Rect(window.Left, window.Top,
+                                      Math.Max(80, window.ActualWidth * 0.25), 24);
+
+                foreach (var screen in System.Windows.Forms.Screen.AllScreens)
+                {
+                    var wa = screen.WorkingArea;
+                    var inDips = new Rect(wa.Left / sx, wa.Top / sy, wa.Width / sx, wa.Height / sy);
+                    if (inDips.IntersectsWith(handle)) return;   // reachable - leave it exactly where it is
+                }
+
+                Log.Warn($"Window '{window.Title}' at {window.Left},{window.Top} is on no monitor - recentring.");
+                var work = SystemParameters.WorkArea;
+                window.Left = work.Left + 60;
+                window.Top = work.Top + 60;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -93,21 +155,6 @@ namespace HolyLogger
             return new Dictionary<string, Box>(StringComparer.OrdinalIgnoreCase);
         }
 
-        // True when a window at (left, top) would still be reachable on some monitor of the current
-        // virtual desktop. Requires the title bar to be grabbable rather than the whole window to fit.
-        private static bool IsPositionOnScreen(double left, double top)
-        {
-            if (double.IsNaN(left) || double.IsNaN(top) ||
-                double.IsInfinity(left) || double.IsInfinity(top))
-                return false;
 
-            double vsLeft = SystemParameters.VirtualScreenLeft;
-            double vsTop = SystemParameters.VirtualScreenTop;
-            double vsRight = vsLeft + SystemParameters.VirtualScreenWidth;
-            double vsBottom = vsTop + SystemParameters.VirtualScreenHeight;
-
-            return left >= vsLeft - 10 && top >= vsTop - 10 &&
-                   left <= vsRight - 100 && top <= vsBottom - 60;
-        }
     }
 }
