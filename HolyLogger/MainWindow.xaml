@@ -462,12 +462,8 @@
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
-                    <MenuItem x:Name="ManualModeMenuItem" Header="Manual Mode" ToolTip="Manual Frequency and Time" Click="ManualModeMenuItem_Click">
-                        <MenuItem.Icon>
-                            <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                        </MenuItem.Icon>
-                    </MenuItem>
-                    <Separator />
+                    <!-- "Manual Mode" removed from Tools: the status bar's "Freq from: Manual / CAT"
+                         radio buttons now own this, and they name both states instead of one. -->
                     <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
                         <MenuItem.Icon>
                             <!-- Tint the dark PNG via OpacityMask so it shows in dark mode (theme text color). -->
@@ -699,12 +695,22 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                    <TextBlock Margin="10,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Manual"/><LineBreak/><Run Text="Mode:"/></TextBlock>
+                    <TextBlock Margin="10,0,4,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Freq"/><LineBreak/><Run Text="from:"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
-                    <Button x:Name="Btn_ManualMode" Click="ManualModeMenuItem_Click" Cursor="Hand" Padding="8,1" MinWidth="40" ToolTip="Toggle Manual Mode (same as Tools &gt; Manual Mode)">
-                        <TextBlock x:Name="L_IsManual" FontSize="16" FontWeight="Bold" TextAlignment="Center"/>
-                    </Button>
+                    <!-- Two named choices rather than one switch: an on/off switch labelled "Manual Mode"
+                         only ever names ONE of the two states, so "off" left the operator guessing what
+                         the program was actually doing. Both states are now spelled out.
+                         RB_CatMode is greyed out by UpdateFreqModeRadios when CAT is unavailable, since
+                         the frequency cannot come from the radio then. -->
+                    <StackPanel Orientation="Vertical" VerticalAlignment="Center">
+                        <RadioButton x:Name="RB_CatMode" GroupName="FreqMode" Content="CAT"
+                                     FontSize="12" Cursor="Hand" Checked="FreqMode_Checked"
+                                     ToolTip="The frequency is read from the radio over CAT"/>
+                        <RadioButton x:Name="RB_ManualMode" GroupName="FreqMode" Content="Manual"
+                                     FontSize="12" Margin="0,2,0,0" Cursor="Hand" Checked="FreqMode_Checked"
+                                     ToolTip="You type the frequency yourself"/>
+                    </StackPanel>
                 </StatusBarItem>
                 <StatusBarItem>
                     <StatusBarItem.ContextMenu>

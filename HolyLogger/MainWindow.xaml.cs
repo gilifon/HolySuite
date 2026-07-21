@@ -446,8 +446,7 @@ namespace HolyLogger
             this.Loaded += MainWindow_Loaded;
                 Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
 
-            ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - ON" : "Manual Mode - OFF";
-            L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
+            UpdateFreqModeRadios();
 
             AdifHandlerWorker = new BackgroundWorker();
             AdifHandlerWorker.WorkerReportsProgress = true;
@@ -4448,8 +4447,11 @@ namespace HolyLogger
                 }
                 else
                 {
-                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
-                    TB_Frequency.BorderThickness = new Thickness(1);
+                    // Do NOT force the border back to grey here: this border also signals whether the
+                    // frequency is driven by the radio (red = CAT off/offline, or Manual Mode). Hard-coding
+                    // grey on a filled box wiped that out and made Manual Mode look like live CAT.
+                    // UpdateStatus owns the colour; it re-applies the correct one.
+                    UpdateStatus();
                 }
 
                 if (string.IsNullOrWhiteSpace(TB_MyCallsign.Text))
@@ -4525,12 +4527,80 @@ namespace HolyLogger
                 matrix.ClearMatrix();
         }
 
-        private void ManualModeMenuItem_Click(object sender, RoutedEventArgs e)
+        // Guard so the radio buttons' Checked handler doesn't re-enter while WE are setting them.
+        private bool _settingFreqModeRadios = false;
+
+        // Clicking "Manual" or "CAT" in the status bar. Routed through the same path as the menu item so
+        // there is one owner of the state.
+        private void FreqMode_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_settingFreqModeRadios) return;
+            bool wantManual = sender == RB_ManualMode;
+            // Compare against what is SHOWN, not the raw setting: with no CAT the display already reads
+            // Manual, so clicking Manual there must not flip the setting behind the scenes.
+            if (wantManual == IsFrequencyTyped) return;
+            ToggleManualMode();
+        }
+
+        // True when the frequency really can come from the radio right now.
+        private bool IsCatFrequencyAvailable =>
+            Properties.Settings.Default.EnableOmniRigCAT
+            && OmniRigEngine != null && Rig != null
+            && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
+
+        // Where the frequency ACTUALLY comes from, which is what the radio buttons must show. Manual
+        // mode means typed - but so does having no CAT, whatever the manual-mode setting says.
+        private bool IsFrequencyTyped =>
+            Properties.Settings.Default.isManualMode || !IsCatFrequencyAvailable;
+
+        // Selects the right radio button and disables CAT when the frequency cannot come from the radio
+        // (CAT off, no rig, or rig offline) - choosing it there would promise something that can't happen.
+        private void UpdateFreqModeRadios()
+        {
+            if (RB_ManualMode == null || RB_CatMode == null) return;
+
+            bool catAvailable = IsCatFrequencyAvailable;
+            bool typed = IsFrequencyTyped;
+
+            _settingFreqModeRadios = true;
+            try
+            {
+                // Show MANUAL whenever the frequency is typed. With no CAT it used to show "CAT"
+                // selected but greyed, which claimed the frequency came from a radio that wasn't
+                // connected. Note this only changes what is DISPLAYED: the isManualMode setting is left
+                // alone, so when the radio comes online the program returns to CAT by itself.
+                RB_ManualMode.IsChecked = typed;
+                RB_CatMode.IsChecked = !typed;
+
+                RB_CatMode.IsEnabled = catAvailable;
+                RB_CatMode.Opacity = catAvailable ? 1.0 : 0.5;
+                RB_CatMode.ToolTip = catAvailable
+                    ? "The frequency is read from the radio over CAT"
+                    : "CAT is not connected, so the frequency cannot be read from the radio. "
+                      + "Enable it in Options > General and put the radio online.";
+            }
+            finally { _settingFreqModeRadios = false; }
+        }
+
+        // Kept as the handler for the frequency box's "Change mode" context-menu item.
+        private void ManualModeMenuItem_Click(object sender, RoutedEventArgs e) => ToggleManualMode();
+
+        // Flips between Manual and CAT. The single owner of the state: the status-bar radios and the
+        // "Change mode" context item both come through here.
+        private void ToggleManualMode()
         {
             Properties.Settings.Default.isManualMode = !Properties.Settings.Default.isManualMode;
-            ManualModeMenuItem.Header = Properties.Settings.Default.isManualMode ? "Manual Mode - ON" : "Manual Mode - OFF";
-            L_IsManual.Text = Properties.Settings.Default.isManualMode ? "On" : "Off";
+            // Drive the radios from the setting, not from their own click, so they follow the state
+            // however it was changed.
+            UpdateFreqModeRadios();
             ShowRigParams();
+            // Repaint the frequency box's border: in Manual Mode the frequency is typed, not read from
+            // the radio, so it gets the same red border as CAT disabled/offline. Called directly because
+            // ShowRigParams -> ShowRigStatus only reaches UpdateStatus when a rig object exists.
+            UpdateStatus();
+            // Swap the lit LED for the no-CAT typing box (and back). ShowRigParams returns early once
+            // the rig is online, so it does not do this for us when CAT is connected.
+            UpdateFreqLed();
         }
 
         private void ResetRecentQSOCounterMenuItem_Click(object sender, RoutedEventArgs e)
@@ -5123,13 +5193,17 @@ namespace HolyLogger
 
             // The LED display is only valid when the frequency comes live from the rig — i.e. CAT is
             // enabled AND the selected rig is online. Whenever it isn't (CAT disabled, no rig defined,
-            // or the rig not online) there is no radio frequency, so switch to the white/red no-CAT box
-            // where the operator types it. (Manual mode keeps the LED, which is editable by clicking.)
+            // the rig not online, or MANUAL MODE) there is no radio frequency, so switch to the
+            // white/red no-CAT box where the operator types it.
+            //
+            // Manual mode is included deliberately: the rig may well be online, but its frequency is
+            // ignored while manual, so showing the lit LED implied a live reading that was not being
+            // updated. Same situation for the operator as CAT being off, so it must look the same.
             bool catEnabled = Properties.Settings.Default.EnableOmniRigCAT;
             bool manualMode = Properties.Settings.Default.isManualMode;
             bool rigOnline = catEnabled && OmniRigEngine != null && Rig != null
                              && Rig.Status == OmniRig.RigStatusX.ST_ONLINE;
-            if (!manualMode && !rigOnline)
+            if (manualMode || !rigOnline)
             {
                 // Only initialise the no-CAT box when first switching to that mode so we don't
                 // overwrite text the user is actively typing.
@@ -10348,12 +10422,20 @@ namespace HolyLogger
 
         private void UpdateStatus()
         {
+            // CAT may have just come online or dropped; the Manual/CAT choice must reflect that.
+            UpdateFreqModeRadios();
+
             TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Gray;
             L_OmniRig.Foreground = ThemeManager.Brush("TextBrush");
             L_OmniRig.FontWeight = FontWeights.Normal;
             
             Status = "CAT Enabled";
-            if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null || Rig.Status != OmniRig.RigStatusX.ST_ONLINE)//disabled or offline -> red border
+            // Red border = the frequency is NOT being driven by the radio, so the operator owns it.
+            // Manual Mode counts: CAT may be online, but the frequency is typed rather than read from
+            // the rig, so it must look the same as CAT disabled/offline instead of implying it is live.
+            if (!Properties.Settings.Default.EnableOmniRigCAT || Rig == null
+                || Rig.Status != OmniRig.RigStatusX.ST_ONLINE
+                || Properties.Settings.Default.isManualMode)
             {
                 TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
                 TB_Frequency.BorderThickness = new Thickness(2);

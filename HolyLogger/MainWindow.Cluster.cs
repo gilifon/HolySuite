@@ -3513,7 +3513,13 @@ namespace HolyLogger
             // While a HolyCluster selection is held, leave the DX box alone — it already shows the exact
             // clicked callsign, which must not be overwritten by a different on-frequency spot. While a
             // band-hover preview is active the DX box is intentionally hidden, so don't refill it either.
+            //
+            // MANUAL MODE never auto-fills: the frequency is typed by the operator, not read from the
+            // radio, so "on my radio frequency" is not true even when the number happens to equal a
+            // spot's. Matching a typed frequency and filling a callsign the operator never tuned to
+            // would be wrong. A double-click on a spot still fills it explicitly.
             if (!holdingHolyClusterCall && !_clusterBandHoverActive
+                && !Properties.Settings.Default.isManualMode
                 && Properties.Settings.Default.ClusterAutoFillDxCall
                 && !string.IsNullOrWhiteSpace(onFreqCallsStr) && TB_DXCallsign != null)
             {

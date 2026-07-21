@@ -236,4 +236,55 @@
             </Setter.Value>
         </Setter>
     </Style>
+
+    <!-- Sliding on/off switch, the shape people expect for a true/false setting: a rounded track with a
+         knob that moves to the right and turns green when on. Reusable via
+         Style="{StaticResource ToggleSwitchStyle}" on any ToggleButton.
+         Green = ResetButtonBg (the palette's green), grey track = ButtonHoverBg, so it follows the
+         colour scheme instead of hardcoding colours. -->
+    <Style x:Key="ToggleSwitchStyle" TargetType="ToggleButton">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToggleButton">
+                    <Grid Width="52" Height="24" Background="Transparent" SnapsToDevicePixels="True">
+                        <Border x:Name="Track" CornerRadius="12"
+                                Background="{DynamicResource ButtonHoverBg}"
+                                BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"/>
+                        <!-- OFF/ON caption inside the track, on the opposite side to the knob. -->
+                        <TextBlock x:Name="Caption" Text="OFF" FontSize="10" FontWeight="Bold"
+                                   VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,7,0"
+                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                        <Border x:Name="Knob" Width="18" Height="18" CornerRadius="9"
+                                HorizontalAlignment="Left" Margin="3,0,0,0"
+                                Background="{DynamicResource WindowBg}"
+                                BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"/>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <!-- Hover first, so the checked trigger below can override the border: a green
+                             track with a blue hover border looked wrong. -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Track" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <!-- The same green as the map's Auto Zoom switch (#2ecc71 / #1a9e55 border),
+                                 so every on/off switch in the program reads identically. Literal because
+                                 the map's copy is CSS inside the WebBrowser and cannot share a token. -->
+                            <Setter TargetName="Track" Property="Background" Value="#2ECC71"/>
+                            <Setter TargetName="Track" Property="BorderBrush" Value="#1A9E55"/>
+                            <Setter TargetName="Knob" Property="HorizontalAlignment" Value="Right"/>
+                            <Setter TargetName="Knob" Property="Margin" Value="0,0,3,0"/>
+                            <Setter TargetName="Caption" Property="Text" Value="ON"/>
+                            <Setter TargetName="Caption" Property="HorizontalAlignment" Value="Left"/>
+                            <Setter TargetName="Caption" Property="Margin" Value="8,0,0,0"/>
+                            <!-- Dark, not TextBrush: the green track is a fixed light colour, so the
+                                 light TextBrush of the dark schemes would be unreadable on it. -->
+                            <Setter TargetName="Caption" Property="Foreground" Value="#0B3D22"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
 </ResourceDictionary>
