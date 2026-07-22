@@ -2,7 +2,7 @@
 ; Installs HolyLogger to Program Files and creates Start Menu + Desktop shortcuts
 
 !define APPNAME "HolyLogger"
-!define APPVERSION "8.7.1"
+!define APPVERSION "8.8.1"
 !define MANUFACTURER "4Z1KD"
 !define INSTALL_DIR "$PROGRAMFILES\${MANUFACTURER}\${APPNAME}"
 !define SOURCE_DIR "HolyLogger\bin\x86\Release"
@@ -12,7 +12,11 @@ OutFile "HolyLogger_${APPVERSION}_Setup.exe"
 InstallDir "${INSTALL_DIR}"
 InstallDirRegKey HKLM "Software\${MANUFACTURER}\${APPNAME}" "InstallDir"
 RequestExecutionLevel admin
-SetCompressor /SOLID lzma
+; NOT /SOLID. Solid compression packs every file into one stream that has to be decompressed in
+; order, so the progress bar cannot advance until a file completes - and 11 of this app's 25 MB are
+; a SINGLE file (Data\callsigns_merged_big.txt). The bar sat still for most of the install and then
+; filled at once, which reads as a hung installer.
+SetCompressor lzma
 
 ;--------------------------------
 ; Pages
@@ -40,8 +44,9 @@ Section "Install"
   File "${SOURCE_DIR}\StickyWindow.dll"
   File "${SOURCE_DIR}\System.Data.SQLite.dll"
   File "${SOURCE_DIR}\System.Net.Http.Formatting.dll"
-  File "${SOURCE_DIR}\System.Runtime.InteropServices.RuntimeInformation.dll"
-  File "${SOURCE_DIR}\System.ValueTuple.dll"
+  ; System.Runtime.InteropServices.RuntimeInformation.dll and System.ValueTuple.dll were listed here
+  ; but are no longer produced by the build. NSIS fails the COMPILE on a missing File, so this script
+  ; could not be built at all until they were removed.
   File "${SOURCE_DIR}\WpfAnimatedGif.dll"
   File "${SOURCE_DIR}\WPFTextBoxAutoComplete.dll"
   File "${SOURCE_DIR}\Xceed.Wpf.AvalonDock.dll"

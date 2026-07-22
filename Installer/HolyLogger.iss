@@ -3,7 +3,7 @@
 ; Compile with: "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" HolyLogger.iss
 
 #define MyAppName "HolyLogger"
-#define MyAppVersion "8.7.9"
+#define MyAppVersion "8.8.1"
 #define MyAppPublisher "HolyLogger"
 #define MyAppExeName "HolyLogger.exe"
 #define SrcDir "..\HolyLogger\bin\x86\Release"
@@ -20,10 +20,17 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#MyAppExeName}
 SetupIconFile=..\HolyLogger\HolyLogger icon.ico
-OutputDir=C:\Users\user\HolyLogger-Installer
+; Relative to this script, so whoever builds the installer gets it next to the source instead of
+; needing one particular user's folder to exist on their machine.
+OutputDir=Output
 OutputBaseFilename=HolyLogger-{#MyAppVersion}-setup
 Compression=lzma2
-SolidCompression=yes
+; NOT solid. Solid compression packs every file into one stream that has to be decompressed in
+; order, so the progress bar cannot move until a file finishes - and 11 of this app's 25 MB are a
+; SINGLE file (Data\callsigns_merged_big.txt). The bar therefore sat still for most of the install
+; and then jumped to full at the end, which looks like a hung installer.
+; Non-solid costs a couple of MB of download and gives a bar that actually tracks the work.
+SolidCompression=no
 WizardStyle=modern
 ; x86 app -> install under Program Files (x86) and run the wizard in 32-bit mode.
 PrivilegesRequired=admin
@@ -35,7 +42,10 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
 [Files]
-Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.pdb"
+; *.xml excluded as well as *.pdb: those are the libraries' IntelliSense documentation (LiveCharts,
+; MoreLinq, Newtonsoft.Json, SQLite...), 3.1 MB of the 25 MB payload, and nothing reads them at
+; runtime. Only .config files are needed beside the DLLs, and those are kept.
+Source: "{#SrcDir}\*"; DestDir: "{app}"; Flags: recursesubdirs createallsubdirs ignoreversion; Excludes: "*.pdb,*.xml"
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
