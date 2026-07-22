@@ -3431,10 +3431,28 @@ namespace HolyLogger
                     _holyClusterReachedFreq = true;    // the radio has landed on the selected spot's frequency
                 else if (_holyClusterReachedFreq)
                     _holyClusterSelectedCall = null;   // ...and has since moved away -> release the hold
-                // If it hasn't reached the frequency yet (CAT still slewing the radio), keep holding so a
-                // stale-frequency recompute in that window doesn't drop the selection prematurely.
+                else if ((DateTime.UtcNow - _holyClusterSelectedAtUtc).TotalSeconds > SuspensionTimeoutSeconds)
+                {
+                    // The radio never got there: CAT off, tuning refused, the operator turned the knob
+                    // somewhere else. Holding for a landing that will never happen suspends the rule for
+                    // the rest of the session, which is how a station stays on screen forever.
+                    _holyClusterSelectedCall = null;
+                }
             }
             bool holdingHolyClusterCall = !string.IsNullOrWhiteSpace(_holyClusterSelectedCall);
+
+            // A band-hover preview that outlived its MouseLeave. The watchdog timer normally ends it;
+            // this is a second, independent check on every recompute, so the rule cannot be suspended by
+            // a hover the mouse left long ago.
+            if (_clusterBandHoverActive && (clusterBandRowPanel == null || !clusterBandRowPanel.IsMouseOver))
+                EndClusterBandHoverPreview();
+
+            // A double-clicked spot whose frequency the radio never reached. Same reasoning as the
+            // HolyCluster hold above: waiting forever for an arrival that is not coming would leave the
+            // station on screen no matter where the operator tunes.
+            if (_clusterAutoFilledDXCall && !_clusterAutoFilledReached
+                && (DateTime.UtcNow - _clusterAutoFilledAtUtc).TotalSeconds > SuspensionTimeoutSeconds)
+                _clusterAutoFilledReached = true;
 
             // An F9-dismissed callsign stays dismissed until the operator moves to ANOTHER filled spot
             // (a different on-frequency call gets filled -- see the auto-fill below) or double-clicks it.
@@ -3472,43 +3490,61 @@ namespace HolyLogger
             // full re-render, never per knob tick.
             string sig = onFreqSig.ToString();
             string onFreqCallsStr = onFreqCalls.ToString().TrimEnd(',');
-            string prevOnFreqSig = _lastMapOnFreqSig;
             if (!string.Equals(sig, _lastMapOnFreqSig, StringComparison.Ordinal))
             {
                 _lastMapOnFreqSig = sig;
                 if (MapControl != null && Properties.Settings.Default.ClusterMapEnabled)
                     MapControl.SetOnFreqSpots(onFreqCallsStr);
+            }
 
-                // If we just lost all on-frequency spots (was non-empty, now empty), clear the DX callsign
-                // only if it was auto-filled by the cluster (avoid erasing a user-typed value) AND the
-                // radio has actually moved off the frequency it was filled at. The on-frequency set also
-                // empties transiently when the visible spots change (e.g. hovering a band checkbox
-                // re-filters the list) while the VFO stays put -- that must NOT clear the filled call.
-                if (string.IsNullOrEmpty(sig) && !string.IsNullOrEmpty(prevOnFreqSig) && !holdingHolyClusterCall
-                    && !_clusterBandHoverActive   // a band-hover preview owns the DX box; don't clear here
-                    && Math.Abs(currentFreqMhz - _clusterAutoFilledFreqMhz) * 1000.0 > toleranceKhz)
+            // Has the radio actually arrived at the frequency the call was filled at? After a
+            // double-click, CAT needs a moment to slew, and during that moment the station is legitimately
+            // not yet on frequency. The rule below is only enforced once the radio has been there.
+            if (_clusterAutoFilledFreqMhz > 0
+                && Math.Abs(currentFreqMhz - _clusterAutoFilledFreqMhz) * 1000.0 <= toleranceKhz)
+                _clusterAutoFilledReached = true;
+
+            // ONE rule, tested every pass: a cluster-filled DX callsign stays only while that station is
+            // still on the radio's frequency. If it is not, the box (and the name, locator, country and
+            // QRZ photo that came with it) is cleared.
+            //
+            // The authority is the per-spot IsOnFrequency flag - the same one that tints the row green,
+            // recomputed against the VFO on every pass. Earlier versions inferred the same fact
+            // indirectly, from the on-frequency SET changing plus how far the VFO had moved since the
+            // fill, and that inference kept being wrong in ways the flag never is:
+            //   * the set emptied for another reason (a band filter, a refresh, the cluster's undo
+            //     button) and the later tune-away produced no further change, so nothing ever cleared;
+            //   * the spot dropped out of the list while the VFO stayed put, which the "has the radio
+            //     moved?" test read as "still on the station" - leaving a callsign, photo and locator on
+            //     screen for a station that was no longer being shown as on frequency at all.
+            // If the operator is on the frequency, the spot is on frequency, and the flag says so.
+            if (_clusterAutoFilledDXCall && _clusterAutoFilledReached && !holdingHolyClusterCall
+                && !_clusterBandHoverActive)   // a band-hover preview owns the DX box; don't clear here
+            {
+                string onFreqSnapshot = onFreqCallsStr;
+                try
                 {
-                    try
+                    Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        Dispatcher.BeginInvoke(new Action(() =>
+                        try
                         {
-                            try
-                            {
-                                if (_clusterAutoFilledDXCall)
-                                {
-                                    _clusterAutoFilledDXCall = false;
-                                    // Flagged as OUR clear, not the operator's, so it does not count as
-                                    // dismissing the call (see _clusterAutoClearingDxCall).
-                                    _clusterAutoClearingDxCall = true;
-                                    try { HandleGlobalFunctionKey(System.Windows.Input.Key.F9, false); }
-                                    finally { _clusterAutoClearingDxCall = false; }
-                                }
-                            }
-                            catch (Exception swallowed) { Log.Swallow(swallowed); }
-                        }));
-                    }
-                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                            if (!_clusterAutoFilledDXCall) return;
+
+                            string filled = (TB_DXCallsign?.Text ?? string.Empty).Trim();
+                            if (filled.Length == 0) return;                       // nothing to clear
+                            if (IsCallOnFrequency(onFreqSnapshot, filled)) return; // still there: keep it
+
+                            _clusterAutoFilledDXCall = false;
+                            // Flagged as OUR clear, not the operator's, so it does not count as
+                            // dismissing the call (see _clusterAutoClearingDxCall).
+                            _clusterAutoClearingDxCall = true;
+                            try { HandleGlobalFunctionKey(System.Windows.Input.Key.F9, false); }
+                            finally { _clusterAutoClearingDxCall = false; }
+                        }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }));
                 }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
 
             // Auto-fill the DX callsign when there is at least one on-frequency spot -- unless the
@@ -3588,6 +3624,10 @@ namespace HolyLogger
                                     TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
                                     _clusterAutoFilledDXCall = true;
                                     _clusterAutoFilledFreqMhz = currentFreqMhz;   // remember where we filled
+                                    // Filled BECAUSE the radio is on this frequency, so it is there by
+                                    // definition - no slew to wait for.
+                                    _clusterAutoFilledReached = true;
+                                    _clusterAutoFilledAtUtc = DateTime.UtcNow;
                                     TB_DXCallsign_TextChanged(TB_DXCallsign, null);
                                     TB_DXCallsign_LostFocus(TB_DXCallsign, new RoutedEventArgs());
                                 }
@@ -3713,6 +3753,33 @@ namespace HolyLogger
         // frequency, so a band-filter/hover refresh that transiently empties the on-frequency set while
         // the VFO stays put does not wrongly clear the filled call.
         private double _clusterAutoFilledFreqMhz = 0;
+
+        // True once the radio has actually been ON that frequency. A double-clicked spot fills the box
+        // immediately while CAT is still slewing, and until the radio arrives the station is genuinely
+        // not on frequency yet - clearing then would wipe the call the operator just chose.
+        private bool _clusterAutoFilledReached = false;
+
+        // When the current call was put in the box, for the timeout above.
+        private DateTime _clusterAutoFilledAtUtc = DateTime.UtcNow;
+
+        // How long any suspension of the on-frequency rule may last before it is forced to end.
+        //
+        // Every suspension here waits for something that USUALLY happens: the mouse leaving a band
+        // checkbox, the radio arriving where it was sent. When one of those never happens, an unbounded
+        // wait does not merely delay the rule - it switches it off for the rest of the session, and the
+        // DX box keeps a station the operator left long ago. Generous enough for a slow CAT slew, short
+        // enough that nobody is left staring at a stale callsign.
+        private const double SuspensionTimeoutSeconds = 15.0;
+
+        // Is this callsign one of the spots currently on the radio's frequency? The list is the
+        // comma-separated set built from the per-spot IsOnFrequency flags.
+        private static bool IsCallOnFrequency(string onFreqCallsCsv, string callsign)
+        {
+            if (string.IsNullOrEmpty(onFreqCallsCsv) || string.IsNullOrWhiteSpace(callsign)) return false;
+            foreach (string call in onFreqCallsCsv.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                if (string.Equals(call.Trim(), callsign, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
 
         // Reentrancy guard: true only while the cluster auto-fill is programmatically setting the DX
         // callsign. TB_DXCallsign_TextChanged treats any change made while the box has focus as a
@@ -4591,7 +4658,11 @@ namespace HolyLogger
             // so stale info lingered after tuning away (e.g. re-engaging Live Scale off the spot's freq).
             // Set AFTER the assignment above: setting .Text runs TB_DXCallsign_TextChanged first.
             _clusterAutoFilledDXCall = true;
-            _clusterAutoFilledFreqMhz = freqMhz;   // clear only once the radio moves off THIS frequency
+            _clusterAutoFilledFreqMhz = freqMhz;
+            // CAT may still be slewing to this spot. Hold the "is it still on frequency?" rule off until
+            // the radio has actually arrived, or it would clear the call the operator just double-clicked.
+            _clusterAutoFilledReached = false;
+            _clusterAutoFilledAtUtc = DateTime.UtcNow;
 
             string normalizedMode = NormalizeClusterModeForLogger(spot.Mode);
             SelectLoggerMode(normalizedMode);

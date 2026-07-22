@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Net;
 using System.Net.Sockets;
@@ -48,6 +48,10 @@ namespace HolyLogger
         // The hold is only released by tuning AWAY after this becomes true, so a stale-frequency recompute
         // during the brief CAT slew (or before HolyCluster tunes at all) can't drop the selection early.
         private bool _holyClusterReachedFreq;
+
+        // When the selection arrived, so the hold above can be given up if the radio never reaches that
+        // frequency at all (see SuspensionTimeoutSeconds in MainWindow.Cluster.cs).
+        private DateTime _holyClusterSelectedAtUtc = DateTime.UtcNow;
 
         // Open or close the listener to match the current setting. Safe to call repeatedly (startup,
         // and whenever the options are applied). Any existing listener is torn down first, so a changed
@@ -140,6 +144,7 @@ namespace HolyLogger
                 _holyClusterSelectedCall = string.IsNullOrWhiteSpace(call) ? null : call;
                 _holyClusterSelectedFreqMhz = freqMhz;
                 _holyClusterReachedFreq = false;   // wait until the radio actually lands on this frequency
+                _holyClusterSelectedAtUtc = DateTime.UtcNow;   // ...but not forever (see SuspensionTimeoutSeconds)
 
                 if (!string.IsNullOrWhiteSpace(call) && TB_DXCallsign != null)
                 {
@@ -154,6 +159,14 @@ namespace HolyLogger
                         TB_DXCallsign.Text = call;
                         TB_DXCallsign.CaretIndex = TB_DXCallsign.Text.Length;
                         _clusterAutoFilledDXCall = true;
+                        // Record WHERE it was filled, exactly as the double-click path does. Without
+                        // this the "is that station still on the radio's frequency?" rule in
+                        // UpdateClusterFrequencyHighlight would judge this call against whatever
+                        // frequency some earlier fill had left behind. Reached=false because CAT may
+                        // still be slewing to the spot.
+                        _clusterAutoFilledFreqMhz = freqMhz;
+                        _clusterAutoFilledReached = false;
+                        _clusterAutoFilledAtUtc = DateTime.UtcNow;
                         TB_DXCallsign_TextChanged(TB_DXCallsign, null);
                         TB_DXCallsign_LostFocus(TB_DXCallsign, new RoutedEventArgs());
                     }

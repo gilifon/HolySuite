@@ -1713,6 +1713,12 @@ namespace HolyLogger
             //TB_Frequency.Text = string.Empty;
             // Drop any stuck map-hover blue highlight on the cluster rows.
             SetClusterRowMapHighlight(null);
+
+            // ...and the clicked-row selection with it. The highlighted row is what says "this is the
+            // station in the form"; once the form has been emptied - by F9, or by the cluster clearing
+            // a call whose station is no longer on frequency - a row left highlighted points at nothing.
+            try { if (clusterSpotsGrid?.SelectedItem != null) clusterSpotsGrid.UnselectAll(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
             TB_DXCallsign.Clear();
             TB_Exchange.Clear();
             // Contest mode: also empty the received-exchange cells beside RST-R (they mirror into
