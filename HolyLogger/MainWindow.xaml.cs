@@ -1700,8 +1700,14 @@ namespace HolyLogger
             // when the spot is double-clicked (both in UpdateClusterFrequencyHighlight / TuneToClusterSpot)
             // -- NOT by merely tuning off and back, so a dismissed spot stays dismissed. Harmless for a
             // user-typed call that isn't a spot -- there's simply no on-frequency spot for it to block.
+            //
+            // ...but ONLY when the operator pressed F9 / Clear. The cluster clears this box itself when
+            // the radio tunes away from a spot it auto-filled, and that cleanup comes through here too.
+            // Recording a dismissal for it meant that tuning off a spot and back on could never re-fill
+            // the callsign: the auto-fill saw its own earlier clear as the operator's refusal, and the
+            // DX box stayed empty with the spot sitting green on frequency.
             string clearedCall = (TB_DXCallsign.Text ?? string.Empty).Trim();
-            if (!string.IsNullOrWhiteSpace(clearedCall))
+            if (!string.IsNullOrWhiteSpace(clearedCall) && !IsClusterAutoClearingDxCall)
                 _clusterDismissedCall = clearedCall.ToUpperInvariant();
 
             //TB_Frequency.Text = string.Empty;
@@ -8287,6 +8293,10 @@ namespace HolyLogger
             if (qrzPhotoWindow == null)
             {
                 qrzPhotoWindow = new QRZPhotoWindow();
+                // Owner alone keeps the photo above the MAIN window, which is all it ever needed.
+                // It used to be Topmost as well, which put it above every OTHER window too - the
+                // Channels window could not be raised over it by clicking, and its custom title bar
+                // stayed buried underneath where there was nothing left to drag.
                 qrzPhotoWindow.Owner = this;
                 qrzPhotoWindow.Closed += (sender, args) =>
                 {

@@ -3497,7 +3497,11 @@ namespace HolyLogger
                                 if (_clusterAutoFilledDXCall)
                                 {
                                     _clusterAutoFilledDXCall = false;
-                                    HandleGlobalFunctionKey(System.Windows.Input.Key.F9, false);
+                                    // Flagged as OUR clear, not the operator's, so it does not count as
+                                    // dismissing the call (see _clusterAutoClearingDxCall).
+                                    _clusterAutoClearingDxCall = true;
+                                    try { HandleGlobalFunctionKey(System.Windows.Input.Key.F9, false); }
+                                    finally { _clusterAutoClearingDxCall = false; }
                                 }
                             }
                             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -3537,7 +3541,17 @@ namespace HolyLogger
                             // parks keyboard focus in this now-empty box, so a focused-but-empty box must
                             // still accept the auto-fill. Otherwise, after leaving a spot and tuning back
                             // onto its frequency, the callsign would never be re-filled.
-                            bool userEditing = TB_DXCallsign.IsFocused && !string.IsNullOrEmpty(current);
+                            //
+                            // ...and a call the CLUSTER put there is not the operator's either, however
+                            // the focus happens to sit. Double-clicking a spot leaves focus in this box,
+                            // so without the _clusterAutoFilledDXCall test, tuning from one spotted
+                            // station straight onto another left the first one standing - with its name,
+                            // locator and QRZ photo - while a different station sat on the frequency.
+                            // The "left the frequency" clear cannot catch that case: it only fires when
+                            // NO spot is on frequency, and here one is.
+                            bool userEditing = TB_DXCallsign.IsFocused
+                                               && !string.IsNullOrEmpty(current)
+                                               && !_clusterAutoFilledDXCall;
                             if (userEditing)
                                 return;
 
@@ -3710,6 +3724,15 @@ namespace HolyLogger
         // call back — the user dismissed it on purpose. Released when the radio moves to another filled
         // spot (see UpdateClusterFrequencyHighlight); a double-click on the spot still fills it explicitly.
         private string _clusterDismissedCall;
+
+        // True only while the code below clears the DX box ITSELF, because the radio tuned away from the
+        // spot it had auto-filled. That cleanup goes through the same F9/Clear handler the operator uses,
+        // and that handler records whatever it clears as "dismissed" - so without this flag simply tuning
+        // off a spot marked it dismissed, and tuning back on to it would never re-fill. A dismissal must
+        // only ever come from the operator actually pressing F9 / Clear.
+        private bool _clusterAutoClearingDxCall;
+
+        internal bool IsClusterAutoClearingDxCall => _clusterAutoClearingDxCall;
 
         private static readonly string[] ClusterBandOptions = new[] { "160", "80", "60", "40", "30", "20", "17", "15", "12", "10", "6", "VHF", "UHF", "SHF" };
         private static readonly string[] ClusterModeOptions = new[] { "CW", "DIGI", "SSB", "FM", "FT8", "RTTY", "AM" };
