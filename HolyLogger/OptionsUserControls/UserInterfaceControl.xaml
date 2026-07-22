@@ -46,6 +46,22 @@
                 <RadioButton x:Name="AddQSO_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="Add QSO" Click="HasChanged_Click" IsChecked="{Binding Default.AddQSOWithEnter, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
+        <!-- Placed below the Color Theme box; the options pages sit in a ScrollViewer, so content
+             past the design height is reachable rather than cut off. -->
+        <GroupBox Header="Log and Search tables" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,560,0,0" Width="360" FontSize="16">
+            <StackPanel Margin="10,6,10,8">
+                <!-- Same wording and the same RowLotwBg sample as the cluster's own checkbox, because
+                     it is the same mark in the same colour, just applied to the log tables. -->
+                <CheckBox x:Name="CBX_MarkLotwUsers" FontSize="16" Margin="0,2"
+                          IsChecked="{Binding Default.MarkLotwUsersInLog, Source={StaticResource Settings}, Mode=TwoWay}"
+                          Checked="MarkLotwUsers_Changed" Unchecked="MarkLotwUsers_Changed">
+                    <TextBlock VerticalAlignment="Center" FontSize="16"><Run Text="Mark LOTW User "/><Run Text="(yellow)" Background="{DynamicResource RowLotwBg}"/></TextBlock>
+                </CheckBox>
+                <TextBlock Text="Tints the callsign of a station that uploads to LoTW, in the log table and in the Search window."
+                           FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0"
+                           Foreground="{DynamicResource MutedTextBrush}"/>
+            </StackPanel>
+        </GroupBox>
         <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,442,0,0" Width="360" FontSize="16">
             <TextBlock Margin="6,8" FontSize="13" TextWrapping="Wrap"
                        Text="All application colors (form background, table headers, contest frames, …) are now edited in one place: View  ›  Color Scheme  ›  Customize Colors."/>

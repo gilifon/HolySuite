@@ -32,6 +32,7 @@
         <local:QsoTimeDisplayConverter x:Key="QsoTimeDisplayConverter"/>
         <local:BoolToFontWeightConverter x:Key="BoolToFontWeightConverter"/>
         <local:BandColorConverter x:Key="BandColorConverter"/>
+        <local:LotwUserConverter x:Key="LotwUserConverter"/>
 
         <!-- Theme control styles (Label/TextBox/Menu/DataGrid/Window, etc.) now live app-wide in
              Themes/Controls.xaml, merged in App.xaml, so every window is themed consistently. -->
@@ -1340,7 +1341,23 @@
                 <DataGridTemplateColumn Header="Callsign" IsReadOnly="False" SortMemberPath="DXCall">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,0,5,0" FontWeight="Bold" />
+                            <!-- A LoTW uploader's callsign is tinted with RowLotwBg, the same colour the
+                                 cluster uses for a LoTW spot. Only the callsign itself is tinted, not the
+                                 whole row: log rows already carry meaning from their background (filter
+                                 matches, worked-before), and a second row colour would fight those. -->
+                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,0,5,0" FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Background" Value="Transparent"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding DXCall, Converter={StaticResource LotwUserConverter}}" Value="True">
+                                                <Setter Property="Background" Value="{DynamicResource RowLotwBg}"/>
+                                                <Setter Property="ToolTip" Value="This station uploads to LoTW"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

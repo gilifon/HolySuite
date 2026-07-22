@@ -5677,6 +5677,20 @@ namespace HolyLogger
         // session or its own login page. The stored username/password only decide whether the service is
         // configured yet -- if not, we offer to jump straight to its settings section.
 
+        // Re-reads the log grid's rows so the LoTW callsign tint appears or disappears at once when the
+        // option is toggled. Also refreshes any open Search window, which shows the same mark.
+        public void RefreshLogTableMarks()
+        {
+            try { QSODataGrid?.Items.Refresh(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            foreach (var window in Application.Current.Windows.OfType<SearchWindow>())
+            {
+                try { window.RefreshRows(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
         // The active log's name for the Search window's title bar. Never throws: a search that opens
         // with a blank name is a nuisance, a search that fails to open because the name lookup hiccuped
         // is a bug.
@@ -10698,6 +10712,24 @@ namespace HolyLogger
 
             return System.Windows.Data.Binding.DoNothing;
         }
+    }
+
+    // True when this callsign is a known LoTW uploader, so the log table can flag it the way the
+    // cluster already flags a spotted station.
+    //
+    // Returns a BOOL rather than a brush on purpose: the caller turns it into a colour through a
+    // DynamicResource, so the marking follows a theme change. A brush handed back from here would be
+    // resolved once and then stay whatever colour was current when the row was drawn.
+    //
+    // LotwUserService keeps the ARRL list in a HashSet, so this is an O(1) lookup per row - and it
+    // answers false until a list has been downloaded, which simply means nothing is marked yet.
+    public class LotwUserConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+            => Properties.Settings.Default.MarkLotwUsersInLog && LotwUserService.IsLotwUser(value as string);
+
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+            => System.Windows.Data.Binding.DoNothing;
     }
 
     // Colors the Band/Frequency cells in the QSO log grid using the exact same per-band colors as

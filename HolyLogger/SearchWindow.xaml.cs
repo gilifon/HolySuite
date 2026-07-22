@@ -779,6 +779,14 @@ namespace HolyLogger
 
         private void Btn_Undo_Click(object sender, RoutedEventArgs e) => UndoLastEdit();
 
+        // Re-reads the rows so a changed display option (the LoTW callsign tint) shows immediately.
+        internal void RefreshRows()
+        {
+            if (_cellInEdit) return;   // a refresh inside an edit transaction is not allowed
+            try { ResultsGrid.Items.Refresh(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void UndoLastEdit()
         {
             if (_undo.Count == 0) return;

@@ -383,6 +383,18 @@ namespace HolyLogger.OptionsUserControls
             }
         }
 
+        // The log grid's cells are already drawn, and QSO carries no change notification, so the tint
+        // only appears or disappears when the rows are re-read. Without this the checkbox would look
+        // like it had done nothing until the log was next reloaded.
+        private void MarkLotwUsers_Changed(object sender, RoutedEventArgs e)
+        {
+            try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            HasChanged = true;
+
+            var mainWindow = Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+            mainWindow?.RefreshLogTableMarks();
+        }
+
         private void MapShowDayNight_Changed(object sender, RoutedEventArgs e)
         {
             if (_isLoadingClusterSettings)
