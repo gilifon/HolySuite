@@ -2714,5 +2714,60 @@ Environment.NewLine +
         // True when two station callsigns are the same log identity.
         public static bool Same(string a, string b)
             => string.Equals(Base(a), Base(b), StringComparison.OrdinalIgnoreCase);
+
+        // Splits a callsign into its prefix and suffix halves, cutting at the LAST digit of the base
+        // callsign - the digit belongs to the prefix, being part of what identifies the country/area:
+        //
+        //   4Z5SL      -> "4Z5"     + "SL"
+        //   4Z5SL/M    -> "4Z5"     + "SL/M"      a trailing stroke stays with the suffix
+        //   4X/OK1DL   -> "4X/OK1"  + "DL"        a leading stroke stays with the prefix
+        //   4X/OK1DL/P -> "4X/OK1"  + "DL/P"
+        //
+        // A shape with no recognisable callsign in it (a bare country prefix like "4X", or junk) is
+        // returned entirely as the prefix, so nothing is invented for it.
+        public static void Split(string callsign, out string prefix, out string suffix)
+        {
+            prefix = (callsign ?? string.Empty).Trim();
+            suffix = string.Empty;
+            if (prefix.Length == 0) return;
+
+            string[] parts = prefix.Split('/');
+            int baseIndex = -1;
+            for (int i = 0; i < parts.Length; i++)
+                if (FullCall.IsMatch(parts[i])) { baseIndex = i; break; }
+
+            // Nothing matched the ordinary callsign shape. That is mostly special-event calls, which
+            // are longer than FullCall allows (LZ1771SDG, DL40RRDXA, OE2008OHO). Falling back to the
+            // last segment applies the same last-digit rule by a looser route, so those still split
+            // into a usable prefix and suffix instead of landing whole in the prefix box. A segment
+            // with no digit at all still drops out below and is searched exactly as typed.
+            bool loose = baseIndex < 0;
+            if (loose) baseIndex = parts.Length - 1;
+
+            string lead = baseIndex > 0 ? string.Join("/", parts, 0, baseIndex) + "/" : string.Empty;
+            string baseCall = parts[baseIndex];
+            string tail = baseIndex < parts.Length - 1
+                ? "/" + string.Join("/", parts, baseIndex + 1, parts.Length - baseIndex - 1)
+                : string.Empty;
+
+            int lastDigit = -1;
+            for (int i = 0; i < baseCall.Length; i++)
+                if (char.IsDigit(baseCall[i])) lastDigit = i;
+            if (lastDigit < 0) return;
+
+            // On the loose path only, insist there is a letter BEFORE the digit. Without this a bare
+            // country prefix such as "4X" - which someone may well type or log - would be torn into
+            // "4" + "X". FullCall matches have already proved their shape and need no such check.
+            if (loose)
+            {
+                bool letterBefore = false;
+                for (int i = 0; i < lastDigit; i++)
+                    if (char.IsLetter(baseCall[i])) { letterBefore = true; break; }
+                if (!letterBefore) return;
+            }
+
+            prefix = lead + baseCall.Substring(0, lastDigit + 1);
+            suffix = baseCall.Substring(lastDigit + 1) + tail;
+        }
     }
 }

@@ -176,6 +176,37 @@ namespace HolyLogger
                 && (string.IsNullOrEmpty(Selected.Callsign) || string.IsNullOrEmpty(Selected.Operator));
         }
 
+        // Searches ANY log, not just the one being logged into. The Search window works on the QSO
+        // list it is handed, so the selected log's QSOs are simply loaded and passed straight to it -
+        // no need to activate the log first, which would disturb where new QSOs are being written.
+        //
+        // Edits made in that window go to the database through DataAccess.Update, so they land in the
+        // right log whichever one is active.
+        private void Btn_Search_Click(object sender, RoutedEventArgs e)
+        {
+            if (!RequireSelection()) return;
+
+            long id = Selected.Id;
+            string name = Selected.Name;
+            try
+            {
+                var qsos = _dal.GetQSOsForLog(id);
+                if (qsos == null || qsos.Count == 0)
+                {
+                    HolyMessageBox.ShowWarning($"\"{name}\" has no QSOs to search.", "Search Log", this);
+                    return;
+                }
+
+                var search = new SearchWindow(qsos, name) { Owner = this };
+                search.Show();
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError("Could not open the search for this log.\n\n" + ex.Message,
+                                         "Search Log", this);
+            }
+        }
+
         private bool RequireSelection()
         {
             if (Selected == null)

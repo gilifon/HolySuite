@@ -85,6 +85,11 @@ namespace HolyLogger
             // ---- Lines ----------------------------------------------------------------------------
             { "ThemeBorderBrush", new[] { "#AAAAAA", "#2C2F35", "#26344E" } }, // borders / dividers
             { "MenuBorder",       new[] { "#9AA0A6", "#4A515C", "#3E5273" } }, // popup/menu frame — clearly visible against MenuBg
+            // Frame around the fields you type into. Deliberately stronger than ThemeBorderBrush: a
+            // text box has to be findable at a glance, and WPF's own default border is so faint that a
+            // row of empty boxes reads as blank space. Light scheme goes DARKER against white; the dark
+            // schemes go LIGHTER, since there "darker" would mean invisible.
+            { "InputBorder",      new[] { "#7A7F87", "#5A626E", "#4E6A93" } },
 
             // ---- Accent + stateful highlights -----------------------------------------------------
             { "AccentBrush",      new[] { "#1565C0", "#3B82F6", "#4C8DFF" } }, // primary accent (blue)
@@ -148,6 +153,7 @@ namespace HolyLogger
 
             new TokenInfo("ThemeBorderBrush", "Borders and accents", "Borders",       "Borders and divider lines around panels and controls."),
             new TokenInfo("MenuBorder",       "Borders and accents", "Menu frame",    "The frame around popup menus and dropdown lists."),
+            new TokenInfo("InputBorder",      "Borders and accents", "Input frame",   "The frame around text boxes you type into."),
             new TokenInfo("AccentBrush",      "Borders and accents", "Accent",        "Headings, links and emphasized labels (the blue)."),
             new TokenInfo("ContestNameBrush", "Borders and accents", "Contest name",  "The active contest's name in the status bar."),
             new TokenInfo("Danger",           "Borders and accents", "Errors and warnings", "Error text and warning markers (the red)."),

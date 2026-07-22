@@ -70,6 +70,10 @@
         <Setter Property="Background" Value="{DynamicResource ControlBg}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
         <Setter Property="CaretBrush" Value="{DynamicResource TextBrush}"/>
+        <!-- WPF's default text-box border is so faint that a row of empty boxes reads as blank space.
+             InputBorder is a deliberately stronger frame; see ThemePalette. -->
+        <Setter Property="BorderBrush" Value="{DynamicResource InputBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
     </Style>
 
     <!-- DataGrid header + cells (any grid, any window). -->

@@ -3246,17 +3246,6 @@ namespace HolyLogger
             return t;
         }
 
-        // Double-clicking a row in the Search window loads that QSO for editing here. Same path as the
-        // log's own right-click "Edit", plus bringing this window to the front - the QSO fields are
-        // here, so leaving the Search window on top would look like nothing had happened.
-        public void EditQsoFromSearch(QSO qso)
-        {
-            if (qso == null) return;
-            EditQsoFromContextMenu(qso);
-            try { Activate(); }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-        }
-
         private void EditQsoFromContextMenu(QSO qso)
         {
             if (qso == null) return;
@@ -5594,7 +5583,7 @@ namespace HolyLogger
                 searchWindow.Activate();
                 return;
             }
-            searchWindow = new SearchWindow(Qsos) { Owner = this };
+            searchWindow = new SearchWindow(Qsos, SafeActiveLogName()) { Owner = this };
             searchWindow.Closed += (s, _) => searchWindow = null;
             searchWindow.Show();
             if (!string.IsNullOrWhiteSpace(presetCallsign))
@@ -5612,7 +5601,7 @@ namespace HolyLogger
                 searchWindow.Activate();
                 return;
             }
-            searchWindow = new SearchWindow(Qsos) { Owner = this };
+            searchWindow = new SearchWindow(Qsos, SafeActiveLogName()) { Owner = this };
             searchWindow.Closed += (s, _) => searchWindow = null;
             searchWindow.Show();
             searchWindow.SetCountry(country, runSearch: true);
@@ -5687,6 +5676,15 @@ namespace HolyLogger
         // security risk). We just open the personal-area URL; the site authenticates via the browser
         // session or its own login page. The stored username/password only decide whether the service is
         // configured yet -- if not, we offer to jump straight to its settings section.
+
+        // The active log's name for the Search window's title bar. Never throws: a search that opens
+        // with a blank name is a nuisance, a search that fails to open because the name lookup hiccuped
+        // is a bug.
+        private string SafeActiveLogName()
+        {
+            try { return dal?.GetLogName(dal.ActiveLogId); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
 
         private enum OnlineLogger { Lotw, Eqsl, Qrz, Clublog }
 
@@ -10636,8 +10634,18 @@ namespace HolyLogger
             return value;
         }
 
+        // Used when a Date cell is edited (the log grid is read-only, so this never runs there).
+        // Anything that is not a date we recognise is REJECTED - DoNothing leaves the stored value
+        // alone rather than writing a typo into the log.
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
+            string typed = (value as string)?.Trim();
+            if (string.IsNullOrWhiteSpace(typed)) return System.Windows.Data.Binding.DoNothing;
+
+            string[] accepted = { "dd-MM-yyyy", "dd/MM/yyyy", "dd.MM.yyyy", "yyyyMMdd", "yyyy-MM-dd" };
+            if (DateTime.TryParseExact(typed, accepted, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
+                return dt.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+
             return System.Windows.Data.Binding.DoNothing;
         }
     }
@@ -10657,6 +10665,37 @@ namespace HolyLogger
 
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
+            return System.Windows.Data.Binding.DoNothing;
+        }
+    }
+
+    // Time for EDITING, as opposed to the display converter above.
+    //
+    // The display drops the seconds ("08:54"), which is right for reading a log and wrong for editing
+    // one: committing that back would store 08:54:00 and quietly destroy the logged seconds. This
+    // shows the full HH:mm:ss so nothing is lost by opening the cell.
+    public class QsoTimeEditConverter : System.Windows.Data.IValueConverter
+    {
+        public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string raw = value as string;
+            if (!string.IsNullOrWhiteSpace(raw) && raw.Length == 6 &&
+                DateTime.TryParseExact(raw, "HHmmss", CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
+                return dt.ToString("HH:mm:ss", CultureInfo.InvariantCulture);
+            return value;
+        }
+
+        // Anything that is not a time we recognise is REJECTED (DoNothing keeps the stored value)
+        // rather than written through - a log is worth more than a typo.
+        public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+        {
+            string typed = (value as string)?.Trim();
+            if (string.IsNullOrWhiteSpace(typed)) return System.Windows.Data.Binding.DoNothing;
+
+            string[] accepted = { "HH:mm:ss", "HH:mm", "HHmmss", "HHmm" };
+            if (DateTime.TryParseExact(typed, accepted, CultureInfo.InvariantCulture, DateTimeStyles.None, out DateTime dt))
+                return dt.ToString("HHmmss", CultureInfo.InvariantCulture);
+
             return System.Windows.Data.Binding.DoNothing;
         }
     }

@@ -2,48 +2,106 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:HolyLogger"
+        xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Log Search"
-        Height="620" Width="980"
-        MinHeight="440" MinWidth="600"
-        ResizeMode="CanResize"
+        Height="620" Width="1025"
+        MinHeight="440" MinWidth="1025"
+        WindowStyle="None" ResizeMode="CanResize"
+        Icon="Images/crown.png"
+        Background="{DynamicResource WindowBg}"
+        Foreground="{DynamicResource TextBrush}"
         WindowStartupLocation="Manual"
         PreviewKeyDown="Window_PreviewKeyDown"
         Loaded="Window_Loaded"
+        StateChanged="Window_StateChanged"
         LocationChanged="Window_LocationChanged"
         SizeChanged="Window_SizeChanged">
+
+    <shell:WindowChrome.WindowChrome>
+        <!-- Custom title bar (below) replaces the OS caption. The OS one draws a single plain string:
+             it cannot show part of the text in bold, nor be made larger. Since the title now has to
+             name the log being searched, and that name is the part worth reading, the caption is drawn
+             here instead - the same approach the Channels and Cluster windows already take.
+             CaptionHeight matches the bar's height so drag / double-click-maximize / snap keep working. -->
+        <shell:WindowChrome CaptionHeight="34" CornerRadius="0" GlassFrameThickness="0"
+                            ResizeBorderThickness="6" UseAeroCaptionButtons="False"/>
+    </shell:WindowChrome.WindowChrome>
 
     <Window.Resources>
         <local:QsoDateDisplayConverter x:Key="QsoDateDisplayConverter"/>
         <local:QsoTimeDisplayConverter x:Key="QsoTimeDisplayConverter"/>
+        <!-- Editing shows the seconds the display hides, so opening the cell cannot lose them. -->
+        <local:QsoTimeEditConverter x:Key="QsoTimeEditConverter"/>
         <local:BandColorConverter x:Key="BandColorConverter"/>
     </Window.Resources>
 
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
+        <!-- Custom title bar. 34px tall so a 17pt title sits comfortably: that is about as large as a
+             caption can go before it starts to crowd the window buttons beside it. -->
+        <Border x:Name="CustomTitleBar" Grid.Row="0" Height="34" Background="{DynamicResource TitleBarBg}">
+            <DockPanel LastChildFill="False">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                    <Button x:Name="TitleBar_MinimizeBtn" Content="&#xE921;" Style="{StaticResource CaptionButtonStyle}"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBar_Minimize_Click" ToolTip="Minimize"/>
+                    <Button x:Name="TitleBar_MaxRestoreBtn" Content="&#xE922;" Style="{StaticResource CaptionButtonStyle}"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBar_MaxRestore_Click" ToolTip="Maximize"/>
+                    <Button x:Name="TitleBar_CloseBtn" Content="&#xE8BB;" Style="{StaticResource CaptionCloseButtonStyle}"
+                            shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBar_Close_Click" ToolTip="Close"/>
+                </StackPanel>
+                <Image Source="Images/crown.png" Width="18" Height="18" Margin="10,0,8,0"
+                       VerticalAlignment="Center" DockPanel.Dock="Left"/>
+                <!-- "Log Search —" stays normal weight; the LOG NAME is the part worth reading, so it
+                     alone is bold. TB_TitleLog is filled in by the constructor. -->
+                <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="17"
+                           Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis">
+                    <Run Text="Log Search"/><Run Text="  —  "/><Run x:Name="TB_TitleLog" FontWeight="Bold"/>
+                </TextBlock>
+            </DockPanel>
+        </Border>
+
         <!-- Search bar -->
-        <Border Grid.Row="0" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,0,0,2" Padding="10,8">
+        <Border Grid.Row="1" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,0,0,2" Padding="10,8">
             <Grid>
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
-                </Grid.ColumnDefinitions>
-                <!-- Every label is inside the SAME StackPanel as the control it names, so the WrapPanel
-                     can only ever break BETWEEN filters. Loose labels could wrap to the end of one line
-                     while their box started the next, leaving a box with no visible name. -->
-                <WrapPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                    <TextBlock Text="Callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <TextBox x:Name="TB_Callsign" Width="140" FontSize="14" VerticalAlignment="Center"
+                <!-- Explicit rows, not a WrapPanel.
+                     Which filter landed on which line used to be decided by whatever width was left
+                     over, which is why Mode sat under Band instead of beside it. Now the window has a
+                     fixed minimum width there is nothing for wrapping to decide, so the rows are
+                     stated outright. Each label still shares a panel with the control it names.
+
+                     HorizontalAlignment="Left" makes this panel exactly as wide as its widest row -
+                     row 1, ending at the Mode dropdown. The QSO count on row 3 is docked to the right
+                     of that same width, which is what lines it up under Mode. -->
+                <StackPanel x:Name="FiltersPanel" Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Center">
+
+                  <!-- Row 1: callsign halves, country, band, mode -->
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                  <!-- Callsign split into its two halves. The digit belongs to the prefix (4Z5 + SL),
+                       a leading stroke stays with the prefix (4X/OK1 + DL) and a trailing one with the
+                       suffix (4Z5 + SL/M). Either box alone is a valid search. -->
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                    <TextBlock Text="Prefix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="Start of the callsign, up to and including the digit: 4Z5, or 4X/OK1"/>
+                    <!-- Widths are recomputed in Window_Loaded to fit exactly 7 and 10 characters of
+                         the actual font; these are only the fallback if that measurement is skipped. -->
+                    <TextBox x:Name="TB_Prefix" Width="72" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                             ToolTip="Start of the callsign, up to and including the digit: 4Z5, or 4X/OK1"
+                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    <TextBlock Text="Suffix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,6,0"
+                               ToolTip="Letters after the digit, with any stroke: SL, or SL/M"/>
+                    <TextBox x:Name="TB_Suffix" Width="98" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                             ToolTip="Letters after the digit, with any stroke: SL, or SL/M"
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                   </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                     <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <ComboBox x:Name="CB_Country" Width="220" FontSize="14" VerticalAlignment="Center"
+                    <ComboBox x:Name="CB_Country" Width="210" FontSize="14" VerticalAlignment="Center"
                               IsEditable="True" StaysOpenOnEdit="True" IsTextSearchEnabled="False" MaxDropDownHeight="280"
                               IsSynchronizedWithCurrentItem="False"
                               PreviewKeyDown="CB_Country_PreviewKeyDown"
@@ -62,26 +120,57 @@
                     </ComboBox>
                   </StackPanel>
 
-                  <!-- Second filter row. The WrapPanel flows these onto their own line at the
-                       default width; the window's Height/MinHeight were raised to match. -->
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+                  <!-- Band and Mode: same panel, so Mode always sits immediately right of Band. -->
+                  <StackPanel x:Name="BandGroup" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Band:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox x:Name="CB_Band" Width="90" FontSize="14" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
-                    <TextBlock Text="Mode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="Mode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,6,0"/>
                     <ComboBox x:Name="CB_Mode" Width="90" FontSize="14" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
                   </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+
+                  </StackPanel>
+
+                  <!-- Row 2: my callsign, locator, holyland square, comment -->
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,6,0,0">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                     <TextBlock Text="My callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"/>
                     <ComboBox x:Name="CB_MyCall" Width="130" FontSize="14" VerticalAlignment="Center"
                               ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"
                               SelectionChanged="Filter_Changed"/>
                   </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <TextBlock Text="Locator:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="The worked station's grid square, e.g. KM72"/>
+                    <TextBox x:Name="TB_Locator" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                             ToolTip="The worked station's grid square, e.g. KM72"
+                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <TextBlock Text="Holyland Square:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="Holyland square received (the Exchange column)"/>
+                    <TextBox x:Name="TB_Square" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                             ToolTip="Holyland square received (the Exchange column)"
+                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                  </StackPanel>
+                  <!-- The Comment box is positioned and sized in Window_Loaded (AlignCommentBox): its
+                       left edge under the Band dropdown, its right edge under Mode's. The width here is
+                       only a fallback for if that measurement is ever skipped. -->
+                  <StackPanel x:Name="CommentGroup" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Comment:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="Any part of the QSO's comment text"/>
+                    <TextBox x:Name="TB_Comment" Width="196" FontSize="14" VerticalAlignment="Center"
+                             ToolTip="Any part of the QSO's comment text"
+                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                  </StackPanel>
+                  </StackPanel>
+
+                  <!-- Row 3: the date range, the buttons, and the result count docked right. -->
+                  <DockPanel LastChildFill="False" Margin="0,6,0,0">
+                  <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                     <TextBlock Text="From:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <DatePicker x:Name="DP_From" Width="125" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"
                                 SelectedDateChanged="Filter_Changed"/>
@@ -89,22 +178,18 @@
                     <DatePicker x:Name="DP_To" Width="125" FontSize="13" VerticalAlignment="Center"
                                 SelectedDateChanged="Filter_Changed"/>
                   </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
-                    <TextBlock Text="Locator:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="The worked station's grid square, e.g. KM72"/>
-                    <TextBox x:Name="TB_Locator" Width="90" FontSize="14" VerticalAlignment="Center"
-                             ToolTip="The worked station's grid square, e.g. KM72"
-                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,6,20,0">
-                    <TextBlock Text="Square:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="Holyland square received (the Exchange column)"/>
-                    <TextBox x:Name="TB_Square" Width="90" FontSize="14" VerticalAlignment="Center"
-                             ToolTip="Holyland square received (the Exchange column)"
-                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+
                   </StackPanel>
 
-                    <Button x:Name="Btn_Search" FontSize="14" Padding="16,4" Margin="0,6,0,0"
+                  <!-- Buttons and the count travel together, docked to the right edge of the filter
+                       block, so the pill still lands under the Mode dropdown and the buttons sit
+                       right-justified beside it instead of trailing the Square box. -->
+                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Undo of a SAVED edit. Ctrl+Z does the same, but a disabled button is the only
+                         thing that tells you an undo exists and what it would put back. -->
+                    <Button x:Name="Btn_Undo" Content="Undo" FontSize="14" Padding="12,4" Margin="0,0,14,0"
+                            IsEnabled="False" Click="Btn_Undo_Click"/>
+                    <Button x:Name="Btn_Search" FontSize="14" Padding="16,4"
                             Click="Btn_Search_Click" Background="#1565C0" Foreground="White"
                             BorderBrush="#0D47A1" Cursor="Hand">
                         <StackPanel Orientation="Horizontal">
@@ -117,17 +202,29 @@
                     </Button>
                     <Button x:Name="Btn_Clear" Content="Clear" FontSize="14" Padding="12,4"
                             Click="Btn_Clear_Click" Background="#757575" Foreground="White"
-                            BorderBrush="#616161" Cursor="Hand" Margin="8,6,0,0"/>
-                </WrapPanel>
-                <!-- QSO count, right-justified so it tracks the right edge on resize -->
-                <TextBlock x:Name="TB_Count" Grid.Column="1" VerticalAlignment="Center"
-                           HorizontalAlignment="Right" FontSize="16" FontWeight="Bold"
-                           Foreground="{DynamicResource AccentBrush}" Margin="20,0,6,0"/>
+                            BorderBrush="#616161" Cursor="Hand" Margin="8,0,0,0"/>
+
+                    <!-- Result count, in a rounded grey pill at the right edge of the filter block -
+                         which is the Mode dropdown's right edge (see the panel comment above). Grey and
+                         border come from theme tokens, not fixed colours, so the pill still looks like
+                         a control in the dark schemes instead of a white patch. Always visible: it
+                         starts at "0 QSOs" rather than appearing only once a search has been run. -->
+                    <Border VerticalAlignment="Center" MinWidth="120" Margin="16,0,0,0"
+                            Background="{DynamicResource GridHeaderBg}"
+                            BorderBrush="{DynamicResource GridLine}" BorderThickness="1"
+                            CornerRadius="10" Padding="14,4,14,4">
+                        <TextBlock x:Name="TB_Count" Text="0 QSOs" FontSize="16" FontWeight="Bold"
+                                   HorizontalAlignment="Center" TextAlignment="Center"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                    </Border>
+                  </StackPanel>
+                  </DockPanel>
+                </StackPanel>
             </Grid>
         </Border>
 
         <!-- Results grid -->
-        <DataGrid x:Name="ResultsGrid" Grid.Row="1"
+        <DataGrid x:Name="ResultsGrid" Grid.Row="2"
                   ItemsSource="{Binding}"
                   AutoGenerateColumns="False"
                   AlternationCount="2"
@@ -135,12 +232,24 @@
                   RowBackground="{DynamicResource GridRowBg}"
                   AlternatingRowBackground="{DynamicResource GridAltRowBg}"
                   CanUserAddRows="False"
-                  IsReadOnly="True"
+                  CanUserDeleteRows="False"
+                  SelectionUnit="FullRow"
                   FontSize="16"
                   BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3"
-                  MouseDoubleClick="ResultsGrid_MouseDoubleClick"
+                  BeginningEdit="ResultsGrid_BeginningEdit"
+                  PreparingCellForEdit="ResultsGrid_PreparingCellForEdit"
+                  CellEditEnding="ResultsGrid_CellEditEnding"
+                  RowEditEnding="ResultsGrid_RowEditEnding"
                   Sorting="ResultsGrid_Sorting"
                   VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}">
+            <DataGrid.Resources>
+                <!-- Scoped to this grid, exactly as the Channels window does it: a very light blue
+                     selection so the band-coloured Frequency and Band text (green on 40M, etc.) stays
+                     readable. The app-wide SelectionBg is a strong #3399FF that swallowed it.
+                     SelectionText is dark so the plain columns still read on the light row. -->
+                <SolidColorBrush x:Key="SelectionBg" Color="#CFE8FF"/>
+                <SolidColorBrush x:Key="SelectionText" Color="#1A1A1A"/>
+            </DataGrid.Resources>
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
                     <Setter Property="BorderBrush" Value="#1565C0"/>
@@ -228,21 +337,54 @@
                 </Style>
             </DataGrid.ColumnHeaderStyle>
             <DataGrid.Columns>
-                <DataGridTemplateColumn x:Name="Col_Date" Header="Date" IsReadOnly="True" SortMemberPath="Date">
+                <!-- Date and Time are editable, but only accept a value that parses. The converters'
+                     ConvertBack returns Binding.DoNothing for anything else, so a typo leaves the
+                     logged value untouched instead of writing nonsense into the log. -->
+                <DataGridTemplateColumn x:Name="Col_Date" Header="Date" SortMemberPath="Date" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Date, Converter={StaticResource QsoDateDisplayConverter}}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox HorizontalContentAlignment="Center" BorderThickness="0" ToolTip="dd-MM-yyyy">
+                                <TextBox.Text>
+                                    <Binding Path="Date" Mode="TwoWay" UpdateSourceTrigger="LostFocus"
+                                             Converter="{StaticResource QsoDateDisplayConverter}"
+                                             NotifyOnValidationError="True">
+                                        <Binding.ValidationRules>
+                                            <local:QsoDateRule/>
+                                        </Binding.ValidationRules>
+                                    </Binding>
+                                </TextBox.Text>
+                            </TextBox>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Time" IsReadOnly="True" SortMemberPath="Time">
+                <DataGridTemplateColumn Header="Time" SortMemberPath="Time" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Time, Converter={StaticResource QsoTimeDisplayConverter}}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox HorizontalContentAlignment="Center" BorderThickness="0" ToolTip="HH:mm:ss (UTC)">
+                                <TextBox.Text>
+                                    <Binding Path="Time" Mode="TwoWay" UpdateSourceTrigger="LostFocus"
+                                             Converter="{StaticResource QsoTimeEditConverter}"
+                                             NotifyOnValidationError="True">
+                                        <Binding.ValidationRules>
+                                            <local:QsoTimeRule/>
+                                        </Binding.ValidationRules>
+                                    </Binding>
+                                </TextBox.Text>
+                            </TextBox>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Callsign" IsReadOnly="True" SortMemberPath="DXCall">
+                <DataGridTemplateColumn Header="Callsign" IsReadOnly="True" SortMemberPath="DXCall" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,0,5,0" FontWeight="Bold"
@@ -250,76 +392,126 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Name" IsReadOnly="True" SortMemberPath="Name">
+                <!-- Editable columns. Each keeps its display template and gains a CellEditingTemplate,
+                     so the cell looks exactly as before until you actually edit it. -->
+                <DataGridTemplateColumn Header="Name" SortMemberPath="Name" Width="180">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Name}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Name, Mode=TwoWay}" HorizontalContentAlignment="Center" BorderThickness="0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Country" IsReadOnly="True" SortMemberPath="Country">
+                <!-- Country is NOT editable: it is decided by the callsign's DXCC prefix, not typed.
+                     Typing over it would let the country disagree with the callsign, which is the kind
+                     of error awards and statistics are counted from. -->
+                <DataGridTemplateColumn Header="Country" IsReadOnly="True" SortMemberPath="Country" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
+                            <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5,0,5,0"
+                                       ToolTip="Set from the callsign's DXCC prefix — not editable"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Frequency" IsReadOnly="True" SortMemberPath="Freq">
+                <DataGridTemplateColumn Header="Frequency" SortMemberPath="Freq" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Freq}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
                                        FontWeight="Bold" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Freq, Mode=TwoWay}" HorizontalContentAlignment="Center" BorderThickness="0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Band" IsReadOnly="True" SortMemberPath="Band">
+                <DataGridTemplateColumn Header="Band" SortMemberPath="Band" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Band}" Foreground="{Binding Band, Converter={StaticResource BandColorConverter}}"
                                        FontWeight="Bold" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <!-- Dropdown, not free text: the same band list the Bad-QSO editor offers, so a
+                         band can only ever be one the rest of the program recognises. -->
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <ComboBox SelectedItem="{Binding Band, Mode=TwoWay}" IsEditable="False"
+                                      ItemsSource="{Binding Source={x:Static local:SearchWindow.KnownBands}}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="RST-R" IsReadOnly="True" SortMemberPath="RST_RCVD">
+                <DataGridTemplateColumn Header="RST-R" SortMemberPath="RST_RCVD" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding RST_RCVD}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding RST_RCVD, Mode=TwoWay}" HorizontalContentAlignment="Center" BorderThickness="0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="RST-S" IsReadOnly="True" SortMemberPath="RST_SENT">
+                <DataGridTemplateColumn Header="RST-S" SortMemberPath="RST_SENT" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding RST_SENT}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding RST_SENT, Mode=TwoWay}" HorizontalContentAlignment="Center" BorderThickness="0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Mode" IsReadOnly="True" SortMemberPath="Mode">
+                <DataGridTemplateColumn Header="Mode" SortMemberPath="Mode" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Mode}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <ComboBox SelectedItem="{Binding Mode, Mode=TwoWay}" IsEditable="False"
+                                      ItemsSource="{Binding Source={x:Static local:SearchWindow.KnownModes}}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Exchange" IsReadOnly="True" SortMemberPath="SRX">
+                <DataGridTemplateColumn Header="Exchange" SortMemberPath="SRX" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding SRX}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding SRX, Mode=TwoWay}" HorizontalContentAlignment="Center" BorderThickness="0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Comment" IsReadOnly="True" SortMemberPath="Comment" Width="*">
+                <DataGridTemplateColumn Header="Comment" SortMemberPath="Comment" Width="*">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
+                    <DataGridTemplateColumn.CellEditingTemplate>
+                        <DataTemplate>
+                            <TextBox Text="{Binding Comment, Mode=TwoWay}" HorizontalContentAlignment="Center" BorderThickness="0"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
         <!-- Status bar -->
-        <Border Grid.Row="2" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,2,0,0" Padding="10,5">
+        <Border Grid.Row="3" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,2,0,0" Padding="10,5">
             <TextBlock x:Name="TB_Status" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"
                        Text="Enter a Callsign or Country (or both) and press Search."/>
         </Border>
