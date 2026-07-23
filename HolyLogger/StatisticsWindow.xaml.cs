@@ -499,6 +499,17 @@ namespace HolyLogger
 
         // Green-highlight the worked rows whose entity is in the confirmed set, and update the count line.
         // Does not re-sort; the caller refreshes the list (BuildCountryTables / the button both do).
+        // Count of distinct DELETED entities confirmed, from the codes the last download stored.
+        private static int CountConfirmedDeleted()
+        {
+            string csv = Properties.Settings.Default.LotwConfirmedDeletedCodes;
+            if (string.IsNullOrWhiteSpace(csv)) return 0;
+            var set = new HashSet<int>();
+            foreach (var part in csv.Split(','))
+                if (int.TryParse(part.Trim(), out int c)) set.Add(c);
+            return set.Count;
+        }
+
         private void ApplyConfirmedHighlight()
         {
             if (_workedList == null) return;
@@ -509,10 +520,20 @@ namespace HolyLogger
                 if (item.IsConfirmed) confirmed++;
             }
 
+            // How many DELETED entities are confirmed (from the DXCC codes LoTW returned, stored by the
+            // download). ALWAYS shown - including "0 deleted" - because an operator needs to see the
+            // figure to trust it, and a deleted-entity total is a thing many operators actively track.
+            // The deleted count is not part of "of N" (that is the current worked list), so it reads as
+            // a separate clause.
+            int deletedConfirmed = CountConfirmedDeleted();
+
+            // Kept to one line to fit the worked column (wrapping would misalign the four column
+            // headers, which share a fixed height). "of N" is dropped because the worked-countries
+            // header right above already shows that total.
             TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
             TB_LotwStatus.Text = _confirmedEntities.Count == 0
                 ? string.Empty
-                : $"Confirmed (LoTW): {confirmed} of {_workedList.Count}";
+                : $"Confirmed (LoTW): {confirmed} active,  {deletedConfirmed} deleted";
 
             // Top summary box: confirmed / worked entities (countries).
             TB_ConfirmedDxcc.Text = _confirmedEntities.Count == 0
@@ -859,10 +880,15 @@ namespace HolyLogger
                 // marker below then had nothing to scope by, so a confirmation for 4Z5SL could match a
                 // completely different operator's QSO in another log that merely shared the same
                 // call+band+mode+date. That is how an imported friend's log got 24 QSOs wrongly ticked.
+                // qso_qsldetail=yes adds the WORKED station's entity to each record: <DXCC> (the ARRL
+                // entity code), <COUNTRY>, and APP_LoTW_DXCC_ENTITY_STATUS (Current / Deleted). This is
+                // the authoritative, DATE-CORRECT entity - a 1985 East-Germany QSO comes back as East
+                // Germany, not modern Germany - which our own cty.dat resolver (current-only) cannot
+                // give. It is what lets the confirmations be split into active vs deleted entities.
                 string url = "https://lotw.arrl.org/lotwuser/lotwreport.adi"
                            + "?login=" + Uri.EscapeDataString(user)
                            + "&password=" + Uri.EscapeDataString(pass)
-                           + "&qso_query=1&qso_qsl=yes&qso_mydetail=yes&qso_qslsince=" + Uri.EscapeDataString(sinceQuery);
+                           + "&qso_query=1&qso_qsl=yes&qso_mydetail=yes&qso_qsldetail=yes&qso_qslsince=" + Uri.EscapeDataString(sinceQuery);
 
                 string adif;
                 // Decompress gzip/deflate — otherwise a compressed response reads back as binary garbage.
@@ -1018,6 +1044,15 @@ namespace HolyLogger
                 s.LotwLastNewJson = newList != null ? JsonConvert.SerializeObject(newList) : string.Empty;
                 if (!string.IsNullOrWhiteSpace(maxRxDate)) s.LotwLastQsl = maxRxDate;   // stored as a date
                 s.LotwSeenKeysJson = JsonConvert.SerializeObject(newSeenKeys);
+
+                // Confirmed DELETED entities, by DXCC code. Full run replaces the set; an incremental
+                // run adds to it (a deleted entity newly confirmed since last check). Stored as codes so
+                // re-confirming the same entity never inflates the count.
+                var deletedCodes = new HashSet<int>(result.ConfirmedDeletedCodes);
+                if (incremental && !string.IsNullOrWhiteSpace(s.LotwConfirmedDeletedCodes))
+                    foreach (var part in s.LotwConfirmedDeletedCodes.Split(','))
+                        if (int.TryParse(part.Trim(), out int old)) deletedCodes.Add(old);
+                s.LotwConfirmedDeletedCodes = string.Join(",", deletedCodes);
                 s.Save();
 
                 // ApplyConfirmedHighlight sets the "Confirmed (LoTW): N of M" status, colors the rows, and
@@ -1092,6 +1127,12 @@ namespace HolyLogger
             public string MaxRxDate;
             public List<string> NewSeenKeys;
             public int MarkedConfirmed;
+
+            // Distinct DXCC entity CODES confirmed, split by whether the entity is deleted. Taken from
+            // LoTW's own <DXCC> per record (date-correct), so a deleted entity is counted as deleted
+            // even though our cty.dat resolver would map its callsign to the modern parent.
+            public HashSet<int> ConfirmedActiveCodes = new HashSet<int>();
+            public HashSet<int> ConfirmedDeletedCodes = new HashSet<int>();
         }
 
         // The heavy half of the LoTW check, run on a background thread (see the caller). Splits the
@@ -1138,6 +1179,18 @@ namespace HolyLogger
                 if (!string.IsNullOrEmpty(name)
                     && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                     result.ResolvedNames.Add(name);
+
+                // Classify by LoTW's own entity code (date-correct). DeletedEntities is our shipped,
+                // authoritative list; LoTW also sends APP_LoTW_DXCC_ENTITY_STATUS, but keying on our
+                // list keeps the answer offline and consistent between the LoTW and manual-QSL paths.
+                string dxccStr = ExtractAdifField(rec, "dxcc");
+                if (int.TryParse((dxccStr ?? string.Empty).Trim(), out int dxccCode) && dxccCode > 0)
+                {
+                    if (DXCCManager.DeletedEntities.IsDeleted(dxccCode))
+                        result.ConfirmedDeletedCodes.Add(dxccCode);
+                    else
+                        result.ConfirmedActiveCodes.Add(dxccCode);
+                }
 
                 if (string.Compare(rxDate, result.MaxRxDate, StringComparison.Ordinal) > 0)
                     result.MaxRxDate = rxDate;

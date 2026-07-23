@@ -45,6 +45,7 @@
       <Link>VersionInfo.cs</Link>
     </Compile>
     <Compile Include="DXCC.cs" />
+    <Compile Include="DeletedEntities.cs" />
     <Compile Include="EntityResolver.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

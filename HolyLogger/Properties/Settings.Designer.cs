@@ -1840,6 +1840,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string LotwConfirmedDeletedCodes {
+            get {
+                return ((string)(this["LotwConfirmedDeletedCodes"]));
+            }
+            set {
+                this["LotwConfirmedDeletedCodes"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ActiveProfile {
             get {
                 return ((string)(this["ActiveProfile"]));
