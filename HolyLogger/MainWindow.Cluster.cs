@@ -4107,6 +4107,22 @@ namespace HolyLogger
             clusterVisibleSpots.ReplaceAll(filtered);   // one Reset event, one DataGrid layout pass
 
             UpdateClusterFrequencyHighlight();
+
+            // Re-align Live Scale AFTER the new rows have been laid out.
+            //
+            // The call above reaches ScrollClusterLiveScale synchronously, in the same call stack as the
+            // ReplaceAll a few lines up - so it measures the table as it was BEFORE the new spots were
+            // arranged. The engine's own retry only rescues the case where a row reports zero height;
+            // right after a Reset the old containers usually still report their PREVIOUS height, so the
+            // measurement looks valid, one wrong offset is applied, and nothing tries again.
+            //
+            // The result was a centre line that drifted off its row as spots arrived and stayed off,
+            // until some later event - a turn of the VFO knob - happened to recompute it against a
+            // settled layout, at which point the row snapped into the frame.
+            if (clusterLiveScaleOn && !_clusterBandHoverActive)
+                Dispatcher.BeginInvoke(new Action(ScrollClusterLiveScale),
+                                       System.Windows.Threading.DispatcherPriority.Loaded);
+
             UpdateClusterSpotCountIndicator();
             UpdateClusterBandSpotCounts();
             RequestClusterHeaderAlignmentRefresh();
