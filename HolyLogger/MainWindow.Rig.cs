@@ -441,7 +441,46 @@ namespace HolyLogger
         //OmniRig ParamsChange events
         private void OmniRigEngine_ParamsChange(int RigNumber, int Params)
         {
+            LogRigModeChange();
             QueueShowRigParams();
+        }
+
+        // The last raw mode value seen, so only CHANGES are logged - OmniRig raises ParamsChange for
+        // every frequency tick, and logging each one would bury the mode changes we are looking for.
+        private int _lastLoggedRigMode = -1;
+
+        // Records exactly what OmniRig reports for the rig's mode, and what HolyLogger makes of it.
+        //
+        // OmniRig has only eight mode values (CW_U/CW_L, SSB_U/SSB_L, DIG_U/DIG_L, AM, FM) - there is
+        // no "USB-D". Whether a rig's data sub-mode arrives as DIG_U or as plain SSB_U is decided by
+        // that rig's .ini file in OmniRig, not here. This line settles which of the two it is, instead
+        // of reasoning about what the rig "should" send.
+        private void LogRigModeChange()
+        {
+            try
+            {
+                if (Rig == null) return;
+                int raw = (int)Rig.Mode;
+                if (raw == _lastLoggedRigMode) return;
+                _lastLoggedRigMode = raw;
+
+                string name;
+                switch (raw)
+                {
+                    case PM_CW_U:  name = "PM_CW_U";  break;
+                    case PM_CW_L:  name = "PM_CW_L";  break;
+                    case PM_SSB_U: name = "PM_SSB_U"; break;
+                    case PM_SSB_L: name = "PM_SSB_L"; break;
+                    case PM_DIG_U: name = "PM_DIG_U"; break;
+                    case PM_DIG_L: name = "PM_DIG_L"; break;
+                    case PM_AM:    name = "PM_AM";    break;
+                    case PM_FM:    name = "PM_FM";    break;
+                    default:       name = "(unknown)"; break;
+                }
+
+                Log.Warn($"OmniRig mode: {name} (0x{raw:X8}) -> HolyLogger shows \"{GetNormalizedRigMode()}\"");
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         //OmniRig StatusChange events
