@@ -115,6 +115,14 @@ namespace HolyParser
         // 2 = permanently rejected. Not serialized to the contest server.
         public int ClublogStatus { get; set; }
 
+        // LoTW CONFIRMATION: 1 when the other station has confirmed this QSO in Logbook of The World.
+        // Not the same thing as LotwStatus, which only says whether WE uploaded it - a QSO can be
+        // uploaded for years and never confirmed. Set from the confirmations LoTW returns.
+        public int LotwQslRcvd { get; set; }
+
+        // The date LoTW recorded the confirmation (ADIF QSLRDATE, yyyyMMdd). Empty when unconfirmed.
+        public string LotwQslRDate { get; set; }
+
         // Name of the log this QSO belongs to. Display-only: filled in by the upload-queue queries so the
         // (global) queue window can show which log each pending/dismissed QSO came from. Not persisted.
         public string LogName { get; set; }

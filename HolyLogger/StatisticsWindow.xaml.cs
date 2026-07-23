@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -55,8 +56,16 @@ namespace HolyLogger
             var s = Properties.Settings.Default;
 
             // Restore size first so the on-screen test below uses the real window size.
+            //
+            // The saved height is never allowed BELOW what the XAML asks for. A size stored before the
+            // content grew would otherwise win over the new default and clip whatever was added at the
+            // bottom - which is exactly what happened when the "Get All Confirmations" row was added to
+            // the LoTW box: the XAML height went up, the saved height overwrote it, and the button ended
+            // up jammed against the frame. Growing the window is still remembered; only shrinking it
+            // past the content is refused.
+            double contentHeight = Height;   // the XAML value, i.e. what this window's content needs
             if (s.StatisticsWindowWidth  >= MinWidth)  Width  = s.StatisticsWindowWidth;
-            if (s.StatisticsWindowHeight >= MinHeight) Height = s.StatisticsWindowHeight;
+            if (s.StatisticsWindowHeight >= MinHeight) Height = Math.Max(s.StatisticsWindowHeight, contentHeight);
 
             // Restore the last position only if it still lands on a visible monitor. A position
             // saved on a second monitor that's since been turned off or rearranged (e.g. Left=2250
@@ -533,6 +542,17 @@ namespace HolyLogger
             bool totalKnown = s.LotwConfirmedQsoCount > 0 && s.LotwConfirmedQsoCount >= _confirmedEntities.Count;
             TB_SumTotalQsls.Text = totalKnown ? s.LotwConfirmedQsoCount.ToString("N0", inv) : "—";
 
+            // Matched-in-this-log: read live from the database (the marks are what the log grid shows),
+            // scoped to the active log so it answers "how many in the log I'm looking at".
+            int matched = 0;
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal != null) matched = dal.GetLotwConfirmedCount(dal.ActiveLogId);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            TB_SumMatchedInLog.Text = matched.ToString("N0", inv);
+
             // A full/baseline download has no meaningful "new since last check" delta — everything is
             // pulled at once. Showing the whole set as "new" just duplicates the total, so the two "New"
             // rows show "—" for a full download and only display real deltas after an incremental check.
@@ -699,6 +719,83 @@ namespace HolyLogger
             win.ShowDialog();
         }
 
+        // Set by "Get All Confirmations" so the next check asks LoTW for EVERYTHING instead of only what
+        // has arrived since last time. One-shot: cleared as soon as the check reads it.
+        private bool _forceFullDownload;
+
+        // Writes the confirmations that matched no QSO, each followed by what the log holds for that
+        // same callsign. Desktop file, same place as the other diagnostics.
+        private static void WriteUnmatchedReport(int total, int matched, List<DataAccess.LotwConfirmation> unmatched)
+        {
+            string path = System.IO.Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                "lotw_unmatched_confirmations.txt");
+
+            var dal = DataAccess.GetInstance();
+            var text = new System.Text.StringBuilder();
+            text.AppendLine($"LoTW confirmations that matched no QSO — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            text.AppendLine(new string('=', 78));
+            text.AppendLine($"Confirmations received from LoTW : {total:N0}");
+            text.AppendLine($"Matched to a QSO                 : {matched:N0}");
+            text.AppendLine($"NOT matched                      : {(unmatched?.Count ?? 0):N0}");
+            text.AppendLine();
+            text.AppendLine("For each one, 'LoTW sent' is the confirmation; 'log has' is every QSO in the");
+            text.AppendLine("database with that callsign. Compare band / mode / date / station callsign.");
+            text.AppendLine();
+
+            // The "log has" lookup is one query per entry, so only the first block gets it. A few hundred
+            // examples are more than enough to see the pattern, and running ~2,400 extra queries on the
+            // UI thread would add a long freeze for no extra insight.
+            const int detailed = 200;
+
+            if (unmatched != null)
+            {
+                int i = 0;
+                foreach (var c in unmatched)
+                {
+                    text.AppendLine($"LoTW sent : {c.Call,-12} {c.Band,-6} {c.Mode,-6} {c.QsoDate,-10} station={c.StationCallsign}");
+                    if (i < detailed)
+                    {
+                        var inLog = dal?.DescribeQsosForCallsign(c.Call) ?? new List<string>();
+                        if (inLog.Count == 0)
+                            text.AppendLine("  log has : (no QSO with this callsign at all)");
+                        else
+                            foreach (string line in inLog) text.AppendLine("  log has : " + line);
+                        text.AppendLine();
+                    }
+                    if (i == detailed)
+                        text.AppendLine($"  …(the rest are listed without the log comparison)\n");
+                    i++;
+                }
+            }
+
+            System.IO.File.WriteAllText(path, text.ToString(), System.Text.Encoding.UTF8);
+        }
+
+        // Downloads the complete confirmation history and marks every confirmed QSO.
+        //
+        // The ordinary check is incremental - it asks for confirmations since the last one - so it can
+        // never fill in the years already confirmed before this feature existed. This runs the very same
+        // code with the "since" date reset to the beginning, so there is one download path, not two.
+        private void BTN_GetAllConfirmations_Click(object sender, RoutedEventArgs e)
+        {
+            int already = 0;
+            try { already = DataAccess.GetInstance()?.GetLotwConfirmedCount() ?? 0; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (!HolyMessageBox.ShowConfirm(
+                    "Download your COMPLETE LoTW confirmation history and mark every confirmed QSO?\n\n" +
+                    $"Marked so far: {already:N0} QSO(s).\n\n" +
+                    "This takes longer than the normal check - it asks for every confirmation you have " +
+                    "ever received, not just the new ones. It is only needed once; after that the normal " +
+                    "Check LoTW keeps things up to date.",
+                    "Get All Confirmations", HolyMsgType.Info, this))
+                return;
+
+            _forceFullDownload = true;
+            BTN_CheckLotw_Click(sender, e);
+        }
+
         private async void BTN_CheckLotw_Click(object sender, RoutedEventArgs e)
         {
             var s = Properties.Settings.Default;
@@ -735,9 +832,11 @@ namespace HolyLogger
             // from the old timestamp scheme (whose total may be inflated by same-day re-counts). Either
             // way, do one full re-download to reset the total cleanly and seed the de-dupe set; every
             // check after that is incremental.
-            bool incremental = _confirmedEntities.Count > 0
+            bool incremental = !_forceFullDownload
+                               && _confirmedEntities.Count > 0
                                && !string.IsNullOrWhiteSpace(s.LotwLastQsl)
                                && !string.IsNullOrWhiteSpace(s.LotwSeenKeysJson);
+            _forceFullDownload = false;   // one-shot: only the click that set it gets the full run
             string sinceQuery = incremental ? MarkerDate(s.LotwLastQsl) : "1970-01-01";
             string sinceDisplay = incremental ? PrettySince(s.LotwLastQsl) : string.Empty;
 
@@ -754,12 +853,16 @@ namespace HolyLogger
             ShowLotwSpinner(true);
             try
             {
-                // We do NOT request qso_qsldetail: we match by callsign, so the extra per-record fields
-                // would only bloat and slow the download.
+                // qso_mydetail=yes is REQUIRED, not optional: it makes LoTW include STATION_CALLSIGN on
+                // every record - the callsign WE logged the QSO under. Without it that field is empty
+                // (verified: 0 of 1926 records carry it plain, 1926 of 1926 with the flag), and the
+                // marker below then had nothing to scope by, so a confirmation for 4Z5SL could match a
+                // completely different operator's QSO in another log that merely shared the same
+                // call+band+mode+date. That is how an imported friend's log got 24 QSOs wrongly ticked.
                 string url = "https://lotw.arrl.org/lotwuser/lotwreport.adi"
                            + "?login=" + Uri.EscapeDataString(user)
                            + "&password=" + Uri.EscapeDataString(pass)
-                           + "&qso_query=1&qso_qsl=yes&qso_qslsince=" + Uri.EscapeDataString(sinceQuery);
+                           + "&qso_query=1&qso_qsl=yes&qso_mydetail=yes&qso_qslsince=" + Uri.EscapeDataString(sinceQuery);
 
                 string adif;
                 // Decompress gzip/deflate — otherwise a compressed response reads back as binary garbage.
@@ -770,7 +873,37 @@ namespace HolyLogger
                 using (var http = new System.Net.Http.HttpClient(handler))
                 {
                     http.Timeout = TimeSpan.FromSeconds(300);   // large accounts can take a while server-side
-                    adif = await http.GetStringAsync(url);
+
+                    // Stream the reply rather than take it whole, and count <eor> records as they arrive,
+                    // so the overlay shows a real "Downloaded N confirmations…" climbing instead of a
+                    // spinner. ResponseHeadersRead hands us the body stream before it has all arrived; the
+                    // AutomaticDecompression above means the stream we read is already un-gzipped.
+                    var sb = new System.Text.StringBuilder();
+                    int eor = 0;
+                    using (var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
+                    using (var stream = await resp.Content.ReadAsStreamAsync())
+                    using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
+                    {
+                        char[] buf = new char[16384];
+                        string carry = string.Empty;   // last 4 chars, to catch an <eor> split across reads
+                        int n;
+                        while ((n = await reader.ReadAsync(buf, 0, buf.Length)) > 0)
+                        {
+                            sb.Append(buf, 0, n);
+
+                            string hay = carry + new string(buf, 0, n);
+                            int idx = 0;
+                            while ((idx = hay.IndexOf("<eor>", idx, StringComparison.OrdinalIgnoreCase)) >= 0)
+                            {
+                                eor++;
+                                idx += 5;
+                            }
+                            carry = hay.Length >= 4 ? hay.Substring(hay.Length - 4) : hay;
+
+                            TB_LotwLoadingText.Text = $"Downloaded {eor:N0} confirmations from LoTW…";
+                        }
+                    }
+                    adif = sb.ToString();
                 }
 
                 if (adif.IndexOf("Invalid password", StringComparison.OrdinalIgnoreCase) >= 0
@@ -798,21 +931,15 @@ namespace HolyLogger
                     return;
                 }
 
-                // Walk the QSL records, resolving each callsign to a DXCC entity via the SAME resolver the
-                // worked list uses, so the names line up for highlighting. Strip the ADIF header (up to
-                // <eoh>) first, so the header's own fields (PROGRAMID, APP_LoTW_LASTQSL, …) don't leak
-                // into the first record's captured field list.
+                // Everything from here - splitting the reply into records, resolving each callsign, and
+                // marking the log - is CPU/DB work that used to run on the UI thread, freezing the window
+                // for over a minute on a full download (the debugger raised ContextSwitchDeadlock). It now
+                // runs on a background thread, reporting a running count so the operator sees a number
+                // climb instead of a stalled spinner. The DXCC resolver is read-only after load, so
+                // concurrent lookups are safe.
                 int eohIdx = adif.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase);
                 string recordsBody = eohIdx >= 0 ? adif.Substring(eohIdx + 5) : adif;
-                var records = System.Text.RegularExpressions.Regex.Split(
-                    recordsBody, "<eor>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-                int qslCount = 0;   // total records with a call (the confirmed-QSO total after a full run)
-                var resolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-                // De-dupe same-day re-fetches. Because qso_qslsince is date-only, an incremental query
-                // FROM the boundary date re-returns every QSL received that day. We remember the QSO keys
-                // already counted on that date (LotwSeenKeysJson) and treat a record as NEW only when its
-                // QSL-received date is LATER than the boundary, or it's a same-date QSO we haven't seen.
                 string boundaryDate = incremental ? MarkerDate(s.LotwLastQsl) : string.Empty;
                 var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 if (incremental && !string.IsNullOrWhiteSpace(s.LotwSeenKeysJson))
@@ -825,56 +952,45 @@ namespace HolyLogger
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
-                // Genuinely-new confirmations only (details captured for the viewer on incremental runs).
-                var newList = incremental ? new List<LotwNewQso>() : null;
-                int newCount = 0;
-                string maxRxDate = boundaryDate;   // latest QSL-received date seen this run
-                foreach (var rec in records)
+                // Snapshot the confirmed-country set so the "is this a NEW country?" test inside the loop
+                // reads a private copy off the UI thread rather than the live field.
+                var confirmedSnapshot = new HashSet<string>(_confirmedEntities, StringComparer.OrdinalIgnoreCase);
+
+                // Report progress back to the loading overlay, with a PHASE label so the wording tracks
+                // what the program is actually doing - reading the reply, then matching it to the log -
+                // instead of one misleading line that stays put through the whole thing. Progress<T>
+                // captures the UI context, so the text update lands on the UI thread automatically.
+                var progress = new Progress<(string label, int done, int total)>(p =>
                 {
-                    string call = ExtractAdifField(rec, "call");
-                    if (string.IsNullOrWhiteSpace(call)) continue;
-                    qslCount++;
+                    TB_LotwLoadingText.Text = p.total > 0
+                        ? $"{p.label}…  {p.done:N0} of {p.total:N0}"
+                        : $"{p.label}…  {p.done:N0}";
+                    TB_LotwLoadingSub.Text = p.label == "Matching to your log"
+                        ? "Marking each confirmed QSO in your logs."
+                        : "Reading the confirmations LoTW sent back.";
+                });
 
-                    string name = _masterResolver.GetDXCC(call)?.Name;
-                    if (!string.IsNullOrEmpty(name)
-                        && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
-                        resolvedNames.Add(name);
+                LotwRunResult result = await Task.Run(() =>
+                    ProcessLotwConfirmations(recordsBody, incremental, boundaryDate, seenKeys, confirmedSnapshot, progress));
 
-                    string rxDate = QslRcvdDate(rec);
-                    string key = QsoKey(rec);
-                    if (string.Compare(rxDate, maxRxDate, StringComparison.Ordinal) > 0) maxRxDate = rxDate;
+                // Locals the UI-thread tail below still expects.
+                int qslCount = result.QslCount;
+                var resolvedNames = result.ResolvedNames;
+                var newList = result.NewList;
+                int newCount = result.NewCount;
+                string maxRxDate = result.MaxRxDate;
+                var newSeenKeys = result.NewSeenKeys;
+                int markedConfirmed = result.MarkedConfirmed;
 
-                    bool isNew = !incremental
-                              || string.Compare(rxDate, boundaryDate, StringComparison.Ordinal) > 0
-                              || (string.Equals(rxDate, boundaryDate, StringComparison.Ordinal) && !seenKeys.Contains(key));
-                    if (isNew)
+                // The marking went into the database; the log grid is showing QSO objects read when the
+                // log was opened. Re-read them so the ticks appear now rather than after a restart.
+                if (markedConfirmed > 0)
+                {
+                    try
                     {
-                        newCount++;
-                        if (newList != null)
-                            newList.Add(new LotwNewQso
-                            {
-                                Call = call.Trim().ToUpperInvariant(),
-                                Country = name ?? string.Empty,
-                                DateStr = FormatAdifDateDMY(ExtractAdifField(rec, "qso_date")),
-                                TimeStr = FormatAdifTime(ExtractAdifField(rec, "time_on")),
-                                Band = (ExtractAdifField(rec, "band") ?? string.Empty).ToUpperInvariant(),
-                                Mode = (ExtractAdifField(rec, "mode") ?? string.Empty).ToUpperInvariant(),
-                                // _confirmedEntities isn't unioned until after this loop, so it still holds
-                                // the pre-check set — a country absent from it is a NEW country.
-                                IsNewCountry = !string.IsNullOrEmpty(name) && !_confirmedEntities.Contains(name),
-                                Fields = ParseAdifFields(rec)   // every ADIF field, for the details table
-                            });
+                        (Application.Current.Windows.OfType<MainWindow>().FirstOrDefault())?.ReloadActiveLogQsos();
                     }
-                }
-
-                // Rebuild the boundary-day key set from THIS run's records on the latest QSL-received date,
-                // so the next check can skip these same-day QSLs.
-                var newSeenKeys = new List<string>();
-                foreach (var rec in records)
-                {
-                    if (string.IsNullOrWhiteSpace(ExtractAdifField(rec, "call"))) continue;
-                    if (string.Equals(QslRcvdDate(rec), maxRxDate, StringComparison.Ordinal))
-                        newSeenKeys.Add(QsoKey(rec));
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
                 // How many NEW countries this check added = growth of the entity set.
@@ -908,6 +1024,12 @@ namespace HolyLogger
                 // fills the 3-row summary (total / new QSLs since date / new countries) from what we saved.
                 ApplyConfirmedHighlight();
                 ApplyWorkedSort();   // rebuild the list so the new row colors show
+
+                // A full download (Get All Confirmations, or a first-ever check) ends with a summary,
+                // so the operator knows it finished and can SEE that every log was updated, not only the
+                // one open now. Left off an incremental check, which would nag on each routine run.
+                if (!incremental)
+                    ShowFullDownloadSummary(qslCount, markedConfirmed);
             }
             catch (Exception ex)
             {
@@ -919,6 +1041,164 @@ namespace HolyLogger
                 ShowLotwSpinner(false);
                 BTN_CheckLotw.IsEnabled = true;
             }
+        }
+
+        // Reports the outcome of a full confirmation download, and shows plainly that the marks reached
+        // EVERY log - the per-log breakdown makes the cross-log effect visible instead of leaving the
+        // operator to wonder whether their other logs were touched.
+        private void ShowFullDownloadSummary(int downloaded, int matched)
+        {
+            var text = new System.Text.StringBuilder();
+            text.AppendLine($"Downloaded {downloaded:N0} confirmation(s) from LoTW.");
+            text.AppendLine();
+
+            try
+            {
+                var perLog = DataAccess.GetInstance()?.GetLotwConfirmedCountsByLog()
+                             ?? new List<KeyValuePair<string, int>>();
+                int totalMarked = perLog.Sum(p => p.Value);
+
+                if (perLog.Count == 0)
+                {
+                    text.AppendLine("No QSO in any of your logs matched a confirmation yet.");
+                }
+                else if (perLog.Count == 1)
+                {
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed.");
+                }
+                else
+                {
+                    text.AppendLine($"{totalMarked:N0} QSO(s) are now marked confirmed, across all your logs:");
+                    text.AppendLine();
+                    foreach (var p in perLog)
+                        text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
+                    text.AppendLine();
+                    text.AppendLine("A confirmation belongs to the contact, so every log that holds a matching " +
+                                    "QSO - under any of your station callsigns - was updated, not only the one open now.");
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            HolyMessageBox.Show(text.ToString().TrimEnd(), "LoTW confirmations updated", HolyMsgType.Info, this);
+        }
+
+        // Everything ProcessLotwConfirmations produces that the UI-thread tail of the check needs.
+        private class LotwRunResult
+        {
+            public int QslCount;
+            public HashSet<string> ResolvedNames;
+            public List<LotwNewQso> NewList;
+            public int NewCount;
+            public string MaxRxDate;
+            public List<string> NewSeenKeys;
+            public int MarkedConfirmed;
+        }
+
+        // The heavy half of the LoTW check, run on a background thread (see the caller). Splits the
+        // reply into records, resolves each callsign, works out which confirmations are new, marks the
+        // matching QSOs in the database, and writes the unmatched-diagnostic file - reporting a running
+        // record count through `progress` so the overlay can show a climbing number.
+        //
+        // Touches no UI. It reads the DXCC resolver (safe: read-only after load) and a caller-supplied
+        // SNAPSHOT of the confirmed-country set, never the live field.
+        private LotwRunResult ProcessLotwConfirmations(
+            string recordsBody, bool incremental, string boundaryDate,
+            HashSet<string> seenKeys, HashSet<string> confirmedSnapshot,
+            IProgress<(string label, int done, int total)> progress)
+        {
+            var records = System.Text.RegularExpressions.Regex.Split(
+                recordsBody, "<eor>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+            int totalRecords = records.Length;
+
+            var result = new LotwRunResult
+            {
+                ResolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase),
+                NewList = incremental ? new List<LotwNewQso>() : null,
+                NewSeenKeys = new List<string>(),
+                MaxRxDate = boundaryDate
+            };
+
+            var confirmations = new List<DataAccess.LotwConfirmation>();
+            int seen = 0;
+
+            foreach (var rec in records)
+            {
+                string call = ExtractAdifField(rec, "call");
+                if (string.IsNullOrWhiteSpace(call)) continue;
+                result.QslCount++;
+
+                // One record does three jobs; do them together so the record is parsed once.
+                string band = (ExtractAdifField(rec, "band") ?? string.Empty).Trim();
+                string mode = (ExtractAdifField(rec, "mode") ?? string.Empty).Trim();
+                string qsoDate = (ExtractAdifField(rec, "qso_date") ?? string.Empty).Trim();
+                string rxDate = QslRcvdDate(rec);
+                string key = QsoKey(rec);
+
+                string name = _masterResolver.GetDXCC(call)?.Name;
+                if (!string.IsNullOrEmpty(name)
+                    && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                    result.ResolvedNames.Add(name);
+
+                if (string.Compare(rxDate, result.MaxRxDate, StringComparison.Ordinal) > 0)
+                    result.MaxRxDate = rxDate;
+
+                bool isNew = !incremental
+                          || string.Compare(rxDate, boundaryDate, StringComparison.Ordinal) > 0
+                          || (string.Equals(rxDate, boundaryDate, StringComparison.Ordinal) && !seenKeys.Contains(key));
+                if (isNew)
+                {
+                    result.NewCount++;
+                    result.NewList?.Add(new LotwNewQso
+                    {
+                        Call = call.Trim().ToUpperInvariant(),
+                        Country = name ?? string.Empty,
+                        DateStr = FormatAdifDateDMY(qsoDate),
+                        TimeStr = FormatAdifTime(ExtractAdifField(rec, "time_on")),
+                        Band = band.ToUpperInvariant(),
+                        Mode = mode.ToUpperInvariant(),
+                        IsNewCountry = !string.IsNullOrEmpty(name) && !confirmedSnapshot.Contains(name),
+                        Fields = ParseAdifFields(rec)
+                    });
+                }
+
+                confirmations.Add(new DataAccess.LotwConfirmation
+                {
+                    Call = call.Trim().ToUpperInvariant(),
+                    Band = band,
+                    Mode = mode,
+                    QsoDate = qsoDate,
+                    StationCallsign = (ExtractAdifField(rec, "station_callsign") ?? string.Empty).Trim(),
+                    QslRDate = (ExtractAdifField(rec, "qslrdate") ?? string.Empty).Trim()
+                });
+
+                // Report every so often, not every record: marshaling to the UI thread on all ~6,000
+                // would itself become the bottleneck.
+                if ((++seen % 200) == 0) progress?.Report(("Reading confirmations", seen, totalRecords));
+            }
+            progress?.Report(("Reading confirmations", seen, totalRecords));
+
+            // Rebuild the boundary-day key set from this run's records on the latest QSL-received date.
+            foreach (var rec in records)
+            {
+                if (string.IsNullOrWhiteSpace(ExtractAdifField(rec, "call"))) continue;
+                if (string.Equals(QslRcvdDate(rec), result.MaxRxDate, StringComparison.Ordinal))
+                    result.NewSeenKeys.Add(QsoKey(rec));
+            }
+
+            // fullReset on a full (non-incremental) download: it is authoritative, so clear every mark
+            // first and rebuild - which also scrubs any bad marks a pre-station-scoping build left behind.
+            // The matching is its own phase with its own counter, so the overlay keeps moving through the
+            // slow database work instead of freezing on the last "Reading…" number.
+            int totalConf = confirmations.Count;
+            Action<int> matchProgress = n => progress?.Report(("Matching to your log", n, totalConf));
+            List<DataAccess.LotwConfirmation> unmatched = null;
+            try { result.MarkedConfirmed = DataAccess.GetInstance()?.MarkLotwConfirmed(confirmations, !incremental, matchProgress, out unmatched) ?? 0; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            try { WriteUnmatchedReport(confirmations.Count, result.MarkedConfirmed, unmatched); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return result;
         }
 
         // Show/hide the download overlay and run (or stop) the spinner's continuous rotation.

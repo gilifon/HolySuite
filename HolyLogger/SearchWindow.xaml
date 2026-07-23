@@ -150,6 +150,13 @@
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                   </StackPanel>
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                    <TextBlock Text="LoTW:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="Confirmed by the other station in Logbook of The World"/>
+                    <ComboBox x:Name="CB_Lotw" Width="130" FontSize="14" VerticalAlignment="Center"
+                              ToolTip="Confirmed by the other station in Logbook of The World"
+                              SelectionChanged="Filter_Changed"/>
+                  </StackPanel>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                     <TextBlock Text="Holyland Square:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                ToolTip="Holyland square received (the Exchange column)"/>
                     <TextBox x:Name="TB_Square" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
@@ -236,6 +243,8 @@
                   CanUserDeleteRows="False"
                   SelectionUnit="FullRow"
                   FontSize="16"
+                  ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                  ScrollViewer.CanContentScroll="True"
                   BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3"
                   BeginningEdit="ResultsGrid_BeginningEdit"
                   PreparingCellForEdit="ResultsGrid_PreparingCellForEdit"
@@ -510,7 +519,12 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
                 </DataGridTemplateColumn>
-                <DataGridTemplateColumn Header="Comment" SortMemberPath="Comment" Width="*">
+                <!-- Star width so Comment absorbs spare space, but with a MINIMUM so it cannot be
+                     squeezed away. Without the minimum a star column silently swallows every shortage:
+                     the row can never be wider than the viewport, so the horizontal scrollbar never
+                     appears and Comment just gets thinner each time a column is added. With it, the
+                     grid overflows once there is not enough room and the scrollbar does its job. -->
+                <DataGridTemplateColumn Header="Comment" SortMemberPath="Comment" Width="*" MinWidth="60">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Comment}" HorizontalAlignment="Center" Padding="5,0,5,0"/>
@@ -521,6 +535,34 @@
                             <TextBox Text="{Binding Comment, Mode=TwoWay}" HorizontalContentAlignment="Center" BorderThickness="0"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellEditingTemplate>
+                </DataGridTemplateColumn>
+
+                <!-- LAST COLUMN, and new columns go after it, never among the existing ones: inserting
+                     into the middle moves every column the operator has learned the position of. It has
+                     to come after Comment specifically, because Comment is the star-width column that
+                     absorbs the spare space - anything before it would not sit at the right edge.
+
+                     LoTW confirmation, same tick as the log table. Read-only: it is what LoTW says,
+                     not something to type over. -->
+                <DataGridTemplateColumn Header="LoTW" IsReadOnly="True" SortMemberPath="LotwQslRcvd" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value=""/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding LotwQslRcvd}" Value="1">
+                                                <Setter Property="Text" Value="&#x2713;"/>
+                                                <Setter Property="Foreground" Value="#1E7E34"/>
+                                                <Setter Property="ToolTip" Value="Confirmed in LoTW"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>

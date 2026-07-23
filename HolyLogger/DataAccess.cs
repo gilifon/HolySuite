@@ -746,6 +746,8 @@ Environment.NewLine +
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                        if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
+                        if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -816,6 +818,8 @@ Environment.NewLine +
                             if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                             if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                             if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                        if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
+                        if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
                             if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                             q.StandartizeQSO();
@@ -932,6 +936,8 @@ Environment.NewLine +
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                        if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
+                        if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -1833,6 +1839,268 @@ Environment.NewLine +
             }
         }
 
+        // LoTW CONFIRMATION columns, separate from lotw_status.
+        //
+        // lotw_status says whether WE uploaded the QSO; these say whether the other station confirmed
+        // it. A QSO can sit uploaded for years and never be confirmed, so the two cannot share a field.
+        // New rows default to 0 = unconfirmed, and stay that way until a LoTW download says otherwise -
+        // no back-fill, because "we don't know yet" is the honest starting state here.
+        private void AddLotwConfirmationColumns()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'lotw_qsl_rcvd'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [lotw_qsl_rcvd] INTEGER NOT NULL DEFAULT 0", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'lotw_qsl_rdate'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [lotw_qsl_rdate] nvarchar(20) NULL", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // One confirmation as LoTW reported it.
+        public class LotwConfirmation
+        {
+            public string Call { get; set; }
+            public string Band { get; set; }
+            public string Mode { get; set; }
+            public string QsoDate { get; set; }        // yyyyMMdd
+            public string StationCallsign { get; set; } // ours, when the report carries it
+            public string QslRDate { get; set; }        // yyyyMMdd, when the report carries it
+        }
+
+        // Marks the QSOs that LoTW says are confirmed. Returns how many rows changed.
+        //
+        // Matched on the same four things LoTW itself matches a contact on - worked callsign, band,
+        // mode and date - plus OUR station callsign when the report names it, which matters to anyone
+        // who operates under more than one call. Time is deliberately not compared: LoTW records the
+        // other station's logged time, which routinely differs from ours by a minute or two.
+        public int MarkLotwConfirmed(IList<LotwConfirmation> confirmations)
+            => MarkLotwConfirmed(confirmations, out _);
+
+        // The PSK family: LoTW reports the exact sub-mode, the log almost always stores plain "PSK".
+        // Measured from a real 5,935-confirmation download, these were the ONLY digital modes where a
+        // confirmation matched a QSO on call+band+date but was rejected on mode. Kept narrow on purpose
+        // - broadening further (e.g. folding all data modes together) would risk a wrong match.
+        private static readonly string[] PskFamily =
+            { "PSK", "PSK31", "PSK63", "PSK125", "BPSK", "BPSK31", "BPSK63", "QPSK", "QPSK31", "QPSK63", "DATA" };
+
+        private static readonly string PskFamilyInList =
+            string.Join(",", PskFamily.Select(m => "'" + m + "'"));
+
+        private static bool IsPskFamily(string mode)
+        {
+            string m = (mode ?? string.Empty).Trim();
+            foreach (string f in PskFamily)
+                if (string.Equals(m, f, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
+        public int MarkLotwConfirmed(IList<LotwConfirmation> confirmations, out List<LotwConfirmation> unmatched)
+            => MarkLotwConfirmed(confirmations, false, null, out unmatched);
+
+        public int MarkLotwConfirmed(IList<LotwConfirmation> confirmations, bool fullReset, out List<LotwConfirmation> unmatched)
+            => MarkLotwConfirmed(confirmations, fullReset, null, out unmatched);
+
+        // unmatched receives every confirmation that found no QSO, for diagnosis.
+        //
+        // fullReset clears every existing confirmation mark before re-applying. Passed on a FULL
+        // download, which is authoritative: it both rebuilds cleanly and undoes any earlier bad marks
+        // (an older build, before station-callsign scoping, ticked QSOs in the wrong operator's log).
+        //
+        // onProgress, when given, is called with the running count as confirmations are processed - this
+        // is the slow part on a big download, so the caller can keep a counter moving. UI-agnostic: it
+        // is just an int, and the caller marshals it to the screen.
+        public int MarkLotwConfirmed(IList<LotwConfirmation> confirmations, bool fullReset,
+                                     Action<int> onProgress, out List<LotwConfirmation> unmatched)
+        {
+            unmatched = new List<LotwConfirmation>();
+            if (confirmations == null || confirmations.Count == 0) return 0;
+
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+
+                int changed = 0;
+                using (var tx = con.BeginTransaction())
+                {
+                    if (fullReset)
+                        using (var clear = new SQLiteCommand(
+                            "UPDATE qso SET lotw_qsl_rcvd = 0, lotw_qsl_rdate = NULL WHERE lotw_qsl_rcvd = 1", con, tx))
+                            clear.ExecuteNonQuery();
+
+                    // The station callsign is REQUIRED to match: my_callsign = @mycall. A confirmation
+                    // whose station is empty matches nothing here (my_callsign is never blank), which is
+                    // the safe direction - better to leave a QSO unticked than to tick a QSO some OTHER
+                    // operator made that merely shares the call+band+mode+date. Removing the old
+                    // "@mycall = '' OR ..." escape is what stops confirmations leaking across logs.
+                    using (var exact = new SQLiteCommand(
+                        "UPDATE qso SET lotw_qsl_rcvd = 1, lotw_qsl_rdate = @rdate " +
+                        "WHERE dx_callsign = @call COLLATE NOCASE " +
+                        "  AND band  = @band COLLATE NOCASE " +
+                        "  AND mode  = @mode COLLATE NOCASE " +
+                        "  AND date  = @date " +
+                        "  AND my_callsign = @mycall COLLATE NOCASE", con, tx))
+                    // Fallback for the digital sub-modes. LoTW reports the exact sub-mode (PSK31, PSK63,
+                    // DATA...) while the log stores the family (PSK), so the exact query above misses
+                    // them. This one drops the mode test to "the log's mode is in the SAME family", and
+                    // is tried ONLY when the LoTW mode has a known family and the exact match already
+                    // failed - so an ordinary SSB/CW/FT8 QSO is never broadened.
+                    using (var family = new SQLiteCommand(
+                        "UPDATE qso SET lotw_qsl_rcvd = 1, lotw_qsl_rdate = @rdate " +
+                        "WHERE dx_callsign = @call COLLATE NOCASE " +
+                        "  AND band  = @band COLLATE NOCASE " +
+                        "  AND date  = @date " +
+                        "  AND my_callsign = @mycall COLLATE NOCASE " +
+                        "  AND UPPER(TRIM(mode)) IN (" + PskFamilyInList + ")", con, tx))
+                    {
+                        foreach (var cmd in new[] { exact, family })
+                        {
+                            cmd.Parameters.Add(new SQLiteParameter("@rdate"));
+                            cmd.Parameters.Add(new SQLiteParameter("@call"));
+                            cmd.Parameters.Add(new SQLiteParameter("@band"));
+                            cmd.Parameters.Add(new SQLiteParameter("@date"));
+                            cmd.Parameters.Add(new SQLiteParameter("@mycall"));
+                        }
+                        exact.Parameters.Add(new SQLiteParameter("@mode"));
+
+                        int processed = 0;
+                        foreach (var c in confirmations)
+                        {
+                            if (string.IsNullOrWhiteSpace(c?.Call) || string.IsNullOrWhiteSpace(c.QsoDate)) continue;
+                            // Cannot attribute a confirmation with no station callsign to any operator,
+                            // so it is left unmatched rather than guessed at across logs.
+                            if (string.IsNullOrWhiteSpace(c.StationCallsign)) { unmatched.Add(c); continue; }
+
+                            string rdate  = c.QslRDate ?? string.Empty;
+                            string call   = c.Call.Trim();
+                            string band   = (c.Band ?? string.Empty).Trim();
+                            string date   = c.QsoDate.Trim();
+                            string mycall = (c.StationCallsign ?? string.Empty).Trim();
+
+                            exact.Parameters["@rdate"].Value = rdate;
+                            exact.Parameters["@call"].Value = call;
+                            exact.Parameters["@band"].Value = band;
+                            exact.Parameters["@date"].Value = date;
+                            exact.Parameters["@mycall"].Value = mycall;
+                            exact.Parameters["@mode"].Value = (c.Mode ?? string.Empty).Trim();
+
+                            int rows = exact.ExecuteNonQuery();
+
+                            // Only fall back when the exact match failed AND the LoTW mode is a digital
+                            // sub-mode we widen to its family. Everything else is a genuine non-match.
+                            if (rows == 0 && IsPskFamily(c.Mode))
+                            {
+                                family.Parameters["@rdate"].Value = rdate;
+                                family.Parameters["@call"].Value = call;
+                                family.Parameters["@band"].Value = band;
+                                family.Parameters["@date"].Value = date;
+                                family.Parameters["@mycall"].Value = mycall;
+                                rows = family.ExecuteNonQuery();
+                            }
+
+                            if (rows > 0) changed += rows; else unmatched.Add(c);
+
+                            if (onProgress != null && (++processed % 200) == 0) onProgress(processed);
+                        }
+                    }
+                    tx.Commit();
+                }
+                return changed;
+            }
+        }
+
+        // Every QSO logged with this callsign, as "band mode date mycall" lines. Used by the unmatched
+        // report to show what the log actually holds beside what LoTW sent, which is what reveals
+        // whether the mismatch is the band, the mode, the date or the station callsign.
+        public List<string> DescribeQsosForCallsign(string dxCallsign, int limit = 6)
+        {
+            var found = new List<string>();
+            if (string.IsNullOrWhiteSpace(dxCallsign)) return found;
+
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return found;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT band, mode, date, my_callsign FROM qso " +
+                    "WHERE dx_callsign = @call COLLATE NOCASE ORDER BY date LIMIT @lim", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@call", dxCallsign.Trim()));
+                    cmd.Parameters.Add(new SQLiteParameter("@lim", limit));
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                            found.Add($"{rdr["band"],-6} {rdr["mode"],-6} {rdr["date"],-10} {rdr["my_callsign"]}");
+                }
+            }
+            return found;
+        }
+
+        // How many QSOs are currently marked confirmed by LoTW.
+        public int GetLotwConfirmedCount()
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                using (var cmd = new SQLiteCommand("SELECT COUNT(*) FROM qso WHERE lotw_qsl_rcvd = 1", con))
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        // Confirmed-QSO count per log, most first, so a completion message can SHOW that the marking
+        // reached every log (not only the active one) - a LoTW confirmation belongs to a contact, so a
+        // matching QSO in any log is marked.
+        public List<KeyValuePair<string, int>> GetLotwConfirmedCountsByLog()
+        {
+            var rows = new List<KeyValuePair<string, int>>();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return rows;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT l.name, COUNT(q.Id) AS n " +
+                    "FROM qso q JOIN logs l ON l.Id = q.log_id " +
+                    "WHERE q.lotw_qsl_rcvd = 1 GROUP BY l.name HAVING n > 0 ORDER BY n DESC", con))
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                        rows.Add(new KeyValuePair<string, int>(
+                            rdr["name"]?.ToString() ?? "(unnamed)", Convert.ToInt32(rdr["n"])));
+            }
+            return rows;
+        }
+
+        // How many QSOs in ONE log are marked confirmed by LoTW. The confirmation marks span the whole
+        // database (a LoTW confirmation belongs to a contact, not a log), so a per-log figure is what
+        // answers "how many in the log I'm looking at".
+        public int GetLotwConfirmedCount(long logId)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT COUNT(*) FROM qso WHERE lotw_qsl_rcvd = 1 AND log_id = @log", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@log", logId));
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+        }
+
         // Index that backs the LoTW pending-queue lookups (filter on lotw_status). Idempotent.
         private void EnsureLotwIndex()
         {
@@ -2577,6 +2845,7 @@ Environment.NewLine +
             AddEqslStatusColumn();
             AddQrzColumns();
             AddLotwColumns();
+            AddLotwConfirmationColumns();
             AddClublogColumn();
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();

@@ -60,7 +60,7 @@ namespace HolyLogger
 
     public partial class SearchWindow : Window
     {
-        private readonly ObservableCollection<QSO> _allQsos;
+        private ObservableCollection<QSO> _allQsos;
         private System.Collections.Generic.List<SearchCountryItem> _allCountries;
         private ListCollectionView _countriesView;
         private string _countryFilter = "";
@@ -333,6 +333,7 @@ namespace HolyLogger
             if (CB_Band.Items.Count > 0)   CB_Band.SelectedIndex = 0;
             if (CB_Mode.Items.Count > 0)   CB_Mode.SelectedIndex = 0;
             if (CB_MyCall.Items.Count > 0) CB_MyCall.SelectedIndex = 0;
+            if (CB_Lotw.Items.Count > 0)   CB_Lotw.SelectedIndex = 0;
             TB_Locator.Text = "";
             TB_Square.Text  = "";
             TB_Comment.Text = "";
@@ -358,6 +359,7 @@ namespace HolyLogger
                               SelectedFilter(CB_Band) != null ||
                               SelectedFilter(CB_Mode) != null ||
                               SelectedFilter(CB_MyCall) != null ||
+                              SelectedFilter(CB_Lotw) != null ||
                               DP_From.SelectedDate != null ||
                               DP_To.SelectedDate != null;
             Btn_Clear.Background = hasContent ? ClearActiveBrush : ClearIdleBrush;
@@ -537,6 +539,7 @@ namespace HolyLogger
             string locator  = TB_Locator.Text.Trim();
             string square   = TB_Square.Text.Trim();
             string comment  = TB_Comment.Text.Trim();
+            string lotw     = SelectedFilter(CB_Lotw);
             DateTime? from  = DP_From.SelectedDate;
             DateTime? to    = DP_To.SelectedDate;
 
@@ -547,7 +550,7 @@ namespace HolyLogger
                               string.IsNullOrEmpty(country) && band == null && mode == null &&
                               myCall == null && string.IsNullOrEmpty(locator) &&
                               string.IsNullOrEmpty(square) && string.IsNullOrEmpty(comment) &&
-                              from == null && to == null;
+                              lotw == null && from == null && to == null;
 
             var results = _allQsos.AsEnumerable();
 
@@ -585,6 +588,12 @@ namespace HolyLogger
             if (!string.IsNullOrEmpty(square))
                 results = results.Where(q => q.SRX != null &&
                     q.SRX.IndexOf(square, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            if (lotw != null)
+            {
+                bool wantConfirmed = lotw == LotwConfirmed;
+                results = results.Where(q => (q.LotwQslRcvd == 1) == wantConfirmed);
+            }
 
             // Comments are free text, so this is a "contains" match - the useful thing is finding the
             // QSO where you noted something, not matching how the note began.
@@ -679,7 +688,15 @@ namespace HolyLogger
             Fill(CB_Band, q => q.Band);
             Fill(CB_Mode, q => q.Mode);
             Fill(CB_MyCall, q => q.MyCall);
+
+            // Fixed choices, not values found in the log: "not confirmed" has to be offerable even when
+            // every QSO happens to be confirmed, and the other way round.
+            CB_Lotw.ItemsSource = new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed };
+            CB_Lotw.SelectedIndex = 0;
         }
+
+        private const string LotwConfirmed = "Confirmed";
+        private const string LotwNotConfirmed = "Not confirmed";
 
         // Dropdown / date-picker changes only refresh the Clear button. The search still runs on
         // Search, Enter or Esc, so picking a band does not fire a search through a half-typed callsign.
@@ -784,6 +801,18 @@ namespace HolyLogger
         {
             if (_cellInEdit) return;   // a refresh inside an edit transaction is not allowed
             try { ResultsGrid.Items.Refresh(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Points the window at a freshly-loaded QSO collection and re-runs the current search, so an
+        // OPEN Search window reflects data that changed underneath it - the LoTW confirmation marking
+        // reassigns the main window's collection, and without this the search would keep showing the
+        // old objects, which never received the ticks.
+        public void ReplaceSource(ObservableCollection<QSO> qsos)
+        {
+            if (qsos == null || _cellInEdit) return;
+            _allQsos = qsos;
+            try { RunSearch(); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 

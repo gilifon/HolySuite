@@ -1423,6 +1423,34 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+
+                <!-- LAST COLUMN, and new columns go after it, never among the existing ones: inserting
+                     into the middle moves every column the operator has learned the position of.
+
+                     LoTW CONFIRMATION: has the station confirmed this QSO in Logbook of The World.
+                     Nothing to do with whether we uploaded it - a QSO can be uploaded for years and
+                     never confirmed. Blank rather than a cross when unconfirmed: most QSOs are
+                     unconfirmed, and a column full of crosses reads as a column full of errors. -->
+                <DataGridTemplateColumn Header="LoTW" IsReadOnly="True" SortMemberPath="LotwQslRcvd" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value=""/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding LotwQslRcvd}" Value="1">
+                                                <Setter Property="Text" Value="&#x2713;"/>
+                                                <Setter Property="Foreground" Value="#1E7E34"/>
+                                                <Setter Property="ToolTip" Value="Confirmed in LoTW"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

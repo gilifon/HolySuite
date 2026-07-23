@@ -579,9 +579,24 @@ namespace HolyLogger
             gridColumnOrder.Add(new KeyValuePair<string, int>("Exchange", Properties.Settings.Default.Exchange_index));
             gridColumnOrder.Add(new KeyValuePair<string, int>("Comment", Properties.Settings.Default.Comment_index));
             
+            gridColumnOrder.Add(new KeyValuePair<string, int>("LoTW", Properties.Settings.Default.Lotw_index));
+
             foreach (var item in QSODataGrid.Columns)
             {
-                item.DisplayIndex = gridColumnOrder.FirstOrDefault(p => p.Key == item.Header.ToString()).Value;
+                string header = item.Header?.ToString() ?? string.Empty;
+                var saved = gridColumnOrder.FirstOrDefault(p => p.Key == header);
+
+                // A column with NO saved position keeps the place the XAML gave it.
+                //
+                // FirstOrDefault returns an empty pair when the header is not in the list, and its Value
+                // is 0 - so the old code silently moved any column it did not know about to DisplayIndex
+                // 0, the far LEFT. That is what happened to the LoTW column: it was added at the right
+                // end of the XAML and still appeared first, because this loop dragged it there on every
+                // start. -1 means "never saved" for a known column, and is left alone for the same reason.
+                if (saved.Key == null) continue;
+                if (saved.Value < 0 || saved.Value >= QSODataGrid.Columns.Count) continue;
+
+                item.DisplayIndex = saved.Value;
             }
             var _rwCallsign = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Callsign");
             var _rwName     = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Name");
@@ -4332,6 +4347,8 @@ namespace HolyLogger
                     Properties.Settings.Default.Exchange_index = item.DisplayIndex;
                 else if (item.Header.ToString() == "Comment")
                     Properties.Settings.Default.Comment_index = item.DisplayIndex;
+                else if (item.Header.ToString() == "LoTW")
+                    Properties.Settings.Default.Lotw_index = item.DisplayIndex;
             }
         }
 
@@ -5688,6 +5705,42 @@ namespace HolyLogger
         // security risk). We just open the personal-area URL; the site authenticates via the browser
         // session or its own login page. The stored username/password only decide whether the service is
         // configured yet -- if not, we offer to jump straight to its settings section.
+
+        // Re-loads the active log's QSOs from the database.
+        //
+        // Needed after something writes to the QSOs behind the grid's back - the LoTW confirmation
+        // marking does exactly that, updating rows in the database while the grid holds QSO objects
+        // read when the log was opened. Without this the ticks appear only after switching logs or
+        // restarting, which looks like the download did nothing.
+        public void ReloadActiveLogQsos()
+        {
+            try
+            {
+                if (dal == null) return;
+
+                // Qsos is a plain FIELD, and the grid binds to the window's DataContext - so assigning
+                // Qsos on its own changes nothing on screen. The three existing reload paths all follow
+                // the load with the CollectionChanged hook and DataContext assignment below; leaving
+                // those out was why the LoTW ticks only appeared after a restart.
+                Qsos = dal.GetQSOsForLog(dal.ActiveLogId);
+                Qsos.CollectionChanged += Qsos_CollectionChanged;
+
+                // Drop any active callsign filter: its FilteredQsos holds the OLD QSO objects, and
+                // leaving it in place would keep showing them.
+                FilteredQsos = null;
+                _foreignFilterRows = null;
+
+                DataContext = Qsos;
+                LastQSO = Qsos.FirstOrDefault();
+
+                // An open Search window holds the PREVIOUS collection, whose objects never received the
+                // confirmation marks (the marking updated the database, not the in-memory QSOs). Point
+                // it at the freshly-loaded collection so it updates without being reopened.
+                if (searchWindow != null && searchWindow.IsLoaded)
+                    searchWindow.ReplaceSource(Qsos);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
 
         // Re-reads the log grid's rows so the LoTW callsign tint appears or disappears at once when the
         // option is toggled. Also refreshes any open Search window, which shows the same mark.
