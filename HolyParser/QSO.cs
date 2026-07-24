@@ -180,6 +180,25 @@ namespace HolyParser
         public int ClublogStatusRank =>
             ClublogQslRcvd == 1 ? (ClublogDeletedEntity == 1 ? 1 : 2) : 0;
 
+        // PAPER QSL CONFIRMATION: 1 when the operator has received this QSO's paper QSL card by post.
+        // Unlike the other sources this is MANUAL - there is nothing to download - so it is edited
+        // directly in the log grid (the checkbox binds to PaperQslConfirmed below). Exported to ADIF like
+        // every other confirmation field so it round-trips.
+        public int PaperQslRcvd { get; set; }
+
+        // Two-way bool view of PaperQslRcvd for the editable grid checkbox. [JsonIgnore] so the contest
+        // server payload is unchanged (PaperQslRcvd already carries the value for persistence/export).
+        [JsonIgnore]
+        public bool PaperQslConfirmed
+        {
+            get => PaperQslRcvd == 1;
+            set => PaperQslRcvd = value ? 1 : 0;
+        }
+
+        // Two-level paper-QSL status for sorting the Paper QSL column. There is no deleted-entity split
+        // (a manual paper card carries no DXCC code), so it is simply confirmed (2) or not (0).
+        public int PaperQslStatusRank => PaperQslRcvd == 1 ? 2 : 0;
+
         // Name of the log this QSO belongs to. Display-only: filled in by the upload-queue queries so the
         // (global) queue window can show which log each pending/dismissed QSO came from. Not persisted.
         public string LogName { get; set; }

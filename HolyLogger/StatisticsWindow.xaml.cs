@@ -45,7 +45,7 @@ namespace HolyLogger
         // The confirmation source whose analysis the window is currently showing - one folder each in the
         // vertical tab strip. "Worked" is the plain log with no confirmation overlay; the rest color the
         // worked list by that service's confirmations. Only LoTW and QRZ are wired in this first step.
-        private enum ConfSource { Worked, Lotw, Qrz, Eqsl, Clublog }
+        private enum ConfSource { Worked, Lotw, Qrz, Eqsl, Clublog, Paper }
         private ConfSource _source = ConfSource.Worked;
 
         // Cancels the running Check (download + marking) when the operator presses Stop. A fresh source
@@ -534,6 +534,7 @@ namespace HolyLogger
                 case ConfSource.Qrz:     return q.QrzQslRcvd == 1;
                 case ConfSource.Eqsl:    return q.EqslQslRcvd == 1;
                 case ConfSource.Clublog: return q.ClublogQslRcvd == 1;
+                case ConfSource.Paper:   return q.PaperQslRcvd == 1;
                 default:                 return true;
             }
         }
@@ -564,6 +565,8 @@ namespace HolyLogger
             // or a past download left a cached confirmed set.
             if (s.UseClublogService || !string.IsNullOrWhiteSpace(s.ClublogConfirmedEntities))
                 AddSourceFolder(ConfSource.Clublog, "Club Log");
+            // Paper QSL is manual (no service to configure), so it is ALWAYS available.
+            AddSourceFolder(ConfSource.Paper, "Paper QSL");
             LB_Source.SelectedIndex = 0;   // Worked; fires LB_Source_SelectionChanged -> RefreshForSource
         }
 
@@ -590,6 +593,7 @@ namespace HolyLogger
                 case ConfSource.Qrz:     return ThemeManager.Brush("FormBg");         // main-form blue
                 case ConfSource.Eqsl:    return HexBrush("#E6CCFF");                  // purple (the Msg buttons)
                 case ConfSource.Clublog: return HexBrush("#EAD9BF");                  // light brown
+                case ConfSource.Paper:   return HexBrush("#FFFFFF");                  // white
                 default:                 return ThemeManager.Brush("RowOnFreqBg");    // Worked = on-frequency green
             }
         }
@@ -624,6 +628,22 @@ namespace HolyLogger
             RefreshForSource();
         }
 
+        // Called by the log windows when a Paper QSL checkbox is ticked/unticked, so the Paper QSL folder
+        // recomputes its confirmed countries live - the "no button needed" behaviour. Updates the matching
+        // QSO in our own list (the grid may hold a different instance after a reload) and repaints only
+        // when the Paper QSL folder is the one on screen.
+        public void NotifyPaperQslChanged(int qsoId, bool confirmed)
+        {
+            try
+            {
+                if (_allQsos != null)
+                    foreach (var q in _allQsos)
+                        if (q != null && q.id == qsoId) { q.PaperQslRcvd = confirmed ? 1 : 0; break; }
+                if (_source == ConfSource.Paper) RefreshForSource();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Repaints the tables for the selected source: load that source's confirmed cache, recolor the
         // worked list, and show only that source's download button (none on the Worked folder).
         private void RefreshForSource()
@@ -648,6 +668,23 @@ namespace HolyLogger
         private void LoadConfirmedCache()
         {
             _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // Paper QSL has nothing to download - it is manually marked per QSO - so its confirmed set is
+            // computed LIVE from the log itself: the entities of the QSOs the operator ticked. This is what
+            // makes it recalculate automatically the moment a paper-QSL checkbox changes, with no button.
+            if (_source == ConfSource.Paper)
+            {
+                if (_allQsos != null)
+                    foreach (var q in _allQsos)
+                    {
+                        if (q == null || q.PaperQslRcvd != 1) continue;
+                        string name = Resolve(q.DXCall)?.Name;
+                        if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                            _confirmedEntities.Add(name);
+                    }
+                return;
+            }
+
             // The Worked folder has no confirmation overlay; each other folder reads its own cache.
             string cached =
                 _source == ConfSource.Lotw    ? Properties.Settings.Default.LotwConfirmedEntities :
@@ -697,7 +734,8 @@ namespace HolyLogger
             _source == ConfSource.Lotw    ? "LoTW" :
             _source == ConfSource.Qrz     ? "QRZ" :
             _source == ConfSource.Eqsl    ? "eQSL" :
-            _source == ConfSource.Clublog ? "Club Log" : "Worked";
+            _source == ConfSource.Clublog ? "Club Log" :
+            _source == ConfSource.Paper   ? "Paper QSL" : "Worked";
 
         private void ApplyConfirmedHighlight()
         {
@@ -744,19 +782,21 @@ namespace HolyLogger
 
             if (_source == ConfSource.Worked)
             {
-                // Plain log folder: Worked = worked / total; Missing = never contacted.
-                TB_WorkedTileLabel.Text = "Worked / DXCC";
+                // Plain log folder: Worked = worked / total; Missing = never contacted. The tiles spell out
+                // "Countries" (the number is a country count); the source is named by the folder tab.
+                TB_WorkedTileLabel.Text = "Worked Countries";
                 TB_UniqueCountries.Text = $"{workedDxcc} / {totalDxcc}";
-                TB_MissingTileLabel.Text = "Missing DXCC";
+                TB_MissingTileLabel.Text = "Missing Countries";
                 TB_MissingDxcc.Text = missingCount.ToString();
             }
             else
             {
                 // Confirmation folder: Confirmed + Missing partition all 340. Worked-not-confirmed is
-                // the chaseable subset (contacted but not confirmed here).
-                TB_ConfirmedTileLabel.Text = $"Confirmed ({SourceName})";
-                TB_WorkedTileLabel.Text = "Worked, not confirmed";
-                TB_MissingTileLabel.Text = $"Missing ({SourceName})";
+                // the chaseable subset (contacted but not confirmed here). Labels spell out "Countries";
+                // the source name is dropped here because the folder tab (and status line) already show it.
+                TB_ConfirmedTileLabel.Text = "Confirmed Countries";
+                TB_WorkedTileLabel.Text = "Worked Countries, not confirmed";
+                TB_MissingTileLabel.Text = "Missing Countries";
                 TB_ConfirmedDxcc.Text = $"{confirmed} / {totalDxcc}";
                 TB_UniqueCountries.Text = Math.Max(0, workedDxcc - confirmed).ToString();
                 TB_MissingDxcc.Text = missingCount.ToString();
@@ -783,8 +823,9 @@ namespace HolyLogger
             if (BTN_CheckEqsl != null)          BTN_CheckEqsl.Visibility          = _source == ConfSource.Eqsl    ? Visibility.Visible : Visibility.Collapsed;
             if (BTN_CheckClublog != null)       BTN_CheckClublog.Visibility       = _source == ConfSource.Clublog ? Visibility.Visible : Visibility.Collapsed;
 
-            // Worked: no confirmation source. Keep the frame's SPACE (Hidden) so the zones align.
-            if (_source == ConfSource.Worked)
+            // Worked and Paper QSL have no downloaded summary (Paper is manual). Keep the frame's SPACE
+            // (Hidden) so the zone lists still line up with the download folders.
+            if (_source == ConfSource.Worked || _source == ConfSource.Paper)
             {
                 ConfirmSummaryPanel.Visibility = Visibility.Hidden;
                 return;

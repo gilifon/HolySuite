@@ -504,6 +504,8 @@ namespace HolyParser
             string crd = AdifValue(row, "app_holylogger_clublog_qslrdate");
             if (!string.IsNullOrWhiteSpace(crd)) qso_row.ClublogQslRDate = crd.Trim();
             qso_row.ClublogDeletedEntity = AdifYesNo(row, "app_holylogger_clublog_deleted");
+            // Paper QSL: HolyLogger-private APP_ field (manual mark).
+            qso_row.PaperQslRcvd = AdifYesNo(row, "app_holylogger_paper_qsl_rcvd");
 
             qso_row.StandartizeQSO();
             return qso_row;

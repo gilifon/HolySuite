@@ -2116,6 +2116,21 @@ namespace HolyLogger
                 e.Cancel = true;
         }
 
+        // The Paper QSL checkbox was ticked/unticked in the log grid. The two-way binding has already
+        // updated the QSO; persist it to the database and tell the Statistics window (if open) so its
+        // Paper QSL folder recomputes its confirmed countries live - no recalculate button needed.
+        private void PaperQsl_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!((sender as System.Windows.Controls.CheckBox)?.DataContext is QSO qso)) return;
+            try
+            {
+                dal?.SetPaperQslConfirmed(qso.id, qso.PaperQslConfirmed);
+                if (statisticsWindow != null && statisticsWindow.IsLoaded)
+                    statisticsWindow.NotifyPaperQslChanged(qso.id, qso.PaperQslConfirmed);
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
         private void UpdateSortArrows()
         {
             if (QSODataGrid == null)

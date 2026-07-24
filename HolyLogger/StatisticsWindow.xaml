@@ -175,21 +175,31 @@
                                 <!-- Confirmed is the headline number for a source, so it is leftmost.
                                      Confirmed + Missing partition all DXCC entities (out of 340). Hidden
                                      on the Worked folder, which has no confirmation. -->
+                                <!-- All three tiles share one fixed label width and a fixed-height label area
+                                     (labels centered, wrapping to two lines), so the tiles stay equal-width
+                                     and their big numbers line up even though "Worked Countries, not
+                                     confirmed" wraps and the others do not. -->
                                 <Border x:Name="TileConfirmed" Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="#2E9E4F" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed (LoTW)" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                        <Grid Height="44">
+                                            <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed Countries" Width="150" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                        </Grid>
                                         <TextBlock x:Name="TB_ConfirmedDxcc" FontSize="30" FontWeight="Bold" Foreground="#2E9E4F" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked / DXCC" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                        <Grid Height="44">
+                                            <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked Countries, not confirmed" Width="150" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                        </Grid>
                                         <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
                                 <Border Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Danger}" BorderThickness="1">
                                     <StackPanel>
-                                        <TextBlock x:Name="TB_MissingTileLabel" Text="Missing DXCC" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                        <Grid Height="44">
+                                            <TextBlock x:Name="TB_MissingTileLabel" Text="Missing Countries" Width="150" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                        </Grid>
                                         <TextBlock x:Name="TB_MissingDxcc" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>

@@ -464,7 +464,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -505,6 +505,7 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("clublog_qsl_rcvd"));
                 insertSQL.Parameters.Add(new SQLiteParameter("clublog_qsl_rdate"));
                 insertSQL.Parameters.Add(new SQLiteParameter("clublog_deleted_entity"));
+                insertSQL.Parameters.Add(new SQLiteParameter("paper_qsl_rcvd"));
 
                 foreach (var qso in qsos)
                 {
@@ -545,6 +546,7 @@ Environment.NewLine +
                     insertSQL.Parameters[34].Value = qso.ClublogQslRcvd;
                     insertSQL.Parameters[35].Value = (object)qso.ClublogQslRDate ?? DBNull.Value;
                     insertSQL.Parameters[36].Value = qso.ClublogDeletedEntity;
+                    insertSQL.Parameters[37].Value = qso.PaperQslRcvd;
 
                     try
                     {
@@ -784,6 +786,7 @@ Environment.NewLine +
                         if (rdr["clublog_qsl_rcvd"] != null && rdr["clublog_qsl_rcvd"] != DBNull.Value) q.ClublogQslRcvd = Convert.ToInt32(rdr["clublog_qsl_rcvd"]);
                         if (rdr["clublog_qsl_rdate"] != null && rdr["clublog_qsl_rdate"] != DBNull.Value) q.ClublogQslRDate = rdr["clublog_qsl_rdate"].ToString();
                         if (rdr["clublog_deleted_entity"] != null && rdr["clublog_deleted_entity"] != DBNull.Value) q.ClublogDeletedEntity = Convert.ToInt32(rdr["clublog_deleted_entity"]);
+                        if (rdr["paper_qsl_rcvd"] != null && rdr["paper_qsl_rcvd"] != DBNull.Value) q.PaperQslRcvd = Convert.ToInt32(rdr["paper_qsl_rcvd"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -866,6 +869,7 @@ Environment.NewLine +
                         if (rdr["clublog_qsl_rcvd"] != null && rdr["clublog_qsl_rcvd"] != DBNull.Value) q.ClublogQslRcvd = Convert.ToInt32(rdr["clublog_qsl_rcvd"]);
                         if (rdr["clublog_qsl_rdate"] != null && rdr["clublog_qsl_rdate"] != DBNull.Value) q.ClublogQslRDate = rdr["clublog_qsl_rdate"].ToString();
                         if (rdr["clublog_deleted_entity"] != null && rdr["clublog_deleted_entity"] != DBNull.Value) q.ClublogDeletedEntity = Convert.ToInt32(rdr["clublog_deleted_entity"]);
+                        if (rdr["paper_qsl_rcvd"] != null && rdr["paper_qsl_rcvd"] != DBNull.Value) q.PaperQslRcvd = Convert.ToInt32(rdr["paper_qsl_rcvd"]);
                             if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                             q.StandartizeQSO();
@@ -994,6 +998,7 @@ Environment.NewLine +
                         if (rdr["clublog_qsl_rcvd"] != null && rdr["clublog_qsl_rcvd"] != DBNull.Value) q.ClublogQslRcvd = Convert.ToInt32(rdr["clublog_qsl_rcvd"]);
                         if (rdr["clublog_qsl_rdate"] != null && rdr["clublog_qsl_rdate"] != DBNull.Value) q.ClublogQslRDate = rdr["clublog_qsl_rdate"].ToString();
                         if (rdr["clublog_deleted_entity"] != null && rdr["clublog_deleted_entity"] != DBNull.Value) q.ClublogDeletedEntity = Convert.ToInt32(rdr["clublog_deleted_entity"]);
+                        if (rdr["paper_qsl_rcvd"] != null && rdr["paper_qsl_rcvd"] != DBNull.Value) q.PaperQslRcvd = Convert.ToInt32(rdr["paper_qsl_rcvd"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -2071,6 +2076,44 @@ Environment.NewLine +
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // The Paper QSL confirmation column - a single manual flag (1 = the operator received this QSO's
+        // paper card by post). No date / deleted-entity columns: it is hand-marked, not downloaded, so
+        // there is no service-supplied confirmation date or DXCC code to store. Idempotent.
+        private void AddPaperConfirmationColumn()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'paper_qsl_rcvd'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [paper_qsl_rcvd] INTEGER NOT NULL DEFAULT 0", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Sets (or clears) the manual Paper QSL flag on one QSO and persists it immediately - called when
+        // the operator ticks/unticks the Paper QSL checkbox in the log grid.
+        public void SetPaperQslConfirmed(long qsoId, bool confirmed)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return;
+                using (var cmd = new SQLiteCommand("UPDATE qso SET paper_qsl_rcvd = @v WHERE Id = @id", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@v", confirmed ? 1 : 0));
+                    cmd.Parameters.Add(new SQLiteParameter("@id", qsoId));
+                    cmd.ExecuteNonQuery();
+                }
+            }
         }
 
         // One confirmation as LoTW - or QRZ, or eQSL - reported it. A service-neutral carrier: each source
@@ -3255,6 +3298,7 @@ Environment.NewLine +
             AddQrzConfirmationColumns();
             AddEqslConfirmationColumns();
             AddClublogConfirmationColumns();
+            AddPaperConfirmationColumn();
             AddClublogColumn();
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();

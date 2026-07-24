@@ -314,6 +314,20 @@ namespace HolyLogger
 
         private void Btn_Clear_Click(object sender, RoutedEventArgs e) => ClearAll();
 
+        // Paper QSL checkbox toggled in the search results. The two-way binding has already updated the
+        // QSO; persist it and tell the Statistics window (if open) so its Paper QSL folder recomputes.
+        private void PaperQsl_Changed(object sender, RoutedEventArgs e)
+        {
+            if (!((sender as CheckBox)?.DataContext is QSO qso)) return;
+            try
+            {
+                DataAccess.GetInstance()?.SetPaperQslConfirmed(qso.id, qso.PaperQslConfirmed);
+                var stats = Application.Current?.Windows.OfType<StatisticsWindow>().FirstOrDefault();
+                if (stats != null && stats.IsLoaded) stats.NotifyPaperQslChanged(qso.id, qso.PaperQslConfirmed);
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
         private void ClearAll()
         {
             TB_Prefix.Text          = "";

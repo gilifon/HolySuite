@@ -1548,6 +1548,18 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <!-- Paper QSL: the ONLY editable confirmation column. Tick it when the paper card arrives
+                     by post; it persists immediately and the Statistics ▸ Paper QSL folder recomputes. -->
+                <DataGridTemplateColumn Header="Paper QSL" IsReadOnly="True" SortMemberPath="PaperQslStatusRank" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      IsChecked="{Binding PaperQslConfirmed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Checked="PaperQsl_Changed" Unchecked="PaperQsl_Changed"
+                                      ToolTip="Tick when you receive this QSO's paper QSL card by post"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

@@ -656,6 +656,17 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <!-- Paper QSL: editable here too, so a searched QSO can be marked when its card arrives. -->
+                <DataGridTemplateColumn Header="Paper QSL" IsReadOnly="True" SortMemberPath="PaperQslStatusRank" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      IsChecked="{Binding PaperQslConfirmed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Checked="PaperQsl_Changed" Unchecked="PaperQsl_Changed"
+                                      ToolTip="Tick when you receive this QSO's paper QSL card by post"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

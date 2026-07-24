@@ -184,6 +184,12 @@ namespace HolyParser
                         adif.AppendFormat("<app_holylogger_clublog_qslrdate:{0}>{1}", qso.ClublogQslRDate.Length, qso.ClublogQslRDate);
                     if (qso.ClublogDeletedEntity == 1) adif.Append("<app_holylogger_clublog_deleted:1>Y");
                 }
+                if (qso.PaperQslRcvd == 1)
+                {
+                    // Manual paper-QSL mark, round-tripped through a HolyLogger-private APP_ field (like
+                    // QRZ / Club Log) so re-import keeps it.
+                    adif.Append("<app_holylogger_paper_qsl_rcvd:1>Y");
+                }
                 adif.AppendLine("<eor>");
             }
 
