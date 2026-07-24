@@ -168,6 +168,13 @@ namespace HolyParser
                         adif.AppendFormat("<app_holylogger_qrz_qslrdate:{0}>{1}", qso.QrzQslRDate.Length, qso.QrzQslRDate);
                     if (qso.QrzDeletedEntity == 1) adif.Append("<app_holylogger_qrz_deleted:1>Y");
                 }
+                if (qso.EqslQslRcvd == 1)
+                {
+                    // eQSL uses the STANDARD ADIF fields (other loggers read them too).
+                    adif.Append("<eqsl_qsl_rcvd:1>Y");
+                    if (!string.IsNullOrWhiteSpace(qso.EqslQslRDate))
+                        adif.AppendFormat("<eqsl_qslrdate:{0}>{1}", qso.EqslQslRDate.Length, qso.EqslQslRDate);
+                }
                 adif.AppendLine("<eor>");
             }
 

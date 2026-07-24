@@ -488,6 +488,12 @@
     <Setting Name="QrzConfirmedDeletedCodes" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>
+    <Setting Name="EqslConfirmedEntities" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="EqslConfirmedDeletedCodes" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
     <Setting Name="ActiveProfile" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

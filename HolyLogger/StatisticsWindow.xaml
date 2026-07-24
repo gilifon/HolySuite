@@ -230,6 +230,15 @@
                                                 </ToolTip>
                                             </Button.ToolTip>
                                         </Button>
+                                        <Button x:Name="BTN_CheckEqsl" Content="Get All eQSL Confirmations" FontSize="12" Padding="8,3"
+                                                Margin="8,0,0,0" VerticalAlignment="Center" Click="BTN_CheckEqsl_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads your eQSL In Box (the cards other stations sent you) for every eQSL account and marks the confirmed QSOs with the eQSL tick.&#10;&#10;eQSL confirmations are a different set from LoTW and QRZ — they have their own column.&#10;&#10;Uses the accounts in Options ▸ eQSL."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
                                     </StackPanel>
                                     <TextBlock x:Name="TB_LotwStatus" FontSize="16" FontWeight="Bold" MaxWidth="345"
                                                HorizontalAlignment="Left" TextWrapping="Wrap" Foreground="#2E9E4F"/>
@@ -330,6 +339,9 @@
                                                 </Ellipse.RenderTransform>
                                             </Ellipse>
                                         </Grid>
+                                        <Button x:Name="BTN_StopCheck" Content="Stop" FontSize="13" Padding="16,4"
+                                                Margin="0,16,0,0" HorizontalAlignment="Center"
+                                                Click="BTN_StopCheck_Click"/>
                                     </StackPanel>
                                 </Border>
                                 </Grid>

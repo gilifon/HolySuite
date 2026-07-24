@@ -156,7 +156,8 @@ namespace HolyLogger
         // Downloads every CONFIRMED QSO from the logbook this key belongs to. QRZ has no "changed since"
         // that helps here the way LoTW's qslsince does, and the whole confirmed set is small and cheap
         // (a few hundred KB), so this always fetches all of them; the caller marks with fullReset.
-        public static async Task<QrzFetchResult> FetchConfirmationsAsync(string apiKey)
+        public static async Task<QrzFetchResult> FetchConfirmationsAsync(string apiKey,
+                                                                         System.Threading.CancellationToken ct = default(System.Threading.CancellationToken))
         {
             var result = new QrzFetchResult();
             if (string.IsNullOrWhiteSpace(apiKey)) { result.Reason = "auth"; return result; }
@@ -173,11 +174,12 @@ namespace HolyLogger
             try
             {
                 using (var content = new FormUrlEncodedContent(fields))
-                using (HttpResponseMessage resp = await _http.PostAsync(Endpoint, content))
+                using (HttpResponseMessage resp = await _http.PostAsync(Endpoint, content, ct))
                 {
                     body = await resp.Content.ReadAsStringAsync();
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 result.NetworkError = true;

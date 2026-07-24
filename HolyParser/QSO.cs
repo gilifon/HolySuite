@@ -149,6 +149,21 @@ namespace HolyParser
         public int QrzStatusRank =>
             QrzQslRcvd == 1 ? (QrzDeletedEntity == 1 ? 1 : 2) : 0;
 
+        // eQSL CONFIRMATION: 1 when the QSO is confirmed in the eQSL In Box (EQSL_QSL_RCVD = Y). Tracked
+        // separately from the eQSL UPLOAD state (EqslStatus). Set from the eQSL In Box download.
+        public int EqslQslRcvd { get; set; }
+
+        // The date eQSL recorded the confirmation (EQSL_QSLRDATE, yyyyMMdd). Empty when unconfirmed.
+        public string EqslQslRDate { get; set; }
+
+        // 1 when the eQSL-confirmed entity is a DELETED DXCC entity. eQSL's download carries no <DXCC>,
+        // so this is resolved from the callsign via cty.dat (current-only) and is only approximate.
+        public int EqslDeletedEntity { get; set; }
+
+        // Three-level eQSL status for sorting the eQSL column, like LotwStatusRank.
+        public int EqslStatusRank =>
+            EqslQslRcvd == 1 ? (EqslDeletedEntity == 1 ? 1 : 2) : 0;
+
         // Name of the log this QSO belongs to. Display-only: filled in by the upload-queue queries so the
         // (global) queue window can show which log each pending/dismissed QSO came from. Not persisted.
         public string LogName { get; set; }

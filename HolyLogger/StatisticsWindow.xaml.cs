@@ -45,8 +45,19 @@ namespace HolyLogger
         // The confirmation source whose analysis the window is currently showing - one folder each in the
         // vertical tab strip. "Worked" is the plain log with no confirmation overlay; the rest color the
         // worked list by that service's confirmations. Only LoTW and QRZ are wired in this first step.
-        private enum ConfSource { Worked, Lotw, Qrz }
+        private enum ConfSource { Worked, Lotw, Qrz, Eqsl, Clublog }
         private ConfSource _source = ConfSource.Worked;
+
+        // Cancels the running Check (download + marking) when the operator presses Stop. A fresh source
+        // is created at the start of each Check.
+        private System.Threading.CancellationTokenSource _checkCts;
+
+        private void BTN_StopCheck_Click(object sender, RoutedEventArgs e)
+        {
+            try { _checkCts?.Cancel(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            BTN_StopCheck.IsEnabled = false;
+            TB_LotwLoadingSub.Text = "Stopping…";
+        }
 
         private enum WorkedSort { CountDesc, CountAsc, NameAsc, NameDesc, ConfirmedDesc, ConfirmedAsc }
         private enum MissingSort { NameAsc, NameDesc }
@@ -521,6 +532,7 @@ namespace HolyLogger
             {
                 case ConfSource.Lotw: return q.LotwQslRcvd == 1;
                 case ConfSource.Qrz:  return q.QrzQslRcvd == 1;
+                case ConfSource.Eqsl: return q.EqslQslRcvd == 1;
                 default:              return true;
             }
         }
@@ -540,6 +552,13 @@ namespace HolyLogger
                 AddSourceFolder(ConfSource.Lotw, "LoTW");
             if (s.UseQrzLogbook || !string.IsNullOrWhiteSpace(s.QrzConfirmedEntities))
                 AddSourceFolder(ConfSource.Qrz, "QRZ");
+            // eQSL is configured by the per-callsign accounts table, so show the folder when an account
+            // exists (or the service is on, or a past download left a cache).
+            bool hasEqsl = false;
+            try { hasEqsl = (DataAccess.GetInstance()?.GetEqslAccounts().Count ?? 0) > 0; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (s.UseEqslService || hasEqsl || !string.IsNullOrWhiteSpace(s.EqslConfirmedEntities))
+                AddSourceFolder(ConfSource.Eqsl, "eQSL");
             LB_Source.SelectedIndex = 0;   // Worked; fires LB_Source_SelectionChanged -> RefreshForSource
         }
 
@@ -551,22 +570,31 @@ namespace HolyLogger
         // The light tint that identifies each confirmation source - used both for the folder tab and for
         // the per-source content area, so the two always match. (eQSL / Club Log / Paper are listed for
         // when those folders are added.)
-        private static readonly Dictionary<ConfSource, System.Windows.Media.Brush> _sourceBrushes =
-            new Dictionary<ConfSource, System.Windows.Media.Brush>();
+        private static readonly Dictionary<string, System.Windows.Media.Brush> _sourceBrushes =
+            new Dictionary<string, System.Windows.Media.Brush>();
 
+        // The tab / page colours reuse the app's OWN defined background colours, so the folders match the
+        // rest of the UI and follow any scheme customization: Worked = the on-radio-frequency green
+        // (RowOnFreqBg), LoTW = the LoTW-user yellow (RowLotwBg), QRZ = the main-form blue (FormBg).
+        // eQSL uses the fixed Msg-button purple; Club Log a light brown.
         private static System.Windows.Media.Brush SourceBackground(ConfSource src)
         {
-            if (_sourceBrushes.TryGetValue(src, out var cached)) return cached;
-            string hex;
             switch (src)
             {
-                case ConfSource.Lotw: hex = "#FFF8E1"; break;   // light yellow
-                case ConfSource.Qrz:  hex = "#E8F5E9"; break;   // light green
-                default:              hex = "#BDDFFF"; break;   // Worked (pure analysis) = light blue (the app's form blue)
+                case ConfSource.Lotw:    return ThemeManager.Brush("RowLotwBg");     // LoTW-user yellow
+                case ConfSource.Qrz:     return ThemeManager.Brush("FormBg");         // main-form blue
+                case ConfSource.Eqsl:    return HexBrush("#E6CCFF");                  // purple (the Msg buttons)
+                case ConfSource.Clublog: return HexBrush("#EAD9BF");                  // light brown
+                default:                 return ThemeManager.Brush("RowOnFreqBg");    // Worked = on-frequency green
             }
+        }
+
+        private static System.Windows.Media.Brush HexBrush(string hex)
+        {
+            if (_sourceBrushes.TryGetValue(hex, out var cached)) return cached;
             var b = (System.Windows.Media.SolidColorBrush)new System.Windows.Media.BrushConverter().ConvertFromString(hex);
             b.Freeze();
-            _sourceBrushes[src] = b;
+            _sourceBrushes[hex] = b;
             return b;
         }
 
@@ -608,6 +636,8 @@ namespace HolyLogger
                 BTN_CheckLotw.Visibility = _source == ConfSource.Lotw ? Visibility.Visible : Visibility.Collapsed;
             if (BTN_CheckQrz != null)
                 BTN_CheckQrz.Visibility = _source == ConfSource.Qrz ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_CheckEqsl != null)
+                BTN_CheckEqsl.Visibility = _source == ConfSource.Eqsl ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // Restore the last downloaded confirmed-entity set so the colors/count show immediately on open
@@ -619,6 +649,7 @@ namespace HolyLogger
             string cached =
                 _source == ConfSource.Lotw ? Properties.Settings.Default.LotwConfirmedEntities :
                 _source == ConfSource.Qrz  ? Properties.Settings.Default.QrzConfirmedEntities  :
+                _source == ConfSource.Eqsl ? Properties.Settings.Default.EqslConfirmedEntities :
                 string.Empty;
             if (string.IsNullOrWhiteSpace(cached)) return;
             foreach (var n in cached.Split('|'))
@@ -647,6 +678,7 @@ namespace HolyLogger
             string csv =
                 _source == ConfSource.Lotw ? Properties.Settings.Default.LotwConfirmedDeletedCodes :
                 _source == ConfSource.Qrz  ? Properties.Settings.Default.QrzConfirmedDeletedCodes  :
+                _source == ConfSource.Eqsl ? Properties.Settings.Default.EqslConfirmedDeletedCodes :
                 string.Empty;
             if (string.IsNullOrWhiteSpace(csv)) return 0;
             var set = new HashSet<int>();
@@ -657,7 +689,9 @@ namespace HolyLogger
 
         // The current source's display name, for the confirmed tile and status line.
         private string SourceName =>
-            _source == ConfSource.Lotw ? "LoTW" : _source == ConfSource.Qrz ? "QRZ" : "Worked";
+            _source == ConfSource.Lotw ? "LoTW" :
+            _source == ConfSource.Qrz  ? "QRZ" :
+            _source == ConfSource.Eqsl ? "eQSL" : "Worked";
 
         private void ApplyConfirmedHighlight()
         {
@@ -1046,6 +1080,10 @@ namespace HolyLogger
             string sinceDisplay = incremental ? PrettySince(s.LotwLastQsl) : string.Empty;
 
             BTN_CheckLotw.IsEnabled = false;
+            LB_Source.IsEnabled = false;   // no folder switching mid-download/mark (it would block the UI)
+            _checkCts = new System.Threading.CancellationTokenSource();
+            var ct = _checkCts.Token;
+            BTN_StopCheck.IsEnabled = true;
             TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;   // clear any prior error red
             TB_LotwStatus.Text = incremental
                 ? "Checking LoTW for new confirmations…"
@@ -1090,7 +1128,7 @@ namespace HolyLogger
                     // AutomaticDecompression above means the stream we read is already un-gzipped.
                     var sb = new System.Text.StringBuilder();
                     int eor = 0;
-                    using (var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead))
+                    using (var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct))
                     using (var stream = await resp.Content.ReadAsStreamAsync())
                     using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
                     {
@@ -1099,6 +1137,7 @@ namespace HolyLogger
                         int n;
                         while ((n = await reader.ReadAsync(buf, 0, buf.Length)) > 0)
                         {
+                            ct.ThrowIfCancellationRequested();
                             sb.Append(buf, 0, n);
 
                             string hay = carry + new string(buf, 0, n);
@@ -1181,7 +1220,7 @@ namespace HolyLogger
                 });
 
                 LotwRunResult result = await Task.Run(() =>
-                    ProcessLotwConfirmations(recordsBody, incremental, boundaryDate, seenKeys, confirmedSnapshot, progress));
+                    ProcessLotwConfirmations(recordsBody, incremental, boundaryDate, seenKeys, confirmedSnapshot, progress, ct));
 
                 // Locals the UI-thread tail below still expects.
                 int qslCount = result.QslCount;
@@ -1250,6 +1289,13 @@ namespace HolyLogger
                 if (!incremental)
                     ShowFullDownloadSummary(qslCount, markedConfirmed);
             }
+            catch (OperationCanceledException)
+            {
+                TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
+                TB_LotwStatus.Text = "";
+                HolyMessageBox.Show("LoTW update stopped — no changes were made.",
+                    "LoTW confirmations", HolyMsgType.Info, this);
+            }
             catch (Exception ex)
             {
                 TB_LotwStatus.Foreground = System.Windows.Media.Brushes.IndianRed;
@@ -1259,6 +1305,9 @@ namespace HolyLogger
             {
                 ShowLotwSpinner(false);
                 BTN_CheckLotw.IsEnabled = true;
+                LB_Source.IsEnabled = true;
+                _checkCts?.Dispose();
+                _checkCts = null;
             }
         }
 
@@ -1289,12 +1338,16 @@ namespace HolyLogger
             }
 
             BTN_CheckQrz.IsEnabled = false;
+            LB_Source.IsEnabled = false;   // no folder switching mid-download/mark (it would block the UI)
+            _checkCts = new System.Threading.CancellationTokenSource();
+            var ct = _checkCts.Token;
+            BTN_StopCheck.IsEnabled = true;
             TB_LotwLoadingText.Text = "Downloading confirmations from QRZ…";
             TB_LotwLoadingSub.Text = "Reading your confirmed QSOs from QRZ.com.";
             ShowLotwSpinner(true);
             try
             {
-                QrzLogbookService.QrzFetchResult fetch = await QrzLogbookService.FetchConfirmationsAsync(key);
+                QrzLogbookService.QrzFetchResult fetch = await QrzLogbookService.FetchConfirmationsAsync(key, ct);
 
                 if (fetch.NetworkError)
                 {
@@ -1320,9 +1373,12 @@ namespace HolyLogger
                 // thread because the DB marking takes the connection lock and can run long on a big log.
                 TB_LotwLoadingText.Text = $"Marking {confirmations.Count:N0} confirmed QSO(s)…";
                 TB_LotwLoadingSub.Text = "Matching each QRZ confirmation to your logs.";
+                TB_LotwLoadingText.Text = $"Marking QRZ confirmations…  0 of {confirmations.Count:N0}";
+                var markProgress = new Progress<int>(done =>
+                    TB_LotwLoadingText.Text = $"Marking QRZ confirmations…  {done:N0} of {confirmations.Count:N0}");
                 List<DataAccess.LotwConfirmation> unmatched = null;
                 int marked = await Task.Run(() =>
-                    Dal.MarkQrzConfirmed(confirmations, true, out unmatched));
+                    Dal.MarkQrzConfirmed(confirmations, true, ((IProgress<int>)markProgress).Report, ct, out unmatched));
 
                 // The marks went into the database; the open grid is showing QSO objects read when the
                 // log was opened, so re-read them for the QRZ ticks to appear now rather than on restart.
@@ -1355,6 +1411,11 @@ namespace HolyLogger
 
                 ShowQrzDownloadSummary(fetch.Count);
             }
+            catch (OperationCanceledException)
+            {
+                HolyMessageBox.Show("QRZ update stopped — no changes were made.",
+                    "QRZ confirmations", HolyMsgType.Info, this);
+            }
             catch (Exception ex)
             {
                 HolyMessageBox.Show("QRZ download failed: " + ex.Message,
@@ -1364,6 +1425,9 @@ namespace HolyLogger
             {
                 ShowLotwSpinner(false);
                 BTN_CheckQrz.IsEnabled = true;
+                LB_Source.IsEnabled = true;
+                _checkCts?.Dispose();
+                _checkCts = null;
             }
         }
 
@@ -1402,6 +1466,153 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             HolyMessageBox.Show(text.ToString().TrimEnd(), "QRZ confirmations updated", HolyMsgType.Info, this);
+        }
+
+        // The eQSL side of the confirmation feature. eQSL is per-callsign, so this loops over every eQSL
+        // account (Options ▸ eQSL) and downloads that account's In Box (received cards). eQSL's download
+        // carries no <DXCC>, so the deleted-entity split is resolved from the callsign via cty.dat and is
+        // only approximate. Always a full rebuild.
+        private async void BTN_CheckEqsl_Click(object sender, RoutedEventArgs e)
+        {
+            List<EqslAccount> accounts;
+            try { accounts = Dal?.GetEqslAccounts() ?? new List<EqslAccount>(); }
+            catch (Exception ex) { HolyMessageBox.Show("Couldn't read eQSL accounts: " + ex.Message, "eQSL confirmations", HolyMsgType.Warning, this); return; }
+
+            accounts = accounts.Where(a => !string.IsNullOrWhiteSpace(a.Username) && !string.IsNullOrWhiteSpace(a.Password)).ToList();
+            if (accounts.Count == 0)
+            {
+                bool openOptions = HolyMessageBox.ShowConfirm(
+                    "No eQSL account with a user name and password is set, so eQSL confirmations can't be downloaded.\n\n" +
+                    "Open Options → eQSL to add one now?",
+                    "eQSL account needed", HolyMsgType.Warning, this);
+                if (openOptions)
+                {
+                    var opts = new OptionsWindow();
+                    opts.Owner = this;
+                    opts.EqslItem.IsSelected = true;
+                    opts.ShowDialog();
+                }
+                return;
+            }
+
+            BTN_CheckEqsl.IsEnabled = false;
+            LB_Source.IsEnabled = false;   // no folder switching mid-download/mark (it would block the UI)
+            _checkCts = new System.Threading.CancellationTokenSource();
+            var ct = _checkCts.Token;
+            BTN_StopCheck.IsEnabled = true;
+            ShowLotwSpinner(true);
+            try
+            {
+                // Download each account's In Box; stamp the account callsign on every confirmation so the
+                // match is scoped to that operator.
+                var all = new List<DataAccess.LotwConfirmation>();
+                var failed = new List<string>();
+                int idx = 0;
+                foreach (var acct in accounts)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    idx++;
+                    TB_LotwLoadingText.Text = $"Downloading eQSL In Box… ({idx} of {accounts.Count})";
+                    TB_LotwLoadingSub.Text = $"Account {acct.Callsign}";
+                    var r = await EqslConfirmationService.FetchInboxAsync(acct.Username, acct.Password, acct.Callsign, ct);
+                    if (r.Ok) all.AddRange(r.Confirmations);
+                    else if (r.NetworkError) { failed.Add($"{acct.Callsign}: no connection"); }
+                    else failed.Add($"{acct.Callsign}: {r.Reason}");
+                }
+
+                if (all.Count == 0)
+                {
+                    string why = failed.Count > 0 ? "\n\n" + string.Join("\n", failed) : "";
+                    HolyMessageBox.Show("No eQSL confirmations were downloaded." + why,
+                        "eQSL confirmations", HolyMsgType.Warning, this);
+                    return;
+                }
+
+                TB_LotwLoadingText.Text = $"Marking eQSL confirmations…  0 of {all.Count:N0}";
+                TB_LotwLoadingSub.Text = "Matching each eQSL confirmation to your logs.";
+                // Live counter: MarkConfirmedCore reports its running count; Progress<int> marshals each
+                // update back to the UI thread so the number climbs instead of just a spinner turning.
+                var markProgress = new Progress<int>(done =>
+                    TB_LotwLoadingText.Text = $"Marking eQSL confirmations…  {done:N0} of {all.Count:N0}");
+                List<DataAccess.LotwConfirmation> unmatched = null;
+                int marked = await Task.Run(() =>
+                    Dal.MarkEqslConfirmed(all, true, ((IProgress<int>)markProgress).Report, ct, out unmatched));
+
+                if (marked > 0)
+                {
+                    try { (Application.Current.Windows.OfType<MainWindow>().FirstOrDefault())?.ReloadActiveLogQsos(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                // Cache the eQSL confirmed-entity set (resolved from callsigns). eQSL sends no <DXCC> and
+                // the cty.dat resolver exposes only the (current) entity name, not a code, so the deleted-
+                // entity split isn't available for eQSL - left empty (a known caveat, not a bug).
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var c in all)
+                {
+                    string name = Resolve(c.Call)?.Name;
+                    if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                        names.Add(name);
+                }
+                var s = Properties.Settings.Default;
+                s.EqslConfirmedEntities = string.Join("|", names);
+                s.EqslConfirmedDeletedCodes = string.Empty;
+                s.Save();
+
+                ReloadQsosAfterCheck();
+                ShowEqslDownloadSummary(all.Count, failed);
+            }
+            catch (OperationCanceledException)
+            {
+                // The marking rolls its transaction back on cancel, so nothing was changed.
+                HolyMessageBox.Show("eQSL update stopped — no changes were made.",
+                    "eQSL confirmations", HolyMsgType.Info, this);
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.Show("eQSL download failed: " + ex.Message,
+                    "eQSL confirmations", HolyMsgType.Warning, this);
+            }
+            finally
+            {
+                ShowLotwSpinner(false);
+                BTN_CheckEqsl.IsEnabled = true;
+                LB_Source.IsEnabled = true;
+                _checkCts?.Dispose();
+                _checkCts = null;
+            }
+        }
+
+        private void ShowEqslDownloadSummary(int downloaded, List<string> failed)
+        {
+            var text = new System.Text.StringBuilder();
+            text.AppendLine($"Downloaded {downloaded:N0} received eQSL(s) from your In Box.");
+            text.AppendLine();
+            try
+            {
+                var perLog = Dal?.GetEqslConfirmedCountsByLog() ?? new List<KeyValuePair<string, int>>();
+                int totalMarked = perLog.Sum(p => p.Value);
+                if (perLog.Count == 0)
+                    text.AppendLine("No QSO in any of your logs matched an eQSL confirmation yet.");
+                else if (perLog.Count == 1)
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on eQSL.");
+                else
+                {
+                    text.AppendLine($"{totalMarked:N0} QSO(s) are now marked eQSL-confirmed, across all your logs:");
+                    text.AppendLine();
+                    foreach (var p in perLog)
+                        text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (failed != null && failed.Count > 0)
+            {
+                text.AppendLine();
+                text.AppendLine("Some accounts could not be downloaded:");
+                foreach (var f in failed) text.AppendLine("    • " + f);
+            }
+            HolyMessageBox.Show(text.ToString().TrimEnd(), "eQSL confirmations updated", HolyMsgType.Info, this);
         }
 
         // Reports the outcome of a full confirmation download, and shows plainly that the marks reached
@@ -1471,7 +1682,8 @@ namespace HolyLogger
         private LotwRunResult ProcessLotwConfirmations(
             string recordsBody, bool incremental, string boundaryDate,
             HashSet<string> seenKeys, HashSet<string> confirmedSnapshot,
-            IProgress<(string label, int done, int total)> progress)
+            IProgress<(string label, int done, int total)> progress,
+            System.Threading.CancellationToken ct)
         {
             var records = System.Text.RegularExpressions.Regex.Split(
                 recordsBody, "<eor>", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -1573,7 +1785,8 @@ namespace HolyLogger
             int totalConf = confirmations.Count;
             Action<int> matchProgress = n => progress?.Report(("Matching to your log", n, totalConf));
             List<DataAccess.LotwConfirmation> unmatched = null;
-            try { result.MarkedConfirmed = DataAccess.GetInstance()?.MarkLotwConfirmed(confirmations, !incremental, matchProgress, out unmatched) ?? 0; }
+            try { result.MarkedConfirmed = DataAccess.GetInstance()?.MarkLotwConfirmed(confirmations, !incremental, matchProgress, ct, out unmatched) ?? 0; }
+            catch (OperationCanceledException) { throw; }   // let Stop propagate (transaction rolled back)
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             try { WriteUnmatchedReport(confirmations.Count, result.MarkedConfirmed, unmatched); }

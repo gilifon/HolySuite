@@ -1876,6 +1876,30 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EqslConfirmedEntities {
+            get {
+                return ((string)(this["EqslConfirmedEntities"]));
+            }
+            set {
+                this["EqslConfirmedEntities"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EqslConfirmedDeletedCodes {
+            get {
+                return ((string)(this["EqslConfirmedDeletedCodes"]));
+            }
+            set {
+                this["EqslConfirmedDeletedCodes"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ActiveProfile {
             get {
                 return ((string)(this["ActiveProfile"]));

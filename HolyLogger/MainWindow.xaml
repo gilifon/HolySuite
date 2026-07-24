@@ -1504,6 +1504,28 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <!-- eQSL confirmation tick, parallel to LoTW/QRZ. Green = confirmed (eQSL sends no DXCC so
+                     the deleted split is unavailable — always green). Sorted via EqslStatusRank. -->
+                <DataGridTemplateColumn Header="eQSL" IsReadOnly="True" SortMemberPath="EqslStatusRank" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value=""/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding EqslQslRcvd}" Value="1">
+                                                <Setter Property="Text" Value="&#x2713;"/>
+                                                <Setter Property="Foreground" Value="#1E7E34"/>
+                                                <Setter Property="ToolTip" Value="Confirmed on eQSL"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

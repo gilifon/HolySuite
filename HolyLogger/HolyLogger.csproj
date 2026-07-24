@@ -232,6 +232,7 @@
     <Compile Include="LotwUploader.cs" />
     <Compile Include="ClublogService.cs" />
     <Compile Include="CredentialStore.cs" />
+    <Compile Include="EqslConfirmationService.cs" />
     <Compile Include="QrzLogbookService.cs" />
     <Compile Include="WaveOutPlayer.cs" />
     <Compile Include="TqslStationData.cs" />

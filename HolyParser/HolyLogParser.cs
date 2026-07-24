@@ -495,6 +495,10 @@ namespace HolyParser
             string qrd = AdifValue(row, "app_holylogger_qrz_qslrdate");
             if (!string.IsNullOrWhiteSpace(qrd)) qso_row.QrzQslRDate = qrd.Trim();
             qso_row.QrzDeletedEntity = AdifYesNo(row, "app_holylogger_qrz_deleted");
+            // eQSL: standard ADIF fields (also read from other loggers' exports).
+            qso_row.EqslQslRcvd = AdifYesNo(row, "eqsl_qsl_rcvd");
+            string erd = AdifValue(row, "eqsl_qslrdate");
+            if (!string.IsNullOrWhiteSpace(erd)) qso_row.EqslQslRDate = erd.Trim();
 
             qso_row.StandartizeQSO();
             return qso_row;
