@@ -499,6 +499,11 @@ namespace HolyParser
             qso_row.EqslQslRcvd = AdifYesNo(row, "eqsl_qsl_rcvd");
             string erd = AdifValue(row, "eqsl_qslrdate");
             if (!string.IsNullOrWhiteSpace(erd)) qso_row.EqslQslRDate = erd.Trim();
+            // Club Log: HolyLogger-private APP_ fields (no standard ADIF field for it).
+            qso_row.ClublogQslRcvd = AdifYesNo(row, "app_holylogger_clublog_qsl_rcvd");
+            string crd = AdifValue(row, "app_holylogger_clublog_qslrdate");
+            if (!string.IsNullOrWhiteSpace(crd)) qso_row.ClublogQslRDate = crd.Trim();
+            qso_row.ClublogDeletedEntity = AdifYesNo(row, "app_holylogger_clublog_deleted");
 
             qso_row.StandartizeQSO();
             return qso_row;

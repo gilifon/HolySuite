@@ -164,6 +164,22 @@ namespace HolyParser
         public int EqslStatusRank =>
             EqslQslRcvd == 1 ? (EqslDeletedEntity == 1 ? 1 : 2) : 0;
 
+        // Club Log CONFIRMATION: 1 when the QSO comes back QSL_RCVD = Y/V in Club Log's getadif.php
+        // whole-log export. Tracked separately from Club Log UPLOAD state. Unlike eQSL, Club Log's
+        // export DOES carry a numeric <DXCC>, so the deleted-entity flag below is authoritative.
+        public int ClublogQslRcvd { get; set; }
+
+        // The date Club Log recorded the confirmation (QSLRDATE, yyyyMMdd). Empty when unconfirmed.
+        public string ClublogQslRDate { get; set; }
+
+        // 1 when the Club Log-confirmed entity is a DELETED DXCC entity. Set from the DXCC code Club Log
+        // returns for the confirmation; meaningless unless ClublogQslRcvd = 1.
+        public int ClublogDeletedEntity { get; set; }
+
+        // Three-level Club Log status for sorting the Club Log column, like LotwStatusRank.
+        public int ClublogStatusRank =>
+            ClublogQslRcvd == 1 ? (ClublogDeletedEntity == 1 ? 1 : 2) : 0;
+
         // Name of the log this QSO belongs to. Display-only: filled in by the upload-queue queries so the
         // (global) queue window can show which log each pending/dismissed QSO came from. Not persisted.
         public string LogName { get; set; }

@@ -1900,6 +1900,68 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ClublogConfirmedEntities {
+            get {
+                return ((string)(this["ClublogConfirmedEntities"]));
+            }
+            set {
+                this["ClublogConfirmedEntities"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string ClublogConfirmedDeletedCodes {
+            get {
+                return ((string)(this["ClublogConfirmedDeletedCodes"]));
+            }
+            set {
+                this["ClublogConfirmedDeletedCodes"] = value;
+            }
+        }
+
+        // How many confirmations each service REPORTED on its last download (not how many matched a QSO
+        // in the log). Shown as "Confirmed on <service>" in the summary frame, like LotwConfirmedQsoCount.
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int QrzConfirmedQsoCount {
+            get {
+                return ((int)(this["QrzConfirmedQsoCount"]));
+            }
+            set {
+                this["QrzConfirmedQsoCount"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int EqslConfirmedQsoCount {
+            get {
+                return ((int)(this["EqslConfirmedQsoCount"]));
+            }
+            set {
+                this["EqslConfirmedQsoCount"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("0")]
+        public int ClublogConfirmedQsoCount {
+            get {
+                return ((int)(this["ClublogConfirmedQsoCount"]));
+            }
+            set {
+                this["ClublogConfirmedQsoCount"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ActiveProfile {
             get {
                 return ((string)(this["ActiveProfile"]));

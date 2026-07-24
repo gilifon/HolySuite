@@ -212,5 +212,143 @@ namespace HolyLogger
             }
             return result;
         }
+
+        // ---- Confirmation DOWNLOAD (getadif.php whole-log export) --------------------------------
+
+        // The outcome of downloading + parsing one callsign's Club Log log. Ok means the ADIF came back
+        // and was parsed (Confirmations may still be empty if nothing is QSL_RCVD = Y/V). NetworkError =
+        // the request never completed; Reason carries a human-readable rejection otherwise.
+        public class ClublogFetchResult
+        {
+            public bool Ok;
+            public bool NetworkError;
+            public string Reason;
+            public int Count;
+            public List<DataAccess.LotwConfirmation> Confirmations = new List<DataAccess.LotwConfirmation>();
+        }
+
+        // Downloads one callsign's whole log from Club Log (getadif.php) and returns the QSOs Club Log
+        // reports confirmed (QSL_RCVD = Y or V). Unlike eQSL, Club Log's export carries a numeric <DXCC>,
+        // so each confirmation's entity is authoritative (the deleted-entity flag is exact). stationCallsign
+        // is stamped on every confirmation so the match is scoped to that operator's QSOs. Never throws
+        // except OperationCanceledException.
+        public static async Task<ClublogFetchResult> FetchLogAsync(string email, string password, string callsign,
+                                                                   System.Threading.CancellationToken ct = default(System.Threading.CancellationToken))
+        {
+            var result = new ClublogFetchResult();
+            if (!HasApiKey || string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password) || string.IsNullOrWhiteSpace(callsign))
+            {
+                result.Reason = "missing application key, credentials, or callsign";
+                return result;
+            }
+
+            string adif;
+            try
+            {
+                var fields = new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>("email", email.Trim()),
+                    new KeyValuePair<string, string>("password", password),
+                    new KeyValuePair<string, string>("call", callsign.Trim().ToUpperInvariant()),
+                    new KeyValuePair<string, string>("api", ApiKey.Trim())
+                };
+                using (var content = new FormUrlEncodedContent(fields))
+                using (var resp = await _http.PostAsync(GetAdifEndpoint, content, ct))
+                    adif = await resp.Content.ReadAsStringAsync();
+            }
+            catch (OperationCanceledException) { throw; }
+            catch
+            {
+                result.NetworkError = true;
+                return result;
+            }
+
+            // A bad login (or a call not in the account) returns Club Log's HTML page, not an ADIF export.
+            string head = (adif ?? string.Empty).TrimStart();
+            if (head.StartsWith("<!DOCTYPE", StringComparison.OrdinalIgnoreCase) || head.StartsWith("<html", StringComparison.OrdinalIgnoreCase))
+            {
+                result.Reason = "Club Log rejected the login (or the callsign is not in this account)";
+                return result;
+            }
+
+            result.Confirmations = ParseLog(adif, callsign.Trim().ToUpperInvariant());
+            result.Count = result.Confirmations.Count;
+            result.Ok = true;
+            return result;
+        }
+
+        // Parses Club Log's getadif.php export (standard length-prefixed ADIF, records ended by <eor>).
+        // Only QSOs Club Log flags confirmed (QSL_RCVD = Y or V) are kept; the numeric <DXCC> and the
+        // <QSLRDATE> are carried through so the caller can mark the exact entity and confirmation date.
+        private static List<DataAccess.LotwConfirmation> ParseLog(string adif, string stationCallsign)
+        {
+            var list = new List<DataAccess.LotwConfirmation>();
+            if (string.IsNullOrEmpty(adif)) return list;
+
+            int eoh = adif.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase);
+            int i = eoh >= 0 ? eoh + 5 : 0;
+            int n = adif.Length;
+
+            var cur = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            while (i < n)
+            {
+                int lt = adif.IndexOf('<', i);
+                if (lt < 0) break;
+                int gt = adif.IndexOf('>', lt + 1);
+                if (gt < 0) break;
+                string tag = adif.Substring(lt + 1, gt - lt - 1);
+                i = gt + 1;
+
+                if (tag.Equals("eor", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddLog(list, cur, stationCallsign);
+                    cur.Clear();
+                    continue;
+                }
+
+                string[] parts = tag.Split(':');       // name : len [ : type ]
+                if (parts.Length < 2) continue;
+                string name = parts[0].Trim();
+                int len;
+                if (!int.TryParse(parts[1].Trim(), out len) || len < 0) continue;
+                if (i + len > n) len = n - i;
+                string val = adif.Substring(i, len);
+                i += len;
+                if (name.Length > 0) cur[name] = val;
+            }
+            AddLog(list, cur, stationCallsign);   // trailing record, if any
+            return list;
+        }
+
+        private static string GetField(Dictionary<string, string> f, string name)
+        {
+            string v;
+            return f.TryGetValue(name, out v) ? (v ?? string.Empty).Trim() : string.Empty;
+        }
+
+        private static void AddLog(List<DataAccess.LotwConfirmation> list, Dictionary<string, string> f, string stationCallsign)
+        {
+            string call = GetField(f, "call");
+            if (string.IsNullOrWhiteSpace(call)) return;
+
+            // ADIF QSL_RCVD enum: Y = confirmed, V = verified (both count); N/R/I do not.
+            string rcvd = GetField(f, "qsl_rcvd");
+            if (!(rcvd.StartsWith("Y", StringComparison.OrdinalIgnoreCase) || rcvd.StartsWith("V", StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            int dxcc = 0;
+            int.TryParse(GetField(f, "dxcc"), out dxcc);
+
+            list.Add(new DataAccess.LotwConfirmation
+            {
+                Call = call,
+                Band = GetField(f, "band"),
+                Mode = GetField(f, "mode"),
+                QsoDate = GetField(f, "qso_date"),
+                QslRDate = GetField(f, "qslrdate"),
+                StationCallsign = stationCallsign,   // scope the match to this operator's QSOs
+                DxccCode = dxcc                       // Club Log DOES send <DXCC>, so the entity is exact
+            });
+        }
     }
 }

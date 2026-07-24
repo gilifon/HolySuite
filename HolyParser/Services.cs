@@ -175,6 +175,15 @@ namespace HolyParser
                     if (!string.IsNullOrWhiteSpace(qso.EqslQslRDate))
                         adif.AppendFormat("<eqsl_qslrdate:{0}>{1}", qso.EqslQslRDate.Length, qso.EqslQslRDate);
                 }
+                if (qso.ClublogQslRcvd == 1)
+                {
+                    // Club Log confirmation is not a standard ADIF field, so it round-trips through
+                    // HolyLogger-private APP_ fields (like QRZ), keeping every tick on re-import.
+                    adif.Append("<app_holylogger_clublog_qsl_rcvd:1>Y");
+                    if (!string.IsNullOrWhiteSpace(qso.ClublogQslRDate))
+                        adif.AppendFormat("<app_holylogger_clublog_qslrdate:{0}>{1}", qso.ClublogQslRDate.Length, qso.ClublogQslRDate);
+                    if (qso.ClublogDeletedEntity == 1) adif.Append("<app_holylogger_clublog_deleted:1>Y");
+                }
                 adif.AppendLine("<eor>");
             }
 

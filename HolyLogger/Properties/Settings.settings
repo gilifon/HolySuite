@@ -494,6 +494,21 @@
     <Setting Name="EqslConfirmedDeletedCodes" Type="System.String" Scope="User">
       <Value Profile="(Default)"></Value>
     </Setting>
+    <Setting Name="ClublogConfirmedEntities" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="ClublogConfirmedDeletedCodes" Type="System.String" Scope="User">
+      <Value Profile="(Default)"></Value>
+    </Setting>
+    <Setting Name="QrzConfirmedQsoCount" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="EqslConfirmedQsoCount" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
+    <Setting Name="ClublogConfirmedQsoCount" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">0</Value>
+    </Setting>
     <Setting Name="ActiveProfile" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
     </Setting>

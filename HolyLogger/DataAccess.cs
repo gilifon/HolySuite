@@ -464,7 +464,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -502,6 +502,9 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("eqsl_qsl_rcvd"));
                 insertSQL.Parameters.Add(new SQLiteParameter("eqsl_qsl_rdate"));
                 insertSQL.Parameters.Add(new SQLiteParameter("eqsl_deleted_entity"));
+                insertSQL.Parameters.Add(new SQLiteParameter("clublog_qsl_rcvd"));
+                insertSQL.Parameters.Add(new SQLiteParameter("clublog_qsl_rdate"));
+                insertSQL.Parameters.Add(new SQLiteParameter("clublog_deleted_entity"));
 
                 foreach (var qso in qsos)
                 {
@@ -539,6 +542,9 @@ Environment.NewLine +
                     insertSQL.Parameters[31].Value = qso.EqslQslRcvd;
                     insertSQL.Parameters[32].Value = (object)qso.EqslQslRDate ?? DBNull.Value;
                     insertSQL.Parameters[33].Value = qso.EqslDeletedEntity;
+                    insertSQL.Parameters[34].Value = qso.ClublogQslRcvd;
+                    insertSQL.Parameters[35].Value = (object)qso.ClublogQslRDate ?? DBNull.Value;
+                    insertSQL.Parameters[36].Value = qso.ClublogDeletedEntity;
 
                     try
                     {
@@ -775,6 +781,9 @@ Environment.NewLine +
                         if (rdr["eqsl_qsl_rcvd"] != null && rdr["eqsl_qsl_rcvd"] != DBNull.Value) q.EqslQslRcvd = Convert.ToInt32(rdr["eqsl_qsl_rcvd"]);
                         if (rdr["eqsl_qsl_rdate"] != null && rdr["eqsl_qsl_rdate"] != DBNull.Value) q.EqslQslRDate = rdr["eqsl_qsl_rdate"].ToString();
                         if (rdr["eqsl_deleted_entity"] != null && rdr["eqsl_deleted_entity"] != DBNull.Value) q.EqslDeletedEntity = Convert.ToInt32(rdr["eqsl_deleted_entity"]);
+                        if (rdr["clublog_qsl_rcvd"] != null && rdr["clublog_qsl_rcvd"] != DBNull.Value) q.ClublogQslRcvd = Convert.ToInt32(rdr["clublog_qsl_rcvd"]);
+                        if (rdr["clublog_qsl_rdate"] != null && rdr["clublog_qsl_rdate"] != DBNull.Value) q.ClublogQslRDate = rdr["clublog_qsl_rdate"].ToString();
+                        if (rdr["clublog_deleted_entity"] != null && rdr["clublog_deleted_entity"] != DBNull.Value) q.ClublogDeletedEntity = Convert.ToInt32(rdr["clublog_deleted_entity"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -854,6 +863,9 @@ Environment.NewLine +
                         if (rdr["eqsl_qsl_rcvd"] != null && rdr["eqsl_qsl_rcvd"] != DBNull.Value) q.EqslQslRcvd = Convert.ToInt32(rdr["eqsl_qsl_rcvd"]);
                         if (rdr["eqsl_qsl_rdate"] != null && rdr["eqsl_qsl_rdate"] != DBNull.Value) q.EqslQslRDate = rdr["eqsl_qsl_rdate"].ToString();
                         if (rdr["eqsl_deleted_entity"] != null && rdr["eqsl_deleted_entity"] != DBNull.Value) q.EqslDeletedEntity = Convert.ToInt32(rdr["eqsl_deleted_entity"]);
+                        if (rdr["clublog_qsl_rcvd"] != null && rdr["clublog_qsl_rcvd"] != DBNull.Value) q.ClublogQslRcvd = Convert.ToInt32(rdr["clublog_qsl_rcvd"]);
+                        if (rdr["clublog_qsl_rdate"] != null && rdr["clublog_qsl_rdate"] != DBNull.Value) q.ClublogQslRDate = rdr["clublog_qsl_rdate"].ToString();
+                        if (rdr["clublog_deleted_entity"] != null && rdr["clublog_deleted_entity"] != DBNull.Value) q.ClublogDeletedEntity = Convert.ToInt32(rdr["clublog_deleted_entity"]);
                             if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                             q.StandartizeQSO();
@@ -979,6 +991,9 @@ Environment.NewLine +
                         if (rdr["eqsl_qsl_rcvd"] != null && rdr["eqsl_qsl_rcvd"] != DBNull.Value) q.EqslQslRcvd = Convert.ToInt32(rdr["eqsl_qsl_rcvd"]);
                         if (rdr["eqsl_qsl_rdate"] != null && rdr["eqsl_qsl_rdate"] != DBNull.Value) q.EqslQslRDate = rdr["eqsl_qsl_rdate"].ToString();
                         if (rdr["eqsl_deleted_entity"] != null && rdr["eqsl_deleted_entity"] != DBNull.Value) q.EqslDeletedEntity = Convert.ToInt32(rdr["eqsl_deleted_entity"]);
+                        if (rdr["clublog_qsl_rcvd"] != null && rdr["clublog_qsl_rcvd"] != DBNull.Value) q.ClublogQslRcvd = Convert.ToInt32(rdr["clublog_qsl_rcvd"]);
+                        if (rdr["clublog_qsl_rdate"] != null && rdr["clublog_qsl_rdate"] != DBNull.Value) q.ClublogQslRDate = rdr["clublog_qsl_rdate"].ToString();
+                        if (rdr["clublog_deleted_entity"] != null && rdr["clublog_deleted_entity"] != DBNull.Value) q.ClublogDeletedEntity = Convert.ToInt32(rdr["clublog_deleted_entity"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -2014,6 +2029,50 @@ Environment.NewLine +
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // The Club Log confirmation columns, parallel to the LoTW/QRZ/eQSL ones. Club Log is a fourth,
+        // independent confirmation universe (getadif.php QSL_RCVD = Y/V), so a QSO can carry any
+        // combination of the four ticks. Idempotent.
+        private void AddClublogConfirmationColumns()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'clublog_qsl_rcvd'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [clublog_qsl_rcvd] INTEGER NOT NULL DEFAULT 0", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'clublog_qsl_rdate'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [clublog_qsl_rdate] nvarchar(20) NULL", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'clublog_deleted_entity'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [clublog_deleted_entity] INTEGER NOT NULL DEFAULT 0", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // One confirmation as LoTW - or QRZ, or eQSL - reported it. A service-neutral carrier: each source
         // gives the same handful of fields and is matched to the log the same way, so the same type feeds
         // MarkLotwConfirmed / MarkQrzConfirmed / MarkEqslConfirmed.
@@ -2113,6 +2172,23 @@ Environment.NewLine +
         public int MarkEqslConfirmed(IList<LotwConfirmation> confirmations, bool fullReset,
                                      Action<int> onProgress, System.Threading.CancellationToken ct, out List<LotwConfirmation> unmatched)
             => MarkConfirmedCore("eqsl_qsl_rcvd", "eqsl_qsl_rdate", "eqsl_deleted_entity",
+                                 confirmations, fullReset, onProgress, ct, out unmatched);
+
+        // Club Log counterparts. Same matching engine, Club Log columns.
+        public int MarkClublogConfirmed(IList<LotwConfirmation> confirmations, out List<LotwConfirmation> unmatched)
+            => MarkClublogConfirmed(confirmations, false, null, out unmatched);
+
+        public int MarkClublogConfirmed(IList<LotwConfirmation> confirmations, bool fullReset, out List<LotwConfirmation> unmatched)
+            => MarkClublogConfirmed(confirmations, fullReset, null, out unmatched);
+
+        public int MarkClublogConfirmed(IList<LotwConfirmation> confirmations, bool fullReset,
+                                        Action<int> onProgress, out List<LotwConfirmation> unmatched)
+            => MarkConfirmedCore("clublog_qsl_rcvd", "clublog_qsl_rdate", "clublog_deleted_entity",
+                                 confirmations, fullReset, onProgress, System.Threading.CancellationToken.None, out unmatched);
+
+        public int MarkClublogConfirmed(IList<LotwConfirmation> confirmations, bool fullReset,
+                                        Action<int> onProgress, System.Threading.CancellationToken ct, out List<LotwConfirmation> unmatched)
+            => MarkConfirmedCore("clublog_qsl_rcvd", "clublog_qsl_rdate", "clublog_deleted_entity",
                                  confirmations, fullReset, onProgress, ct, out unmatched);
 
         // Shared engine behind MarkLotwConfirmed / MarkQrzConfirmed. The three column names name the
@@ -2381,6 +2457,49 @@ Environment.NewLine +
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
                 using (var cmd = new SQLiteCommand(
                     "SELECT COUNT(*) FROM qso WHERE eqsl_qsl_rcvd = 1 AND log_id = @log", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@log", logId));
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+        }
+
+        // Club Log counterparts of the three count helpers.
+        public int GetClublogConfirmedCount()
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                using (var cmd = new SQLiteCommand("SELECT COUNT(*) FROM qso WHERE clublog_qsl_rcvd = 1", con))
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        public List<KeyValuePair<string, int>> GetClublogConfirmedCountsByLog()
+        {
+            var rows = new List<KeyValuePair<string, int>>();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return rows;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT l.name, COUNT(q.Id) AS n " +
+                    "FROM qso q JOIN logs l ON l.Id = q.log_id " +
+                    "WHERE q.clublog_qsl_rcvd = 1 GROUP BY l.name HAVING n > 0 ORDER BY n DESC", con))
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                        rows.Add(new KeyValuePair<string, int>(
+                            rdr["name"]?.ToString() ?? "(unnamed)", Convert.ToInt32(rdr["n"])));
+            }
+            return rows;
+        }
+
+        public int GetClublogConfirmedCount(long logId)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT COUNT(*) FROM qso WHERE clublog_qsl_rcvd = 1 AND log_id = @log", con))
                 {
                     cmd.Parameters.Add(new SQLiteParameter("@log", logId));
                     return Convert.ToInt32(cmd.ExecuteScalar());
@@ -3135,6 +3254,7 @@ Environment.NewLine +
             AddLotwConfirmationColumns();
             AddQrzConfirmationColumns();
             AddEqslConfirmationColumns();
+            AddClublogConfirmationColumns();
             AddClublogColumn();
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();

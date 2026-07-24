@@ -530,10 +530,11 @@ namespace HolyLogger
         {
             switch (_source)
             {
-                case ConfSource.Lotw: return q.LotwQslRcvd == 1;
-                case ConfSource.Qrz:  return q.QrzQslRcvd == 1;
-                case ConfSource.Eqsl: return q.EqslQslRcvd == 1;
-                default:              return true;
+                case ConfSource.Lotw:    return q.LotwQslRcvd == 1;
+                case ConfSource.Qrz:     return q.QrzQslRcvd == 1;
+                case ConfSource.Eqsl:    return q.EqslQslRcvd == 1;
+                case ConfSource.Clublog: return q.ClublogQslRcvd == 1;
+                default:                 return true;
             }
         }
 
@@ -559,6 +560,10 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             if (s.UseEqslService || hasEqsl || !string.IsNullOrWhiteSpace(s.EqslConfirmedEntities))
                 AddSourceFolder(ConfSource.Eqsl, "eQSL");
+            // Club Log is a single account (e-mail + password), so show the folder when the service is on
+            // or a past download left a cached confirmed set.
+            if (s.UseClublogService || !string.IsNullOrWhiteSpace(s.ClublogConfirmedEntities))
+                AddSourceFolder(ConfSource.Clublog, "Club Log");
             LB_Source.SelectedIndex = 0;   // Worked; fires LB_Source_SelectionChanged -> RefreshForSource
         }
 
@@ -645,9 +650,10 @@ namespace HolyLogger
             _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             // The Worked folder has no confirmation overlay; each other folder reads its own cache.
             string cached =
-                _source == ConfSource.Lotw ? Properties.Settings.Default.LotwConfirmedEntities :
-                _source == ConfSource.Qrz  ? Properties.Settings.Default.QrzConfirmedEntities  :
-                _source == ConfSource.Eqsl ? Properties.Settings.Default.EqslConfirmedEntities :
+                _source == ConfSource.Lotw    ? Properties.Settings.Default.LotwConfirmedEntities :
+                _source == ConfSource.Qrz     ? Properties.Settings.Default.QrzConfirmedEntities  :
+                _source == ConfSource.Eqsl    ? Properties.Settings.Default.EqslConfirmedEntities :
+                _source == ConfSource.Clublog ? Properties.Settings.Default.ClublogConfirmedEntities :
                 string.Empty;
             if (string.IsNullOrWhiteSpace(cached)) return;
             foreach (var n in cached.Split('|'))
@@ -674,9 +680,10 @@ namespace HolyLogger
         private int CountConfirmedDeleted()
         {
             string csv =
-                _source == ConfSource.Lotw ? Properties.Settings.Default.LotwConfirmedDeletedCodes :
-                _source == ConfSource.Qrz  ? Properties.Settings.Default.QrzConfirmedDeletedCodes  :
-                _source == ConfSource.Eqsl ? Properties.Settings.Default.EqslConfirmedDeletedCodes :
+                _source == ConfSource.Lotw    ? Properties.Settings.Default.LotwConfirmedDeletedCodes :
+                _source == ConfSource.Qrz     ? Properties.Settings.Default.QrzConfirmedDeletedCodes  :
+                _source == ConfSource.Eqsl    ? Properties.Settings.Default.EqslConfirmedDeletedCodes :
+                _source == ConfSource.Clublog ? Properties.Settings.Default.ClublogConfirmedDeletedCodes :
                 string.Empty;
             if (string.IsNullOrWhiteSpace(csv)) return 0;
             var set = new HashSet<int>();
@@ -687,9 +694,10 @@ namespace HolyLogger
 
         // The current source's display name, for the confirmed tile and status line.
         private string SourceName =>
-            _source == ConfSource.Lotw ? "LoTW" :
-            _source == ConfSource.Qrz  ? "QRZ" :
-            _source == ConfSource.Eqsl ? "eQSL" : "Worked";
+            _source == ConfSource.Lotw    ? "LoTW" :
+            _source == ConfSource.Qrz     ? "QRZ" :
+            _source == ConfSource.Eqsl    ? "eQSL" :
+            _source == ConfSource.Clublog ? "Club Log" : "Worked";
 
         private void ApplyConfirmedHighlight()
         {
@@ -770,9 +778,10 @@ namespace HolyLogger
             var muted = (Brush)ThemeManager.Brush("MutedTextBrush");
 
             // The current source's full-download button; only its own button shows in the frame.
-            if (BTN_GetAllConfirmations != null) BTN_GetAllConfirmations.Visibility = _source == ConfSource.Lotw ? Visibility.Visible : Visibility.Collapsed;
-            if (BTN_CheckQrz != null)           BTN_CheckQrz.Visibility           = _source == ConfSource.Qrz  ? Visibility.Visible : Visibility.Collapsed;
-            if (BTN_CheckEqsl != null)          BTN_CheckEqsl.Visibility          = _source == ConfSource.Eqsl ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_GetAllConfirmations != null) BTN_GetAllConfirmations.Visibility = _source == ConfSource.Lotw    ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_CheckQrz != null)           BTN_CheckQrz.Visibility           = _source == ConfSource.Qrz     ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_CheckEqsl != null)          BTN_CheckEqsl.Visibility          = _source == ConfSource.Eqsl    ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_CheckClublog != null)       BTN_CheckClublog.Visibility       = _source == ConfSource.Clublog ? Visibility.Visible : Visibility.Collapsed;
 
             // Worked: no confirmation source. Keep the frame's SPACE (Hidden) so the zones align.
             if (_source == ConfSource.Worked)
@@ -809,16 +818,25 @@ namespace HolyLogger
             }
             else
             {
-                // QRZ / eQSL: full-download only. Row 0 = total confirmed across all your logs, Row 1 =
-                // matched in the log open now. The two "New" rows keep the frame the same height, showing
-                // "—" (no incremental check for these sources).
+                // QRZ / eQSL / Club Log: full-download only.
+                //   Row 0 "Confirmed on <service>" = how many the SERVICE reported on the last download
+                //     (stored count), independent of the log - the same meaning LoTW's row has. This is
+                //     what tells you "the service says 48", even when none are in your log.
+                //   Row 1 "Matched in this log"    = how many of those actually landed on a QSO in the log
+                //     open now (read live from the database).
+                // The two "New" rows keep the frame the same height, showing "—" (no incremental check).
                 int total = 0, matched = 0;
                 try
                 {
+                    if (_source == ConfSource.Qrz)          total = s.QrzConfirmedQsoCount;
+                    else if (_source == ConfSource.Clublog) total = s.ClublogConfirmedQsoCount;
+                    else                                    total = s.EqslConfirmedQsoCount;
+
                     if (dal != null)
                     {
-                        if (_source == ConfSource.Qrz) { total = dal.GetQrzConfirmedCount();  matched = dal.GetQrzConfirmedCount(dal.ActiveLogId); }
-                        else                           { total = dal.GetEqslConfirmedCount(); matched = dal.GetEqslConfirmedCount(dal.ActiveLogId); }
+                        if (_source == ConfSource.Qrz)          matched = dal.GetQrzConfirmedCount(dal.ActiveLogId);
+                        else if (_source == ConfSource.Clublog) matched = dal.GetClublogConfirmedCount(dal.ActiveLogId);
+                        else                                    matched = dal.GetEqslConfirmedCount(dal.ActiveLogId);
                     }
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -849,6 +867,19 @@ namespace HolyLogger
                 link.TextDecorations = null;
                 link.Cursor = Cursors.Arrow;
             }
+        }
+
+        // The confirmations that actually matched a QSO in the log = everything downloaded MINUS the
+        // unmatched list the marker returns. Used to build each source's confirmed-country cache from
+        // real matches, so the "Confirmed (X)" tile never counts entities the log has no confirmed QSO
+        // for (matched by reference: the unmatched list holds the very same objects).
+        private static List<DataAccess.LotwConfirmation> MatchedOnly(
+            IEnumerable<DataAccess.LotwConfirmation> all, List<DataAccess.LotwConfirmation> unmatched)
+        {
+            if (all == null) return new List<DataAccess.LotwConfirmation>();
+            if (unmatched == null || unmatched.Count == 0) return all.ToList();
+            var skip = new HashSet<DataAccess.LotwConfirmation>(unmatched);
+            return all.Where(c => !skip.Contains(c)).ToList();
         }
 
         // Click the "New confirmations" count -> show the new QSOs (from the last incremental check) with
@@ -1401,9 +1432,12 @@ namespace HolyLogger
                 // Cache the QRZ confirmed-entity set and the deleted-entity codes, mirroring what the LoTW
                 // download stores. This is what the Statistics window's QRZ folder reads to color the
                 // worked list and show "Confirmed (QRZ): N active, M deleted" - independent of LoTW.
+                // Built from the confirmations that actually MATCHED a QSO in the log (not the raw
+                // download), so the country tile can never claim entities the log has no confirmed QSO for.
+                var qrzMatched = MatchedOnly(confirmations, unmatched);
                 var qrzNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 var qrzDeleted = new HashSet<int>();
-                foreach (var c in confirmations)
+                foreach (var c in qrzMatched)
                 {
                     string name = Resolve(c.Call)?.Name;
                     if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
@@ -1413,6 +1447,7 @@ namespace HolyLogger
                 var qs = Properties.Settings.Default;
                 qs.QrzConfirmedEntities = string.Join("|", qrzNames);
                 qs.QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
+                qs.QrzConfirmedQsoCount = confirmations.Count;   // what QRZ reported (frame "Confirmed on QRZ")
                 qs.Save();
 
                 // Re-read the log so the QSO confirmation flags (which the zone lists use) are live, then
@@ -1556,9 +1591,10 @@ namespace HolyLogger
 
                 // Cache the eQSL confirmed-entity set (resolved from callsigns). eQSL sends no <DXCC> and
                 // the cty.dat resolver exposes only the (current) entity name, not a code, so the deleted-
-                // entity split isn't available for eQSL - left empty (a known caveat, not a bug).
+                // entity split isn't available for eQSL - left empty (a known caveat, not a bug). Built from
+                // the confirmations that MATCHED a QSO in the log, so the tile never over-counts countries.
                 var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                foreach (var c in all)
+                foreach (var c in MatchedOnly(all, unmatched))
                 {
                     string name = Resolve(c.Call)?.Name;
                     if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
@@ -1567,6 +1603,7 @@ namespace HolyLogger
                 var s = Properties.Settings.Default;
                 s.EqslConfirmedEntities = string.Join("|", names);
                 s.EqslConfirmedDeletedCodes = string.Empty;
+                s.EqslConfirmedQsoCount = all.Count;   // what eQSL reported (frame "Confirmed on eQSL")
                 s.Save();
 
                 ReloadQsosAfterCheck();
@@ -1623,6 +1660,163 @@ namespace HolyLogger
                 foreach (var f in failed) text.AppendLine("    • " + f);
             }
             HolyMessageBox.Show(text.ToString().TrimEnd(), "eQSL confirmations updated", HolyMsgType.Info, this);
+        }
+
+        // The Club Log side of the confirmation feature. Club Log is a single account (e-mail + password),
+        // but getadif.php is per-callsign, so this loops over every station callsign the operator used and
+        // downloads that call's whole-log export, keeping the QSOs Club Log reports confirmed
+        // (QSL_RCVD = Y/V). Unlike eQSL, Club Log DOES send <DXCC>, so the deleted-entity split is exact.
+        // Always a full rebuild.
+        private async void BTN_CheckClublog_Click(object sender, RoutedEventArgs e)
+        {
+            var s0 = Properties.Settings.Default;
+            string email = s0.ClublogEmail?.Trim();
+            string password = s0.ClublogPassword;
+            if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(password))
+            {
+                bool openOptions = HolyMessageBox.ShowConfirm(
+                    "Your Club Log e-mail and password aren't set, so Club Log confirmations can't be downloaded.\n\n" +
+                    "Open Options → Club Log to enter them now?",
+                    "Club Log account needed", HolyMsgType.Warning, this);
+                if (openOptions)
+                {
+                    var opts = new OptionsWindow();
+                    opts.Owner = this;
+                    opts.ClublogItem.IsSelected = true;
+                    opts.ShowDialog();
+                }
+                return;
+            }
+
+            // A Club Log account belongs to ONE operator, so we only ever ask about THIS operator's own
+            // callsign - the personal callsign in Settings. We must NOT loop over every my_callsign in the
+            // database: a shared/club machine holds other operators' logs too, and asking Club Log about a
+            // friend's call under your login is both wrong and pointless (Club Log rejects it).
+            string myCall = s0.my_callsign?.Trim();
+            if (string.IsNullOrWhiteSpace(myCall))
+            {
+                HolyMessageBox.Show("Your own callsign isn't set (Options → General), so there is nothing to download from Club Log.",
+                    "Club Log confirmations", HolyMsgType.Warning, this);
+                return;
+            }
+            var calls = new List<string> { myCall };
+
+            BTN_CheckClublog.IsEnabled = false;
+            LB_Source.IsEnabled = false;   // no folder switching mid-download/mark (it would block the UI)
+            _checkCts = new System.Threading.CancellationTokenSource();
+            var ct = _checkCts.Token;
+            BTN_StopCheck.IsEnabled = true;
+            ShowLotwSpinner(true);
+            try
+            {
+                var all = new List<DataAccess.LotwConfirmation>();
+                var failed = new List<string>();
+                int idx = 0;
+                foreach (var call in calls)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    idx++;
+                    TB_LotwLoadingText.Text = $"Downloading Club Log export… ({idx} of {calls.Count})";
+                    TB_LotwLoadingSub.Text = $"Callsign {call}";
+                    var r = await ClublogService.FetchLogAsync(email, password, call, ct);
+                    if (r.Ok) all.AddRange(r.Confirmations);
+                    else if (r.NetworkError) failed.Add($"{call}: no connection");
+                    else failed.Add($"{call}: {r.Reason}");
+                }
+
+                if (all.Count == 0)
+                {
+                    string why = failed.Count > 0 ? "\n\n" + string.Join("\n", failed) : "";
+                    HolyMessageBox.Show("No Club Log confirmations were downloaded." + why,
+                        "Club Log confirmations", HolyMsgType.Warning, this);
+                    return;
+                }
+
+                TB_LotwLoadingText.Text = $"Marking Club Log confirmations…  0 of {all.Count:N0}";
+                TB_LotwLoadingSub.Text = "Matching each Club Log confirmation to your logs.";
+                var markProgress = new Progress<int>(done =>
+                    TB_LotwLoadingText.Text = $"Marking Club Log confirmations…  {done:N0} of {all.Count:N0}");
+                List<DataAccess.LotwConfirmation> unmatched = null;
+                int marked = await Task.Run(() =>
+                    Dal.MarkClublogConfirmed(all, true, ((IProgress<int>)markProgress).Report, ct, out unmatched));
+
+                if (marked > 0)
+                {
+                    try { (Application.Current.Windows.OfType<MainWindow>().FirstOrDefault())?.ReloadActiveLogQsos(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                // Cache the Club Log confirmed-entity set and deleted-entity codes. Club Log sends <DXCC>,
+                // so the active/deleted split is exact (same as QRZ / LoTW, not the eQSL approximation).
+                // Built from the confirmations that MATCHED a QSO in the log, so the "Confirmed (Club Log)"
+                // country tile agrees with the marked-QSO count instead of counting the whole download.
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var deleted = new HashSet<int>();
+                foreach (var c in MatchedOnly(all, unmatched))
+                {
+                    string name = Resolve(c.Call)?.Name;
+                    if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                        names.Add(name);
+                    if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) deleted.Add(c.DxccCode);
+                }
+                s0.ClublogConfirmedEntities = string.Join("|", names);
+                s0.ClublogConfirmedDeletedCodes = string.Join(",", deleted);
+                s0.ClublogConfirmedQsoCount = all.Count;   // what Club Log reported (frame "Confirmed on Club Log")
+                s0.Save();
+
+                ReloadQsosAfterCheck();
+                ShowClublogDownloadSummary(all.Count, failed);
+            }
+            catch (OperationCanceledException)
+            {
+                HolyMessageBox.Show("Club Log update stopped — no changes were made.",
+                    "Club Log confirmations", HolyMsgType.Info, this);
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.Show("Club Log download failed: " + ex.Message,
+                    "Club Log confirmations", HolyMsgType.Warning, this);
+            }
+            finally
+            {
+                ShowLotwSpinner(false);
+                BTN_CheckClublog.IsEnabled = true;
+                LB_Source.IsEnabled = true;
+                _checkCts?.Dispose();
+                _checkCts = null;
+            }
+        }
+
+        private void ShowClublogDownloadSummary(int downloaded, List<string> failed)
+        {
+            var text = new System.Text.StringBuilder();
+            text.AppendLine($"Downloaded {downloaded:N0} confirmed QSO(s) from Club Log.");
+            text.AppendLine();
+            try
+            {
+                var perLog = Dal?.GetClublogConfirmedCountsByLog() ?? new List<KeyValuePair<string, int>>();
+                int totalMarked = perLog.Sum(p => p.Value);
+                if (perLog.Count == 0)
+                    text.AppendLine("No QSO in any of your logs matched a Club Log confirmation yet.");
+                else if (perLog.Count == 1)
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on Club Log.");
+                else
+                {
+                    text.AppendLine($"{totalMarked:N0} QSO(s) are now marked Club Log-confirmed, across all your logs:");
+                    text.AppendLine();
+                    foreach (var p in perLog)
+                        text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (failed != null && failed.Count > 0)
+            {
+                text.AppendLine();
+                text.AppendLine("Some callsigns could not be downloaded:");
+                foreach (var f in failed) text.AppendLine("    • " + f);
+            }
+            HolyMessageBox.Show(text.ToString().TrimEnd(), "Club Log confirmations updated", HolyMsgType.Info, this);
         }
 
         // Reports the outcome of a full confirmation download, and shows plainly that the marks reached
@@ -1798,6 +1992,27 @@ namespace HolyLogger
             try { result.MarkedConfirmed = DataAccess.GetInstance()?.MarkLotwConfirmed(confirmations, !incremental, matchProgress, ct, out unmatched) ?? 0; }
             catch (OperationCanceledException) { throw; }   // let Stop propagate (transaction rolled back)
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // Rebuild the confirmed-country / deleted-code sets from confirmations that actually MATCHED a
+            // QSO in the log (the per-record loop above accumulated them from the whole download). This
+            // keeps the "Confirmed (LoTW)" tile honest - it never counts an entity the log has no confirmed
+            // QSO for, matching how the QRZ / eQSL / Club Log folders now build their sets.
+            var lotwUnmatched = new HashSet<DataAccess.LotwConfirmation>(unmatched ?? new List<DataAccess.LotwConfirmation>());
+            result.ResolvedNames.Clear();
+            result.ConfirmedDeletedCodes.Clear();
+            result.ConfirmedActiveCodes.Clear();
+            foreach (var c in confirmations)
+            {
+                if (lotwUnmatched.Contains(c)) continue;
+                string nm = _masterResolver.GetDXCC(c.Call)?.Name;
+                if (!string.IsNullOrEmpty(nm) && !string.Equals(nm, "Unknown", StringComparison.OrdinalIgnoreCase))
+                    result.ResolvedNames.Add(nm);
+                if (c.DxccCode > 0)
+                {
+                    if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) result.ConfirmedDeletedCodes.Add(c.DxccCode);
+                    else result.ConfirmedActiveCodes.Add(c.DxccCode);
+                }
+            }
 
             try { WriteUnmatchedReport(confirmations.Count, result.MarkedConfirmed, unmatched); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
