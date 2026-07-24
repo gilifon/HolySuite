@@ -632,12 +632,10 @@ namespace HolyLogger
             // Tint the per-source content area to match the selected folder's colour.
             if (SV_SourceContent != null) SV_SourceContent.Background = SourceBackground(_source);
 
+            // Only "Check LoTW Updates" (incremental) lives in the header; the per-source full-download
+            // buttons live in the summary frame and are toggled by PopulateConfirmedSummary.
             if (BTN_CheckLotw != null)
                 BTN_CheckLotw.Visibility = _source == ConfSource.Lotw ? Visibility.Visible : Visibility.Collapsed;
-            if (BTN_CheckQrz != null)
-                BTN_CheckQrz.Visibility = _source == ConfSource.Qrz ? Visibility.Visible : Visibility.Collapsed;
-            if (BTN_CheckEqsl != null)
-                BTN_CheckEqsl.Visibility = _source == ConfSource.Eqsl ? Visibility.Visible : Visibility.Collapsed;
         }
 
         // Restore the last downloaded confirmed-entity set so the colors/count show immediately on open
@@ -759,85 +757,97 @@ namespace HolyLogger
             PopulateConfirmedSummary();
         }
 
-        // The 3-row summary under the worked table: total confirmations, what the LAST check added
-        // (new QSLs, and since when), and — the number that matters — new countries.
+        // The summary frame, shown on EVERY confirmation folder (LoTW / QRZ / eQSL) so the pages look
+        // alike. Kept the same 4-row height everywhere; QRZ/eQSL have no incremental "check", so their
+        // "New" rows read "—". On the Worked folder there is no confirmation, so the frame is kept but
+        // made invisible (Hidden, not Collapsed) - it still reserves its space so the zone lists below it
+        // line up with the other folders.
         private void PopulateConfirmedSummary()
         {
             if (ConfirmSummaryPanel == null) return;
             var s = Properties.Settings.Default;
-            // The delta summary (new confirmations since date, matched-in-log) is built from the LoTW
-            // download's incremental markers, so it belongs only to the LoTW folder for now.
-            if (_source != ConfSource.Lotw || (_confirmedEntities.Count == 0 && s.LotwConfirmedQsoCount == 0))
+            var inv = System.Globalization.CultureInfo.InvariantCulture;
+            var muted = (Brush)ThemeManager.Brush("MutedTextBrush");
+
+            // The current source's full-download button; only its own button shows in the frame.
+            if (BTN_GetAllConfirmations != null) BTN_GetAllConfirmations.Visibility = _source == ConfSource.Lotw ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_CheckQrz != null)           BTN_CheckQrz.Visibility           = _source == ConfSource.Qrz  ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_CheckEqsl != null)          BTN_CheckEqsl.Visibility          = _source == ConfSource.Eqsl ? Visibility.Visible : Visibility.Collapsed;
+
+            // Worked: no confirmation source. Keep the frame's SPACE (Hidden) so the zones align.
+            if (_source == ConfSource.Worked)
             {
-                ConfirmSummaryPanel.Visibility = Visibility.Collapsed;
+                ConfirmSummaryPanel.Visibility = Visibility.Hidden;
                 return;
             }
             ConfirmSummaryPanel.Visibility = Visibility.Visible;
 
-            var inv = System.Globalization.CultureInfo.InvariantCulture;
-            // Never show a bogus total: it can't be below the confirmed-country count (each country has
-            // >=1 confirmed QSO). If it is (stale value from earlier broken downloads), show "—" until a
-            // full Check LoTW recomputes it, rather than the misleading small number.
-            bool totalKnown = s.LotwConfirmedQsoCount > 0 && s.LotwConfirmedQsoCount >= _confirmedEntities.Count;
-            TB_SumTotalQsls.Text = totalKnown ? s.LotwConfirmedQsoCount.ToString("N0", inv) : "—";
+            var dal = DataAccess.GetInstance();
 
-            // Matched-in-this-log: read live from the database (the marks are what the log grid shows),
-            // scoped to the active log so it answers "how many in the log I'm looking at".
-            int matched = 0;
-            try
+            if (_source == ConfSource.Lotw)
             {
-                var dal = DataAccess.GetInstance();
-                if (dal != null) matched = dal.GetLotwConfirmedCount(dal.ActiveLogId);
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            TB_SumMatchedInLog.Text = matched.ToString("N0", inv);
+                TB_SumConfirmedLabel.Text = "Confirmed at LoTW";
+                // Never show a bogus total: it can't be below the confirmed-country count. If it is (stale
+                // value from earlier broken downloads), show "—" until a full check recomputes it.
+                bool totalKnown = s.LotwConfirmedQsoCount > 0 && s.LotwConfirmedQsoCount >= _confirmedEntities.Count;
+                TB_SumTotalQsls.Text = totalKnown ? s.LotwConfirmedQsoCount.ToString("N0", inv) : "—";
 
-            // A full/baseline download has no meaningful "new since last check" delta — everything is
-            // pulled at once. Showing the whole set as "new" just duplicates the total, so the two "New"
-            // rows show "—" for a full download and only display real deltas after an incremental check.
-            bool fullDownload = string.IsNullOrWhiteSpace(s.LotwLastCheckSince);
-            var muted = (Brush)ThemeManager.Brush("MutedTextBrush");
+                int matched = 0;
+                try { if (dal != null) matched = dal.GetLotwConfirmedCount(dal.ActiveLogId); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                TB_SumMatchedInLog.Text = matched.ToString("N0", inv);
 
-            TB_SumNewQsls.Text = fullDownload ? "—" : s.LotwLastNewQsls.ToString(inv);
-            TB_SumSince.Text = fullDownload
-                ? "   (full download)"
-                : $"   (since {s.LotwLastCheckSince})";
+                bool fullDownload = string.IsNullOrWhiteSpace(s.LotwLastCheckSince);
+                TB_SumNewQsls.Text = fullDownload ? "—" : s.LotwLastNewQsls.ToString(inv);
+                TB_SumSince.Text = fullDownload ? "   (full download)" : $"   (since {s.LotwLastCheckSince})";
+                bool hasNew = !fullDownload && s.LotwLastNewQsls > 0 && !string.IsNullOrWhiteSpace(s.LotwLastNewJson);
+                StyleSummaryLink(LNK_NewQsls, hasNew, muted);
 
-            // The "New confirmations" number is a link that opens the list of new QSOs — but only when
-            // there actually are some to show. Otherwise it's plain, non-clickable text.
-            bool hasNew = !fullDownload && s.LotwLastNewQsls > 0
-                          && !string.IsNullOrWhiteSpace(s.LotwLastNewJson);
-            LNK_NewQsls.IsEnabled = hasNew;
-            if (hasNew)
-            {
-                LNK_NewQsls.Foreground = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));   // link blue
-                LNK_NewQsls.TextDecorations = TextDecorations.Underline;
-                LNK_NewQsls.Cursor = Cursors.Hand;
+                TB_SumNewCountries.Text = fullDownload ? "—" : s.LotwLastNewCountries.ToString(inv);
+                bool hasNewCountry = !fullDownload && s.LotwLastNewCountries > 0 && !string.IsNullOrWhiteSpace(s.LotwLastNewJson);
+                StyleSummaryLink(LNK_NewCountries, hasNewCountry, muted);
             }
             else
             {
-                LNK_NewQsls.Foreground = (Brush)ThemeManager.Brush("TextBrush");
-                LNK_NewQsls.TextDecorations = null;
-                LNK_NewQsls.Cursor = Cursors.Arrow;
-            }
+                // QRZ / eQSL: full-download only. Row 0 = total confirmed across all your logs, Row 1 =
+                // matched in the log open now. The two "New" rows keep the frame the same height, showing
+                // "—" (no incremental check for these sources).
+                int total = 0, matched = 0;
+                try
+                {
+                    if (dal != null)
+                    {
+                        if (_source == ConfSource.Qrz) { total = dal.GetQrzConfirmedCount();  matched = dal.GetQrzConfirmedCount(dal.ActiveLogId); }
+                        else                           { total = dal.GetEqslConfirmedCount(); matched = dal.GetEqslConfirmedCount(dal.ActiveLogId); }
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-            // "New countries" is likewise a link — it opens the same table filtered to just the QSOs
-            // that gave a new country. Clickable only when there are new countries with a captured list.
-            TB_SumNewCountries.Text = fullDownload ? "—" : s.LotwLastNewCountries.ToString(inv);
-            bool hasNewCountry = !fullDownload && s.LotwLastNewCountries > 0
-                                 && !string.IsNullOrWhiteSpace(s.LotwLastNewJson);
-            LNK_NewCountries.IsEnabled = hasNewCountry;
-            if (hasNewCountry)
+                TB_SumConfirmedLabel.Text = $"Confirmed on {SourceName}";
+                TB_SumTotalQsls.Text = total.ToString("N0", inv);
+                TB_SumMatchedInLog.Text = matched.ToString("N0", inv);
+                TB_SumNewQsls.Text = "—";
+                TB_SumSince.Text = "   (full download)";
+                TB_SumNewCountries.Text = "—";
+                StyleSummaryLink(LNK_NewQsls, false, muted);
+                StyleSummaryLink(LNK_NewCountries, false, muted);
+            }
+        }
+
+        private static void StyleSummaryLink(System.Windows.Documents.Hyperlink link, bool active, Brush muted)
+        {
+            link.IsEnabled = active;
+            if (active)
             {
-                LNK_NewCountries.Foreground = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));   // link blue
-                LNK_NewCountries.TextDecorations = TextDecorations.Underline;
-                LNK_NewCountries.Cursor = Cursors.Hand;
+                link.Foreground = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));   // link blue
+                link.TextDecorations = TextDecorations.Underline;
+                link.Cursor = Cursors.Hand;
             }
             else
             {
-                LNK_NewCountries.Foreground = muted;
-                LNK_NewCountries.TextDecorations = null;
-                LNK_NewCountries.Cursor = Cursors.Arrow;
+                link.Foreground = muted;
+                link.TextDecorations = null;
+                link.Cursor = Cursors.Arrow;
             }
         }
 

@@ -221,24 +221,6 @@
                                                 </ToolTip>
                                             </Button.ToolTip>
                                         </Button>
-                                        <Button x:Name="BTN_CheckQrz" Content="Get All QRZ Confirmations" FontSize="12" Padding="8,3"
-                                                Margin="8,0,0,0" VerticalAlignment="Center" Click="BTN_CheckQrz_Click">
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Downloads every confirmed QSO from your QRZ.com logbook and marks them with the QRZ tick.&#10;&#10;QRZ confirms a contact when the other operator also logged it on QRZ, so this is a different set from LoTW — it has its own column.&#10;&#10;Needs your QRZ Logbook API key (Options ▸ QRZ Logbook)."/>
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
-                                        <Button x:Name="BTN_CheckEqsl" Content="Get All eQSL Confirmations" FontSize="12" Padding="8,3"
-                                                Margin="8,0,0,0" VerticalAlignment="Center" Click="BTN_CheckEqsl_Click">
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Downloads your eQSL In Box (the cards other stations sent you) for every eQSL account and marks the confirmed QSOs with the eQSL tick.&#10;&#10;eQSL confirmations are a different set from LoTW and QRZ — they have their own column.&#10;&#10;Uses the accounts in Options ▸ eQSL."/>
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
                                     </StackPanel>
                                     <TextBlock x:Name="TB_LotwStatus" FontSize="16" FontWeight="Bold" MaxWidth="345"
                                                HorizontalAlignment="Left" TextWrapping="Wrap" Foreground="#2E9E4F"/>
@@ -428,7 +410,7 @@
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Confirmed at LoTW" FontSize="13"
+                                        <TextBlock Grid.Row="0" Grid.Column="0" x:Name="TB_SumConfirmedLabel" Text="Confirmed at LoTW" FontSize="13"
                                                    Margin="0,0,18,1" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
                                         <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="14"
@@ -443,20 +425,22 @@
                                                    FontWeight="Bold" Margin="0,0,0,1" VerticalAlignment="Center"
                                                    Foreground="#2E9E4F"/>
 
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="New confirmations" FontSize="13"
+                                        <TextBlock Grid.Row="2" Grid.Column="0" x:Name="TB_NewConfLabel" Text="New confirmations" FontSize="13"
                                                    Margin="0,0,18,1" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="1" FontSize="14" Margin="0,0,0,1"
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TB_NewConfValue" FontSize="14" Margin="0,0,0,1"
                                                    VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewQsls" Click="NewQsls_Click"
                                                    ToolTip="Click to see the new confirmations"><Run x:Name="TB_SumNewQsls" FontWeight="Bold"/></Hyperlink><Run x:Name="TB_SumSince" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"/></TextBlock>
 
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="New countries" FontSize="13"
+                                        <TextBlock Grid.Row="3" Grid.Column="0" x:Name="TB_NewCountriesLabel" Text="New countries" FontSize="13"
                                                    Margin="0,0,18,1" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="1" FontSize="14" Margin="0,0,0,1"
+                                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TB_NewCountriesValue" FontSize="14" Margin="0,0,0,1"
                                                    VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewCountries" Click="NewCountries_Click"
                                                    ToolTip="Click to see the QSOs that gave a new country"><Run x:Name="TB_SumNewCountries" FontWeight="Bold"/></Hyperlink></TextBlock>
 
+                                        <!-- The source's full-download button lives in the frame; only the one for the
+                                             current folder is shown. (LoTW also keeps "Check LoTW Updates" in the header.) -->
                                         <Button x:Name="BTN_GetAllConfirmations" Grid.Row="4" Grid.ColumnSpan="2"
                                                 Content="Get All LoTW Confirmations" FontSize="12" Padding="8,3"
                                                 HorizontalAlignment="Left" Margin="0,6,0,0"
@@ -465,6 +449,28 @@
                                                 <ToolTip>
                                                     <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
                                                                Text="Rebuild from scratch: downloads your ENTIRE LoTW history and re-marks every log. Slower, and needed only once — to fill in past years.&#10;&#10;For routine updates use “Check LoTW Updates” above."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                        <Button x:Name="BTN_CheckQrz" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All QRZ Confirmations" FontSize="12" Padding="8,3"
+                                                HorizontalAlignment="Left" Margin="0,6,0,0" Visibility="Collapsed"
+                                                Click="BTN_CheckQrz_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads every confirmed QSO from your QRZ.com logbook and marks them with the QRZ tick.&#10;&#10;Needs your QRZ Logbook API key (Options ▸ QRZ Logbook)."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                        <Button x:Name="BTN_CheckEqsl" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All eQSL Confirmations" FontSize="12" Padding="8,3"
+                                                HorizontalAlignment="Left" Margin="0,6,0,0" Visibility="Collapsed"
+                                                Click="BTN_CheckEqsl_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads your eQSL In Box (the cards other stations sent you) for every eQSL account and marks the confirmed QSOs.&#10;&#10;Uses the accounts in Options ▸ eQSL."/>
                                                 </ToolTip>
                                             </Button.ToolTip>
                                         </Button>
