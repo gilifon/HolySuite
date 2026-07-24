@@ -33,35 +33,67 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>   <!-- left: static log analysis + pivot -->
-                    <ColumnDefinition Width="Auto"/>   <!-- middle: folder strip (source selector) -->
-                    <ColumnDefinition Width="*"/>       <!-- right: per-source analysis + tables -->
+                    <ColumnDefinition Width="*"/>       <!-- right: the per-source page (tabs + content) -->
                 </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>      <!-- top: tab strip (right) / free space (left) -->
+                    <RowDefinition Height="*"/>          <!-- the content, pushed down below the tabs -->
+                </Grid.RowDefinitions>
 
-                <!-- Vertical "folders": pick which confirmation source the RIGHT column analyzes. Placed
-                     BETWEEN the static left part and the per-source right part it drives. Populated in code
-                     with only the sources the operator uses (Worked is always first). -->
-                <ListBox x:Name="LB_Source" Grid.Column="1" Width="98" BorderThickness="1,0,1,0"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" Background="{DynamicResource GridHeaderBg}"
-                         SelectionChanged="LB_Source_SelectionChanged" Padding="0,8,0,0"
-                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                <!-- Above the left column: the name of the log these statistics are for. Wraps (MaxWidth)
+                     so even a long name shows in full without widening the column. -->
+                <Border Grid.Row="0" Grid.Column="0" x:Name="LeftTopSpacer">
+                    <StackPanel VerticalAlignment="Center" Margin="14,2,12,2" MaxWidth="440">
+                        <TextBlock Text="Log file:" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}"/>
+                        <TextBlock x:Name="TB_LogName" FontSize="15" FontWeight="Bold" TextWrapping="Wrap"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                    </StackPanel>
+                </Border>
+
+                <!-- Horizontal "folder" tabs across the top of the per-source page. The SELECTED tab takes
+                     its source colour and drops its bottom edge (a -1 margin) so it overlaps the page's top
+                     border and reads as one piece with the page below it. Panel.ZIndex keeps it on top. -->
+                <ListBox x:Name="LB_Source" Grid.Row="0" Grid.Column="1" Panel.ZIndex="1" Margin="8,6,8,0"
+                         BorderThickness="0" Background="Transparent" ClipToBounds="False"
+                         SelectionChanged="LB_Source_SelectionChanged">
+                    <!-- Plain items host (no ScrollViewer), so the selected tab's 1px overhang is NOT
+                         clipped and can cover the page's top border below it. -->
+                    <ListBox.Template>
+                        <ControlTemplate TargetType="ListBox">
+                            <ItemsPresenter/>
+                        </ControlTemplate>
+                    </ListBox.Template>
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Orientation="Horizontal" ClipToBounds="False"/></ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
-                            <Setter Property="Padding" Value="12,10,12,10"/>
+                            <Setter Property="Padding" Value="20,7,20,7"/>
                             <Setter Property="FontSize" Value="14"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
                             <Setter Property="Template">
                                 <Setter.Value>
                                     <ControlTemplate TargetType="ListBoxItem">
-                                        <!-- Each folder keeps its own source colour (set in code); the
-                                             SELECTED folder gets an accent bar and bold text. -->
-                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderThickness="0,0,3,0"
-                                                BorderBrush="Transparent" Padding="{TemplateBinding Padding}">
-                                            <ContentPresenter/>
+                                        <!-- Unselected tabs: muted, full border (bottom sits on the page's
+                                             top line). Selected tab: source colour, bold, NO bottom border,
+                                             -1 bottom margin so it overlaps and hides the page top border
+                                             under it. Same height, so the selected tab reaches that line. -->
+                                        <Border x:Name="Bd" Background="{DynamicResource GridHeaderBg}"
+                                                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                                BorderThickness="1" CornerRadius="7,7,0,0"
+                                                Margin="2,0,0,0" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                                         </Border>
                                         <ControlTemplate.Triggers>
+                                            <Trigger Property="IsMouseOver" Value="True">
+                                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource GridAltRowBg}"/>
+                                            </Trigger>
                                             <Trigger Property="IsSelected" Value="True">
-                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
                                                 <Setter Property="FontWeight" Value="Bold"/>
+                                                <Setter TargetName="Bd" Property="Background" Value="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}"/>
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter TargetName="Bd" Property="BorderThickness" Value="1,1,1,0"/>
+                                                <Setter TargetName="Bd" Property="Margin" Value="2,0,0,-2"/>
                                             </Trigger>
                                         </ControlTemplate.Triggers>
                                     </ControlTemplate>
@@ -73,7 +105,7 @@
 
                 <!-- Col 0: LEFT static part — pure log analysis (QSO + callsign counts, dates) and the
                      Band×Mode pivot. Identical on every folder, so it sits outside the folder selection. -->
-                <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                <ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                     <StackPanel VerticalAlignment="Top" Margin="12,10,12,10">
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
@@ -103,7 +135,7 @@
                             </Border>
                         </StackPanel>
 
-                            <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Band × Mode" FontSize="16" FontWeight="Bold"
+                            <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Bands &amp; Mode" FontSize="16" FontWeight="Bold"
                                        Margin="0,0,0,6" Foreground="{DynamicResource AccentBrush}"/>
                             <!--
                                 Inner PivotBorder: left+top edge in blue (1px).
@@ -130,9 +162,13 @@
                         </StackPanel>
                     </ScrollViewer>
 
-                    <!-- Col 2: RIGHT per-source analysis — the three source tiles on top, then the
-                         country / zone tables. Everything here changes with the selected folder. -->
-                    <ScrollViewer x:Name="SV_SourceContent" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <!-- The per-source PAGE (Row 1, Col 1): framed on all four sides. The selected tab
+                         overlaps and hides the TOP border directly under it (a -1 margin + matching tint),
+                         so the top border shows everywhere except under the active tab - one sheet.
+                         The tint is set in code. -->
+                    <Border Grid.Row="1" Grid.Column="1" Margin="8,0,8,8"
+                            BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                    <ScrollViewer x:Name="SV_SourceContent" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                         <StackPanel Orientation="Horizontal" Margin="12,10,12,10" VerticalAlignment="Top">
 
                             <!-- COL A: source tiles + the two big country lists. The lists sit directly
@@ -495,6 +531,7 @@
                             </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
+                    </Border>
             </Grid>
         </Border>
 

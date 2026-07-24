@@ -148,7 +148,17 @@ namespace HolyLogger
         {
             int total = _allQsos != null ? _allQsos.Count : 0;
             TB_TotalQSOs.Text = total.ToString();
-            TB_PivotHeader.Text = "QSOs by Band × Mode\n(" + total + ")";
+
+            // Name of the log these statistics are for, shown top-left. Wraps in the UI, so a long name
+            // is shown in full.
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                string logName = dal?.GetLogName(dal.ActiveLogId);
+                TB_LogName.Text = string.IsNullOrWhiteSpace(logName) ? "(unnamed log)" : logName;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            TB_PivotHeader.Text = "QSOs by Bands & Mode\n(" + total + ")";
 
             // Warn if the country file is overdue for a refresh (e.g. AD1C moved the download URL). The
             // cty.dat version tile was removed from the window; the warning still surfaces a stale file.
@@ -552,7 +562,7 @@ namespace HolyLogger
             {
                 case ConfSource.Lotw: hex = "#FFF8E1"; break;   // light yellow
                 case ConfSource.Qrz:  hex = "#E8F5E9"; break;   // light green
-                default:              hex = "#EEEEEE"; break;   // Worked (pure analysis) = light gray
+                default:              hex = "#BDDFFF"; break;   // Worked (pure analysis) = light blue (the app's form blue)
             }
             var b = (System.Windows.Media.SolidColorBrush)new System.Windows.Media.BrushConverter().ConvertFromString(hex);
             b.Freeze();
