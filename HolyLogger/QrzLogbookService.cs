@@ -135,5 +135,168 @@ namespace HolyLogger
             if (map.TryGetValue("COUNT", out tmp)) result.Count = tmp;
             if (map.TryGetValue("BOOKID", out tmp)) result.BookId = tmp;
         }
+
+        // ------------------------------------------------------------------------------------------
+        // FETCH: reading the confirmed QSOs back out of the logbook (the QRZ side of the confirmation
+        // feature). Parallel to LoTW's confirmation download, but the transport is different - QRZ
+        // returns the records as one HTML-escaped ADIF blob wrapped in a key=value envelope.
+        // ------------------------------------------------------------------------------------------
+
+        // The outcome of ACTION=FETCH. Ok mirrors RESULT=OK; Count is QRZ's own COUNT header (how many
+        // records it sent); Confirmations is the parsed list, ready for DataAccess.MarkQrzConfirmed.
+        public class QrzFetchResult
+        {
+            public bool Ok;
+            public bool NetworkError;
+            public string Reason;
+            public int Count;
+            public List<DataAccess.LotwConfirmation> Confirmations = new List<DataAccess.LotwConfirmation>();
+        }
+
+        // Downloads every CONFIRMED QSO from the logbook this key belongs to. QRZ has no "changed since"
+        // that helps here the way LoTW's qslsince does, and the whole confirmed set is small and cheap
+        // (a few hundred KB), so this always fetches all of them; the caller marks with fullReset.
+        public static async Task<QrzFetchResult> FetchConfirmationsAsync(string apiKey)
+        {
+            var result = new QrzFetchResult();
+            if (string.IsNullOrWhiteSpace(apiKey)) { result.Reason = "auth"; return result; }
+
+            var fields = new List<KeyValuePair<string, string>>
+            {
+                new KeyValuePair<string, string>("KEY", apiKey.Trim()),
+                new KeyValuePair<string, string>("ACTION", "FETCH"),
+                // STATUS:CONFIRMED -> only confirmed records; MAX high enough to never page.
+                new KeyValuePair<string, string>("OPTION", "STATUS:CONFIRMED,MAX:100000")
+            };
+
+            string body;
+            try
+            {
+                using (var content = new FormUrlEncodedContent(fields))
+                using (HttpResponseMessage resp = await _http.PostAsync(Endpoint, content))
+                {
+                    body = await resp.Content.ReadAsStringAsync();
+                }
+            }
+            catch
+            {
+                result.NetworkError = true;
+                return result;
+            }
+
+            // The body is "COUNT=n&RESULT=OK&ADIF=<html-escaped ADIF>". The ADIF value is full of
+            // &lt;/&gt; entities, so splitting the WHOLE body on '&' (as the STATUS/INSERT parser does)
+            // would shred it. Instead take everything after the literal "ADIF=" as the blob, and parse
+            // only the head - which has no entities - for RESULT / COUNT.
+            int adifAt = body.IndexOf("ADIF=", StringComparison.OrdinalIgnoreCase);
+            string head = adifAt >= 0 ? body.Substring(0, adifAt) : body;
+            string adifEscaped = adifAt >= 0 ? body.Substring(adifAt + 5) : string.Empty;
+
+            var map = ParseKeyValues(head);
+            string rv;
+            map.TryGetValue("RESULT", out rv);
+            result.Ok = string.Equals(rv, "OK", StringComparison.OrdinalIgnoreCase);
+            string reason;
+            if (map.TryGetValue("REASON", out reason)) result.Reason = reason;
+            string cnt;
+            if (map.TryGetValue("COUNT", out cnt)) { int c; if (int.TryParse(cnt.Trim(), out c)) result.Count = c; }
+
+            if (result.Ok && adifEscaped.Length > 0)
+            {
+                string adif = System.Net.WebUtility.HtmlDecode(adifEscaped);
+                result.Confirmations = ParseAdifConfirmations(adif);
+            }
+            return result;
+        }
+
+        // Splits a "k=v&k=v" envelope (no HTML entities) into a case-insensitive map, url-decoding
+        // each value. Same shape as Parse() above, factored out so FETCH can reuse it on the head only.
+        private static Dictionary<string, string> ParseKeyValues(string s)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (string.IsNullOrEmpty(s)) return map;
+            foreach (string pair in s.Replace("\r", "").Replace("\n", "&").Split('&'))
+            {
+                if (pair.Length == 0) continue;
+                int eq = pair.IndexOf('=');
+                string key = eq >= 0 ? pair.Substring(0, eq) : pair;
+                string val = eq >= 0 ? pair.Substring(eq + 1) : "";
+                try { val = Uri.UnescapeDataString(val.Replace('+', ' ')); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                map[key.Trim()] = val.Trim();
+            }
+            return map;
+        }
+
+        // Parses QRZ's ADIF blob (length-prefixed <field:len[:type]>value, records ended by <eor>) into
+        // confirmations. Only the handful of fields the matcher needs are kept; a record with no <call>
+        // is skipped. We FETCH with STATUS:CONFIRMED, but app_qrzlog_status is still checked so a record
+        // is only taken when QRZ actually flags it confirmed (C).
+        private static List<DataAccess.LotwConfirmation> ParseAdifConfirmations(string adif)
+        {
+            var list = new List<DataAccess.LotwConfirmation>();
+            if (string.IsNullOrEmpty(adif)) return list;
+
+            var cur = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            int i = 0, n = adif.Length;
+            while (i < n)
+            {
+                int lt = adif.IndexOf('<', i);
+                if (lt < 0) break;
+                int gt = adif.IndexOf('>', lt + 1);
+                if (gt < 0) break;
+                string tag = adif.Substring(lt + 1, gt - lt - 1);
+                i = gt + 1;
+
+                if (tag.Equals("eor", StringComparison.OrdinalIgnoreCase))
+                {
+                    AddConfirmation(list, cur);
+                    cur.Clear();
+                    continue;
+                }
+                if (tag.Equals("eoh", StringComparison.OrdinalIgnoreCase)) { cur.Clear(); continue; }
+
+                // "name:len" or "name:len:type"
+                string[] parts = tag.Split(':');
+                if (parts.Length < 2) continue;
+                string name = parts[0].Trim();
+                int len;
+                if (!int.TryParse(parts[1].Trim(), out len) || len < 0) continue;
+                if (i + len > n) len = n - i;         // defend against a truncated stream
+                string val = adif.Substring(i, len);
+                i += len;
+                if (name.Length > 0) cur[name] = val;
+            }
+            // A final record is normally closed by <eor>; add any trailing one just in case.
+            AddConfirmation(list, cur);
+            return list;
+        }
+
+        private static string Field(Dictionary<string, string> f, string name)
+        {
+            string v;
+            return f.TryGetValue(name, out v) ? (v ?? string.Empty).Trim() : string.Empty;
+        }
+
+        private static void AddConfirmation(List<DataAccess.LotwConfirmation> list, Dictionary<string, string> f)
+        {
+            string call = Field(f, "call");
+            if (string.IsNullOrWhiteSpace(call)) return;
+
+            string status = Field(f, "app_qrzlog_status");
+            if (status.Length > 0 && !status.Equals("C", StringComparison.OrdinalIgnoreCase)) return;
+
+            var c = new DataAccess.LotwConfirmation
+            {
+                Call = call,
+                Band = Field(f, "band"),
+                Mode = Field(f, "mode"),
+                QsoDate = Field(f, "qso_date"),
+                StationCallsign = Field(f, "station_callsign"),
+                QslRDate = Field(f, "app_qrzlog_qsldate")
+            };
+            int dxcc;
+            if (int.TryParse(Field(f, "dxcc"), out dxcc)) c.DxccCode = dxcc;
+            list.Add(c);
+        }
     }
 }

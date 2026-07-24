@@ -41,18 +41,49 @@ namespace HolyLogger.OptionsUserControls
             HasChanged = false;
         }
 
-        // Re-reads the eQSL accounts from the database into the grid.
+        // Re-reads the eQSL accounts from the database into the grid, then re-selects the callsign that
+        // was selected last time this page was open (persisted in EqslLastSelectedCallsign), so reopening
+        // the window lands the user back on the same row.
         public void LoadAccounts()
         {
             try
             {
                 _accounts = new ObservableCollection<EqslAccount>(DataAccess.GetInstance().GetEqslAccounts());
                 DG_Accounts.ItemsSource = _accounts;
+                RestoreLastSelection();
             }
             catch (Exception ex)
             {
                 HolyMessageBox.ShowError("Failed to load eQSL accounts: " + ex.Message, "eQSL Accounts", Window.GetWindow(this));
             }
+        }
+
+        // Selects the row whose callsign matches the saved one (if it still exists). Runs under _loading
+        // so it does not re-write the setting via the SelectionChanged handler.
+        private void RestoreLastSelection()
+        {
+            string last = Properties.Settings.Default.EqslLastSelectedCallsign;
+            if (string.IsNullOrWhiteSpace(last) || _accounts == null) return;
+
+            foreach (EqslAccount a in _accounts)
+            {
+                if (string.Equals(a.Callsign, last, StringComparison.OrdinalIgnoreCase))
+                {
+                    DG_Accounts.SelectedItem = a;
+                    DG_Accounts.ScrollIntoView(a);
+                    break;
+                }
+            }
+        }
+
+        // Remembers the selected callsign so the next open of this window lands on the same row.
+        private void DG_Accounts_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_loading) return;
+            EqslAccount acct = DG_Accounts.SelectedItem as EqslAccount;
+            if (acct == null || string.IsNullOrWhiteSpace(acct.Callsign)) return;
+            Properties.Settings.Default.EqslLastSelectedCallsign = acct.Callsign;
+            Properties.Settings.Default.Save();
         }
 
         private void CB_AutoUpload_Changed(object sender, RoutedEventArgs e)

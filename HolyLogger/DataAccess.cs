@@ -464,7 +464,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -491,6 +491,14 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("cq_zone"));
                 insertSQL.Parameters.Add(new SQLiteParameter("itu_zone"));
                 insertSQL.Parameters.Add(new SQLiteParameter("lotw_status"));
+                // Confirmation status, so an ADIF exported by HolyLogger keeps every tick on re-import
+                // (even onto another computer). Positional parameters - keep this order matching the SQL.
+                insertSQL.Parameters.Add(new SQLiteParameter("lotw_qsl_rcvd"));
+                insertSQL.Parameters.Add(new SQLiteParameter("lotw_qsl_rdate"));
+                insertSQL.Parameters.Add(new SQLiteParameter("lotw_deleted_entity"));
+                insertSQL.Parameters.Add(new SQLiteParameter("qrz_qsl_rcvd"));
+                insertSQL.Parameters.Add(new SQLiteParameter("qrz_qsl_rdate"));
+                insertSQL.Parameters.Add(new SQLiteParameter("qrz_deleted_entity"));
 
                 foreach (var qso in qsos)
                 {
@@ -519,6 +527,12 @@ Environment.NewLine +
                     insertSQL.Parameters[22].Value = (object)qso.CQZone ?? DBNull.Value;
                     insertSQL.Parameters[23].Value = (object)qso.ITUZone ?? DBNull.Value;
                     insertSQL.Parameters[24].Value = qso.LotwStatus;
+                    insertSQL.Parameters[25].Value = qso.LotwQslRcvd;
+                    insertSQL.Parameters[26].Value = (object)qso.LotwQslRDate ?? DBNull.Value;
+                    insertSQL.Parameters[27].Value = qso.LotwDeletedEntity;
+                    insertSQL.Parameters[28].Value = qso.QrzQslRcvd;
+                    insertSQL.Parameters[29].Value = (object)qso.QrzQslRDate ?? DBNull.Value;
+                    insertSQL.Parameters[30].Value = qso.QrzDeletedEntity;
 
                     try
                     {
@@ -748,6 +762,10 @@ Environment.NewLine +
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
                         if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
                         if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
+                        if (rdr["lotw_deleted_entity"] != null && rdr["lotw_deleted_entity"] != DBNull.Value) q.LotwDeletedEntity = Convert.ToInt32(rdr["lotw_deleted_entity"]);
+                        if (rdr["qrz_qsl_rcvd"] != null && rdr["qrz_qsl_rcvd"] != DBNull.Value) q.QrzQslRcvd = Convert.ToInt32(rdr["qrz_qsl_rcvd"]);
+                        if (rdr["qrz_qsl_rdate"] != null && rdr["qrz_qsl_rdate"] != DBNull.Value) q.QrzQslRDate = rdr["qrz_qsl_rdate"].ToString();
+                        if (rdr["qrz_deleted_entity"] != null && rdr["qrz_deleted_entity"] != DBNull.Value) q.QrzDeletedEntity = Convert.ToInt32(rdr["qrz_deleted_entity"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -820,6 +838,10 @@ Environment.NewLine +
                             if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
                         if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
                         if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
+                        if (rdr["lotw_deleted_entity"] != null && rdr["lotw_deleted_entity"] != DBNull.Value) q.LotwDeletedEntity = Convert.ToInt32(rdr["lotw_deleted_entity"]);
+                        if (rdr["qrz_qsl_rcvd"] != null && rdr["qrz_qsl_rcvd"] != DBNull.Value) q.QrzQslRcvd = Convert.ToInt32(rdr["qrz_qsl_rcvd"]);
+                        if (rdr["qrz_qsl_rdate"] != null && rdr["qrz_qsl_rdate"] != DBNull.Value) q.QrzQslRDate = rdr["qrz_qsl_rdate"].ToString();
+                        if (rdr["qrz_deleted_entity"] != null && rdr["qrz_deleted_entity"] != DBNull.Value) q.QrzDeletedEntity = Convert.ToInt32(rdr["qrz_deleted_entity"]);
                             if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                             q.StandartizeQSO();
@@ -938,6 +960,10 @@ Environment.NewLine +
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
                         if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
                         if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
+                        if (rdr["lotw_deleted_entity"] != null && rdr["lotw_deleted_entity"] != DBNull.Value) q.LotwDeletedEntity = Convert.ToInt32(rdr["lotw_deleted_entity"]);
+                        if (rdr["qrz_qsl_rcvd"] != null && rdr["qrz_qsl_rcvd"] != DBNull.Value) q.QrzQslRcvd = Convert.ToInt32(rdr["qrz_qsl_rcvd"]);
+                        if (rdr["qrz_qsl_rdate"] != null && rdr["qrz_qsl_rdate"] != DBNull.Value) q.QrzQslRDate = rdr["qrz_qsl_rdate"].ToString();
+                        if (rdr["qrz_deleted_entity"] != null && rdr["qrz_deleted_entity"] != DBNull.Value) q.QrzDeletedEntity = Convert.ToInt32(rdr["qrz_deleted_entity"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -1871,11 +1897,68 @@ Environment.NewLine +
                         SchemaHasChanged = true;
                     }
                 }
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'lotw_deleted_entity'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [lotw_deleted_entity] INTEGER NOT NULL DEFAULT 0", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // One confirmation as LoTW reported it.
+        // The QRZ.com confirmation columns, parallel to the LoTW ones. Kept separate because QRZ's
+        // "confirmed" is a different, broader set than LoTW's, so a QSO can carry one tick and not the
+        // other. Idempotent - each ALTER runs only if the column is missing.
+        private void AddQrzConfirmationColumns()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'qrz_qsl_rcvd'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [qrz_qsl_rcvd] INTEGER NOT NULL DEFAULT 0", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'qrz_qsl_rdate'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [qrz_qsl_rdate] nvarchar(20) NULL", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+                using (var cmd = new SQLiteCommand(
+                    "SELECT count(*) FROM pragma_table_info('qso') WHERE name = 'qrz_deleted_entity'", con))
+                {
+                    if (Convert.ToInt32(cmd.ExecuteScalar()) == 0)
+                    {
+                        using (var alter = new SQLiteCommand(
+                            "ALTER TABLE qso ADD COLUMN [qrz_deleted_entity] INTEGER NOT NULL DEFAULT 0", con))
+                            alter.ExecuteNonQuery();
+                        SchemaHasChanged = true;
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // One confirmation as LoTW - or QRZ - reported it. A service-neutral carrier: both the LoTW
+        // report and the QRZ FETCH give the same handful of fields, and both are matched to the log the
+        // same way, so the same type feeds MarkLotwConfirmed and MarkQrzConfirmed.
         public class LotwConfirmation
         {
             public string Call { get; set; }
@@ -1884,6 +1967,7 @@ Environment.NewLine +
             public string QsoDate { get; set; }        // yyyyMMdd
             public string StationCallsign { get; set; } // ours, when the report carries it
             public string QslRDate { get; set; }        // yyyyMMdd, when the report carries it
+            public int DxccCode { get; set; }           // LoTW's worked-entity code (date-correct)
         }
 
         // Marks the QSOs that LoTW says are confirmed. Returns how many rows changed.
@@ -1930,6 +2014,28 @@ Environment.NewLine +
         // is just an int, and the caller marshals it to the screen.
         public int MarkLotwConfirmed(IList<LotwConfirmation> confirmations, bool fullReset,
                                      Action<int> onProgress, out List<LotwConfirmation> unmatched)
+            => MarkConfirmedCore("lotw_qsl_rcvd", "lotw_qsl_rdate", "lotw_deleted_entity",
+                                 confirmations, fullReset, onProgress, out unmatched);
+
+        // QRZ counterparts of the MarkLotwConfirmed overloads. Identical matching (QRZ FETCH gives the
+        // same call/band/mode/date/station fields LoTW does), only the target columns differ.
+        public int MarkQrzConfirmed(IList<LotwConfirmation> confirmations, out List<LotwConfirmation> unmatched)
+            => MarkQrzConfirmed(confirmations, false, null, out unmatched);
+
+        public int MarkQrzConfirmed(IList<LotwConfirmation> confirmations, bool fullReset, out List<LotwConfirmation> unmatched)
+            => MarkQrzConfirmed(confirmations, fullReset, null, out unmatched);
+
+        public int MarkQrzConfirmed(IList<LotwConfirmation> confirmations, bool fullReset,
+                                    Action<int> onProgress, out List<LotwConfirmation> unmatched)
+            => MarkConfirmedCore("qrz_qsl_rcvd", "qrz_qsl_rdate", "qrz_deleted_entity",
+                                 confirmations, fullReset, onProgress, out unmatched);
+
+        // Shared engine behind MarkLotwConfirmed / MarkQrzConfirmed. The three column names name the
+        // rcvd flag, the confirmation-date, and the deleted-entity flag to write; they are internal
+        // constants (never user input), so interpolating them into the SQL is safe.
+        private int MarkConfirmedCore(string rcvdCol, string rdateCol, string deletedCol,
+                                      IList<LotwConfirmation> confirmations, bool fullReset,
+                                      Action<int> onProgress, out List<LotwConfirmation> unmatched)
         {
             unmatched = new List<LotwConfirmation>();
             if (confirmations == null || confirmations.Count == 0) return 0;
@@ -1943,7 +2049,7 @@ Environment.NewLine +
                 {
                     if (fullReset)
                         using (var clear = new SQLiteCommand(
-                            "UPDATE qso SET lotw_qsl_rcvd = 0, lotw_qsl_rdate = NULL WHERE lotw_qsl_rcvd = 1", con, tx))
+                            $"UPDATE qso SET {rcvdCol} = 0, {rdateCol} = NULL, {deletedCol} = 0 WHERE {rcvdCol} = 1", con, tx))
                             clear.ExecuteNonQuery();
 
                     // The station callsign is REQUIRED to match: my_callsign = @mycall. A confirmation
@@ -1952,19 +2058,19 @@ Environment.NewLine +
                     // operator made that merely shares the call+band+mode+date. Removing the old
                     // "@mycall = '' OR ..." escape is what stops confirmations leaking across logs.
                     using (var exact = new SQLiteCommand(
-                        "UPDATE qso SET lotw_qsl_rcvd = 1, lotw_qsl_rdate = @rdate " +
+                        $"UPDATE qso SET {rcvdCol} = 1, {rdateCol} = @rdate, {deletedCol} = @deleted " +
                         "WHERE dx_callsign = @call COLLATE NOCASE " +
                         "  AND band  = @band COLLATE NOCASE " +
                         "  AND mode  = @mode COLLATE NOCASE " +
                         "  AND date  = @date " +
                         "  AND my_callsign = @mycall COLLATE NOCASE", con, tx))
-                    // Fallback for the digital sub-modes. LoTW reports the exact sub-mode (PSK31, PSK63,
-                    // DATA...) while the log stores the family (PSK), so the exact query above misses
-                    // them. This one drops the mode test to "the log's mode is in the SAME family", and
-                    // is tried ONLY when the LoTW mode has a known family and the exact match already
-                    // failed - so an ordinary SSB/CW/FT8 QSO is never broadened.
+                    // Fallback for the digital sub-modes. The report gives the exact sub-mode (PSK31,
+                    // PSK63, DATA...) while the log stores the family (PSK), so the exact query above
+                    // misses them. This one drops the mode test to "the log's mode is in the SAME
+                    // family", and is tried ONLY when the reported mode has a known family and the exact
+                    // match already failed - so an ordinary SSB/CW/FT8 QSO is never broadened.
                     using (var family = new SQLiteCommand(
-                        "UPDATE qso SET lotw_qsl_rcvd = 1, lotw_qsl_rdate = @rdate " +
+                        $"UPDATE qso SET {rcvdCol} = 1, {rdateCol} = @rdate, {deletedCol} = @deleted " +
                         "WHERE dx_callsign = @call COLLATE NOCASE " +
                         "  AND band  = @band COLLATE NOCASE " +
                         "  AND date  = @date " +
@@ -1978,6 +2084,7 @@ Environment.NewLine +
                             cmd.Parameters.Add(new SQLiteParameter("@band"));
                             cmd.Parameters.Add(new SQLiteParameter("@date"));
                             cmd.Parameters.Add(new SQLiteParameter("@mycall"));
+                            cmd.Parameters.Add(new SQLiteParameter("@deleted"));
                         }
                         exact.Parameters.Add(new SQLiteParameter("@mode"));
 
@@ -1988,6 +2095,10 @@ Environment.NewLine +
                             // Cannot attribute a confirmation with no station callsign to any operator,
                             // so it is left unmatched rather than guessed at across logs.
                             if (string.IsNullOrWhiteSpace(c.StationCallsign)) { unmatched.Add(c); continue; }
+
+                            int deletedFlag = DXCCManager.DeletedEntities.IsDeleted(c.DxccCode) ? 1 : 0;
+                            exact.Parameters["@deleted"].Value = deletedFlag;
+                            family.Parameters["@deleted"].Value = deletedFlag;
 
                             string rdate  = c.QslRDate ?? string.Empty;
                             string call   = c.Call.Trim();
@@ -2094,6 +2205,49 @@ Environment.NewLine +
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
                 using (var cmd = new SQLiteCommand(
                     "SELECT COUNT(*) FROM qso WHERE lotw_qsl_rcvd = 1 AND log_id = @log", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@log", logId));
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+                }
+            }
+        }
+
+        // QRZ counterparts of the three LoTW count helpers above.
+        public int GetQrzConfirmedCount()
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                using (var cmd = new SQLiteCommand("SELECT COUNT(*) FROM qso WHERE qrz_qsl_rcvd = 1", con))
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+        }
+
+        public List<KeyValuePair<string, int>> GetQrzConfirmedCountsByLog()
+        {
+            var rows = new List<KeyValuePair<string, int>>();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return rows;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT l.name, COUNT(q.Id) AS n " +
+                    "FROM qso q JOIN logs l ON l.Id = q.log_id " +
+                    "WHERE q.qrz_qsl_rcvd = 1 GROUP BY l.name HAVING n > 0 ORDER BY n DESC", con))
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                        rows.Add(new KeyValuePair<string, int>(
+                            rdr["name"]?.ToString() ?? "(unnamed)", Convert.ToInt32(rdr["n"])));
+            }
+            return rows;
+        }
+
+        public int GetQrzConfirmedCount(long logId)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT COUNT(*) FROM qso WHERE qrz_qsl_rcvd = 1 AND log_id = @log", con))
                 {
                     cmd.Parameters.Add(new SQLiteParameter("@log", logId));
                     return Convert.ToInt32(cmd.ExecuteScalar());
@@ -2846,6 +3000,7 @@ Environment.NewLine +
             AddQrzColumns();
             AddLotwColumns();
             AddLotwConfirmationColumns();
+            AddQrzConfirmationColumns();
             AddClublogColumn();
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();

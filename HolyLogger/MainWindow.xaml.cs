@@ -434,6 +434,14 @@ namespace HolyLogger
                 }
             }
 
+            // Settings.Upgrade() above only bridges versions WITHIN one install identity; when the
+            // installed path/identity changes between releases it carries nothing, blanking the online-
+            // service logins. Restore any that are missing from the identity-independent mirror, then
+            // refresh the mirror so it always reflects the current logins. Runs every start (not only on
+            // a version change), so the mirror recovers even a store that a bad upgrade left half-empty.
+            CredentialStore.RestoreMissing();
+            CredentialStore.Backup();
+
             NormalizeEnterKeyBehaviorSettings();
 
             if (Properties.Settings.Default.isAutoCheckUpdates && isNetworkAvailable)
@@ -6040,6 +6048,9 @@ namespace HolyLogger
         private async void Options_Closed(object sender, EventArgs e)
         {
             OptionsWindow optionWindow = (OptionsWindow)sender;
+            // Mirror any credential the operator just entered/changed to the identity-independent store,
+            // so it survives the next version upgrade or reinstall even if user.config does not.
+            CredentialStore.Backup();
             if(optionWindow.QRZServicesControlInstance.HasChanged)
             {
                 _SessionKey = isNetworkAvailable ? await Helper.LoginToQRZAsync() : "";

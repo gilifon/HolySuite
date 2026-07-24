@@ -125,6 +125,7 @@
       <HintPath>..\packages\System.Runtime.InteropServices.RuntimeInformation.4.3.0\lib\net45\System.Runtime.InteropServices.RuntimeInformation.dll</HintPath>
     </Reference>
     <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Security" />
     <Reference Include="System.Xml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Xaml">
@@ -230,6 +231,7 @@
     <Compile Include="EqslQueueWindow.cs" />
     <Compile Include="LotwUploader.cs" />
     <Compile Include="ClublogService.cs" />
+    <Compile Include="CredentialStore.cs" />
     <Compile Include="QrzLogbookService.cs" />
     <Compile Include="WaveOutPlayer.cs" />
     <Compile Include="TqslStationData.cs" />

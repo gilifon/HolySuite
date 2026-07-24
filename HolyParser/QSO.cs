@@ -123,6 +123,32 @@ namespace HolyParser
         // The date LoTW recorded the confirmation (ADIF QSLRDATE, yyyyMMdd). Empty when unconfirmed.
         public string LotwQslRDate { get; set; }
 
+        // 1 when the confirmed entity is a DELETED DXCC entity (East Germany, Czechoslovakia, ...).
+        // Set from the DXCC code LoTW returns for the confirmation; meaningless unless LotwQslRcvd = 1.
+        public int LotwDeletedEntity { get; set; }
+
+        // Three-level LoTW status for sorting the LoTW column: confirmed-active (2), confirmed-deleted
+        // (1), not-confirmed (0). Descending gives the operator's requested order.
+        public int LotwStatusRank =>
+            LotwQslRcvd == 1 ? (LotwDeletedEntity == 1 ? 1 : 2) : 0;
+
+        // QRZ.com CONFIRMATION: 1 when QRZ says this QSO is confirmed (app_qrzlog_status = C). This is
+        // a DIFFERENT, broader universe than LoTW - QRZ confirms on a QRZ-to-QRZ logbook match - so it
+        // is tracked and shown independently of LotwQslRcvd. Set from the QRZ FETCH confirmations.
+        public int QrzQslRcvd { get; set; }
+
+        // The date QRZ recorded the confirmation (app_qrzlog_qsldate, yyyyMMdd). Empty when unconfirmed.
+        public string QrzQslRDate { get; set; }
+
+        // 1 when the QRZ-confirmed entity is a DELETED DXCC entity. Set from the DXCC code QRZ returns
+        // for the confirmation; meaningless unless QrzQslRcvd = 1.
+        public int QrzDeletedEntity { get; set; }
+
+        // Three-level QRZ status for sorting the QRZ column, exactly like LotwStatusRank: confirmed-
+        // active (2), confirmed-deleted (1), not-confirmed (0).
+        public int QrzStatusRank =>
+            QrzQslRcvd == 1 ? (QrzDeletedEntity == 1 ? 1 : 2) : 0;
+
         // Name of the log this QSO belongs to. Display-only: filled in by the upload-queue queries so the
         // (global) queue window can show which log each pending/dismissed QSO came from. Not persisted.
         public string LogName { get; set; }

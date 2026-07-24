@@ -544,7 +544,9 @@
 
                      LoTW confirmation, same tick as the log table. Read-only: it is what LoTW says,
                      not something to type over. -->
-                <DataGridTemplateColumn Header="LoTW" IsReadOnly="True" SortMemberPath="LotwQslRcvd" Width="Auto">
+                <!-- Green tick = confirmed active entity, RED tick = confirmed DELETED entity, blank =
+                     not confirmed; sorted on three levels via LotwStatusRank. Same as the log table. -->
+                <DataGridTemplateColumn Header="LoTW" IsReadOnly="True" SortMemberPath="LotwStatusRank" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold">
@@ -552,11 +554,60 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Text" Value=""/>
                                         <Style.Triggers>
-                                            <DataTrigger Binding="{Binding LotwQslRcvd}" Value="1">
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding LotwQslRcvd}" Value="1"/>
+                                                    <Condition Binding="{Binding LotwDeletedEntity}" Value="0"/>
+                                                </MultiDataTrigger.Conditions>
                                                 <Setter Property="Text" Value="&#x2713;"/>
                                                 <Setter Property="Foreground" Value="#1E7E34"/>
                                                 <Setter Property="ToolTip" Value="Confirmed in LoTW"/>
-                                            </DataTrigger>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding LotwQslRcvd}" Value="1"/>
+                                                    <Condition Binding="{Binding LotwDeletedEntity}" Value="1"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Text" Value="&#x2713;"/>
+                                                <Setter Property="Foreground" Value="#CC0000"/>
+                                                <Setter Property="ToolTip" Value="Confirmed in LoTW — DELETED DXCC entity"/>
+                                            </MultiDataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <!-- QRZ.com confirmation, parallel to the LoTW column: green = confirmed active entity,
+                     RED = confirmed DELETED entity, blank = not confirmed; sorted on three levels via
+                     QrzStatusRank. A separate, broader set from LoTW. -->
+                <DataGridTemplateColumn Header="QRZ" IsReadOnly="True" SortMemberPath="QrzStatusRank" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock">
+                                        <Setter Property="Text" Value=""/>
+                                        <Style.Triggers>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding QrzQslRcvd}" Value="1"/>
+                                                    <Condition Binding="{Binding QrzDeletedEntity}" Value="0"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Text" Value="&#x2713;"/>
+                                                <Setter Property="Foreground" Value="#1E7E34"/>
+                                                <Setter Property="ToolTip" Value="Confirmed on QRZ.com"/>
+                                            </MultiDataTrigger>
+                                            <MultiDataTrigger>
+                                                <MultiDataTrigger.Conditions>
+                                                    <Condition Binding="{Binding QrzQslRcvd}" Value="1"/>
+                                                    <Condition Binding="{Binding QrzDeletedEntity}" Value="1"/>
+                                                </MultiDataTrigger.Conditions>
+                                                <Setter Property="Text" Value="&#x2713;"/>
+                                                <Setter Property="Foreground" Value="#CC0000"/>
+                                                <Setter Property="ToolTip" Value="Confirmed on QRZ.com — DELETED DXCC entity"/>
+                                            </MultiDataTrigger>
                                         </Style.Triggers>
                                     </Style>
                                 </TextBlock.Style>

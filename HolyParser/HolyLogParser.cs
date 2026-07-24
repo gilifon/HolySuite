@@ -484,8 +484,40 @@ namespace HolyParser
                 qso_row.LotwStatus = val.Trim().Equals("Y", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
             }
 
+            // Confirmation status from a HolyLogger export, so a re-import (even on another computer)
+            // restores every tick. LoTW uses the standard ADIF fields; QRZ uses app fields. Absent on
+            // logs from other programs, so these simply stay 0 there.
+            qso_row.LotwQslRcvd = AdifYesNo(row, "lotw_qsl_rcvd");
+            string lrd = AdifValue(row, "lotw_qslrdate");
+            if (!string.IsNullOrWhiteSpace(lrd)) qso_row.LotwQslRDate = lrd.Trim();
+            qso_row.LotwDeletedEntity = AdifYesNo(row, "app_holylogger_lotw_deleted");
+            qso_row.QrzQslRcvd = AdifYesNo(row, "app_holylogger_qrz_qsl_rcvd");
+            string qrd = AdifValue(row, "app_holylogger_qrz_qslrdate");
+            if (!string.IsNullOrWhiteSpace(qrd)) qso_row.QrzQslRDate = qrd.Trim();
+            qso_row.QrzDeletedEntity = AdifYesNo(row, "app_holylogger_qrz_deleted");
+
             qso_row.StandartizeQSO();
             return qso_row;
+        }
+
+        // Reads one ADIF field's value from a record row (length-prefixed <field:len[:type]>value), or
+        // null when the field is absent. Used for the confirmation fields on import.
+        private static string AdifValue(string row, string field)
+        {
+            var m = Regex.Match(row, "<" + field + @":(\d{1,5})(?::[a-zA-Z])?>", RegexOptions.IgnoreCase);
+            if (!m.Success) return null;
+            int len = int.Parse(m.Groups[1].Value);
+            int start = m.Index + m.Length;
+            if (start >= row.Length) return string.Empty;
+            if (start + len > row.Length) len = row.Length - start;
+            return row.Substring(start, len);
+        }
+
+        // 1 when the ADIF field is present and its value starts with Y, else 0.
+        private static int AdifYesNo(string row, string field)
+        {
+            string v = AdifValue(row, field);
+            return v != null && v.Trim().StartsWith("Y", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
         }
 
         public QSO ParseN1MMRawQSO(string row)

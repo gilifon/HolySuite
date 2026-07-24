@@ -42,10 +42,22 @@
 
         <Label Grid.Row="3" Content="Password" HorizontalAlignment="Left" Margin="0,8,0,0"
                VerticalAlignment="Top" FontSize="14"/>
+        <!-- Password + eye toggle (same pattern as the LoTW web password): the masked PasswordBox and a
+             plain TextBox share this position; the eye button swaps which is shown so the operator can
+             verify what they typed. -->
         <PasswordBox Grid.Row="3" x:Name="TB_Password" HorizontalAlignment="Left" Height="26"
                      Margin="160,10,0,0" VerticalAlignment="Top" Width="280" FontSize="14"
                      VerticalContentAlignment="Center"
                      PasswordChanged="TB_Password_PasswordChanged"/>
+        <TextBox Grid.Row="3" x:Name="TB_PasswordVisible" HorizontalAlignment="Left" Height="26"
+                 Margin="160,10,0,0" VerticalAlignment="Top" Width="280" FontSize="14"
+                 VerticalContentAlignment="Center" Visibility="Collapsed"
+                 TextChanged="TB_PasswordVisible_TextChanged"/>
+        <ToggleButton Grid.Row="3" x:Name="BTN_ShowPassword" HorizontalAlignment="Left"
+                      Margin="448,10,0,0" VerticalAlignment="Top" Width="30" Height="26"
+                      FontFamily="Segoe MDL2 Assets" FontSize="14" Content="&#xE7B3;"
+                      ToolTip="Show / hide the password"
+                      Checked="ShowPassword_Checked" Unchecked="ShowPassword_Unchecked"/>
 
         <Button Grid.Row="4" x:Name="TestConnectionBtn" Content="Test Connection"
                 HorizontalAlignment="Left" Margin="160,12,0,0" Width="150" FontSize="14"

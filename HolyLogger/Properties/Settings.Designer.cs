@@ -1852,6 +1852,30 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string QrzConfirmedEntities {
+            get {
+                return ((string)(this["QrzConfirmedEntities"]));
+            }
+            set {
+                this["QrzConfirmedEntities"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string QrzConfirmedDeletedCodes {
+            get {
+                return ((string)(this["QrzConfirmedDeletedCodes"]));
+            }
+            set {
+                this["QrzConfirmedDeletedCodes"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ActiveProfile {
             get {
                 return ((string)(this["ActiveProfile"]));
@@ -2266,6 +2290,18 @@ namespace HolyLogger.Properties {
             }
             set {
                 this["EqslQthNickname"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string EqslLastSelectedCallsign {
+            get {
+                return ((string)(this["EqslLastSelectedCallsign"]));
+            }
+            set {
+                this["EqslLastSelectedCallsign"] = value;
             }
         }
 

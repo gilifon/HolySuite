@@ -130,6 +130,19 @@
                   AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
                   HeadersVisibility="Column" GridLinesVisibility="All" SelectionMode="Single"
                   FontSize="13" ScrollViewer.VerticalScrollBarVisibility="Auto">
+            <!-- Column header row uses the color-scheme header background (LogHeaderBg, the same token
+                 the main log/cluster tables use, overridable via View > Color Scheme > Customize Colors)
+                 with black text, so this table's header matches the rest of the app. -->
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="Background" Value="{DynamicResource LogHeaderBg}"/>
+                    <Setter Property="Foreground" Value="Black"/>
+                    <Setter Property="BorderBrush" Value="#1565C0"/>
+                    <Setter Property="BorderThickness" Value="0,0,1,3"/>
+                    <Setter Property="Padding" Value="5,3,5,3"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
             <DataGrid.RowStyle>
                 <Style TargetType="DataGridRow">
                     <Style.Triggers>

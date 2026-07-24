@@ -54,9 +54,36 @@ namespace HolyLogger.OptionsUserControls
             HasChanged = true;
         }
 
+        // Eye toggle for the QRZ lookup password: reveal the masked PasswordBox by swapping in a plain
+        // TextBox (and back), keeping the two in sync so the saved setting is always current.
+        private void ShowPassword_Checked(object sender, RoutedEventArgs e)
+        {
+            TB_PasswordVisible.Text = TB_Password.Password;
+            TB_PasswordVisible.Visibility = Visibility.Visible;
+            TB_Password.Visibility = Visibility.Collapsed;
+        }
+
+        private void ShowPassword_Unchecked(object sender, RoutedEventArgs e)
+        {
+            TB_Password.Password = TB_PasswordVisible.Text;
+            TB_Password.Visibility = Visibility.Visible;
+            TB_PasswordVisible.Visibility = Visibility.Collapsed;
+        }
+
+        private void TB_PasswordVisible_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (_loading) return;
+            Properties.Settings.Default.qrz_password = TB_PasswordVisible.Text;
+            HasChanged = true;
+        }
+
+        // The password currently entered, whichever box is showing.
+        private string CurrentPassword =>
+            BTN_ShowPassword.IsChecked == true ? TB_PasswordVisible.Text : TB_Password.Password;
+
         private void TestConnectionBtn_Click(object sender, RoutedEventArgs e)
         {
-            Properties.Settings.Default.qrz_password = TB_Password.Password;
+            Properties.Settings.Default.qrz_password = CurrentPassword;
             Properties.Settings.Default.qrz_username = TB_UserName.Text;
             bool ok = Helper.LoginToQRZ(out string sessionKey);
             if (ok)

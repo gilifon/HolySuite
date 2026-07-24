@@ -16,7 +16,9 @@ namespace HolyLogger
 {
     public partial class StatisticsWindow : Window
     {
-        private readonly ObservableCollection<QSO> _allQsos;
+        // Not readonly: re-read from the database after a Check so the per-QSO confirmation flags (which
+        // the zone lists read) are live, without the operator having to reopen the window.
+        private ObservableCollection<QSO> _allQsos;
 
         public DataAccess Dal { get; set; }
 
@@ -35,9 +37,16 @@ namespace HolyLogger
         private List<CountryItem> _workedList;
         private List<CountryItem> _missingList;
 
-        // DXCC entity names confirmed on LoTW. Populated from the LoTW confirmation download (or the
-        // cached result); drives the Confirmed column (green check / red minus) in the worked list.
+        // DXCC entity names confirmed by the SELECTED confirmation source. Populated from that source's
+        // cached download result; drives the Confirmed column (tick) in the worked list. Reloaded from a
+        // different cache whenever the source folder changes (see LoadConfirmedCache / _source).
         private HashSet<string> _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // The confirmation source whose analysis the window is currently showing - one folder each in the
+        // vertical tab strip. "Worked" is the plain log with no confirmation overlay; the rest color the
+        // worked list by that service's confirmations. Only LoTW and QRZ are wired in this first step.
+        private enum ConfSource { Worked, Lotw, Qrz }
+        private ConfSource _source = ConfSource.Worked;
 
         private enum WorkedSort { CountDesc, CountAsc, NameAsc, NameDesc, ConfirmedDesc, ConfirmedAsc }
         private enum MissingSort { NameAsc, NameDesc }
@@ -85,18 +94,37 @@ namespace HolyLogger
 
             LoadConfirmedCache();
             ComputeStats();
+            BuildSourceFolders();
 
             // Match country-table scroll heights to the pivot table height whenever the pivot resizes.
             PivotOuterBorder.SizeChanged += (sender, e) =>
             {
                 if (e.NewSize.Height > 0)
                 {
-                    SV_WorkedCountries.Height  = e.NewSize.Height;
-                    SV_MissingCountries.Height = e.NewSize.Height;
-                    SV_MissingCQ.Height        = e.NewSize.Height;
-                    SV_MissingITU.Height       = e.NewSize.Height;
+                    _tableHeight = e.NewSize.Height;
+                    SV_WorkedCountries.Height  = _tableHeight;
+                    SV_MissingCountries.Height = _tableHeight;
+                    AdjustZoneHeights();
                 }
             };
+            // The zone lists (CQ/ITU) live in the right column, UNDER the LoTW panel slot. On the LoTW
+            // folder that slot is taller than the tiles, so the zones start lower; shrink them by that
+            // extra offset so their BOTTOMS line up with the country lists. When the slot height changes
+            // (folder switch shows/hides the panel), recompute.
+            LotwSlot.SizeChanged += (snd, ev) => AdjustZoneHeights();
+        }
+
+        private double _tableHeight;
+
+        private void AdjustZoneHeights()
+        {
+            if (_tableHeight <= 0 || SV_MissingCQ == null) return;
+            double extra = 0;
+            try { extra = Math.Max(0, LotwSlot.ActualHeight - TilesRow.ActualHeight); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            double h = Math.Max(80, _tableHeight - extra);
+            SV_MissingCQ.Height  = h;
+            SV_MissingITU.Height = h;
         }
 
         protected override void OnSourceInitialized(EventArgs e)
@@ -121,15 +149,14 @@ namespace HolyLogger
             int total = _allQsos != null ? _allQsos.Count : 0;
             TB_TotalQSOs.Text = total.ToString();
             TB_PivotHeader.Text = "QSOs by Band × Mode\n(" + total + ")";
-            TB_CtyVersion.Text = string.IsNullOrEmpty(_masterResolver.Version) ? "—" : _masterResolver.Version;
 
-            // Warn if the country file is overdue for a refresh (e.g. AD1C moved the download URL).
+            // Warn if the country file is overdue for a refresh (e.g. AD1C moved the download URL). The
+            // cty.dat version tile was removed from the window; the warning still surfaces a stale file.
             string ctyWarning = CtyDatService.UpdateWarning();
             if (!string.IsNullOrEmpty(ctyWarning))
             {
                 TB_CtyWarning.Text = ctyWarning;
                 TB_CtyWarning.Visibility = Visibility.Visible;
-                TB_CtyVersion.Foreground = System.Windows.Media.Brushes.OrangeRed;
             }
             else
             {
@@ -234,18 +261,19 @@ namespace HolyLogger
 
         private List<int> MissingZones(int maxZone, Func<DXCC, int> zoneOf)
         {
-            var worked = new HashSet<int>();
+            var achieved = new HashSet<int>();
             if (_allQsos != null)
             {
                 foreach (QSO q in _allQsos)
                 {
+                    if (!IsAchievedForSource(q)) continue;   // confirmation folders count only confirmed QSOs
                     var d = Resolve(q.DXCall);
                     if (d == null) continue;
                     int z = zoneOf(d);
-                    if (z >= 1 && z <= maxZone) worked.Add(z);
+                    if (z >= 1 && z <= maxZone) achieved.Add(z);
                 }
             }
-            return Enumerable.Range(1, maxZone).Where(z => !worked.Contains(z)).ToList();
+            return Enumerable.Range(1, maxZone).Where(z => !achieved.Contains(z)).ToList();
         }
 
         // ── pivot table builder ───────────────────────────────────────────
@@ -427,8 +455,6 @@ namespace HolyLogger
                 .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
-            var workedNames = new HashSet<string>(workedCounts.Keys, StringComparer.OrdinalIgnoreCase);
-
             _workedList = workedCounts.Keys
                 .Select(name => new CountryItem
                 {
@@ -440,24 +466,9 @@ namespace HolyLogger
             // Single line now — the LoTW button sits beside it on the same row.
             TB_WorkedHeader.Text = $"Worked Countries ({_workedList.Count})";
 
-            var allDxccEntities = _masterResolver.GetAllEntityNames();
-            _missingList = allDxccEntities
-                .Where(n => !workedNames.Contains(n))
-                .Select(name => new CountryItem
-                {
-                    Name      = name,
-                    FlagImage = GetFlagImage(name),
-                }).ToList();
-
-            TB_MissingHeader.Text = $"Missing Countries\n({_missingList.Count})";
-
-            // Top summary boxes: worked-of-total and the missing gap. Derived from the master
-            // entity list so worked + missing always equals the total (currently 340 DXCC entities).
-            int totalDxcc   = allDxccEntities.Count;
-            int missingDxcc = _missingList.Count;
-            int workedDxcc  = totalDxcc - missingDxcc;
-            TB_UniqueCountries.Text = $"{workedDxcc} / {totalDxcc}";
-            TB_MissingDxcc.Text     = missingDxcc.ToString();
+            // The Missing list is source-aware, so it is built in its own method that the folder switch
+            // also calls. The tiles are set by ApplyConfirmedHighlight from the same _missingList.
+            RebuildMissingCountries();
 
             TB_SortWorkedName.MouseLeftButtonUp  -= SortWorkedByName;
             TB_SortWorkedName.MouseLeftButtonUp  += SortWorkedByName;
@@ -468,19 +479,137 @@ namespace HolyLogger
             TB_SortMissingName.MouseLeftButtonUp -= SortMissingByName;
             TB_SortMissingName.MouseLeftButtonUp += SortMissingByName;
 
-            ApplyConfirmedHighlight();   // color rows from the (possibly cached) LoTW-confirmed set
+            ApplyConfirmedHighlight();   // sets the tiles + colors the worked rows for the current source
             ApplyWorkedSort();
+        }
+
+        // Rebuilds the Missing Countries list for the CURRENT folder, so it always matches the Missing
+        // tile: on the Worked folder it is the entities never contacted; on a confirmation folder it is
+        // the entities not confirmed by that source (all DXCC minus that source's confirmed set).
+        private void RebuildMissingCountries()
+        {
+            var allDxccEntities = _masterResolver.GetAllEntityNames();
+            HashSet<string> achieved = _source == ConfSource.Worked
+                ? new HashSet<string>(_workedList.Select(c => c.Name), StringComparer.OrdinalIgnoreCase)
+                : _confirmedEntities;
+
+            _missingList = allDxccEntities
+                .Where(n => !achieved.Contains(n))
+                .Select(name => new CountryItem { Name = name, FlagImage = GetFlagImage(name) })
+                .ToList();
+
+            TB_MissingHeader.Text = $"Missing Countries\n({_missingList.Count})";
             ApplyMissingSort();
         }
 
+        // Whether a QSO counts as "achieved" for the current folder - i.e. removes its entity/zone from
+        // the Missing lists. On the Worked folder any logged QSO counts; on a confirmation folder only a
+        // QSO confirmed by that source counts. Reads the per-QSO confirmation flags.
+        private bool IsAchievedForSource(QSO q)
+        {
+            switch (_source)
+            {
+                case ConfSource.Lotw: return q.LotwQslRcvd == 1;
+                case ConfSource.Qrz:  return q.QrzQslRcvd == 1;
+                default:              return true;
+            }
+        }
+
         // ---- LoTW "confirmed countries" (confirmed on LoTW) ----
+
+        // Fills the vertical folder strip with the confirmation sources this operator uses. "Worked"
+        // (the plain log, no confirmation) is always first; LoTW / QRZ appear when their service is in
+        // use, or when a past download left a cached confirmed set to show. Selecting index 0 lands on
+        // Worked and fires the first RefreshForSource.
+        private void BuildSourceFolders()
+        {
+            var s = Properties.Settings.Default;
+            LB_Source.Items.Clear();
+            AddSourceFolder(ConfSource.Worked, "Worked");
+            if (s.UseLotwService || !string.IsNullOrWhiteSpace(s.LotwConfirmedEntities))
+                AddSourceFolder(ConfSource.Lotw, "LoTW");
+            if (s.UseQrzLogbook || !string.IsNullOrWhiteSpace(s.QrzConfirmedEntities))
+                AddSourceFolder(ConfSource.Qrz, "QRZ");
+            LB_Source.SelectedIndex = 0;   // Worked; fires LB_Source_SelectionChanged -> RefreshForSource
+        }
+
+        private void AddSourceFolder(ConfSource src, string label)
+        {
+            LB_Source.Items.Add(new ListBoxItem { Content = label, Tag = src, Background = SourceBackground(src) });
+        }
+
+        // The light tint that identifies each confirmation source - used both for the folder tab and for
+        // the per-source content area, so the two always match. (eQSL / Club Log / Paper are listed for
+        // when those folders are added.)
+        private static readonly Dictionary<ConfSource, System.Windows.Media.Brush> _sourceBrushes =
+            new Dictionary<ConfSource, System.Windows.Media.Brush>();
+
+        private static System.Windows.Media.Brush SourceBackground(ConfSource src)
+        {
+            if (_sourceBrushes.TryGetValue(src, out var cached)) return cached;
+            string hex;
+            switch (src)
+            {
+                case ConfSource.Lotw: hex = "#FFF8E1"; break;   // light yellow
+                case ConfSource.Qrz:  hex = "#E8F5E9"; break;   // light green
+                default:              hex = "#EEEEEE"; break;   // Worked (pure analysis) = light gray
+            }
+            var b = (System.Windows.Media.SolidColorBrush)new System.Windows.Media.BrushConverter().ConvertFromString(hex);
+            b.Freeze();
+            _sourceBrushes[src] = b;
+            return b;
+        }
+
+        private void LB_Source_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!(LB_Source.SelectedItem is ListBoxItem item) || !(item.Tag is ConfSource src)) return;
+            _source = src;
+            RefreshForSource();
+        }
+
+        // Re-reads the active log's QSOs so their (now updated) confirmation flags are current, then
+        // repaints the folder. Called after a Check so every value stays live - nothing needs a reopen.
+        private void ReloadQsosAfterCheck()
+        {
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal != null) _allQsos = dal.GetQSOsForLog(dal.ActiveLogId);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            _resolveCache = null;   // rebuilt lazily against the fresh list
+            RefreshForSource();
+        }
+
+        // Repaints the tables for the selected source: load that source's confirmed cache, recolor the
+        // worked list, and show only that source's download button (none on the Worked folder).
+        private void RefreshForSource()
+        {
+            LoadConfirmedCache();
+            RebuildMissingCountries();   // Missing Countries list for this source
+            PopulateMissingZones();      // Missing CQ / ITU zones for this source
+            ApplyConfirmedHighlight();   // tiles read the freshly-built _missingList
+            ApplyWorkedSort();
+
+            // Tint the per-source content area to match the selected folder's colour.
+            if (SV_SourceContent != null) SV_SourceContent.Background = SourceBackground(_source);
+
+            if (BTN_CheckLotw != null)
+                BTN_CheckLotw.Visibility = _source == ConfSource.Lotw ? Visibility.Visible : Visibility.Collapsed;
+            if (BTN_CheckQrz != null)
+                BTN_CheckQrz.Visibility = _source == ConfSource.Qrz ? Visibility.Visible : Visibility.Collapsed;
+        }
 
         // Restore the last downloaded confirmed-entity set so the colors/count show immediately on open
         // without re-downloading. Stored as a '|'-joined list of DXCC entity names.
         private void LoadConfirmedCache()
         {
             _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            string cached = Properties.Settings.Default.LotwConfirmedEntities;
+            // The Worked folder has no confirmation overlay; each other folder reads its own cache.
+            string cached =
+                _source == ConfSource.Lotw ? Properties.Settings.Default.LotwConfirmedEntities :
+                _source == ConfSource.Qrz  ? Properties.Settings.Default.QrzConfirmedEntities  :
+                string.Empty;
             if (string.IsNullOrWhiteSpace(cached)) return;
             foreach (var n in cached.Split('|'))
                 if (!string.IsNullOrWhiteSpace(n)) _confirmedEntities.Add(n.Trim());
@@ -488,7 +617,9 @@ namespace HolyLogger
             // Self-heal a bogus total left over from earlier broken-download testing: the confirmed-QSO
             // count can never be below the number of confirmed countries (each country has >=1 confirmed
             // QSO). If it is, drop the incremental marker so the next Check LoTW does a one-time full
-            // re-download that recomputes the true total. The cached colors stay until then.
+            // re-download that recomputes the true total. The cached colors stay until then. LoTW-only:
+            // the incremental marker belongs to the LoTW download.
+            if (_source != ConfSource.Lotw) return;
             var s = Properties.Settings.Default;
             if (s.LotwConfirmedQsoCount < _confirmedEntities.Count && !string.IsNullOrWhiteSpace(s.LotwLastQsl))
             {
@@ -499,10 +630,14 @@ namespace HolyLogger
 
         // Green-highlight the worked rows whose entity is in the confirmed set, and update the count line.
         // Does not re-sort; the caller refreshes the list (BuildCountryTables / the button both do).
-        // Count of distinct DELETED entities confirmed, from the codes the last download stored.
-        private static int CountConfirmedDeleted()
+        // Count of distinct DELETED entities confirmed by the current source, from the codes that
+        // source's last download stored.
+        private int CountConfirmedDeleted()
         {
-            string csv = Properties.Settings.Default.LotwConfirmedDeletedCodes;
+            string csv =
+                _source == ConfSource.Lotw ? Properties.Settings.Default.LotwConfirmedDeletedCodes :
+                _source == ConfSource.Qrz  ? Properties.Settings.Default.QrzConfirmedDeletedCodes  :
+                string.Empty;
             if (string.IsNullOrWhiteSpace(csv)) return 0;
             var set = new HashSet<int>();
             foreach (var part in csv.Split(','))
@@ -510,12 +645,19 @@ namespace HolyLogger
             return set.Count;
         }
 
+        // The current source's display name, for the confirmed tile and status line.
+        private string SourceName =>
+            _source == ConfSource.Lotw ? "LoTW" : _source == ConfSource.Qrz ? "QRZ" : "Worked";
+
         private void ApplyConfirmedHighlight()
         {
             if (_workedList == null) return;
+            // The Worked folder has no confirmation source, so its Conf. column is blank (not all-crosses).
+            bool showConf = _source != ConfSource.Worked;
             int confirmed = 0;
             foreach (var item in _workedList)
             {
+                item.ShowConfirmation = showConf;
                 item.IsConfirmed = _confirmedEntities.Contains(item.Name);
                 if (item.IsConfirmed) confirmed++;
             }
@@ -531,14 +673,44 @@ namespace HolyLogger
             // headers, which share a fixed height). "of N" is dropped because the worked-countries
             // header right above already shows that total.
             TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
-            TB_LotwStatus.Text = _confirmedEntities.Count == 0
+            TB_LotwStatus.Text = (_source == ConfSource.Worked || _confirmedEntities.Count == 0)
                 ? string.Empty
-                : $"Confirmed (LoTW): {confirmed} active,  {deletedConfirmed} deleted";
+                : $"Confirmed ({SourceName}): {confirmed} active,  {deletedConfirmed} deleted";
 
-            // Top summary box: confirmed / worked entities (countries).
-            TB_ConfirmedDxcc.Text = _confirmedEntities.Count == 0
-                ? "—"
-                : $"{confirmed} / {_workedList.Count}";
+            // The three source tiles. Confirmed and Missing PARTITION all DXCC entities (out of the full
+            // 340): Confirmed = entities confirmed by this source, Missing = 340 - Confirmed. "Worked,
+            // not confirmed" is the chaseable SUBSET of Missing - entities already contacted but not yet
+            // confirmed here (worked - confirmed) - so it is not a third partition, just a highlight.
+            int workedDxcc = _workedList.Count;                                  // 265 - entities contacted
+            int totalDxcc  = _masterResolver.GetAllEntityNames().Count;         // 340 - all DXCC entities
+            // The Missing tile ALWAYS reads the Missing Countries list, so tile and list can never
+            // disagree (that mismatch is the bug this fixes). The list itself is source-aware.
+            int missingCount = _missingList != null ? _missingList.Count : 0;
+
+            // The Confirmed tile only makes sense for a confirmation source; the Worked folder is the
+            // plain log, so it shows just Worked / DXCC and Missing DXCC.
+            if (TileConfirmed != null)
+                TileConfirmed.Visibility = _source == ConfSource.Worked ? Visibility.Collapsed : Visibility.Visible;
+
+            if (_source == ConfSource.Worked)
+            {
+                // Plain log folder: Worked = worked / total; Missing = never contacted.
+                TB_WorkedTileLabel.Text = "Worked / DXCC";
+                TB_UniqueCountries.Text = $"{workedDxcc} / {totalDxcc}";
+                TB_MissingTileLabel.Text = "Missing DXCC";
+                TB_MissingDxcc.Text = missingCount.ToString();
+            }
+            else
+            {
+                // Confirmation folder: Confirmed + Missing partition all 340. Worked-not-confirmed is
+                // the chaseable subset (contacted but not confirmed here).
+                TB_ConfirmedTileLabel.Text = $"Confirmed ({SourceName})";
+                TB_WorkedTileLabel.Text = "Worked, not confirmed";
+                TB_MissingTileLabel.Text = $"Missing ({SourceName})";
+                TB_ConfirmedDxcc.Text = $"{confirmed} / {totalDxcc}";
+                TB_UniqueCountries.Text = Math.Max(0, workedDxcc - confirmed).ToString();
+                TB_MissingDxcc.Text = missingCount.ToString();
+            }
 
             PopulateConfirmedSummary();
         }
@@ -549,7 +721,9 @@ namespace HolyLogger
         {
             if (ConfirmSummaryPanel == null) return;
             var s = Properties.Settings.Default;
-            if (_confirmedEntities.Count == 0 && s.LotwConfirmedQsoCount == 0)
+            // The delta summary (new confirmations since date, matched-in-log) is built from the LoTW
+            // download's incremental markers, so it belongs only to the LoTW folder for now.
+            if (_source != ConfSource.Lotw || (_confirmedEntities.Count == 0 && s.LotwConfirmedQsoCount == 0))
             {
                 ConfirmSummaryPanel.Visibility = Visibility.Collapsed;
                 return;
@@ -809,8 +983,8 @@ namespace HolyLogger
                     $"Marked so far: {already:N0} QSO(s).\n\n" +
                     "This takes longer than the normal check - it asks for every confirmation you have " +
                     "ever received, not just the new ones. It is only needed once; after that the normal " +
-                    "Check LoTW keeps things up to date.",
-                    "Get All Confirmations", HolyMsgType.Info, this))
+                    "Check LoTW Updates keeps things up to date.",
+                    "Get All LoTW Confirmations", HolyMsgType.Info, this))
                 return;
 
             _forceFullDownload = true;
@@ -1055,10 +1229,10 @@ namespace HolyLogger
                 s.LotwConfirmedDeletedCodes = string.Join(",", deletedCodes);
                 s.Save();
 
-                // ApplyConfirmedHighlight sets the "Confirmed (LoTW): N of M" status, colors the rows, and
-                // fills the 3-row summary (total / new QSLs since date / new countries) from what we saved.
-                ApplyConfirmedHighlight();
-                ApplyWorkedSort();   // rebuild the list so the new row colors show
+                // Re-read the log so QSO confirmation flags are live (the zone lists read them), then
+                // repaint the folder - RefreshForSource rebuilds the Missing lists, sets the tiles/status,
+                // colors the rows, and fills the 3-row summary. No manual reopen needed.
+                ReloadQsosAfterCheck();
 
                 // A full download (Get All Confirmations, or a first-ever check) ends with a summary,
                 // so the operator knows it finished and can SEE that every log was updated, not only the
@@ -1076,6 +1250,148 @@ namespace HolyLogger
                 ShowLotwSpinner(false);
                 BTN_CheckLotw.IsEnabled = true;
             }
+        }
+
+        // The QRZ side of the confirmation feature, triggered by the Check QRZ button next to Check LoTW.
+        // QRZ's confirmed set is a DIFFERENT, usually larger universe than LoTW's (QRZ confirms a contact
+        // when the other operator also logged it on QRZ), so it fills its own qrz_qsl_rcvd column and its
+        // own tick and is never mixed with LoTW. One button, always a full fetch: the confirmed set is
+        // small and cheap to download, so there is no incremental mode to get subtly wrong.
+        private async void BTN_CheckQrz_Click(object sender, RoutedEventArgs e)
+        {
+            string key = Properties.Settings.Default.qrz_api_key?.Trim();
+            if (string.IsNullOrWhiteSpace(key))
+            {
+                // Same discoverable flow as the LoTW button: offer to open the right Options page rather
+                // than silently doing nothing.
+                bool openOptions = HolyMessageBox.ShowConfirm(
+                    "Your QRZ.com Logbook API key isn't set, so QRZ confirmations can't be downloaded.\n\n" +
+                    "Open Options → QRZ Logbook to enter it now?",
+                    "QRZ API key needed", HolyMsgType.Warning, this);
+                if (openOptions)
+                {
+                    var opts = new OptionsWindow();
+                    opts.Owner = this;
+                    opts.QRZItem.IsSelected = true;
+                    opts.ShowDialog();
+                }
+                return;
+            }
+
+            BTN_CheckQrz.IsEnabled = false;
+            TB_LotwLoadingText.Text = "Downloading confirmations from QRZ…";
+            TB_LotwLoadingSub.Text = "Reading your confirmed QSOs from QRZ.com.";
+            ShowLotwSpinner(true);
+            try
+            {
+                QrzLogbookService.QrzFetchResult fetch = await QrzLogbookService.FetchConfirmationsAsync(key);
+
+                if (fetch.NetworkError)
+                {
+                    HolyMessageBox.Show(
+                        "Couldn't reach QRZ.com. Check your internet connection and try again.",
+                        "QRZ confirmations", HolyMsgType.Warning, this);
+                    return;
+                }
+                if (!fetch.Ok)
+                {
+                    string why = string.IsNullOrWhiteSpace(fetch.Reason) ? "the request was rejected" : fetch.Reason;
+                    HolyMessageBox.Show(
+                        "QRZ.com did not accept the request: " + why + ".\n\n" +
+                        "Reading confirmations needs a valid QRZ Logbook API key, and some accounts need a " +
+                        "QRZ subscription to read logbook data. Check Options → QRZ Logbook.",
+                        "QRZ confirmations", HolyMsgType.Warning, this);
+                    return;
+                }
+
+                var confirmations = fetch.Confirmations ?? new List<DataAccess.LotwConfirmation>();
+
+                // Full authoritative rebuild: clear existing QRZ marks, then re-apply. Run off the UI
+                // thread because the DB marking takes the connection lock and can run long on a big log.
+                TB_LotwLoadingText.Text = $"Marking {confirmations.Count:N0} confirmed QSO(s)…";
+                TB_LotwLoadingSub.Text = "Matching each QRZ confirmation to your logs.";
+                List<DataAccess.LotwConfirmation> unmatched = null;
+                int marked = await Task.Run(() =>
+                    Dal.MarkQrzConfirmed(confirmations, true, out unmatched));
+
+                // The marks went into the database; the open grid is showing QSO objects read when the
+                // log was opened, so re-read them for the QRZ ticks to appear now rather than on restart.
+                if (marked > 0)
+                {
+                    try { (Application.Current.Windows.OfType<MainWindow>().FirstOrDefault())?.ReloadActiveLogQsos(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                // Cache the QRZ confirmed-entity set and the deleted-entity codes, mirroring what the LoTW
+                // download stores. This is what the Statistics window's QRZ folder reads to color the
+                // worked list and show "Confirmed (QRZ): N active, M deleted" - independent of LoTW.
+                var qrzNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                var qrzDeleted = new HashSet<int>();
+                foreach (var c in confirmations)
+                {
+                    string name = Resolve(c.Call)?.Name;
+                    if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                        qrzNames.Add(name);
+                    if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) qrzDeleted.Add(c.DxccCode);
+                }
+                var qs = Properties.Settings.Default;
+                qs.QrzConfirmedEntities = string.Join("|", qrzNames);
+                qs.QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
+                qs.Save();
+
+                // Re-read the log so the QSO confirmation flags (which the zone lists use) are live, then
+                // repaint the current folder - no manual reopen needed.
+                ReloadQsosAfterCheck();
+
+                ShowQrzDownloadSummary(fetch.Count);
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.Show("QRZ download failed: " + ex.Message,
+                    "QRZ confirmations", HolyMsgType.Warning, this);
+            }
+            finally
+            {
+                ShowLotwSpinner(false);
+                BTN_CheckQrz.IsEnabled = true;
+            }
+        }
+
+        // QRZ counterpart of ShowFullDownloadSummary: reports the download and shows, per log, that the
+        // marks reached every log holding a matching QSO - not only the one open now.
+        private void ShowQrzDownloadSummary(int downloaded)
+        {
+            var text = new System.Text.StringBuilder();
+            text.AppendLine($"Downloaded {downloaded:N0} confirmed QSO(s) from QRZ.com.");
+            text.AppendLine();
+
+            try
+            {
+                var perLog = Dal?.GetQrzConfirmedCountsByLog() ?? new List<KeyValuePair<string, int>>();
+                int totalMarked = perLog.Sum(p => p.Value);
+
+                if (perLog.Count == 0)
+                {
+                    text.AppendLine("No QSO in any of your logs matched a QRZ confirmation yet.");
+                }
+                else if (perLog.Count == 1)
+                {
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on QRZ.");
+                }
+                else
+                {
+                    text.AppendLine($"{totalMarked:N0} QSO(s) are now marked QRZ-confirmed, across all your logs:");
+                    text.AppendLine();
+                    foreach (var p in perLog)
+                        text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
+                    text.AppendLine();
+                    text.AppendLine("A confirmation belongs to the contact, so every log holding a matching " +
+                                    "QSO - under any of your station callsigns - was updated, not only the one open now.");
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            HolyMessageBox.Show(text.ToString().TrimEnd(), "QRZ confirmations updated", HolyMsgType.Info, this);
         }
 
         // Reports the outcome of a full confirmation download, and shows plainly that the marks reached
@@ -1184,7 +1500,8 @@ namespace HolyLogger
                 // authoritative list; LoTW also sends APP_LoTW_DXCC_ENTITY_STATUS, but keying on our
                 // list keeps the answer offline and consistent between the LoTW and manual-QSL paths.
                 string dxccStr = ExtractAdifField(rec, "dxcc");
-                if (int.TryParse((dxccStr ?? string.Empty).Trim(), out int dxccCode) && dxccCode > 0)
+                int dxccCode = 0;
+                if (int.TryParse((dxccStr ?? string.Empty).Trim(), out dxccCode) && dxccCode > 0)
                 {
                     if (DXCCManager.DeletedEntities.IsDeleted(dxccCode))
                         result.ConfirmedDeletedCodes.Add(dxccCode);
@@ -1221,7 +1538,8 @@ namespace HolyLogger
                     Mode = mode,
                     QsoDate = qsoDate,
                     StationCallsign = (ExtractAdifField(rec, "station_callsign") ?? string.Empty).Trim(),
-                    QslRDate = (ExtractAdifField(rec, "qslrdate") ?? string.Empty).Trim()
+                    QslRDate = (ExtractAdifField(rec, "qslrdate") ?? string.Empty).Trim(),
+                    DxccCode = dxccCode
                 });
 
                 // Report every so often, not every record: marshaling to the UI thread on all ~6,000
@@ -1448,7 +1766,10 @@ namespace HolyLogger
             TB_SortWorkedCount.Text = _workedSort == WorkedSort.CountDesc ? "Count ▼"
                                     : _workedSort == WorkedSort.CountAsc  ? "Count ▲"
                                     :                                        "Count";
-            TB_SortWorkedConfirmed.Text = _workedSort == WorkedSort.ConfirmedDesc ? "Conf. ▼"
+            // Blank on the Worked folder (no confirmation source), so there is no "Conf." header over an
+            // empty column.
+            TB_SortWorkedConfirmed.Text = _source == ConfSource.Worked ? ""
+                                        : _workedSort == WorkedSort.ConfirmedDesc ? "Conf. ▼"
                                         : _workedSort == WorkedSort.ConfirmedAsc  ? "Conf. ▲"
                                         :                                            "Conf.";
         }
@@ -1613,14 +1934,18 @@ namespace HolyLogger
         public string CountStr => Count > 0 ? Count.ToString() : "";
         public Brush RowBg { get; set; }
 
-        // LoTW confirmation state, shown in the Confirmed column: green check when confirmed, bold red
-        // cross when not. ✓ = check mark, ✗ = ballot X (clearer than a thin minus).
+        // Confirmation state, shown in the Confirmed column: green check when confirmed, bold red cross
+        // when not. ✓ = check mark, ✗ = ballot X (clearer than a thin minus). ShowConfirmation is false
+        // on the Worked folder (no confirmation source), where the column is blank instead of all-crosses.
+        public bool ShowConfirmation { get; set; }
         public bool IsConfirmed { get; set; }
-        public string ConfirmedMark => IsConfirmed ? "✓" : "✗";
-        public Brush ConfirmedBrush => IsConfirmed
-            ? System.Windows.Media.Brushes.ForestGreen
-            : (Brush)new SolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F));   // vivid red, far more visible
-        public string ConfirmedTip => IsConfirmed ? "Confirmed on LoTW" : "Not confirmed on LoTW";
+        public string ConfirmedMark => !ShowConfirmation ? "" : (IsConfirmed ? "✓" : "✗");
+        public Brush ConfirmedBrush => !ShowConfirmation
+            ? System.Windows.Media.Brushes.Transparent
+            : (IsConfirmed
+                ? System.Windows.Media.Brushes.ForestGreen
+                : (Brush)new SolidColorBrush(Color.FromRgb(0xD3, 0x2F, 0x2F)));   // vivid red, far more visible
+        public string ConfirmedTip => !ShowConfirmation ? null : (IsConfirmed ? "Confirmed" : "Not confirmed");
     }
 
     // One newly-confirmed QSO, captured from the last incremental LoTW check for the "see the new

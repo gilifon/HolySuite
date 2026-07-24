@@ -149,6 +149,25 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.SOAPBOX)) adif.AppendFormat("<soapbox:{0}>{1}", qso.SOAPBOX.Length, qso.SOAPBOX);
                 // LoTW sent status, so the upload queue survives an export/re-import round trip.
                 adif.AppendFormat("<lotw_qsl_sent:1>{0}", qso.LotwStatus == 1 ? "Y" : "N");
+
+                // Confirmation status, so a full export/re-import (even onto another computer running
+                // HolyLogger) keeps every confirmation tick without re-downloading. LoTW uses the STANDARD
+                // ADIF fields (other loggers read them too); QRZ has no standard field, so it goes in
+                // APP_ fields that other programs safely ignore and HolyLogger reads back on import.
+                if (qso.LotwQslRcvd == 1)
+                {
+                    adif.Append("<lotw_qsl_rcvd:1>Y");
+                    if (!string.IsNullOrWhiteSpace(qso.LotwQslRDate))
+                        adif.AppendFormat("<lotw_qslrdate:{0}>{1}", qso.LotwQslRDate.Length, qso.LotwQslRDate);
+                    if (qso.LotwDeletedEntity == 1) adif.Append("<app_holylogger_lotw_deleted:1>Y");
+                }
+                if (qso.QrzQslRcvd == 1)
+                {
+                    adif.Append("<app_holylogger_qrz_qsl_rcvd:1>Y");
+                    if (!string.IsNullOrWhiteSpace(qso.QrzQslRDate))
+                        adif.AppendFormat("<app_holylogger_qrz_qslrdate:{0}>{1}", qso.QrzQslRDate.Length, qso.QrzQslRDate);
+                    if (qso.QrzDeletedEntity == 1) adif.Append("<app_holylogger_qrz_deleted:1>Y");
+                }
                 adif.AppendLine("<eor>");
             }
 

@@ -1,7 +1,7 @@
 <Window x:Class="HolyLogger.StatisticsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Log Statistics"
+        Title="Log Statistics &amp; Confirmations"
         Height="940" Width="950"
         MinHeight="600" MinWidth="940"
         ResizeMode="CanResize"
@@ -23,7 +23,7 @@
                     <Path Stretch="Uniform" Fill="{DynamicResource AccentBrush}"
                           Data="M5 9.2h3V19H5V9.2zM10.6 5h2.8v14h-2.8V5zm5.6 8H19v6h-2.8v-6z"/>
                 </Viewbox>
-                <TextBlock Text="Log Statistics" FontSize="18" FontWeight="Bold"
+                <TextBlock Text="Log Statistics &amp; Confirmations" FontSize="18" FontWeight="Bold"
                            Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
             </StackPanel>
         </Border>
@@ -31,95 +31,80 @@
         <!-- Body -->
         <Border Grid.Row="1" Background="{DynamicResource WindowBg}">
             <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto"/>
-                    <RowDefinition Height="*"/>
-                </Grid.RowDefinitions>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>   <!-- left: static log analysis + pivot -->
+                    <ColumnDefinition Width="Auto"/>   <!-- middle: folder strip (source selector) -->
+                    <ColumnDefinition Width="*"/>       <!-- right: per-source analysis + tables -->
+                </Grid.ColumnDefinitions>
 
-                <!-- Summary strip -->
-                <Border Grid.Row="0" Background="{DynamicResource GridHeaderBg}" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1" Padding="14,12">
-                    <StackPanel>
-                    <StackPanel Orientation="Horizontal">
+                <!-- Vertical "folders": pick which confirmation source the RIGHT column analyzes. Placed
+                     BETWEEN the static left part and the per-source right part it drives. Populated in code
+                     with only the sources the operator uses (Worked is always first). -->
+                <ListBox x:Name="LB_Source" Grid.Column="1" Width="98" BorderThickness="1,0,1,0"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}" Background="{DynamicResource GridHeaderBg}"
+                         SelectionChanged="LB_Source_SelectionChanged" Padding="0,8,0,0"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled">
+                    <ListBox.ItemContainerStyle>
+                        <Style TargetType="ListBoxItem">
+                            <Setter Property="Padding" Value="12,10,12,10"/>
+                            <Setter Property="FontSize" Value="14"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                            <Setter Property="Template">
+                                <Setter.Value>
+                                    <ControlTemplate TargetType="ListBoxItem">
+                                        <!-- Each folder keeps its own source colour (set in code); the
+                                             SELECTED folder gets an accent bar and bold text. -->
+                                        <Border x:Name="Bd" Background="{TemplateBinding Background}" BorderThickness="0,0,3,0"
+                                                BorderBrush="Transparent" Padding="{TemplateBinding Padding}">
+                                            <ContentPresenter/>
+                                        </Border>
+                                        <ControlTemplate.Triggers>
+                                            <Trigger Property="IsSelected" Value="True">
+                                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                <Setter Property="FontWeight" Value="Bold"/>
+                                            </Trigger>
+                                        </ControlTemplate.Triggers>
+                                    </ControlTemplate>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListBox.ItemContainerStyle>
+                </ListBox>
 
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Total QSOs" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_TotalQSOs" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Unique Calls" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_UniqueCalls" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Worked / DXCC" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Missing DXCC: how many of all DXCC entities are still un-worked. -->
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Danger}" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Missing DXCC" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_MissingDxcc" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Confirmed on LoTW: countries confirmed / worked. Blank until the user runs
-                             Check LoTW confirmations (or from cache). -->
-                        <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="#2E9E4F" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Confirmed (LoTW)" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_ConfirmedDxcc" FontSize="30" FontWeight="Bold" Foreground="#2E9E4F" HorizontalAlignment="Center"/>
-                            </StackPanel>
-                        </Border>
-
-                        <!-- Date Range — dates stacked with Start / End labels -->
-                        <Border Padding="14,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
-                            <StackPanel>
-                                <TextBlock Text="Date Range" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
-                                <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="Start " FontSize="14" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TB_DateStart" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                <!-- Col 0: LEFT static part — pure log analysis (QSO + callsign counts, dates) and the
+                     Band×Mode pivot. Identical on every folder, so it sits outside the folder selection. -->
+                <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                    <StackPanel VerticalAlignment="Top" Margin="12,10,12,10">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                            <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="Total QSOs" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TB_TotalQSOs" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
                                 </StackPanel>
-                                <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                    <TextBlock Text="End   " FontSize="14" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="TB_DateEnd" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                            </Border>
+                            <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                                <StackPanel>
+                                    <TextBlock Text="Unique Calls" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TB_UniqueCalls" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
                                 </StackPanel>
-                            </StackPanel>
-                        </Border>
+                            </Border>
+                            <Border Padding="14,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Text="Date Range" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Start " FontSize="14" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TB_DateStart" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
+                                        <TextBlock Text="End   " FontSize="14" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TB_DateEnd" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
 
-                        <!-- cty.dat (DXCC entity database) release date, so the totals above are traceable. -->
-                        <Border Margin="14,0,0,0" Padding="14,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" VerticalAlignment="Center">
-                            <StackPanel>
-                                <TextBlock Text="DXCC data" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
-                                <TextBlock x:Name="TB_CtyVersion" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" Margin="0,4,0,0"/>
-                            </StackPanel>
-                        </Border>
-
-                    </StackPanel>
-                    <!-- Shown only when the country file is overdue for a refresh (e.g. the download
-                         URL no longer works); the text explains what to do. -->
-                    <TextBlock x:Name="TB_CtyWarning" Foreground="{DynamicResource Danger}" FontSize="13" FontWeight="SemiBold"
-                               TextWrapping="Wrap" Margin="2,8,2,0" Visibility="Collapsed"/>
-                    </StackPanel>
-                </Border>
-
-                <!-- Scrollable content -->
-                <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
-                    <StackPanel Orientation="Horizontal" Margin="12,10,12,10" VerticalAlignment="Top">
-
-                        <!-- Pivot table section -->
-                        <StackPanel VerticalAlignment="Top">
-                            <!-- Same fixed 54px header height as the country/zone columns, so the pivot
-                                 table (and the data-quality text + button below it) line up with them. -->
-                            <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Band × Mode" Height="54" FontSize="16" FontWeight="Bold"
-                                       Foreground="{DynamicResource AccentBrush}"/>
+                            <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Band × Mode" FontSize="16" FontWeight="Bold"
+                                       Margin="0,0,0,6" Foreground="{DynamicResource AccentBrush}"/>
                             <!--
                                 Inner PivotBorder: left+top edge in blue (1px).
                                 Outer PivotOuterBorder: right+bottom edge in black (2px).
@@ -138,10 +123,48 @@
                             <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
                                     Margin="0,6,0,0" Padding="10,4" FontSize="13"
                                     Visibility="Collapsed" Click="BTN_EditProblems_Click"/>
-                        </StackPanel>
 
-                        <!-- Country tables section -->
-                        <StackPanel Orientation="Horizontal" Margin="20,0,0,0" VerticalAlignment="Top">
+                            <!-- Shown only when the country file is overdue for a refresh. -->
+                            <TextBlock x:Name="TB_CtyWarning" Foreground="{DynamicResource Danger}" FontSize="13" FontWeight="SemiBold"
+                                       TextWrapping="Wrap" Margin="2,8,2,0" MaxWidth="390" Visibility="Collapsed"/>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Col 2: RIGHT per-source analysis — the three source tiles on top, then the
+                         country / zone tables. Everything here changes with the selected folder. -->
+                    <ScrollViewer x:Name="SV_SourceContent" Grid.Column="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                        <StackPanel Orientation="Horizontal" Margin="12,10,12,10" VerticalAlignment="Top">
+
+                            <!-- COL A: source tiles + the two big country lists. The lists sit directly
+                                 under the SHORT tiles, so they line up with the pivot table on the left. -->
+                            <StackPanel Orientation="Vertical">
+                            <StackPanel x:Name="TilesRow" Orientation="Horizontal" Margin="0,0,0,10">
+                                <!-- Confirmed is the headline number for a source, so it is leftmost.
+                                     Confirmed + Missing partition all DXCC entities (out of 340). Hidden
+                                     on the Worked folder, which has no confirmation. -->
+                                <Border x:Name="TileConfirmed" Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="#2E9E4F" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed (LoTW)" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                        <TextBlock x:Name="TB_ConfirmedDxcc" FontSize="30" FontWeight="Bold" Foreground="#2E9E4F" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked / DXCC" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                        <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+                                <Border Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Danger}" BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock x:Name="TB_MissingTileLabel" Text="Missing DXCC" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                        <TextBlock x:Name="TB_MissingDxcc" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Center"/>
+                                    </StackPanel>
+                                </Border>
+
+                            </StackPanel>
+
+                            <!-- The country / zone tables, laid out in a row. -->
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Top">
 
                             <!-- Worked Countries -->
                             <StackPanel Margin="0,0,10,0" VerticalAlignment="Top">
@@ -153,12 +176,21 @@
                                         <TextBlock x:Name="TB_WorkedHeader" Text="Worked Countries"
                                                    FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                                                    VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                        <Button x:Name="BTN_CheckLotw" Content="Check LoTW" FontSize="12" Padding="8,3"
+                                        <Button x:Name="BTN_CheckLotw" Content="Check LoTW Updates" FontSize="12" Padding="8,3"
                                                 VerticalAlignment="Center" Click="BTN_CheckLotw_Click">
                                             <Button.ToolTip>
                                                 <ToolTip>
                                                     <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Fetches only what is NEW since your last check — the quick, everyday update, and marks those QSOs.&#10;&#10;To rebuild from scratch instead, use “Get All Confirmations” below."/>
+                                                               Text="Fetches only what is NEW since your last check — the quick, everyday update, and marks those QSOs.&#10;&#10;To rebuild from scratch instead, use “Get All LoTW Confirmations” below."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                        <Button x:Name="BTN_CheckQrz" Content="Get All QRZ Confirmations" FontSize="12" Padding="8,3"
+                                                Margin="8,0,0,0" VerticalAlignment="Center" Click="BTN_CheckQrz_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Downloads every confirmed QSO from your QRZ.com logbook and marks them with the QRZ tick.&#10;&#10;QRZ confirms a contact when the other operator also logged it on QRZ, so this is a different set from LoTW — it has its own column.&#10;&#10;Needs your QRZ Logbook API key (Options ▸ QRZ Logbook)."/>
                                                 </ToolTip>
                                             </Button.ToolTip>
                                         </Button>
@@ -188,8 +220,14 @@
                                         </Border>
                                         <ScrollViewer x:Name="SV_WorkedCountries"
                                                       VerticalScrollBarVisibility="Auto"
+                                                      CanContentScroll="True"
                                                       MaxHeight="500">
-                                            <ItemsControl x:Name="IC_WorkedCountries">
+                                            <ItemsControl x:Name="IC_WorkedCountries"
+                                                          VirtualizingStackPanel.IsVirtualizing="True"
+                                                          VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
@@ -259,106 +297,6 @@
                                     </StackPanel>
                                 </Border>
                                 </Grid>
-
-                                <!-- LoTW confirmations summary, right under the worked table. Hidden until
-                                     a confirmations download has run. Larger/bold so the numbers read at a
-                                     glance. A GroupBox so the "LoTW info" label sits on the top frame line
-                                     (the line breaks around it), vertically centered on it. -->
-                                <GroupBox x:Name="ConfirmSummaryPanel" Margin="0,4,0,0" Padding="10,3"
-                                          BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
-                                          Background="{DynamicResource GridAltRowBg}" Visibility="Collapsed">
-                                    <GroupBox.Header>
-                                        <TextBlock Text="LoTW info" FontSize="13" FontWeight="Bold"
-                                                   Foreground="{DynamicResource AccentBrush}"/>
-                                    </GroupBox.Header>
-                                    <!-- The default GroupBox template renders the bottom/right edges with a
-                                         lighter bevel that ignores BorderBrush, so the frame looked blue on
-                                         top/left and grey below. This template draws ONE border on all four
-                                         sides, with the header laid over the top line (its own background
-                                         masking the line behind the text) to keep the on-the-line look. -->
-                                    <GroupBox.Template>
-                                        <ControlTemplate TargetType="GroupBox">
-                                            <Grid>
-                                                <Grid.RowDefinitions>
-                                                    <RowDefinition Height="Auto"/>
-                                                    <RowDefinition Height="*"/>
-                                                </Grid.RowDefinitions>
-                                                <Border Grid.Row="0" Grid.RowSpan="2" Margin="0,7,0,0" CornerRadius="3"
-                                                        Background="{TemplateBinding Background}"
-                                                        BorderBrush="{TemplateBinding BorderBrush}"
-                                                        BorderThickness="{TemplateBinding BorderThickness}"/>
-                                                <Border Grid.Row="0" HorizontalAlignment="Left" Margin="8,0,0,0" Padding="4,0"
-                                                        Background="{TemplateBinding Background}">
-                                                    <ContentPresenter ContentSource="Header"/>
-                                                </Border>
-                                                <ContentPresenter Grid.Row="1" Margin="{TemplateBinding Padding}"/>
-                                            </Grid>
-                                        </ControlTemplate>
-                                    </GroupBox.Template>
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <!-- Row 0: what LoTW holds for the whole account. Row 1: how many of
-                                             those landed on a QSO in THIS log. The two are different numbers
-                                             (LoTW confirms contacts from every log and every program you have
-                                             ever used), and showing only the first made them look wrong. -->
-                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Confirmed at LoTW" FontSize="15"
-                                                   Margin="0,0,18,0" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="18"
-                                                   FontWeight="Bold" Margin="0,0" VerticalAlignment="Center"
-                                                   Foreground="#2E9E4F"/>
-
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Matched in this log" FontSize="15"
-                                                   Margin="0,0,18,0" VerticalAlignment="Center"
-                                                   ToolTip="Confirmations that matched a QSO in the log open now, and carry the LoTW tick"
-                                                   Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="TB_SumMatchedInLog" FontSize="18"
-                                                   FontWeight="Bold" Margin="0,0" VerticalAlignment="Center"
-                                                   Foreground="#2E9E4F"/>
-
-                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="New confirmations" FontSize="15"
-                                                   Margin="0,0,18,0" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="1" FontSize="18" Margin="0,0"
-                                                   VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewQsls" Click="NewQsls_Click"
-                                                   ToolTip="Click to see the new confirmations"><Run x:Name="TB_SumNewQsls" FontWeight="Bold"/></Hyperlink><Run x:Name="TB_SumSince" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/></TextBlock>
-
-                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="New countries" FontSize="15"
-                                                   Margin="0,0,18,0" VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="1" FontSize="18" Margin="0,0"
-                                                   VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewCountries" Click="NewCountries_Click"
-                                                   ToolTip="Click to see the QSOs that gave a new country"><Run x:Name="TB_SumNewCountries" FontWeight="Bold"/></Hyperlink></TextBlock>
-
-                                        <!-- One-time full download. The ordinary Check LoTW asks only for
-                                             confirmations since the last check, so it can never fill in the
-                                             years already confirmed; this asks for all of them and marks
-                                             every matching QSO. Spans both columns and sits BELOW the
-                                             numbers, so nothing above it moves. -->
-                                        <Button x:Name="BTN_GetAllConfirmations" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All Confirmations" FontSize="13" Padding="10,4"
-                                                HorizontalAlignment="Left" Margin="0,8,0,2"
-                                                Click="BTN_GetAllConfirmations_Click">
-                                            <Button.ToolTip>
-                                                <ToolTip>
-                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
-                                                               Text="Rebuild from scratch: downloads your ENTIRE LoTW history and re-marks every log. Slower, and needed only once — to fill in past years.&#10;&#10;For routine updates use “Check LoTW” above."/>
-                                                </ToolTip>
-                                            </Button.ToolTip>
-                                        </Button>
-                                    </Grid>
-                                </GroupBox>
                             </StackPanel>
 
                             <!-- Missing Countries -->
@@ -379,8 +317,14 @@
                                         </Border>
                                         <ScrollViewer x:Name="SV_MissingCountries"
                                                       VerticalScrollBarVisibility="Auto"
+                                                      CanContentScroll="True"
                                                       MaxHeight="500">
-                                            <ItemsControl x:Name="IC_MissingCountries">
+                                            <ItemsControl x:Name="IC_MissingCountries"
+                                                          VirtualizingStackPanel.IsVirtualizing="True"
+                                                          VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate>
                                                         <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
@@ -406,8 +350,85 @@
                                 </Border>
                             </StackPanel>
 
+                            </StackPanel>   <!-- close the Worked + Missing lists row -->
+                            </StackPanel>   <!-- close COL A -->
+
+                            <!-- COL B: the LoTW summary panel on top, then the zone lists. This column is
+                                 taller than the tiles, so the zones sit lower than the country lists. -->
+                            <StackPanel Orientation="Vertical" Margin="20,0,0,0">
+
+                                <!-- Slot that always reserves the tiles' height above the zones (even when
+                                     the LoTW panel is hidden). So on Worked / QRZ the zone lists line up
+                                     with the country lists; on LoTW the taller panel grows the slot and the
+                                     zones drop below it. -->
+                                <Border x:Name="LotwSlot" MinHeight="{Binding ActualHeight, ElementName=TilesRow}">
+                                <!-- No title: this frame only ever shows on the LoTW folder. Tight rows. -->
+                                <Border x:Name="ConfirmSummaryPanel" Padding="10,6"
+                                        VerticalAlignment="Top" CornerRadius="3"
+                                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
+                                        Background="{DynamicResource GridAltRowBg}" Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+
+                                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Confirmed at LoTW" FontSize="13"
+                                                   Margin="0,0,18,1" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="14"
+                                                   FontWeight="Bold" Margin="0,0,0,1" VerticalAlignment="Center"
+                                                   Foreground="#2E9E4F"/>
+
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Matched in this log" FontSize="13"
+                                                   Margin="0,0,18,1" VerticalAlignment="Center"
+                                                   ToolTip="Confirmations that matched a QSO in the log open now, and carry the LoTW tick"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="TB_SumMatchedInLog" FontSize="14"
+                                                   FontWeight="Bold" Margin="0,0,0,1" VerticalAlignment="Center"
+                                                   Foreground="#2E9E4F"/>
+
+                                        <TextBlock Grid.Row="2" Grid.Column="0" Text="New confirmations" FontSize="13"
+                                                   Margin="0,0,18,1" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="2" Grid.Column="1" FontSize="14" Margin="0,0,0,1"
+                                                   VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewQsls" Click="NewQsls_Click"
+                                                   ToolTip="Click to see the new confirmations"><Run x:Name="TB_SumNewQsls" FontWeight="Bold"/></Hyperlink><Run x:Name="TB_SumSince" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"/></TextBlock>
+
+                                        <TextBlock Grid.Row="3" Grid.Column="0" Text="New countries" FontSize="13"
+                                                   Margin="0,0,18,1" VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource MutedTextBrush}"/>
+                                        <TextBlock Grid.Row="3" Grid.Column="1" FontSize="14" Margin="0,0,0,1"
+                                                   VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewCountries" Click="NewCountries_Click"
+                                                   ToolTip="Click to see the QSOs that gave a new country"><Run x:Name="TB_SumNewCountries" FontWeight="Bold"/></Hyperlink></TextBlock>
+
+                                        <Button x:Name="BTN_GetAllConfirmations" Grid.Row="4" Grid.ColumnSpan="2"
+                                                Content="Get All LoTW Confirmations" FontSize="12" Padding="8,3"
+                                                HorizontalAlignment="Left" Margin="0,6,0,0"
+                                                Click="BTN_GetAllConfirmations_Click">
+                                            <Button.ToolTip>
+                                                <ToolTip>
+                                                    <TextBlock FontSize="16" TextWrapping="Wrap" MaxWidth="340"
+                                                               Text="Rebuild from scratch: downloads your ENTIRE LoTW history and re-marks every log. Slower, and needed only once — to fill in past years.&#10;&#10;For routine updates use “Check LoTW Updates” above."/>
+                                                </ToolTip>
+                                            </Button.ToolTip>
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                                </Border>
+
+                                <!-- Zone lists (CQ + ITU) under the LoTW panel. -->
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Top" Margin="0,10,0,0">
+
                             <!-- Missing CQ Zones (1..40) -->
-                            <StackPanel Margin="10,0,0,0" VerticalAlignment="Top">
+                            <StackPanel Margin="0,0,0,0" VerticalAlignment="Top">
                                 <TextBlock x:Name="TB_MissingCQHeader" Text="Missing CQ Zones" Height="54"
                                            FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}"/>
                                 <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,2,2">
@@ -470,11 +491,10 @@
                                 </Border>
                             </StackPanel>
 
+                                </StackPanel>
+                            </StackPanel>
                         </StackPanel>
-
-                    </StackPanel>
-                </ScrollViewer>
-
+                    </ScrollViewer>
             </Grid>
         </Border>
 
