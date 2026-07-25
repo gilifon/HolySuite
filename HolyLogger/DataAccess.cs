@@ -247,7 +247,7 @@ Environment.NewLine +
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
@@ -269,6 +269,7 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("continent", qso.Continent));
                 insertSQL.Parameters.Add(new SQLiteParameter("cq_zone", qso.CQZone));
                 insertSQL.Parameters.Add(new SQLiteParameter("itu_zone", qso.ITUZone));
+                insertSQL.Parameters.Add(new SQLiteParameter("state", qso.State));
                 insertSQL.Parameters.Add(new SQLiteParameter("prop_mode", qso.PROP_MODE));
                 insertSQL.Parameters.Add(new SQLiteParameter("sat_name", qso.SAT_NAME));
                 insertSQL.Parameters.Add(new SQLiteParameter("soapbox", qso.SOAPBOX));
@@ -464,7 +465,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -506,6 +507,7 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("clublog_qsl_rdate"));
                 insertSQL.Parameters.Add(new SQLiteParameter("clublog_deleted_entity"));
                 insertSQL.Parameters.Add(new SQLiteParameter("paper_qsl_rcvd"));
+                insertSQL.Parameters.Add(new SQLiteParameter("state"));
 
                 foreach (var qso in qsos)
                 {
@@ -547,6 +549,7 @@ Environment.NewLine +
                     insertSQL.Parameters[35].Value = (object)qso.ClublogQslRDate ?? DBNull.Value;
                     insertSQL.Parameters[36].Value = qso.ClublogDeletedEntity;
                     insertSQL.Parameters[37].Value = qso.PaperQslRcvd;
+                    insertSQL.Parameters[38].Value = (object)qso.State ?? DBNull.Value;
 
                     try
                     {
@@ -604,7 +607,7 @@ Environment.NewLine +
                 }
                 catch { /* best-effort; at minimum the QSO itself is updated below */ }
 
-                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox WHERE id = @id";
+                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox WHERE id = @id";
                 try
                 {
                     foreach (var uid in ids)
@@ -631,6 +634,7 @@ Environment.NewLine +
                         insertSQL.Parameters.Add(new SQLiteParameter("@continent", qso.Continent));
                         insertSQL.Parameters.Add(new SQLiteParameter("@cq_zone", qso.CQZone));
                         insertSQL.Parameters.Add(new SQLiteParameter("@itu_zone", qso.ITUZone));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@state", qso.State));
                         insertSQL.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                         insertSQL.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                         insertSQL.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
@@ -765,8 +769,11 @@ Environment.NewLine +
                         if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                     if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                     if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                         if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                         if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                        if (rdr["state"] != null) q.State = rdr["state"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                         if (rdr["time"] != null) q.Time = rdr["time"].ToString();
                         if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                         if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
@@ -850,6 +857,8 @@ Environment.NewLine +
                             if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                             if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                             if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                        if (rdr["state"] != null) q.State = rdr["state"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                             if (rdr["time"] != null) q.Time = rdr["time"].ToString();
                             if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                             if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
@@ -930,6 +939,8 @@ Environment.NewLine +
                             if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                             if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                             if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                        if (rdr["state"] != null) q.State = rdr["state"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                             if (rdr["time"] != null) q.Time = rdr["time"].ToString();
                             if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                             if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
@@ -977,8 +988,11 @@ Environment.NewLine +
                         if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                     if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                     if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                         if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                         if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                        if (rdr["state"] != null) q.State = rdr["state"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                         if (rdr["time"] != null) q.Time = (string)rdr["time"];
                         if (rdr["date"] != null) q.Date = (string)rdr["date"];
                         if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
@@ -1618,6 +1632,7 @@ Environment.NewLine +
                     if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                     if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                     if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                     if (rdr["time"] != null) q.Time = rdr["time"].ToString();
                     if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
@@ -1696,6 +1711,7 @@ Environment.NewLine +
                     if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                     if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                     if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                     if (rdr["time"] != null) q.Time = rdr["time"].ToString();
                     if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
@@ -1774,6 +1790,7 @@ Environment.NewLine +
                     if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                     if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                     if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                     if (rdr["time"] != null) q.Time = rdr["time"].ToString();
                     if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
@@ -2141,8 +2158,8 @@ Environment.NewLine +
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
-                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,log_id) " +
-                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@log)";
+                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,log_id) " +
+                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@log)";
                 using (var cmd = new SQLiteCommand(sql, con))
                 {
                     cmd.Parameters.AddWithValue("@my", (object)qso.MyCall ?? DBNull.Value);
@@ -2166,6 +2183,7 @@ Environment.NewLine +
                     cmd.Parameters.AddWithValue("@cont", (object)qso.Continent ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@cqz", (object)qso.CQZone ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@ituz", (object)qso.ITUZone ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@state", (object)qso.State ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@prop", (object)qso.PROP_MODE ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@sat", (object)qso.SAT_NAME ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@soap", (object)qso.SOAPBOX ?? DBNull.Value);
@@ -2696,6 +2714,7 @@ Environment.NewLine +
                     if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
                     if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
                     if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
+                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
                     if (rdr["time"] != null) q.Time = rdr["time"].ToString();
                     if (rdr["date"] != null) q.Date = rdr["date"].ToString();
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
@@ -3255,6 +3274,7 @@ Environment.NewLine +
             , [continent] nvarchar(100) NULL COLLATE NOCASE
             , [cq_zone] nvarchar(10) NULL COLLATE NOCASE
             , [itu_zone] nvarchar(10) NULL COLLATE NOCASE
+            , [state] nvarchar(20) NULL COLLATE NOCASE
             , [prop_mode] nvarchar(100) NULL COLLATE NOCASE
             , [sat_name] nvarchar(100) NULL COLLATE NOCASE
             , [soapbox] nvarchar(100) NULL COLLATE NOCASE
@@ -3392,6 +3412,7 @@ Environment.NewLine +
                 AddColToTable("qso", "cq_zone", "nvarchar(10) NULL");
                 AddColToTable("qso", "itu_zone", "nvarchar(10) NULL");
             }
+            AddColToTable("qso", "state", "nvarchar(20) NULL");   // ADIF STATE (worked station's subdivision)
             AddEqslStatusColumn();
             AddQrzColumns();
             AddLotwColumns();

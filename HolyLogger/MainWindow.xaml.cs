@@ -1501,6 +1501,7 @@ namespace HolyLogger
                 qso.Continent = Continent;
                 qso.CQZone = TB_CQZone.Text;
                 qso.ITUZone = TB_ITUZone.Text;
+                qso.State = TB_State.Text;          // ADIF STATE - now stored with the QSO
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
                 qso.Operator = TB_Operator.Text;
@@ -1600,6 +1601,7 @@ namespace HolyLogger
                 QsoToUpdate.Continent = Continent;
                 QsoToUpdate.CQZone = TB_CQZone.Text;
                 QsoToUpdate.ITUZone = TB_ITUZone.Text;
+                QsoToUpdate.State = TB_State.Text;   // ADIF STATE - now stored with the QSO
                 QsoToUpdate.Name = TB_DX_Name.Text.Length > 25 ? TB_DX_Name.Text.Substring(0, 25) : TB_DX_Name.Text; //FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.Operator = TB_Operator.Text;
@@ -4454,6 +4456,7 @@ namespace HolyLogger
                 // boxes aren't blank.
                 TB_CQZone.Text = QsoToUpdate.CQZone ?? string.Empty;
                 TB_ITUZone.Text = QsoToUpdate.ITUZone ?? string.Empty;
+                TB_State.Text = QsoToUpdate.State ?? string.Empty;   // ADIF STATE, stored with the QSO
                 if (string.IsNullOrWhiteSpace(TB_CQZone.Text) || string.IsNullOrWhiteSpace(TB_ITUZone.Text))
                 {
                     try

@@ -4,8 +4,8 @@
         xmlns:local="clr-namespace:HolyLogger"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="Log Workshop"
-        Height="620" Width="1025"
-        MinHeight="440" MinWidth="1025"
+        Height="720" Width="1025"
+        MinHeight="560" MinWidth="1025"
         WindowStyle="None" ResizeMode="CanResize"
         Icon="Images/crown.png"
         Background="{DynamicResource WindowBg}"
@@ -81,26 +81,30 @@
                      of that same width, which is what lines it up under Mode. -->
                 <StackPanel x:Name="FiltersPanel" Orientation="Vertical" HorizontalAlignment="Left" VerticalAlignment="Center">
 
+                  <!-- Rows 1-2 (the callsign / QSO-identity filters) share a light green background. -->
+                  <Border Background="#DFF5DF" CornerRadius="4" Padding="6,5">
+                  <StackPanel>
+
                   <!-- Row 1: callsign halves, country, band, mode -->
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                   <!-- Callsign split into its two halves. The digit belongs to the prefix (4Z5 + SL),
                        a leading stroke stays with the prefix (4X/OK1 + DL) and a trailing one with the
                        suffix (4Z5 + SL/M). Either box alone is a valid search. -->
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <TextBlock Text="Prefix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                ToolTip="Start of the callsign, up to and including the digit: 4Z5, or 4X/OK1"/>
                     <!-- Widths are recomputed in Window_Loaded to fit exactly 7 and 10 characters of
                          the actual font; these are only the fallback if that measurement is skipped. -->
                     <TextBox x:Name="TB_Prefix" Width="72" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
                              ToolTip="Start of the callsign, up to and including the digit: 4Z5, or 4X/OK1"
-                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
-                    <TextBlock Text="Suffix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="10,0,6,0"
+                             TextChanged="Prefix_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    <TextBlock Text="Suffix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,0,6,0"
                                ToolTip="Letters after the digit, with any stroke: SL, or SL/M"/>
                     <TextBox x:Name="TB_Suffix" Width="98" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
                              ToolTip="Letters after the digit, with any stroke: SL, or SL/M"
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                   </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox x:Name="CB_Country" Width="210" FontSize="14" VerticalAlignment="Center"
                               IsEditable="True" StaysOpenOnEdit="True" IsTextSearchEnabled="False" MaxDropDownHeight="280"
@@ -121,64 +125,192 @@
                     </ComboBox>
                   </StackPanel>
 
-                  <!-- Band and Mode: same panel, so Mode always sits immediately right of Band. -->
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
+                    <TextBlock Text="Frequency:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox x:Name="TB_Freq" Width="84" FontSize="14" VerticalAlignment="Bottom"
+                             TextChanged="Freq_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    <TextBlock Text="MHz" FontSize="11" FontWeight="Bold" VerticalAlignment="Bottom"
+                               Margin="4,0,0,0" Foreground="{DynamicResource TextBrush}"/>
+                  </StackPanel>
+
+                  <!-- Band, Mode and Submode: same panel, so each sits immediately right of the last. -->
                   <StackPanel x:Name="BandGroup" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="Band:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <ComboBox x:Name="CB_Band" Width="90" FontSize="14" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
-                    <TextBlock Text="Mode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="14,0,6,0"/>
+                    <TextBlock Text="Mode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,6,0"/>
                     <ComboBox x:Name="CB_Mode" Width="90" FontSize="14" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
+                    <TextBlock Text="Submode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,6,0"/>
+                    <!-- The full official ADIF submode enumeration (~150 values), plus anything unusual
+                         already in this log. Type-ahead (built into ComboBox) jumps to a match by typing
+                         its first letters, so the long list stays usable without a custom filter. -->
+                    <ComboBox x:Name="CB_Submode" Width="110" FontSize="14" VerticalAlignment="Center"
+                              SelectionChanged="Filter_Changed"/>
                   </StackPanel>
 
                   </StackPanel>
 
-                  <!-- Row 2: my callsign, locator, holyland square, comment -->
+                  <!-- Row 2: name, DX locator, CQ zone, ITU zone, continent, state, Holyland square, comment.
+                       Gaps between items are tightened (12px, was 20px) and the zone boxes are sized to
+                       their real content (2 digits) rather than the generic width, so the saved space
+                       can go to Comment - the field most worth having room to read. Comment stays the
+                       rightmost item in the row. -->
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,6,0,0">
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                    <TextBlock Text="My callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"/>
-                    <ComboBox x:Name="CB_MyCall" Width="130" FontSize="14" VerticalAlignment="Center"
-                              ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"
-                              SelectionChanged="Filter_Changed"/>
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                    <TextBlock Text="Locator:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="The worked station's grid square, e.g. KM72"/>
-                    <TextBox x:Name="TB_Locator" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
-                             ToolTip="The worked station's grid square, e.g. KM72"
-                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                    <TextBlock Text="LoTW:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="Confirmed by the other station in Logbook of The World"/>
-                    <ComboBox x:Name="CB_Lotw" Width="130" FontSize="14" VerticalAlignment="Center"
-                              ToolTip="Confirmed by the other station in Logbook of The World"
-                              SelectionChanged="Filter_Changed"/>
-                  </StackPanel>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                    <TextBlock Text="Holyland Square:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="Holyland square received (the Exchange column)"/>
-                    <TextBox x:Name="TB_Square" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
-                             ToolTip="Holyland square received (the Exchange column)"
-                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
-                  </StackPanel>
-                  <!-- The Comment box is positioned and sized in Window_Loaded (AlignCommentBox): its
-                       left edge under the Band dropdown, its right edge under Mode's. The width here is
-                       only a fallback for if that measurement is ever skipped. -->
-                  <StackPanel x:Name="CommentGroup" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Comment:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="Any part of the QSO's comment text"/>
-                    <TextBox x:Name="TB_Comment" Width="196" FontSize="14" VerticalAlignment="Center"
-                             ToolTip="Any part of the QSO's comment text"
-                             TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
-                  </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                      <TextBlock Text="Name:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_Name" Width="150" FontSize="14" VerticalAlignment="Center"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                      <TextBlock Text="DX Locator:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="The worked station's grid square, e.g. KM72"/>
+                      <TextBox x:Name="TB_Locator" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                               ToolTip="The worked station's grid square, e.g. KM72"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                      <TextBlock Text="CQ zone:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_CqZone" Width="30" FontSize="14" VerticalAlignment="Center" MaxLength="2"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                      <TextBlock Text="ITU zone:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_ItuZone" Width="30" FontSize="14" VerticalAlignment="Center" MaxLength="2"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                      <TextBlock Text="Continent:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <!-- Two-letter codes, so the box only needs room for the text + the arrow. Filled from
+                           the log; driven and locked by the callsign prefix, like Band is by Frequency. -->
+                      <ComboBox x:Name="CB_Continent" Width="72" FontSize="14" VerticalAlignment="Center"
+                                ToolTip="EU, NA, SA, AS, AF, OC, AN" SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                      <TextBlock Text="State:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="The worked station's state / province, e.g. CA"/>
+                      <TextBox x:Name="TB_StateFilter" Width="46" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                               ToolTip="The worked station's state / province, e.g. CA"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
+                      <!-- "Holyland Square" stacked on two lines instead of one wide label, to save the
+                           horizontal room a single-line "Holyland Square:" would need. LineHeight tightens
+                           the gap between the two words (the font's default line spacing left them looking
+                           too far apart), and centers the whole two-line block against the text box. -->
+                      <TextBlock FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextAlignment="Center" Margin="0,0,6,0"
+                                 LineHeight="15" LineStackingStrategy="BlockLineHeight"
+                                 ToolTip="Holyland square received (the Exchange column)">
+                        <Run Text="Holyland"/><LineBreak/><Run Text="Square:"/>
+                      </TextBlock>
+                      <TextBox x:Name="TB_Square" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                               ToolTip="Holyland square received (the Exchange column)"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel x:Name="CommentGroup" Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="Comment:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="Any part of the QSO's comment text"/>
+                      <TextBox x:Name="TB_Comment" Width="288" FontSize="14" VerticalAlignment="Center"
+                               ToolTip="Any part of the QSO's comment text"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
                   </StackPanel>
 
-                  <!-- Row 3: the date range, the buttons, and the result count docked right. -->
-                  <DockPanel LastChildFill="False" Margin="0,6,0,0">
-                  <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                  </StackPanel>
+                  </Border>
+
+                  <!-- Row 3: my callsign, operator, my grid, my square - light blue background. -->
+                  <Border Background="#DCEBFB" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                      <TextBlock Text="My callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"/>
+                      <ComboBox x:Name="CB_MyCall" Width="130" FontSize="14" VerticalAlignment="Center"
+                                ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"
+                                SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                      <TextBlock Text="Operator:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_Operator" Width="110" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                      <TextBlock Text="My grid:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="Your own grid square"/>
+                      <TextBox x:Name="TB_MyGrid" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="My square:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="Your sent Holyland square"/>
+                      <TextBox x:Name="TB_MySquare" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                  </StackPanel>
+                  </Border>
+
+                  <!-- Row 4: the confirmation sources - light red background. -->
+                  <Border Background="#FBE1E1" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <TextBlock Text="Confirmed on:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                      <TextBlock Text="LoTW:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Lotw" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"
+                                ToolTip="Confirmed by the other station in Logbook of The World"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                      <TextBlock Text="QRZ:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Qrz" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                      <TextBlock Text="eQSL:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Eqsl" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
+                      <TextBlock Text="Club Log:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Clublog" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="Paper:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Paper" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                  </StackPanel>
+                  </Border>
+
+                  <!-- Row 4 (as displayed): prop mode, sat name, soapbox, time - gray background. -->
+                  <Border Background="#E3E3E3" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                      <TextBlock Text="Prop mode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_PropMode" Width="80" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                      <TextBlock Text="Sat name:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_SatName" Width="100" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
+                      <TextBlock Text="Soapbox:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_Soapbox" Width="150" FontSize="14" VerticalAlignment="Center"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="Time:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="Any part of the QSO time (UTC), e.g. 20 or 2034"/>
+                      <TextBox x:Name="TB_Time" Width="80" FontSize="14" VerticalAlignment="Center"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                  </StackPanel>
+                  </Border>
+
+                  <!-- Row 3: date range, buttons, result count. A Grid with the three groups OVERLAID in
+                       one cell (not docked left/right around each other) - each is positioned by its own
+                       HorizontalAlignment against the FULL row width, the same width as the coloured rows
+                       above. That's what centers Search on the rows above rather than merely in whatever
+                       gap happens to be left between the dates and the count pill. -->
+                  <Grid Margin="0,6,0,0">
+                  <StackPanel HorizontalAlignment="Left" Orientation="Horizontal" VerticalAlignment="Center">
                     <TextBlock Text="From:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                     <DatePicker x:Name="DP_From" Width="125" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"
                                 SelectedDateChanged="Filter_Changed"/>
@@ -187,12 +319,21 @@
                                 SelectedDateChanged="Filter_Changed"/>
                   </StackPanel>
 
-                  </StackPanel>
+                  <!-- Result count, in a rounded grey pill at the row's right edge. Grey and border come
+                       from theme tokens, not fixed colours, so the pill still looks like a control in the
+                       dark schemes instead of a white patch. Always visible: it starts at "0 QSOs" rather
+                       than appearing only once a search has been run. -->
+                  <Border HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="120" Margin="0,0,4,0"
+                          Background="{DynamicResource GridHeaderBg}"
+                          BorderBrush="{DynamicResource GridLine}" BorderThickness="1"
+                          CornerRadius="10" Padding="14,4,14,4">
+                      <TextBlock x:Name="TB_Count" Text="0 QSOs" FontSize="16" FontWeight="Bold"
+                                 HorizontalAlignment="Center" TextAlignment="Center"
+                                 Foreground="{DynamicResource AccentBrush}"/>
+                  </Border>
 
-                  <!-- Buttons and the count travel together, docked to the right edge of the filter
-                       block, so the pill still lands under the Mode dropdown and the buttons sit
-                       right-justified beside it instead of trailing the Square box. -->
-                  <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                  <!-- Search sits on the row's true centre, with Undo/Clear at its sides. -->
+                  <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <!-- Undo of a SAVED edit. Ctrl+Z does the same, but a disabled button is the only
                          thing that tells you an undo exists and what it would put back. -->
                     <Button x:Name="Btn_Undo" Content="Undo" FontSize="14" Padding="12,4" Margin="0,0,14,0"
@@ -211,22 +352,8 @@
                     <Button x:Name="Btn_Clear" Content="Clear" FontSize="14" Padding="12,4"
                             Click="Btn_Clear_Click" Background="#757575" Foreground="White"
                             BorderBrush="#616161" Cursor="Hand" Margin="8,0,0,0"/>
-
-                    <!-- Result count, in a rounded grey pill at the right edge of the filter block -
-                         which is the Mode dropdown's right edge (see the panel comment above). Grey and
-                         border come from theme tokens, not fixed colours, so the pill still looks like
-                         a control in the dark schemes instead of a white patch. Always visible: it
-                         starts at "0 QSOs" rather than appearing only once a search has been run. -->
-                    <Border VerticalAlignment="Center" MinWidth="120" Margin="16,0,0,0"
-                            Background="{DynamicResource GridHeaderBg}"
-                            BorderBrush="{DynamicResource GridLine}" BorderThickness="1"
-                            CornerRadius="10" Padding="14,4,14,4">
-                        <TextBlock x:Name="TB_Count" Text="0 QSOs" FontSize="16" FontWeight="Bold"
-                                   HorizontalAlignment="Center" TextAlignment="Center"
-                                   Foreground="{DynamicResource AccentBrush}"/>
-                    </Border>
                   </StackPanel>
-                  </DockPanel>
+                  </Grid>
                 </StackPanel>
             </Grid>
         </Border>

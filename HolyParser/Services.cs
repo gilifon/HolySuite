@@ -112,6 +112,8 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.Country)) adif.AppendFormat("<country:{0}>{1}", qso.Country.Length, qso.Country);
                 if (!string.IsNullOrWhiteSpace(qso.CQZone)) adif.AppendFormat("<cqz:{0}>{1}", qso.CQZone.Length, qso.CQZone);
                 if (!string.IsNullOrWhiteSpace(qso.ITUZone)) adif.AppendFormat("<ituz:{0}>{1}", qso.ITUZone.Length, qso.ITUZone);
+                // ADIF STATE: the worked station's primary administrative subdivision (e.g. "CA").
+                if (!string.IsNullOrWhiteSpace(qso.State)) adif.AppendFormat("<state:{0}>{1}", qso.State.Length, qso.State);
                 // ADIF <freq> is MHz. Fall back to the stored text if it cannot be parsed at all, so a
                 // value we simply don't understand is passed through rather than silently dropped.
                 string freqMhz = HolyLogParser.NormalizeFreqToMhz(qso.Freq) ?? qso.Freq;

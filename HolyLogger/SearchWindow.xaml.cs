@@ -1,4 +1,5 @@
 ﻿using HolyParser;
+using DXCCManager;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -573,6 +574,135 @@ namespace HolyLogger
             UpdateClearButton();
         }
 
+        private static readonly EntityResolver _entityResolver = new EntityResolver();
+
+        // Typing a callsign prefix implies the country, so auto-fill the Country box from it and LOCK the
+        // Country dropdown - you can't pick a country that contradicts the prefix - mirroring how a
+        // frequency drives and locks the band. Clearing the prefix re-enables and empties the Country box.
+        private void Prefix_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                bool prefixFilled = !string.IsNullOrWhiteSpace(TB_Prefix.Text);
+
+                // The continent is implied by the callsign too, so it follows the same rule as the country:
+                // derived from the prefix and locked while one is typed.
+                if (CB_Continent != null) CB_Continent.IsEnabled = !prefixFilled;
+                if (prefixFilled)
+                {
+                    string cont = _entityResolver.GetDXCC(
+                        (TB_Prefix.Text + (TB_Suffix != null ? TB_Suffix.Text : string.Empty)).Trim())?.Continent;
+                    if (CB_Continent != null)
+                    {
+                        object hit = null;
+                        if (!string.IsNullOrWhiteSpace(cont))
+                            foreach (var it in CB_Continent.Items)
+                                if (string.Equals(it as string, cont, StringComparison.OrdinalIgnoreCase)) { hit = it; break; }
+                        CB_Continent.SelectedItem = hit;
+                        if (hit == null && CB_Continent.Items.Count > 0) CB_Continent.SelectedIndex = 0;
+                    }
+                }
+                else if (CB_Continent != null && CB_Continent.Items.Count > 0)
+                {
+                    CB_Continent.SelectedIndex = 0;   // prefix cleared -> drop the derived continent
+                }
+
+                if (prefixFilled)
+                {
+                    string call = (TB_Prefix.Text + (TB_Suffix != null ? TB_Suffix.Text : string.Empty)).Trim();
+                    string country = _entityResolver.GetDXCC(call)?.Name;
+                    var item = (!string.IsNullOrEmpty(country) && !string.Equals(country, "Unknown", StringComparison.OrdinalIgnoreCase))
+                               ? _allCountries.FirstOrDefault(c => string.Equals(c.Name, country, StringComparison.OrdinalIgnoreCase))
+                               : null;
+                    if (item != null)
+                    {
+                        // Show the flag + name exactly as in the list: a NON-editable combo renders the
+                        // selected item through the flag+name ItemTemplate.
+                        _countryFilter = "";
+                        _countriesView?.Refresh();
+                        CB_Country.IsEditable = false;
+                        CB_Country.SelectedItem = item;
+                    }
+                    else
+                    {
+                        // Country not in this log's list (never worked) - just show its name as text.
+                        CB_Country.IsEditable = true;
+                        CB_Country.SelectedItem = null;
+                        CB_Country.Text = country ?? "";
+                    }
+                    CB_Country.IsEnabled = false;
+                }
+                else
+                {
+                    CB_Country.IsEnabled = true;
+                    if (!CB_Country.IsEditable)
+                    {
+                        CB_Country.IsEditable = true;
+                        // The editable text box is recreated when IsEditable flips back on; re-hook the
+                        // type-to-filter handler to the new instance.
+                        CB_Country.Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            try
+                            {
+                                CB_Country.ApplyTemplate();
+                                var box = CB_Country.Template.FindName("PART_EditableTextBox", CB_Country) as TextBox;
+                                if (box != null)
+                                {
+                                    _countryEditBox = box;
+                                    _countryEditBox.TextChanged -= OnCountryTextChanged;
+                                    _countryEditBox.TextChanged += OnCountryTextChanged;
+                                }
+                            }
+                            catch (Exception swallowed) { Log.Swallow(swallowed); }
+                        }), System.Windows.Threading.DispatcherPriority.Loaded);
+                    }
+                    CB_Country.SelectedItem = null;
+                    CB_Country.Text = "";
+                    if (_countryEditBox != null) _countryEditBox.Text = "";
+                    _countryFilter = "";
+                    _countriesView?.Refresh();
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            UpdateClearButton();
+        }
+
+        // Typing a frequency auto-selects its band in the Band filter (same freq->band rule as the QSO
+        // editor), so a frequency search is also a band search. Only selects a band the log actually has
+        // (the Band list is built from the log); otherwise the band is left as-is.
+        private void Freq_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                bool freqFilled = !string.IsNullOrWhiteSpace(TB_Freq.Text);
+                // Band is derived from the frequency and enforced-by-frequency, so LOCK the Band dropdown
+                // while a frequency is present; re-enable it (and clear the derived value) when empty.
+                if (CB_Band != null) CB_Band.IsEnabled = !freqFilled;
+
+                if (freqFilled)
+                {
+                    string mhz = HolyLogParser.NormalizeFreqToMhz(TB_Freq.Text.Trim());
+                    if (!string.IsNullOrWhiteSpace(mhz))
+                    {
+                        string band = HolyLogParser.convertFreqToBand(mhz);
+                        if (!string.IsNullOrWhiteSpace(band) && CB_Band != null)
+                            foreach (var item in CB_Band.Items)
+                                if (string.Equals(item as string, band, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    CB_Band.SelectedItem = item;
+                                    break;
+                                }
+                    }
+                }
+                else if (CB_Band != null && CB_Band.Items.Count > 0)
+                {
+                    CB_Band.SelectedIndex = 0;   // frequency cleared -> drop the derived band filter
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            UpdateClearButton();
+        }
+
         private void SearchField_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter)
@@ -583,21 +713,30 @@ namespace HolyLogger
         // a callsign immediately.
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            // Prefix holds 7 characters, suffix 10 - measured rather than guessed in pixels, so the
+            // Prefix holds 6 characters, suffix 10 - measured rather than guessed in pixels, so the
             // boxes stay right if the theme font or size ever changes.
-            SizeToCharacters(TB_Prefix, 7);
+            SizeToCharacters(TB_Prefix, 6);
             SizeToCharacters(TB_Suffix, 10);
 
-            // These three were far wider than anything they can hold. Sized to a real worst-case value
-            // instead of a round number: a six-character grid square, a Holyland square, and - for the
-            // callsign list - the longest entry the log actually produced, so the box fits 4X2XMAS
-            // without leaving room for a callsign nobody has.
+            // These were far wider than anything they can hold. Sized to a real worst-case value instead
+            // of a round number: a six-character grid square, a Holyland square, the longest entry the
+            // log actually produced for the callsign list (so the box fits 4X2XMAS without leaving room
+            // for a callsign nobody has), and the longest Band / Mode value currently offered.
             SizeToSample(TB_Locator, "KM72OR");
             SizeToSample(TB_Square, "K07YZ");
             SizeToSample(CB_MyCall, LongestItem(CB_MyCall), dropDownArrow);
+            SizeComboToSample(CB_Band, LongestItem(CB_Band), maxWidth: 68);
+            SizeComboToSample(CB_Mode, LongestItem(CB_Mode), maxWidth: 68);
+            SizeComboToSample(CB_Submode, LongestItem(CB_Submode), maxWidth: 92);
 
             // After the above: it measures the row, so the fields must already be their final size.
             AlignCommentBox();
+
+            // The filter rows (Prefix/Suffix/.../Submode, and the rest below) must never be allowed to
+            // clip or wrap - so the window can't be resized narrower than what they actually need. Rather
+            // than hard-code a pixel guess, measure the real rendered width once everything above has
+            // settled, and raise MinWidth (and the current Width, if it is currently smaller) to match.
+            Dispatcher.BeginInvoke(new Action(LockMinWidthToContent), System.Windows.Threading.DispatcherPriority.Loaded);
 
             // Open showing the whole log, so the window starts as a view OF the log rather than a
             // blank form. Filters then narrow it down.
@@ -605,6 +744,22 @@ namespace HolyLogger
 
             TB_Prefix.Focus();
             Keyboard.Focus(TB_Prefix);
+        }
+
+        // Raises MinWidth (and Width, if it is currently smaller) to whatever the filter rows actually
+        // need, measured from the real rendered layout rather than a guessed pixel number - so it stays
+        // correct if the theme font, DPI, or the filters themselves ever change. +20 is the search bar
+        // Border's own Padding="10,8" (left+right); +8 is a small rounding safety margin.
+        private void LockMinWidthToContent()
+        {
+            try
+            {
+                if (FiltersPanel == null || !FiltersPanel.IsArrangeValid) return;
+                double required = FiltersPanel.ActualWidth + 20 + 8;
+                if (required > MinWidth) MinWidth = required;
+                if (ActualWidth < MinWidth) Width = MinWidth;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Esc anywhere in the window clears both fields and the results (same as the Clear
@@ -679,6 +834,17 @@ namespace HolyLogger
             TB_Comment.Text = "";
             DP_From.SelectedDate = null;
             DP_To.SelectedDate   = null;
+            // The rest of the fields added so every QSO field is searchable.
+            TB_Name.Text = ""; TB_Operator.Text = ""; TB_Freq.Text = "";
+            if (CB_Submode.Items.Count > 0) CB_Submode.SelectedIndex = 0;
+            TB_MyGrid.Text = ""; TB_MySquare.Text = ""; TB_CqZone.Text = ""; TB_ItuZone.Text = "";
+            TB_PropMode.Text = ""; TB_SatName.Text = ""; TB_Soapbox.Text = "";
+            TB_Time.Text = ""; TB_StateFilter.Text = "";
+            if (CB_Continent.Items.Count > 0) CB_Continent.SelectedIndex = 0;
+            if (CB_Qrz.Items.Count > 0)     CB_Qrz.SelectedIndex = 0;
+            if (CB_Eqsl.Items.Count > 0)    CB_Eqsl.SelectedIndex = 0;
+            if (CB_Clublog.Items.Count > 0) CB_Clublog.SelectedIndex = 0;
+            if (CB_Paper.Items.Count > 0)   CB_Paper.SelectedIndex = 0;
 
             // Back to the whole log, not to an empty grid - clearing a filter should reveal everything
             // again, exactly as removing a spreadsheet filter does.
@@ -701,7 +867,25 @@ namespace HolyLogger
                               SelectedFilter(CB_MyCall) != null ||
                               SelectedFilter(CB_Lotw) != null ||
                               DP_From.SelectedDate != null ||
-                              DP_To.SelectedDate != null;
+                              DP_To.SelectedDate != null ||
+                              !string.IsNullOrEmpty(TB_Name.Text) ||
+                              !string.IsNullOrEmpty(TB_Operator.Text) ||
+                              !string.IsNullOrEmpty(TB_Freq.Text) ||
+                              SelectedFilter(CB_Submode) != null ||
+                              !string.IsNullOrEmpty(TB_MyGrid.Text) ||
+                              !string.IsNullOrEmpty(TB_MySquare.Text) ||
+                              !string.IsNullOrEmpty(TB_CqZone.Text) ||
+                              !string.IsNullOrEmpty(TB_ItuZone.Text) ||
+                              SelectedFilter(CB_Continent) != null ||
+                              !string.IsNullOrEmpty(TB_PropMode.Text) ||
+                              !string.IsNullOrEmpty(TB_SatName.Text) ||
+                              !string.IsNullOrEmpty(TB_Soapbox.Text) ||
+                              !string.IsNullOrEmpty(TB_Time.Text) ||
+                              !string.IsNullOrEmpty(TB_StateFilter.Text) ||
+                              SelectedFilter(CB_Qrz) != null ||
+                              SelectedFilter(CB_Eqsl) != null ||
+                              SelectedFilter(CB_Clublog) != null ||
+                              SelectedFilter(CB_Paper) != null;
             Btn_Clear.Background = hasContent ? ClearActiveBrush : ClearIdleBrush;
         }
 
@@ -716,6 +900,47 @@ namespace HolyLogger
         public static readonly string[] KnownModes =
         {
             "SSB", "USB", "LSB", "CW", "FM", "RTTY", "FT8", "FT4", "PSK31", "DIGI"
+        };
+
+        // The full official ADIF Submode enumeration (adif.org), so the Submode filter offers every
+        // submode value the standard defines, not just what happens to be in this log.
+        public static readonly string[] KnownSubmodes =
+        {
+            "8PSK125", "8PSK125F", "8PSK125FL", "8PSK250", "8PSK250F", "8PSK250FL",
+            "8PSK500", "8PSK500F", "8PSK1000", "8PSK1000F", "8PSK1200F",
+            "AMTORFEC", "GTOR", "NAVTEX", "SITORB",
+            "CHIP64", "CHIP128",
+            "PCW",
+            "C4FM", "DMR", "DSTAR", "FREEDV", "M17",
+            "DOM-M", "DOM4", "DOM5", "DOM8", "DOM11", "DOM16", "DOM22", "DOM44", "DOM88", "DOMINOEX", "DOMINOF",
+            "VARA HF", "VARA SATELLITE", "VARA FM 1200", "VARA FM 9600",
+            "FMHELL", "FSKHELL", "HELL80", "HELLX5", "HELLX9", "HFSK", "PSKHELL", "SLOWHELL",
+            "ISCAT-A", "ISCAT-B",
+            "JT4A", "JT4B", "JT4C", "JT4D", "JT4E", "JT4F", "JT4G",
+            "JT9-1", "JT9-2", "JT9-5", "JT9-10", "JT9-30", "JT9A", "JT9B", "JT9C", "JT9D", "JT9E",
+            "JT9E FAST", "JT9F", "JT9F FAST", "JT9G", "JT9G FAST", "JT9H", "JT9H FAST",
+            "JT65A", "JT65B", "JT65B2", "JT65C", "JT65C2",
+            "FSQCALL", "FST4", "FST4W", "FT4", "JS8", "JTMS",
+            "MFSK4", "MFSK8", "MFSK11", "MFSK16", "MFSK22", "MFSK31", "MFSK32", "MFSK64", "MFSK64L",
+            "MFSK128", "MFSK128L", "Q65",
+            "OLIVIA 4/125", "OLIVIA 4/250", "OLIVIA 8/250", "OLIVIA 8/500",
+            "OLIVIA 16/500", "OLIVIA 16/1000", "OLIVIA 32/1000",
+            "OPERA-BEACON", "OPERA-QSO",
+            "PAC2", "PAC3", "PAC4",
+            "PAX2",
+            "FSK31", "PSK10", "PSK31", "PSK63", "PSK63F", "PSK63RC4", "PSK63RC5", "PSK63RC10", "PSK63RC20",
+            "PSK63RC32", "PSK125", "PSK125C12", "PSK125R", "PSK125RC10", "PSK125RC12", "PSK125RC16",
+            "PSK125RC4", "PSK125RC5", "PSK250", "PSK250C6", "PSK250R", "PSK250RC2", "PSK250RC3",
+            "PSK250RC5", "PSK250RC6", "PSK250RC7", "PSK500", "PSK500C2", "PSK500C4", "PSK500R",
+            "PSK500RC2", "PSK500RC3", "PSK500RC4", "PSK800C2", "PSK800RC2", "PSK1000", "PSK1000C2",
+            "PSK1000R", "PSK1000RC2", "PSKAM10", "PSKAM31", "PSKAM50", "PSKFEC31",
+            "QPSK31", "QPSK63", "QPSK125", "QPSK250", "QPSK500", "SIM31",
+            "QRA64A", "QRA64B", "QRA64C", "QRA64D", "QRA64E",
+            "ROS-EME", "ROS-HF", "ROS-MF",
+            "LSB", "USB",
+            "THOR-M", "THOR4", "THOR5", "THOR8", "THOR11", "THOR16", "THOR22", "THOR25X4",
+            "THOR50X1", "THOR50X2", "THOR100",
+            "THRBX", "THRBX1", "THRBX2", "THRBX4", "THROB1", "THROB2", "THROB4"
         };
 
         // The value both "any" entries carry, so an unset dropdown reads as no filter at all.
@@ -741,16 +966,16 @@ namespace HolyLogger
             {
                 try
                 {
-                    if (CB_Band == null || CB_Mode == null || TB_Comment == null ||
+                    if (CB_Band == null || CB_Submode == null || TB_Comment == null ||
                         CommentGroup == null || FiltersPanel == null) return;
-                    if (!CB_Band.IsArrangeValid || !CB_Mode.IsArrangeValid || !TB_Comment.IsArrangeValid) return;
+                    if (!CB_Band.IsArrangeValid || !CB_Submode.IsArrangeValid || !TB_Comment.IsArrangeValid) return;
 
                     double LeftOf(FrameworkElement e) =>
                         e.TransformToAncestor(FiltersPanel).Transform(new Point(0, 0)).X;
 
-                    double bandLeft   = LeftOf(CB_Band);
-                    double modeRight  = LeftOf(CB_Mode) + CB_Mode.ActualWidth;
-                    double boxLeft    = LeftOf(TB_Comment);
+                    double bandLeft      = LeftOf(CB_Band);
+                    double submodeRight  = LeftOf(CB_Submode) + CB_Submode.ActualWidth;
+                    double boxLeft       = LeftOf(TB_Comment);
 
                     // Shift the whole group right so the BOX (not its label) starts under Band. Only
                     // ever rightwards: if the fields ahead of Comment already reach past Band, pulling
@@ -763,9 +988,9 @@ namespace HolyLogger
                         boxLeft = bandLeft;
                     }
 
-                    // Stretch to Mode's right edge. The floor keeps the box usable if the row is ever
-                    // so crowded that there is almost nothing left.
-                    TB_Comment.Width = Math.Max(60, modeRight - boxLeft);
+                    // Stretch to Submode's right edge (the last item on row 1). The floor keeps the box
+                    // usable if the row is ever so crowded that there is almost nothing left.
+                    TB_Comment.Width = Math.Max(60, submodeRight - boxLeft);
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -817,19 +1042,25 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }   // keep the XAML fallback width
         }
 
-        // Makes a text box exactly wide enough for `characters` characters of its own font, plus its
-        // padding and border.
+        // Makes a (non-editable) ComboBox exactly wide enough for its longest item, plus just the toggle
+        // arrow. SizeToSample above adds a fixed +10 "caret room" that only matters for an EDITABLE box
+        // the operator types into (a plain filter dropdown never gets a caret), so reusing it here left
+        // Band / Mode looking barely narrower than their old fixed width. This drops that +10 and uses a
+        // tighter arrow allowance, so a short code like "20M" gets a genuinely tight box.
         //
-        // Measured with 'W', the widest character a callsign can contain, so a full-width entry never
-        // has to scroll sideways. A fixed pixel width would drift the moment the theme's font or size
-        // changed; this asks the font itself.
-        private static void SizeToCharacters(TextBox box, int characters)
+        // maxWidth caps the result. Without it, CB_Submode sized itself to its single longest item - a
+        // rare official ADIF entry like "OLIVIA 16/1000" or "VARA SATELLITE" (14 characters) - which alone
+        // pushed the whole row past the window's fixed width. The closed box only needs to comfortably
+        // show the short, common values (FT8, PSK31, ...); an outlier still selects and searches fine, it
+        // just displays clipped in the closed box - the full text is still readable in the open list.
+        private static void SizeComboToSample(ComboBox box, string sample, double arrowWidth = 22, double maxWidth = double.PositiveInfinity)
         {
+            if (box == null || string.IsNullOrEmpty(sample)) return;
             try
             {
                 var typeface = new Typeface(box.FontFamily, box.FontStyle, box.FontWeight, box.FontStretch);
                 var text = new FormattedText(
-                    new string('W', characters),
+                    sample,
                     System.Globalization.CultureInfo.CurrentCulture,
                     FlowDirection.LeftToRight,
                     typeface,
@@ -837,7 +1068,43 @@ namespace HolyLogger
                     Brushes.Black,
                     VisualTreeHelper.GetDpi(box).PixelsPerDip);
 
-                box.Width = Math.Ceiling(text.Width)
+                double w = Math.Ceiling(text.Width)
+                         + box.Padding.Left + box.Padding.Right
+                         + box.BorderThickness.Left + box.BorderThickness.Right
+                         + arrowWidth;
+                box.Width = Math.Min(w, maxWidth);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }   // keep the XAML fallback width
+        }
+
+        // Makes a text box exactly wide enough for `characters` characters of its own font, plus its
+        // padding and border.
+        //
+        // Measured against a realistic callsign-half sample (digits and letters, the actual alphabet a
+        // callsign is drawn from) rather than 'W' repeated - 'W' is the single widest capital letter in
+        // most UI fonts, so sizing to N of them made the box look far wider than any real callsign half
+        // ever fills. A small safety margin (10%) covers the rare word that leans harder on wide letters
+        // than this sample does. A fixed pixel width would drift the moment the theme's font or size
+        // changed; this asks the font itself.
+        private static void SizeToCharacters(TextBox box, int characters)
+        {
+            try
+            {
+                var typeface = new Typeface(box.FontFamily, box.FontStyle, box.FontWeight, box.FontStretch);
+                string alphabet = "4X0OK1SL2MZ3PQ5"; // digits + letters actually seen in callsigns
+                var sample = new char[characters];
+                for (int i = 0; i < characters; i++) sample[i] = alphabet[i % alphabet.Length];
+
+                var text = new FormattedText(
+                    new string(sample),
+                    System.Globalization.CultureInfo.CurrentCulture,
+                    FlowDirection.LeftToRight,
+                    typeface,
+                    box.FontSize,
+                    Brushes.Black,
+                    VisualTreeHelper.GetDpi(box).PixelsPerDip);
+
+                box.Width = Math.Ceiling(text.Width * 1.1)
                           + box.Padding.Left + box.Padding.Right
                           + box.BorderThickness.Left + box.BorderThickness.Right
                           + 6;   // caret room, so the last character is not flush against the border
@@ -882,6 +1149,25 @@ namespace HolyLogger
             string lotw     = SelectedFilter(CB_Lotw);
             DateTime? from  = DP_From.SelectedDate;
             DateTime? to    = DP_To.SelectedDate;
+            // The rest of the QSO's fields, so every field that defines a QSO is searchable.
+            string name      = TB_Name.Text.Trim();
+            string oper      = TB_Operator.Text.Trim();
+            string freq      = TB_Freq.Text.Trim();
+            string submode   = SelectedFilter(CB_Submode);
+            string myGrid    = TB_MyGrid.Text.Trim();
+            string mySquare  = TB_MySquare.Text.Trim();
+            string cqz       = TB_CqZone.Text.Trim();
+            string ituz      = TB_ItuZone.Text.Trim();
+            string continent = SelectedFilter(CB_Continent);
+            string state     = TB_StateFilter.Text.Trim();
+            string propMode  = TB_PropMode.Text.Trim();
+            string satName   = TB_SatName.Text.Trim();
+            string soapbox   = TB_Soapbox.Text.Trim();
+            string time      = TB_Time.Text.Trim();
+            string qrz       = SelectedFilter(CB_Qrz);
+            string eqsl      = SelectedFilter(CB_Eqsl);
+            string clublog   = SelectedFilter(CB_Clublog);
+            string paper     = SelectedFilter(CB_Paper);
 
             // No filter set means show the WHOLE log, the way a spreadsheet shows every row until you
             // filter it. An empty grid told the operator nothing about what was in the log and made the
@@ -890,7 +1176,15 @@ namespace HolyLogger
                               string.IsNullOrEmpty(country) && band == null && mode == null &&
                               myCall == null && string.IsNullOrEmpty(locator) &&
                               string.IsNullOrEmpty(square) && string.IsNullOrEmpty(comment) &&
-                              lotw == null && from == null && to == null;
+                              lotw == null && from == null && to == null &&
+                              string.IsNullOrEmpty(name) && string.IsNullOrEmpty(oper) &&
+                              string.IsNullOrEmpty(freq) && submode == null &&
+                              string.IsNullOrEmpty(myGrid) && string.IsNullOrEmpty(mySquare) &&
+                              string.IsNullOrEmpty(cqz) && string.IsNullOrEmpty(ituz) &&
+                              continent == null && string.IsNullOrEmpty(propMode) &&
+                              string.IsNullOrEmpty(satName) && string.IsNullOrEmpty(soapbox) &&
+                              string.IsNullOrEmpty(time) && string.IsNullOrEmpty(state) &&
+                              qrz == null && eqsl == null && clublog == null && paper == null;
 
             var results = _allQsos.AsEnumerable();
 
@@ -905,14 +1199,22 @@ namespace HolyLogger
                         && HalfMatches(qSuffix, suffix, isPrefix: false);
                 });
 
-            if (!string.IsNullOrEmpty(country))
+            // Country is enforced ONLY when no prefix is given. When a prefix IS given, the Country box was
+            // auto-filled from it for display, but the real criterion is the callsign prefix - so a QSO
+            // with that prefix but a blank/differing Country field is still found.
+            if (!string.IsNullOrEmpty(country) && string.IsNullOrEmpty(prefix))
                 results = results.Where(q => q.Country != null &&
                     q.Country.IndexOf(country, StringComparison.OrdinalIgnoreCase) >= 0);
 
             // Band / mode / my callsign come from dropdowns built out of the log itself, so they are
             // exact matches - picking "20M" must not also bring in "20M" QSOs of some other band whose
             // name merely contains it.
-            if (band != null)
+            //
+            // Band is enforced ONLY when no frequency is given. When a frequency IS given, the Band box was
+            // auto-filled from it for display, but the real criterion is the frequency - so we match on
+            // frequency alone and ignore the band, otherwise a QSO logged with a frequency but a blank Band
+            // field would be wrongly excluded.
+            if (band != null && string.IsNullOrEmpty(freq))
                 results = results.Where(q => string.Equals(q.Band, band, StringComparison.OrdinalIgnoreCase));
 
             if (mode != null)
@@ -934,6 +1236,44 @@ namespace HolyLogger
                 bool wantConfirmed = lotw == LotwConfirmed;
                 results = results.Where(q => (q.LotwQslRcvd == 1) == wantConfirmed);
             }
+
+            // The rest of the QSO's fields - all "contains" matches, like Locator / Square / Comment.
+            if (!string.IsNullOrEmpty(name))
+                results = results.Where(q => q.Name != null && q.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(oper))
+                results = results.Where(q => q.Operator != null && q.Operator.IndexOf(oper, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(freq))
+                results = results.Where(q => q.Freq != null && q.Freq.IndexOf(freq, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (submode != null)
+                results = results.Where(q => string.Equals(q.SUBMode, submode, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(myGrid))
+                results = results.Where(q => q.MyLocator != null && q.MyLocator.IndexOf(myGrid, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(mySquare))
+                results = results.Where(q => q.STX != null && q.STX.IndexOf(mySquare, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(cqz))
+                results = results.Where(q => q.CQZone != null && q.CQZone.IndexOf(cqz, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(ituz))
+                results = results.Where(q => q.ITUZone != null && q.ITUZone.IndexOf(ituz, StringComparison.OrdinalIgnoreCase) >= 0);
+            // Continent is enforced ONLY when no prefix is given - with a prefix the continent is implied by
+            // the callsign (and shown locked), so the prefix is the real criterion.
+            if (continent != null && string.IsNullOrEmpty(prefix))
+                results = results.Where(q => string.Equals(q.Continent, continent, StringComparison.OrdinalIgnoreCase));
+            if (!string.IsNullOrEmpty(state))
+                results = results.Where(q => q.State != null && q.State.IndexOf(state, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(propMode))
+                results = results.Where(q => q.PROP_MODE != null && q.PROP_MODE.IndexOf(propMode, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(satName))
+                results = results.Where(q => q.SAT_NAME != null && q.SAT_NAME.IndexOf(satName, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(soapbox))
+                results = results.Where(q => q.SOAPBOX != null && q.SOAPBOX.IndexOf(soapbox, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (!string.IsNullOrEmpty(time))
+                results = results.Where(q => q.Time != null && q.Time.IndexOf(time, StringComparison.OrdinalIgnoreCase) >= 0);
+
+            // The other confirmation sources, same "confirmed / not confirmed" logic as LoTW.
+            if (qrz != null)     { bool w = qrz == LotwConfirmed;     results = results.Where(q => (q.QrzQslRcvd == 1) == w); }
+            if (eqsl != null)    { bool w = eqsl == LotwConfirmed;    results = results.Where(q => (q.EqslQslRcvd == 1) == w); }
+            if (clublog != null) { bool w = clublog == LotwConfirmed; results = results.Where(q => (q.ClublogQslRcvd == 1) == w); }
+            if (paper != null)   { bool w = paper == LotwConfirmed;   results = results.Where(q => (q.PaperQslRcvd == 1) == w); }
 
             // Comments are free text, so this is a "contains" match - the useful thing is finding the
             // QSO where you noted something, not matching how the note began.
@@ -1028,11 +1368,30 @@ namespace HolyLogger
             Fill(CB_Band, q => q.Band);
             Fill(CB_Mode, q => q.Mode);
             Fill(CB_MyCall, q => q.MyCall);
+            Fill(CB_Continent, q => q.Continent);
+
+            // Submode: the full official ADIF list, plus anything unusual already logged that isn't in
+            // it (e.g. a value from another program's export), so nothing already in the log is hidden.
+            var submodeValues = KnownSubmodes
+                .Concat(_allQsos.Select(q => q.SUBMode).Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v.Trim()))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            submodeValues.Insert(0, AnyItem);
+            CB_Submode.ItemsSource = submodeValues;
+            CB_Submode.SelectedIndex = 0;
 
             // Fixed choices, not values found in the log: "not confirmed" has to be offerable even when
             // every QSO happens to be confirmed, and the other way round.
             CB_Lotw.ItemsSource = new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed };
             CB_Lotw.SelectedIndex = 0;
+
+            // The other four confirmation sources, same fixed choices.
+            foreach (var cb in new[] { CB_Qrz, CB_Eqsl, CB_Clublog, CB_Paper })
+            {
+                cb.ItemsSource = new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed };
+                cb.SelectedIndex = 0;
+            }
         }
 
         private const string LotwConfirmed = "Confirmed";

@@ -502,6 +502,10 @@ namespace HolyParser
             // A received paper / bureau card = the standard QSL_RCVD field.
             qso_row.PaperQslRcvd = AdifYesNo(row, "qsl_rcvd");
 
+            // ADIF STATE: the worked station's primary administrative subdivision (e.g. "CA").
+            string st = AdifValue(row, "state");
+            if (!string.IsNullOrWhiteSpace(st)) qso_row.State = st.Trim();
+
             qso_row.StandartizeQSO();
             return qso_row;
         }

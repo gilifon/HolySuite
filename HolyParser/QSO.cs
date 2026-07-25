@@ -88,6 +88,10 @@ namespace HolyParser
         [JsonProperty("itu_zone")]
         public string ITUZone { get; set; }
 
+        // The worked station's Primary Administrative Subdivision (ADIF STATE, e.g. a US state "CA").
+        [JsonProperty("state")]
+        public string State { get; set; }
+
         [JsonProperty("operator")]
         public string Operator { get; set; }
 
