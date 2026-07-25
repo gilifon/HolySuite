@@ -76,6 +76,85 @@ namespace HolyLogger
         // The daily-backups folder (with HOW TO RESTORE.txt) -- for Help > Open Backups Folder.
         public string BackupsFolder => Path.Combine(DataFolder, "Backups");
 
+        // The live database file itself (logDB.db), for the in-app Restore feature.
+        public string DbPath => dbPath;
+
+        // Outcome of RestoreFromBackup: Ok + where the operator's pre-restore log was safely kept, or a
+        // human-readable Error and nothing was changed (the original database is exactly as it was).
+        public class RestoreResult
+        {
+            public bool Ok;
+            public string SafetyCopyPath;
+            public string Error;
+        }
+
+        // Swaps in a chosen backup as the live database, in-app - replacing the manual "close the app,
+        // rename logDB.db by hand, copy the backup over, rename it back" procedure the operator used to
+        // have to get exactly right themselves. safetyCopyFileName is the EXACT name shown to the operator
+        // in the confirmation dialog before this runs, so what they were told matches what actually
+        // happens - it is not generated fresh in here.
+        //
+        // The current database is NEVER deleted - only renamed aside - so a failed or regretted restore
+        // is always recoverable. If copying the backup into place fails partway (disk full, permissions),
+        // the original file is automatically moved back before returning, so the operator is never left
+        // with no database at all.
+        //
+        // Does not reopen a connection or reset the singleton: every window and cached QSO list already
+        // in this process still refers to the OLD database's data, so the only safe way forward is for the
+        // caller to restart the application. Called with the same lock every other DB access uses, so it
+        // cannot race a concurrent read/write.
+        public RestoreResult RestoreFromBackup(string backupFilePath, string safetyCopyFileName)
+        {
+            var result = new RestoreResult();
+            lock (_dbLock)
+            {
+                try
+                {
+                    if (string.IsNullOrWhiteSpace(backupFilePath) || !File.Exists(backupFilePath))
+                    {
+                        result.Error = "That backup file no longer exists.";
+                        return result;
+                    }
+
+                    // The file cannot be moved or replaced while SQLite still has it open.
+                    try { con?.Close(); con?.Dispose(); } catch (Exception ex) { Log.Swallow(ex); }
+                    con = null;
+
+                    string safetyCopyPath = Path.Combine(Path.GetDirectoryName(dbPath), safetyCopyFileName);
+
+                    if (File.Exists(dbPath))
+                        File.Move(dbPath, safetyCopyPath);   // the undo path - this file is never deleted
+
+                    try
+                    {
+                        File.Copy(backupFilePath, dbPath);
+                    }
+                    catch (Exception copyEx)
+                    {
+                        // Roll back automatically: the operator asked for a restore, not to be left with
+                        // nothing if the copy itself fails.
+                        try
+                        {
+                            if (File.Exists(safetyCopyPath) && !File.Exists(dbPath))
+                                File.Move(safetyCopyPath, dbPath);
+                        }
+                        catch (Exception rollbackEx) { Log.Swallow(rollbackEx); }
+                        result.Error = "Could not copy the backup into place: " + copyEx.Message;
+                        return result;
+                    }
+
+                    result.Ok = true;
+                    result.SafetyCopyPath = safetyCopyPath;
+                    return result;
+                }
+                catch (Exception ex)
+                {
+                    result.Error = ex.Message;
+                    return result;
+                }
+            }
+        }
+
         // How many daily backups to keep in the Backups folder; older ones are pruned.
         private const int DailyBackupsToKeep = 12;
 
@@ -168,24 +247,20 @@ namespace HolyLogger
             }
         }
 
-        // The restore instructions, shown both in HOW TO RESTORE.txt and in the in-app
-        // "Backups & Restore" window, so the two can never drift apart.
-        // inApp: true when shown in the Backups & Restore window (which has an "Open Backups Folder"
-        // button, so step 4 points at it); false for the HOW TO RESTORE.txt saved in the backups folder,
-        // where there is no button, so it gives the path instead.
-        public static string GetRestoreInstructions(string backupsFolder, bool inApp = false)
+        // The restore instructions, written to HOW TO RESTORE.txt in the backups folder - a manual
+        // fallback for the one case the in-app Restore button can't cover: HolyLogger failing to launch
+        // at all. No longer shown in-app (the Backups & Restore window now restores with a button instead
+        // of asking the operator to rename/copy files by hand); kept here only for that fallback case.
+        public static string GetRestoreInstructions(string backupsFolder)
         {
             string backups = backupsFolder;   // ...\Backups
             string logFolder = Path.GetDirectoryName(backupsFolder.TrimEnd('\\', '/')) ?? backupsFolder;   // parent = folder holding logDB.db
 
-            string step4 = inApp
-                ? "4. Click the \"Open Backups Folder\" button below to open your backups folder," + Environment.NewLine +
-                  "   then pick the backup with the most recent date from BEFORE the problem" + Environment.NewLine +
-                  "   happened, e.g.  logDB-2026-07-03.db" + Environment.NewLine
-                : "4. Open your backups folder:" + Environment.NewLine +
-                  "      " + backups + Environment.NewLine +
-                  "   and pick the backup with the most recent date from BEFORE the problem" + Environment.NewLine +
-                  "   happened, e.g.  logDB-2026-07-03.db" + Environment.NewLine;
+            string step4 =
+                "4. Open your backups folder:" + Environment.NewLine +
+                "      " + backups + Environment.NewLine +
+                "   and pick the backup with the most recent date from BEFORE the problem" + Environment.NewLine +
+                "   happened, e.g.  logDB-2026-07-03.db" + Environment.NewLine;
 
             return
 "HOW TO RESTORE YOUR LOG FROM A BACKUP" + Environment.NewLine +

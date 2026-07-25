@@ -61,7 +61,15 @@ namespace HolyLogger
                 // Size first, so the visibility net below measures the real window. Anything below the
                 // window's own minimum is ignored, which self-heals a stale too-small saved value.
                 if (b.W > 0 && b.W >= window.MinWidth) window.Width = b.W;
-                if (b.H > 0 && b.H >= window.MinHeight) window.Height = b.H;
+
+                // A window whose height is content-driven (SizeToContent="Height" / "WidthAndHeight") must
+                // never have Height set explicitly - WPF throws if you try, and the whole point of that
+                // setting is to always fit the CURRENT content, not a size saved from a session when the
+                // content was a different height (this is what previously left a stale, oversized empty
+                // area under a window's content after that content was trimmed down).
+                bool heightIsAuto = window.SizeToContent == SizeToContent.Height
+                                 || window.SizeToContent == SizeToContent.WidthAndHeight;
+                if (!heightIsAuto && b.H > 0 && b.H >= window.MinHeight) window.Height = b.H;
 
                 // Apply the saved corner whenever it is a real number - including on a second monitor.
                 // This used to be gated on a test against SystemParameters.VirtualScreen*, which WPF

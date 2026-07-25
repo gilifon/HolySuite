@@ -7386,7 +7386,7 @@ namespace HolyLogger
         {
             try
             {
-                var win = new BackupRestoreWindow(DataAccess.GetRestoreInstructions(dal.BackupsFolder, inApp: true), dal.BackupsFolder) { Owner = this };
+                var win = new BackupRestoreWindow(dal.BackupsFolder) { Owner = this };
                 win.ShowDialog();
             }
             catch (Exception ex)

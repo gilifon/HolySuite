@@ -36,6 +36,9 @@
         <local:LotwUserConverter x:Key="LotwUserConverter"/>
     </Window.Resources>
 
+    <!-- Frame around the whole window in the app's accent blue. WindowStyle=None removed the OS
+         border, so without this the window's edge is invisible against whatever is behind it. -->
+    <Border BorderBrush="#1565C0" BorderThickness="3">
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
@@ -806,4 +809,5 @@
                        Text="Enter a Callsign or Country (or both) and press Search."/>
         </Border>
     </Grid>
+    </Border>
 </Window>
