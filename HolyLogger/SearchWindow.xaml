@@ -3,7 +3,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:HolyLogger"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
-        Title="Log Search"
+        Title="Log Workshop"
         Height="620" Width="1025"
         MinHeight="440" MinWidth="1025"
         WindowStyle="None" ResizeMode="CanResize"
@@ -62,7 +62,7 @@
                      alone is bold. TB_TitleLog is filled in by the constructor. -->
                 <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="17"
                            Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis">
-                    <Run Text="Log Search"/><Run Text="  —  "/><Run x:Name="TB_TitleLog" FontWeight="Bold"/>
+                    <Run Text="Log Workshop"/><Run Text="  —  "/><Run x:Name="TB_TitleLog" FontWeight="Bold"/>
                 </TextBlock>
             </DockPanel>
         </Border>
@@ -251,6 +251,7 @@
                   CellEditEnding="ResultsGrid_CellEditEnding"
                   RowEditEnding="ResultsGrid_RowEditEnding"
                   Sorting="ResultsGrid_Sorting"
+                  PreviewMouseRightButtonDown="ResultsGrid_PreviewMouseRightButtonDown"
                   VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}">
             <DataGrid.Resources>
                 <!-- Scoped to this grid, exactly as the Channels window does it: a very light blue
@@ -397,17 +398,19 @@
                 <DataGridTemplateColumn Header="Callsign" IsReadOnly="True" SortMemberPath="DXCall" Width="Auto">
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
-                            <!-- Same LoTW tint as the log table and the cluster, under the same option. -->
-                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,0,5,0" FontWeight="Bold"
-                                       Cursor="Hand" MouseLeftButtonUp="Callsign_MouseLeftButtonUp">
+                            <!-- Same LoTW tint as the log table and the cluster, under the same option.
+                                 QRZ is opened from the right-click menu (not a left-click), so no hand
+                                 cursor / click handler here. -->
+                            <TextBlock Text="{Binding DXCall}" HorizontalAlignment="Center" Padding="5,0,5,0" FontWeight="Bold">
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Background" Value="Transparent"/>
-                                        <Setter Property="ToolTip" Value="QRZ"/>
+                                        <Setter Property="ToolTip" Value="Click to open this station's QRZ page"/>
                                         <Style.Triggers>
+                                            <!-- LoTW-user tint only (same highlight as the log table / cluster);
+                                                 no tooltip override, so it keeps the "open QRZ" hint. -->
                                             <DataTrigger Binding="{Binding DXCall, Converter={StaticResource LotwUserConverter}}" Value="True">
                                                 <Setter Property="Background" Value="{DynamicResource RowLotwBg}"/>
-                                                <Setter Property="ToolTip" Value="Uploads to LoTW — click for QRZ"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

@@ -550,13 +550,24 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="SearchMenuItem" Header="Search (Active Log)" ToolTip="Search the active log" Click="SearchMenuItem_Click">
+                    <MenuItem x:Name="SearchMenuItem" ToolTip="Search, edit, delete and queue-upload the active log's QSOs" Click="SearchMenuItem_Click">
                         <MenuItem.Icon>
+                            <!-- tools (wrench) in the icon slot -->
                             <Viewbox Width="16" Height="16">
                                 <Path Stretch="Uniform" Fill="#1565C0"
-                                      Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                      Data="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/>
                             </Viewbox>
                         </MenuItem.Icon>
+                        <MenuItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <!-- search magnifier next to the text -->
+                                <Viewbox Width="15" Height="15" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <Path Stretch="Uniform" Fill="#1565C0"
+                                          Data="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                                </Viewbox>
+                                <TextBlock Text="Log Workshop (Active Log)" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </MenuItem.Header>
                     </MenuItem>
                     <Separator />
                     <MenuItem x:Name="StatisticsMenuItem" Header="Statistics &amp; Confirmations (Active Log)" ToolTip="Show statistics and confirmation analysis (LoTW / QRZ) for the active log" Click="StatisticsMenuItem_Click">
@@ -1350,9 +1361,12 @@
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Background" Value="Transparent"/>
                                         <Style.Triggers>
+                                            <!-- LoTW-user tint only. No tooltip: in this table the callsign
+                                                 cell is editable (left-click edits it), and QRZ is opened
+                                                 from the right-click menu, so a "click for QRZ" hint here
+                                                 would be misleading. -->
                                             <DataTrigger Binding="{Binding DXCall, Converter={StaticResource LotwUserConverter}}" Value="True">
                                                 <Setter Property="Background" Value="{DynamicResource RowLotwBg}"/>
-                                                <Setter Property="ToolTip" Value="This station uploads to LoTW"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

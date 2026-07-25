@@ -2116,6 +2116,107 @@ Environment.NewLine +
             }
         }
 
+        // The log a QSO belongs to (captured just before a delete so an undo can restore it to the SAME
+        // log - the Search window can be searching a log that is not the active one). -1 if not found.
+        public long GetQsoLogId(int id)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return -1;
+                using (var cmd = new SQLiteCommand("SELECT log_id FROM qso WHERE Id = @id", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@id", id));
+                    var o = cmd.ExecuteScalar();
+                    return (o == null || o == DBNull.Value) ? -1 : Convert.ToInt64(o);
+                }
+            }
+        }
+
+        // Re-inserts a previously-deleted QSO into the given log, restoring its data, confirmation flags and
+        // per-service upload status. Returns the new row Id (the primary key changes on re-insert). Used by
+        // the Search window's Undo-delete.
+        public int RestoreQso(QSO qso, long logId)
+        {
+            if (qso == null) return 0;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,log_id) " +
+                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@log)";
+                using (var cmd = new SQLiteCommand(sql, con))
+                {
+                    cmd.Parameters.AddWithValue("@my", (object)qso.MyCall ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@op", (object)qso.Operator ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@mysq", (object)qso.STX ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@myloc", (object)qso.MyLocator ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@dxloc", (object)qso.DXLocator ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@freq", (object)qso.Freq ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@band", (object)qso.Band ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@dx", (object)qso.DXCall ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@rr", (object)qso.RST_RCVD ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@rs", (object)qso.RST_SENT ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@date", (object)qso.Date ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@time", (object)qso.Time ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@mode", (object)qso.Mode ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@sub", (object)qso.SUBMode ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@exch", (object)qso.SRX ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@com", (object)qso.Comment ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@name", (object)qso.Name ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@country", (object)qso.Country ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@cont", (object)qso.Continent ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@cqz", (object)qso.CQZone ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ituz", (object)qso.ITUZone ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@prop", (object)qso.PROP_MODE ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@sat", (object)qso.SAT_NAME ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@soap", (object)qso.SOAPBOX ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@es", qso.EqslStatus);
+                    cmd.Parameters.AddWithValue("@qs", qso.QrzStatus);
+                    cmd.Parameters.AddWithValue("@ls", qso.LotwStatus);
+                    cmd.Parameters.AddWithValue("@cs", qso.ClublogStatus);
+                    cmd.Parameters.AddWithValue("@lr", qso.LotwQslRcvd);
+                    cmd.Parameters.AddWithValue("@lrd", (object)qso.LotwQslRDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@lde", qso.LotwDeletedEntity);
+                    cmd.Parameters.AddWithValue("@qr", qso.QrzQslRcvd);
+                    cmd.Parameters.AddWithValue("@qrd", (object)qso.QrzQslRDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@qde", qso.QrzDeletedEntity);
+                    cmd.Parameters.AddWithValue("@er", qso.EqslQslRcvd);
+                    cmd.Parameters.AddWithValue("@erd", (object)qso.EqslQslRDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@ede", qso.EqslDeletedEntity);
+                    cmd.Parameters.AddWithValue("@cr", qso.ClublogQslRcvd);
+                    cmd.Parameters.AddWithValue("@crd", (object)qso.ClublogQslRDate ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@cde", qso.ClublogDeletedEntity);
+                    cmd.Parameters.AddWithValue("@paper", qso.PaperQslRcvd);
+                    cmd.Parameters.AddWithValue("@log", logId);
+                    cmd.ExecuteNonQuery();
+                }
+                using (var idc = new SQLiteCommand("SELECT last_insert_rowid()", con))
+                    return Convert.ToInt32(idc.ExecuteScalar());
+            }
+        }
+
+        // Persists the five per-source confirmation flags for one QSO - used by the QSO editor's
+        // "Confirmed" checkboxes. Kept separate from Update() (which writes only the QSO's data fields), so
+        // a normal edit never disturbs confirmation state unless the operator changed it here.
+        public void UpdateConfirmations(QSO qso)
+        {
+            if (qso == null) return;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return;
+                using (var cmd = new SQLiteCommand(
+                    "UPDATE qso SET lotw_qsl_rcvd=@l, qrz_qsl_rcvd=@q, eqsl_qsl_rcvd=@e, clublog_qsl_rcvd=@c, paper_qsl_rcvd=@p WHERE Id=@id", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@l", qso.LotwQslRcvd));
+                    cmd.Parameters.Add(new SQLiteParameter("@q", qso.QrzQslRcvd));
+                    cmd.Parameters.Add(new SQLiteParameter("@e", qso.EqslQslRcvd));
+                    cmd.Parameters.Add(new SQLiteParameter("@c", qso.ClublogQslRcvd));
+                    cmd.Parameters.Add(new SQLiteParameter("@p", qso.PaperQslRcvd));
+                    cmd.Parameters.Add(new SQLiteParameter("@id", (long)qso.id));
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         // One confirmation as LoTW - or QRZ, or eQSL - reported it. A service-neutral carrier: each source
         // gives the same handful of fields and is matched to the log the same way, so the same type feeds
         // MarkLotwConfirmed / MarkQrzConfirmed / MarkEqslConfirmed.

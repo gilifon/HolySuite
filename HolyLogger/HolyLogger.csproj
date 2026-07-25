@@ -309,6 +309,9 @@
     <Compile Include="SearchWindow.xaml.cs">
       <DependentUpon>SearchWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="QsoEditWindow.xaml.cs">
+      <DependentUpon>QsoEditWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="BadQsoEditorWindow.xaml.cs">
       <DependentUpon>BadQsoEditorWindow.xaml</DependentUpon>
     </Compile>
@@ -519,6 +522,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="ProfileNameDialog.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="QsoEditWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

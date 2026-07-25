@@ -150,45 +150,29 @@ namespace HolyParser
                 // LoTW sent status, so the upload queue survives an export/re-import round trip.
                 adif.AppendFormat("<lotw_qsl_sent:1>{0}", qso.LotwStatus == 1 ? "Y" : "N");
 
-                // Confirmation status, so a full export/re-import (even onto another computer running
-                // HolyLogger) keeps every confirmation tick without re-downloading. LoTW uses the STANDARD
-                // ADIF fields (other loggers read them too); QRZ has no standard field, so it goes in
-                // APP_ fields that other programs safely ignore and HolyLogger reads back on import.
+                // Confirmation status, using ONLY official ADIF fields so any logger reads the file and it
+                // stays standards-compliant (no HolyLogger-private APP_ fields). ADIF defines received-
+                // confirmation fields for exactly three sources - paper (QSL_RCVD), eQSL (EQSL_QSL_RCVD)
+                // and LoTW (LOTW_QSL_RCVD). It has NO field for QRZ.com or Club Log confirmations, so those
+                // are intentionally NOT written here: they live in the database and are restored by re-
+                // downloading from those services. Deleted-entity flags are DERIVED (from the DXCC entity),
+                // so they are not written either - the app recomputes them from the entity when needed.
                 if (qso.LotwQslRcvd == 1)
                 {
                     adif.Append("<lotw_qsl_rcvd:1>Y");
                     if (!string.IsNullOrWhiteSpace(qso.LotwQslRDate))
                         adif.AppendFormat("<lotw_qslrdate:{0}>{1}", qso.LotwQslRDate.Length, qso.LotwQslRDate);
-                    if (qso.LotwDeletedEntity == 1) adif.Append("<app_holylogger_lotw_deleted:1>Y");
-                }
-                if (qso.QrzQslRcvd == 1)
-                {
-                    adif.Append("<app_holylogger_qrz_qsl_rcvd:1>Y");
-                    if (!string.IsNullOrWhiteSpace(qso.QrzQslRDate))
-                        adif.AppendFormat("<app_holylogger_qrz_qslrdate:{0}>{1}", qso.QrzQslRDate.Length, qso.QrzQslRDate);
-                    if (qso.QrzDeletedEntity == 1) adif.Append("<app_holylogger_qrz_deleted:1>Y");
                 }
                 if (qso.EqslQslRcvd == 1)
                 {
-                    // eQSL uses the STANDARD ADIF fields (other loggers read them too).
                     adif.Append("<eqsl_qsl_rcvd:1>Y");
                     if (!string.IsNullOrWhiteSpace(qso.EqslQslRDate))
                         adif.AppendFormat("<eqsl_qslrdate:{0}>{1}", qso.EqslQslRDate.Length, qso.EqslQslRDate);
                 }
-                if (qso.ClublogQslRcvd == 1)
-                {
-                    // Club Log confirmation is not a standard ADIF field, so it round-trips through
-                    // HolyLogger-private APP_ fields (like QRZ), keeping every tick on re-import.
-                    adif.Append("<app_holylogger_clublog_qsl_rcvd:1>Y");
-                    if (!string.IsNullOrWhiteSpace(qso.ClublogQslRDate))
-                        adif.AppendFormat("<app_holylogger_clublog_qslrdate:{0}>{1}", qso.ClublogQslRDate.Length, qso.ClublogQslRDate);
-                    if (qso.ClublogDeletedEntity == 1) adif.Append("<app_holylogger_clublog_deleted:1>Y");
-                }
                 if (qso.PaperQslRcvd == 1)
                 {
-                    // Manual paper-QSL mark, round-tripped through a HolyLogger-private APP_ field (like
-                    // QRZ / Club Log) so re-import keeps it.
-                    adif.Append("<app_holylogger_paper_qsl_rcvd:1>Y");
+                    // A received paper / bureau card is exactly what the standard QSL_RCVD field means.
+                    adif.Append("<qsl_rcvd:1>Y");
                 }
                 adif.AppendLine("<eor>");
             }

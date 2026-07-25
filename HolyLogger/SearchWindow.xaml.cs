@@ -73,14 +73,340 @@ namespace HolyLogger
         // A click on a callsign in the results opens that station's QRZ.com page in the default
         // browser — the callsign acts like a web link (hand cursor + "QRZ" tooltip in the XAML).
         // Gated on ClickCount==1 so a double-click opens the page once, not twice.
-        private void Callsign_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void OpenQrz(string callsign)
         {
-            if (e.ClickCount != 1) return;
-            var qso = (sender as FrameworkElement)?.DataContext as QSO;
-            string call = (qso?.DXCall ?? string.Empty).Trim().ToUpperInvariant();
+            string call = (callsign ?? string.Empty).Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(call)) return;
             try { System.Diagnostics.Process.Start("https://www.qrz.com/db/" + call); }
             catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // ===== Right-click row menu: Search QRZ / Edit / Delete / send-to-upload-queue =====
+
+        private DataGridRow _hlRow;          // the row highlighted while its menu / editor is up
+        private Brush _hlOrigBg;             // its background, to restore afterwards
+        private bool _hlKeep;                // keep the highlight past the menu close (an editor is open)
+
+        private void HighlightRow(DataGridRow row)
+        {
+            ClearHighlight();
+            if (row == null) return;
+            _hlRow = row;
+            _hlOrigBg = row.Background;
+            row.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x82));   // clear amber
+        }
+
+        private void ClearHighlight()
+        {
+            if (_hlRow != null) { _hlRow.Background = _hlOrigBg; _hlRow = null; _hlOrigBg = null; }
+        }
+
+        private static T FindVisualParent<T>(DependencyObject child) where T : DependencyObject
+        {
+            while (child != null)
+            {
+                if (child is T t) return t;
+                child = VisualTreeHelper.GetParent(child);
+            }
+            return null;
+        }
+
+        private void ResultsGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+            if (row == null) { e.Handled = true; return; }     // header / empty area: no menu
+            var qso = row.Item as QSO;
+            if (qso == null) { e.Handled = true; return; }
+
+            // Colour the row so it is unmistakable which QSO the menu (and the editor) act on.
+            HighlightRow(row);
+
+            var menu = BuildRowContextMenu(qso, row);
+            menu.Closed += (s, _) => { if (!_hlKeep) ClearHighlight(); _hlKeep = false; };
+            menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+            menu.PlacementTarget = ResultsGrid;
+            menu.IsOpen = true;
+            e.Handled = true;   // suppress any default context menu
+        }
+
+        // The same styled menu resources the main window's log right-click menu uses (rounded white card,
+        // blue hover, red Delete). Parsed once, lazily.
+        private ResourceDictionary _ctxRes;
+        private ResourceDictionary CtxRes
+        {
+            get
+            {
+                if (_ctxRes == null)
+                {
+                    const string xaml =
+@"<ResourceDictionary xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation'
+                     xmlns:x='http://schemas.microsoft.com/winfx/2006/xaml'>
+  <Style x:Key='CtxMenu' TargetType='ContextMenu'>
+    <Setter Property='Background' Value='Transparent'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='ContextMenu'>
+          <Border Background='#FFFFFF' BorderBrush='#1565C0' BorderThickness='1.5' CornerRadius='10' Padding='6' SnapsToDevicePixels='True'>
+            <Border.Effect>
+              <DropShadowEffect BlurRadius='14' ShadowDepth='2' Opacity='0.35' Color='#666666'/>
+            </Border.Effect>
+            <StackPanel IsItemsHost='True' KeyboardNavigation.DirectionalNavigation='Cycle'/>
+          </Border>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <ControlTemplate x:Key='CtxItemTemplate' TargetType='MenuItem'>
+    <Border x:Name='bd' Background='Transparent' CornerRadius='6' Padding='{TemplateBinding Padding}'>
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width='24'/>
+          <ColumnDefinition Width='*'/>
+        </Grid.ColumnDefinitions>
+        <ContentPresenter Grid.Column='0' ContentSource='Icon' VerticalAlignment='Center' HorizontalAlignment='Center'/>
+        <ContentPresenter Grid.Column='1' ContentSource='Header' VerticalAlignment='Center' Margin='8,0,0,0'/>
+      </Grid>
+    </Border>
+    <ControlTemplate.Triggers>
+      <Trigger Property='IsHighlighted' Value='True'>
+        <Setter TargetName='bd' Property='Background' Value='#1565C0'/>
+        <Setter Property='Foreground' Value='White'/>
+      </Trigger>
+      <Trigger Property='IsEnabled' Value='False'>
+        <Setter Property='Foreground' Value='#AAAAAA'/>
+      </Trigger>
+    </ControlTemplate.Triggers>
+  </ControlTemplate>
+  <ControlTemplate x:Key='CtxItemDangerTemplate' TargetType='MenuItem'>
+    <Border x:Name='bd' Background='Transparent' CornerRadius='6' Padding='{TemplateBinding Padding}'>
+      <Grid>
+        <Grid.ColumnDefinitions>
+          <ColumnDefinition Width='24'/>
+          <ColumnDefinition Width='*'/>
+        </Grid.ColumnDefinitions>
+        <ContentPresenter Grid.Column='0' ContentSource='Icon' VerticalAlignment='Center' HorizontalAlignment='Center'/>
+        <ContentPresenter Grid.Column='1' ContentSource='Header' VerticalAlignment='Center' Margin='8,0,0,0'/>
+      </Grid>
+    </Border>
+    <ControlTemplate.Triggers>
+      <Trigger Property='IsHighlighted' Value='True'>
+        <Setter TargetName='bd' Property='Background' Value='#D32F2F'/>
+        <Setter Property='Foreground' Value='White'/>
+      </Trigger>
+    </ControlTemplate.Triggers>
+  </ControlTemplate>
+  <Style x:Key='CtxItem' TargetType='MenuItem'>
+    <Setter Property='FontSize' Value='15'/>
+    <Setter Property='Foreground' Value='#1A1A1A'/>
+    <Setter Property='Padding' Value='12,7'/>
+    <Setter Property='Margin' Value='2,1'/>
+    <Setter Property='Cursor' Value='Hand'/>
+    <Setter Property='Template' Value='{StaticResource CtxItemTemplate}'/>
+  </Style>
+  <Style x:Key='CtxItemDanger' TargetType='MenuItem' BasedOn='{StaticResource CtxItem}'>
+    <Setter Property='Foreground' Value='#C62828'/>
+    <Setter Property='Template' Value='{StaticResource CtxItemDangerTemplate}'/>
+  </Style>
+  <Style x:Key='CtxSep' TargetType='Separator'>
+    <Setter Property='Margin' Value='8,5'/>
+    <Setter Property='Template'>
+      <Setter.Value>
+        <ControlTemplate TargetType='Separator'>
+          <Border Height='1' Background='#BDBDBD' SnapsToDevicePixels='True'/>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+</ResourceDictionary>";
+                    _ctxRes = (ResourceDictionary)System.Windows.Markup.XamlReader.Parse(xaml);
+                }
+                return _ctxRes;
+            }
+        }
+
+        private static TextBlock MakeMenuGlyph(string glyph, Brush color)
+        {
+            return new TextBlock
+            {
+                Text = glyph,
+                FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                FontSize = 15,
+                Foreground = color,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+        }
+
+        private ContextMenu BuildRowContextMenu(QSO qso, DataGridRow row)
+        {
+            var res = CtxRes;
+            var itemStyle = (Style)res["CtxItem"];
+            var dangerStyle = (Style)res["CtxItemDanger"];
+            var sepStyle = (Style)res["CtxSep"];
+            var blue = (Brush)new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+            var red = (Brush)new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+
+            var menu = new ContextMenu { Style = (Style)res["CtxMenu"] };
+
+            var qrz = new MenuItem { Header = "Search QRZ", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            qrz.Click += (s, e) => OpenQrz(qso.DXCall);
+            menu.Items.Add(qrz);
+
+            // Edit / Delete are deferred until the menu has fully closed (the editor is modal; running it
+            // while the menu is still dismissing and holding mouse capture leaves it unable to take the
+            // click). _hlKeep keeps the row highlighted across the close.
+            var edit = new MenuItem { Header = "Edit", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            edit.Click += (s, e) =>
+            {
+                _hlKeep = true;
+                Dispatcher.BeginInvoke(new Action(() => EditQso(qso, row)), System.Windows.Threading.DispatcherPriority.Background);
+            };
+            menu.Items.Add(edit);
+
+            var del = new MenuItem { Header = "Delete", Style = dangerStyle, Icon = MakeMenuGlyph("", red) };
+            del.Click += (s, e) =>
+            {
+                _hlKeep = true;
+                Dispatcher.BeginInvoke(new Action(() => DeleteQso(qso)), System.Windows.Threading.DispatcherPriority.Background);
+            };
+            menu.Items.Add(del);
+
+            menu.Items.Add(new Separator { Style = sepStyle });
+
+            var header = new MenuItem { Header = "Send to upload queue for:", Style = itemStyle, IsEnabled = false, Icon = MakeMenuGlyph("", blue) };
+            menu.Items.Add(header);
+
+            // Real CheckBox controls (not checkable menu items) so each logger shows a visible box. Hosting
+            // them directly in the menu keeps it open while you tick several, until OK.
+            var s0 = Properties.Settings.Default;
+            var cbLotw = MakeServiceCheck("LoTW", s0.UseLotwService);
+            var cbQrz  = MakeServiceCheck("QRZ", s0.UseQrzLogbook);
+            var cbEqsl = MakeServiceCheck("eQSL", s0.UseEqslService);
+            var cbClub = MakeServiceCheck("Club Log", s0.UseClublogService);
+            menu.Items.Add(cbLotw);
+            menu.Items.Add(cbQrz);
+            menu.Items.Add(cbEqsl);
+            menu.Items.Add(cbClub);
+
+            var ok = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                Padding = new Thickness(10, 4, 10, 4),
+                Margin = new Thickness(38, 6, 8, 4),
+                HorizontalAlignment = HorizontalAlignment.Left,
+                Cursor = Cursors.Hand
+            };
+            ok.Click += (s, e) =>
+            {
+                QueueForUpload(qso, cbLotw.IsChecked == true, cbQrz.IsChecked == true,
+                               cbEqsl.IsChecked == true, cbClub.IsChecked == true);
+                menu.IsOpen = false;
+            };
+            menu.Items.Add(ok);
+
+            return menu;
+        }
+
+        // A service checkbox in the menu. Disabled (and greyed with a hint) when that service isn't set up,
+        // so you can't queue to a logger you don't use.
+        private static CheckBox MakeServiceCheck(string name, bool configured)
+        {
+            return new CheckBox
+            {
+                Content = configured ? name : name + "   (not configured)",
+                IsEnabled = configured,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)),
+                FontSize = 14,
+                Margin = new Thickness(40, 3, 8, 3),
+                VerticalAlignment = VerticalAlignment.Center
+            };
+        }
+
+        // Puts the QSO into the chosen services' upload queues (status 0 = pending). Always allowed - even
+        // if already sent - so an edited QSO can be re-sent; the uploader reads the QSO's CURRENT fields.
+        private void QueueForUpload(QSO qso, bool lotw, bool qrz, bool eqsl, bool club)
+        {
+            var dal = DataAccess.GetInstance();
+            if (dal == null || qso == null) return;
+            var done = new List<string>();
+            try
+            {
+                if (lotw) { dal.SetLotwStatus(qso.id, 0);    done.Add("LoTW"); }
+                if (qrz)  { dal.SetQrzStatus(qso.id, 0);     done.Add("QRZ"); }
+                if (eqsl) { dal.SetEqslStatus(qso.id, 0);    done.Add("eQSL"); }
+                if (club) { dal.SetClublogStatus(qso.id, 0); done.Add("Club Log"); }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            if (done.Count > 0)
+                HolyMessageBox.Show($"{qso.DXCall} queued for upload to: {string.Join(", ", done)}.",
+                    "Upload queue", HolyMsgType.Info, this);
+            else
+                HolyMessageBox.Show("Tick at least one logger first.", "Upload queue", HolyMsgType.Info, this);
+        }
+
+        private void EditQso(QSO qso, DataGridRow row)
+        {
+            try
+            {
+                Rect rect = default(Rect);
+                try
+                {
+                    // The row's screen rectangle, converted to WPF (DIP) units so the editor can place
+                    // itself above/below it correctly on high-DPI displays.
+                    var src = PresentationSource.FromVisual(row);
+                    if (row != null && src != null)
+                    {
+                        var m = src.CompositionTarget.TransformFromDevice;
+                        Point tl = m.Transform(row.PointToScreen(new Point(0, 0)));
+                        Point br = m.Transform(row.PointToScreen(new Point(row.ActualWidth, row.ActualHeight)));
+                        rect = new Rect(tl, br);
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                var dlg = new QsoEditWindow(qso, rect) { Owner = this };
+                bool? res = dlg.ShowDialog();
+                if (res == true)
+                {
+                    try { ResultsGrid.Items.Refresh(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+            }
+            finally { _hlKeep = false; ClearHighlight(); }
+        }
+
+        // Delete asks for confirmation first, and is ALSO undo-able (it goes on the same Undo stack as
+        // edits) as a second safety net. The QSO's log is captured first so Undo restores it to the right log.
+        private void DeleteQso(QSO qso)
+        {
+            try
+            {
+                bool ok = HolyMessageBox.ShowConfirm(
+                    $"Delete this QSO with {qso.DXCall} on {qso.Date}?\n\nYou can still undo it afterwards with the Undo button.",
+                    "Delete QSO", HolyMsgType.Warning, this);
+                if (!ok) return;
+
+                var dal = DataAccess.GetInstance();
+                long logId = dal?.GetQsoLogId(qso.id) ?? -1;
+
+                dal?.Delete(qso.id);
+                (ResultsGrid.DataContext as ObservableCollection<QSO>)?.Remove(qso);
+                _allQsos?.Remove(qso);
+                try { ResultsGrid.Items.Refresh(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                _undo.Push(new EditStep
+                {
+                    Qso = qso,
+                    IsDelete = true,
+                    LogId = logId,
+                    Label = $"deleted {qso.DXCall} on {qso.Date}"
+                });
+                UpdateUndoButton();
+                TB_Status.Text = $"Deleted {qso.DXCall}.  Press Undo to restore it.";
+            }
+            catch (Exception ex) { HolyMessageBox.ShowError("Could not delete the QSO: " + ex.Message, "Delete QSO", this); }
+            finally { _hlKeep = false; ClearHighlight(); }
         }
 
         // logName names the log being searched, and is shown in the title bar. Any log can be searched
@@ -93,7 +419,7 @@ namespace HolyLogger
 
             string titleLog = string.IsNullOrWhiteSpace(logName) ? "(unnamed log)" : logName.Trim();
             TB_TitleLog.Text = titleLog;          // the bold half of the custom caption
-            Title = "Log Search — " + titleLog;   // taskbar / Alt-Tab still use the plain Title
+            Title = "Log Workshop — " + titleLog;   // taskbar / Alt-Tab still use the plain Title
 
             // Build country list from distinct countries in the log, sorted A-Z
             _allCountries = _allQsos
@@ -728,8 +1054,10 @@ namespace HolyLogger
         private class EditStep
         {
             public QSO Qso;
-            public Dictionary<string, string> Before;   // only the fields that changed
+            public Dictionary<string, string> Before;   // only the fields that changed (null for a delete)
             public string Label;
+            public bool IsDelete;                        // true = this step deleted Qso; undo re-inserts it
+            public long LogId;                           // the log to restore a deleted QSO into
         }
 
         private readonly Stack<EditStep> _undo = new Stack<EditStep>();
@@ -803,6 +1131,20 @@ namespace HolyLogger
             bool any = _undo.Count > 0;
             Btn_Undo.IsEnabled = any;
             Btn_Undo.Content = any ? $"Undo ({_undo.Count})" : "Undo";
+            // Dark-red, bold, white text while there is something to undo, so it stands out; revert to the
+            // themed default when empty.
+            if (any)
+            {
+                Btn_Undo.Background = new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+                Btn_Undo.Foreground = System.Windows.Media.Brushes.White;
+                Btn_Undo.FontWeight = FontWeights.Bold;
+            }
+            else
+            {
+                Btn_Undo.ClearValue(BackgroundProperty);
+                Btn_Undo.ClearValue(ForegroundProperty);
+                Btn_Undo.ClearValue(FontWeightProperty);
+            }
             Btn_Undo.ToolTip = any
                 ? "Undo: " + _undo.Peek().Label
                 : "Nothing to undo. Changes made in this window can be undone until it is closed.";
@@ -837,6 +1179,24 @@ namespace HolyLogger
             EditStep step = _undo.Pop();
             try
             {
+                if (step.IsDelete)
+                {
+                    // Re-insert the deleted QSO into its original log, add it back to the source list, then
+                    // rebuild the results so it reappears in the right (sorted) place - a plain Add to the
+                    // bound collection can leave it unsorted/off-screen, which looks like "nothing came back".
+                    int newId = DataAccess.GetInstance()?.RestoreQso(step.Qso, step.LogId) ?? 0;
+                    if (newId > 0) step.Qso.id = newId;
+                    _allQsos?.Add(step.Qso);
+                    try { RunSearch(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    try { ResultsGrid.SelectedItem = step.Qso; ResultsGrid.ScrollIntoView(step.Qso); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                    TB_Status.Text = $"Restored {step.Qso.DXCall}."
+                                   + (_undo.Count > 0 ? $"  {_undo.Count} more can be undone." : "  Nothing left to undo.");
+                    UpdateUndoButton();
+                    return;
+                }
+
                 foreach (var pair in step.Before)
                     FieldProps[pair.Key].SetValue(step.Qso, pair.Value);
 

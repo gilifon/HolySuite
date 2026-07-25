@@ -487,25 +487,20 @@ namespace HolyParser
             // Confirmation status from a HolyLogger export, so a re-import (even on another computer)
             // restores every tick. LoTW uses the standard ADIF fields; QRZ uses app fields. Absent on
             // logs from other programs, so these simply stay 0 there.
+            // Confirmation status - ONLY official ADIF fields (no private APP_ fields). QRZ.com and Club
+            // Log have no standard confirmation field, so they are not read from ADIF (they are restored by
+            // re-downloading from those services). Deleted-entity flags are derived and recomputed by the
+            // app from the DXCC entity, so they are not read here either.
             qso_row.LotwQslRcvd = AdifYesNo(row, "lotw_qsl_rcvd");
             string lrd = AdifValue(row, "lotw_qslrdate");
             if (!string.IsNullOrWhiteSpace(lrd)) qso_row.LotwQslRDate = lrd.Trim();
-            qso_row.LotwDeletedEntity = AdifYesNo(row, "app_holylogger_lotw_deleted");
-            qso_row.QrzQslRcvd = AdifYesNo(row, "app_holylogger_qrz_qsl_rcvd");
-            string qrd = AdifValue(row, "app_holylogger_qrz_qslrdate");
-            if (!string.IsNullOrWhiteSpace(qrd)) qso_row.QrzQslRDate = qrd.Trim();
-            qso_row.QrzDeletedEntity = AdifYesNo(row, "app_holylogger_qrz_deleted");
-            // eQSL: standard ADIF fields (also read from other loggers' exports).
+
             qso_row.EqslQslRcvd = AdifYesNo(row, "eqsl_qsl_rcvd");
             string erd = AdifValue(row, "eqsl_qslrdate");
             if (!string.IsNullOrWhiteSpace(erd)) qso_row.EqslQslRDate = erd.Trim();
-            // Club Log: HolyLogger-private APP_ fields (no standard ADIF field for it).
-            qso_row.ClublogQslRcvd = AdifYesNo(row, "app_holylogger_clublog_qsl_rcvd");
-            string crd = AdifValue(row, "app_holylogger_clublog_qslrdate");
-            if (!string.IsNullOrWhiteSpace(crd)) qso_row.ClublogQslRDate = crd.Trim();
-            qso_row.ClublogDeletedEntity = AdifYesNo(row, "app_holylogger_clublog_deleted");
-            // Paper QSL: HolyLogger-private APP_ field (manual mark).
-            qso_row.PaperQslRcvd = AdifYesNo(row, "app_holylogger_paper_qsl_rcvd");
+
+            // A received paper / bureau card = the standard QSL_RCVD field.
+            qso_row.PaperQslRcvd = AdifYesNo(row, "qsl_rcvd");
 
             qso_row.StandartizeQSO();
             return qso_row;

@@ -1962,6 +1962,18 @@ namespace HolyLogger.Properties {
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string QsoEditWindowPos {
+            get {
+                return ((string)(this["QsoEditWindowPos"]));
+            }
+            set {
+                this["QsoEditWindowPos"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
         public string ActiveProfile {
             get {
                 return ((string)(this["ActiveProfile"]));

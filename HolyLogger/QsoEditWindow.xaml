@@ -1,0 +1,149 @@
+<Window x:Class="HolyLogger.QsoEditWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Edit QSO"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" SizeToContent="WidthAndHeight"
+        ShowInTaskbar="False" WindowStartupLocation="CenterOwner">
+
+    <Window.Resources>
+        <!-- A column header, styled like the log table's headers. -->
+        <Style x:Key="Hdr" TargetType="TextBlock">
+            <Setter Property="Background" Value="#DEB887"/>
+            <Setter Property="Foreground" Value="#3A2A15"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="Padding" Value="2,3"/>
+            <Setter Property="Margin" Value="1,1,1,0"/>
+        </Style>
+        <!-- An editable cell under a header. IsUndoEnabled (default) gives per-box Ctrl+Z. -->
+        <Style x:Key="Cell" TargetType="TextBox">
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Padding" Value="2,3"/>
+            <Setter Property="Margin" Value="1,0,1,1"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Foreground" Value="#111111"/>
+            <Setter Property="BorderBrush" Value="#9BB8DC"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+        <Style x:Key="CellRO" TargetType="TextBox" BasedOn="{StaticResource Cell}">
+            <Setter Property="IsReadOnly" Value="True"/>
+            <Setter Property="Background" Value="#E7EFF9"/>
+            <Setter Property="Foreground" Value="#445A75"/>
+        </Style>
+        <Style x:Key="ConfBox" TargetType="CheckBox">
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="Margin" Value="1,3,1,4"/>
+        </Style>
+    </Window.Resources>
+
+    <!-- Rounded, light-blue card. The outer window is transparent, so this Border is the visible shape. -->
+    <Border CornerRadius="12" Background="#BDDFFF" BorderBrush="#1565C0" BorderThickness="1">
+        <Border.Effect>
+            <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.35" Color="#000000"/>
+        </Border.Effect>
+        <StackPanel>
+            <!-- Title bar (drag to move) -->
+            <Border x:Name="TitleBar" CornerRadius="12,12,0,0" Background="#1565C0" Padding="14,8"
+                    MouseLeftButtonDown="TitleBar_MouseDown">
+                <DockPanel>
+                    <TextBlock Text="Edit QSO" Foreground="White" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
+                    <TextBlock x:Name="TB_TitleCall" DockPanel.Dock="Right" Foreground="#CFE3FF" FontSize="14"
+                               FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                </DockPanel>
+            </Border>
+
+            <!-- The table's columns, folded into two stacked header+cell rows, each field at its table
+                 width. Row 1 -->
+            <Grid Margin="12,12,12,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="92"/>
+                    <ColumnDefinition Width="76"/>
+                    <ColumnDefinition Width="82"/>
+                    <ColumnDefinition Width="172"/>
+                    <ColumnDefinition Width="112"/>
+                    <ColumnDefinition Width="92"/>
+                    <ColumnDefinition Width="74"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Date"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Time"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Callsign"  Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="Name"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="Country"   Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="5" Text="Frequency" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="6" Text="Band"      Style="{StaticResource Hdr}"/>
+
+                <TextBox  Grid.Row="1" Grid.Column="0" x:Name="TB_Date"    Style="{StaticResource Cell}"/>
+                <TextBox  Grid.Row="1" Grid.Column="1" x:Name="TB_Time"    Style="{StaticResource Cell}"/>
+                <TextBox  Grid.Row="1" Grid.Column="2" x:Name="TB_Call"    Style="{StaticResource Cell}" CharacterCasing="Upper" TextChanged="Call_TextChanged"/>
+                <TextBox  Grid.Row="1" Grid.Column="3" x:Name="TB_Name"    Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
+                <TextBox  Grid.Row="1" Grid.Column="4" x:Name="TB_Country" Style="{StaticResource CellRO}" ToolTip="Set from the callsign's DXCC prefix — not editable"/>
+                <TextBox  Grid.Row="1" Grid.Column="5" x:Name="TB_Freq"    Style="{StaticResource Cell}" ToolTip="MHz" TextChanged="Freq_TextChanged"/>
+                <ComboBox Grid.Row="1" Grid.Column="6" x:Name="CB_Band"    IsEditable="True" FontSize="12" Margin="1,0,1,1"
+                          VerticalContentAlignment="Center"
+                          ToolTip="Pick the band. When a frequency is set, the band is derived from it and locked."/>
+            </Grid>
+
+            <!-- Row 2 -->
+            <Grid Margin="12,2,12,6">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="52"/>
+                    <ColumnDefinition Width="52"/>
+                    <ColumnDefinition Width="62"/>
+                    <ColumnDefinition Width="82"/>
+                    <ColumnDefinition Width="192"/>
+                    <ColumnDefinition Width="46"/>
+                    <ColumnDefinition Width="46"/>
+                    <ColumnDefinition Width="46"/>
+                    <ColumnDefinition Width="60"/>
+                    <ColumnDefinition Width="66"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="RST-R"    Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="RST-S"    Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Mode"     Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="Exchange" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="Comment"  Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="5" Text="LoTW"     Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="6" Text="QRZ"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="7" Text="eQSL"     Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="8" Text="Club Log" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="9" Text="Paper"    Style="{StaticResource Hdr}"/>
+
+                <TextBox  Grid.Row="1" Grid.Column="0" x:Name="TB_RstRcvd"  Style="{StaticResource Cell}"/>
+                <TextBox  Grid.Row="1" Grid.Column="1" x:Name="TB_RstSent"  Style="{StaticResource Cell}"/>
+                <TextBox  Grid.Row="1" Grid.Column="2" x:Name="TB_Mode"     Style="{StaticResource Cell}" CharacterCasing="Upper"/>
+                <TextBox  Grid.Row="1" Grid.Column="3" x:Name="TB_Exchange" Style="{StaticResource Cell}"/>
+                <TextBox  Grid.Row="1" Grid.Column="4" x:Name="TB_Comment"  Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
+                <CheckBox Grid.Row="1" Grid.Column="5" x:Name="CB_ConfLotw"    Style="{StaticResource ConfBox}"/>
+                <CheckBox Grid.Row="1" Grid.Column="6" x:Name="CB_ConfQrz"     Style="{StaticResource ConfBox}"/>
+                <CheckBox Grid.Row="1" Grid.Column="7" x:Name="CB_ConfEqsl"    Style="{StaticResource ConfBox}"/>
+                <CheckBox Grid.Row="1" Grid.Column="8" x:Name="CB_ConfClublog" Style="{StaticResource ConfBox}"/>
+                <CheckBox Grid.Row="1" Grid.Column="9" x:Name="CB_ConfPaper"   Style="{StaticResource ConfBox}"/>
+            </Grid>
+
+            <!-- Save / Cancel -->
+            <Border CornerRadius="0,0,12,12" Background="#A9CCF0" Padding="14,10">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Button x:Name="BTN_Save" Content="Save" Width="96" FontSize="14" FontWeight="Bold"
+                            Padding="10,5" Margin="0,0,14,0" Click="Save_Click" IsDefault="True"/>
+                    <Button x:Name="BTN_Cancel" Content="Cancel" Width="96" FontSize="14"
+                            Padding="10,5" Click="Cancel_Click" IsCancel="True"/>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </Border>
+</Window>
