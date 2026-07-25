@@ -9,6 +9,9 @@
 # Editor/tool temp copies (e.g. MainWindow.xaml.cs.tmp.<pid>.<hash>)
 *.tmp.*
 
+# Local installer/build-output staging folder - never a source artifact
+_setup/
+
 [Dd]ata/
 
 # Build results
