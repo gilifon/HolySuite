@@ -36,6 +36,54 @@
 
         <!-- Theme control styles (Label/TextBox/Menu/DataGrid/Window, etc.) now live app-wide in
              Themes/Controls.xaml, merged in App.xaml, so every window is themed consistently. -->
+
+        <!-- The compact drop-down used by Mode and by Band. The whole box is the button, with a slim
+             chevron rather than the standard 17px arrow column: this row of the form has about 24px of
+             free space left in it altogether, and two standard arrows need 34. A 10px chevron on each
+             box fits, and without one there was nothing at rest to say these boxes open at all.
+             Shared by both boxes so the two can never drift into looking like different controls. -->
+        <ControlTemplate x:Key="FlatComboTemplate" TargetType="ComboBox">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                </Grid.ColumnDefinitions>
+                <ToggleButton Grid.ColumnSpan="2"
+                              IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                              BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}"
+                              Cursor="Hand">
+                    <ToggleButton.Template>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
+                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="bd" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
+                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </ToggleButton.Template>
+                </ToggleButton>
+                <ContentPresenter Grid.Column="0" Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0"/>
+                <!-- Drawn, not a glyph: a Path is the same crisp triangle in every font and at every DPI,
+                     and it takes the theme's text colour like the value beside it. Never takes the
+                     click - the ToggleButton underneath spans the whole box. -->
+                <Path Grid.Column="1" Data="M 0,0 L 8,0 L 4,4.5 Z" Fill="{TemplateBinding Foreground}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,2,0"
+                      IsHitTestVisible="False" SnapsToDevicePixels="True"/>
+                <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom">
+                    <Border BorderBrush="#0078D7" BorderThickness="1" Background="{DynamicResource MenuBg}" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{TemplateBinding ActualWidth}">
+                        <ScrollViewer>
+                            <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </ScrollViewer>
+                    </Border>
+                </Popup>
+            </Grid>
+        </ControlTemplate>
         <Style x:Key="RaisedActionButtonStyle" TargetType="Button">
             <Setter Property="Foreground" Value="#1E2A34"/>
             <Setter Property="FontWeight" Value="SemiBold"/>
@@ -718,13 +766,17 @@
                          only ever names ONE of the two states, so "off" left the operator guessing what
                          the program was actually doing. Both states are now spelled out.
                          RB_CatMode is greyed out by UpdateFreqModeRadios when CAT is unavailable, since
-                         the frequency cannot come from the radio then. -->
+                         the frequency cannot come from the radio then.
+                         Click, not Checked: with CAT unavailable the display already shows Manual, so a
+                         click on it is no transition and raises no Checked - which left the operator
+                         unable to actually CHOOSE Manual (and with it the frozen date/time and the band
+                         picker). Click fires on every press, checked or not. -->
                     <StackPanel Orientation="Vertical" VerticalAlignment="Center">
                         <RadioButton x:Name="RB_CatMode" GroupName="FreqMode" Content="CAT"
-                                     FontSize="12" Cursor="Hand" Checked="FreqMode_Checked"
+                                     FontSize="12" Cursor="Hand" Click="FreqMode_Click"
                                      ToolTip="The frequency is read from the radio over CAT"/>
                         <RadioButton x:Name="RB_ManualMode" GroupName="FreqMode" Content="Manual"
-                                     FontSize="12" Margin="0,2,0,0" Cursor="Hand" Checked="FreqMode_Checked"
+                                     FontSize="12" Margin="0,2,0,0" Cursor="Hand" Click="FreqMode_Click"
                                      ToolTip="You type the frequency yourself"/>
                     </StackPanel>
                 </StatusBarItem>
@@ -880,13 +932,14 @@
                              Background="White" Foreground="Black" CaretBrush="Black" BorderThickness="0"
                              TextAlignment="Right" MaxLength="11"
                              VerticalContentAlignment="Center"
-                             KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"/>
+                             KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"
+                             TextChanged="TB_FreqNoCat_TextChanged"/>
                 </Border>
             </Grid>
             <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"
                        VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
         </StackPanel>
-        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="572,54,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="580,54,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid Width="95">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -961,41 +1014,9 @@
             <Run Text="Square" />
         </TextBlock>
         <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="400,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="58" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyHolyland_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="5" TabIndex="4"/>
-        <Label Content="Mode" HorizontalAlignment="Left" Margin="478,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="530,56,0,0" Grid.Row="1" VerticalAlignment="Top" Width="40" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}">
-            <ComboBox.Template>
-                <ControlTemplate TargetType="ComboBox">
-                    <Grid>
-                        <ToggleButton IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
-                                      BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}"
-                                      Cursor="Hand">
-                            <ToggleButton.Template>
-                                <ControlTemplate TargetType="ToggleButton">
-                                    <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
-                                    <ControlTemplate.Triggers>
-                                        <Trigger Property="IsMouseOver" Value="True">
-                                            <Setter TargetName="bd" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
-                                            <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                        </Trigger>
-                                        <Trigger Property="IsChecked" Value="True">
-                                            <Setter TargetName="bd" Property="Background" Value="{DynamicResource ButtonHoverBg}"/>
-                                            <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
-                                        </Trigger>
-                                    </ControlTemplate.Triggers>
-                                </ControlTemplate>
-                            </ToggleButton.Template>
-                        </ToggleButton>
-                        <ContentPresenter Content="{TemplateBinding SelectionBoxItem}" ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}" IsHitTestVisible="False" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="2,0"/>
-                        <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom">
-                            <Border BorderBrush="#0078D7" BorderThickness="1" Background="{DynamicResource MenuBg}" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{TemplateBinding ActualWidth}">
-                                <ScrollViewer>
-                                    <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
-                                </ScrollViewer>
-                            </Border>
-                        </Popup>
-                    </Grid>
-                </ControlTemplate>
-            </ComboBox.Template>
+        <Label Content="Mode" HorizontalAlignment="Left" Margin="479,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="528,56,0,0" Grid.Row="1" VerticalAlignment="Top" Width="50" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
+                  Template="{StaticResource FlatComboTemplate}">
             <ComboBoxItem x:Name="op_cw" Content="CW"/>
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
             <ComboBoxItem x:Name="op_ssb" Content="SSB"/>
@@ -1009,7 +1030,11 @@
         <!-- Kept (hidden) as the data source: it still drives band calculation and is bound to
              Settings.Frequency. The new LED readout reads/writes this same value. -->
         <TextBox x:Name="TB_Frequency" Visibility="Collapsed" HorizontalAlignment="Left" Margin="216,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
-        <Label Content="Band" HorizontalAlignment="Left" Margin="383,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <!-- Band and Mode both moved a few pixels in this row to make room for the drop-down chevrons.
+             The strip from the kHz label to the map is packed: the free space was 6px here, 7px before
+             the Mode label, 2px before Spot and 10px before the map, and the two 10px chevrons plus the
+             10px each box grew to keep its text come out of exactly those. -->
+        <Label Content="Band" HorizontalAlignment="Left" Margin="377,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
@@ -1025,7 +1050,26 @@
         </Border>
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
 
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="427,56,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="48" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
+        <!-- Centred, like the drop-down that stands in for it, so the band does not jump sideways when
+             the box swaps between the two. -->
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="419,56,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextAlignment="Center" HorizontalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
+        <!-- The band is normally READ OUT of the frequency, and TB_Band above shows it. With no frequency
+             to read it out of (Manual mode, nothing typed) there is nothing to show, so the operator
+             picks it instead and this drop-down takes the box's place - same spot, same size, the same
+             compact control the Mode box next to it uses.
+             Two controls rather than one because TB_Band.Text is the program's answer to "what band are
+             we on" - the cluster filters, the dup check, the matrix and the logged QSO all read it. The
+             drop-down writes that box; nothing else has to know the band was chosen by hand.
+             15px rather than the read-out's 16: of the 58px, the chevron takes 10 and the border and
+             margins 5, leaving 43 for text - and the widest bands (70CM, 23CM) measure 43.7 at 16 bold
+             against 41.0 at 15. The read-out beside it has no chevron to pay for and stays at 16. -->
+        <ComboBox x:Name="CB_Band" HorizontalAlignment="Left" Margin="419,56,0,0" Grid.Row="1"
+                  VerticalAlignment="Top" Width="58" Height="28" FontSize="15" FontWeight="Bold"
+                  Visibility="Collapsed" IsTabStop="False"
+                  BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
+                  Template="{StaticResource FlatComboTemplate}"
+                  SelectionChanged="CB_Band_SelectionChanged" DropDownOpened="CB_Band_DropDownOpened"
+                  ToolTip="No frequency — choose the band this QSO was on"/>
         <TextBlock HorizontalAlignment="Left" Margin="12,96,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 

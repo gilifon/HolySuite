@@ -904,10 +904,17 @@ namespace HolyParser
                 if (parsedFreq >= 50 && parsedFreq <= 54) return "6M";
                 if (parsedFreq >= 70 && parsedFreq <= 71) return "4M";
                 if (parsedFreq >= 144 && parsedFreq <= 148) return "2M";
+                if (parsedFreq >= 222 && parsedFreq <= 225) return "1.25M";
                 if (parsedFreq >= 420 && parsedFreq <= 450) return "70CM";
+                if (parsedFreq >= 902 && parsedFreq <= 928) return "33CM";
             }
             else if (parsedFreq < 1000000)
             {
+                // 23cm read as MHz. It cannot go in the branch above (1296 is not under 1000) and it is
+                // not really kHz either - but 1240..1300 kHz is longwave broadcast, no amateur band, so
+                // the only reading of a number like 1296 that means anything here is megahertz. Exactly
+                // the same trick the 2400..2500 line below has always used for 13cm.
+                if (parsedFreq >= 1240 && parsedFreq <= 1300) return "23CM";
                 if (parsedFreq >= 1800 && parsedFreq <= 2000) return "160M";
                 if (parsedFreq >= 2400 && parsedFreq <= 2500) return "13CM";
                 if (parsedFreq >= 3500 && parsedFreq <= 4000) return "80M";
@@ -922,7 +929,9 @@ namespace HolyParser
                 if (parsedFreq >= 50000 && parsedFreq <= 54000) return "6M";
                 if (parsedFreq >= 70000 && parsedFreq <= 71000) return "4M";
                 if (parsedFreq >= 144000 && parsedFreq <= 148000) return "2M";
+                if (parsedFreq >= 222000 && parsedFreq <= 225000) return "1.25M";
                 if (parsedFreq >= 420000 && parsedFreq <= 450000) return "70CM";
+                if (parsedFreq >= 902000 && parsedFreq <= 928000) return "33CM";
 
                 if (parsedFreq >= 18000 && parsedFreq <= 20000) return "160M";
                 if (parsedFreq >= 24000 && parsedFreq <= 25000) return "13CM";
@@ -972,7 +981,9 @@ namespace HolyParser
                 if (parsedFreq >= 50000000 && parsedFreq <= 54000000) return "6M";
                 if (parsedFreq >= 70000000 && parsedFreq <= 71000000) return "4M";
                 if (parsedFreq >= 144000000 && parsedFreq <= 148000000) return "2M";
+                if (parsedFreq >= 222000000 && parsedFreq <= 225000000) return "1.25M";
                 if (parsedFreq >= 420000000 && parsedFreq <= 450000000) return "70CM";
+                if (parsedFreq >= 902000000 && parsedFreq <= 928000000) return "33CM";
             }
             if (parsedFreq < 100000000) //n1mm
             {
@@ -995,14 +1006,85 @@ namespace HolyParser
             return string.Empty;
         }
 
+        // Every band the program works, in the order an operator thinks of them: longest wavelength
+        // first, HF then VHF/UHF/microwave. This is the vocabulary offered wherever a band is CHOSEN
+        // rather than derived from a frequency - the Bad-QSO editor, and the main window's Band box
+        // when there is no frequency to derive it from - so the two cannot offer different bands.
+        public static readonly string[] KnownBands =
+            { "160M", "80M", "60M", "40M", "30M", "20M", "17M", "15M", "12M", "10M",
+              "6M", "4M", "2M", "1.25M", "70CM", "33CM", "23CM", "13CM" };
+
         // A representative frequency for a band, in MHz.
         //
         // These used to be returned in kHz ("14200" for 20M) while the rest of the program - the CAT
         // and cluster setters, TB_Frequency, convertFreqToBand - all speak MHz. Since this fills in
         // QSO.Freq whenever a QSO has a band but no frequency, every such QSO was stored a thousand
         // times too high, and was then written into ADIF uploads as if it were MHz.
+        // Where the operators are on each band, per mode: {CW/data, phone}. An empty phone entry means
+        // the band has no phone segment at all (30m is CW and data only), and the CW figure is used.
+        //
+        // These are the frequencies a QSO logged by band+mode alone is credited to. They are an
+        // estimate of where the contact was, never a measurement - see BandModeToFreq.
+        private static readonly Dictionary<string, string[]> BandSpotFreqs =
+            new Dictionary<string, string[]>(StringComparer.OrdinalIgnoreCase)
+        {
+            { "160M",  new[] { "1.81",     "1.85"     } },
+            { "80M",   new[] { "3.55",     "3.75"     } },
+            { "60M",   new[] { "5.332",    "5.3585"   } },
+            { "40M",   new[] { "7.03",     "7.185"    } },
+            { "30M",   new[] { "10.116",   ""         } },   // no phone on 30m
+            { "20M",   new[] { "14.035",   "14.225"   } },
+            { "17M",   new[] { "18.08",    "18.13"    } },
+            { "15M",   new[] { "21.035",   "21.275"   } },
+            { "12M",   new[] { "24.905",   "24.95"    } },
+            { "10M",   new[] { "28.035",   "28.385"   } },
+            { "6M",    new[] { "50.09",    "50.125"   } },
+            { "2M",    new[] { "144.05",   "144.2"    } },
+            { "1.25M", new[] { "222.05",   "222.1"    } },
+            { "70CM",  new[] { "432.05",   "432.1"    } },
+            { "33CM",  new[] { "902.05",   "902.1"    } },
+            { "23CM",  new[] { "1296.05",  "1296.1"   } },
+        };
+
+        // The modes worked in the phone part of a band. Everything else - CW, and every digital mode -
+        // sits in the CW/data segment, so it takes the CW figure. That is an approximation for digital
+        // (FT8 on 20m is 14.074, not 14.035) but it puts the QSO in the right segment of the right band,
+        // which is what a frequency guessed from a band can honestly claim.
+        private static bool IsPhoneMode(string mode)
+        {
+            if (string.IsNullOrWhiteSpace(mode)) return false;
+            switch (mode.Trim().ToUpperInvariant())
+            {
+                case "SSB": case "USB": case "LSB": case "FM": case "AM": case "PH": case "PHONE":
+                    return true;
+                default:
+                    return false;
+            }
+        }
+
+        // A frequency to stand in for a QSO that has a band and a mode but no frequency of its own.
+        // Falls back to the band's single representative frequency for bands with no per-mode figure
+        // (4m and 13cm), and to nothing at all for a band it does not know.
+        public static string BandModeToFreq(string band, string mode)
+        {
+            if (string.IsNullOrWhiteSpace(band)) return string.Empty;
+
+            string[] pair;
+            if (!BandSpotFreqs.TryGetValue(band.Trim(), out pair))
+                return convertBandToFreq(band);
+
+            bool phone = IsPhoneMode(mode);
+            string wanted = phone ? pair[1] : pair[0];
+            return !string.IsNullOrEmpty(wanted) ? wanted : (phone ? pair[0] : pair[1]);
+        }
+
+        // On VHF and up these are the band's CALLING frequency, where the operators actually are, rather
+        // than a round number near the edge: 2m gave 145 (the FM repeater segment) and 70cm gave 433,
+        // when a QSO logged by band alone is far more likely to have been an SSB/CW contact around
+        // 144.200 / 432.100. HF is left as it always was.
         public static string convertBandToFreq(string band)
         {
+            if (band == null) return string.Empty;
 
             if (band.ToLower() == "160m") return "1.8";
             if (band.ToLower() == "80m") return "3.6";
@@ -1014,10 +1096,16 @@ namespace HolyParser
             if (band.ToLower() == "15m") return "21.3";
             if (band.ToLower() == "12m") return "24.9";
             if (band.ToLower() == "10m") return "28.4";
-            if (band.ToLower() == "6m") return "50";
-            if (band.ToLower() == "7m") return "70";
-            if (band.ToLower() == "2m") return "145";
-            if (band.ToLower() == "70cm") return "433";
+            if (band.ToLower() == "6m") return "50.11";      // DX calling (50.125 is the USA one)
+            // Was "7m" - a band that does not exist and that nothing could ever ask for, so 4m QSOs
+            // logged by band alone came back with no frequency at all.
+            if (band.ToLower() == "4m") return "70.2";
+            if (band.ToLower() == "2m") return "144.2";
+            if (band.ToLower() == "1.25m") return "222.1";
+            if (band.ToLower() == "70cm") return "432.1";
+            if (band.ToLower() == "33cm") return "902.1";
+            if (band.ToLower() == "23cm") return "1296.1";
+            if (band.ToLower() == "13cm") return "2400";     // no calling frequency given for 13cm
             return string.Empty;
         }
 
@@ -1036,10 +1124,20 @@ namespace HolyParser
             if (!double.TryParse(freq.Trim(), NumberStyles.Float, CultureInfo.InvariantCulture, out mhz))
                 return null;
             if (mhz <= 0) return null;
-            if (mhz >= 1000) mhz /= 1000.0;     // kHz -> MHz
-            if (mhz >= 1000) return null;       // Hz, or nonsense - do not guess
+            if (mhz >= 1000 && !IsMicrowaveMhz(mhz)) mhz /= 1000.0;     // kHz -> MHz
+            if (mhz >= 1000 && !IsMicrowaveMhz(mhz)) return null;       // Hz, or nonsense - do not guess
 
             return mhz.ToString("0.######", CultureInfo.InvariantCulture);
+        }
+
+        // "1000 or more means kHz" holds right up to 23cm, where the MHz figure is itself four digits:
+        // 1296.1 MHz is a real frequency on a real band, and dividing it put the QSO on 1.2961 MHz -
+        // longwave, where no amateur has ever worked anybody. Only these two windows are exempt, so a
+        // stray "14200" from an import is still read as 14.2 MHz exactly as before.
+        private static bool IsMicrowaveMhz(double mhz)
+        {
+            return (mhz >= 1240 && mhz <= 1300)      // 23cm
+                || (mhz >= 2300 && mhz <= 2500);     // 13cm
         }
 
         public static bool IsIsraeliStation(string callsign)

@@ -1493,6 +1493,33 @@ namespace HolyLogger
             e.Handled = true;
         }
 
+        // The band to store with a QSO. Read out of the frequency as it always was; only when there is
+        // no frequency to read does the band the operator picked stand in for it. Written this way round
+        // so that with a frequency present the answer is byte-for-byte the one this used to give.
+        private string BandForLog()
+        {
+            // Only when there really is a frequency - a stale stored one behind an emptied box must not
+            // decide the band of the QSO being logged.
+            if (!FrequencyIsEmpty)
+            {
+                string fromFreq = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
+                if (!string.IsNullOrWhiteSpace(fromFreq)) return fromFreq;
+            }
+            return (TB_Band.Text ?? string.Empty).Trim();
+        }
+
+        // The frequency to store. What was typed, or - for a QSO logged by band alone - that band's
+        // calling frequency, which is where such a contact almost certainly was. It is an estimate, not
+        // a reading, but a QSO with no frequency at all is worse: the log grid, the map and every
+        // confirmation service that matches on frequency have nothing to work with.
+        private string FreqForLog(string band)
+        {
+            string typed = FrequencyIsEmpty ? string.Empty : (TB_Frequency.Text ?? string.Empty).Trim();
+            if (typed.Length > 0) return typed;
+            if (string.IsNullOrWhiteSpace(band)) return string.Empty;
+            return HolyLogParser.BandModeToFreq(band, CB_Mode != null ? CB_Mode.Text : null);
+        }
+
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
             if (!Validate()) return;
@@ -1511,8 +1538,8 @@ namespace HolyLogger
                 qso.DXCall = TB_DXCallsign.Text;
                 qso.Mode = CB_Mode.Text;
                 qso.SRX = TB_Exchange.Text;
-                qso.Freq = TB_Frequency.Text;
-                qso.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
+                qso.Band = BandForLog();
+                qso.Freq = FreqForLog(qso.Band);
                 qso.Country = Country;
                 qso.Continent = Continent;
                 qso.CQZone = TB_CQZone.Text;
@@ -1611,8 +1638,8 @@ namespace HolyLogger
                 QsoToUpdate.DXCall = TB_DXCallsign.Text;
                 QsoToUpdate.Mode = CB_Mode.Text;
                 QsoToUpdate.SRX = TB_Exchange.Text;
-                QsoToUpdate.Freq = TB_Frequency.Text;
-                QsoToUpdate.Band = HolyLogParser.convertFreqToBand(TB_Frequency.Text);
+                QsoToUpdate.Band = BandForLog();
+                QsoToUpdate.Freq = FreqForLog(QsoToUpdate.Band);
                 QsoToUpdate.Country = Country;
                 QsoToUpdate.Continent = Continent;
                 QsoToUpdate.CQZone = TB_CQZone.Text;
@@ -4542,6 +4569,9 @@ namespace HolyLogger
             state = newState;
             UpdateAddBtnLabel();
             UpdateEditModeBackground();
+            // Editing an existing QSO means the radio is no longer setting the mode, so the combo has to
+            // be the operator's for as long as the edit lasts - and locked again the moment it ends.
+            UpdateModeComboLock();
         }
 
         private void UpdateAddBtnLabel()
@@ -4628,7 +4658,10 @@ namespace HolyLogger
                 //}
 
 
-                if (string.IsNullOrWhiteSpace(TB_Frequency.Text))
+                // A QSO needs to say where on the dial it happened - but a band on its own says that too,
+                // and ADIF has always allowed BAND without FREQ. So a band picked by hand (Manual mode,
+                // no frequency) is enough; without either, the frequency box is still what is missing.
+                if (FrequencyIsEmpty && string.IsNullOrWhiteSpace(TB_Band.Text))
                 {
                     allOK = false;
                     TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
@@ -4721,13 +4754,23 @@ namespace HolyLogger
 
         // Clicking "Manual" or "CAT" in the status bar. Routed through the same path as the menu item so
         // there is one owner of the state.
-        private void FreqMode_Checked(object sender, RoutedEventArgs e)
+        //
+        // Compared against the SETTING, not against what the radios show. The two differ whenever CAT is
+        // unavailable: the display then reads Manual (the frequency is typed, whatever the setting says)
+        // while the setting is still CAT. Comparing against the display made the click a no-op there, so
+        // a station with no CAT interface could never actually choose Manual - and therefore never got
+        // the date/time it sets itself, or the band picker.
+        private void FreqMode_Click(object sender, RoutedEventArgs e)
         {
             if (_settingFreqModeRadios) return;
             bool wantManual = sender == RB_ManualMode;
-            // Compare against what is SHOWN, not the raw setting: with no CAT the display already reads
-            // Manual, so clicking Manual there must not flip the setting behind the scenes.
-            if (wantManual == IsFrequencyTyped) return;
+            if (wantManual == Properties.Settings.Default.isManualMode)
+            {
+                // Already in that state. The click may still have moved the dot away from where the
+                // display belongs (clicking CAT while it is only shown as Manual), so put it back.
+                UpdateFreqModeRadios();
+                return;
+            }
             ToggleManualMode();
         }
 
@@ -4761,12 +4804,33 @@ namespace HolyLogger
                 RB_ManualMode.IsChecked = typed;
                 RB_CatMode.IsChecked = !typed;
 
-                RB_CatMode.IsEnabled = catAvailable;
+                bool chosenManual = Properties.Settings.Default.isManualMode;
+
+                // CAT stays clickable while Manual was CHOSEN even if no radio is connected - otherwise
+                // there would be no way back out of Manual on a station without CAT. It is only greyed
+                // when it is both unavailable and not something the operator is currently in.
+                RB_CatMode.IsEnabled = catAvailable || chosenManual;
                 RB_CatMode.Opacity = catAvailable ? 1.0 : 0.5;
                 RB_CatMode.ToolTip = catAvailable
                     ? "The frequency is read from the radio over CAT"
-                    : "CAT is not connected, so the frequency cannot be read from the radio. "
-                      + "Enable it in Options > General and put the radio online.";
+                    : chosenManual
+                        ? "Leave Manual. CAT is not connected, so the frequency is still typed - but the "
+                          + "date and time go back to following UTC by themselves."
+                        : "CAT is not connected, so the frequency cannot be read from the radio. "
+                          + "Enable it in Options > General and put the radio online.";
+
+                // Manual is shown for two different reasons - because it was chosen, or because there is
+                // no CAT to read from - and they behave differently (a chosen Manual freezes the date and
+                // time and lets you pick the band). Bold says which one this is.
+                RB_ManualMode.FontWeight = chosenManual ? FontWeights.Bold : FontWeights.Normal;
+                RB_ManualMode.ToolTip = chosenManual
+                    ? "Manual: you type the frequency, and the date and time stay exactly as you set them "
+                      + "until you change them yourself."
+                    : catAvailable
+                        ? "You type the frequency yourself. The date and time also stop following UTC, so "
+                          + "you can log a QSO that happened earlier."
+                        : "CAT is not connected, so the frequency is typed anyway. Click to also hold the "
+                          + "date and time at what you set, and pick the band yourself.";
             }
             finally { _settingFreqModeRadios = false; }
         }
@@ -4790,6 +4854,18 @@ namespace HolyLogger
             // Swap the lit LED for the no-CAT typing box (and back). ShowRigParams returns early once
             // the rig is online, so it does not do this for us when CAT is connected.
             UpdateFreqLed();
+
+            // The Band box becomes a drop-down in Manual with no frequency, and goes back to being a
+            // read-out of the frequency the moment CAT is chosen.
+            UpdateBandPickAvailability();
+
+            // Back to CAT: the date and time follow UTC again. Do it here rather than waiting for the
+            // next tick of the UTC timer, so the change is visible the instant the button is clicked.
+            if (!Properties.Settings.Default.isManualMode && state == State.New)
+            {
+                TP_Date.Value = DateTime.UtcNow;
+                TP_Time.Value = DateTime.UtcNow;
+            }
         }
 
         private void ResetRecentQSOCounterMenuItem_Click(object sender, RoutedEventArgs e)
@@ -5342,6 +5418,13 @@ namespace HolyLogger
 
             UpdateClusterFrequencyHighlight();
             UpdateFrequencyDisplay();
+
+            // A frequency arriving or going away is what decides whether the band is read out or picked.
+            // AFTER UpdateFrequencyDisplay, never before: that is what copies the new frequency into the
+            // visible no-CAT box, and the visible box is what "is there a frequency" now reads. Asked
+            // first, it still saw the empty box a moment earlier and left the picker up over a frequency
+            // that had just been filled in.
+            UpdateBandPickAvailability();
         }
 
         private void TB_Frequency_GotFocus(object sender, RoutedEventArgs e)
@@ -5489,11 +5572,19 @@ namespace HolyLogger
         private void CommitFreqNoCat()
         {
             string txt = (TB_FreqNoCat?.Text ?? string.Empty).Trim();
+            if (txt.Length == 0)
+            {
+                // Emptying the box is an answer, not a mistake: it says there is no frequency for this
+                // QSO, which is how the Band box becomes a picker. Anything else that will not parse is
+                // still ignored - a half-typed number must not wipe a good frequency.
+                SetWorkingFrequency(string.Empty);
+                return;
+            }
             if (double.TryParse(txt, System.Globalization.NumberStyles.Float,
                                  System.Globalization.CultureInfo.InvariantCulture, out double kHz) && kHz > 0)
             {
                 double mhz = kHz / 1000.0;
-                TB_Frequency.Text = mhz.ToString("0.0#####", System.Globalization.CultureInfo.InvariantCulture);
+                SetWorkingFrequency(mhz.ToString("0.0#####", System.Globalization.CultureInfo.InvariantCulture));
                 long hz = (long)Math.Round(mhz * 1000000.0);
                 TB_FreqNoCat.Text = (hz / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture)
                                     + "." + (hz % 1000).ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
@@ -5509,6 +5600,37 @@ namespace HolyLogger
         private void TB_FreqNoCat_LostFocus(object sender, RoutedEventArgs e)
         {
             CommitFreqNoCat();
+        }
+
+        // Clearing the box counts the moment the last character goes, without waiting for Enter or for
+        // the focus to leave. An empty frequency is what turns the Band box into its drop-down, and
+        // there is nothing to press Enter ON when the box is empty - so the operator deleted the
+        // frequency and the form went on showing a band it no longer had any basis for.
+        //
+        // Only the empty case. A part-typed number is still left for CommitFreqNoCat: "14" on its way to
+        // "14200" would otherwise be taken as 14 kHz and drag the band along on every keystroke.
+        private void TB_FreqNoCat_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            if (TB_FreqNoCat == null || TB_Frequency == null) return;
+
+            if ((TB_FreqNoCat.Text ?? string.Empty).Trim().Length == 0)
+            {
+                if ((TB_Frequency.Text ?? string.Empty).Length != 0)
+                    SetWorkingFrequency(string.Empty);
+
+                // The band was READ OUT of the frequency that has just been deleted, so it goes with it -
+                // cleared here directly rather than left to the stored frequency's own change event. A
+                // band left behind is not just stale: the picker then opens with that band already
+                // selected, and choosing it again is no change at all, so the list closes having done
+                // nothing at all.
+                if (!string.IsNullOrEmpty(TB_Band.Text))
+                    TB_Band.Text = string.Empty;
+            }
+
+            // Every keystroke in this box, in both directions: it is the box that decides whether Band is
+            // a read-out or a picker, and relying on the stored frequency's own change event to carry the
+            // news left the two out of step.
+            UpdateBandPickAvailability();
         }
 
         // Click the LED to edit. Show an inline TextBox pre-filled with the current kHz value.
@@ -8221,6 +8343,164 @@ namespace HolyLogger
             }
 
             UpdateBandTextBoxColor();
+            UpdateBandPickAvailability();   // the chevron only shows while the box is still empty
+        }
+
+        // ---------- Band picker: Manual mode with no frequency -----------------------------------
+        //
+        // The Band box is a read-out - it is filled from the frequency and from nothing else. That
+        // leaves nowhere to say which band a QSO was on when there IS no frequency, which is exactly
+        // the case once the operator has chosen Manual and not typed one (logging from paper, or from a
+        // radio the program cannot read). Then, and only then, the box becomes a drop-down of every
+        // band the program works.
+        //
+        // TB_Band.Text stays the one answer to "what band are we on": the cluster filters, the duplicate
+        // check, the matrix and the logged QSO all read it, so picking from the list just writes it and
+        // every one of them follows without needing to know where the band came from.
+        // The working frequency, in MHz. Writes BOTH ends, and everything that changes the frequency
+        // outside the radio must go through here.
+        //
+        // TB_Frequency is a permanently collapsed box whose Text is bound TwoWay to Settings.Frequency
+        // with the TextBox default UpdateSourceTrigger of LostFocus - and a collapsed box never gets
+        // focus, so the setting never catches up on its own and a refresh of that binding puts the old
+        // value straight back. Clearing the box alone therefore did not stick: the frequency reappeared
+        // while the band, an ordinary unbound box, stayed cleared. The rig path (MainWindow.Rig.cs) has
+        // always set both for the same reason.
+        private void SetWorkingFrequency(string mhz)
+        {
+            string value = mhz ?? string.Empty;
+            if (TB_Frequency == null) return;
+
+            Properties.Settings.Default.Frequency = value;
+            TB_Frequency.Text = value;
+        }
+
+        // "There is no frequency" - answered from the box the operator can SEE, whenever that box is the
+        // one on screen.
+        //
+        // TB_Frequency is the stored value, and in the no-CAT box it only catches up when an entry is
+        // committed - Enter, or the focus leaving. Asking it alone meant a frequency that had visibly
+        // been deleted still counted as present, and the Band box went on showing a band derived from
+        // it. What the operator is looking at decides.
+        private bool FrequencyIsEmpty
+        {
+            get
+            {
+                if (FreqNoCatBezel != null && FreqNoCatBezel.Visibility == Visibility.Visible
+                    && TB_FreqNoCat != null)
+                    return (TB_FreqNoCat.Text ?? string.Empty).Trim().Length == 0;
+
+                return TB_Frequency == null || string.IsNullOrWhiteSpace(TB_Frequency.Text);
+            }
+        }
+
+        private bool BandPickAvailable =>
+            Properties.Settings.Default.isManualMode && FrequencyIsEmpty;
+
+        // Guard so filling the list, or following TB_Band, is not mistaken for the operator picking.
+        private bool _settingBandPick;
+
+        // Swaps the read-out box for the drop-down and back. Called wherever either half of the
+        // condition can change - the frequency arriving or going away, and Manual/CAT - so the swap
+        // happens the moment it becomes true, with no click needed to discover it.
+        private void UpdateBandPickAvailability()
+        {
+            if (TB_Band == null || CB_Band == null) return;
+
+            bool pickable = BandPickAvailable;
+
+            if (pickable && CB_Band.Items.Count == 0)
+                foreach (string b in HolyLogParser.KnownBands) CB_Band.Items.Add(b);
+
+            // Whichever one is showing must show the same band, so switching between them never loses it.
+            // SelectedIndex = -1 for "no band": setting SelectedItem to a string that is not in the list
+            // leaves the old selection sitting there to be re-announced later.
+            _settingBandPick = true;
+            try
+            {
+                string current = (TB_Band.Text ?? string.Empty).Trim();
+                if (current.Length == 0) CB_Band.SelectedIndex = -1;
+                else CB_Band.SelectedItem = current;
+            }
+            finally { _settingBandPick = false; }
+
+            // Shut the list BEFORE hiding the box it hangs off: picking a band fills the frequency, and
+            // that swaps this control away while its own selection is still being handled.
+            if (!pickable) CB_Band.IsDropDownOpen = false;
+            CB_Band.Visibility = pickable ? Visibility.Visible : Visibility.Collapsed;
+            TB_Band.Visibility = pickable ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        // A band chosen from the list. Writing TB_Band.Text is most of the job: everything downstream
+        // watches that box, exactly as it does when the frequency fills it in.
+        // The operator opened the list. This - not a flag around the assignments - is what makes a
+        // selection "theirs".
+        //
+        // Keeping the box's selection in step with the band is done while the box is COLLAPSED, and a
+        // collapsed ComboBox has generated no item containers, so WPF cannot apply the selection yet and
+        // defers the event. It arrives tens of milliseconds later, once the box is shown, long after any
+        // flag around the assignment has been reset - carrying the band that was selected BEFORE. Read
+        // as a choice, it re-filled the frequency the operator had just deleted, which put the band back
+        // too. It only failed on the first try because the stale selection is then spent.
+        private bool _bandDropDownWasOpened;
+
+        private void CB_Band_DropDownOpened(object sender, EventArgs e)
+        {
+            _bandDropDownWasOpened = true;
+        }
+
+        private void CB_Band_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_settingBandPick) return;
+            if (!_bandDropDownWasOpened) return;   // not a choice: a deferred event from a past selection
+            _bandDropDownWasOpened = false;
+
+            string band = CB_Band.SelectedItem as string;
+            if (string.IsNullOrWhiteSpace(band)) return;
+
+            TB_Band.Text = band;
+            // force: choosing a band from this list IS the operator saying where the QSO was, so the
+            // frequency follows it even if one is already showing. Without that, picking a second band
+            // left the form claiming 10M at 18080 kHz - a frequency on 17m.
+            AutoFillFreqFromBandMode(null, force: true);
+        }
+
+        // Band and mode together say roughly where on the dial a QSO was, and that is worth more in the
+        // log than an empty frequency. Fills the frequency box from the two of them - but ONLY while it
+        // is empty. A frequency that is already there was either typed or read from the radio, and
+        // neither may be overwritten by a guess.
+        //
+        // modeOverride is for the mode combo's own SelectionChanged, where CB_Mode.Text still holds the
+        // PREVIOUS mode (it is data-bound and lags one event).
+        //
+        // force is for a band picked by hand: that is a statement about where the QSO was, so the
+        // frequency has to match it whether or not one is already showing. A mode change never forces -
+        // changing mode with a frequency in the box leaves that frequency alone.
+        private void AutoFillFreqFromBandMode(string modeOverride, bool force = false)
+        {
+            if (TB_Frequency == null || TB_Band == null) return;
+            if (!force && !FrequencyIsEmpty) return;
+
+            string band = (TB_Band.Text ?? string.Empty).Trim();
+            if (band.Length == 0) return;
+
+            string mode = !string.IsNullOrWhiteSpace(modeOverride)
+                ? modeOverride
+                : (CB_Mode != null ? CB_Mode.Text : null);
+
+            string freq = HolyLogParser.BandModeToFreq(band, mode);
+            if (string.IsNullOrWhiteSpace(freq)) return;
+
+            SetWorkingFrequency(freq);   // TextChanged re-derives the band from it, and lands on the same one
+
+            // And show it in the box the operator is looking at. UpdateFreqLed refuses to touch that box
+            // while it has keyboard focus - rightly, since it will not fight someone typing in it - but
+            // the caret is still sitting there right after they deleted the old frequency, so the value
+            // went into the stored frequency and never appeared on screen. This one did not come from
+            // typing: it came from the band they just picked, so it has to be shown.
+            if (TB_FreqNoCat != null && FreqNoCatBezel != null
+                && FreqNoCatBezel.Visibility == Visibility.Visible)
+                FillFreqNoCatFromFrequency();
         }
 
         private void UpdateBandTextBoxColor()
@@ -8229,17 +8509,25 @@ namespace HolyLogger
             string band = TB_Band.Text;
             if (string.IsNullOrWhiteSpace(band))
             {
-                TB_Band.Foreground = SystemColors.ControlTextBrush;
+                SetBandBoxForeground(SystemColors.ControlTextBrush);
                 return;
             }
             try
             {
-                TB_Band.Foreground = GetBandBrush(band);
+                SetBandBoxForeground(GetBandBrush(band));
             }
             catch
             {
-                TB_Band.Foreground = SystemColors.ControlTextBrush;
+                SetBandBoxForeground(SystemColors.ControlTextBrush);
             }
+        }
+
+        // Both halves of the Band box - the read-out and the drop-down that stands in for it - carry the
+        // band's own colour, so which one is showing makes no difference to what the operator sees.
+        private void SetBandBoxForeground(System.Windows.Media.Brush brush)
+        {
+            TB_Band.Foreground = brush;
+            if (CB_Band != null) CB_Band.Foreground = brush;
         }
 
         private void TB_DX_Name_TextChanged(object sender, TextChangedEventArgs e)
@@ -8505,6 +8793,10 @@ namespace HolyLogger
                 // Refresh the Msg buttons so they switch to/from the CW look immediately on a mode
                 // change (matters when the radio is off, where the mode comes from this dropdown).
                 UpdateMessageButtonLabels();
+                // CW and phone live in different parts of a band, so the mode is half of the answer to
+                // "which frequency". Only ever fills an EMPTY box - changing mode with a frequency
+                // already in it leaves that frequency exactly where it is.
+                AutoFillFreqFromBandMode(val);
             }
             catch (Exception ex)
             {

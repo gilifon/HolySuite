@@ -1218,11 +1218,12 @@ namespace HolyLogger
 
         // Choices offered by the Band and Mode cell dropdowns. Deliberately the SAME lists the
         // Bad-QSO editor uses, so the two places that repair a QSO cannot offer different vocabularies.
-        public static readonly string[] KnownBands =
-        {
-            "160M", "80M", "60M", "40M", "30M", "20M", "17M",
-            "15M", "12M", "10M", "6M", "2M", "70CM", "13CM"
-        };
+        //
+        // The bands now come from the one list in HolyParser rather than a copy of it. The copy had
+        // quietly fallen behind - no 4M, no 23CM - and a QSO on a band this list did not know left the
+        // cell's dropdown with nothing selected. Kept under this name because the grid's editing
+        // template binds to it by x:Static.
+        public static readonly string[] KnownBands = HolyLogParser.KnownBands;
 
         public static readonly string[] KnownModes =
         {

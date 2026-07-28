@@ -504,6 +504,32 @@ namespace HolyLogger
             }), DispatcherPriority.Background);
         }
 
+        // The Mode combo is frozen while the radio is driving it, and only then — otherwise the operator
+        // must be able to set the mode by hand.
+        //
+        // The three conditions below are exactly the ones ShowRigParams itself checks before it writes
+        // CB_Mode.Text: online, not Manual, not editing an existing QSO. It used to lock on "online"
+        // alone, which froze the box in the two cases where the rig is online but deliberately ignored -
+        // a QSO typed in Manual mode, and a QSO being edited - so neither the radio nor the operator was
+        // setting the mode and it simply could not be changed.
+        //
+        // Called from ShowRigParams (rig events, Manual/CAT switches) and from UpdateState (entering and
+        // leaving edit), so it never waits for the next rig poll to catch up.
+        private void UpdateModeComboLock()
+        {
+            if (CB_Mode == null) return;
+
+            bool rigOnline = OmniRigEngine != null && Rig != null
+                             && Rig.Status == OmniRig.RigStatusX.ST_ONLINE
+                             && Properties.Settings.Default.EnableOmniRigCAT;
+
+            bool rigDrivesMode = rigOnline
+                                 && !Properties.Settings.Default.isManualMode
+                                 && state != State.Edit;
+
+            CB_Mode.IsHitTestVisible = !rigDrivesMode;
+        }
+
         private void ShowRigParams()
         {
             ShowRigStatus();
@@ -512,9 +538,7 @@ namespace HolyLogger
                              && Rig.Status == OmniRig.RigStatusX.ST_ONLINE
                              && Properties.Settings.Default.EnableOmniRigCAT;
 
-            // When the radio is online it controls the mode — block user interaction with the combo.
-            // When offline the operator must be able to pick the mode manually.
-            if (CB_Mode != null) CB_Mode.IsHitTestVisible = !rigOnline;
+            UpdateModeComboLock();
 
             if (!rigOnline)
             {

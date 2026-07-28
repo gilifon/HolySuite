@@ -24,8 +24,9 @@ namespace HolyLogger
         private static readonly QsoDateDisplayConverter _dateConv = new QsoDateDisplayConverter();  // yyyyMMdd <-> dd-MM-yyyy
         private static readonly QsoTimeEditConverter _timeConv = new QsoTimeEditConverter();        // HHmmss  <-> HH:mm:ss
         private static readonly CultureInfo _ci = CultureInfo.InvariantCulture;
-        private static readonly string[] _bands =
-            { "160M", "80M", "60M", "40M", "30M", "20M", "17M", "15M", "12M", "10M", "6M", "4M", "2M", "70CM", "23CM", "13CM" };
+        // The one list of bands the program works (HolyParser), shared with the main window's Band
+        // picker so a band offered in one place is offered in the other.
+        private static readonly string[] _bands = HolyLogParser.KnownBands;
 
         public QsoEditWindow(QSO qso, Rect avoidScreenRect = default(Rect))
         {
