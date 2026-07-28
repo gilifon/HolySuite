@@ -101,6 +101,11 @@ namespace HolyLogger
             { "RowLotwBg",        new[] { "#FFF176", "#4A4416", "#4A4416" } }, // cluster: LoTW user spot (yellow)
             { "FilterRowBg",      new[] { "#C8F0D0", "#1E4030", "#1E4030" } }, // QSO grid: filtered-match row
             { "FilterRowAltBg",   new[] { "#A8D8B4", "#183328", "#183328" } }, // QSO grid: filtered-match alt row
+            // The same pale blue a selected row has always had in the Log Workshop, so a ticked row looks
+            // exactly like a selected one - and every ticked row looks that way at once. Identical in all
+            // three schemes because the Workshop's selection blue is itself fixed (a ticked row keeps dark
+            // text on it, which only works over a light background).
+            { "RowPickedBg",      new[] { "#CFE8FF", "#CFE8FF", "#CFE8FF" } }, // Log Workshop: row ticked in the selection column
             { "WorkedElsewhereBg",    new[] { "#CFE3FF", "#183048", "#183048" } }, // QSO grid: same call found in the copy-target log (reference only)
             { "WorkedElsewhereAltBg", new[] { "#B3D2F5", "#12263A", "#12263A" } }, // QSO grid: same-call target-log alt row
 
@@ -140,6 +145,7 @@ namespace HolyLogger
             new TokenInfo("SelectionBg",      "Tables", "Selected item",              "Background of the selected row, cell or menu item."),
             new TokenInfo("FilterRowBg",      "Tables", "Filter match rows",          "Log rows that match the active callsign filter."),
             new TokenInfo("FilterRowAltBg",   "Tables", "Filter match rows (alt.)",   "Every second filter-match row."),
+            new TokenInfo("RowPickedBg",      "Tables", "Ticked rows (Log Workshop)", "Log Workshop rows you have ticked with the selection checkbox. All of them are highlighted, not only the last one clicked."),
             new TokenInfo("WorkedElsewhereBg",    "Tables", "Worked-before (target log)",       "Same-callsign QSOs found in the copy-target log, shown for reference."),
             new TokenInfo("WorkedElsewhereAltBg", "Tables", "Worked-before (target log, alt.)", "Every second reference row from the copy-target log."),
             new TokenInfo("RowHoverBg",       "Tables", "Cluster: map-hovered spot",  "Cluster row highlighted while hovering its dot on the map."),

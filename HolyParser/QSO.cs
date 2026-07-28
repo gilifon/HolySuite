@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -8,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace HolyParser
 {
-    public class QSO : IEquatable<QSO>
+    public class QSO : IEquatable<QSO>, INotifyPropertyChanged
     {
         [JsonProperty("id")]
         public int id { get; set; }
@@ -206,6 +207,29 @@ namespace HolyParser
         // Name of the log this QSO belongs to. Display-only: filled in by the upload-queue queries so the
         // (global) queue window can show which log each pending/dismissed QSO came from. Not persisted.
         public string LogName { get; set; }
+
+        // TICKED IN THE LOG WORKSHOP'S SELECTION COLUMN. A screen state only: never saved, never exported
+        // and never sent to the contest server, hence [JsonIgnore] exactly like PaperQslConfirmed.
+        //
+        // It lives on the QSO rather than in the window because a DataGrid recycles row containers as you
+        // scroll: state kept on the row would move to whatever QSO that container is reused for, so a tick
+        // made at the top of the log would reappear on an unrelated row further down.
+        [JsonIgnore]
+        public bool IsPicked
+        {
+            get => _isPicked;
+            set
+            {
+                if (_isPicked == value) return;
+                _isPicked = value;
+                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsPicked)));
+            }
+        }
+        private bool _isPicked;
+
+        // Raised for IsPicked and nothing else. The rest of a QSO's fields are re-read when the grid
+        // rebuilds a row, but a ticked row has to change colour the instant the box is clicked.
+        public event PropertyChangedEventHandler PropertyChanged;
 
         public QSO()
         {

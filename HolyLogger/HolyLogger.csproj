@@ -288,6 +288,7 @@
     <Compile Include="Helper.cs" />
     <Compile Include="Log.cs" />
     <Compile Include="ConfirmationColumnGroup.cs" />
+    <Compile Include="RowMenuParts.cs" />
     <Compile Include="ConfirmationStripHelper.cs" />
     <Compile Include="SettingsFlush.cs" />
     <Compile Include="ProfileManager.cs" />

@@ -85,7 +85,8 @@ namespace HolyLogger
         // ===== Right-click row menu: Search QRZ / Edit / Delete / send-to-upload-queue =====
 
         private DataGridRow _hlRow;          // the row highlighted while its menu / editor is up
-        private Brush _hlOrigBg;             // its background, to restore afterwards
+        private Brush _hlOrigBg;             // its own background, to restore afterwards (null if it had none)
+        private bool _hlHadLocalBg;          // did it have a background of its own at all? see HighlightRow
         private bool _hlKeep;                // keep the highlight past the menu close (an editor is open)
 
         private void HighlightRow(DataGridRow row)
@@ -93,13 +94,21 @@ namespace HolyLogger
             ClearHighlight();
             if (row == null) return;
             _hlRow = row;
-            _hlOrigBg = row.Background;
+            // Note whether the row had a background of its OWN, as opposed to one it merely picks up from
+            // the grid's alternating colours or from the ticked-row trigger. Putting an inherited colour
+            // back as a local one would freeze the row on it: a local value outranks a style trigger, so
+            // unticking that row later would leave it looking selected for good.
+            _hlHadLocalBg = row.ReadLocalValue(BackgroundProperty) != DependencyProperty.UnsetValue;
+            _hlOrigBg = _hlHadLocalBg ? row.Background : null;
             row.Background = new SolidColorBrush(Color.FromRgb(0xFF, 0xE0, 0x82));   // clear amber
         }
 
         private void ClearHighlight()
         {
-            if (_hlRow != null) { _hlRow.Background = _hlOrigBg; _hlRow = null; _hlOrigBg = null; }
+            if (_hlRow == null) return;
+            if (_hlHadLocalBg) _hlRow.Background = _hlOrigBg;
+            else _hlRow.ClearValue(BackgroundProperty);   // back to the trigger / alternating colour
+            _hlRow = null; _hlOrigBg = null; _hlHadLocalBg = false;
         }
 
         private static T FindVisualParent<T>(DependencyObject child) where T : DependencyObject
@@ -119,10 +128,25 @@ namespace HolyLogger
             var qso = row.Item as QSO;
             if (qso == null) { e.Handled = true; return; }
 
-            // Colour the row so it is unmistakable which QSO the menu (and the editor) act on.
-            HighlightRow(row);
+            // A right-click that lands OUTSIDE the selection drops it. The menu always acts on what the
+            // mouse is pointing at, so ticks left standing on rows elsewhere would be a trap - the
+            // operator would be looking at one row while the menu spoke for a dozen others.
+            if (!qso.IsPicked)
+            {
+                ClearPicks();
+                UpdatePickState();
+            }
 
-            var menu = BuildRowContextMenu(qso, row);
+            // With several rows ticked and the click landing on one of them, the menu speaks for the whole
+            // selection - which the blue highlight already shows, so the single-row amber would only
+            // muddle the picture and is left off.
+            var picked = ResultsGrid.Items.OfType<QSO>().Where(q => q.IsPicked).ToList();
+            bool many = picked.Count > 1 && qso.IsPicked;
+
+            // Colour the row so it is unmistakable which QSO the menu (and the editor) act on.
+            if (!many) HighlightRow(row);
+
+            var menu = many ? BuildSelectionContextMenu(picked) : BuildRowContextMenu(qso, row);
             menu.Closed += (s, _) => { if (!_hlKeep) ClearHighlight(); _hlKeep = false; };
             menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
             menu.PlacementTarget = ResultsGrid;
@@ -249,6 +273,13 @@ namespace HolyLogger
 
             var menu = new ContextMenu { Style = (Style)res["CtxMenu"] };
 
+            // Whose QSO this menu is about, spelled out at the top. Delete and the upload queue act
+            // without a second look at the table, and the row underneath is half-covered by the menu
+            // itself - so the callsign says it here, with date / band / mode beneath to pin down WHICH
+            // contact with that station it is.
+            menu.Items.Add(RowMenuParts.MakeMenuTitle(qso.DXCall, RowMenuParts.QsoSubtitle(qso)));
+            menu.Items.Add(new Separator { Style = sepStyle });
+
             var qrz = new MenuItem { Header = "Search QRZ", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
             qrz.Click += (s, e) => OpenQrz(qso.DXCall);
             menu.Items.Add(qrz);
@@ -280,22 +311,18 @@ namespace HolyLogger
             // Real CheckBox controls (not checkable menu items) so each logger shows a visible box. Hosting
             // them directly in the menu keeps it open while you tick several, until OK.
             var s0 = Properties.Settings.Default;
-            var cbLotw = MakeServiceCheck("LoTW", s0.UseLotwService);
-            var cbQrz  = MakeServiceCheck("QRZ", s0.UseQrzLogbook);
-            var cbEqsl = MakeServiceCheck("eQSL", s0.UseEqslService);
-            var cbClub = MakeServiceCheck("Club Log", s0.UseClublogService);
-            menu.Items.Add(cbLotw);
-            menu.Items.Add(cbQrz);
-            menu.Items.Add(cbEqsl);
-            menu.Items.Add(cbClub);
+            var cbLotw = RowMenuParts.MakeServiceCheck("LoTW", s0.UseLotwService);
+            var cbQrz  = RowMenuParts.MakeServiceCheck("QRZ", s0.UseQrzLogbook);
+            var cbEqsl = RowMenuParts.MakeServiceCheck("eQSL", s0.UseEqslService);
+            var cbClub = RowMenuParts.MakeServiceCheck("Club Log", s0.UseClublogService);
+            menu.Items.Add(RowMenuParts.MakeServiceGrid(cbLotw, cbQrz, cbEqsl, cbClub));
 
             var ok = new Button
             {
                 Content = "OK",
                 Width = 80,
+                FontSize = 15,
                 Padding = new Thickness(10, 4, 10, 4),
-                Margin = new Thickness(38, 6, 8, 4),
-                HorizontalAlignment = HorizontalAlignment.Left,
                 Cursor = Cursors.Hand
             };
             ok.Click += (s, e) =>
@@ -304,24 +331,96 @@ namespace HolyLogger
                                cbEqsl.IsChecked == true, cbClub.IsChecked == true);
                 menu.IsOpen = false;
             };
-            menu.Items.Add(ok);
+            menu.Items.Add(MakeButtonRow(ok, RowMenuParts.MakeCloseButton(menu)));
 
             return menu;
         }
 
-        // A service checkbox in the menu. Disabled (and greyed with a hint) when that service isn't set up,
-        // so you can't queue to a logger you don't use.
-        private static CheckBox MakeServiceCheck(string name, bool configured)
+        // OK and Close side by side at the foot of the card. OK belongs to the logger boxes above it;
+        // Close ends the menu whether or not anything was ticked.
+        private static UIElement MakeButtonRow(Button ok, Button close)
         {
-            return new CheckBox
+            close.Margin = new Thickness(10, 0, 0, 0);
+            var row = new StackPanel
             {
-                Content = configured ? name : name + "   (not configured)",
-                IsEnabled = configured,
-                Foreground = new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A)),
-                FontSize = 14,
-                Margin = new Thickness(40, 3, 8, 3),
-                VerticalAlignment = VerticalAlignment.Center
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(40, 6, 8, 4)   // 40 = the menu's text indent, as everywhere else
             };
+            row.Children.Add(ok);
+            row.Children.Add(close);
+            return row;
+        }
+
+        // The menu for a MULTI-ROW selection: opened by right-clicking a row that is part of it.
+        //
+        // Deliberately a different menu, not the single-row one with different wording. Edit and Search QRZ
+        // are absent: they act on one contact, and offering them while seven rows are lit invites a click
+        // that would quietly apply to only one of them. Every item here names the count, so what the menu
+        // is about to touch is never in doubt.
+        private ContextMenu BuildSelectionContextMenu(List<QSO> picked)
+        {
+            var res = CtxRes;
+            var itemStyle = (Style)res["CtxItem"];
+            var dangerStyle = (Style)res["CtxItemDanger"];
+            var sepStyle = (Style)res["CtxSep"];
+            var blue = (Brush)new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+            var red = (Brush)new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+            int n = picked.Count;
+
+            var menu = new ContextMenu { Style = (Style)res["CtxMenu"] };
+
+            // Title line: what the whole menu is talking about, with the first few callsigns under it so
+            // the selection can be recognised without counting rows behind the menu.
+            string names = string.Join(", ", picked.Take(6).Select(q => q.DXCall));
+            if (n > 6) names += $", … (+{n - 6:N0} more)";
+            menu.Items.Add(RowMenuParts.MakeMenuTitle($"{n:N0} QSOs selected", names));
+            menu.Items.Add(new Separator { Style = sepStyle });
+
+            var export = new MenuItem { Header = $"Export these {n:N0} to ADIF…", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            // Deferred like Edit/Delete below: a modal file dialog opened while the menu is still
+            // dismissing (and holding mouse capture) cannot take the click.
+            export.Click += (s, e) => Dispatcher.BeginInvoke(new Action(() => ExportQsosToAdif(picked)),
+                                                             System.Windows.Threading.DispatcherPriority.Background);
+            menu.Items.Add(export);
+
+            var clear = new MenuItem { Header = "Clear selection", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            clear.Click += (s, e) => { ClearPicks(); UpdatePickState(); };
+            menu.Items.Add(clear);
+
+            var del = new MenuItem { Header = $"Delete these {n:N0} QSOs", Style = dangerStyle, Icon = MakeMenuGlyph("", red) };
+            del.Click += (s, e) => Dispatcher.BeginInvoke(new Action(() => DeleteQsos(picked)),
+                                                          System.Windows.Threading.DispatcherPriority.Background);
+            menu.Items.Add(del);
+
+            menu.Items.Add(new Separator { Style = sepStyle });
+
+            var header = new MenuItem { Header = $"Send these {n:N0} to upload queue for:", Style = itemStyle, IsEnabled = false, Icon = MakeMenuGlyph("", blue) };
+            menu.Items.Add(header);
+
+            var s0 = Properties.Settings.Default;
+            var cbLotw = RowMenuParts.MakeServiceCheck("LoTW", s0.UseLotwService);
+            var cbQrz  = RowMenuParts.MakeServiceCheck("QRZ", s0.UseQrzLogbook);
+            var cbEqsl = RowMenuParts.MakeServiceCheck("eQSL", s0.UseEqslService);
+            var cbClub = RowMenuParts.MakeServiceCheck("Club Log", s0.UseClublogService);
+            menu.Items.Add(RowMenuParts.MakeServiceGrid(cbLotw, cbQrz, cbEqsl, cbClub));
+
+            var ok = new Button
+            {
+                Content = "OK",
+                Width = 80,
+                FontSize = 15,
+                Padding = new Thickness(10, 4, 10, 4),
+                Cursor = Cursors.Hand
+            };
+            ok.Click += (s, e) =>
+            {
+                QueueForUpload(picked, cbLotw.IsChecked == true, cbQrz.IsChecked == true,
+                               cbEqsl.IsChecked == true, cbClub.IsChecked == true);
+                menu.IsOpen = false;
+            };
+            menu.Items.Add(MakeButtonRow(ok, RowMenuParts.MakeCloseButton(menu)));
+
+            return menu;
         }
 
         // Puts the QSO into the chosen services' upload queues (status 0 = pending). Always allowed - even
@@ -345,6 +444,123 @@ namespace HolyLogger
                     "Upload queue", HolyMsgType.Info, this);
             else
                 HolyMessageBox.Show("Tick at least one logger first.", "Upload queue", HolyMsgType.Info, this);
+        }
+
+        // The same thing for a whole selection. One message at the end rather than one per QSO - fifty
+        // dialogs to dismiss would be its own kind of failure.
+        private void QueueForUpload(List<QSO> qsos, bool lotw, bool qrz, bool eqsl, bool club)
+        {
+            if (qsos == null || qsos.Count == 0) return;
+            if (!lotw && !qrz && !eqsl && !club)
+            {
+                HolyMessageBox.Show("Tick at least one logger first.", "Upload queue", HolyMsgType.Info, this);
+                return;
+            }
+
+            var dal = DataAccess.GetInstance();
+            if (dal == null) return;
+
+            var done = new List<string>();
+            if (lotw) done.Add("LoTW");
+            if (qrz)  done.Add("QRZ");
+            if (eqsl) done.Add("eQSL");
+            if (club) done.Add("Club Log");
+
+            int queued = 0, failed = 0;
+            foreach (var q in qsos)
+            {
+                try
+                {
+                    if (lotw) dal.SetLotwStatus(q.id, 0);
+                    if (qrz)  dal.SetQrzStatus(q.id, 0);
+                    if (eqsl) dal.SetEqslStatus(q.id, 0);
+                    if (club) dal.SetClublogStatus(q.id, 0);
+                    queued++;
+                }
+                // One bad QSO must not abandon the rest half-queued, but it is counted and reported
+                // rather than passed over in silence.
+                catch (Exception ex) { failed++; Log.Swallow(ex); }
+            }
+
+            string message = $"{queued:N0} QSO{(queued == 1 ? "" : "s")} queued for upload to: {string.Join(", ", done)}.";
+            if (failed > 0) message += $"\n\n{failed:N0} could not be queued.";
+            HolyMessageBox.Show(message, "Upload queue", failed > 0 ? HolyMsgType.Warning : HolyMsgType.Info, this);
+        }
+
+        // Deleting a whole selection. One confirmation for the batch, and ONE undo step: undoing a
+        // fifty-row delete fifty times over is not an undo the operator would trust.
+        private void DeleteQsos(List<QSO> qsos)
+        {
+            if (qsos == null || qsos.Count == 0) return;
+            if (qsos.Count == 1) { DeleteQso(qsos[0]); return; }
+
+            try
+            {
+                // The confirmation names callsigns, not just a number: "delete 12 QSOs" is easy to agree
+                // to without checking, and the ticks may have been made minutes ago.
+                string preview = string.Join(", ", qsos.Take(10).Select(q => q.DXCall));
+                if (qsos.Count > 10) preview += $", … (+{qsos.Count - 10:N0} more)";
+
+                bool ok = HolyMessageBox.ShowConfirm(
+                    $"Delete these {qsos.Count:N0} QSOs?\n\n{preview}\n\nYou can still undo it afterwards with the Undo button.",
+                    "Delete QSOs", HolyMsgType.Warning, this);
+                if (!ok) return;
+
+                var dal = DataAccess.GetInstance();
+                var bound = ResultsGrid.DataContext as ObservableCollection<QSO>;
+                var deleted = new List<QSO>(qsos.Count);
+                var logIds = new List<long>(qsos.Count);
+
+                foreach (var q in qsos)
+                {
+                    long logId = dal?.GetQsoLogId(q.id) ?? -1;
+                    dal?.Delete(q.id);
+                    bound?.Remove(q);
+                    _allQsos?.Remove(q);
+                    q.IsPicked = false;
+                    deleted.Add(q);
+                    logIds.Add(logId);
+                }
+
+                try { ResultsGrid.Items.Refresh(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                UpdatePickState();
+
+                _undo.Push(new EditStep
+                {
+                    IsDelete = true,
+                    BatchQsos = deleted,
+                    BatchLogIds = logIds,
+                    Label = $"deleted {deleted.Count:N0} QSOs"
+                });
+                UpdateUndoButton();
+                TB_Status.Text = $"Deleted {deleted.Count:N0} QSOs.  Press Undo to restore them.";
+            }
+            catch (Exception ex) { HolyMessageBox.ShowError("Could not delete the QSOs: " + ex.Message, "Delete QSOs", this); }
+            finally { _hlKeep = false; ClearHighlight(); }
+        }
+
+        // Writes just the selected QSOs to an ADIF file, through the same generator the File menu's export
+        // uses - so the selection exports with exactly the same fields and formats as a whole log would.
+        private void ExportQsosToAdif(List<QSO> qsos)
+        {
+            if (qsos == null || qsos.Count == 0) return;
+            try
+            {
+                string adif = HolyParser.Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName);
+                var save = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "ADIF File|*.adi",
+                    DefaultExt = "adi",
+                    Title = $"Export {qsos.Count:N0} selected QSOs",
+                    FileName = $"selection_{DateTime.Now:yyyyMMdd_HHmm}.adi"
+                };
+                if (save.ShowDialog() != true) return;
+
+                System.IO.File.WriteAllText(save.FileName, adif);
+                HolyMessageBox.ShowSuccess($"{qsos.Count:N0} QSO{(qsos.Count == 1 ? "" : "s")} exported.", "Export ADIF", this);
+                TB_Status.Text = $"Exported {qsos.Count:N0} selected QSOs to {System.IO.Path.GetFileName(save.FileName)}.";
+            }
+            catch (Exception ex) { HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", this); }
         }
 
         private void EditQso(QSO qso, DataGridRow row)
@@ -395,6 +611,7 @@ namespace HolyLogger
                 (ResultsGrid.DataContext as ObservableCollection<QSO>)?.Remove(qso);
                 _allQsos?.Remove(qso);
                 try { ResultsGrid.Items.Refresh(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                UpdatePickState();   // a row just left the table; the count and header box must follow
 
                 _undo.Push(new EditStep
                 {
@@ -820,7 +1037,11 @@ namespace HolyLogger
         // actually clicked - e.OriginalSource is the one that raised it.
         private void PaperQsl_Changed(object sender, RoutedEventArgs e)
         {
-            if (!((e.OriginalSource as CheckBox)?.DataContext is QSO qso)) return;
+            var box = e.OriginalSource as CheckBox;
+            // The selection column's boxes bubble through here too, and their DataContext is a QSO just
+            // the same - without this a tick in the selection column would write a paper QSL to the log.
+            if ((box?.Tag as string) == "PickBox") return;
+            if (!(box?.DataContext is QSO qso)) return;
             try
             {
                 DataAccess.GetInstance()?.SetPaperQslConfirmed(qso.id, qso.PaperQslConfirmed);
@@ -828,6 +1049,91 @@ namespace HolyLogger
                 if (stats != null && stats.IsLoaded) stats.NotifyPaperQslChanged(qso.id, qso.PaperQslConfirmed);
             }
             catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // ===== Row selection (the tick boxes in the first column) =====
+        //
+        // Modelled on a mail client's message list: the boxes are the ONLY thing that selects. Clicking a
+        // cell to read or edit it never adds a row and never drops one, so a selection of eighty rows
+        // cannot be wiped by one stray click - which is exactly what the DataGrid's own click-to-select
+        // would do. That is why the state is QSO.IsPicked and not DataGrid.SelectedItems.
+
+        private int _lastPickedIndex = -1;   // Shift+click anchor, as an index into the rows on show
+        private bool _syncingPickAll;        // set while WE write the header box, so its handler stays quiet
+
+        private void PickBox_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var box = sender as CheckBox;
+                if (box == null) return;
+
+                bool ticked = box.IsChecked == true;   // the binding has already written this to the QSO
+                int index = ResultsGrid.Items.IndexOf(box.DataContext);
+
+                // Shift+click fills in everything between the box clicked last and this one, both ends
+                // included - the alternative is ticking eighty rows one at a time.
+                if (index >= 0 && _lastPickedIndex >= 0 && _lastPickedIndex < ResultsGrid.Items.Count &&
+                    (Keyboard.Modifiers & ModifierKeys.Shift) == ModifierKeys.Shift)
+                {
+                    int from = Math.Min(_lastPickedIndex, index);
+                    int to   = Math.Max(_lastPickedIndex, index);
+                    for (int i = from; i <= to; i++)
+                        if (ResultsGrid.Items[i] is QSO q) q.IsPicked = ticked;
+                }
+
+                _lastPickedIndex = index;
+                UpdatePickState();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // The box in the column header. Nothing ticked -> tick every row the search is showing; anything
+        // ticked -> clear the lot. Only the listed rows are touched, never the whole log.
+        private void Chk_PickAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (_syncingPickAll) return;
+            try
+            {
+                bool tickAll = !ResultsGrid.Items.OfType<QSO>().Any(q => q.IsPicked);
+                foreach (var q in ResultsGrid.Items.OfType<QSO>()) q.IsPicked = tickAll;
+                _lastPickedIndex = -1;
+                UpdatePickState();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Brings the header box and the status-bar count back in line with what is actually ticked.
+        private void UpdatePickState()
+        {
+            try
+            {
+                int total = 0, picked = 0;
+                foreach (var q in ResultsGrid.Items.OfType<QSO>())
+                {
+                    total++;
+                    if (q.IsPicked) picked++;
+                }
+
+                _syncingPickAll = true;
+                // null = the filled square: some rows ticked, but not all of them.
+                Chk_PickAll.IsChecked = picked == 0 ? (bool?)false : picked == total ? (bool?)true : null;
+                _syncingPickAll = false;
+
+                TB_PickCount.Text = picked == 1 ? "1 selected" : $"{picked:N0} selected";
+                TB_PickCount.Visibility = picked == 0 ? Visibility.Collapsed : Visibility.Visible;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // A new search lists a different set of rows, so the old ticks mean nothing. Cleared across the
+        // WHOLE log rather than just the rows on screen: the state sits on the QSOs, which outlive the
+        // result list, so a row ticked in an earlier search would otherwise come back still ticked.
+        private void ClearPicks()
+        {
+            if (_allQsos != null)
+                foreach (var q in _allQsos) q.IsPicked = false;
+            _lastPickedIndex = -1;
         }
 
         private void ClearAll()
@@ -1321,8 +1627,10 @@ namespace HolyLogger
             var found = new ObservableCollection<QSO>(
                 results.OrderByDescending(q => DateKey(q.Date), StringComparer.Ordinal)
                        .ThenByDescending(q => TimeKey(q.Time), StringComparer.Ordinal));
+            ClearPicks();                    // these are different rows now - see ClearPicks
             ResultsGrid.DataContext = found;
             ShowDateSortIndicator();
+            UpdatePickState();
             TB_Count.Text = found.Count == 1 ? "1 QSO" : $"{found.Count:N0} QSOs";
             TB_Status.Text = unfiltered
                 ? $"Showing the whole log — {found.Count:N0} QSO{(found.Count == 1 ? "" : "s")}. Set any filter above to narrow it down."
@@ -1438,6 +1746,11 @@ namespace HolyLogger
             public string Label;
             public bool IsDelete;                        // true = this step deleted Qso; undo re-inserts it
             public long LogId;                           // the log to restore a deleted QSO into
+
+            // A multi-row delete from the selection menu: ONE step that removed all of these, so one
+            // press of Undo puts all of them back. Null for every other kind of step.
+            public List<QSO> BatchQsos;
+            public List<long> BatchLogIds;               // the log each of them came from, same order
         }
 
         private readonly Stack<EditStep> _undo = new Stack<EditStep>();
@@ -1559,6 +1872,27 @@ namespace HolyLogger
             EditStep step = _undo.Pop();
             try
             {
+                if (step.IsDelete && step.BatchQsos != null)
+                {
+                    // A selection delete: every QSO goes back into the log it came from, in one go.
+                    var dalBatch = DataAccess.GetInstance();
+                    int restored = 0;
+                    for (int i = 0; i < step.BatchQsos.Count; i++)
+                    {
+                        QSO q = step.BatchQsos[i];
+                        int newId = dalBatch?.RestoreQso(q, step.BatchLogIds[i]) ?? 0;
+                        if (newId > 0) q.id = newId;
+                        _allQsos?.Add(q);
+                        restored++;
+                    }
+                    try { RunSearch(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                    TB_Status.Text = $"Restored {restored:N0} QSOs."
+                                   + (_undo.Count > 0 ? $"  {_undo.Count} more can be undone." : "  Nothing left to undo.");
+                    UpdateUndoButton();
+                    return;
+                }
+
                 if (step.IsDelete)
                 {
                     // Re-insert the deleted QSO into its original log, add it back to the source list, then
@@ -1848,6 +2182,10 @@ namespace HolyLogger
         // Every other column is genuinely text and keeps the built-in behaviour.
         private void ResultsGrid_Sorting(object sender, DataGridSortingEventArgs e)
         {
+            // Re-sorting moves the rows, so the Shift+click anchor (a position, not a QSO) no longer
+            // points at what the operator last clicked. Ticks themselves are untouched.
+            _lastPickedIndex = -1;
+
             string path = e.Column.SortMemberPath;
             bool byBand = path == "Band";
             if (!byBand && path != "Freq") return;   // text column: let the DataGrid handle it

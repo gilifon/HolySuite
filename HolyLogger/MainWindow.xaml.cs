@@ -2828,6 +2828,12 @@ namespace HolyLogger
 
             var menu = new ContextMenu { Style = (Style)res["CtxMenu"] };
 
+            // Whose QSO this menu is about, spelled out at the top - the same caption the Log Workshop's
+            // row menu carries, built by the same helper so the two cannot drift apart. Delete and Edit
+            // act without a second look at the table, and the row underneath is half-covered by the menu.
+            menu.Items.Add(RowMenuParts.MakeMenuTitle(qso.DXCall, RowMenuParts.QsoSubtitle(qso)));
+            menu.Items.Add(new Separator { Style = sepStyle });
+
             var spotItem = new MenuItem { Header = "Spot", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
             spotItem.Click += (s, e) =>
             {
@@ -2871,6 +2877,14 @@ namespace HolyLogger
                 Dispatcher.BeginInvoke(new Action(() => DeleteQsoFromContextMenu(qso)),
                                        System.Windows.Threading.DispatcherPriority.Background);
             menu.Items.Add(deleteItem);
+
+            // A visible way out, as in the Workshop's menus. Centred under the items, which lines it up
+            // with the centred callsign at the top and closes the card off symmetrically.
+            var close = RowMenuParts.MakeCloseButton(menu);
+            close.HorizontalAlignment = HorizontalAlignment.Center;
+            close.Margin = new Thickness(8, 8, 8, 4);
+            menu.Items.Add(new Separator { Style = sepStyle });
+            menu.Items.Add(close);
 
             return menu;
         }

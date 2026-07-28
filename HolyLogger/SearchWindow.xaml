@@ -372,8 +372,6 @@
                   AutoGenerateColumns="False"
                   AlternationCount="2"
                   Background="{DynamicResource WindowBg}"
-                  RowBackground="{DynamicResource GridRowBg}"
-                  AlternatingRowBackground="{DynamicResource GridAltRowBg}"
                   CanUserAddRows="False"
                   CanUserDeleteRows="False"
                   SelectionUnit="FullRow"
@@ -501,7 +499,64 @@
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader" BasedOn="{StaticResource WorkshopHeaderBase}"/>
             </DataGrid.ColumnHeaderStyle>
+            <DataGrid.RowStyle>
+                <!-- ALL THREE row colours are set here, and none of them on the DataGrid itself.
+                     That is deliberate: DataGrid.RowBackground / AlternatingRowBackground are pushed
+                     onto every row by a transfer that compares value precedence, and a colour set on the
+                     grid element is a LOCAL value - it outranks any trigger in this style. Leaving the
+                     two properties on the grid is what stopped a ticked row from ever changing colour.
+                     With the grid no longer setting them, the plain / alternate / ticked colours are just
+                     ordinary setters and triggers here, and the last matching trigger wins. -->
+                <Style TargetType="DataGridRow">
+                    <Setter Property="Background" Value="{DynamicResource GridRowBg}"/>
+                    <Style.Triggers>
+                        <Trigger Property="ItemsControl.AlternationIndex" Value="1">
+                            <Setter Property="Background" Value="{DynamicResource GridAltRowBg}"/>
+                        </Trigger>
+                        <!-- Ticked LAST, so it beats both of the above. Every ticked row is highlighted,
+                             in the same pale blue a selected row has always had here - tick ten rows and
+                             all ten stay lit, not just the last one clicked. The dark selection text
+                             comes with it, which is what keeps the row readable on that light blue when
+                             the application is in a dark scheme. -->
+                        <DataTrigger Binding="{Binding IsPicked}" Value="True">
+                            <Setter Property="Background" Value="{DynamicResource RowPickedBg}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </DataGrid.RowStyle>
             <DataGrid.Columns>
+                <!-- SELECTION COLUMN. The one column that belongs on the LEFT rather than at the far
+                     right, because it is not log data - it is the handle you tick, and that is where a
+                     mail client puts it.
+
+                     IsReadOnly so a click lands on the checkbox instead of putting the cell into edit
+                     mode, and unsortable / unmovable / unresizable so it stays exactly where the eye
+                     expects it. Selecting is done ONLY from these boxes: clicking anywhere else in a row
+                     never adds or drops a row, so a selection cannot be lost by a stray click. -->
+                <DataGridTemplateColumn x:Name="Col_Pick" Width="38" MinWidth="38" IsReadOnly="True"
+                                        CanUserSort="False" CanUserReorder="False" CanUserResize="False">
+                    <DataGridTemplateColumn.Header>
+                        <!-- Master box: nothing ticked -> ticks every row the search is showing;
+                             anything ticked -> clears the lot. Three-state so a partial selection shows
+                             the filled square instead of claiming everything is selected. -->
+                        <CheckBox x:Name="Chk_PickAll" IsThreeState="True"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Click="Chk_PickAll_Click"
+                                  ToolTip="Select all the rows listed, or clear the selection"/>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <!-- Tag marks this as the selection box: the grid-wide CheckBox.Checked
+                                 handler (PaperQsl_Changed) fires for EVERY checkbox in the table, and
+                                 must not mistake a tick here for a paper QSL card arriving. -->
+                            <CheckBox Tag="PickBox" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      IsChecked="{Binding IsPicked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Click="PickBox_Click"
+                                      ToolTip="Select this QSO&#x0a;Shift+click another box to select everything between the two"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <!-- Date and Time are editable, but only accept a value that parses. The converters'
                      ConvertBack returns Binding.DoNothing for anything else, so a typo leaves the
                      logged value untouched instead of writing nonsense into the log. -->
@@ -749,8 +804,20 @@
 
         <!-- Status bar -->
         <Border Grid.Row="3" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,2,0,0" Padding="10,5">
-            <TextBlock x:Name="TB_Status" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"
-                       Text="Enter a Callsign or Country (or both) and press Search."/>
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock x:Name="TB_Status" Grid.Column="0" FontSize="13" TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource MutedTextBrush}"
+                           Text="Enter a Callsign or Country (or both) and press Search."/>
+                <!-- How many rows are ticked. Hidden entirely while nothing is selected, so the bar looks
+                     exactly as it did before the moment there is nothing to report. -->
+                <TextBlock x:Name="TB_PickCount" Grid.Column="1" FontSize="13" FontWeight="Bold"
+                           Margin="12,0,0,0" Visibility="Collapsed"
+                           Foreground="{DynamicResource AccentBrush}"/>
+            </Grid>
         </Border>
     </Grid>
     </Border>
