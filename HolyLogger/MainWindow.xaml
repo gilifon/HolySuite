@@ -1282,12 +1282,19 @@
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <Rectangle Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="53" Margin="0,279,0,0" />
         <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,281,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
-        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" Grid.Row="2" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" BeginningEdit="QSODataGrid_BeginningEdit" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
+        <!-- The grid and its "Received Confirmation" overlay share this single-cell wrapper on purpose:
+             the overlay is positioned by a Margin measured from its parent's origin, so its parent must be
+             the same element the header bounds are measured against (see ConfirmationStripHelper.cs).
+             ClipToBounds keeps the overlay from spilling outside the grid when columns scroll sideways. -->
+        <Grid Grid.Row="2" ClipToBounds="True">
+        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" BeginningEdit="QSODataGrid_BeginningEdit" CheckBox.Checked="PaperQsl_Changed" CheckBox.Unchecked="PaperQsl_Changed" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
             <DataGrid.Resources>
                 <!-- Keep the selected row blue even when the grid loses focus (e.g. while the right-click
                      context menu is open), so the user clearly sees which row the menu refers to. -->
                 <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightBrushKey}" Color="{x:Static SystemColors.HighlightColor}"/>
                 <SolidColorBrush x:Key="{x:Static SystemColors.InactiveSelectionHighlightTextBrushKey}" Color="{x:Static SystemColors.HighlightTextColor}"/>
+                <!-- ConfirmHeaderStyle (and the confirmation columns' templates) come from the app-wide
+                     Themes/ConfirmationColumns.xaml merged in App.xaml, shared with the Log Workshop. -->
             </DataGrid.Resources>
             <DataGrid.ColumnHeaderStyle>
                 <Style TargetType="DataGridColumnHeader">
@@ -1445,137 +1452,53 @@
                      Nothing to do with whether we uploaded it - a QSO can be uploaded for years and
                      never confirmed. Blank rather than a cross when unconfirmed: most QSOs are
                      unconfirmed, and a column full of crosses reads as a column full of errors. -->
-                <!-- Green tick = confirmed (active entity); RED tick = confirmed but the entity is a
-                     DELETED DXCC entity; blank = not confirmed. Sorted on three levels via
-                     LotwStatusRank (active 2 / deleted 1 / none 0). -->
-                <DataGridTemplateColumn Header="LoTW" IsReadOnly="True" SortMemberPath="LotwStatusRank" Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value=""/>
-                                        <Style.Triggers>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding LotwQslRcvd}" Value="1"/>
-                                                    <Condition Binding="{Binding LotwDeletedEntity}" Value="0"/>
-                                                </MultiDataTrigger.Conditions>
-                                                <Setter Property="Text" Value="&#x2713;"/>
-                                                <Setter Property="Foreground" Value="#1E7E34"/>
-                                                <Setter Property="ToolTip" Value="Confirmed in LoTW"/>
-                                            </MultiDataTrigger>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding LotwQslRcvd}" Value="1"/>
-                                                    <Condition Binding="{Binding LotwDeletedEntity}" Value="1"/>
-                                                </MultiDataTrigger.Conditions>
-                                                <Setter Property="Text" Value="&#x2713;"/>
-                                                <Setter Property="Foreground" Value="#CC0000"/>
-                                                <Setter Property="ToolTip" Value="Confirmed in LoTW — DELETED DXCC entity (counts all-time, not toward active awards)"/>
-                                            </MultiDataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <!-- QRZ.com confirmation tick, exactly parallel to the LoTW column above but a separate,
-                     broader set (QRZ confirms when the other op also logged the contact on QRZ). Green =
-                     confirmed active entity; RED = confirmed deleted entity; blank = not confirmed.
-                     Sorted on three levels via QrzStatusRank (active 2 / deleted 1 / none 0). -->
-                <DataGridTemplateColumn Header="QRZ" IsReadOnly="True" SortMemberPath="QrzStatusRank" Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value=""/>
-                                        <Style.Triggers>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding QrzQslRcvd}" Value="1"/>
-                                                    <Condition Binding="{Binding QrzDeletedEntity}" Value="0"/>
-                                                </MultiDataTrigger.Conditions>
-                                                <Setter Property="Text" Value="&#x2713;"/>
-                                                <Setter Property="Foreground" Value="#1E7E34"/>
-                                                <Setter Property="ToolTip" Value="Confirmed on QRZ.com"/>
-                                            </MultiDataTrigger>
-                                            <MultiDataTrigger>
-                                                <MultiDataTrigger.Conditions>
-                                                    <Condition Binding="{Binding QrzQslRcvd}" Value="1"/>
-                                                    <Condition Binding="{Binding QrzDeletedEntity}" Value="1"/>
-                                                </MultiDataTrigger.Conditions>
-                                                <Setter Property="Text" Value="&#x2713;"/>
-                                                <Setter Property="Foreground" Value="#CC0000"/>
-                                                <Setter Property="ToolTip" Value="Confirmed on QRZ.com — DELETED DXCC entity (counts all-time, not toward active awards)"/>
-                                            </MultiDataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <!-- eQSL confirmation tick, parallel to LoTW/QRZ. Green = confirmed (eQSL sends no DXCC so
-                     the deleted split is unavailable — always green). Sorted via EqslStatusRank. -->
-                <DataGridTemplateColumn Header="eQSL" IsReadOnly="True" SortMemberPath="EqslStatusRank" Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value=""/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding EqslQslRcvd}" Value="1">
-                                                <Setter Property="Text" Value="&#x2713;"/>
-                                                <Setter Property="Foreground" Value="#1E7E34"/>
-                                                <Setter Property="ToolTip" Value="Confirmed on eQSL"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <!-- Club Log confirmation tick, parallel to LoTW/QRZ/eQSL. Green = confirmed
-                     (QSL_RCVD = Y/V in Club Log's export). Sorted via ClublogStatusRank. -->
-                <DataGridTemplateColumn Header="Club Log" IsReadOnly="True" SortMemberPath="ClublogStatusRank" Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
-                                <TextBlock.Style>
-                                    <Style TargetType="TextBlock">
-                                        <Setter Property="Text" Value=""/>
-                                        <Style.Triggers>
-                                            <DataTrigger Binding="{Binding ClublogQslRcvd}" Value="1">
-                                                <Setter Property="Text" Value="&#x2713;"/>
-                                                <Setter Property="Foreground" Value="#1E7E34"/>
-                                                <Setter Property="ToolTip" Value="Confirmed on Club Log"/>
-                                            </DataTrigger>
-                                        </Style.Triggers>
-                                    </Style>
-                                </TextBlock.Style>
-                            </TextBlock>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
-                <!-- Paper QSL: the ONLY editable confirmation column. Tick it when the paper card arrives
-                     by post; it persists immediately and the Statistics ▸ Paper QSL folder recomputes. -->
-                <DataGridTemplateColumn Header="Paper QSL" IsReadOnly="True" SortMemberPath="PaperQslStatusRank" Width="Auto">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
-                                      IsChecked="{Binding PaperQslConfirmed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                                      Checked="PaperQsl_Changed" Unchecked="PaperQsl_Changed"
-                                      ToolTip="Tick when you receive this QSO's paper QSL card by post"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
+                <!-- The five confirmation columns. Their look (green header strip, tick colours,
+                     tooltips) is defined ONCE in Themes/ConfirmationColumns.xaml and shared with the Log
+                     Workshop's table, so a change is made in one place. They are draggable, but only as
+                     one block and with nothing allowed between them - ConfirmationColumnGroup enforces
+                     that, since a column dropped in the middle would split the green strip.
+
+                     CanUserResize=False on all five: each is only ever a tick or a tick-sized box, so
+                     there is nothing to widen for, and a resized member would break the set up into
+                     mismatched columns instead of the one solid block it is meant to read as. -->
+                <DataGridTemplateColumn Header="LoTW" IsReadOnly="True" CanUserResize="False"
+                                        SortMemberPath="LotwStatusRank" Width="Auto" MinWidth="42"
+                                        HeaderStyle="{StaticResource ConfirmHeaderStyle}"
+                                        HeaderTemplate="{StaticResource ConfirmHeaderTemplate}"
+                                        CellTemplate="{StaticResource LotwTickTemplate}"/>
+                <DataGridTemplateColumn Header="QRZ" IsReadOnly="True" CanUserResize="False"
+                                        SortMemberPath="QrzStatusRank" Width="Auto" MinWidth="36"
+                                        HeaderStyle="{StaticResource ConfirmHeaderStyle}"
+                                        HeaderTemplate="{StaticResource ConfirmHeaderTemplate}"
+                                        CellTemplate="{StaticResource QrzTickTemplate}"/>
+                <DataGridTemplateColumn Header="eQSL" IsReadOnly="True" CanUserResize="False"
+                                        SortMemberPath="EqslStatusRank" Width="Auto" MinWidth="42"
+                                        HeaderStyle="{StaticResource ConfirmHeaderStyle}"
+                                        HeaderTemplate="{StaticResource ConfirmHeaderTemplate}"
+                                        CellTemplate="{StaticResource EqslTickTemplate}"/>
+                <DataGridTemplateColumn Header="Club Log" IsReadOnly="True" CanUserResize="False"
+                                        SortMemberPath="ClublogStatusRank" Width="Auto" MinWidth="68"
+                                        HeaderStyle="{StaticResource ConfirmHeaderStyle}"
+                                        HeaderTemplate="{StaticResource ConfirmHeaderTemplate}"
+                                        CellTemplate="{StaticResource ClublogTickTemplate}"/>
+                <DataGridTemplateColumn Header="Paper QSL" IsReadOnly="True" CanUserResize="False"
+                                        SortMemberPath="PaperQslStatusRank" Width="Auto" MinWidth="76"
+                                        HeaderStyle="{StaticResource ConfirmHeaderStyle}"
+                                        HeaderTemplate="{StaticResource ConfirmHeaderTemplate}"
+                                        CellTemplate="{StaticResource PaperQslTemplate}"/>
             </DataGrid.Columns>
         </DataGrid>
+
+        <!-- Spans the combined width of the LoTW..Paper QSL header group with one line of text - see
+             ConfirmationStripHelper.cs for why an overlay is needed rather than per-column text. Kept
+             non-hit-testable so clicks still reach the header underneath (e.g. to sort). -->
+        <Border x:Name="ConfirmationStripLabel" IsHitTestVisible="False" Panel.ZIndex="50"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent"
+                TextElement.FontSize="11" TextElement.FontWeight="Bold" TextElement.Foreground="#1A1A1A">
+            <!-- The letters are created by ConfirmationStripHelper (they are spread apart at runtime to
+                 fill the strip's width), and inherit the font settings above. -->
+        </Border>
+        </Grid>
 
         <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
         <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>

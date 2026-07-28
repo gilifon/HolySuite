@@ -1,0 +1,171 @@
+<!--
+    The look of the five confirmation columns (LoTW / QRZ / eQSL / Club Log / Paper QSL), defined ONCE
+    and used by both log tables: the main window's QSODataGrid and the Log Workshop's ResultsGrid.
+
+    WHY THIS FILE EXISTS
+    The two grids are deliberately NOT merged - the main one is a read-only view, the Workshop one is an
+    editable spreadsheet with validation and undo - so they keep their own columns, right-click menus and
+    editing rules. But these five columns are purely visual and identical in both, and they are the part
+    that keeps changing (Paper QSL was added, the green strip, the colours, the fixed ordering...). Every
+    such change previously had to be made twice, and drift was real: QRZ and Club Log had different
+    tooltips in the two tables because one was updated and the other was not.
+
+    WHAT IS SHARED, AND WHY IT IS TEMPLATES RATHER THAN COLUMNS
+    A DataGridColumn belongs to exactly one DataGrid, so the columns themselves cannot be shared objects.
+    DataTemplates can, so the templates live here and each grid keeps a thin column declaration that
+    points at them.
+
+    THE GREEN STRIP
+    Each header draws its own green upper half; the ConfirmHeader* styles remove the padding and the right
+    border so those halves touch exactly and read as ONE continuous strip across the whole group. That is
+    why no code, timer or overlay is needed - it follows the columns automatically when widths change.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Header style for these five columns: no padding and no right border, so each column's green half
+         touches the next and the group reads as one strip. The main window's grid uses the plain default
+         header, so this style stands alone there; the Log Workshop's grid has its OWN header template
+         (sort arrows, grippers), so that window re-declares this style BasedOn its local base - see the
+         note there. Tan background matches the surrounding header row. -->
+    <Style x:Key="ConfirmHeaderStyle" TargetType="DataGridColumnHeader">
+        <Setter Property="BorderBrush" Value="#1565C0"/>
+        <Setter Property="BorderThickness" Value="0,0,0,3"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="Background" Value="#DEB887"/>
+    </Style>
+
+    <!-- The green band and the small bold caption. Used as HeaderTemplate, so the caption text comes from
+         each column's own Header string and only this one template defines the shape.
+         The green upper half (row 0) has NO vertical border, so it stays seamless across the group. The
+         label row (row 1) draws its OWN right-edge line instead - the column's outer header style cannot
+         do "no border up top, a border below" by itself, since BorderThickness there applies to the whole
+         header, so the line for the text lives in the template instead. -->
+    <DataTemplate x:Key="ConfirmHeaderTemplate">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <Border Grid.Row="0" Background="{DynamicResource RowOnFreqBg}"/>
+            <Border Grid.Row="1" BorderBrush="#1565C0" BorderThickness="0,0,1,0">
+                <TextBlock Text="{Binding}" FontSize="11" FontWeight="Bold" Margin="3,0,3,0"
+                           Foreground="#1A1A1A" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            </Border>
+        </Grid>
+    </DataTemplate>
+
+    <!-- LoTW: green tick = confirmed (active entity); RED tick = confirmed but a DELETED DXCC entity;
+         blank = not confirmed. Sorted three ways via LotwStatusRank (active 2 / deleted 1 / none 0). -->
+    <DataTemplate x:Key="LotwTickTemplate">
+        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Text" Value=""/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding LotwQslRcvd}" Value="1"/>
+                                <Condition Binding="{Binding LotwDeletedEntity}" Value="0"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Text" Value="&#x2713;"/>
+                            <Setter Property="Foreground" Value="#1E7E34"/>
+                            <Setter Property="ToolTip" Value="Confirmed in LoTW"/>
+                        </MultiDataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding LotwQslRcvd}" Value="1"/>
+                                <Condition Binding="{Binding LotwDeletedEntity}" Value="1"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Text" Value="&#x2713;"/>
+                            <Setter Property="Foreground" Value="#CC0000"/>
+                            <Setter Property="ToolTip" Value="Confirmed in LoTW — DELETED DXCC entity (counts all-time, not toward active awards)"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </DataTemplate>
+
+    <!-- QRZ.com: exactly parallel to LoTW, but a separate and broader set (QRZ confirms when the other
+         operator also logged the contact on QRZ). Sorted via QrzStatusRank. -->
+    <DataTemplate x:Key="QrzTickTemplate">
+        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Text" Value=""/>
+                    <Style.Triggers>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding QrzQslRcvd}" Value="1"/>
+                                <Condition Binding="{Binding QrzDeletedEntity}" Value="0"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Text" Value="&#x2713;"/>
+                            <Setter Property="Foreground" Value="#1E7E34"/>
+                            <Setter Property="ToolTip" Value="Confirmed on QRZ.com"/>
+                        </MultiDataTrigger>
+                        <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                                <Condition Binding="{Binding QrzQslRcvd}" Value="1"/>
+                                <Condition Binding="{Binding QrzDeletedEntity}" Value="1"/>
+                            </MultiDataTrigger.Conditions>
+                            <Setter Property="Text" Value="&#x2713;"/>
+                            <Setter Property="Foreground" Value="#CC0000"/>
+                            <Setter Property="ToolTip" Value="Confirmed on QRZ.com — DELETED DXCC entity (counts all-time, not toward active awards)"/>
+                        </MultiDataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </DataTemplate>
+
+    <!-- eQSL: always green - eQSL's download carries no DXCC, so the active/deleted split is unavailable
+         for it (a known limitation of the source, not a bug here). Sorted via EqslStatusRank. -->
+    <DataTemplate x:Key="EqslTickTemplate">
+        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Text" Value=""/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding EqslQslRcvd}" Value="1">
+                            <Setter Property="Text" Value="&#x2713;"/>
+                            <Setter Property="Foreground" Value="#1E7E34"/>
+                            <Setter Property="ToolTip" Value="Confirmed on eQSL"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </DataTemplate>
+
+    <!-- Club Log: green tick when Club Log's export reports QSL_RCVD = Y/V. Sorted via ClublogStatusRank. -->
+    <DataTemplate x:Key="ClublogTickTemplate">
+        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+            <TextBlock.Style>
+                <Style TargetType="TextBlock">
+                    <Setter Property="Text" Value=""/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding ClublogQslRcvd}" Value="1">
+                            <Setter Property="Text" Value="&#x2713;"/>
+                            <Setter Property="Foreground" Value="#1E7E34"/>
+                            <Setter Property="ToolTip" Value="Confirmed on Club Log"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </TextBlock.Style>
+        </TextBlock>
+    </DataTemplate>
+
+    <!-- Paper QSL: the ONLY editable confirmation column - tick it when the card arrives by post.
+         The template carries NO event handler: a handler here could not reach either window's code-behind.
+         Instead each grid attaches CheckBox.Checked / CheckBox.Unchecked at the DataGrid level and the
+         event bubbles up to it, which also keeps each window free to react in its own way. -->
+    <DataTemplate x:Key="PaperQslTemplate">
+        <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
+                  IsChecked="{Binding PaperQslConfirmed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                  ToolTip="Tick when you receive this QSO's paper QSL card by post"/>
+    </DataTemplate>
+
+</ResourceDictionary>

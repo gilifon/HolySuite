@@ -70,6 +70,10 @@ namespace HolyLogger
         // so logging, heartbeat, and ADIF are unaffected — only the on-screen display is shortened.
         TextBlock TB_FrequencyDisplay;
 
+        // Tracks the last-applied bounds of the "Received Confirmation" overlay so
+        // ConfirmationStripHelper can skip re-arranging it when layout is already stable.
+        private Rect _confirmationStripLastRect = Rect.Empty;
+
         public ObservableCollection<QSO> Qsos;
         public ObservableCollection<QSO> FilteredQsos;
 
@@ -329,6 +333,14 @@ namespace HolyLogger
 
             TB_Frequency.GotFocus += TB_Frequency_GotFocus;
             TB_Frequency.LostFocus += TB_Frequency_LostFocus;
+
+            // Keep the "Received Confirmation" overlay tracking the LoTW..Paper QSL header group's
+            // actual on-screen bounds — column widths change (Auto-sizing) and the window resizes.
+            QSODataGrid.Loaded += (s, e) => UpdateConfirmationStripPosition();
+            QSODataGrid.LayoutUpdated += (s, e) => UpdateConfirmationStripPosition();
+
+            // The same five columns drag as one block and admit no column between them.
+            ConfirmationColumnGroup.Attach(QSODataGrid);
             TB_DXCallsign.PreviewMouseLeftButtonDown += TB_DXCallsign_PreviewMouseLeftButtonDown;
             // Bindings populate after the constructor, so defer the first overlay refresh to Loaded
             // priority — by then the bound value is present and we can render its 3-decimal form.
@@ -606,6 +618,10 @@ namespace HolyLogger
 
                 item.DisplayIndex = saved.Value;
             }
+            // Only LoTW's position is remembered out of the five confirmation columns, so after restoring
+            // the saved order the other four are still wherever the XAML put them. Pull the block back
+            // together around LoTW, or the group would arrive split - see ConfirmationColumnGroup.
+            ConfirmationColumnGroup.Normalize(QSODataGrid);
             var _rwCallsign = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Callsign");
             var _rwName     = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Name");
             var _rwCountry  = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Country");
@@ -2121,9 +2137,14 @@ namespace HolyLogger
         // The Paper QSL checkbox was ticked/unticked in the log grid. The two-way binding has already
         // updated the QSO; persist it to the database and tell the Statistics window (if open) so its
         // Paper QSL folder recomputes its confirmed countries live - no recalculate button needed.
+        // Attached at the DataGrid level (CheckBox.Checked/Unchecked="PaperQsl_Changed" on QSODataGrid, in
+        // the XAML), so this fires for the shared PaperQslTemplate's checkbox via routed-event bubbling -
+        // that template has no handler of its own, since it is shared with the Log Workshop's grid too.
+        // Bubbling means `sender` is the DataGrid the handler is registered on, NOT the checkbox that was
+        // actually clicked - e.OriginalSource is the one that raised it.
         private void PaperQsl_Changed(object sender, RoutedEventArgs e)
         {
-            if (!((sender as System.Windows.Controls.CheckBox)?.DataContext is QSO qso)) return;
+            if (!((e.OriginalSource as System.Windows.Controls.CheckBox)?.DataContext is QSO qso)) return;
             try
             {
                 dal?.SetPaperQslConfirmed(qso.id, qso.PaperQslConfirmed);
@@ -2131,6 +2152,12 @@ namespace HolyLogger
                     statisticsWindow.NotifyPaperQslChanged(qso.id, qso.PaperQslConfirmed);
             }
             catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        private void UpdateConfirmationStripPosition()
+        {
+            ConfirmationStripHelper.UpdatePosition(QSODataGrid, ConfirmationStripLabel, ref _confirmationStripLastRect,
+                "LotwStatusRank", "PaperQslStatusRank");
         }
 
         private void UpdateSortArrows()

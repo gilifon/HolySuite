@@ -11,6 +11,9 @@
                      reference are set on Application.Resources at startup by ThemeManager (single
                      source of truth = ThemePalette). See Application_Startup. -->
                 <ResourceDictionary Source="Themes/Controls.xaml"/>
+                <!-- The five confirmation columns' look (LoTW/QRZ/eQSL/Club Log/Paper QSL), shared by
+                     BOTH log tables so a change to them is made once. See the file's own header. -->
+                <ResourceDictionary Source="Themes/ConfirmationColumns.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <properties:Settings x:Key="Settings" />
         </ResourceDictionary>

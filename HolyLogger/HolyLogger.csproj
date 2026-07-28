@@ -28,7 +28,7 @@
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>1</ApplicationRevision>
-    <ApplicationVersion>8.8.1.%2a</ApplicationVersion>
+    <ApplicationVersion>8.8.2.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <PublishWizardCompleted>true</PublishWizardCompleted>
     <BootstrapperEnabled>true</BootstrapperEnabled>
@@ -287,6 +287,8 @@
     </Compile>
     <Compile Include="Helper.cs" />
     <Compile Include="Log.cs" />
+    <Compile Include="ConfirmationColumnGroup.cs" />
+    <Compile Include="ConfirmationStripHelper.cs" />
     <Compile Include="SettingsFlush.cs" />
     <Compile Include="ProfileManager.cs" />
     <Compile Include="ProfileNameDialog.xaml.cs">
@@ -354,6 +356,10 @@
     <Compile Include="ToolsUserControls\MapAssetProvider.cs" />
     <Compile Include="UDPSocket.cs" />
     <Page Include="Themes\Controls.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="Themes\ConfirmationColumns.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

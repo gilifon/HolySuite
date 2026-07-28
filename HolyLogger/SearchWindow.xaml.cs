@@ -465,6 +465,22 @@ namespace HolyLogger
             // A correction to the last QSO touched would otherwise never be offered, because the row
             // is left by closing the window rather than by moving off it.
             Closing += (s, e) => OfferReupload();
+
+            // Keep the "Received Confirmation" overlay tracking the LoTW..Paper QSL header group's
+            // actual on-screen bounds — column widths change (Auto-sizing) and the window resizes.
+            ResultsGrid.Loaded += (s, e) => UpdateConfirmationStripPosition();
+            ResultsGrid.LayoutUpdated += (s, e) => UpdateConfirmationStripPosition();
+
+            // The same five columns drag as one block and admit no column between them.
+            ConfirmationColumnGroup.Attach(ResultsGrid);
+        }
+
+        private Rect _confirmationStripLastRect = Rect.Empty;
+
+        private void UpdateConfirmationStripPosition()
+        {
+            ConfirmationStripHelper.UpdatePosition(ResultsGrid, ConfirmationStripLabel, ref _confirmationStripLastRect,
+                "LotwStatusRank", "PaperQslStatusRank");
         }
 
         private void OnMouseDownOutsideCapture(object sender, MouseButtonEventArgs e)
@@ -797,9 +813,14 @@ namespace HolyLogger
 
         // Paper QSL checkbox toggled in the search results. The two-way binding has already updated the
         // QSO; persist it and tell the Statistics window (if open) so its Paper QSL folder recomputes.
+        // Attached at the DataGrid level (CheckBox.Checked/Unchecked="PaperQsl_Changed" on ResultsGrid, in
+        // the XAML), so this fires for the shared PaperQslTemplate's checkbox via routed-event bubbling -
+        // that template has no handler of its own, since it is shared with the main window's grid too.
+        // Bubbling means `sender` is the DataGrid the handler is registered on, NOT the checkbox that was
+        // actually clicked - e.OriginalSource is the one that raised it.
         private void PaperQsl_Changed(object sender, RoutedEventArgs e)
         {
-            if (!((sender as CheckBox)?.DataContext is QSO qso)) return;
+            if (!((e.OriginalSource as CheckBox)?.DataContext is QSO qso)) return;
             try
             {
                 DataAccess.GetInstance()?.SetPaperQslConfirmed(qso.id, qso.PaperQslConfirmed);
