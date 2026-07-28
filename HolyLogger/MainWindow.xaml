@@ -933,7 +933,7 @@
                              TextAlignment="Right" MaxLength="11"
                              VerticalContentAlignment="Center"
                              KeyDown="TB_FreqNoCat_KeyDown" LostFocus="TB_FreqNoCat_LostFocus"
-                             TextChanged="TB_FreqNoCat_TextChanged"/>
+                             GotFocus="TB_FreqNoCat_GotFocus" TextChanged="TB_FreqNoCat_TextChanged"/>
                 </Border>
             </Grid>
             <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"

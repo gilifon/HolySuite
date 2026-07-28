@@ -5578,6 +5578,7 @@ namespace HolyLogger
                 // QSO, which is how the Band box becomes a picker. Anything else that will not parse is
                 // still ignored - a half-typed number must not wipe a good frequency.
                 SetWorkingFrequency(string.Empty);
+                _freqNoCatBeforeEdit = string.Empty;   // "no frequency" is now the committed state
                 return;
             }
             if (double.TryParse(txt, System.Globalization.NumberStyles.Float,
@@ -5589,12 +5590,42 @@ namespace HolyLogger
                 TB_FreqNoCat.Text = (hz / 1000).ToString(System.Globalization.CultureInfo.InvariantCulture)
                                     + "." + (hz % 1000).ToString("D3", System.Globalization.CultureInfo.InvariantCulture);
             }
+
+            // Committed: THIS is now what the box held before any further editing, so Escape after
+            // pressing Enter goes back to what was just entered rather than to something older.
+            _freqNoCatBeforeEdit = TB_FreqNoCat.Text;
         }
 
         private void TB_FreqNoCat_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key == Key.Enter) { CommitFreqNoCat(); e.Handled = true; }
-            else if (e.Key == Key.Escape) { UpdateFreqLed(); e.Handled = true; }
+            else if (e.Key == Key.Escape) { RestoreFreqNoCat(); e.Handled = true; }
+        }
+
+        // What was in the box when the operator started editing it, so Escape can put it back.
+        private string _freqNoCatBeforeEdit;
+
+        private void TB_FreqNoCat_GotFocus(object sender, RoutedEventArgs e)
+        {
+            _freqNoCatBeforeEdit = TB_FreqNoCat == null ? null : TB_FreqNoCat.Text;
+        }
+
+        // Escape means "forget what I just did to this box" - typed over, or deleted altogether.
+        //
+        // It used to call UpdateFreqLed, which restores the box from the stored frequency but refuses to
+        // touch it while it has focus - and pressing Escape IN the box means it always does, so Escape
+        // did nothing whatsoever. Restoring from a snapshot also survives the deletion having already
+        // cleared the stored frequency, which is what makes the Band box a picker: by then there is
+        // nothing left to restore FROM.
+        private void RestoreFreqNoCat()
+        {
+            if (TB_FreqNoCat == null) return;
+
+            TB_FreqNoCat.Text = _freqNoCatBeforeEdit ?? string.Empty;
+            TB_FreqNoCat.CaretIndex = TB_FreqNoCat.Text.Length;
+            // Puts the frequency, the band and the read-out/picker back with it. An empty snapshot goes
+            // through the same path and leaves everything cleared, which is equally "as it was".
+            CommitFreqNoCat();
         }
 
         private void TB_FreqNoCat_LostFocus(object sender, RoutedEventArgs e)
@@ -7722,6 +7753,16 @@ namespace HolyLogger
             }
         }
 
+        // True while the caret is in one of the two frequency editors - the no-CAT box, or the inline
+        // editor over the LED. Both treat Esc as "undo this edit", which only reaches them if the
+        // window-wide Esc stands aside.
+        private bool IsEditingFrequency()
+        {
+            return (TB_FreqNoCat != null && TB_FreqNoCat.IsKeyboardFocused)
+                || (TB_FreqLedEdit != null && TB_FreqLedEdit.IsKeyboardFocused
+                    && TB_FreqLedEdit.Visibility == Visibility.Visible);
+        }
+
         // Central handler for the application-wide function keys. Returns true if the key was handled.
         // Shared by the main window preview and the cluster window so the keys keep responding even
         // when a secondary window (e.g. the Cluster window) has keyboard focus.
@@ -7745,6 +7786,15 @@ namespace HolyLogger
             }
             if (key == Key.F9 || key == Key.Escape)
             {
+                // Esc belongs to whichever frequency editor the caret is sitting in: there it undoes the
+                // edit in progress and puts back the frequency that was there. This is a TUNNELING
+                // handler, so without stepping aside it consumed Esc before the box ever saw it - and
+                // ClearBtn_Click deliberately leaves the frequency alone, so what the operator had just
+                // typed survived and looked as though Esc had accepted it. F9 still clears the form from
+                // anywhere, including from inside these boxes.
+                if (key == Key.Escape && IsEditingFrequency())
+                    return false;
+
                 // Esc also aborts a message transmission in progress (SSB voice or CW) — the same as
                 // pressing the sending F-key again. If nothing is being transmitted it clears the entry
                 // form as before. (F9 keeps its clear-only behaviour.)
