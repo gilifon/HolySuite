@@ -119,7 +119,19 @@ namespace HolyLogger.Properties {
                 this["isManualMode"] = value;
             }
         }
-        
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool isTimeManual {
+            get {
+                return ((bool)(this["isTimeManual"]));
+            }
+            set {
+                this["isTimeManual"] = value;
+            }
+        }
+
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("True")]

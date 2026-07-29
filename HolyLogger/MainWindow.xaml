@@ -352,6 +352,84 @@
                 </Setter.Value>
             </Setter>
         </Style>
+
+        <!-- The status bar's "Freq & Mode from:" choice, drawn as one two-segment pill instead of two
+             radio dots: the chosen half is filled, so which one is live reads at a glance from across
+             the room. They are still RadioButtons in the same GroupName, so FreqMode_Click and
+             UpdateFreqModeRadios drive them exactly as before.
+
+             FontWeight is deliberately NOT touched here: UpdateFreqModeRadios uses bold on Manual to
+             say it was CHOSEN rather than merely displayed for want of a radio, and a trigger setting
+             it would erase that distinction. Nor is there an IsEnabled trigger - the same method
+             already dims unavailable CAT with Opacity. -->
+        <Style x:Key="FreqSegLeft" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Seg" CornerRadius="3,0,0,3" Background="Transparent"
+                                Padding="9,3" SnapsToDevicePixels="True">
+                            <!-- The hidden bold twin is what gives this segment its width. Sized to the
+                                 visible text alone, the segment grew when UpdateFreqModeRadios bolded the
+                                 chosen Manual, and the whole status bar to its right jumped sideways on
+                                 every toggle. Reserving the bold width up front keeps each segment as
+                                 narrow as its own word - a fixed MinWidth for all four left CAT and Auto
+                                 swimming in empty space. -->
+                            <Grid>
+                                <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontWeight="Bold" Visibility="Hidden"/>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Seg" Property="Background" Value="{DynamicResource GridHeaderBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Seg" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- Identical to FreqSegLeft but rounded on the other end - the corner radius lives inside the
+             template, so the two halves cannot share one. -->
+        <Style x:Key="FreqSegRight" TargetType="RadioButton">
+            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="Seg" CornerRadius="0,3,3,0" Background="Transparent"
+                                Padding="9,3" SnapsToDevicePixels="True">
+                            <!-- See FreqSegLeft: the hidden bold twin reserves the width so bolding the
+                                 label cannot resize the segment. -->
+                            <Grid>
+                                <TextBlock Text="{Binding Content, RelativeSource={RelativeSource TemplatedParent}}"
+                                           FontWeight="Bold" Visibility="Hidden"/>
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"
+                                                  TextElement.Foreground="{Binding Foreground, RelativeSource={RelativeSource TemplatedParent}}"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Seg" Property="Background" Value="{DynamicResource GridHeaderBg}"/>
+                            </Trigger>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="Seg" Property="Background" Value="{DynamicResource AccentBrush}"/>
+                                <Setter Property="Foreground" Value="{DynamicResource SelectionText}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
     <!-- White frame around the whole window (title bar included). Wrapping Content in a Border is
@@ -404,6 +482,10 @@
                 </DockPanel>
             </Border>
             <Grid DockPanel.Dock="Top">
+            <!-- Menu bar and the callsign lock share one left-aligned row, so the lock sits immediately
+                 past "Help" whatever the menu measures - it belongs with the station identity it guards,
+                 not among the status bar's counters where it used to live. -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
             <Menu VerticalAlignment="Center" HorizontalAlignment="Left" Background="Transparent">
                 <MenuItem Header="File" FontSize="16">
                     <MenuItem x:Name="ViewLogsMenuItem" Header="Log Manager" ToolTip="See all your logs; open, rename, delete, export, or create a new log" Click="ViewLogsMenuItem_Click">
@@ -511,7 +593,7 @@
                                     <Image Source="Images/station.png" Stretch="UniformToFill" Width="16" Height="16"/>
                                 </MenuItem.Icon>
                             </MenuItem>-->
-                    <!-- "Manual Mode" removed from Tools: the status bar's "Freq from: Manual / CAT"
+                    <!-- "Manual Mode" removed from Tools: the status bar's "Freq &amp; Mode: CAT / Manual"
                          radio buttons now own this, and they name both states instead of one. -->
                     <MenuItem x:Name="ResetQSOCounterMenuItem" Header="Reset QSO Counter" ToolTip="Reset the QSO counter" Click="ResetRecentQSOCounterMenuItem_Click">
                         <MenuItem.Icon>
@@ -704,11 +786,49 @@
                     </MenuItem>
                 </MenuItem>
             </Menu>
+            <Border x:Name="LockBtnBorder" CornerRadius="3" Padding="3,1" Margin="10,0,0,0"
+                    VerticalAlignment="Center" Background="Transparent">
+                <!-- Icon rendered via OpacityMask so the PNG's shape is painted in a solid color.
+                     Always black: this lock always sits on the light red/blue lock background
+                     (a white icon would vanish there in dark mode). -->
+                <Rectangle x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'"
+                           Height="22" Width="20" Fill="Black"
+                           MouseUp="Lock_Btn_MouseUp" Cursor="Hand">
+                    <Rectangle.OpacityMask>
+                        <ImageBrush x:Name="LockMask" ImageSource="Images/lock.png" Stretch="Uniform"/>
+                    </Rectangle.OpacityMask>
+                </Rectangle>
+            </Border>
+            </StackPanel>
 
                 <!-- UTC clock, centred over the map (the map spans x=677..right-6 in the row below). -->
                 <TextBlock x:Name="L_TitleClock" HorizontalAlignment="Stretch" TextAlignment="Center"
                            Margin="677,0,6,0" VerticalAlignment="Center"
                            FontWeight="Bold" Foreground="{DynamicResource TextBrush}" FontSize="20" IsHitTestVisible="False" Visibility="Collapsed"/>
+
+                <!-- Heartbeat button, at the top right corner of the window, past the clock. The clock
+                     stretches across this same cell but is centred text and not hit-testable, so the two
+                     do not fight over the space or over the click. -->
+                <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="0,0,8,0"
+                        HorizontalAlignment="Right" VerticalAlignment="Center"
+                        Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1"
+                        ToolTipService.Placement="Left" Visibility="Visible" Cursor="Hand" Click="ShareStatusButton_Click">
+                    <Button.ToolTip>
+                        <TextBlock TextAlignment="Center">
+                            <Run Text="Send heartbeat to"/>
+                            <LineBreak/>
+                            <Run Text="HolyLogger On The Air"/>
+                        </TextBlock>
+                    </Button.ToolTip>
+                    <Viewbox Width="14" Height="14">
+                        <Canvas Width="24" Height="24">
+                            <Path Stroke="#303030" StrokeThickness="2" Fill="Transparent" Data="M7,12 L16,7 M7,12 L16,17"/>
+                            <Ellipse Canvas.Left="3.5" Canvas.Top="8.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                            <Ellipse Canvas.Left="14.5" Canvas.Top="3.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                            <Ellipse Canvas.Left="14.5" Canvas.Top="13.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
+                        </Canvas>
+                    </Viewbox>
+                </Button>
             </Grid>
         </DockPanel>
         <DockPanel Grid.Row="4">
@@ -752,6 +872,50 @@
                 <StatusBarItem>
                     <StatusBarItem.ContextMenu>
                         <ContextMenu>
+                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
+                    <TextBlock Margin="10,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Recent"/><LineBreak/><Run Text="QSOs:"/></TextBlock>
+                </StatusBarItem>
+                <StatusBarItem>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
+                                <MenuItem.Icon>
+                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                                </MenuItem.Icon>
+                            </MenuItem>
+                        </ContextMenu>
+                    </StatusBarItem.ContextMenu>
+                    <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}" Margin="0,0,0,0" FontSize="16" VerticalAlignment="Center"/>
+                </StatusBarItem>
+                <!-- Frequency source: at the end of the counters, because the counts belong together and
+                     this is a setting rather than another number to read.
+
+                     Label and toggle live in ONE framed box: they are a single question ("where does the
+                     frequency come from?") and its answer, and side by side on a busy status bar without
+                     a frame they read as two unrelated items. "from:" is gone - the frame says the toggle
+                     belongs to the label, so the word had nothing left to do.
+
+                     Two named choices rather than one switch: an on/off switch labelled "Manual Mode"
+                     only ever names ONE of the two states, so "off" left the operator guessing what
+                     the program was actually doing. Both states are now spelled out.
+                     RB_CatMode is greyed out by UpdateFreqModeRadios when CAT is unavailable, since
+                     the frequency cannot come from the radio then.
+                     Click, not Checked: with CAT unavailable the display already shows Manual, so a
+                     click on it is no transition and raises no Checked - which left the operator
+                     unable to actually CHOOSE Manual (and with it the band picker). Click fires on every
+                     press, checked or not.
+
+                     This toggle governs the FREQUENCY AND MODE only. It used to freeze the date and time
+                     as well; holding those still is getting a switch of its own. -->
+                <StatusBarItem>
+                    <StatusBarItem.ContextMenu>
+                        <ContextMenu>
                             <MenuItem Header="Change mode" Click="ManualModeMenuItem_Click">
                                 <MenuItem.Icon>
                                     <Image Source="Images/manual.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -759,82 +923,58 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                    <TextBlock Margin="10,0,4,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Freq"/><LineBreak/><Run Text="from:"/></TextBlock>
+                    <!-- Blue frame: the accent colour, so the group is picked out from the plain text and
+                         counts around it and follows the theme (it lightens on the dark schemes). -->
+                    <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource AccentBrush}"
+                            Margin="12,0,0,0" Padding="7,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Freq &amp; Mode" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <!-- The toggle keeps its own hairline frame: it is the control, the outer box
+                                 is only the grouping. -->
+                            <Border CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                    VerticalAlignment="Center" SnapsToDevicePixels="True">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="RB_CatMode" GroupName="FreqMode" Content="CAT"
+                                                 Style="{StaticResource FreqSegLeft}" Click="FreqMode_Click"
+                                                 ToolTip="The frequency and mode are read from the radio over CAT."/>
+                                    <!-- Hairline between the halves, so the pill still reads as two choices
+                                         when neither is being hovered. -->
+                                    <Rectangle Width="1" Fill="{DynamicResource ThemeBorderBrush}"/>
+                                    <RadioButton x:Name="RB_ManualMode" GroupName="FreqMode" Content="Manual"
+                                                 Style="{StaticResource FreqSegRight}" Click="FreqMode_Click"
+                                                 ToolTip="You type the frequency and pick the mode yourself."/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </Border>
                 </StatusBarItem>
+                <!-- The QSO's date and time: do they follow the UTC clock, or stand where you set them?
+                     Built like the frequency group beside it - same framed label + two-segment toggle - so
+                     the two read as the same kind of choice. The frame is RED because Manual here means
+                     the date and time on screen are NOT the time now, which is worth noticing at a glance
+                     when you look up mid-contact.
+
+                     This is the switch that used to be part of Manual Mode. It is its own now: where the
+                     frequency comes from and whether the clock runs are two unrelated questions, and
+                     answering one by answering the other surprised people. -->
                 <StatusBarItem>
-                    <!-- Two named choices rather than one switch: an on/off switch labelled "Manual Mode"
-                         only ever names ONE of the two states, so "off" left the operator guessing what
-                         the program was actually doing. Both states are now spelled out.
-                         RB_CatMode is greyed out by UpdateFreqModeRadios when CAT is unavailable, since
-                         the frequency cannot come from the radio then.
-                         Click, not Checked: with CAT unavailable the display already shows Manual, so a
-                         click on it is no transition and raises no Checked - which left the operator
-                         unable to actually CHOOSE Manual (and with it the frozen date/time and the band
-                         picker). Click fires on every press, checked or not. -->
-                    <StackPanel Orientation="Vertical" VerticalAlignment="Center">
-                        <RadioButton x:Name="RB_CatMode" GroupName="FreqMode" Content="CAT"
-                                     FontSize="12" Cursor="Hand" Click="FreqMode_Click"
-                                     ToolTip="The frequency is read from the radio over CAT"/>
-                        <RadioButton x:Name="RB_ManualMode" GroupName="FreqMode" Content="Manual"
-                                     FontSize="12" Margin="0,2,0,0" Cursor="Hand" Click="FreqMode_Click"
-                                     ToolTip="You type the frequency yourself"/>
-                    </StackPanel>
-                </StatusBarItem>
-                <StatusBarItem>
-                    <StatusBarItem.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </ContextMenu>
-                    </StatusBarItem.ContextMenu>
-                    <TextBlock Margin="8,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Recent"/><LineBreak/><Run Text="QSOs:"/></TextBlock>
-                </StatusBarItem>
-                <StatusBarItem>
-                    <StatusBarItem.ContextMenu>
-                        <ContextMenu>
-                            <MenuItem Header="Reset" Click="ResetRecentQSOCounterMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>
-                        </ContextMenu>
-                    </StatusBarItem.ContextMenu>
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock x:Name="L_QSOCounter" Text="{Binding Default.RecentQSOCounter, Source={StaticResource Settings}}" Margin="0,0,0,0" FontSize="16" VerticalAlignment="Center"/>
-                        <Button x:Name="ShareStatusButton" Width="24" Height="24" Padding="0" Margin="30,0,0,0" Background="#4CAF50" BorderBrush="#2E7D32" BorderThickness="1" ToolTipService.Placement="Top" Visibility="Visible" Cursor="Hand" Click="ShareStatusButton_Click">
-                            <Button.ToolTip>
-                                <TextBlock TextAlignment="Center">
-                                    <Run Text="Send heartbeat to"/>
-                                    <LineBreak/>
-                                    <Run Text="HolyLogger On The Air"/>
-                                </TextBlock>
-                            </Button.ToolTip>
-                            <Viewbox Width="14" Height="14">
-                                <Canvas Width="24" Height="24">
-                                    <Path Stroke="#303030" StrokeThickness="2" Fill="Transparent" Data="M7,12 L16,7 M7,12 L16,17"/>
-                                    <Ellipse Canvas.Left="3.5" Canvas.Top="8.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
-                                    <Ellipse Canvas.Left="14.5" Canvas.Top="3.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
-                                    <Ellipse Canvas.Left="14.5" Canvas.Top="13.5" Width="7" Height="7" Stroke="#303030" StrokeThickness="2" Fill="Transparent"/>
-                                </Canvas>
-                            </Viewbox>
-                        </Button>
-                    </StackPanel>
-                </StatusBarItem>
-                <StatusBarItem>
-                    <Border x:Name="LockBtnBorder" CornerRadius="3" Padding="3,1" Margin="5,0,0,0" Background="Transparent">
-                        <!-- Icon rendered via OpacityMask so the PNG's shape is painted in a solid color.
-                             Always black: this lock always sits on the light red/blue lock background
-                             (a white icon would vanish there in dark mode). -->
-                        <Rectangle x:Name="Lock_Btn" ToolTip="Lock/Unlock 'My Callsign' and 'My Square'"
-                                   Height="22" Width="20" Fill="Black"
-                                   MouseUp="Lock_Btn_MouseUp" Cursor="Hand">
-                            <Rectangle.OpacityMask>
-                                <ImageBrush x:Name="LockMask" ImageSource="Images/lock.png" Stretch="Uniform"/>
-                            </Rectangle.OpacityMask>
-                        </Rectangle>
+                    <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource Danger}"
+                            Margin="10,0,0,0" Padding="7,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Time" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <Border CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                    VerticalAlignment="Center" SnapsToDevicePixels="True">
+                                <StackPanel Orientation="Horizontal">
+                                    <RadioButton x:Name="RB_TimeManual" GroupName="TimeMode" Content="Manual"
+                                                 Style="{StaticResource FreqSegLeft}" Click="TimeMode_Click"
+                                                 ToolTip="The QSO's date and time stay exactly as you set them, so you can log a contact that happened earlier."/>
+                                    <Rectangle Width="1" Fill="{DynamicResource ThemeBorderBrush}"/>
+                                    <RadioButton x:Name="RB_TimeAuto" GroupName="TimeMode" Content="Auto"
+                                                 Style="{StaticResource FreqSegRight}" Click="TimeMode_Click"
+                                                 ToolTip="The QSO's date and time follow the UTC clock."/>
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
                     </Border>
                 </StatusBarItem>
                 <StatusBarItem>

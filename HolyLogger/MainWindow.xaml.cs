@@ -467,6 +467,7 @@ namespace HolyLogger
                 Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
 
             UpdateFreqModeRadios();
+            UpdateTimeModeRadios();
 
             AdifHandlerWorker = new BackgroundWorker();
             AdifHandlerWorker.WorkerReportsProgress = true;
@@ -1344,9 +1345,14 @@ namespace HolyLogger
             this.Dispatcher.Invoke(() =>
             {
                 UpdateTitleClock();
-                // Keep the QSO Date/Time pickers ticking with UTC — but never overwrite a
-                // QSO being edited (state != New) or a manually set time (Manual Mode).
-                if (state == State.New && !Properties.Settings.Default.isManualMode)
+                // Keep the QSO Date/Time pickers ticking with UTC. Two things stop them: a QSO being
+                // edited (state != New), which must not have the clock typed over it, and the status
+                // bar's Time toggle set to Manual.
+                //
+                // The FREQUENCY toggle (CAT/Manual) deliberately has no say here any more: where the
+                // frequency comes from and whether the clock runs are unrelated questions, and answering
+                // one by answering the other surprised operators who had only meant to type a frequency.
+                if (state == State.New && !Properties.Settings.Default.isTimeManual)
                 {
                     TP_Date.Value = DateTime.UtcNow;
                     TP_Time.Value = DateTime.UtcNow;
@@ -1813,7 +1819,9 @@ namespace HolyLogger
             UpdateCountryFlag(null);
             ClearQrzPhoto();
             Continent = string.Empty;
-            if (!Properties.Settings.Default.isManualMode)
+            // Clearing the form starts a new contact, so its date and time are now - unless the operator
+            // is holding them (Time: Manual), e.g. while typing up a page of contacts made off-line.
+            if (!Properties.Settings.Default.isTimeManual)
                 RefreshDateTime_Btn_MouseUp(null, null);
             TB_DXCallsign.Focus();
             ClearMatrix();
@@ -4759,7 +4767,7 @@ namespace HolyLogger
         // unavailable: the display then reads Manual (the frequency is typed, whatever the setting says)
         // while the setting is still CAT. Comparing against the display made the click a no-op there, so
         // a station with no CAT interface could never actually choose Manual - and therefore never got
-        // the date/time it sets itself, or the band picker.
+        // the band picker.
         private void FreqMode_Click(object sender, RoutedEventArgs e)
         {
             if (_settingFreqModeRadios) return;
@@ -4785,14 +4793,32 @@ namespace HolyLogger
         private bool IsFrequencyTyped =>
             Properties.Settings.Default.isManualMode || !IsCatFrequencyAvailable;
 
+        // Whether the frequency was TYPED last time the radios were refreshed. Null until the first
+        // refresh, so starting the program with CAT live is not mistaken for the operator switching to
+        // it - a Time: Manual saved from the last session survives the launch.
+        private bool? _prevFreqTyped;
+
         // Selects the right radio button and disables CAT when the frequency cannot come from the radio
         // (CAT off, no rig, or rig offline) - choosing it there would promise something that can't happen.
+        // Also the one place that notices CAT taking the frequency back over (see _prevFreqTyped).
         private void UpdateFreqModeRadios()
         {
             if (RB_ManualMode == null || RB_CatMode == null) return;
 
             bool catAvailable = IsCatFrequencyAvailable;
             bool typed = IsFrequencyTyped;
+
+            // The frequency has just gone back to coming from the radio (the operator clicked CAT, or
+            // enabled CAT / brought the rig online). Release the clock with it: a program that is
+            // following the rig live has no business showing a time that stopped some while ago, and an
+            // operator who set BOTH to Manual to type up a page of old contacts should not have to
+            // remember the second switch on the way back.
+            //
+            // Deliberately an EDGE, not a standing rule: only this transition forces Auto, so choosing
+            // Time: Manual afterwards, with CAT running, is left alone.
+            if (_prevFreqTyped == true && !typed)
+                ForceTimeAuto();
+            _prevFreqTyped = typed;
 
             _settingFreqModeRadios = true;
             try
@@ -4811,26 +4837,29 @@ namespace HolyLogger
                 // when it is both unavailable and not something the operator is currently in.
                 RB_CatMode.IsEnabled = catAvailable || chosenManual;
                 RB_CatMode.Opacity = catAvailable ? 1.0 : 0.5;
+                // The tooltips speak of the frequency and the mode ONLY. They used to promise that Manual
+                // also held the date and time still; it no longer does (see UTCTimer_Elapsed), and a
+                // tooltip that describes behaviour the program has stopped having is worse than none.
                 RB_CatMode.ToolTip = catAvailable
-                    ? "The frequency is read from the radio over CAT"
+                    ? "The frequency and mode are read from the radio over CAT."
                     : chosenManual
                         ? "Leave Manual. CAT is not connected, so the frequency is still typed - but the "
-                          + "date and time go back to following UTC by themselves."
+                          + "program goes back to the radio by itself as soon as one comes online."
                         : "CAT is not connected, so the frequency cannot be read from the radio. "
                           + "Enable it in Options > General and put the radio online.";
 
                 // Manual is shown for two different reasons - because it was chosen, or because there is
-                // no CAT to read from - and they behave differently (a chosen Manual freezes the date and
-                // time and lets you pick the band). Bold says which one this is.
+                // no CAT to read from - and they behave differently (a chosen Manual lets you pick the
+                // band, and holds even after a radio comes online). Bold says which one this is.
                 RB_ManualMode.FontWeight = chosenManual ? FontWeights.Bold : FontWeights.Normal;
                 RB_ManualMode.ToolTip = chosenManual
-                    ? "Manual: you type the frequency, and the date and time stay exactly as you set them "
-                      + "until you change them yourself."
+                    ? "Manual: you type the frequency and pick the mode yourself, and the program leaves "
+                      + "them alone even when a radio is online."
                     : catAvailable
-                        ? "You type the frequency yourself. The date and time also stop following UTC, so "
-                          + "you can log a QSO that happened earlier."
-                        : "CAT is not connected, so the frequency is typed anyway. Click to also hold the "
-                          + "date and time at what you set, and pick the band yourself.";
+                        ? "You type the frequency and pick the mode yourself instead of reading them from "
+                          + "the radio."
+                        : "CAT is not connected, so the frequency is typed anyway. Click to choose Manual "
+                          + "properly, which also lets you pick the band yourself.";
             }
             finally { _settingFreqModeRadios = false; }
         }
@@ -4859,13 +4888,76 @@ namespace HolyLogger
             // read-out of the frequency the moment CAT is chosen.
             UpdateBandPickAvailability();
 
-            // Back to CAT: the date and time follow UTC again. Do it here rather than waiting for the
-            // next tick of the UTC timer, so the change is visible the instant the button is clicked.
-            if (!Properties.Settings.Default.isManualMode && state == State.New)
+            // Nothing to do about the date and time here: they are the Time toggle's business now (see
+            // TimeMode_Click), and this switch no longer touches them.
+        }
+
+        // ---- Time: Manual / Auto -----------------------------------------------------------------
+
+        // Guard, like _settingFreqModeRadios: ignore the clicks we raise ourselves.
+        private bool _settingTimeModeRadios = false;
+
+        // Clicking "Manual" or "Auto" in the status bar's Time box. Manual holds the QSO's date and time
+        // exactly where the operator put them, so a contact that happened earlier can be logged with its
+        // real time; Auto lets them follow the UTC clock. The frequency is not this switch's business -
+        // that is the box next door.
+        private void TimeMode_Click(object sender, RoutedEventArgs e)
+        {
+            if (_settingTimeModeRadios) return;
+
+            bool wantManual = sender == RB_TimeManual;
+            if (wantManual == Properties.Settings.Default.isTimeManual)
+            {
+                // Already in that state; the click may still have moved the fill, so put it back.
+                UpdateTimeModeRadios();
+                return;
+            }
+
+            Properties.Settings.Default.isTimeManual = wantManual;
+            UpdateTimeModeRadios();
+
+            // Back to Auto: catch the clock up at once rather than waiting for the next tick, so the
+            // click is visibly doing something. Never over a QSO being edited - its own time stands.
+            if (!wantManual && state == State.New)
             {
                 TP_Date.Value = DateTime.UtcNow;
                 TP_Time.Value = DateTime.UtcNow;
             }
+        }
+
+        // Puts the Time toggle back to Auto and catches the clock up. Called when CAT takes the frequency
+        // back over; does nothing if the clock is already running, so it costs nothing to call.
+        private void ForceTimeAuto()
+        {
+            if (!Properties.Settings.Default.isTimeManual) return;
+
+            Properties.Settings.Default.isTimeManual = false;
+            UpdateTimeModeRadios();
+
+            // Never over a QSO being edited - its own date and time stand.
+            if (state == State.New)
+            {
+                TP_Date.Value = DateTime.UtcNow;
+                TP_Time.Value = DateTime.UtcNow;
+            }
+        }
+
+        // Shows which half of the Time toggle is live, driven from the setting so it follows the state
+        // however it was changed. Bold on Manual for the same reason the frequency pill bolds its Manual:
+        // the half that is holding something still is the one worth spotting.
+        private void UpdateTimeModeRadios()
+        {
+            if (RB_TimeManual == null || RB_TimeAuto == null) return;
+
+            bool manual = Properties.Settings.Default.isTimeManual;
+            _settingTimeModeRadios = true;
+            try
+            {
+                RB_TimeManual.IsChecked = manual;
+                RB_TimeAuto.IsChecked = !manual;
+                RB_TimeManual.FontWeight = manual ? FontWeights.Bold : FontWeights.Normal;
+            }
+            finally { _settingTimeModeRadios = false; }
         }
 
         private void ResetRecentQSOCounterMenuItem_Click(object sender, RoutedEventArgs e)
@@ -9016,8 +9108,9 @@ namespace HolyLogger
                 return;
             }
 
-            // Refresh date/time if in automatic mode
-            if (!Properties.Settings.Default.isManualMode && state == State.New)
+            // Typing a callsign is the start of a contact, so its date and time are now - unless a QSO is
+            // being edited, or the operator is holding the clock (Time: Manual).
+            if (state == State.New && !Properties.Settings.Default.isTimeManual)
                 RefreshDateTime_Btn_MouseUp(null, null);
 
             // Perform DXCC lookup (cached by EntityResolver)
