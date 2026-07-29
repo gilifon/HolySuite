@@ -856,6 +856,7 @@ Environment.NewLine +
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                        if (rdr["qrz_status"] != null && rdr["qrz_status"] != DBNull.Value) q.QrzStatus = Convert.ToInt32(rdr["qrz_status"]);
                         if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
                         if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
                         if (rdr["lotw_deleted_entity"] != null && rdr["lotw_deleted_entity"] != DBNull.Value) q.LotwDeletedEntity = Convert.ToInt32(rdr["lotw_deleted_entity"]);
@@ -941,6 +942,7 @@ Environment.NewLine +
                             if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                             if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                             if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                            if (rdr["qrz_status"] != null && rdr["qrz_status"] != DBNull.Value) q.QrzStatus = Convert.ToInt32(rdr["qrz_status"]);
                         if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
                         if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
                         if (rdr["lotw_deleted_entity"] != null && rdr["lotw_deleted_entity"] != DBNull.Value) q.LotwDeletedEntity = Convert.ToInt32(rdr["lotw_deleted_entity"]);
@@ -1075,6 +1077,7 @@ Environment.NewLine +
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
+                        if (rdr["qrz_status"] != null && rdr["qrz_status"] != DBNull.Value) q.QrzStatus = Convert.ToInt32(rdr["qrz_status"]);
                         if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
                         if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
                         if (rdr["lotw_deleted_entity"] != null && rdr["lotw_deleted_entity"] != DBNull.Value) q.LotwDeletedEntity = Convert.ToInt32(rdr["lotw_deleted_entity"]);

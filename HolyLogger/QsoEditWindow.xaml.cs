@@ -48,8 +48,12 @@ namespace HolyLogger
                 && sl >= wa.Left - 4 && sl <= wa.Right - 80 && st >= wa.Top - 4 && st <= wa.Bottom - 30)
             {
                 WindowStartupLocation = WindowStartupLocation.Manual;
+                // The window is tall (every field of the QSO is on it), so a remembered top that used to
+                // fit can now push Save/Cancel off the bottom of the screen. Slide it up until it fits.
                 Left = sl;
-                Top = st;
+                Top = ActualHeight > 0 && st + ActualHeight > wa.Bottom
+                    ? Math.Max(wa.Top, wa.Bottom - ActualHeight)
+                    : st;
                 return;
             }
             PositionAwayFromRow(wa);
@@ -107,18 +111,34 @@ namespace HolyLogger
             _loading = true;
 
             TB_TitleCall.Text = S(_qso.DXCall);
+            TB_TitleId.Text   = _qso.id > 0 ? "#" + _qso.id : string.Empty;
             TB_Call.Text     = S(_qso.DXCall);
             TB_Country.Text  = S(_qso.Country);
             // Date / Time shown in the SAME friendly format as the log table (dd-MM-yyyy, HH:mm:ss).
             TB_Date.Text     = (_dateConv.Convert(S(_qso.Date), typeof(string), null, _ci) as string) ?? S(_qso.Date);
             TB_Time.Text     = (_timeConv.Convert(S(_qso.Time), typeof(string), null, _ci) as string) ?? S(_qso.Time);
             TB_Mode.Text     = S(_qso.Mode);
+            TB_Submode.Text  = S(_qso.SUBMode);
             TB_Freq.Text     = S(_qso.Freq);
             TB_RstSent.Text  = S(_qso.RST_SENT);
             TB_RstRcvd.Text  = S(_qso.RST_RCVD);
             TB_Name.Text     = S(_qso.Name);
             TB_Exchange.Text = S(_qso.SRX);
             TB_Comment.Text  = S(_qso.Comment);
+
+            TB_DxLocator.Text = S(_qso.DXLocator);
+            TB_Continent.Text = S(_qso.Continent);
+            TB_CqZone.Text    = S(_qso.CQZone);
+            TB_ItuZone.Text   = S(_qso.ITUZone);
+            TB_State.Text     = S(_qso.State);
+            TB_PropMode.Text  = S(_qso.PROP_MODE);
+            TB_SatName.Text   = S(_qso.SAT_NAME);
+
+            TB_MyCall.Text    = S(_qso.MyCall);
+            TB_Operator.Text  = S(_qso.Operator);
+            TB_MySquare.Text  = S(_qso.STX);
+            TB_MyLocator.Text = S(_qso.MyLocator);
+            TB_Soapbox.Text   = S(_qso.SOAPBOX);
 
             SetBandValue(S(_qso.Band));
 
@@ -128,22 +148,79 @@ namespace HolyLogger
             CB_ConfClublog.IsChecked = _qso.ClublogQslRcvd == 1;
             CB_ConfPaper.IsChecked   = _qso.PaperQslRcvd == 1;
 
+            TB_LotwNote.Text    = ConfNote(_qso.LotwQslRcvd, _qso.LotwQslRDate, _qso.LotwDeletedEntity);
+            TB_QrzNote.Text     = ConfNote(_qso.QrzQslRcvd, _qso.QrzQslRDate, _qso.QrzDeletedEntity);
+            TB_EqslNote.Text    = ConfNote(_qso.EqslQslRcvd, _qso.EqslQslRDate, _qso.EqslDeletedEntity);
+            TB_ClublogNote.Text = ConfNote(_qso.ClublogQslRcvd, _qso.ClublogQslRDate, _qso.ClublogDeletedEntity);
+            // A paper card is recorded by hand and carries no date or DXCC code with it.
+            TB_PaperNote.Text   = _qso.PaperQslRcvd == 1 ? "by post" : string.Empty;
+
+            TB_UpLotw.Text    = UploadNote(_qso.LotwStatus);
+            TB_UpQrz.Text     = UploadNote(_qso.QrzStatus);
+            TB_UpEqsl.Text    = UploadNote(_qso.EqslStatus);
+            TB_UpClublog.Text = UploadNote(_qso.ClublogStatus);
+
+            DeriveFromCall(onlyIfBlank: true);   // fill Country/Continent only where the QSO has none
+
             _loading = false;
             UpdateBandFromFreq();   // lock/derive the band if a frequency is set
         }
 
-        // Country is read-only and always follows the callsign's DXCC prefix (letting it disagree with the
-        // callsign is exactly the kind of error awards/statistics are counted from), so re-derive it live.
+        // The line under a confirmation tick: when the service recorded it, and whether the entity it was
+        // credited to is a DELETED DXCC entity. Nothing at all when the QSO is not confirmed there.
+        private static string ConfNote(int rcvd, string rdate, int deletedEntity)
+        {
+            if (rcvd != 1) return string.Empty;
+            string when = (_dateConv.Convert(S(rdate), typeof(string), null, _ci) as string) ?? S(rdate);
+            if (string.IsNullOrWhiteSpace(when)) when = "date not given";
+            return deletedEntity == 1 ? when + "\ndeleted DXCC entity" : when;
+        }
+
+        // The upload-queue states a QSO can be in, in the words the upload menus use.
+        private static string UploadNote(int status)
+        {
+            switch (status)
+            {
+                case 1:  return "Uploaded";
+                case 2:  return "Rejected";
+                default: return "Pending";
+            }
+        }
+
+        // Country and Continent are read-only and always follow the callsign's DXCC prefix (letting either
+        // disagree with the callsign is exactly the kind of error awards/statistics are counted from), so
+        // re-derive them the moment the callsign is retyped.
         private void Call_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (TB_Country == null) return;
+            if (_loading) return;
+            DeriveFromCall(onlyIfBlank: false);
+        }
+
+        // Country and Continent from ONE prefix lookup, the same one the main window logs with.
+        // onlyIfBlank is used at load time: what the QSO actually carries is shown as-is, and only a field
+        // the QSO never had (an old row logged before the field existed) is filled in from the prefix.
+        private void DeriveFromCall(bool onlyIfBlank)
+        {
+            if (TB_Country == null || TB_Continent == null) return;
             string call = (TB_Call.Text ?? string.Empty).Trim();
-            if (call.Length == 0) { TB_Country.Text = string.Empty; return; }
+            if (call.Length == 0)
+            {
+                if (!onlyIfBlank) { TB_Country.Text = string.Empty; TB_Continent.Text = string.Empty; }
+                return;
+            }
             try
             {
-                string name = _resolver.GetDXCC(call)?.Name;
-                if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                var dxcc = _resolver.GetDXCC(call);
+                string name = dxcc?.Name;
+                if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase)
+                    && (!onlyIfBlank || string.IsNullOrWhiteSpace(TB_Country.Text)))
                     TB_Country.Text = name;
+                // "XX" is the resolver's way of saying it did not recognise the prefix - keep what the QSO
+                // already carried rather than overwriting it with a non-continent.
+                string cont = dxcc?.Continent;
+                if (!string.IsNullOrEmpty(cont) && !string.Equals(cont, "XX", StringComparison.OrdinalIgnoreCase)
+                    && (!onlyIfBlank || string.IsNullOrWhiteSpace(TB_Continent.Text)))
+                    TB_Continent.Text = cont;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -207,6 +284,19 @@ namespace HolyLogger
                 _qso.Name      = TB_Name.Text.Trim();
                 _qso.SRX       = TB_Exchange.Text.Trim();
                 _qso.Comment   = TB_Comment.Text.Trim();
+                _qso.SUBMode   = TB_Submode.Text.Trim();
+                _qso.DXLocator = TB_DxLocator.Text.Trim();
+                _qso.Continent = TB_Continent.Text.Trim();
+                _qso.CQZone    = TB_CqZone.Text.Trim();
+                _qso.ITUZone   = TB_ItuZone.Text.Trim();
+                _qso.State     = TB_State.Text.Trim();
+                _qso.PROP_MODE = TB_PropMode.Text.Trim();
+                _qso.SAT_NAME  = TB_SatName.Text.Trim();
+                _qso.MyCall    = TB_MyCall.Text.Trim();
+                _qso.Operator  = TB_Operator.Text.Trim();
+                _qso.STX       = TB_MySquare.Text.Trim();
+                _qso.MyLocator = TB_MyLocator.Text.Trim();
+                _qso.SOAPBOX   = TB_Soapbox.Text.Trim();
 
                 _qso.LotwQslRcvd    = CB_ConfLotw.IsChecked    == true ? 1 : 0;
                 _qso.QrzQslRcvd     = CB_ConfQrz.IsChecked     == true ? 1 : 0;

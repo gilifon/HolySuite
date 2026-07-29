@@ -37,7 +37,22 @@
         <Style x:Key="ConfBox" TargetType="CheckBox">
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
-            <Setter Property="Margin" Value="1,3,1,4"/>
+            <Setter Property="Margin" Value="1,3,1,2"/>
+        </Style>
+        <!-- The confirmation date printed under a confirmation tick (and the deleted-entity note). -->
+        <Style x:Key="ConfNote" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="#3E5A7A"/>
+            <Setter Property="TextAlignment" Value="Center"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Margin" Value="2,0,2,4"/>
+        </Style>
+        <!-- Caption above a group of fields. -->
+        <Style x:Key="Caption" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#0D47A1"/>
+            <Setter Property="Margin" Value="13,6,0,1"/>
         </Style>
     </Window.Resources>
 
@@ -50,11 +65,15 @@
             <!-- Title bar (drag to move) -->
             <Border x:Name="TitleBar" CornerRadius="12,12,0,0" Background="#1565C0" Padding="14,8"
                     MouseLeftButtonDown="TitleBar_MouseDown">
-                <DockPanel>
-                    <TextBlock Text="Edit QSO" Foreground="White" FontSize="15" FontWeight="Bold" VerticalAlignment="Center"/>
-                    <TextBlock x:Name="TB_TitleCall" DockPanel.Dock="Right" Foreground="#CFE3FF" FontSize="14"
-                               FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Right"/>
-                </DockPanel>
+                <!-- Grid, not DockPanel: the callsign is centred on the BAR, not on what is left of it. -->
+                <Grid>
+                    <TextBlock Text="Full View &amp; Edit" Foreground="White" FontSize="15" FontWeight="Bold"
+                               VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                    <TextBlock x:Name="TB_TitleCall" Foreground="#FFFFFF" FontSize="17"
+                               FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                    <TextBlock x:Name="TB_TitleId" Foreground="#9EC5F5" FontSize="11"
+                               VerticalAlignment="Center" HorizontalAlignment="Right"/>
+                </Grid>
             </Border>
 
             <!-- The table's columns, folded into two stacked header+cell rows, each field at its table
@@ -93,46 +112,172 @@
                           ToolTip="Pick the band. When a frequency is set, the band is derived from it and locked."/>
             </Grid>
 
-            <!-- Row 2 -->
-            <Grid Margin="12,2,12,6">
+            <!-- Row 2: the rest of what was received from the DX station. -->
+            <Grid Margin="12,2,12,4">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="52"/>
-                    <ColumnDefinition Width="52"/>
+                    <ColumnDefinition Width="54"/>
+                    <ColumnDefinition Width="54"/>
                     <ColumnDefinition Width="62"/>
-                    <ColumnDefinition Width="82"/>
-                    <ColumnDefinition Width="192"/>
-                    <ColumnDefinition Width="46"/>
-                    <ColumnDefinition Width="46"/>
-                    <ColumnDefinition Width="46"/>
-                    <ColumnDefinition Width="60"/>
-                    <ColumnDefinition Width="66"/>
+                    <ColumnDefinition Width="74"/>
+                    <ColumnDefinition Width="112"/>
+                    <ColumnDefinition Width="92"/>
+                    <ColumnDefinition Width="80"/>
+                    <ColumnDefinition Width="58"/>
+                    <ColumnDefinition Width="58"/>
+                    <ColumnDefinition Width="56"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
                 </Grid.RowDefinitions>
 
-                <TextBlock Grid.Row="0" Grid.Column="0" Text="RST-R"    Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="1" Text="RST-S"    Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="2" Text="Mode"     Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="3" Text="Exchange" Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="4" Text="Comment"  Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="5" Text="LoTW"     Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="6" Text="QRZ"      Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="7" Text="eQSL"     Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="8" Text="Club Log" Style="{StaticResource Hdr}"/>
-                <TextBlock Grid.Row="0" Grid.Column="9" Text="Paper"    Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="RST-R"     Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="RST-S"     Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Mode"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="Submode"   Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="Exchange Rcvd" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="5" Text="DX Locator" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="6" Text="Continent" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="7" Text="CQ Zone"   Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="8" Text="ITU Zone"  Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="9" Text="State"     Style="{StaticResource Hdr}"/>
 
-                <TextBox  Grid.Row="1" Grid.Column="0" x:Name="TB_RstRcvd"  Style="{StaticResource Cell}"/>
-                <TextBox  Grid.Row="1" Grid.Column="1" x:Name="TB_RstSent"  Style="{StaticResource Cell}"/>
-                <TextBox  Grid.Row="1" Grid.Column="2" x:Name="TB_Mode"     Style="{StaticResource Cell}" CharacterCasing="Upper"/>
-                <TextBox  Grid.Row="1" Grid.Column="3" x:Name="TB_Exchange" Style="{StaticResource Cell}"/>
-                <TextBox  Grid.Row="1" Grid.Column="4" x:Name="TB_Comment"  Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
-                <CheckBox Grid.Row="1" Grid.Column="5" x:Name="CB_ConfLotw"    Style="{StaticResource ConfBox}"/>
-                <CheckBox Grid.Row="1" Grid.Column="6" x:Name="CB_ConfQrz"     Style="{StaticResource ConfBox}"/>
-                <CheckBox Grid.Row="1" Grid.Column="7" x:Name="CB_ConfEqsl"    Style="{StaticResource ConfBox}"/>
-                <CheckBox Grid.Row="1" Grid.Column="8" x:Name="CB_ConfClublog" Style="{StaticResource ConfBox}"/>
-                <CheckBox Grid.Row="1" Grid.Column="9" x:Name="CB_ConfPaper"   Style="{StaticResource ConfBox}"/>
+                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_RstRcvd"   Style="{StaticResource Cell}"/>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_RstSent"   Style="{StaticResource Cell}"/>
+                <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_Mode"      Style="{StaticResource Cell}" CharacterCasing="Upper"/>
+                <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_Submode"   Style="{StaticResource Cell}" CharacterCasing="Upper"/>
+                <TextBox Grid.Row="1" Grid.Column="4" x:Name="TB_Exchange"  Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         ToolTip="The exchange RECEIVED from the DX station — their Holyland square (the log table's Exchange column)"/>
+                <TextBox Grid.Row="1" Grid.Column="5" x:Name="TB_DxLocator" Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         ToolTip="The DX station's Maidenhead grid square, e.g. KM72"/>
+                <TextBox Grid.Row="1" Grid.Column="6" x:Name="TB_Continent" Style="{StaticResource CellRO}"
+                         ToolTip="Set from the callsign's DXCC prefix — not editable"/>
+                <TextBox Grid.Row="1" Grid.Column="7" x:Name="TB_CqZone"    Style="{StaticResource Cell}"/>
+                <TextBox Grid.Row="1" Grid.Column="8" x:Name="TB_ItuZone"   Style="{StaticResource Cell}"/>
+                <TextBox Grid.Row="1" Grid.Column="9" x:Name="TB_State"     Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         ToolTip="The DX station's state / province (ADIF STATE), e.g. CA"/>
+            </Grid>
+
+            <!-- Row 3: propagation and the free-text fields. -->
+            <Grid Margin="12,2,12,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="100"/>
+                    <ColumnDefinition Width="120"/>
+                    <ColumnDefinition Width="480"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="Prop Mode" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Sat Name"  Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Comment"   Style="{StaticResource Hdr}"/>
+
+                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_PropMode" Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         ToolTip="ADIF propagation mode, e.g. SAT, EME, TR"/>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_SatName"  Style="{StaticResource Cell}" CharacterCasing="Upper"/>
+                <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_Comment"  Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
+            </Grid>
+
+            <!-- Row 4: this end of the contact. -->
+            <TextBlock Text="MY STATION" Style="{StaticResource Caption}"/>
+            <Grid Margin="12,0,12,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="110"/>
+                    <ColumnDefinition Width="260"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="My Callsign" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="Operator"    Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="Exchange Sent" Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="My Locator"  Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="Soapbox"     Style="{StaticResource Hdr}"/>
+
+                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_MyCall"    Style="{StaticResource Cell}" CharacterCasing="Upper"/>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_Operator"  Style="{StaticResource Cell}" CharacterCasing="Upper"/>
+                <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_MySquare"  Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         ToolTip="The exchange YOU sent — your Holyland square, or the contest's sent exchange when a contest is running"/>
+                <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_MyLocator" Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         ToolTip="Your own Maidenhead grid square"/>
+                <TextBox Grid.Row="1" Grid.Column="4" x:Name="TB_Soapbox"   Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
+            </Grid>
+
+            <!-- Confirmations. The tick is editable (that is how a paper card is recorded); the date and the
+                 deleted-entity note under it come from the service that reported the confirmation. -->
+            <TextBlock Text="CONFIRMED BY" Style="{StaticResource Caption}"/>
+            <Grid Margin="12,0,12,4">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="140"/>
+                    <ColumnDefinition Width="140"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="LoTW"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="QRZ"       Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="eQSL"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="Club Log"  Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="Paper QSL" Style="{StaticResource Hdr}"/>
+
+                <StackPanel Grid.Row="1" Grid.Column="0">
+                    <CheckBox x:Name="CB_ConfLotw" Style="{StaticResource ConfBox}"/>
+                    <TextBlock x:Name="TB_LotwNote" Style="{StaticResource ConfNote}"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="1">
+                    <CheckBox x:Name="CB_ConfQrz" Style="{StaticResource ConfBox}"/>
+                    <TextBlock x:Name="TB_QrzNote" Style="{StaticResource ConfNote}"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="2">
+                    <CheckBox x:Name="CB_ConfEqsl" Style="{StaticResource ConfBox}"/>
+                    <TextBlock x:Name="TB_EqslNote" Style="{StaticResource ConfNote}"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="3">
+                    <CheckBox x:Name="CB_ConfClublog" Style="{StaticResource ConfBox}"/>
+                    <TextBlock x:Name="TB_ClublogNote" Style="{StaticResource ConfNote}"/>
+                </StackPanel>
+                <StackPanel Grid.Row="1" Grid.Column="4">
+                    <CheckBox x:Name="CB_ConfPaper" Style="{StaticResource ConfBox}"/>
+                    <TextBlock x:Name="TB_PaperNote" Style="{StaticResource ConfNote}"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Where this QSO stands in each upload queue. Read-only: uploads are driven from the
+                 right-click "Send to upload queue" menu, not by typing a status here. -->
+            <TextBlock Text="UPLOADED TO" Style="{StaticResource Caption}"/>
+            <Grid Margin="12,0,12,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="175"/>
+                    <ColumnDefinition Width="175"/>
+                    <ColumnDefinition Width="175"/>
+                    <ColumnDefinition Width="175"/>
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Grid.Row="0" Grid.Column="0" Text="LoTW"     Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="1" Text="QRZ"      Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="2" Text="eQSL"     Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="Club Log" Style="{StaticResource Hdr}"/>
+
+                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_UpLotw"    Style="{StaticResource CellRO}"/>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_UpQrz"     Style="{StaticResource CellRO}"/>
+                <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_UpEqsl"    Style="{StaticResource CellRO}"/>
+                <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_UpClublog" Style="{StaticResource CellRO}"/>
             </Grid>
 
             <!-- Save / Cancel -->
