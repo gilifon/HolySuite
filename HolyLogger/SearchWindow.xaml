@@ -95,16 +95,16 @@
                        suffix (4Z5 + SL/M). Either box alone is a valid search. -->
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <TextBlock Text="Prefix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="Start of the callsign, up to and including the digit: 4Z5, or 4X/OK1"/>
+                               ToolTip="How the callsign STARTS. Cut it wherever you like — 4Z, 4Z4 and 4Z4DX all find 4Z4DX."/>
                     <!-- Widths are recomputed in Window_Loaded to fit exactly 7 and 10 characters of
                          the actual font; these are only the fallback if that measurement is skipped. -->
                     <TextBox x:Name="TB_Prefix" Width="72" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
-                             ToolTip="Start of the callsign, up to and including the digit: 4Z5, or 4X/OK1"
+                             ToolTip="How the callsign STARTS. Cut it wherever you like — 4Z, 4Z4 and 4Z4DX all find 4Z4DX."
                              TextChanged="Prefix_TextChanged" KeyDown="SearchField_KeyDown"/>
                     <TextBlock Text="Suffix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,0,6,0"
-                               ToolTip="Letters after the digit, with any stroke: SL, or SL/M"/>
+                               ToolTip="How the callsign ENDS: DX, 4DX, SL/M — or the whole call. Either box on its own is enough."/>
                     <TextBox x:Name="TB_Suffix" Width="98" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
-                             ToolTip="Letters after the digit, with any stroke: SL, or SL/M"
+                             ToolTip="How the callsign ENDS: DX, 4DX, SL/M — or the whole call. Either box on its own is enough."
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                   </StackPanel>
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">

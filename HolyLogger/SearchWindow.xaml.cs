@@ -287,7 +287,7 @@ namespace HolyLogger
             // Edit / Delete are deferred until the menu has fully closed (the editor is modal; running it
             // while the menu is still dismissing and holding mouse capture leaves it unable to take the
             // click). _hlKeep keeps the row highlighted across the close.
-            var edit = new MenuItem { Header = "Edit", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            var edit = new MenuItem { Header = "Full View & Edit", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
             edit.Click += (s, e) =>
             {
                 _hlKeep = true;
@@ -1440,6 +1440,60 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }   // keep the XAML fallback width
         }
 
+        // True when a QSO's callsign answers what was typed into the Prefix and Suffix boxes.
+        //
+        // WHERE a callsign divides is the operator's idea, not the program's. 4Z4DX is "4Z" + "4DX" to
+        // anyone reading 4Z as the country, and "4Z4" + "DX" to anyone reading 4Z4 as the call area -
+        // both are ordinary ways to look for that station, and both have to find it. The program used to
+        // impose its own cut (at the last digit) and compare each box against its own half, so one of the
+        // two readings simply found nothing.
+        //
+        // So no cut point is chosen at all: the callsign must START with what is in Prefix and END with
+        // what is in Suffix, without the two overlapping. That holds wherever the operator imagines the
+        // division, and it cannot find a station the two fragments do not really belong to.
+        //
+        // Tested against the identity base form ("4Z5SL/M" -> "4Z5SL") so a portable operation is still
+        // found by its suffix, and against the part after a leading stroke so 4X/OK1DL answers to OK1
+        // as well as to 4X.
+        private static bool CallsignMatchesHalves(string dxCall, string prefix, string suffix)
+        {
+            if (string.IsNullOrEmpty(dxCall)) return false;
+
+            prefix = prefix ?? string.Empty;
+            suffix = suffix ?? string.Empty;
+
+            // The callsign exactly as logged, so a whole call typed into one box finds itself even when
+            // it carries a stroke - "4Z5SL/M" is not its own base form, which is "4Z5SL".
+            if (WrapsAround(dxCall.Trim(), prefix, suffix)) return true;
+
+            string baseCall = CallsignIdentity.Base(dxCall);
+            if (WrapsAround(baseCall, prefix, suffix)) return true;
+
+            int slash = baseCall.LastIndexOf('/');
+            if (slash >= 0 && slash < baseCall.Length - 1
+                && WrapsAround(baseCall.Substring(slash + 1), prefix, suffix))
+                return true;
+
+            // Second chance: the halves as the program splits them. This is what lets a partly typed
+            // suffix narrow the list as you type - "D" then "DX" - which ends-with alone cannot do,
+            // since a callsign ending in DX does not end in D.
+            CallsignIdentity.Split(dxCall, out string qPrefix, out string qSuffix);
+            return HalfMatches(qPrefix, prefix, isPrefix: true)
+                && HalfMatches(qSuffix, suffix, isPrefix: false);
+        }
+
+        // The typed fragments sit at the two ends of this callsign, and do not overlap in the middle.
+        // The length test is what stops "4Z4" + "4DX" from claiming 4Z4DX, where the same "4" would
+        // have to serve as the end of the prefix and the start of the suffix at once.
+        private static bool WrapsAround(string call, string prefix, string suffix)
+        {
+            if (string.IsNullOrEmpty(call)) return false;
+            if (prefix.Length + suffix.Length > call.Length) return false;
+
+            return call.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)
+                && call.EndsWith(suffix, StringComparison.OrdinalIgnoreCase);
+        }
+
         // True when the typed text matches this half of a callsign.
         //
         // "Starts with" rather than "contains", so typing 4Z finds 4Z5SL (prefix 4Z5) without also
@@ -1516,16 +1570,8 @@ namespace HolyLogger
 
             var results = _allQsos.AsEnumerable();
 
-            // Each QSO's callsign is split the same way the boxes are labelled, so what you type into
-            // "Prefix" is compared against a real prefix and never against half of a suffix.
             if (!string.IsNullOrEmpty(prefix) || !string.IsNullOrEmpty(suffix))
-                results = results.Where(q =>
-                {
-                    if (q.DXCall == null) return false;
-                    CallsignIdentity.Split(q.DXCall, out string qPrefix, out string qSuffix);
-                    return HalfMatches(qPrefix, prefix, isPrefix: true)
-                        && HalfMatches(qSuffix, suffix, isPrefix: false);
-                });
+                results = results.Where(q => CallsignMatchesHalves(q.DXCall, prefix, suffix));
 
             // Country is enforced ONLY when no prefix is given. When a prefix IS given, the Country box was
             // auto-filled from it for display, but the real criterion is the callsign prefix - so a QSO
