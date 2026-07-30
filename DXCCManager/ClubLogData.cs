@@ -18,6 +18,7 @@ namespace DXCCManager
         public bool Invalid;         // listed as an operation that never counted for awards
         public bool DeletedEntity;   // the entity itself has been deleted from the DXCC list
         public bool ExactCall;       // matched a full-callsign exception, not merely a prefix
+        public int MatchedLength;    // how many characters of the callsign the match covered
     }
 
     // A date-aware DXCC lookup built from Club Log's prefix and exception database (cty.xml, by G7VJR).
@@ -199,14 +200,14 @@ namespace DXCCManager
 
             // A full-callsign exception always wins — that is the whole point of the exception list.
             Record hit = Pick(exceptions, call, whenUtc);
-            if (hit != null) return ToMatch(hit, true);
+            if (hit != null) return ToMatch(hit, true, call.Length);
 
             // Otherwise the longest prefix that was valid on the day, same rule as cty.dat.
             int len = Math.Min(call.Length, maxPrefixLength);
             for (int l = len; l >= 1; l--)
             {
                 hit = Pick(prefixes, call.Substring(0, l), whenUtc);
-                if (hit != null) return ToMatch(hit, false);
+                if (hit != null) return ToMatch(hit, false, l);
             }
             return null;
         }
@@ -220,7 +221,7 @@ namespace DXCCManager
             return null;
         }
 
-        private ClubLogMatch ToMatch(Record r, bool exactCall)
+        private ClubLogMatch ToMatch(Record r, bool exactCall, int matchedLength)
         {
             bool deleted;
             return new ClubLogMatch
@@ -233,7 +234,8 @@ namespace DXCCManager
                 // ones it names INVALID are a claim that the QSO never counted.
                 Invalid = r.Adif == 0 && string.Equals(r.Entity, "INVALID", StringComparison.OrdinalIgnoreCase),
                 DeletedEntity = deletedByCode.TryGetValue(r.Adif, out deleted) && deleted,
-                ExactCall = exactCall
+                ExactCall = exactCall,
+                MatchedLength = matchedLength
             };
         }
 

@@ -24,5 +24,8 @@ namespace DXCCManager
         public bool InvalidOperation { get; set; }
         // Which database answered - "cty.dat" or "Club Log". Diagnostic only; nothing branches on it.
         public string ResolvedBy { get; set; }
+        // How many characters of the callsign the match covered (0 = nothing matched). Lets two
+        // databases be compared on how SPECIFIC their answers are, not just on which one spoke.
+        public int MatchedLength { get; set; }
     }
 }

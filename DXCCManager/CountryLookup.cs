@@ -124,6 +124,17 @@ namespace DXCCManager
             catch { cl = null; }
             if (cl == null) return fromCty;
 
+            // THE MORE SPECIFIC MATCH WINS. Club Log is consulted first, but its answer may rest on a
+            // short fallback prefix while cty.dat matched far more of the callsign, and then cty.dat is
+            // the better witness. R1FJ is the case that proves it: Club Log's R1FJ record expired in
+            // January 2010, so for a QSO today it drops to "R1" (2 characters) and reports European
+            // Russia, while cty.dat matches "R1FJ" itself and reports Franz Josef Land. A full-callsign
+            // exception is never overruled - that is Club Log's hand-curated core - and neither is
+            // anything cty.dat could not match at all.
+            if (!cl.ExactCall && fromCty != null && fromCty.MatchedLength > cl.MatchedLength
+                && fromCty.Name != "Unknown")
+                return fromCty;
+
             // Club Log lists this call and date as an operation that never counted. "INVALID" is not a
             // country, so the country stays whatever cty.dat believes and only the flag is raised -
             // that way the logger can warn the operator without writing nonsense into the log.

@@ -267,11 +267,23 @@ namespace DXCCManager
 
         private CtyMatch Resolve(string callsign)
         {
+            return Resolve(callsign, out int ignored);
+        }
+
+        // matchedLength reports how many characters of the callsign the answer rests on, so a caller
+        // holding a second opinion can tell a precise match from a one-letter fallback.
+        private CtyMatch Resolve(string callsign, out int matchedLength)
+        {
+            matchedLength = 0;
             if (string.IsNullOrWhiteSpace(callsign)) return null;
             string call = callsign.Trim().ToUpperInvariant();
 
             // 1) Exact full-callsign match wins.
-            if (exactCalls.TryGetValue(call, out CtyMatch exact)) return exact;
+            if (exactCalls.TryGetValue(call, out CtyMatch exact))
+            {
+                matchedLength = call.Length;
+                return exact;
+            }
 
             // 2) Otherwise the longest matching prefix wins.
             int len = Math.Min(call.Length, maxPrefixLength);
@@ -279,14 +291,17 @@ namespace DXCCManager
             {
                 string candidate = call.Substring(0, l);
                 if (prefixMap.TryGetValue(candidate, out CtyMatch byPrefix))
+                {
+                    matchedLength = l;
                     return byPrefix;
+                }
             }
             return null;
         }
 
         public DXCC GetDXCC(string callsign)
         {
-            CtyMatch m = Resolve(callsign);
+            CtyMatch m = Resolve(callsign, out int matchedLength);
             if (m != null)
             {
                 CtyEntity e = m.Entity;
@@ -298,7 +313,8 @@ namespace DXCCManager
                     Prefixes = e.PrimaryPrefix,
                     Locator = LatLonToGrid(e.Lat, e.Lon),
                     CqZone = m.Cq,
-                    ItuZone = m.Itu
+                    ItuZone = m.Itu,
+                    MatchedLength = matchedLength
                 };
             }
 
