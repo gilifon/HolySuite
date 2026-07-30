@@ -127,6 +127,12 @@ namespace HolyLogger
             TB_Comment.Text  = S(_qso.Comment);
 
             TB_DxLocator.Text = S(_qso.DXLocator);
+            TB_Iota.Text      = S(_qso.Iota);
+            TB_SotaRef.Text   = S(_qso.SotaRef);
+            TB_PotaRef.Text   = S(_qso.PotaRef);
+            TB_WwffRef.Text   = S(_qso.WwffRef);
+            TB_Sig.Text       = S(_qso.Sig);
+            TB_SigInfo.Text   = S(_qso.SigInfo);
             TB_Continent.Text = S(_qso.Continent);
             TB_CqZone.Text    = S(_qso.CQZone);
             TB_ItuZone.Text   = S(_qso.ITUZone);
@@ -290,6 +296,12 @@ namespace HolyLogger
                 _qso.Comment   = TB_Comment.Text.Trim();
                 _qso.SUBMode   = TB_Submode.Text.Trim();
                 _qso.DXLocator = TB_DxLocator.Text.Trim();
+                _qso.Iota      = TB_Iota.Text.Trim();
+                _qso.SotaRef   = TB_SotaRef.Text.Trim();
+                _qso.PotaRef   = TB_PotaRef.Text.Trim();
+                _qso.WwffRef   = TB_WwffRef.Text.Trim();
+                _qso.Sig       = TB_Sig.Text.Trim();
+                _qso.SigInfo   = TB_SigInfo.Text.Trim();
                 _qso.Continent = TB_Continent.Text.Trim();
                 _qso.CQZone    = TB_CqZone.Text.Trim();
                 _qso.ITUZone   = TB_ItuZone.Text.Trim();

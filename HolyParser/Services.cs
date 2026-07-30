@@ -132,7 +132,30 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.Operator)) adif.AppendFormat("<operator:{0}>{1}", qso.Operator.Length, qso.Operator);
                 if (!string.IsNullOrWhiteSpace(qso.SRX)) adif.AppendFormat("<srx_string:{0}>{1}", qso.SRX.Length, qso.SRX);
                 if (!string.IsNullOrWhiteSpace(qso.STX)) adif.AppendFormat("<stx_string:{0}>{1}", qso.STX.Length, qso.STX);
-                if (!string.IsNullOrWhiteSpace(qso.SRX)) adif.AppendFormat("<sig:{0}>{1}", qso.SRX.Length, qso.SRX);
+                // ACTIVITY PROGRAMME REFERENCES, in the fields ADIF names for them.
+                if (!string.IsNullOrWhiteSpace(qso.Iota)) adif.AppendFormat("<iota:{0}>{1}", qso.Iota.Trim().Length, qso.Iota.Trim());
+                if (!string.IsNullOrWhiteSpace(qso.SotaRef)) adif.AppendFormat("<sota_ref:{0}>{1}", qso.SotaRef.Trim().Length, qso.SotaRef.Trim());
+                if (!string.IsNullOrWhiteSpace(qso.PotaRef)) adif.AppendFormat("<pota_ref:{0}>{1}", qso.PotaRef.Trim().Length, qso.PotaRef.Trim());
+                if (!string.IsNullOrWhiteSpace(qso.WwffRef)) adif.AppendFormat("<wwff_ref:{0}>{1}", qso.WwffRef.Trim().Length, qso.WwffRef.Trim());
+
+                // <sig> can only be written once, and two things want it: the activity programme the
+                // operator entered (which is what the field is FOR - "the contacted station's special
+                // activity or interest group") and the long-standing lines below, which put the contest
+                // exchange there instead. The programme wins when there is one; with no programme
+                // entered - every QSO logged before this existed, and every contest QSO - the file comes
+                // out byte for byte as it always did.
+                bool sigTakenByActivity = !string.IsNullOrWhiteSpace(qso.Sig);
+                if (sigTakenByActivity)
+                {
+                    string sig = qso.Sig.Trim();
+                    adif.AppendFormat("<sig:{0}>{1}", sig.Length, sig);
+                    if (!string.IsNullOrWhiteSpace(qso.SigInfo))
+                    {
+                        string info = qso.SigInfo.Trim();
+                        adif.AppendFormat("<sig_info:{0}>{1}", info.Length, info);
+                    }
+                }
+                if (!sigTakenByActivity && !string.IsNullOrWhiteSpace(qso.SRX)) adif.AppendFormat("<sig:{0}>{1}", qso.SRX.Length, qso.SRX);
                 if (!string.IsNullOrWhiteSpace(qso.STX)) adif.AppendFormat("<my_sig:{0}>{1}", qso.STX.Length, qso.STX);
 
                 // ===== PROPOSED contest_id tag — pending Holyland score-processor approval (2026-06) =====

@@ -1033,7 +1033,7 @@
              / size). -->
         <Border x:Name="CallsignLockOverlay" Grid.Row="1"
                 HorizontalAlignment="Left" VerticalAlignment="Top"
-                Height="28" Width="130" Margin="101,101,0,0"
+                Height="28" Width="130" Margin="101,87,0,0"
                 Background="#FFF3CD" BorderBrush="Red" BorderThickness="1"
                 Visibility="Collapsed" Panel.ZIndex="60" Cursor="Hand"
                 MouseLeftButtonDown="CallsignLockOverlay_MouseDown"
@@ -1042,7 +1042,7 @@
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
-                    Margin="192,52,0,0" Grid.Row="1">
+                    Margin="192,45,0,0" Grid.Row="1">
             <!-- Both LED and no-CAT borders share one Grid so the kHz label never shifts.
                  Width is the single fixed constraint — content never drives the layout width. -->
             <Grid VerticalAlignment="Center" Width="160">
@@ -1079,7 +1079,7 @@
             <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"
                        VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
         </StackPanel>
-        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="580,54,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
+        <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="580,47,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid Width="95">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -1154,8 +1154,8 @@
             <Run Text="Square" />
         </TextBlock>
         <TextBox x:Name="TB_MyHolyland" HorizontalAlignment="Left" Margin="400,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_square, Source={StaticResource Settings}}" Width="58" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyHolyland_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="5" TabIndex="4"/>
-        <Label Content="Mode" HorizontalAlignment="Left" Margin="479,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
-        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="528,56,0,0" Grid.Row="1" VerticalAlignment="Top" Width="50" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
+        <Label Content="Mode" HorizontalAlignment="Left" Margin="479,48,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16"  ToolTip="Select the working mode"/>
+        <ComboBox x:Name="CB_Mode" Text="{Binding Default.Mode, Source={StaticResource Settings}}" HorizontalAlignment="Left" Margin="528,49,0,0" Grid.Row="1" VerticalAlignment="Top" Width="50" FontSize="16" Height="28" TabIndex="7" SelectionChanged="CB_Mode_SelectionChanged" BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
                   Template="{StaticResource FlatComboTemplate}">
             <ComboBoxItem x:Name="op_cw" Content="CW"/>
             <ComboBoxItem x:Name="op_digi" Content="DIGI"/>
@@ -1165,16 +1165,16 @@
         </ComboBox>
         <!--<ComboBox x:Name="CB_Mode" ItemsSource="{Binding Path=ValidModes}" DisplayMemberPath="Name" SelectedValuePath="Name" SelectedValue="{Binding Path=Mode}" HorizontalAlignment="Left" Margin="101,52,0,0" Grid.Row="1" VerticalAlignment="Top" Width="99" FontSize="16" Height="28"></ComboBox>-->
         <!-- Old "Freq" label hidden: the frequency is now shown on the LED readout in the menu bar. -->
-        <Label Content="Freq" Visibility="Collapsed" HorizontalAlignment="Left" Margin="175,51,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
+        <Label Content="Freq" Visibility="Collapsed" HorizontalAlignment="Left" Margin="175,44,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Your working frequency"/>
         <!--<xctk:MaskedTextBox x:Name="TB_Frequency"  HorizontalAlignment="Left" Margin="348,54,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" HidePromptOnLeave ="false" Mask="90.000,999" PromptChar="0" Text="{Binding Frequency, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Width="100" Height="28" TextChanged="TB_Frequency_TextChanged" FontSize="16" MaxLength="9" />-->
         <!-- Kept (hidden) as the data source: it still drives band calculation and is bound to
              Settings.Frequency. The new LED readout reads/writes this same value. -->
-        <TextBox x:Name="TB_Frequency" Visibility="Collapsed" HorizontalAlignment="Left" Margin="216,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
+        <TextBox x:Name="TB_Frequency" Visibility="Collapsed" HorizontalAlignment="Left" Margin="216,47,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" Height="28" CharacterCasing="Upper" Grid.Row="1" Text="{Binding Default.Frequency, Source={StaticResource Settings}}" TextChanged="TB_Frequency_TextChanged" KeyDown="TB_Frequency_KeyDown" FontSize="16" MaxLength="10" TabIndex="5" Padding="5,0,0,0"/>
         <!-- Band and Mode both moved a few pixels in this row to make room for the drop-down chevrons.
              The strip from the kHz label to the map is packed: the free space was 6px here, 7px before
              the Mode label, 2px before Spot and 10px before the map, and the two 10px chevrons plus the
              10px each box grew to keep its text come out of exactly those. -->
-        <Label Content="Band" HorizontalAlignment="Left" Margin="377,55,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <Label Content="Band" HorizontalAlignment="Left" Margin="377,48,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <!--<Label Content="Score" HorizontalAlignment="Left" Margin="500,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <Label Content="{Binding Score, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Left" Margin="564,12,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />-->
 
@@ -1192,7 +1192,7 @@
 
         <!-- Centred, like the drop-down that stands in for it, so the band does not jump sideways when
              the box swaps between the two. -->
-        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="419,56,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextAlignment="Center" HorizontalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
+        <TextBox x:Name="TB_Band" HorizontalAlignment="Left" Height="28" Margin="419,49,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="58" CharacterCasing="Upper" Grid.Row="1" IsReadOnly="True" FontSize="16" FontWeight="Bold" VerticalContentAlignment="Center" TextAlignment="Center" HorizontalContentAlignment="Center" TextChanged="TB_Band_TextChanged" TabIndex="6" IsTabStop="False" />
         <!-- The band is normally READ OUT of the frequency, and TB_Band above shows it. With no frequency
              to read it out of (Manual mode, nothing typed) there is nothing to show, so the operator
              picks it instead and this drop-down takes the box's place - same spot, same size, the same
@@ -1203,20 +1203,20 @@
              15px rather than the read-out's 16: of the 58px, the chevron takes 10 and the border and
              margins 5, leaving 43 for text - and the widest bands (70CM, 23CM) measure 43.7 at 16 bold
              against 41.0 at 15. The read-out beside it has no chevron to pay for and stays at 16. -->
-        <ComboBox x:Name="CB_Band" HorizontalAlignment="Left" Margin="419,56,0,0" Grid.Row="1"
+        <ComboBox x:Name="CB_Band" HorizontalAlignment="Left" Margin="419,49,0,0" Grid.Row="1"
                   VerticalAlignment="Top" Width="58" Height="28" FontSize="15" FontWeight="Bold"
                   Visibility="Collapsed" IsTabStop="False"
                   BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
                   Template="{StaticResource FlatComboTemplate}"
                   SelectionChanged="CB_Band_SelectionChanged" DropDownOpened="CB_Band_DropDownOpened"
                   ToolTip="No frequency — choose the band this QSO was on"/>
-        <TextBlock HorizontalAlignment="Left" Margin="12,96,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
-        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,101,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
+        <TextBlock HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
+        <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,87,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
         <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
         <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
-                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,115,0,0"
+                      HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,101,0,0"
                       Width="78" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
                       Focusable="False" Click="BtnSuggestToggle_Click"
                       ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
@@ -1262,7 +1262,7 @@
                 </ControlTemplate>
             </ToggleButton.Template>
         </ToggleButton>
-        <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,101,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="12" Foreground="#555555" Visibility="Collapsed"/>
+        <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,87,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="12" Foreground="#555555" Visibility="Collapsed"/>
         <Popup x:Name="CallsignSuggestionsPopup" PlacementTarget="{Binding ElementName=TB_DXCallsign}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
             <Border BorderBrush="Gray" BorderThickness="1" Background="White">
                 <ListBox x:Name="LB_DXCallsignSuggestions" Width="160" MaxHeight="440" FontSize="14" PreviewMouseMove="LB_DXCallsignSuggestions_PreviewMouseMove" MouseLeave="LB_DXCallsignSuggestions_MouseLeave" PreviewMouseLeftButtonDown="LB_DXCallsignSuggestions_PreviewMouseLeftButtonDown" MouseDoubleClick="LB_DXCallsignSuggestions_MouseDoubleClick">
@@ -1333,17 +1333,17 @@
              Sized to fully cover the RST R + Serial cells (the first ~122px of ContestRxPanel) with
              an opaque white card, bold red text and a red border, so a duplicate is unmissable
              instead of a small italic word blending into the pale contest-frame background. -->
-        <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,129,0,0"
+        <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,110,0,0"
                Padding="8,0,8,0" VerticalAlignment="Top" Grid.Row="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                Background="White" BorderBrush="Red" BorderThickness="2" Foreground="Red" FontWeight="Bold"
                RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="15" Panel.ZIndex="10"/>
-        <Border x:Name="L_LegalFrame" HorizontalAlignment="Left" Margin="101,128,0,0" VerticalAlignment="Top"
+        <Border x:Name="L_LegalFrame" HorizontalAlignment="Left" Margin="101,109,0,0" VerticalAlignment="Top"
                 Grid.Row="1" Panel.ZIndex="10" Background="White" BorderBrush="#2E7D32" BorderThickness="1"
                 CornerRadius="2" Visibility="{Binding Visibility, ElementName=L_Legal}">
             <TextBlock x:Name="L_Legal" Padding="8,1,8,1" TextAlignment="Center" Background="Transparent"
                        FontWeight="Bold" FontStyle="Italic" FontSize="15" Visibility="Hidden"><Run Text="Legal " Foreground="#2E7D32"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#2E7D32"/></TextBlock>
         </Border>
-        <Border HorizontalAlignment="Left" Margin="237,106,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.ShowDuration="15000">
+        <Border HorizontalAlignment="Left" Margin="237,92,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
                 <ToolTip>
                     <StackPanel>
@@ -1355,12 +1355,12 @@
             </Border.ToolTip>
             <TextBlock Text="i" Foreground="White" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" FontStyle="Italic"/>
         </Border>
-        <Image x:Name="QRZBtn" ToolTip="Get Data from QRZ.com and open the callsign's QRZ.com page" HorizontalAlignment="Left" Height="24" Margin="261,103,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
+        <Image x:Name="QRZBtn" ToolTip="Get Data from QRZ.com and open the callsign's QRZ.com page" HorizontalAlignment="Left" Height="24" Margin="261,89,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
         <!-- "No QRZ.com connection" alert: a red "!" badge on the QRZ icon's top-right corner, shown
              only when no QRZ session could be established (toggled by SetQrzConnected). Not hit-testable
              so clicks pass through to the QRZ icon underneath. -->
         <Border x:Name="QrzNoConnBadge" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Margin="275,99,0,0" Width="14" Height="14" CornerRadius="7" Background="#D32F2F"
+                Margin="275,85,0,0" Width="14" Height="14" CornerRadius="7" Background="#D32F2F"
                 BorderBrush="White" BorderThickness="1.5" Panel.ZIndex="40" IsHitTestVisible="False"
                 Visibility="Collapsed" ToolTip="No connection to QRZ.com">
             <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="10"
@@ -1376,51 +1376,51 @@
                 ToolTip="Right-click to change the contest exchange colour"/>
         <!-- Foreground of both contest labels is set in code (UpdateContestLabelContrast): black or
              white depending on the brightness of the frame each one sits on, which is user-editable. -->
-        <TextBlock x:Name="L_ExchangeLabel" HorizontalAlignment="Left" Margin="12,150,0,0" VerticalAlignment="Top" Grid.Row="1"
+        <TextBlock x:Name="L_ExchangeLabel" HorizontalAlignment="Left" Margin="12,130,0,0" VerticalAlignment="Top" Grid.Row="1"
                    Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
                    Foreground="{DynamicResource TextBrush}"
                    ToolTip="The exchange received from the DX station"><Run Text="Exchange" FontWeight="Bold"/></TextBlock>
-        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
+        <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
         <!-- Contest received-exchange boxes, built at runtime per the active contest (Phase 2). When a
              contest is active this replaces the single Exchange box; otherwise it's hidden. -->
         <StackPanel x:Name="ContestRxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
-                    VerticalAlignment="Top" Margin="101,142,0,0" Grid.Row="1" Visibility="Collapsed"/>
-        <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
-        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
-        <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,143,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
-        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="349,144,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
-        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="383,145,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
-        <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="288,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
-        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
-        <Label Content="Time" HorizontalAlignment="Left" Margin="451,97,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
-        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="496,100,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
+                    VerticalAlignment="Top" Margin="101,122,0,0" Grid.Row="1" Visibility="Collapsed"/>
+        <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
+        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
+        <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,123,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
+        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="349,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
+        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="383,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
+        <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="288,83,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
+        <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,86,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
+        <Label Content="Time" HorizontalAlignment="Left" Margin="451,83,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
+        <xctk:DateTimeUpDown x:Name="TP_Time" Format="Custom" FormatString="HH:mm" HorizontalAlignment="Left" TextAlignment="Left" Margin="496,86,0,0" Grid.Row="1" VerticalAlignment="Top" Width="64" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
 
 
-        <Border x:Name="ContestDividerLine" BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,92,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
+        <Border x:Name="ContestDividerLine" BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,78,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
         <!-- "You send" band: shown only in contest mode, in the strip freed when the divider drops. It
              mirrors the received frame — a coloured background panel (ContestSendBand) with a label
              (L_SendLabel) and the send cells (ContestTxPanel) laid on top. Background colour is
              user-editable (right-click) and remembered, like the received frame. -->
-        <Border x:Name="ContestSendBand" Grid.Row="1" Margin="4,96,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+        <Border x:Name="ContestSendBand" Grid.Row="1" Margin="4,82,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Width="556" Height="48" Background="{DynamicResource ContestTxBg}" BorderBrush="#5DCAA5" BorderThickness="1" CornerRadius="8"
                 Visibility="Collapsed" Panel.ZIndex="5"
                 MouseRightButtonUp="ContestSendBand_MouseRightButtonUp"
                 ToolTip="Right-click to change the send-exchange colour"/>
-        <TextBlock x:Name="L_SendLabel" Grid.Row="1" HorizontalAlignment="Left" Margin="12,96,0,0" VerticalAlignment="Top"
+        <TextBlock x:Name="L_SendLabel" Grid.Row="1" HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top"
                    Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
                    Panel.ZIndex="6" Visibility="Collapsed"
                    ToolTip="The exchange your station sends"><Run Text="Exchange" FontWeight="Bold"/><LineBreak/><Run Text="send"/></TextBlock>
         <StackPanel x:Name="ContestTxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
-                    VerticalAlignment="Top" Margin="101,96,0,0" Grid.Row="1" Panel.ZIndex="6" Visibility="Collapsed"/>
-        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,143,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
-        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,98,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+                    VerticalAlignment="Top" Margin="101,82,0,0" Grid.Row="1" Panel.ZIndex="6" Visibility="Collapsed"/>
+        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,123,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
+        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,84,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>
         </Button>
         <!-- Undo icon for log-row "Set Radio to Freq" (independent of the cluster undo). Hidden when nothing to undo. -->
         <!-- Centered vertically between the Exchange (y=141) and Name (y=185) labels; horizontally centered to the Name label. -->
-        <Grid x:Name="MainUndoIconGrid" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,164,0,0" Width="26" Height="26" Visibility="Collapsed" Panel.ZIndex="30" RenderTransformOrigin="0.5,0.5">
+        <Grid x:Name="MainUndoIconGrid" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="16,144,0,0" Width="26" Height="26" Visibility="Collapsed" Panel.ZIndex="30" RenderTransformOrigin="0.5,0.5">
             <Grid.RenderTransform>
                 <ScaleTransform x:Name="MainUndoIconScale" ScaleX="1" ScaleY="1"/>
             </Grid.RenderTransform>
@@ -1431,13 +1431,13 @@
                 </Grid>
             </Button>
         </Grid>
-        <Label Content="Name" HorizontalAlignment="Left" Margin="6,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="69,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="264" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" TextChanged="TB_DX_Name_TextChanged" />
-        <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="340,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
-        <Image x:Name="Img_CountryFlag" HorizontalAlignment="Left" Margin="376,193,0,0" VerticalAlignment="Top" Grid.Row="1" Width="30" Height="20" Stretch="Uniform" Visibility="Collapsed" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
-        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="411,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="169" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="16" />
-        <Label Content="State" HorizontalAlignment="Left" Margin="580,185,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
-        <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="627,189,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" CharacterCasing="Upper" MaxLength="3" Grid.Row="1" FontSize="16" TabIndex="17" TextChanged="TB_State_TextChanged" />
+        <Label Content="Name" HorizontalAlignment="Left" Margin="6,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="69,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="264" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" TextChanged="TB_DX_Name_TextChanged" />
+        <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="340,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
+        <Image x:Name="Img_CountryFlag" HorizontalAlignment="Left" Margin="376,167,0,0" VerticalAlignment="Top" Grid.Row="1" Width="30" Height="20" Stretch="Uniform" Visibility="Collapsed" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
+        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="411,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="169" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="16" />
+        <Label Content="State" HorizontalAlignment="Left" Margin="580,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
+        <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="627,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" CharacterCasing="Upper" MaxLength="3" Grid.Row="1" FontSize="16" TabIndex="17" TextChanged="TB_State_TextChanged" />
         <!-- Orphaned QRZ-photo frame: never populated by any code (Img_QRZPhoto is unreferenced),
              but its opaque #F5F7FA background at ZIndex 20 painted a white box over the map
              placeholder whenever the WebBrowser was hidden. Collapsed so it cannot bleed through. -->
@@ -1445,23 +1445,63 @@
             <Image x:Name="Img_QRZPhoto" Stretch="UniformToFill" Visibility="Collapsed" ToolTip="QRZ callsign image" />
         </Border>
 
-        <TextBlock HorizontalAlignment="Left" Margin="11,231,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" FontSize="15" ToolTip="The DX station grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="11,201,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" FontSize="15" ToolTip="The DX station grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="DX" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Locator" />
         </TextBlock>
-        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,231,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="74" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
-        <Label Content="ITU" HorizontalAlignment="Left" Margin="142,229,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="ITU Zone (from QRZ.com)"/>
-        <TextBox x:Name="TB_ITUZone" HorizontalAlignment="Left" Height="28" Margin="177,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
-        <Label Content="CQ" HorizontalAlignment="Left" Margin="212,229,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="CQ Zone (from QRZ.com)"/>
-        <TextBox x:Name="TB_CQZone" HorizontalAlignment="Left" Height="28" Margin="245,231,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
-        <Label Content="Comment" HorizontalAlignment="Left" Margin="281,227,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
-        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="364,231,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="274" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
-        <Rectangle x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,235,0,0" VerticalAlignment="Top" Width="20" Fill="{DynamicResource TextBrush}" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand">
+        <TextBox x:Name="TB_DXLocator" HorizontalAlignment="Left" Margin="69,201,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Width="74" Height="28" FontSize="16" MaxLength="8" TabIndex="18"/>
+        <Label Content="ITU" HorizontalAlignment="Left" Margin="142,199,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="ITU Zone (from QRZ.com)"/>
+        <TextBox x:Name="TB_ITUZone" HorizontalAlignment="Left" Height="28" Margin="177,201,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
+        <Label Content="CQ" HorizontalAlignment="Left" Margin="212,199,0,0" VerticalAlignment="Top" Height="28" VerticalContentAlignment="Center" Grid.Row="1" FontSize="16" ToolTip="CQ Zone (from QRZ.com)"/>
+        <TextBox x:Name="TB_CQZone" HorizontalAlignment="Left" Height="28" Margin="245,201,0,0" VerticalAlignment="Top" Width="31" Grid.Row="1" FontSize="16" MaxLength="2" PreviewTextInput="ZoneTextBox_PreviewTextInput" VerticalContentAlignment="Center" IsTabStop="False"/>
+        <Label Content="Comment" HorizontalAlignment="Left" Margin="281,197,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="Free text comments"/>
+        <TextBox x:Name="TB_Comment" HorizontalAlignment="Left" Height="28" Margin="364,201,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="274" Grid.Row="1" Text="{Binding Default.Comment, Source={StaticResource Settings}}" FontSize="16" MaxLength="65" TabIndex="19"/>
+        <Rectangle x:Name="LockComment_Btn" ToolTip="Lock/Unlock Comment" HorizontalAlignment="Left" Height="22" Margin="647,205,0,0" VerticalAlignment="Top" Width="20" Fill="{DynamicResource TextBrush}" MouseUp="LockComment_Btn_MouseUp" Grid.Row="1" Cursor="Hand">
             <Rectangle.OpacityMask>
                 <ImageBrush x:Name="LockCommentMask" ImageSource="Images/lock.png" Stretch="Uniform"/>
             </Rectangle.OpacityMask>
         </Rectangle>
+        <!-- ACTIVITY PROGRAMME REFERENCES. The four programmes ADIF names get a box each; every other
+             programme on earth - castles, mills, lighthouses, and whatever is founded next year - goes
+             through the Other button into ADIF's SIG / SIG_INFO pair, so this row never has to grow.
+             There is no room for a fifth labelled box: five pairs measure 750px against the form's 661.
+
+             One Canvas rather than nine loose controls so contest mode can hide the whole row with a
+             single Visibility, and so RowShift has one element to place instead of nine. Labels carry
+             Padding="0" because a Label's default 5px padding would push each box out of the measured
+             positions this row was laid out to. -->
+        <Canvas x:Name="ActivityRow" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
+                Margin="0,239,0,0" Width="677" Height="28">
+            <Label Content="IOTA" Canvas.Left="11" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+                   VerticalContentAlignment="Center" ToolTip="Islands on the Air, e.g. EU-005"/>
+            <TextBox x:Name="TB_Iota" Canvas.Left="51" Canvas.Top="0" Width="62" Height="28" FontSize="16"
+                     CharacterCasing="Upper" MaxLength="6" TabIndex="20" TextWrapping="NoWrap"
+                     VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
+                     ToolTip="Islands on the Air: two letters for the continent, then three digits - EU-005"/>
+            <Label Content="SOTA" Canvas.Left="125" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+                   VerticalContentAlignment="Center" ToolTip="Summits on the Air, e.g. W2/WE-003"/>
+            <TextBox x:Name="TB_SotaRef" Canvas.Left="169" Canvas.Top="0" Width="90" Height="28" FontSize="16"
+                     CharacterCasing="Upper" MaxLength="20" TabIndex="21" TextWrapping="NoWrap"
+                     VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
+                     ToolTip="Summits on the Air: the summit reference - W2/WE-003, G/LD-003"/>
+            <Label Content="POTA" Canvas.Left="271" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+                   VerticalContentAlignment="Center" ToolTip="Parks on the Air, e.g. K-0001"/>
+            <TextBox x:Name="TB_PotaRef" Canvas.Left="315" Canvas.Top="0" Width="125" Height="28" FontSize="16"
+                     CharacterCasing="Upper" MaxLength="90" TabIndex="22" TextWrapping="NoWrap"
+                     VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
+                     ToolTip="Parks on the Air: the park reference - K-0001. Two parks at once are written K-0001,US-4578"/>
+            <Label Content="WWFF" Canvas.Left="452" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+                   VerticalContentAlignment="Center" ToolTip="World Wide Flora and Fauna, e.g. 4XFF-0016"/>
+            <TextBox x:Name="TB_WwffRef" Canvas.Left="504" Canvas.Top="0" Width="85" Height="28" FontSize="16"
+                     CharacterCasing="Upper" MaxLength="11" TabIndex="23" TextWrapping="NoWrap"
+                     VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
+                     ToolTip="World Wide Flora and Fauna: the nature-reserve reference - 4XFF-0016"/>
+            <Button x:Name="Btn_OtherActivity" Content="Other…" Canvas.Left="601" Canvas.Top="0"
+                    Width="66" Height="28" FontSize="14" TabIndex="24" Padding="0"
+                    Click="Btn_OtherActivity_Click"
+                    ToolTip="Any other programme - castles, mills, lighthouses. Shows what is set once you choose one."/>
+        </Canvas>
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
         <Rectangle Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="53" Margin="0,279,0,0" />
@@ -1770,12 +1810,12 @@
             </Grid>
         </Border>
 
-        <TextBlock HorizontalAlignment="Left" Margin="11,55,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="11,48,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Operator" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Callsign" />
         </TextBlock>
-        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,54,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" VerticalContentAlignment="Center" MaxLength="14" TabIndex="2"/>
+        <TextBox Text="{Binding Default.Operator, Source={StaticResource Settings}}" x:Name="TB_Operator" HorizontalAlignment="Left" Height="28" Margin="85,47,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="99" CharacterCasing="Upper" Grid.Row="1"  TextChanged="TB_MyCallsign_TextChanged" PreviewKeyDown="PreventSpaceInCallsign" FontSize="16" VerticalContentAlignment="Center" MaxLength="14" TabIndex="2"/>
         <!-- Busy overlay shown while a (potentially large) log is loaded/switched, so the user
              sees that work is happening rather than a frozen window. -->
         <Border x:Name="LogLoadingOverlay" Grid.Row="0" Grid.RowSpan="4" Visibility="Collapsed"

@@ -1,0 +1,55 @@
+<Window x:Class="HolyLogger.OtherActivityWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Other activity programme" Width="560" Height="330" MinWidth="460" MinHeight="300"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False" ResizeMode="NoResize"
+        Background="{DynamicResource WindowBg}">
+    <Grid Margin="16,14,16,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" FontSize="16" TextWrapping="Wrap" Margin="0,0,0,14"
+                   Foreground="{DynamicResource MutedTextBrush}">
+            Islands, summits, parks and nature reserves have their own boxes on the form. Every other
+            programme is recorded here by name, which is how the ADIF standard carries them.
+        </TextBlock>
+
+        <!-- Editable on purpose: the list is only the well-known names, and a programme founded next
+             year has to be typeable without waiting for a new version of HolyLogger. -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+            <TextBlock Text="Programme" FontSize="16" Width="110" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextBrush}"/>
+            <ComboBox x:Name="CB_Programme" IsEditable="True" Width="180" Height="30" FontSize="16"
+                      VerticalContentAlignment="Center"
+                      ToolTip="Pick one, or type the short name of any other programme"/>
+            <TextBlock x:Name="TB_ProgrammeHint" FontSize="16" Margin="12,0,0,0" VerticalAlignment="Center"
+                       Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
+        </StackPanel>
+
+        <StackPanel Grid.Row="2" Orientation="Horizontal">
+            <TextBlock Text="Reference" FontSize="16" Width="110" VerticalAlignment="Center"
+                       Foreground="{DynamicResource TextBrush}"/>
+            <TextBox x:Name="TB_Reference" Width="260" Height="30" FontSize="16" MaxLength="60"
+                     CharacterCasing="Upper" VerticalContentAlignment="Center"
+                     ToolTip="The reference within that programme, e.g. OK-00234"/>
+        </StackPanel>
+
+        <TextBlock x:Name="TB_Warning" Grid.Row="3" FontSize="16" TextWrapping="Wrap" Margin="110,12,0,0"
+                   VerticalAlignment="Top" Foreground="{DynamicResource Danger}" Visibility="Collapsed"/>
+
+        <DockPanel Grid.Row="4" Margin="0,10,0,0">
+            <Button x:Name="Btn_Cancel" Content="Cancel" DockPanel.Dock="Right" Width="110" Height="34"
+                    FontSize="16" IsCancel="True"/>
+            <Button x:Name="Btn_Ok" Content="Save" DockPanel.Dock="Right" Width="110" Height="34"
+                    FontSize="16" FontWeight="Bold" Margin="0,0,10,0" IsDefault="True" Click="Btn_Ok_Click"/>
+            <Button x:Name="Btn_Clear" Content="Clear this QSO" DockPanel.Dock="Left" Width="170" Height="34"
+                    FontSize="16" Click="Btn_Clear_Click"
+                    ToolTip="Remove the programme and reference from this QSO"/>
+        </DockPanel>
+    </Grid>
+</Window>

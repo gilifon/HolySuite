@@ -357,6 +357,12 @@ namespace HolyLogger
             if (ContestExchangeFrame != null)
                 ContestExchangeFrame.Visibility = contest ? Visibility.Visible : Visibility.Collapsed;
 
+            // The activity row (IOTA / SOTA / POTA / WWFF) has nowhere to go in contest mode: the
+            // contest layout slides the lower rows down and already reaches the bottom of the form.
+            // It is no loss - in a contest the exchange is the contest's own - and hiding it is what
+            // keeps every contest position identical to what it was before the row existed.
+            SetActivityRowVisible(!contest);
+
             // The log-row "Set Radio to Freq" undo icon: the generic row-shift above would drop it
             // onto the packed contest exchange row. In contest mode park it just under the Spot (F3)
             // button instead — horizontally centered to that button (button center x 619.5, icon
@@ -365,7 +371,7 @@ namespace HolyLogger
             if (MainUndoIconGrid != null)
                 MainUndoIconGrid.Margin = contest
                     ? new Thickness(607, 84, 0, 0)
-                    : new Thickness(16, 164, 0, 0);
+                    : new Thickness(16, 144, 0, 0);
         }
 
         private void ContestRxBox_TextChanged(object sender, TextChangedEventArgs e)

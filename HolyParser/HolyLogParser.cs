@@ -102,10 +102,38 @@ namespace HolyParser
         private string lotw_qsl_sent_pattern = @"<lotw_qsl_sent:(\d{1,4})(?::[a-z]{1})?>";
         private string cqz_pattern = @"<cqz:(\d{1,4})(?::[a-z]{1})?>";
         private string ituz_pattern = @"<ituz:(\d{1,4})(?::[a-z]{1})?>";
+        // The activity-programme fields are read by name through AdifValue below, so they need no
+        // patterns of their own here.
+
+        // The six activity-programme fields off one record. Four programmes have a field of their own
+        // in ADIF; every other programme travels in the generic sig / sig_info pair. Before this
+        // existed, an imported park or island reference was simply dropped on the floor.
+        private static void ReadActivityFields(string row, QSO qso_row)
+        {
+            qso_row.Iota = Trimmed(AdifValue(row, "iota"));
+            qso_row.SotaRef = Trimmed(AdifValue(row, "sota_ref"));
+            qso_row.PotaRef = Trimmed(AdifValue(row, "pota_ref"));
+            qso_row.WwffRef = Trimmed(AdifValue(row, "wwff_ref"));
+            qso_row.SigInfo = Trimmed(AdifValue(row, "sig_info"));
+
+            // <sig> needs one guard. HolyLogger itself used to export the CONTEST exchange in this
+            // field, so re-importing one of its own older files would otherwise show every Holyland
+            // square as if it were an activity programme. A sig that merely repeats the exchange is
+            // that old usage, not a programme, and is left where it belongs.
+            string sig = Trimmed(AdifValue(row, "sig"));
+            if (!string.IsNullOrWhiteSpace(sig)
+                && !string.IsNullOrWhiteSpace(qso_row.SRX)
+                && string.Equals(sig, qso_row.SRX.Trim(), StringComparison.OrdinalIgnoreCase)
+                && string.IsNullOrWhiteSpace(qso_row.SigInfo))
+            {
+                sig = null;
+            }
+            qso_row.Sig = sig;
+        }
 
         public HolyLogParser() : this("", Operator.Israeli)
         {
-            
+
         }
 
         public HolyLogParser(string rawData, Operator logType, bool isParseDuplicates = true, bool isParseWarc = true)
@@ -426,6 +454,9 @@ namespace HolyParser
                 }
             }
 
+            // After SRX: the <sig> guard below has to be able to compare the two.
+            ReadActivityFields(row, qso_row);
+
             regex = new Regex(stx_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
             if (match.Success)
@@ -540,6 +571,15 @@ namespace HolyParser
             qso_row.DXCC = dated.Entity;
             if (!string.IsNullOrEmpty(dated.Continent) && dated.Continent != "XX")
                 qso_row.Continent = dated.Continent;
+        }
+
+        // An ADIF value with its surrounding blanks gone, and null rather than an empty string, so an
+        // absent field and a field written as nothing land in the database the same way.
+        private static string Trimmed(string s)
+        {
+            if (s == null) return null;
+            s = s.Trim();
+            return s.Length == 0 ? null : s;
         }
 
         // Reads one ADIF field's value from a record row (length-prefixed <field:len[:type]>value), or

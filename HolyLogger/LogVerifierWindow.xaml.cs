@@ -35,6 +35,7 @@ namespace HolyLogger
             public QSO Qso;
             public string Field;          // which QSO field the fix would write
             public string NewValue;       // the value to write (Field-specific)
+            public string Programme;      // for Field == "Activity": IOTA / SOTA / POTA / WWFF
             public int NewCq, NewItu;     // zones that travel with a country correction (0 = leave alone)
             public string NewContinent;
 
@@ -81,6 +82,18 @@ namespace HolyLogger
         // not damage, so it is left in peace.
         private static readonly Regex HolylandSquare =
             new Regex("^[A-Z][0-9]{2}[A-Z]{2}$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+        // True when the QSO already carries a reference somewhere. A comment is only worth offering to
+        // move when the proper fields are still empty - otherwise the reference is already recorded and
+        // the comment is just an old note about it.
+        private static bool HasAnyActivityReference(QSO q)
+        {
+            return !string.IsNullOrWhiteSpace(q.Iota)
+                || !string.IsNullOrWhiteSpace(q.SotaRef)
+                || !string.IsNullOrWhiteSpace(q.PotaRef)
+                || !string.IsNullOrWhiteSpace(q.WwffRef)
+                || !string.IsNullOrWhiteSpace(q.Sig);
+        }
 
         private static bool IsCallChar(char c)
         {
@@ -253,6 +266,45 @@ namespace HolyLogger
                 string grid = (q.DXLocator ?? string.Empty).Trim();
                 if (grid.Length > 0 && !LegalLocator.IsMatch(grid) && !HolylandSquare.IsMatch(grid))
                     findings.Add(Fyi(q, "Grid is not a locator", grid, "e.g. KM72OR", "the log"));
+
+                // --- an activity reference typed into the comment -----------------------------------
+                //
+                // Before HolyLogger had boxes for these, the only place to put an island or park
+                // reference was the comment, so that is where they are. The four formats cannot be
+                // confused with one another, so the programme is known for certain - no guessing.
+                //
+                // Offered ONLY when the comment is the reference and nothing else. A comment that also
+                // holds real words is reported and left alone: moving the reference out would decide on
+                // the operator's behalf what the rest of their sentence was worth.
+                string comment = (q.Comment ?? string.Empty).Trim();
+                if (comment.Length > 0 && !HasAnyActivityReference(q))
+                {
+                    string programme = MainWindow.ProgrammeOf(comment);
+                    if (programme != null)
+                    {
+                        Finding f = New(q, "Reference sitting in the comment", comment,
+                                        programme + " = " + comment.ToUpperInvariant(),
+                                        "the " + programme + " format");
+                        f.Field = "Activity";
+                        f.Programme = programme;
+                        f.NewValue = comment.ToUpperInvariant();
+                        f.Fixable = true;
+                        findings.Add(f);
+                    }
+                    else if (comment.Length <= 60)
+                    {
+                        // A reference hiding among other words: worth pointing at, not worth moving.
+                        foreach (string word in comment.Split(new[] { ' ', ',', ';', '(', ')' }, StringSplitOptions.RemoveEmptyEntries))
+                        {
+                            string p = MainWindow.ProgrammeOf(word);
+                            if (p == null) continue;
+                            findings.Add(Fyi(q, "Comment holds a " + p + " reference", comment,
+                                             "move " + word.ToUpperInvariant() + " into the " + p + " box",
+                                             "the " + p + " format"));
+                            break;
+                        }
+                    }
+                }
 
                 // --- the country, on the QSO's own date ---------------------------------------------
                 if (!dateOk) continue;
@@ -476,6 +528,15 @@ namespace HolyLogger
                     break;
                 case "Continent":
                     qso.Continent = f.NewValue;
+                    break;
+                case "Activity":
+                    // Moved, not copied: the comment held the reference only because there was nowhere
+                    // else to put it, and leaving a copy behind would show it twice in every export.
+                    if (f.Programme == "IOTA") qso.Iota = f.NewValue;
+                    else if (f.Programme == "SOTA") qso.SotaRef = f.NewValue;
+                    else if (f.Programme == "POTA") qso.PotaRef = f.NewValue;
+                    else if (f.Programme == "WWFF") qso.WwffRef = f.NewValue;
+                    qso.Comment = string.Empty;
                     break;
                 case "Country":
                     qso.Country = f.NewValue;

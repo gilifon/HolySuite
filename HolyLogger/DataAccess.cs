@@ -322,7 +322,7 @@ Environment.NewLine +
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
@@ -348,6 +348,7 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("prop_mode", qso.PROP_MODE));
                 insertSQL.Parameters.Add(new SQLiteParameter("sat_name", qso.SAT_NAME));
                 insertSQL.Parameters.Add(new SQLiteParameter("soapbox", qso.SOAPBOX));
+                AddActivityParams(insertSQL, qso, "");
                 try
                 {
                     insertSQL.ExecuteNonQuery();
@@ -374,8 +375,8 @@ Environment.NewLine +
         {
             const int es = 1, qs = 1, ls = 1, cs = 1;
             using (var ins = new SQLiteCommand(
-                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
-                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@prop_mode,@sat_name,@soapbox,@es,@qs,@ls,@cs,@log_id,@src)", con))
+                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
+                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info,@es,@qs,@ls,@cs,@log_id,@src)", con))
             {
                 ins.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
                 ins.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
@@ -401,6 +402,7 @@ Environment.NewLine +
                 ins.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                 ins.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                 ins.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
+                AddActivityParams(ins, qso, "@");
                 ins.Parameters.Add(new SQLiteParameter("@es", es));
                 ins.Parameters.Add(new SQLiteParameter("@qs", qs));
                 ins.Parameters.Add(new SQLiteParameter("@ls", ls));
@@ -487,7 +489,7 @@ Environment.NewLine +
                 SQLiteTransaction T = con.BeginTransaction();
                 foreach (var qso in qsos)
                 {
-                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1,1," + ActiveLogId + ")", con);
+                    SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,eqsl_status,qrz_status,lotw_status,clublog_status,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,1,1," + ActiveLogId + ")", con);
                     insertSQL.Transaction = T;
                     insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                     insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
@@ -513,6 +515,7 @@ Environment.NewLine +
                     insertSQL.Parameters.Add(new SQLiteParameter("prop_mode", qso.PROP_MODE));
                     insertSQL.Parameters.Add(new SQLiteParameter("sat_name", qso.SAT_NAME));
                     insertSQL.Parameters.Add(new SQLiteParameter("soapbox", qso.SOAPBOX));
+                    AddActivityParams(insertSQL, qso, "");
                 }
                 try
                 {
@@ -540,7 +543,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -583,6 +586,13 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("clublog_deleted_entity"));
                 insertSQL.Parameters.Add(new SQLiteParameter("paper_qsl_rcvd"));
                 insertSQL.Parameters.Add(new SQLiteParameter("state"));
+                // Activity references carried by the imported file - positional, so they stay last.
+                insertSQL.Parameters.Add(new SQLiteParameter("iota"));
+                insertSQL.Parameters.Add(new SQLiteParameter("sota_ref"));
+                insertSQL.Parameters.Add(new SQLiteParameter("pota_ref"));
+                insertSQL.Parameters.Add(new SQLiteParameter("wwff_ref"));
+                insertSQL.Parameters.Add(new SQLiteParameter("sig"));
+                insertSQL.Parameters.Add(new SQLiteParameter("sig_info"));
 
                 foreach (var qso in qsos)
                 {
@@ -625,6 +635,12 @@ Environment.NewLine +
                     insertSQL.Parameters[36].Value = qso.ClublogDeletedEntity;
                     insertSQL.Parameters[37].Value = qso.PaperQslRcvd;
                     insertSQL.Parameters[38].Value = (object)qso.State ?? DBNull.Value;
+                    insertSQL.Parameters[39].Value = Blank(qso.Iota);
+                    insertSQL.Parameters[40].Value = Blank(qso.SotaRef);
+                    insertSQL.Parameters[41].Value = Blank(qso.PotaRef);
+                    insertSQL.Parameters[42].Value = Blank(qso.WwffRef);
+                    insertSQL.Parameters[43].Value = Blank(qso.Sig);
+                    insertSQL.Parameters[44].Value = Blank(qso.SigInfo);
 
                     try
                     {
@@ -682,7 +698,7 @@ Environment.NewLine +
                 }
                 catch { /* best-effort; at minimum the QSO itself is updated below */ }
 
-                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox WHERE id = @id";
+                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info WHERE id = @id";
                 try
                 {
                     foreach (var uid in ids)
@@ -713,6 +729,7 @@ Environment.NewLine +
                         insertSQL.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                         insertSQL.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                         insertSQL.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
+                        AddActivityParams(insertSQL, qso, "@");
                         insertSQL.Parameters.Add(new SQLiteParameter("@id", uid));
                         insertSQL.ExecuteNonQuery();
                     }
@@ -807,6 +824,48 @@ Environment.NewLine +
                     cmd.ExecuteNonQuery();
                 }
         }
+        // The six activity-programme columns, read in one place. Every QSO reader in this file calls
+        // this rather than repeating six lines, so a seventh programme field can never be added to
+        // some readers and forgotten in others.
+        //
+        // Guarded by HasColumn because a database that has not been through the migration yet - an old
+        // backup opened by the Restore button, for instance - has no such columns, and rdr["iota"]
+        // would throw rather than return null.
+        private static void ReadActivityFields(SQLiteDataReader rdr, QSO q)
+        {
+            if (HasColumn(rdr, "iota")) q.Iota = rdr["iota"] as string;
+            if (HasColumn(rdr, "sota_ref")) q.SotaRef = rdr["sota_ref"] as string;
+            if (HasColumn(rdr, "pota_ref")) q.PotaRef = rdr["pota_ref"] as string;
+            if (HasColumn(rdr, "wwff_ref")) q.WwffRef = rdr["wwff_ref"] as string;
+            if (HasColumn(rdr, "sig")) q.Sig = rdr["sig"] as string;
+            if (HasColumn(rdr, "sig_info")) q.SigInfo = rdr["sig_info"] as string;
+        }
+
+        // The write half of ReadActivityFields: binds the same six fields in the same fixed order.
+        // An empty box is stored as NULL rather than "", so "has no reference" is one value in the
+        // database and not two.
+        private static void AddActivityParams(SQLiteCommand cmd, QSO qso, string prefix)
+        {
+            cmd.Parameters.Add(new SQLiteParameter(prefix + "iota", Blank(qso.Iota)));
+            cmd.Parameters.Add(new SQLiteParameter(prefix + "sota_ref", Blank(qso.SotaRef)));
+            cmd.Parameters.Add(new SQLiteParameter(prefix + "pota_ref", Blank(qso.PotaRef)));
+            cmd.Parameters.Add(new SQLiteParameter(prefix + "wwff_ref", Blank(qso.WwffRef)));
+            cmd.Parameters.Add(new SQLiteParameter(prefix + "sig", Blank(qso.Sig)));
+            cmd.Parameters.Add(new SQLiteParameter(prefix + "sig_info", Blank(qso.SigInfo)));
+        }
+
+        private static object Blank(string s)
+        {
+            return string.IsNullOrWhiteSpace(s) ? (object)DBNull.Value : s.Trim();
+        }
+
+        private static bool HasColumn(SQLiteDataReader rdr, string name)
+        {
+            for (int i = 0; i < rdr.FieldCount; i++)
+                if (string.Equals(rdr.GetName(i), name, StringComparison.OrdinalIgnoreCase)) return true;
+            return false;
+        }
+
         public ObservableCollection<QSO> GetAllQSOs(Action<int> progressCallback = null)
         {
             lock (_dbLock)
@@ -854,6 +913,7 @@ Environment.NewLine +
                         if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                         if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                        ReadActivityFields(rdr, q);
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
                         if (rdr["qrz_status"] != null && rdr["qrz_status"] != DBNull.Value) q.QrzStatus = Convert.ToInt32(rdr["qrz_status"]);
@@ -940,6 +1000,7 @@ Environment.NewLine +
                             if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                             if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                             if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                            ReadActivityFields(rdr, q);
                             if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                             if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
                             if (rdr["qrz_status"] != null && rdr["qrz_status"] != DBNull.Value) q.QrzStatus = Convert.ToInt32(rdr["qrz_status"]);
@@ -1023,6 +1084,7 @@ Environment.NewLine +
                             if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                             if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                             if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                            ReadActivityFields(rdr, q);
                             q.StandartizeQSO();
                             list.Add(q);
                         }
@@ -1075,6 +1137,7 @@ Environment.NewLine +
                         if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                         if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                         if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                        ReadActivityFields(rdr, q);
                         if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
                         if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
                         if (rdr["qrz_status"] != null && rdr["qrz_status"] != DBNull.Value) q.QrzStatus = Convert.ToInt32(rdr["qrz_status"]);
@@ -1716,6 +1779,7 @@ Environment.NewLine +
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                     if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                     if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    ReadActivityFields(rdr, q);
                     if (rdr["log_name"] != DBNull.Value) q.LogName = rdr["log_name"].ToString();
                     q.QrzStatus = 0;
                     list.Add(q);
@@ -1795,6 +1859,7 @@ Environment.NewLine +
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                     if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                     if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    ReadActivityFields(rdr, q);
                     if (rdr["log_name"] != DBNull.Value) q.LogName = rdr["log_name"].ToString();
                     q.ClublogStatus = 0;
                     list.Add(q);
@@ -1874,6 +1939,7 @@ Environment.NewLine +
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                     if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                     if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    ReadActivityFields(rdr, q);
                     if (rdr["log_name"] != DBNull.Value) q.LogName = rdr["log_name"].ToString();
                     q.EqslStatus = 0;
                     list.Add(q);
@@ -2236,8 +2302,8 @@ Environment.NewLine +
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
-                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,log_id) " +
-                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@log)";
+                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) " +
+                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info,@log)";
                 using (var cmd = new SQLiteCommand(sql, con))
                 {
                     cmd.Parameters.AddWithValue("@my", (object)qso.MyCall ?? DBNull.Value);
@@ -2265,6 +2331,7 @@ Environment.NewLine +
                     cmd.Parameters.AddWithValue("@prop", (object)qso.PROP_MODE ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@sat", (object)qso.SAT_NAME ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@soap", (object)qso.SOAPBOX ?? DBNull.Value);
+                    AddActivityParams(cmd, qso, "@");
                     cmd.Parameters.AddWithValue("@es", qso.EqslStatus);
                     cmd.Parameters.AddWithValue("@qs", qso.QrzStatus);
                     cmd.Parameters.AddWithValue("@ls", qso.LotwStatus);
@@ -2798,6 +2865,7 @@ Environment.NewLine +
                     if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
                     if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
                     if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                    ReadActivityFields(rdr, q);
                     if (rdr["log_name"] != DBNull.Value) q.LogName = rdr["log_name"].ToString();
                     q.LotwStatus = 0;
                     list.Add(q);
@@ -3356,6 +3424,12 @@ Environment.NewLine +
             , [prop_mode] nvarchar(100) NULL COLLATE NOCASE
             , [sat_name] nvarchar(100) NULL COLLATE NOCASE
             , [soapbox] nvarchar(100) NULL COLLATE NOCASE
+            , [iota] nvarchar(20) NULL COLLATE NOCASE
+            , [sota_ref] nvarchar(30) NULL COLLATE NOCASE
+            , [pota_ref] nvarchar(100) NULL COLLATE NOCASE
+            , [wwff_ref] nvarchar(30) NULL COLLATE NOCASE
+            , [sig] nvarchar(50) NULL COLLATE NOCASE
+            , [sig_info] nvarchar(100) NULL COLLATE NOCASE
             , [eqsl_status] INTEGER NOT NULL DEFAULT 0
             , [qrz_status] INTEGER NOT NULL DEFAULT 0
             , [qrz_logid] nvarchar(50) NULL
@@ -3491,6 +3565,14 @@ Environment.NewLine +
                 AddColToTable("qso", "itu_zone", "nvarchar(10) NULL");
             }
             AddColToTable("qso", "state", "nvarchar(20) NULL");   // ADIF STATE (worked station's subdivision)
+            // Activity-programme references. POTA is the wide one on purpose: ADIF allows a comma-
+            // separated LIST there, because a contact can be inside two overlapping parks at once.
+            AddColToTable("qso", "iota", "nvarchar(20) NULL");
+            AddColToTable("qso", "sota_ref", "nvarchar(30) NULL");
+            AddColToTable("qso", "pota_ref", "nvarchar(100) NULL");
+            AddColToTable("qso", "wwff_ref", "nvarchar(30) NULL");
+            AddColToTable("qso", "sig", "nvarchar(50) NULL");
+            AddColToTable("qso", "sig_info", "nvarchar(100) NULL");
             AddEqslStatusColumn();
             AddQrzColumns();
             AddLotwColumns();

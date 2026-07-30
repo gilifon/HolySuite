@@ -813,6 +813,20 @@
                                         HeaderStyle="{StaticResource ConfirmHeaderStyle}"
                                         HeaderTemplate="{StaticResource ConfirmHeaderTemplate}"
                                         CellTemplate="{StaticResource PaperQslTemplate}"/>
+
+                <!-- Activity programmes, at the far right so no existing column moves. Read-only: a QSO
+                     can carry several references at once and they belong in different ADIF fields, so
+                     one cell cannot sensibly be typed into. They are edited in the row's own editor
+                     (right-click, or double-click the row), which has a box for each. -->
+                <DataGridTemplateColumn Header="Activity" IsReadOnly="True" SortMemberPath="ActivitySummary"
+                                        Width="Auto" MinWidth="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding ActivitySummary}" HorizontalAlignment="Center"
+                                       Padding="5,0,5,0" ToolTip="{Binding ActivitySummary}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

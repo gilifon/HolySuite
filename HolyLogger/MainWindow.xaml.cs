@@ -1543,6 +1543,10 @@ namespace HolyLogger
                     "Log identity required", this);
                 return;
             }
+            // A malformed activity reference is worth one question before it goes into the log, because
+            // an award programme matching on it will never find "EU-5". Answering "log it anyway" keeps
+            // what was typed - the operator's data is never silently dropped.
+            if (!ConfirmActivityBeforeSave()) return;
             if (state == State.New)
             {
                 QSO qso = new QSO();
@@ -1563,6 +1567,7 @@ namespace HolyLogger
                 qso.STX = ContestSendExchangeForLog();
                 qso.MyLocator = TB_MyLocator.Text;
                 qso.DXLocator = TB_DXLocator.Text;
+                ActivityToQso(qso);                 // IOTA / SOTA / POTA / WWFF and the Other pair
                 qso.RST_RCVD = TB_RSTRcvd.Text;
                 qso.RST_SENT = TB_RSTSent.Text;
                 DateTime date = TP_Date.Value.Value;
@@ -1662,6 +1667,7 @@ namespace HolyLogger
                 QsoToUpdate.STX = TB_MyHolyland.Text;
                 QsoToUpdate.MyLocator = TB_MyLocator.Text;
                 QsoToUpdate.DXLocator = TB_DXLocator.Text;
+                ActivityToQso(QsoToUpdate);         // IOTA / SOTA / POTA / WWFF and the Other pair
                 QsoToUpdate.RST_RCVD = TB_RSTRcvd.Text;
                 QsoToUpdate.RST_SENT = TB_RSTSent.Text;
                 DateTime date = TP_Date.Value.Value;
@@ -1818,6 +1824,7 @@ namespace HolyLogger
                 TB_RSTRcvd.Text = "599";
             }
             if (TB_Comment.IsEnabled) TB_Comment.Clear();
+            ClearActivityRow();
             TB_State.Text = string.Empty;
             FName = string.Empty;
             Country = string.Empty;
@@ -4514,6 +4521,7 @@ namespace HolyLogger
                 TB_MyHolyland.Text = QsoToUpdate.STX;
                 TB_MyLocator.Text = QsoToUpdate.MyLocator;
                 TB_DXLocator.Text = QsoToUpdate.DXLocator;
+                ActivityFromQso(QsoToUpdate);       // IOTA / SOTA / POTA / WWFF and the Other pair
                 TB_RSTRcvd.Text = QsoToUpdate.RST_RCVD;
                 TB_RSTSent.Text = QsoToUpdate.RST_SENT;
                 TB_DX_Name.Text = QsoToUpdate.Name;
@@ -4624,6 +4632,12 @@ namespace HolyLogger
             CB_Mode.Background = backgroundColor;
             TB_ITUZone.Background = backgroundColor;
             TB_CQZone.Background = backgroundColor;
+
+            // The activity boxes take the same yellow, but they also paint themselves pale red while
+            // what is in them is not a valid reference. Remember which colour "not complaining" means
+            // right now, then let each box decide again - so an edit-mode box that holds rubbish stays
+            // red instead of being quietly turned yellow.
+            SetActivityNormalBackground(backgroundColor);
 
             // Contest mode replaces TB_RSTRcvd/TB_Exchange with the ContestRxPanel cells (RST-R +
             // e.g. Holyland Square). Highlight/reset those the same way, so leaving edit mode clears
@@ -5090,38 +5104,48 @@ namespace HolyLogger
         // How far each control moves in contest mode, by its normal Y band. Space is reclaimed from
         // BOTH ends — the top two rows nudge up, the lower rows slide down toward the X-icons — so the
         // Exchange row gets enough height to keep the label above the box without crowding.
+        //
+        // EVERY NUMBER HERE WAS RE-DERIVED when the normal-mode rows were re-pitched to an even 10px
+        // gap (tops 11, 49, 87, 125, 163, 201, and the activity row at 239). The contest layout itself
+        // did not change by one pixel: each shift grew by exactly as much as its row moved up, so
+        // baseTop + shift still lands where it always did. The rows moved up by 0, 7, 14, 20, 26 and 30
+        // pixels from the top down, which is where the odd-looking constants below come from.
+        //
+        // The activity row is not in this table at all: contest mode hides it (see SetActivityRowVisible).
         private double RowShift(FrameworkElement fe, double baseTop)
         {
             if (fe == MainFormBackgroundRect) return 0;     // page background never moves
             if (fe == FormFrame) return 0;                  // blue entry-form frame is fixed; must not shift
             if (fe == ContestExchangeFrame) return 0;       // frame is positioned for contest mode already
+            if (fe == ActivityRow) return 0;                // hidden in contest mode; nothing to place
 
-            // Duplicate/Legal banner: follows the DX Callsign box down (+26 in contest, same as that
-            // row) so it keeps touching the box's LOWER rim in contest mode, as in normal mode.
-            if (fe == L_Duplicate || fe == L_Legal) return 26;
+            // Duplicate/Legal banner: follows the DX Callsign box down so it keeps touching the box's
+            // LOWER rim in contest mode, as in normal mode. L_LegalFrame is named explicitly because it
+            // is the element that carries the margin (L_Legal is the TextBlock inside it), and it now
+            // sits 5px above the DX Callsign row's band, so the band default would place it wrongly.
+            if (fe == L_Duplicate || fe == L_Legal || fe == L_LegalFrame) return 45;
 
             if (fe.Margin.Left >= 670) return 0;            // right-hand map area never moves
 
-            if (fe == ContestSendBand) return -23;          // "You send" band sits in the freed top strip (~y73)
-            if (fe == ContestTxPanel) return -21;           // send cells (RST S + send field) centered in the band
-            if (fe == L_SendLabel) return -16;              // "Exchange/send" 2-line label, centered in the band
-            if (fe == ContestDividerLine) return 31;        // divider + DX Callsign row
+            if (fe == ContestSendBand) return -9;           // "You send" band sits in the freed top strip (~y73)
+            if (fe == ContestTxPanel) return -7;            // send cells (RST S + send field) centered in the band
+            if (fe == L_SendLabel) return -2;               // "Exchange/send" 2-line label, centered in the band
+            if (fe == ContestDividerLine) return 45;        // divider + DX Callsign row
 
-            if (fe == L_ExchangeLabel) return 18;           // "Exchange/received" 2-line label, centered in the frame
-                                                            // (base y moved 141->150 to center on the box; shift cut 27->18 so contest position is unchanged)
+            if (fe == L_ExchangeLabel) return 38;           // "Exchange/received" 2-line label, centered in the frame
 
             // The received exchange box gets a label above it, which lowers it. Drop the RST
             // labels+boxes and the Add(F1) button to that same line so the Exchange row aligns.
             if (fe == TB_RSTSent || fe == TB_RSTRcvd || fe == L_RstSLabel || fe == L_RstRLabel
-                || fe == SMeter || fe == AddBtn) return 32;
+                || fe == SMeter || fe == AddBtn) return 52;
 
             if (baseTop < 40) return -5;                    // top row (Station / My Locator / Square) up
-            if (baseTop < 90) return -10;                   // Operator / Freq / Band / Mode row up
-            if (baseTop < 140) return 26;                   // DX Callsign row down
-            if (baseTop < 184) return 20;                   // Exchange row content (boxes) down
-            if (baseTop < 226) return 23;                   // Name / Country / State row down (+2)
-            if (baseTop < 268) return 17;                   // DX Locator / ITU / CQ / Comment row down (+2)
-            return 0;                                       // X icons + log table — fixed
+            if (baseTop < 70) return -3;                    // Operator / Freq / Band / Mode row up
+            if (baseTop < 120) return 40;                   // DX Callsign row down
+            if (baseTop < 155) return 40;                   // Exchange row content (boxes) down
+            if (baseTop < 185) return 49;                   // Name / Country / State row down
+            if (baseTop < 230) return 47;                   // DX Locator / ITU / CQ / Comment row down
+            return 0;                                       // activity row, X icons + log table — fixed
         }
 
         private void ShareStatusButton_Click(object sender, RoutedEventArgs e)

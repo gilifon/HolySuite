@@ -93,6 +93,62 @@ namespace HolyParser
         [JsonProperty("state")]
         public string State { get; set; }
 
+        // ACTIVITY PROGRAM REFERENCES ("on the air" programmes).
+        //
+        // ADIF gives its own field to exactly four programmes - islands, summits, parks and nature
+        // reserves - and hands everything else (castles, mills, lighthouses, and whatever is founded
+        // next year) to the generic SIG / SIG_INFO pair. That is why there are six fields here and not
+        // one per programme: the list of programmes has no end, so we store the four the standard
+        // names and let the fifth pair carry the rest by name.
+        //
+        // All six describe the CONTACTED station. The MY_* counterparts (what the operator sends when
+        // they are the one on the summit) are a separate matter and are not stored per QSO.
+
+        // Islands on the Air, format CC-XXX where CC is a continent code, e.g. EU-005.
+        [JsonProperty("iota")]
+        public string Iota { get; set; }
+
+        // Summits on the Air, e.g. W2/WE-003. Always contains a stroke.
+        [JsonProperty("sota_ref")]
+        public string SotaRef { get; set; }
+
+        // Parks on the Air, e.g. K-0001. ADIF's POTARefList allows a COMMA-SEPARATED LIST here,
+        // because one contact can be inside two overlapping parks at once.
+        [JsonProperty("pota_ref")]
+        public string PotaRef { get; set; }
+
+        // World Wide Flora & Fauna, e.g. 4XFF-0016. Always contains "FF-".
+        [JsonProperty("wwff_ref")]
+        public string WwffRef { get; set; }
+
+        // The name of any other programme, e.g. WCA - and the reference within it, e.g. OK-00234.
+        // Two fields rather than one so that everyone spells the programme the same way and an award
+        // check can group them; that is exactly why ADIF splits them.
+        [JsonProperty("sig")]
+        public string Sig { get; set; }
+
+        [JsonProperty("sig_info")]
+        public string SigInfo { get; set; }
+
+        // The activity references as one short line for a log column: "IOTA EU-005", or several
+        // separated by a space when a QSO carries more than one (a summit inside a park is normal).
+        // Display only - never stored, never exported, hence [JsonIgnore].
+        [JsonIgnore]
+        public string ActivitySummary
+        {
+            get
+            {
+                var parts = new List<string>(5);
+                if (!string.IsNullOrWhiteSpace(Iota)) parts.Add("IOTA " + Iota.Trim());
+                if (!string.IsNullOrWhiteSpace(SotaRef)) parts.Add("SOTA " + SotaRef.Trim());
+                if (!string.IsNullOrWhiteSpace(PotaRef)) parts.Add("POTA " + PotaRef.Trim());
+                if (!string.IsNullOrWhiteSpace(WwffRef)) parts.Add("WWFF " + WwffRef.Trim());
+                if (!string.IsNullOrWhiteSpace(Sig))
+                    parts.Add((Sig.Trim() + " " + (SigInfo ?? string.Empty).Trim()).Trim());
+                return string.Join("  ", parts.ToArray());
+            }
+        }
+
         [JsonProperty("operator")]
         public string Operator { get; set; }
 
