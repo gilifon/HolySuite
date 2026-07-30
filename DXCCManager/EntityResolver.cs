@@ -22,7 +22,9 @@ namespace DXCCManager
     //
     // Matching rule (standard cty.dat semantics): an exact-callsign match wins; otherwise
     // the LONGEST matching prefix wins. This is what makes VP6D resolve to Ducie while
-    // VP6A resolves to Pitcairn — the bug the old "first match wins" table had.
+    // VP6A resolves to Pitcairn — the bug the old "first match wins" table had. The primary
+    // prefix counts as an alias of its own entity, ranked below every listed alias
+    // (see primaryPrefixFallbacks).
     public class EntityResolver
     {
         private class CtyEntity
@@ -56,6 +58,15 @@ namespace DXCCManager
 
         private int maxPrefixLength = 1;
         private readonly List<CtyEntity> allEntities = new List<CtyEntity>(360);
+
+        // Entities whose primary prefix still has to be registered as a prefix. The format spec says
+        // the alias lines carry "alias DXCC prefixes (including the primary one)", but 16 of ~340
+        // records don't repeat it: Franz Josef Land labels itself R1FJ yet lists only RI1F, so the
+        // call R1FJ fell all the way through to European Russia's one-letter alias R. These are
+        // applied after the whole file is read, and only where no alias claimed the same key, so an
+        // explicit alias always outranks the primary prefix no matter where the records happen to
+        // sit in the file.
+        private readonly List<CtyEntity> primaryPrefixFallbacks = new List<CtyEntity>(360);
 
         // When set to an existing file, the resolver loads cty.dat from there instead of the
         // copy embedded in this assembly. The app points this at an updatable AppData file so a
@@ -132,6 +143,12 @@ namespace DXCCManager
                     RegisterAliases(entity, aliasBuilder.ToString());
                 }
             }
+
+            foreach (CtyEntity e in primaryPrefixFallbacks)
+            {
+                if (!prefixMap.ContainsKey(e.PrimaryPrefix))
+                    AddPrefix(e.PrimaryPrefix, e, e.CqZone, e.ItuZone);
+            }
         }
 
         // cty.dat encodes its release as a "VERyyyymmdd" token (smuggled in as a fake callsign).
@@ -200,6 +217,11 @@ namespace DXCCManager
 
         private void RegisterAliases(CtyEntity entity, string aliasText)
         {
+            // Some primary prefixes are labels rather than prefixes (VP8/h, 3Y/b); no callsign can
+            // match those, so only the plain ones are worth keeping as a fallback.
+            if (!string.IsNullOrEmpty(entity.PrimaryPrefix) && entity.PrimaryPrefix.IndexOf('/') < 0)
+                primaryPrefixFallbacks.Add(entity);
+
             aliasText = aliasText.TrimEnd(';');
             if (aliasText.Length == 0)
             {
