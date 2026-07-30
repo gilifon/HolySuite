@@ -201,8 +201,20 @@
                 <TextBlock Grid.Row="0" Grid.Column="3" Text="My Locator"  Style="{StaticResource Hdr}"/>
                 <TextBlock Grid.Row="0" Grid.Column="4" Text="Soapbox"     Style="{StaticResource Hdr}"/>
 
-                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_MyCall"    Style="{StaticResource Cell}" CharacterCasing="Upper"/>
-                <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_Operator"  Style="{StaticResource Cell}" CharacterCasing="Upper"/>
+                <!-- NOT editable, and shown bold so it reads as a fact rather than a field: this is the
+                     station callsign the log belongs to, its permanent identity. A log holds QSOs for one
+                     station callsign only - the main window blocks logging under a different call (see
+                     HandleStationCallsignChange), and copying a QSO into another log is refused unless the
+                     two identities match (DataAccess.CopyQsoToLog). Editing it here would have walked
+                     round both, leaving a QSO in a log that is not for that station. A callsign genuinely
+                     logged wrong belongs to the whole log, so it is corrected in the Log Manager.
+                     The OPERATOR beside it stays editable: another operator may work from this station,
+                     and that is per QSO, not per log. -->
+                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_MyCall"    Style="{StaticResource CellRO}"
+                         FontWeight="Bold"
+                         ToolTip="The station callsign this log belongs to — set when the log was created, and not editable here"/>
+                <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_Operator"  Style="{StaticResource Cell}" CharacterCasing="Upper"
+                         ToolTip="Who operated this contact — may differ from the station callsign"/>
                 <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_MySquare"  Style="{StaticResource Cell}" CharacterCasing="Upper"
                          ToolTip="The exchange YOU sent — your Holyland square, or the contest's sent exchange when a contest is running"/>
                 <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_MyLocator" Style="{StaticResource Cell}" CharacterCasing="Upper"
