@@ -317,6 +317,10 @@
       <DependentUpon>DuplicatesWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="LogVerifierWindow.xaml.cs">
+      <DependentUpon>LogVerifierWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="Settings.cs" />
     <Compile Include="SearchWindow.xaml.cs">
       <DependentUpon>SearchWindow.xaml</DependentUpon>
@@ -418,6 +422,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="DuplicatesWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="LogVerifierWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

@@ -1,0 +1,83 @@
+<Window x:Class="HolyLogger.LogVerifierWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Verify Log" Width="1120" Height="640" MinWidth="700" MinHeight="420"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource WindowBg}" Loaded="Window_Loaded">
+    <Grid Margin="14,10,14,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,8">
+            <TextBlock x:Name="TB_Header" FontSize="16" FontWeight="Bold"
+                       Foreground="{DynamicResource AccentBrush}"/>
+            <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       Text="Every QSO is checked against the country databases on ITS OWN DATE, and against itself for impossible values. Nothing is changed until you tick a row and press Apply. Rows marked FYI cannot be corrected automatically - they are shown so you can decide what to do."/>
+        </StackPanel>
+
+        <DataGrid x:Name="FindingsGrid" Grid.Row="1" AutoGenerateColumns="False"
+                  CanUserAddRows="False" SelectionMode="Extended" HeadersVisibility="Column"
+                  GridLinesVisibility="All" FontSize="13" RowHeaderWidth="0"
+                  BorderBrush="#1565C0" BorderThickness="1"
+                  Foreground="{DynamicResource TextBrush}"
+                  HorizontalGridLinesBrush="{DynamicResource GridLine}"
+                  VerticalGridLinesBrush="{DynamicResource GridLine}">
+            <DataGrid.Columns>
+                <!-- The only editable column: everything else is a statement of fact. -->
+                <DataGridCheckBoxColumn Header="Fix" Binding="{Binding Apply}" Width="42">
+                    <DataGridCheckBoxColumn.ElementStyle>
+                        <Style TargetType="CheckBox">
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                            <Setter Property="IsEnabled" Value="{Binding Fixable}"/>
+                        </Style>
+                    </DataGridCheckBoxColumn.ElementStyle>
+                    <DataGridCheckBoxColumn.EditingElementStyle>
+                        <Style TargetType="CheckBox">
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                            <Setter Property="IsEnabled" Value="{Binding Fixable}"/>
+                        </Style>
+                    </DataGridCheckBoxColumn.EditingElementStyle>
+                </DataGridCheckBoxColumn>
+                <DataGridTextColumn Header="Date" Binding="{Binding DateText}" Width="Auto" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="Auto" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Callsign" Binding="{Binding Call}" Width="Auto" IsReadOnly="True">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontWeight" Value="Bold"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="What is wrong" Binding="{Binding Problem}" Width="190" IsReadOnly="True"/>
+                <DataGridTextColumn Header="In the log" Binding="{Binding Current}" Width="*" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Should be" Binding="{Binding Suggested}" Width="*" IsReadOnly="True">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <DataGridTextColumn Header="Evidence" Binding="{Binding Evidence}" Width="150" IsReadOnly="True"/>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <DockPanel Grid.Row="2" Margin="0,12,0,0">
+            <Button x:Name="Btn_Close" Content="Close" DockPanel.Dock="Right" Width="100" Height="34"
+                    FontSize="13" IsCancel="True" Click="Btn_Close_Click"/>
+            <Button x:Name="Btn_Apply" DockPanel.Dock="Right" Width="240" Height="34" Margin="0,0,10,0"
+                    FontSize="13" FontWeight="Bold" IsEnabled="False" Click="Btn_Apply_Click"
+                    Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20" BorderThickness="1.5"
+                    Content="Apply the ticked corrections"/>
+            <Button x:Name="Btn_None" Content="Tick none" DockPanel.Dock="Right" Width="100" Height="34"
+                    Margin="0,0,10,0" FontSize="13" Click="Btn_None_Click"/>
+            <Button x:Name="Btn_All" Content="Tick all" DockPanel.Dock="Right" Width="100" Height="34"
+                    Margin="0,0,10,0" FontSize="13" Click="Btn_All_Click"/>
+            <TextBlock x:Name="TB_Summary" VerticalAlignment="Center" FontSize="12.5"
+                       Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
+        </DockPanel>
+    </Grid>
+</Window>

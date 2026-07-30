@@ -209,7 +209,10 @@ namespace DXCCManager
             {
                 result = new DXCC
                 {
-                    Name = cl.EntityName,
+                    // Only reached for an entity cty.dat cannot name at all - almost always a deleted one
+                    // like Netherlands Antilles. Club Log shouts its names in capitals, so they are cased
+                    // to sit beside the log's own wording instead of glaring out of it.
+                    Name = TitleCase(cl.EntityName),
                     Entity = bridged ? ctyEntity : cl.DxccCode.ToString(),
                     Prefixes = "",
                     Locator = fromCty != null ? fromCty.Locator : "",
@@ -282,6 +285,30 @@ namespace DXCCManager
         private static bool SameCountryName(string a, string b)
         {
             return Flatten(a) == Flatten(b) && Flatten(a).Length > 0;
+        }
+
+        // "BONAIRE, CURACAO (NETH ANTILLES)" -> "Bonaire, Curacao (Neth Antilles)". Only used for names
+        // that come from Club Log verbatim; cty.dat's own wording is never touched.
+        private static string TitleCase(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return string.Empty;
+            var sb = new System.Text.StringBuilder(s.Length);
+            bool startOfWord = true;
+            foreach (char c in s)
+            {
+                if (char.IsLetter(c))
+                {
+                    sb.Append(startOfWord ? char.ToUpperInvariant(c) : char.ToLowerInvariant(c));
+                    startOfWord = false;
+                }
+                else
+                {
+                    sb.Append(c);
+                    // An apostrophe keeps the word going ("Cote d'Ivoire"); anything else starts a new one.
+                    startOfWord = c != '\'';
+                }
+            }
+            return sb.ToString();
         }
 
         private static string Flatten(string s)

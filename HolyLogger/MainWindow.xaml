@@ -622,6 +622,7 @@
                             </Rectangle>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="VerifyLogMenuItem" Header="Verify Log" ToolTip="Check every QSO in this log for a wrong country, a fake callsign and other errors, and offer corrections" Click="VerifyLogMenuItem_Click"/>
                     <Separator />
                     <MenuItem x:Name="SendQueueToEqslMenuItem" Header="Upload Queue to eQSL" ToolTip="Upload the QSOs that are still waiting to be sent to eQSL.cc" Click="SendQueueToEqslMenuItem_Click">
                         <MenuItem.ContextMenu>
