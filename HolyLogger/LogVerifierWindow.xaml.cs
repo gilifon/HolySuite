@@ -93,6 +93,13 @@ namespace HolyLogger
             _qsos = (qsos ?? Enumerable.Empty<QSO>()).Where(q => q != null).ToList();
             _logName = string.IsNullOrWhiteSpace(logName) ? "" : logName.Trim();
             Title = string.IsNullOrEmpty(_logName) ? "Verify Log" : "Verify Log — " + _logName;
+
+            // The same header look as the QSO log, the cluster and the Logs window, from the one place
+            // that defines it: the LogHeaderBg palette token with black text. Its background is a
+            // DynamicResource, so switching colour scheme or editing Customize Colors repaints this
+            // header live too.
+            FindingsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+
             FindingsGrid.ItemsSource = _findings;
         }
 
