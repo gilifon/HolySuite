@@ -300,20 +300,63 @@ namespace DXCCManager
 
                 // ...and by the name that same entity is written under, which is what a stored QSO holds.
                 DXCC named = cty.GetDXCCbyEntityCode(pair.Value);
-                if (named != null && !string.IsNullOrEmpty(named.Name) && named.Name != "Unknown"
-                    && !codeByCountryName.ContainsKey(named.Name))
-                    codeByCountryName[named.Name] = pair.Key;
+                if (named != null && !string.IsNullOrEmpty(named.Name) && named.Name != "Unknown")
+                    AddCountryName(named.Name, pair.Key);
             }
+
+            // Now every entity Club Log lists, DELETED ONES INCLUDED, under Club Log's own wording.
+            // cty.dat contains no deleted entity, so this is the only place a QSO with Czechoslovakia
+            // or the Canal Zone in it can get its number - and an operator licensed for forty years has
+            // plenty of those. Added second, so an entity that still exists always wins the name.
+            if (clubLog != null)
+            {
+                foreach (KeyValuePair<int, string> entity in clubLog.AllEntityNames())
+                    AddCountryName(entity.Value, entity.Key);
+            }
+        }
+
+        // One country name in the lookup table, under the same flattened form the comparison above
+        // uses - so "Bonaire, Curacao (Neth Antilles)" out of a log matches Club Log's capitals, and
+        // "St." matches "Saint". Never overwrites: the first name registered for a wording wins, and
+        // active entities are registered first.
+        private void AddCountryName(string name, int code)
+        {
+            string key = Flatten(name);
+            if (key.Length == 0 || codeByCountryName.ContainsKey(key)) return;
+            codeByCountryName[key] = code;
         }
 
         // The ARRL entity number for a country as it is WRITTEN in a logged QSO, or 0 when no database
         // knows that wording. Used by the ADIF export, so <dxcc> and <country> can never disagree.
         public int EntityCodeForCountry(string countryName)
         {
-            string name = (countryName ?? string.Empty).Trim();
-            if (name.Length == 0) return 0;
+            string key = Flatten(countryName);
+            if (key.Length == 0) return 0;
             int code;
-            return codeByCountryName.TryGetValue(name, out code) ? code : 0;
+            return codeByCountryName.TryGetValue(key, out code) ? code : 0;
+        }
+
+        // The same, but refusing an answer the QSO's own date rules out.
+        //
+        // Some wordings belong to an entity that no longer exists. "Germany" is the awkward one: cty.dat
+        // calls the modern country "Fed. Rep. of Germany", so the bare word "Germany" - which another
+        // logger's file may well carry - is Club Log's name for entity 81, deleted in 1973. Writing 81
+        // into an award submission for a QSO made in 2020 would be plainly wrong, so when the only
+        // match is an entity that had already ceased to exist on the day of the contact, this reports
+        // nothing at all. Saying nothing is recoverable; saying the wrong number is not.
+        public int EntityCodeForCountry(string countryName, DateTime whenUtc)
+        {
+            int code = EntityCodeForCountry(countryName);
+            if (code <= 0 || clubLog == null) return code;
+            if (!clubLog.IsDeletedEntity(code)) return code;
+            return whenUtc <= clubLog.EntityEndUtc(code) ? code : 0;
+        }
+
+        // True when that entity is one the ARRL has deleted. The QSO still counts - it is worked
+        // country number 85 for ever - but nothing new can be worked there.
+        public bool IsDeletedEntityCode(int dxccCode)
+        {
+            return clubLog != null && dxccCode > 0 && clubLog.IsDeletedEntity(dxccCode);
         }
 
         // Puts the ARRL entity number on an answer that came from cty.dat, which has none of its own.

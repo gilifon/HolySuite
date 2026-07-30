@@ -114,8 +114,10 @@ namespace HolyParser
                 // country name beside it is only for people to read. Looked up from the name in this
                 // very record so the two can never contradict each other, and left out entirely when no
                 // database recognises that wording rather than guessing a number for it.
+                // Judged against the QSO's own date, so a wording that belongs to a country which had
+                // already ceased to exist cannot be attached to a modern contact.
                 int dxccCode = 0;
-                try { dxccCode = CountryLookup.Shared.EntityCodeForCountry(qso.Country); }
+                try { dxccCode = CountryLookup.Shared.EntityCodeForCountry(qso.Country, CountryLookup.QsoDate(qso.Date)); }
                 catch (Exception) { dxccCode = 0; }
                 if (dxccCode > 0)
                 {

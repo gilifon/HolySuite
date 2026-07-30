@@ -151,6 +151,21 @@ namespace DXCCManager
             if (!string.IsNullOrEmpty(name)) nameByCode[adif] = name;
             string prefix = Value(e, "prefix");
             if (!string.IsNullOrEmpty(prefix)) prefixByCode[adif] = prefix;
+            // The day the entity stopped existing. Only deleted entities carry one, and it is what
+            // lets a country NAME be judged against a QSO's date: "Germany" is entity 81 for a contact
+            // made in 1970 and cannot possibly be for one made in 2020.
+            string end = Value(e, "end");
+            if (!string.IsNullOrEmpty(end)) endByCode[adif] = ParseDate(end, DateTime.MaxValue);
+        }
+
+        // DXCC code -> the day the entity ceased to exist. Absent for entities that still do.
+        private readonly Dictionary<int, DateTime> endByCode = new Dictionary<int, DateTime>(100);
+
+        // The day this entity stopped existing, or DateTime.MaxValue when it still does.
+        public DateTime EntityEndUtc(int dxccCode)
+        {
+            DateTime end;
+            return endByCode.TryGetValue(dxccCode, out end) ? end : DateTime.MaxValue;
         }
 
         // The active (not deleted) entities, as code/name/prefix triples — used to build the bridge
@@ -307,6 +322,16 @@ namespace DXCCManager
                 ExactCall = exactCall,
                 MatchedLength = matchedLength
             };
+        }
+
+        // EVERY entity Club Log lists, name and code, deleted ones included. The deleted entities are
+        // the whole point: an operator who has been licensed for forty years has QSOs with countries
+        // that stopped existing - Netherlands Antilles, Czechoslovakia, the Canal Zone - and those
+        // contacts still count for awards. Their names are the only way to recognise them in a log,
+        // since cty.dat carries no deleted entity at all.
+        public IEnumerable<KeyValuePair<int, string>> AllEntityNames()
+        {
+            foreach (var pair in nameByCode) yield return pair;
         }
 
         // Club Log's name for a DXCC code, or "" — handy when a QSO carries only the code (from LoTW).
