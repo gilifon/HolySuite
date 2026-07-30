@@ -182,6 +182,34 @@ namespace HolyLogger
         //
         // Edits made in that window go to the database through DataAccess.Update, so they land in the
         // right log whichever one is active.
+        // Verify the SELECTED log, like Search In Log: the log does not have to be activated, so the log
+        // being worked in is left alone. Modal, because it writes corrections and the list on screen must
+        // not go stale underneath the operator while he ticks rows.
+        private void Btn_Verify_Click(object sender, RoutedEventArgs e)
+        {
+            if (!RequireSelection()) return;
+
+            long id = Selected.Id;
+            string name = Selected.Name;
+            try
+            {
+                var qsos = _dal.GetQSOsForLog(id);
+                if (qsos == null || qsos.Count == 0)
+                {
+                    HolyMessageBox.ShowWarning($"\"{name}\" has no QSOs to check.", "Verify Log", this);
+                    return;
+                }
+
+                var verifier = new LogVerifierWindow(qsos, name) { Owner = this };
+                verifier.ShowDialog();
+                LoadLogs();   // a corrected callsign or band can change what this list shows
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError("Could not check this log.\n\n" + ex.Message, "Verify Log", this);
+            }
+        }
+
         private void Btn_Search_Click(object sender, RoutedEventArgs e)
         {
             if (!RequireSelection()) return;

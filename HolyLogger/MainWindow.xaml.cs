@@ -10841,26 +10841,6 @@ namespace HolyLogger
             return ("", "");
         }
 
-        // Tools > Verify Log. Reads the active log fresh from the database rather than using the grid's
-        // collection, so what is checked is what is stored, and reloads the grid afterwards because the
-        // window may have corrected rows the main window is showing.
-        private void VerifyLogMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            try
-            {
-                var all = dal.GetQSOsForLog(dal.ActiveLogId);
-                var verifier = new LogVerifierWindow(all, SafeActiveLogName()) { Owner = this };
-                verifier.ShowDialog();
-                Qsos = dal.GetQSOsForLog(dal.ActiveLogId);
-            }
-            catch (System.Exception ex)
-            {
-                Log.Swallow(ex);
-                MessageBox.Show(this, "The log could not be checked:\n\n" + ex.Message, "Verify Log",
-                                MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
-        }
-
         private async void RemoveDuplicatesMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Identify duplicates up front WITHOUT touching the DB, in the ACTIVE log only. Two

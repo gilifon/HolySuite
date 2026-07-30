@@ -376,26 +376,22 @@ namespace HolyLogger
                 : "Apply " + n.ToString("N0") + " correction" + (n == 1 ? "" : "s");
         }
 
+        // Each Finding raises PropertyChanged, so the boxes follow without refreshing the grid - which
+        // would rebuild every row and throw the operator's scroll position away.
         private void Btn_All_Click(object sender, RoutedEventArgs e)
         {
             foreach (Finding f in _findings) f.Apply = f.Fixable;
-            FindingsGrid.Items.Refresh();
             UpdateApplyButton();
         }
 
         private void Btn_None_Click(object sender, RoutedEventArgs e)
         {
             foreach (Finding f in _findings) f.Apply = false;
-            FindingsGrid.Items.Refresh();
             UpdateApplyButton();
         }
 
         private async void Btn_Apply_Click(object sender, RoutedEventArgs e)
         {
-            // Committing an edit in progress first, or the tick the operator has just clicked is not yet
-            // in the bound object.
-            FindingsGrid.CommitEdit(System.Windows.Controls.DataGridEditingUnit.Row, true);
-
             List<Finding> chosen = _findings.Where(f => f.Apply && f.Fixable && f.Qso != null).ToList();
             if (chosen.Count == 0) return;
 

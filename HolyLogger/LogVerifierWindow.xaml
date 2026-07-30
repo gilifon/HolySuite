@@ -27,21 +27,18 @@
                   HorizontalGridLinesBrush="{DynamicResource GridLine}"
                   VerticalGridLinesBrush="{DynamicResource GridLine}">
             <DataGrid.Columns>
-                <!-- The only editable column: everything else is a statement of fact. -->
-                <DataGridCheckBoxColumn Header="Fix" Binding="{Binding Apply}" Width="42">
-                    <DataGridCheckBoxColumn.ElementStyle>
-                        <Style TargetType="CheckBox">
-                            <Setter Property="HorizontalAlignment" Value="Center"/>
-                            <Setter Property="IsEnabled" Value="{Binding Fixable}"/>
-                        </Style>
-                    </DataGridCheckBoxColumn.ElementStyle>
-                    <DataGridCheckBoxColumn.EditingElementStyle>
-                        <Style TargetType="CheckBox">
-                            <Setter Property="HorizontalAlignment" Value="Center"/>
-                            <Setter Property="IsEnabled" Value="{Binding Fixable}"/>
-                        </Style>
-                    </DataGridCheckBoxColumn.EditingElementStyle>
-                </DataGridCheckBoxColumn>
+                <!-- The only thing the operator can change: everything else is a statement of fact. A
+                     template column rather than a DataGridCheckBoxColumn so one click ticks the box -
+                     a check box column would need the first click just to enter edit mode. -->
+                <DataGridTemplateColumn Header="Fix" Width="42" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      IsEnabled="{Binding Fixable}"
+                                      IsChecked="{Binding Apply, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Date" Binding="{Binding DateText}" Width="Auto" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="Auto" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Callsign" Binding="{Binding Call}" Width="Auto" IsReadOnly="True">
