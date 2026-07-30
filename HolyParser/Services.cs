@@ -1,4 +1,4 @@
-﻿using DXCCManager;
+using DXCCManager;
 using HolyParser;
 using System;
 using System.Collections.Generic;
@@ -132,16 +132,16 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.Operator)) adif.AppendFormat("<operator:{0}>{1}", qso.Operator.Length, qso.Operator);
                 if (!string.IsNullOrWhiteSpace(qso.SRX)) adif.AppendFormat("<srx_string:{0}>{1}", qso.SRX.Length, qso.SRX);
                 if (!string.IsNullOrWhiteSpace(qso.STX)) adif.AppendFormat("<stx_string:{0}>{1}", qso.STX.Length, qso.STX);
-                // ACTIVITY PROGRAMME REFERENCES, in the fields ADIF names for them.
+                // ACTIVITY PROGRAM REFERENCES, in the fields ADIF names for them.
                 if (!string.IsNullOrWhiteSpace(qso.Iota)) adif.AppendFormat("<iota:{0}>{1}", qso.Iota.Trim().Length, qso.Iota.Trim());
                 if (!string.IsNullOrWhiteSpace(qso.SotaRef)) adif.AppendFormat("<sota_ref:{0}>{1}", qso.SotaRef.Trim().Length, qso.SotaRef.Trim());
                 if (!string.IsNullOrWhiteSpace(qso.PotaRef)) adif.AppendFormat("<pota_ref:{0}>{1}", qso.PotaRef.Trim().Length, qso.PotaRef.Trim());
                 if (!string.IsNullOrWhiteSpace(qso.WwffRef)) adif.AppendFormat("<wwff_ref:{0}>{1}", qso.WwffRef.Trim().Length, qso.WwffRef.Trim());
 
-                // <sig> can only be written once, and two things want it: the activity programme the
+                // <sig> can only be written once, and two things want it: the activity program the
                 // operator entered (which is what the field is FOR - "the contacted station's special
                 // activity or interest group") and the long-standing lines below, which put the contest
-                // exchange there instead. The programme wins when there is one; with no programme
+                // exchange there instead. The program wins when there is one; with no program
                 // entered - every QSO logged before this existed, and every contest QSO - the file comes
                 // out byte for byte as it always did.
                 bool sigTakenByActivity = !string.IsNullOrWhiteSpace(qso.Sig);

@@ -1544,7 +1544,7 @@ namespace HolyLogger
                 return;
             }
             // A malformed activity reference is worth one question before it goes into the log, because
-            // an award programme matching on it will never find "EU-5". Answering "log it anyway" keeps
+            // an award program matching on it will never find "EU-5". Answering "log it anyway" keeps
             // what was typed - the operator's data is never silently dropped.
             if (!ConfirmActivityBeforeSave()) return;
             if (state == State.New)

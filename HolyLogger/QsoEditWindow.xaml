@@ -180,11 +180,11 @@
                 <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_Comment"  Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
             </Grid>
 
-            <!-- ACTIVITY PROGRAMMES. Four have a field of their own in ADIF; every other programme -
-                 castles, mills, lighthouses - is named in Programme with its reference beside it, which
+            <!-- ACTIVITY PROGRAMS. Four have a field of their own in ADIF; every other program -
+                 castles, mills, lighthouses - is named in Program with its reference beside it, which
                  is the standard's own SIG / SIG_INFO pair. Set at 16 like the rest of the new work in
                  this program; the older rows above are still at 12. -->
-            <TextBlock Text="ACTIVITY PROGRAMME" Style="{StaticResource Caption}" FontSize="16"/>
+            <TextBlock Text="ACTIVITY PROGRAM" Style="{StaticResource Caption}" FontSize="16"/>
             <Grid Margin="12,0,12,4">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="90"/>
@@ -203,21 +203,21 @@
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="SOTA"      Style="{StaticResource Hdr}" FontSize="16"/>
                 <TextBlock Grid.Row="0" Grid.Column="2" Text="POTA"      Style="{StaticResource Hdr}" FontSize="16"/>
                 <TextBlock Grid.Row="0" Grid.Column="3" Text="WWFF"      Style="{StaticResource Hdr}" FontSize="16"/>
-                <TextBlock Grid.Row="0" Grid.Column="4" Text="Programme" Style="{StaticResource Hdr}" FontSize="16"/>
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="Program" Style="{StaticResource Hdr}" FontSize="16"/>
                 <TextBlock Grid.Row="0" Grid.Column="5" Text="Reference" Style="{StaticResource Hdr}" FontSize="16"/>
 
-                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_Iota"    Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="6"
+                <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_Iota"    Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="20"
                          ToolTip="Islands on the Air: two letters for the continent, then three digits — EU-005"/>
                 <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_SotaRef" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="20"
                          ToolTip="Summits on the Air: the summit reference — W2/WE-003"/>
                 <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_PotaRef" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="90"
                          ToolTip="Parks on the Air: the park reference — K-0001. Two parks at once are written K-0001,US-4578"/>
-                <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_WwffRef" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="11"
+                <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_WwffRef" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="20"
                          ToolTip="World Wide Flora and Fauna: the nature-reserve reference — 4XFF-0016"/>
                 <TextBox Grid.Row="1" Grid.Column="4" x:Name="TB_Sig"     Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="40"
-                         ToolTip="Any other programme, by its short name — WCA for castles, MOTA for mills, ARLHS for lighthouses"/>
+                         ToolTip="Any other program, by its short name — WCA for castles, MOTA for mills, ARLHS for lighthouses"/>
                 <TextBox Grid.Row="1" Grid.Column="5" x:Name="TB_SigInfo" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="60"
-                         ToolTip="The reference within that programme, e.g. OK-00234"/>
+                         ToolTip="The reference within that program, e.g. OK-00234"/>
             </Grid>
 
             <!-- Row 4: this end of the contact. -->

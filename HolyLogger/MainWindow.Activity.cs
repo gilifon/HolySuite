@@ -8,15 +8,15 @@ using HolyParser;
 
 namespace HolyLogger
 {
-    // ACTIVITY PROGRAMME REFERENCES on the main form.
+    // ACTIVITY PROGRAM REFERENCES on the main form.
     //
-    // Four programmes have a box each because ADIF gives them a field each; every other programme -
+    // Four programs have a box each because ADIF gives them a field each; every other program -
     // castles, mills, lighthouses, and whatever is founded next year - goes through the Other button
-    // into the standard SIG / SIG_INFO pair. That split is the whole design: the list of programmes
+    // into the standard SIG / SIG_INFO pair. That split is the whole design: the list of programs
     // has no end, so only the four the standard names are allowed to take up screen space.
     public partial class MainWindow
     {
-        // What each programme's reference has to look like, straight out of the ADIF data types.
+        // What each program's reference has to look like, straight out of the ADIF data types.
         // Anchored and upper-case only: every box on the row is CharacterCasing="Upper".
         private static readonly Regex IotaPattern = new Regex(@"^(AF|AN|AS|EU|NA|OC|SA)-\d{3}$", RegexOptions.Compiled);
         private static readonly Regex SotaPattern = new Regex(@"^[A-Z0-9]{1,8}/[A-Z]{2}-\d{3}$", RegexOptions.Compiled);
@@ -68,10 +68,10 @@ namespace HolyLogger
             return true;
         }
 
-        // Which programme a lone reference belongs to, or null when it is not a reference at all. The
+        // Which program a lone reference belongs to, or null when it is not a reference at all. The
         // four formats cannot be confused with each other, which is what lets the Verify Log tool offer
-        // to move a reference out of a comment without having to ask the operator which programme it is.
-        public static string ProgrammeOf(string reference)
+        // to move a reference out of a comment without having to ask the operator which program it is.
+        public static string ProgramOf(string reference)
         {
             string t = (reference ?? "").Trim().ToUpperInvariant();
             if (t.Length == 0) return null;
@@ -174,7 +174,7 @@ namespace HolyLogger
             UpdateOtherActivityButton();
         }
 
-        // The button carries what it holds, so an "other" programme is visible on the form without
+        // The button carries what it holds, so an "other" program is visible on the form without
         // opening anything. It goes back to reading "Other..." when there is nothing set.
         private void UpdateOtherActivityButton()
         {
@@ -185,7 +185,7 @@ namespace HolyLogger
             {
                 Btn_OtherActivity.Content = "Other…";
                 Btn_OtherActivity.FontWeight = FontWeights.Normal;
-                Btn_OtherActivity.ToolTip = "Any other programme - castles, mills, lighthouses. Shows what is set once you choose one.";
+                Btn_OtherActivity.ToolTip = "Any other program - castles, mills, lighthouses. Shows what is set once you choose one.";
                 return;
             }
             string shown = (sig + " " + info).Trim();
@@ -198,7 +198,7 @@ namespace HolyLogger
         {
             var w = new OtherActivityWindow(activitySig, activitySigInfo) { Owner = this };
             if (w.ShowDialog() != true) return;
-            activitySig = w.Programme;
+            activitySig = w.Program;
             activitySigInfo = w.Reference;
             UpdateOtherActivityButton();
         }

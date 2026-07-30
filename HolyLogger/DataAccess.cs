@@ -1,4 +1,4 @@
-﻿using HolyParser;
+using HolyParser;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -824,8 +824,8 @@ Environment.NewLine +
                     cmd.ExecuteNonQuery();
                 }
         }
-        // The six activity-programme columns, read in one place. Every QSO reader in this file calls
-        // this rather than repeating six lines, so a seventh programme field can never be added to
+        // The six activity-program columns, read in one place. Every QSO reader in this file calls
+        // this rather than repeating six lines, so a seventh program field can never be added to
         // some readers and forgotten in others.
         //
         // Guarded by HasColumn because a database that has not been through the migration yet - an old
@@ -3565,7 +3565,7 @@ Environment.NewLine +
                 AddColToTable("qso", "itu_zone", "nvarchar(10) NULL");
             }
             AddColToTable("qso", "state", "nvarchar(20) NULL");   // ADIF STATE (worked station's subdivision)
-            // Activity-programme references. POTA is the wide one on purpose: ADIF allows a comma-
+            // Activity-program references. POTA is the wide one on purpose: ADIF allows a comma-
             // separated LIST there, because a contact can be inside two overlapping parks at once.
             AddColToTable("qso", "iota", "nvarchar(20) NULL");
             AddColToTable("qso", "sota_ref", "nvarchar(30) NULL");

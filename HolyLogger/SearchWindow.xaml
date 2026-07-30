@@ -814,7 +814,7 @@
                                         HeaderTemplate="{StaticResource ConfirmHeaderTemplate}"
                                         CellTemplate="{StaticResource PaperQslTemplate}"/>
 
-                <!-- Activity programmes, at the far right so no existing column moves. Read-only: a QSO
+                <!-- Activity programs, at the far right so no existing column moves. Read-only: a QSO
                      can carry several references at once and they belong in different ADIF fields, so
                      one cell cannot sensibly be typed into. They are edited in the row's own editor
                      (right-click, or double-click the row), which has a box for each. -->

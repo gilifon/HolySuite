@@ -1,4 +1,4 @@
-﻿using Newtonsoft.Json;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -93,12 +93,12 @@ namespace HolyParser
         [JsonProperty("state")]
         public string State { get; set; }
 
-        // ACTIVITY PROGRAM REFERENCES ("on the air" programmes).
+        // ACTIVITY PROGRAM REFERENCES ("on the air" programs).
         //
-        // ADIF gives its own field to exactly four programmes - islands, summits, parks and nature
+        // ADIF gives its own field to exactly four programs - islands, summits, parks and nature
         // reserves - and hands everything else (castles, mills, lighthouses, and whatever is founded
         // next year) to the generic SIG / SIG_INFO pair. That is why there are six fields here and not
-        // one per programme: the list of programmes has no end, so we store the four the standard
+        // one per program: the list of programs has no end, so we store the four the standard
         // names and let the fifth pair carry the rest by name.
         //
         // All six describe the CONTACTED station. The MY_* counterparts (what the operator sends when
@@ -121,8 +121,8 @@ namespace HolyParser
         [JsonProperty("wwff_ref")]
         public string WwffRef { get; set; }
 
-        // The name of any other programme, e.g. WCA - and the reference within it, e.g. OK-00234.
-        // Two fields rather than one so that everyone spells the programme the same way and an award
+        // The name of any other program, e.g. WCA - and the reference within it, e.g. OK-00234.
+        // Two fields rather than one so that everyone spells the program the same way and an award
         // check can group them; that is exactly why ADIF splits them.
         [JsonProperty("sig")]
         public string Sig { get; set; }

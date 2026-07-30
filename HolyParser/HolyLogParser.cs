@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -102,11 +102,11 @@ namespace HolyParser
         private string lotw_qsl_sent_pattern = @"<lotw_qsl_sent:(\d{1,4})(?::[a-z]{1})?>";
         private string cqz_pattern = @"<cqz:(\d{1,4})(?::[a-z]{1})?>";
         private string ituz_pattern = @"<ituz:(\d{1,4})(?::[a-z]{1})?>";
-        // The activity-programme fields are read by name through AdifValue below, so they need no
+        // The activity-program fields are read by name through AdifValue below, so they need no
         // patterns of their own here.
 
-        // The six activity-programme fields off one record. Four programmes have a field of their own
-        // in ADIF; every other programme travels in the generic sig / sig_info pair. Before this
+        // The six activity-program fields off one record. Four programs have a field of their own
+        // in ADIF; every other program travels in the generic sig / sig_info pair. Before this
         // existed, an imported park or island reference was simply dropped on the floor.
         private static void ReadActivityFields(string row, QSO qso_row)
         {
@@ -118,8 +118,8 @@ namespace HolyParser
 
             // <sig> needs one guard. HolyLogger itself used to export the CONTEST exchange in this
             // field, so re-importing one of its own older files would otherwise show every Holyland
-            // square as if it were an activity programme. A sig that merely repeats the exchange is
-            // that old usage, not a programme, and is left where it belongs.
+            // square as if it were an activity program. A sig that merely repeats the exchange is
+            // that old usage, not a program, and is left where it belongs.
             string sig = Trimmed(AdifValue(row, "sig"));
             if (!string.IsNullOrWhiteSpace(sig)
                 && !string.IsNullOrWhiteSpace(qso_row.SRX)

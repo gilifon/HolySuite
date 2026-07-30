@@ -1462,8 +1462,8 @@
                 <ImageBrush x:Name="LockCommentMask" ImageSource="Images/lock.png" Stretch="Uniform"/>
             </Rectangle.OpacityMask>
         </Rectangle>
-        <!-- ACTIVITY PROGRAMME REFERENCES. The four programmes ADIF names get a box each; every other
-             programme on earth - castles, mills, lighthouses, and whatever is founded next year - goes
+        <!-- ACTIVITY PROGRAM REFERENCES. The four programs ADIF names get a box each; every other
+             program on earth - castles, mills, lighthouses, and whatever is founded next year - goes
              through the Other button into ADIF's SIG / SIG_INFO pair, so this row never has to grow.
              There is no room for a fifth labelled box: five pairs measure 750px against the form's 661.
 
@@ -1475,8 +1475,12 @@
                 Margin="0,239,0,0" Width="677" Height="28">
             <Label Content="IOTA" Canvas.Left="11" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
                    VerticalContentAlignment="Center" ToolTip="Islands on the Air, e.g. EU-005"/>
+            <!-- MaxLength is deliberately looser than the format: an island reference is exactly 6
+                 characters and a nature one 8 to 11, but a box that simply stops accepting keystrokes
+                 makes a typo impossible to correct by typing past it, and impossible to paste into.
+                 The red tint does the complaining instead, and Add asks once before logging. -->
             <TextBox x:Name="TB_Iota" Canvas.Left="51" Canvas.Top="0" Width="62" Height="28" FontSize="16"
-                     CharacterCasing="Upper" MaxLength="6" TabIndex="20" TextWrapping="NoWrap"
+                     CharacterCasing="Upper" MaxLength="20" TabIndex="20" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="Islands on the Air: two letters for the continent, then three digits - EU-005"/>
             <Label Content="SOTA" Canvas.Left="125" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
@@ -1494,13 +1498,13 @@
             <Label Content="WWFF" Canvas.Left="452" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
                    VerticalContentAlignment="Center" ToolTip="World Wide Flora and Fauna, e.g. 4XFF-0016"/>
             <TextBox x:Name="TB_WwffRef" Canvas.Left="504" Canvas.Top="0" Width="85" Height="28" FontSize="16"
-                     CharacterCasing="Upper" MaxLength="11" TabIndex="23" TextWrapping="NoWrap"
+                     CharacterCasing="Upper" MaxLength="20" TabIndex="23" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="World Wide Flora and Fauna: the nature-reserve reference - 4XFF-0016"/>
             <Button x:Name="Btn_OtherActivity" Content="Other…" Canvas.Left="601" Canvas.Top="0"
                     Width="66" Height="28" FontSize="14" TabIndex="24" Padding="0"
                     Click="Btn_OtherActivity_Click"
-                    ToolTip="Any other programme - castles, mills, lighthouses. Shows what is set once you choose one."/>
+                    ToolTip="Any other program - castles, mills, lighthouses. Shows what is set once you choose one."/>
         </Canvas>
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->

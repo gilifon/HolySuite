@@ -35,7 +35,7 @@ namespace HolyLogger
             public QSO Qso;
             public string Field;          // which QSO field the fix would write
             public string NewValue;       // the value to write (Field-specific)
-            public string Programme;      // for Field == "Activity": IOTA / SOTA / POTA / WWFF
+            public string Program;      // for Field == "Activity": IOTA / SOTA / POTA / WWFF
             public int NewCq, NewItu;     // zones that travel with a country correction (0 = leave alone)
             public string NewContinent;
 
@@ -271,7 +271,7 @@ namespace HolyLogger
                 //
                 // Before HolyLogger had boxes for these, the only place to put an island or park
                 // reference was the comment, so that is where they are. The four formats cannot be
-                // confused with one another, so the programme is known for certain - no guessing.
+                // confused with one another, so the program is known for certain - no guessing.
                 //
                 // Offered ONLY when the comment is the reference and nothing else. A comment that also
                 // holds real words is reported and left alone: moving the reference out would decide on
@@ -279,14 +279,14 @@ namespace HolyLogger
                 string comment = (q.Comment ?? string.Empty).Trim();
                 if (comment.Length > 0 && !HasAnyActivityReference(q))
                 {
-                    string programme = MainWindow.ProgrammeOf(comment);
-                    if (programme != null)
+                    string program = MainWindow.ProgramOf(comment);
+                    if (program != null)
                     {
                         Finding f = New(q, "Reference sitting in the comment", comment,
-                                        programme + " = " + comment.ToUpperInvariant(),
-                                        "the " + programme + " format");
+                                        program + " = " + comment.ToUpperInvariant(),
+                                        "the " + program + " format");
                         f.Field = "Activity";
-                        f.Programme = programme;
+                        f.Program = program;
                         f.NewValue = comment.ToUpperInvariant();
                         f.Fixable = true;
                         findings.Add(f);
@@ -296,7 +296,7 @@ namespace HolyLogger
                         // A reference hiding among other words: worth pointing at, not worth moving.
                         foreach (string word in comment.Split(new[] { ' ', ',', ';', '(', ')' }, StringSplitOptions.RemoveEmptyEntries))
                         {
-                            string p = MainWindow.ProgrammeOf(word);
+                            string p = MainWindow.ProgramOf(word);
                             if (p == null) continue;
                             findings.Add(Fyi(q, "Comment holds a " + p + " reference", comment,
                                              "move " + word.ToUpperInvariant() + " into the " + p + " box",
@@ -532,10 +532,10 @@ namespace HolyLogger
                 case "Activity":
                     // Moved, not copied: the comment held the reference only because there was nowhere
                     // else to put it, and leaving a copy behind would show it twice in every export.
-                    if (f.Programme == "IOTA") qso.Iota = f.NewValue;
-                    else if (f.Programme == "SOTA") qso.SotaRef = f.NewValue;
-                    else if (f.Programme == "POTA") qso.PotaRef = f.NewValue;
-                    else if (f.Programme == "WWFF") qso.WwffRef = f.NewValue;
+                    if (f.Program == "IOTA") qso.Iota = f.NewValue;
+                    else if (f.Program == "SOTA") qso.SotaRef = f.NewValue;
+                    else if (f.Program == "POTA") qso.PotaRef = f.NewValue;
+                    else if (f.Program == "WWFF") qso.WwffRef = f.NewValue;
                     qso.Comment = string.Empty;
                     break;
                 case "Country":
