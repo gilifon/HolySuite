@@ -34,6 +34,22 @@ namespace HolyLogger
         // about it being one short token.
         private static readonly Regex ShortName = new Regex(@"^[A-Z0-9][A-Z0-9\-]{1,14}$", RegexOptions.Compiled);
 
+        // The same list, for the QSO editor's Program box. One list in one place: two copies would
+        // drift the moment a program is added to whichever window someone happened to be editing.
+        public static IList<KeyValuePair<string, string>> Known
+        {
+            get { return Array.AsReadOnly(KnownPrograms); }
+        }
+
+        // What a short name stands for, or an empty string when it is not one HolyLogger knows.
+        public static string DescriptionOf(string name)
+        {
+            string typed = (name ?? string.Empty).Trim();
+            foreach (var p in KnownPrograms)
+                if (string.Equals(p.Key, typed, StringComparison.OrdinalIgnoreCase)) return p.Value;
+            return string.Empty;
+        }
+
         public string Program { get; private set; }
         public string Reference { get; private set; }
 

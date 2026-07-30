@@ -248,8 +248,14 @@
                          ToolTip="Parks on the Air: the park reference — K-0001. Two parks at once are written K-0001,US-4578"/>
                 <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_WwffRef" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="20"
                          ToolTip="World Wide Flora and Fauna: the nature-reserve reference — 4XFF-0016"/>
-                <TextBox Grid.Row="1" Grid.Column="4" x:Name="TB_Sig"     Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="40"
-                         ToolTip="Any other program, by its short name — WCA for castles, MOTA for mills, ARLHS for lighthouses"/>
+                <!-- A drop-down rather than a plain box, and the same eight names the Other window on
+                     the main form offers: a short name you have to remember exactly is the one place a
+                     list earns its space. Editable, because a program founded next year must still be
+                     typeable. The Cell style cannot be used here - it targets TextBox - so the look is
+                     set by hand to match the boxes beside it. -->
+                <ComboBox Grid.Row="1" Grid.Column="4" x:Name="TB_Sig" IsEditable="True" FontSize="16"
+                          Margin="1,0,1,1" Padding="2,3" VerticalContentAlignment="Center"
+                          ToolTip="Any other program, by its short name — WCA for castles, MOTA for mills, ARLHS for lighthouses"/>
                 <TextBox Grid.Row="1" Grid.Column="5" x:Name="TB_SigInfo" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="60"
                          ToolTip="The reference within that program, e.g. OK-00234"/>
             </Grid>

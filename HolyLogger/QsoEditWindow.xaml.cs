@@ -131,7 +131,14 @@ namespace HolyLogger
             TB_SotaRef.Text   = S(_qso.SotaRef);
             TB_PotaRef.Text   = S(_qso.PotaRef);
             TB_WwffRef.Text   = S(_qso.WwffRef);
+            // The program drop-down carries the same eight names the main form's Other window offers,
+            // and its tooltip spells out whichever one is in the box - "ARLHS" means nothing on its own.
+            TB_Sig.Items.Clear();
+            foreach (var p in OtherActivityWindow.Known) TB_Sig.Items.Add(p.Key);
             TB_Sig.Text       = S(_qso.Sig);
+            ShowProgramMeaning();
+            TB_Sig.LostFocus += (s, e) => ShowProgramMeaning();
+            TB_Sig.SelectionChanged += (s, e) => Dispatcher.BeginInvoke(new Action(ShowProgramMeaning));
             TB_SigInfo.Text   = S(_qso.SigInfo);
             TB_Continent.Text = S(_qso.Continent);
             TB_CqZone.Text    = S(_qso.CQZone);
@@ -269,6 +276,16 @@ namespace HolyLogger
             CB_Band.Text = band;
         }
 
+        // Puts the full name of the typed program in the box's tooltip, so "ARLHS" can be checked
+        // without opening anything. Falls back to the general hint for a name we do not know.
+        private void ShowProgramMeaning()
+        {
+            string meaning = OtherActivityWindow.DescriptionOf(TB_Sig.Text);
+            TB_Sig.ToolTip = meaning.Length > 0
+                ? meaning
+                : "Any other program, by its short name — WCA for castles, MOTA for mills, ARLHS for lighthouses";
+        }
+
         private void Save_Click(object sender, RoutedEventArgs e)
         {
             if (_qso == null) { DialogResult = false; return; }
@@ -300,7 +317,8 @@ namespace HolyLogger
                 _qso.SotaRef   = TB_SotaRef.Text.Trim();
                 _qso.PotaRef   = TB_PotaRef.Text.Trim();
                 _qso.WwffRef   = TB_WwffRef.Text.Trim();
-                _qso.Sig       = TB_Sig.Text.Trim();
+                // Upper-cased here rather than by CharacterCasing, which a ComboBox does not have.
+                _qso.Sig       = (TB_Sig.Text ?? string.Empty).Trim().ToUpperInvariant();
                 _qso.SigInfo   = TB_SigInfo.Text.Trim();
                 _qso.Continent = TB_Continent.Text.Trim();
                 _qso.CQZone    = TB_CqZone.Text.Trim();
