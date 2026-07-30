@@ -216,9 +216,6 @@
                     <ColumnDefinition Width="110"/>
                     <ColumnDefinition Width="150"/>
                     <ColumnDefinition Width="110"/>
-                    <!-- Gap, so the frame round the last two has somewhere to sit without touching the
-                         WWFF box beside it. -->
-                    <ColumnDefinition Width="12"/>
                     <ColumnDefinition Width="100"/>
                     <ColumnDefinition Width="140"/>
                 </Grid.ColumnDefinitions>
@@ -229,18 +226,19 @@
 
                 <!-- The last two columns are ONE thing - a program and the reference within it - while
                      the first four each stand alone. Declared first so it paints behind the headers and
-                     boxes, and pushed out a few pixels by the negative margin so it frames them rather
-                     than crowding them. -->
-                <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="5" Grid.ColumnSpan="2"
-                        Margin="-5,-4,-4,-3" CornerRadius="8"
-                        BorderBrush="#1565C0" BorderThickness="2"/>
+                     boxes, and pulled out only into the 2px gap that already sits between neighbouring
+                     cells - so a thin line frames the pair without moving either box a pixel and
+                     without crowding the WWFF box beside them. -->
+                <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Grid.ColumnSpan="2"
+                        Margin="-1,-2,-1,-2" CornerRadius="6"
+                        BorderBrush="#1565C0" BorderThickness="1"/>
 
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="IOTA"      Style="{StaticResource Hdr}" FontSize="16"/>
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="SOTA"      Style="{StaticResource Hdr}" FontSize="16"/>
                 <TextBlock Grid.Row="0" Grid.Column="2" Text="POTA"      Style="{StaticResource Hdr}" FontSize="16"/>
                 <TextBlock Grid.Row="0" Grid.Column="3" Text="WWFF"      Style="{StaticResource Hdr}" FontSize="16"/>
-                <TextBlock Grid.Row="0" Grid.Column="5" Text="Program" Style="{StaticResource Hdr}" FontSize="16"/>
-                <TextBlock Grid.Row="0" Grid.Column="6" Text="Reference" Style="{StaticResource Hdr}" FontSize="16"/>
+                <TextBlock Grid.Row="0" Grid.Column="4" Text="Program" Style="{StaticResource Hdr}" FontSize="16"/>
+                <TextBlock Grid.Row="0" Grid.Column="5" Text="Reference" Style="{StaticResource Hdr}" FontSize="16"/>
 
                 <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_Iota"    Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="20"
                          ToolTip="Islands on the Air: two letters for the continent, then three digits — EU-005"/>
@@ -250,9 +248,9 @@
                          ToolTip="Parks on the Air: the park reference — K-0001. Two parks at once are written K-0001,US-4578"/>
                 <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_WwffRef" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="20"
                          ToolTip="World Wide Flora and Fauna: the nature-reserve reference — 4XFF-0016"/>
-                <TextBox Grid.Row="1" Grid.Column="5" x:Name="TB_Sig"     Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="40"
+                <TextBox Grid.Row="1" Grid.Column="4" x:Name="TB_Sig"     Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="40"
                          ToolTip="Any other program, by its short name — WCA for castles, MOTA for mills, ARLHS for lighthouses"/>
-                <TextBox Grid.Row="1" Grid.Column="6" x:Name="TB_SigInfo" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="60"
+                <TextBox Grid.Row="1" Grid.Column="5" x:Name="TB_SigInfo" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="60"
                          ToolTip="The reference within that program, e.g. OK-00234"/>
             </Grid>
 
