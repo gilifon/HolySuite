@@ -823,7 +823,7 @@ namespace HolyLogger
                 if (CB_Continent != null) CB_Continent.IsEnabled = !prefixFilled;
                 if (prefixFilled)
                 {
-                    string cont = _entityResolver.GetDXCC(
+                    string cont = CountryLookup.Shared.Resolve(
                         (TB_Prefix.Text + (TB_Suffix != null ? TB_Suffix.Text : string.Empty)).Trim())?.Continent;
                     if (CB_Continent != null)
                     {
@@ -843,7 +843,7 @@ namespace HolyLogger
                 if (prefixFilled)
                 {
                     string call = (TB_Prefix.Text + (TB_Suffix != null ? TB_Suffix.Text : string.Empty)).Trim();
-                    string country = _entityResolver.GetDXCC(call)?.Name;
+                    string country = CountryLookup.Shared.Resolve(call)?.Name;
                     var item = (!string.IsNullOrEmpty(country) && !string.Equals(country, "Unknown", StringComparison.OrdinalIgnoreCase))
                                ? _allCountries.FirstOrDefault(c => string.Equals(c.Name, country, StringComparison.OrdinalIgnoreCase))
                                : null;

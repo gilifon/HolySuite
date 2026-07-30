@@ -254,7 +254,6 @@ namespace HolyParser
         public static string GenerateCSV(IEnumerable<QSO> qso_list)
         {
             StringBuilder csv = new StringBuilder(200);
-            EntityResolver rem = new EntityResolver();
 
             int index = 1;
 
@@ -288,7 +287,7 @@ namespace HolyParser
                 csv.AppendFormat("{0},", time);
                 csv.AppendFormat("{0},", qso.RST_RCVD);
                 csv.AppendFormat("{0},", qso.RST_SENT);
-                csv.AppendFormat("{0},", rem.GetDXCC(qso.DXCall).Name);
+                csv.AppendFormat("{0},", CountryLookup.Shared.Resolve(qso.DXCall, CountryLookup.QsoDate(qso.Date)).Name);
                 csv.AppendFormat("{0},", qso.Name);
                 csv.AppendFormat("{0},", "");
                 csv.AppendFormat("{0}\r\n", qso.SRX);

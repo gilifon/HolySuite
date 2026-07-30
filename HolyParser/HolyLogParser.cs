@@ -505,8 +505,41 @@ namespace HolyParser
             string st = AdifValue(row, "state");
             if (!string.IsNullOrWhiteSpace(st)) qso_row.State = st.Trim();
 
+            ResolveCountryForDate(qso_row);
             qso_row.StandartizeQSO();
             return qso_row;
+        }
+
+        // Country, entity and continent as they stood ON THE DATE OF THE QSO. Run once the whole record
+        // is parsed, because the date can appear after the callsign in it.
+        //
+        // cty.dat has already filled these in above from today's prefix list, which is wrong for an old
+        // QSO whose prefix no longer exists (4N1DV was Serbia; the 2012 Olympic prefix 2O12L was
+        // England) and for the thousands of callsigns that were somewhere other than their prefix
+        // suggests. Club Log knows both, by date - see CountryLookup. When it has nothing to say, or the
+        // record carries no usable date, whatever cty.dat decided stands.
+        //
+        // Zones are deliberately left alone: an imported file's own <cqz>/<ituz> are the operator's
+        // record of the contact and are not second-guessed here.
+        private void ResolveCountryForDate(QSO qso_row)
+        {
+            if (qso_row == null || string.IsNullOrWhiteSpace(qso_row.DXCall)) return;
+
+            DateTime when;
+            if (!DateTime.TryParseExact((qso_row.Date ?? string.Empty).Trim(), "yyyyMMdd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out when))
+                return;
+
+            DXCC dated;
+            try { dated = CountryLookup.Shared.Resolve(qso_row.DXCall, when); }
+            catch { return; }
+            if (dated == null || dated.Name == "Unknown") return;
+
+            qso_row.Country = dated.Name;
+            qso_row.DXCC = dated.Entity;
+            if (!string.IsNullOrEmpty(dated.Continent) && dated.Continent != "XX")
+                qso_row.Continent = dated.Continent;
         }
 
         // Reads one ADIF field's value from a record row (length-prefixed <field:len[:type]>value), or
@@ -700,6 +733,7 @@ namespace HolyParser
 
                 }
             }
+            ResolveCountryForDate(qso_row);
             qso_row.StandartizeQSO();
             return qso_row;
         }

@@ -16,5 +16,13 @@ namespace DXCCManager
         // Default/most-specific zones from cty.dat for the matched callsign (0 = unknown).
         public int CqZone { get; set; }
         public int ItuZone { get; set; }
+        // The ARRL/ADIF entity code, when the answer came from a source that knows it (Club Log).
+        // 0 means unknown, which is also what Club Log uses for "no DXCC entity" - see NoEntity.
+        public int DxccCode { get; set; }
+        // Set when the answer came from Club Log's list of operations that never counted (pirates and
+        // the like), so the logger can warn instead of silently recording a country.
+        public bool InvalidOperation { get; set; }
+        // Which database answered - "cty.dat" or "Club Log". Diagnostic only; nothing branches on it.
+        public string ResolvedBy { get; set; }
     }
 }

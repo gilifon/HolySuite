@@ -213,3 +213,6 @@ HolyLogger/lotw-user-activity.csv
 HolyLogger/AGMemberList.txt
 HolyLogger/*_wpftmp.csproj
 
+
+# Club Log application API key - must never be committed (see ClublogKey.cs)
+clublog.key

@@ -223,9 +223,18 @@
     <Compile Include="Contests\ContestModels.cs" />
     <Compile Include="Contests\ContestService.cs" />
     <EmbeddedResource Include="contests.json" />
+    <!-- Club Log's application API key, compiled in from a file next to the solution that .gitignore
+         keeps out of the repository (Club Log asks that the key not be published in source code).
+         A checkout without the file still builds; Club Log features then fall back to whatever key
+         ClublogKey finds, or stay switched off. -->
+    <EmbeddedResource Include="..\clublog.key" Condition="Exists('..\clublog.key')">
+      <LogicalName>HolyLogger.clublog.key</LogicalName>
+    </EmbeddedResource>
     <EmbeddedResource Include="MapAssets\d3.v5.min.js" />
     <EmbeddedResource Include="MapAssets\dxcc_colored.json" />
     <Compile Include="CtyDatService.cs" />
+    <Compile Include="ClublogCtyService.cs" />
+    <Compile Include="ClublogKey.cs" />
     <Compile Include="LotwUserService.cs" />
     <Compile Include="DataAccess.cs" />
     <Compile Include="EqslQueueWindow.cs" />

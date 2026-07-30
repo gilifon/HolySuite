@@ -44,6 +44,8 @@
     <Compile Include="..\VersionInfo.cs">
       <Link>VersionInfo.cs</Link>
     </Compile>
+    <Compile Include="ClubLogData.cs" />
+    <Compile Include="CountryLookup.cs" />
     <Compile Include="DXCC.cs" />
     <Compile Include="DeletedEntities.cs" />
     <Compile Include="EntityResolver.cs" />

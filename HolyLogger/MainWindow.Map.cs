@@ -131,7 +131,7 @@ namespace HolyLogger
 
                     if (string.IsNullOrWhiteSpace(locator))
                     {
-                        DXCC entityDXCC = rem.GetDXCC(TB_DXCallsign.Text);
+                        DXCC entityDXCC = CountryLookup.Shared.Resolve(TB_DXCallsign.Text);
                         if (entityDXCC != null && !string.IsNullOrWhiteSpace(entityDXCC.Locator))
                             locator = entityDXCC.Locator;
                     }

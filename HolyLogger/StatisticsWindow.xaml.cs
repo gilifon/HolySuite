@@ -1,4 +1,4 @@
-using DXCCManager;
+﻿using DXCCManager;
 using HolyParser;
 using Newtonsoft.Json;
 using System;
@@ -271,12 +271,24 @@ namespace HolyLogger
         // current country file — never from the possibly-stale stored country/zone fields (that staleness
         // is exactly what produced a wrong count after the DB restore). Cached so each call resolves once.
         private Dictionary<string, DXCC> _resolveCache;
-        private DXCC Resolve(string call)
+
+        // adifDate is the QSO's own date (yyyyMMdd). Pass it whenever it is known: Club Log resolves a
+        // callsign against the date it was worked, which is the only way an entity that no longer issues
+        // its prefix (Serbia's 4N, Bosnia's T9) counts at all. Omit it only for a live "today" answer.
+        // Both sides of a confirmation match must be resolved the same way, or a confirmed country could
+        // be matched under one name and counted under another.
+        private DXCC Resolve(string call, string adifDate = null)
         {
             call = (call ?? string.Empty).Trim();
             if (call.Length == 0 || _masterResolver == null) return null;
             if (_resolveCache == null) _resolveCache = new Dictionary<string, DXCC>(StringComparer.OrdinalIgnoreCase);
-            if (!_resolveCache.TryGetValue(call, out var d)) { d = _masterResolver.GetDXCC(call); _resolveCache[call] = d; }
+            string key = call + "|" + (adifDate ?? string.Empty).Trim();
+            if (!_resolveCache.TryGetValue(key, out var d))
+            {
+                d = CountryLookup.Shared.Resolve(call,
+                        adifDate == null ? DateTime.UtcNow : CountryLookup.QsoDate(adifDate));
+                _resolveCache[key] = d;
+            }
             return d;
         }
 
@@ -288,7 +300,7 @@ namespace HolyLogger
                 foreach (QSO q in _allQsos)
                 {
                     if (!IsAchievedForSource(q)) continue;   // confirmation folders count only confirmed QSOs
-                    var d = Resolve(q.DXCall);
+                    var d = Resolve(q.DXCall, q.Date);
                     if (d == null) continue;
                     int z = zoneOf(d);
                     if (z >= 1 && z <= maxZone) achieved.Add(z);
@@ -471,7 +483,7 @@ namespace HolyLogger
             // GetAllEntityNames() excludes it, so letting it through would list a 266th "country" while the
             // worked/total box — derived as total minus missing — correctly stayed at 265.
             var workedCounts = _allQsos
-                .Select(q => Resolve(q.DXCall)?.Name)
+                .Select(q => Resolve(q.DXCall, q.Date)?.Name)
                 .Where(n => !string.IsNullOrEmpty(n) && !string.Equals(n, "Unknown", StringComparison.OrdinalIgnoreCase))
                 .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
@@ -678,7 +690,7 @@ namespace HolyLogger
                     foreach (var q in _allQsos)
                     {
                         if (q == null || q.PaperQslRcvd != 1) continue;
-                        string name = Resolve(q.DXCall)?.Name;
+                        string name = Resolve(q.DXCall, q.Date)?.Name;
                         if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                             _confirmedEntities.Add(name);
                     }
@@ -1480,7 +1492,7 @@ namespace HolyLogger
                 var qrzDeleted = new HashSet<int>();
                 foreach (var c in qrzMatched)
                 {
-                    string name = Resolve(c.Call)?.Name;
+                    string name = Resolve(c.Call, c.QsoDate)?.Name;
                     if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                         qrzNames.Add(name);
                     if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) qrzDeleted.Add(c.DxccCode);
@@ -1637,7 +1649,7 @@ namespace HolyLogger
                 var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var c in MatchedOnly(all, unmatched))
                 {
-                    string name = Resolve(c.Call)?.Name;
+                    string name = Resolve(c.Call, c.QsoDate)?.Name;
                     if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                         names.Add(name);
                 }
@@ -1795,7 +1807,7 @@ namespace HolyLogger
                 var deleted = new HashSet<int>();
                 foreach (var c in MatchedOnly(all, unmatched))
                 {
-                    string name = Resolve(c.Call)?.Name;
+                    string name = Resolve(c.Call, c.QsoDate)?.Name;
                     if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                         names.Add(name);
                     if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) deleted.Add(c.DxccCode);
@@ -1958,7 +1970,7 @@ namespace HolyLogger
                 string rxDate = QslRcvdDate(rec);
                 string key = QsoKey(rec);
 
-                string name = _masterResolver.GetDXCC(call)?.Name;
+                string name = Resolve(call, qsoDate)?.Name;
                 if (!string.IsNullOrEmpty(name)
                     && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                     result.ResolvedNames.Add(name);
@@ -2045,7 +2057,7 @@ namespace HolyLogger
             foreach (var c in confirmations)
             {
                 if (lotwUnmatched.Contains(c)) continue;
-                string nm = _masterResolver.GetDXCC(c.Call)?.Name;
+                string nm = Resolve(c.Call, c.QsoDate)?.Name;
                 if (!string.IsNullOrEmpty(nm) && !string.Equals(nm, "Unknown", StringComparison.OrdinalIgnoreCase))
                     result.ResolvedNames.Add(nm);
                 if (c.DxccCode > 0)

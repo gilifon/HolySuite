@@ -212,7 +212,9 @@ namespace HolyLogger
             }
             try
             {
-                var dxcc = _resolver.GetDXCC(call);
+                // Resolved on the QSO's own date, so an old contact is named by the entity that existed
+                // then rather than by whoever holds the prefix today.
+                var dxcc = CountryLookup.Shared.Resolve(call, CountryLookup.QsoDate(_qso != null ? _qso.Date : null));
                 string name = dxcc?.Name;
                 if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase)
                     && (!onlyIfBlank || string.IsNullOrWhiteSpace(TB_Country.Text)))

@@ -304,6 +304,9 @@ namespace HolyLogger
             // Point the resolver at the updatable cty.dat (seeded from the embedded copy on first
             // run) before any EntityResolver is created, so the whole app uses the same file.
             CtyDatService.Initialize();
+            // And at Club Log's copy, so CountryLookup can consult it. Both must be pointed at their
+            // files before the first lookup is built.
+            ClublogCtyService.Initialize();
             rem = new EntityResolver();
             InitializeComponent();
 
@@ -371,6 +374,10 @@ namespace HolyLogger
             // Quietly check country-files.com for a newer cty.dat. A downloaded update lands on
             // disk and is picked up on the next launch; failures (offline etc.) are ignored.
             CheckCtyDatUpdateFireAndForget();
+
+            // Same for Club Log's date-aware database, which is what lets an old QSO be named by the
+            // entity that existed on its date. Needs an API key; without one this does nothing at all.
+            CheckClublogCtyUpdateFireAndForget();
 
             // Load the cached LoTW user list (for the yellow cluster highlight) and refresh it in the
             // background if it's missing or more than a week old. Failures are ignored.
@@ -4107,7 +4114,7 @@ namespace HolyLogger
             if (call.Length == 0 || rem == null) return null;
             if (!_dxccEntityCache.TryGetValue(call, out var name))
             {
-                try { name = rem.GetDXCC(call)?.Name; } catch { name = null; }
+                try { name = CountryLookup.Shared.Resolve(call)?.Name; } catch { name = null; }
                 _dxccEntityCache[call] = name;
             }
             return name;
@@ -4535,7 +4542,8 @@ namespace HolyLogger
                 {
                     try
                     {
-                        DXCC editDxcc = rem.GetDXCC((QsoToUpdate.DXCall ?? string.Empty).Trim());
+                        DXCC editDxcc = CountryLookup.Shared.Resolve((QsoToUpdate.DXCall ?? string.Empty).Trim(),
+                                                                    CountryLookup.QsoDate(QsoToUpdate.Date));
                         if (string.IsNullOrWhiteSpace(TB_ITUZone.Text) && editDxcc.ItuZone > 0)
                             TB_ITUZone.Text = editDxcc.ItuZone.ToString();
                         if (string.IsNullOrWhiteSpace(TB_CQZone.Text) && editDxcc.CqZone > 0)
@@ -4967,7 +4975,7 @@ namespace HolyLogger
         private string ContinentOf(string call)
         {
             if (rem == null || string.IsNullOrWhiteSpace(call)) return null;
-            var d = rem.GetDXCC(call.Trim());
+            var d = CountryLookup.Shared.Resolve(call.Trim());
             return d != null ? d.Continent : null;
         }
 
@@ -7373,7 +7381,9 @@ namespace HolyLogger
             {
                 if (!string.IsNullOrWhiteSpace(qso.DXCall))
                 {
-                    var dxcc = rem.GetDXCC(qso.DXCall.Trim());
+                    // Each QSO is resolved on its own date: a prefix that no longer exists (4N = Serbia)
+                    // still counts as that country worked.
+                    var dxcc = CountryLookup.Shared.Resolve(qso.DXCall.Trim(), CountryLookup.QsoDate(qso.Date));
                     if (dxcc != null && !string.IsNullOrWhiteSpace(dxcc.Entity) && dxcc.Entity != "-1")
                     {
                         workedCountries.Add(dxcc.Entity);
@@ -7391,7 +7401,7 @@ namespace HolyLogger
                 return false;
             }
 
-            var dxcc = rem.GetDXCC(dxCallsign.Trim());
+            var dxcc = CountryLookup.Shared.Resolve(dxCallsign.Trim());
             if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || dxcc.Entity == "-1")
             {
                 return false;
@@ -7409,7 +7419,7 @@ namespace HolyLogger
             if (confirmedNames == null || confirmedNames.Count == 0) return false;
             if (string.IsNullOrWhiteSpace(dxCallsign) || workedCountries == null) return false;
 
-            var dxcc = rem.GetDXCC(dxCallsign.Trim());
+            var dxcc = CountryLookup.Shared.Resolve(dxCallsign.Trim());
             if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || dxcc.Entity == "-1") return false;
 
             if (!workedCountries.Contains(dxcc.Entity)) return false;   // not worked -> that's a New Country, not unconfirmed
@@ -9111,8 +9121,14 @@ namespace HolyLogger
             if (state == State.New && !Properties.Settings.Default.isTimeManual)
                 RefreshDateTime_Btn_MouseUp(null, null);
 
-            // Perform DXCC lookup (cached by EntityResolver)
-            DXCC dXCC = rem.GetDXCC(dxCallText);
+            // Perform DXCC lookup. Club Log answers first when it knows this callsign on this date
+            // (K9W was Wake Island, not the USA its prefix suggests); cty.dat answers otherwise and
+            // always supplies the wording and the ITU zone. A QSO being edited is resolved on its own
+            // date, not today's.
+            DateTime lookupWhen = (state == State.Edit && QsoToUpdate != null)
+                ? CountryLookup.QsoDate(QsoToUpdate.Date)
+                : DateTime.UtcNow;
+            DXCC dXCC = CountryLookup.Shared.Resolve(dxCallText, lookupWhen);
             Country = dXCC.Name;
             UpdateCountryFlag(dXCC.Name);
             Continent = dXCC.Continent;
@@ -9365,6 +9381,17 @@ namespace HolyLogger
             Task.Run(async () =>
             {
                 try { await CtyDatService.CheckForUpdateAsync(_sharedHttpClient, isNetworkAvailable); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            });
+        }
+
+        // Background check for a newer Club Log country database. A download is saved to disk and used
+        // from the next launch, so a session's country answers never change under the operator's feet.
+        private void CheckClublogCtyUpdateFireAndForget()
+        {
+            Task.Run(async () =>
+            {
+                try { await ClublogCtyService.CheckForUpdateAsync(_sharedHttpClient, isNetworkAvailable); }
                 catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             });
         }

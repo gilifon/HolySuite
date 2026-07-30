@@ -3202,7 +3202,7 @@ namespace HolyLogger
                     {
                         try
                         {
-                            var spDxcc = rem.GetDXCC(spotter.Trim());
+                            var spDxcc = CountryLookup.Shared.Resolve(spotter.Trim());
                             if (spDxcc != null && !string.IsNullOrWhiteSpace(spDxcc.Locator))
                             {
                                 var spll = MaidenheadLocator.LocatorToLatLng(spDxcc.Locator);
@@ -3213,7 +3213,7 @@ namespace HolyLogger
                         catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                     }
 
-                    var dxccInfo = rem.GetDXCC(dx.Trim());
+                    var dxccInfo = CountryLookup.Shared.Resolve(dx.Trim());
                     string countryName = dxccInfo != null ? dxccInfo.Name : string.Empty;
                     string flagPath = GetFlagPathFromCountryName(countryName);
                     var item = new ClusterSpotViewItem
@@ -3366,7 +3366,7 @@ namespace HolyLogger
                 return;
             }
 
-            var dxcc = rem.GetDXCC(dxCallsign.Trim());
+            var dxcc = CountryLookup.Shared.Resolve(dxCallsign.Trim());
 
             if (dxcc == null || string.IsNullOrWhiteSpace(dxcc.Entity) || dxcc.Entity == "-1")
             {
@@ -4611,7 +4611,7 @@ namespace HolyLogger
                     string locator = spot.Locator;
                     if (string.IsNullOrWhiteSpace(locator))
                     {
-                        var dxcc = rem.GetDXCC((spot.DXCallsign ?? string.Empty).Trim());
+                        var dxcc = CountryLookup.Shared.Resolve((spot.DXCallsign ?? string.Empty).Trim());
                         locator = dxcc != null ? dxcc.Locator : string.Empty;
                     }
 
