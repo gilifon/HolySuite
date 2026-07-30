@@ -409,6 +409,13 @@
                         <Trigger Property="IsSelected" Value="True">
                             <Setter Property="Background" Value="Transparent"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                            <!-- The BORDER matters as much as the fill: WPF's own DataGridCell template
+                                 outlines a selected cell in the Windows highlight colour (#0078D7), and
+                                 clearing only the background left every cell of the row framed in blue -
+                                 a row that still looked ticked, drawn as an outline instead of a block.
+                                 Set to the grid-line colour, not Transparent, so a selected row keeps the
+                                 same vertical rules as every other row. -->
+                            <Setter Property="BorderBrush" Value="{DynamicResource GridLine}"/>
                         </Trigger>
                     </Style.Triggers>
                 </Style>
