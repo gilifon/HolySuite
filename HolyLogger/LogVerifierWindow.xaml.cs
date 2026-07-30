@@ -95,6 +95,22 @@ namespace HolyLogger
                 || !string.IsNullOrWhiteSpace(q.Sig);
         }
 
+        // Which program a piece of a COMMENT belongs to - a stricter question than asking it of a box
+        // the operator filled in on purpose.
+        //
+        // Three of the four formats cannot be mistaken for ordinary writing: an island reference is a
+        // continent code and three digits, a summit always has a stroke, a nature one always has "FF-".
+        // A park reference is just letters, a hyphen and four digits - and so is "FT-1000", which is a
+        // radio, not a park. This log contains exactly that. So a park is only believed when the
+        // comment says somewhere that it is talking about one.
+        private static string ProgramInComment(string piece, string wholeComment)
+        {
+            string program = MainWindow.ProgramOf(piece);
+            if (program != "POTA") return program;
+            string all = (wholeComment ?? string.Empty).ToUpperInvariant();
+            return all.Contains("POTA") || all.Contains("PARK") ? program : null;
+        }
+
         private static bool IsCallChar(char c)
         {
             return (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '/';
@@ -279,7 +295,7 @@ namespace HolyLogger
                 string comment = (q.Comment ?? string.Empty).Trim();
                 if (comment.Length > 0 && !HasAnyActivityReference(q))
                 {
-                    string program = MainWindow.ProgramOf(comment);
+                    string program = ProgramInComment(comment, comment);
                     if (program != null)
                     {
                         Finding f = New(q, "Reference sitting in the comment", comment,
@@ -296,7 +312,7 @@ namespace HolyLogger
                         // A reference hiding among other words: worth pointing at, not worth moving.
                         foreach (string word in comment.Split(new[] { ' ', ',', ';', '(', ')' }, StringSplitOptions.RemoveEmptyEntries))
                         {
-                            string p = MainWindow.ProgramOf(word);
+                            string p = ProgramInComment(word, comment);
                             if (p == null) continue;
                             findings.Add(Fyi(q, "Comment holds a " + p + " reference", comment,
                                              "move " + word.ToUpperInvariant() + " into the " + p + " box",
