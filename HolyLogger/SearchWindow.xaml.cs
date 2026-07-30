@@ -1840,7 +1840,11 @@ namespace HolyLogger
             }
         }
 
-        private void RecordUndoStep(QSO qso, Dictionary<string, string> before)
+        // The fields the editor actually altered, each mapped to the value it held before. Empty means
+        // the commit changed nothing at all - which is the normal case, because the DataGrid opens a
+        // cell's editor on a plain click on the cell that is already current. See
+        // ResultsGrid_CellEditEnding.
+        private static Dictionary<string, string> ChangedFields(QSO qso, Dictionary<string, string> before)
         {
             var changed = new Dictionary<string, string>(StringComparer.Ordinal);
             var after = Snapshot(qso);
@@ -1851,6 +1855,12 @@ namespace HolyLogger
                 if (!string.Equals(was, now ?? string.Empty, StringComparison.Ordinal))
                     changed[pair.Key] = pair.Value;
             }
+            return changed;
+        }
+
+        private void RecordUndoStep(QSO qso, Dictionary<string, string> before)
+        {
+            var changed = ChangedFields(qso, before);
             if (changed.Count == 0) return;   // committed the same value: nothing to undo
 
             var names = new List<string>();
@@ -2151,6 +2161,13 @@ namespace HolyLogger
             Dispatcher.BeginInvoke(
                 new Action(() =>
                 {
+                    // A commit that changed NOTHING is not a correction, and it is the common case: the
+                    // DataGrid opens a cell's editor on a plain click on the cell that is already
+                    // current, so clicking a row twice - or clicking one row and then another - ran the
+                    // whole correction path. That wrote the QSO back to the log and asked "Upload the
+                    // corrected QSO?" about a contact nobody had touched.
+                    if (ChangedFields(qso, before).Count == 0) return;
+
                     SaveEditedQso(qso, edited, before);
                     RecordUndoStep(qso, before);
                     RememberEdit(qso, label);

@@ -395,6 +395,24 @@
                 <SolidColorBrush x:Key="SelectionBg" Color="#CFE8FF"/>
                 <SolidColorBrush x:Key="SelectionText" Color="#1A1A1A"/>
 
+                <!-- In THIS table the tick boxes are the only thing that highlights a row, so the
+                     cells must not paint themselves as well.
+                     WHY: clicking a tick box also makes the DataGrid select the row it sits in -
+                     unavoidable, the box is inside a cell. The app-wide DataGridCell style (see
+                     Themes/Controls.xaml) colours every selected CELL, and that colour is not tied
+                     to the tick: unticking the row cleared IsPicked and the row's own background
+                     went back to normal, but the cells stayed blue, so the row still looked ticked.
+                     Cleared here only - every other grid in the program keeps the standard
+                     click-to-highlight, because there the click IS the selection. -->
+                <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
+                    <Style.Triggers>
+                        <Trigger Property="IsSelected" Value="True">
+                            <Setter Property="Background" Value="Transparent"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                        </Trigger>
+                    </Style.Triggers>
+                </Style>
+
                 <!-- The grid's own header look (tan background, sort arrow, resize grippers), named so the
                      5 confirmation columns can inherit ALL of it and override only what the green strip
                      needs. Defined as a keyed style and applied implicitly below, so normal columns are
