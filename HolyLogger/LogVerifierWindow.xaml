@@ -16,7 +16,7 @@
                        Foreground="{DynamicResource AccentBrush}"/>
             <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
                        Foreground="{DynamicResource MutedTextBrush}"
-                       Text="Every QSO is checked against the country databases on ITS OWN DATE, and against itself for impossible values. Nothing is changed until you tick a row and press Apply. Rows marked FYI cannot be corrected automatically - they are shown so you can decide what to do."/>
+                       Text="Every QSO is checked against the country databases on ITS OWN DATE, and against itself for impossible values. Nothing is changed until you tick a row and press Apply. A row that says &quot;Check by hand&quot; has no tick box: the program will not guess at it, so open the QSO (double-click the row) and decide yourself."/>
         </StackPanel>
 
         <DataGrid x:Name="FindingsGrid" Grid.Row="1" AutoGenerateColumns="False"
@@ -25,7 +25,8 @@
                   BorderBrush="#1565C0" BorderThickness="1"
                   Foreground="{DynamicResource TextBrush}"
                   HorizontalGridLinesBrush="{DynamicResource GridLine}"
-                  VerticalGridLinesBrush="{DynamicResource GridLine}">
+                  VerticalGridLinesBrush="{DynamicResource GridLine}"
+                  MouseDoubleClick="FindingsGrid_MouseDoubleClick">
             <DataGrid.Columns>
                 <!-- The only thing the operator can change: everything else is a statement of fact. A
                      template column rather than a DataGridCheckBoxColumn so one click ticks the box -

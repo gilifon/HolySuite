@@ -200,39 +200,44 @@ namespace HolyLogger
                         findings.Add(Fyi(q, "Impossible time", timeRaw, "00:00 to 23:59", "the log"));
                 }
 
-                // --- band against frequency ---------------------------------------------------------
+                // --- band and frequency -------------------------------------------------------------
+                // One finding per QSO, not two: an empty band and an unusable frequency are the same
+                // fault seen twice, and the operator wants to be told once what is actually wrong.
                 string freq = (q.Freq ?? string.Empty).Trim();
                 string band = (q.Band ?? string.Empty).Trim();
-                if (freq.Length > 0)
+                string mhz = freq.Length == 0 ? "" : HolyLogParser.NormalizeFreqToMhz(freq);
+                string fromFreq = string.IsNullOrWhiteSpace(mhz) ? "" : HolyLogParser.convertFreqToBand(mhz);
+
+                if (freq.Length > 0 && fromFreq.Length == 0)
                 {
-                    string mhz = HolyLogParser.NormalizeFreqToMhz(freq);
-                    string fromFreq = string.IsNullOrWhiteSpace(mhz) ? "" : HolyLogParser.convertFreqToBand(mhz);
-                    if (!string.IsNullOrWhiteSpace(fromFreq) && band.Length > 0
-                        && !string.Equals(fromFreq, band, StringComparison.OrdinalIgnoreCase))
-                    {
-                        Finding f = New(q, "Band does not match the frequency",
-                                        band + "  (" + freq + ")", fromFreq, "the frequency logged");
-                        f.Field = "Band";
-                        f.NewValue = fromFreq;
-                        f.Fixable = true;
-                        findings.Add(f);
-                    }
+                    // The frequency is on no amateur band at all, so it cannot say which band this was
+                    // and nothing can be derived from it. Only the operator knows what he was on.
+                    findings.Add(Fyi(q, "Frequency is on no amateur band",
+                                     freq + " MHz" + (band.Length == 0 ? "  (and no band)" : "  (band " + band + ")"),
+                                     "set the band by hand - the frequency cannot say", "the log"));
                 }
-                if (band.Length == 0)
+                else if (band.Length == 0 && fromFreq.Length > 0)
                 {
-                    // An empty band is repairable whenever the frequency is there to derive it from.
-                    string mhz = HolyLogParser.NormalizeFreqToMhz(freq);
-                    string fromFreq = string.IsNullOrWhiteSpace(mhz) ? "" : HolyLogParser.convertFreqToBand(mhz);
-                    if (!string.IsNullOrWhiteSpace(fromFreq))
-                    {
-                        Finding f = New(q, "No band", "(empty)   (" + freq + ")", fromFreq,
-                                        "the frequency logged");
-                        f.Field = "Band";
-                        f.NewValue = fromFreq;
-                        f.Fixable = true;
-                        findings.Add(f);
-                    }
-                    else findings.Add(Fyi(q, "No band", "(empty)", "a band", "the log"));
+                    Finding f = New(q, "No band", "(empty)   (" + freq + ")", fromFreq,
+                                    "the frequency logged");
+                    f.Field = "Band";
+                    f.NewValue = fromFreq;
+                    f.Fixable = true;
+                    findings.Add(f);
+                }
+                else if (band.Length == 0)
+                {
+                    findings.Add(Fyi(q, "No band and no frequency", "(both empty)",
+                                     "set the band by hand", "the log"));
+                }
+                else if (fromFreq.Length > 0 && !string.Equals(fromFreq, band, StringComparison.OrdinalIgnoreCase))
+                {
+                    Finding f = New(q, "Band does not match the frequency",
+                                    band + "  (" + freq + ")", fromFreq, "the frequency logged");
+                    f.Field = "Band";
+                    f.NewValue = fromFreq;
+                    f.Fixable = true;
+                    findings.Add(f);
                 }
                 if (string.IsNullOrWhiteSpace(q.Mode))
                     findings.Add(Fyi(q, "No mode", "(empty)", "a mode", "the log"));
@@ -317,7 +322,7 @@ namespace HolyLogger
             if (problem == "Wrong country") return 1;
             if (problem == "No country") return 2;
             if (problem == "Damaged callsign") return 3;
-            if (problem.StartsWith("Band")) return 4;
+            if (problem.StartsWith("Band") || problem.StartsWith("Frequency")) return 4;
             if (problem == "Wrong continent") return 5;
             return 6;
         }
@@ -345,11 +350,13 @@ namespace HolyLogger
             };
         }
 
+        // A finding the program must not act on by itself. "Check by hand" rather than "FYI": the label
+        // has to say what the operator should do, in words that need no explaining.
         private static Finding Fyi(QSO q, string problem, string current, string note, string evidence)
         {
             Finding f = New(q, problem, current, note, evidence);
             f.Fixable = false;
-            f.Suggested = "FYI — " + note;
+            f.Suggested = "Check by hand — " + note;
             return f;
         }
 
@@ -487,6 +494,29 @@ namespace HolyLogger
                 return backup;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // Double-clicking a row opens that QSO in the full editor, which is the only way to settle a
+        // "Check by hand" finding - a missing band nobody can derive, a callsign with a note buried in
+        // it. Saving there writes through DataAccess, so the log is updated wherever it is displayed;
+        // the scan is then run again so the row disappears if the edit settled it.
+        private async void FindingsGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            Finding f = FindingsGrid.SelectedItem as Finding;
+            if (f == null || f.Qso == null) return;
+
+            try
+            {
+                var editor = new QsoEditWindow(f.Qso) { Owner = this };
+                bool? saved = editor.ShowDialog();
+                if (saved == true) await RunCheck();
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                MessageBox.Show(this, "This QSO could not be opened for editing:\n\n" + ex.Message,
+                                "Verify Log", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         private void Btn_Close_Click(object sender, RoutedEventArgs e)
