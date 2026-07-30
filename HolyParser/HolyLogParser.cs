@@ -225,7 +225,6 @@ namespace HolyParser
             qso_row.SRX = "";
             qso_row.STX = "";
             qso_row.Name = "";
-            qso_row.GenerateSoapBox();
 
             Regex regex = new Regex(band_pattern, RegexOptions.IgnoreCase);
             Match match = regex.Match(row);
@@ -545,7 +544,6 @@ namespace HolyParser
             qso_row.SRX = "";
             qso_row.STX = "";
             qso_row.Name = "";
-            qso_row.GenerateSoapBox();
 
             Regex regex = new Regex(@"<band>(.*)?<", RegexOptions.IgnoreCase);
             Match match = regex.Match(row);

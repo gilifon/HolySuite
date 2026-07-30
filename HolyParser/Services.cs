@@ -148,7 +148,11 @@ namespace HolyParser
                 else if (qso.Band == "13CM") adif.AppendFormat("<prop_mode:{0}>{1}", 3, "SAT");
                 if (!string.IsNullOrWhiteSpace(qso.SAT_NAME)) adif.AppendFormat("<sat_name:{0}>{1}", qso.SAT_NAME.Length, qso.SAT_NAME);
                 else if (qso.Band == "13CM") adif.AppendFormat("<sat_name:{0}>{1}", 6, "QO-100");
-                if (!string.IsNullOrWhiteSpace(qso.SOAPBOX)) adif.AppendFormat("<soapbox:{0}>{1}", qso.SOAPBOX.Length, qso.SOAPBOX);
+                // Only a real soapbox goes out. Older QSOs hold a generated "<GUID> <ticks>" ID in this
+                // field, and it was being uploaded to LoTW / eQSL / QRZ / Club Log as if it were the
+                // operator's own commentary.
+                string soapbox = QSO.SoapboxText(qso.SOAPBOX);
+                if (!string.IsNullOrWhiteSpace(soapbox)) adif.AppendFormat("<soapbox:{0}>{1}", soapbox.Length, soapbox);
                 // LoTW sent status, so the upload queue survives an export/re-import round trip.
                 adif.AppendFormat("<lotw_qsl_sent:1>{0}", qso.LotwStatus == 1 ? "Y" : "N");
 

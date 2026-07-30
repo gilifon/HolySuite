@@ -138,7 +138,9 @@ namespace HolyLogger
             TB_Operator.Text  = S(_qso.Operator);
             TB_MySquare.Text  = S(_qso.STX);
             TB_MyLocator.Text = S(_qso.MyLocator);
-            TB_Soapbox.Text   = S(_qso.SOAPBOX);
+            // Blank for the machine IDs older QSOs carry here (see QSO.IsGeneratedSoapboxId): the box is
+            // for the operator's own words, or a note an imported ADIF brought with it.
+            TB_Soapbox.Text   = S(QSO.SoapboxText(_qso.SOAPBOX));
 
             SetBandValue(S(_qso.Band));
 
@@ -292,7 +294,9 @@ namespace HolyLogger
                 _qso.State     = TB_State.Text.Trim();
                 _qso.PROP_MODE = TB_PropMode.Text.Trim();
                 _qso.SAT_NAME  = TB_SatName.Text.Trim();
-                _qso.MyCall    = TB_MyCall.Text.Trim();
+                // MyCall is deliberately NOT written back: the station callsign is the log's identity and
+                // this window only displays it (see the read-only box in the XAML). Leaving the assignment
+                // out means no path through this editor can change it, whatever the box ends up holding.
                 _qso.Operator  = TB_Operator.Text.Trim();
                 _qso.STX       = TB_MySquare.Text.Trim();
                 _qso.MyLocator = TB_MyLocator.Text.Trim();

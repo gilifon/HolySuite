@@ -333,9 +333,30 @@ namespace HolyParser
 
             HASH = mycall + dxcall + band + mode + Date;// + SRX + STX;
         }
-        public void GenerateSoapBox()
+        // SOAPBOX used to be filled on every new QSO with "<GUID> <UTC ticks>" as a unique stamp, and
+        // nothing ever read it back. It cost the QSO its soapbox - an official ADIF field for the
+        // operator's OWN words - and that machine ID travelled out in every export and every upload,
+        // as well as showing up in the editor as if the operator had typed it. The generator is gone;
+        // a soapbox is now either what an imported file carried or what the operator writes.
+        //
+        // The IDs already in the database stay where they are, and this recognises them so they can be
+        // treated as the empty field they really are - not displayed, not exported.
+        public static bool IsGeneratedSoapboxId(string soapbox)
         {
-            SOAPBOX = Guid.NewGuid().ToString() + " " + DateTime.UtcNow.Ticks.ToString();
+            if (string.IsNullOrWhiteSpace(soapbox)) return false;
+            string[] parts = soapbox.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 1 || parts.Length > 2) return false;
+            Guid ignored;
+            if (!Guid.TryParse(parts[0], out ignored)) return false;
+            if (parts.Length == 1) return true;
+            foreach (char c in parts[1]) if (!char.IsDigit(c)) return false;   // the ticks half
+            return true;
+        }
+
+        // The soapbox as something worth showing: the generated IDs read as nothing at all.
+        public static string SoapboxText(string soapbox)
+        {
+            return IsGeneratedSoapboxId(soapbox) ? string.Empty : soapbox;
         }
         public bool Equals(QSO other)
         {

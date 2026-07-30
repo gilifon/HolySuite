@@ -670,7 +670,6 @@ namespace HolyLogger
 
             _holyLogParser = new HolyLogParser();
             QSO qso = _holyLogParser.ParseRawQSO(data);
-            qso.GenerateSoapBox();
 
             // Perform QRZ lookup outside Dispatcher to avoid blocking UI and ensure proper exception handling
             string qrzName = string.Empty;
@@ -1565,7 +1564,6 @@ namespace HolyLogger
                 qso.Time = time.Hour.ToString("D2") + time.Minute.ToString("D2") + time.Second.ToString("D2");
                 qso.PROP_MODE = Properties.Settings.Default.IsSatelliteMode ? "SAT" : "";
                 qso.SAT_NAME = "";
-                qso.GenerateSoapBox();
                 if (Properties.Settings.Default.IsSatelliteMode && !string.IsNullOrWhiteSpace(Properties.Settings.Default.SatelliteName))
                 {
                     qso.SAT_NAME = Properties.Settings.Default.SatelliteName;
