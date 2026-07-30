@@ -110,6 +110,18 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.DXCall)) adif.AppendFormat("<call:{0}>{1}", qso.DXCall.Length, qso.DXCall);
                 if (!string.IsNullOrWhiteSpace(qso.Name)) adif.AppendFormat("<name:{0}>{1}", qso.Name.Length, qso.Name);
                 if (!string.IsNullOrWhiteSpace(qso.Country)) adif.AppendFormat("<country:{0}>{1}", qso.Country.Length, qso.Country);
+                // ADIF <dxcc> is the ARRL entity NUMBER - what award programs actually match on; the
+                // country name beside it is only for people to read. Looked up from the name in this
+                // very record so the two can never contradict each other, and left out entirely when no
+                // database recognises that wording rather than guessing a number for it.
+                int dxccCode = 0;
+                try { dxccCode = CountryLookup.Shared.EntityCodeForCountry(qso.Country); }
+                catch (Exception) { dxccCode = 0; }
+                if (dxccCode > 0)
+                {
+                    string code = dxccCode.ToString();
+                    adif.AppendFormat("<dxcc:{0}>{1}", code.Length, code);
+                }
                 if (!string.IsNullOrWhiteSpace(qso.CQZone)) adif.AppendFormat("<cqz:{0}>{1}", qso.CQZone.Length, qso.CQZone);
                 if (!string.IsNullOrWhiteSpace(qso.ITUZone)) adif.AppendFormat("<ituz:{0}>{1}", qso.ITUZone.Length, qso.ITUZone);
                 // ADIF STATE: the worked station's primary administrative subdivision (e.g. "CA").

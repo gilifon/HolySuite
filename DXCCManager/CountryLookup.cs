@@ -28,6 +28,20 @@ namespace DXCCManager
         // Club Log DXCC code -> the cty.dat entity (its primary prefix) that means the same country.
         private readonly Dictionary<int, string> ctyEntityByCode = new Dictionary<int, string>(400);
 
+        // The same bridge read backwards: cty.dat entity -> ARRL entity code. cty.dat carries no entity
+        // numbers of its own, so whenever cty.dat's answer is the one returned - which is exactly what
+        // the specificity rule below does for R1FJ and its like - this is the only way the number can be
+        // filled in at all.
+        private readonly Dictionary<string, int> codeByCtyEntity =
+            new Dictionary<string, int>(400, StringComparer.OrdinalIgnoreCase);
+
+        // Country NAME -> ARRL entity code, for the ADIF export. Deliberately keyed on the name rather
+        // than resolved afresh from the callsign: what goes in <dxcc> has to be the number of the very
+        // country written in <country> beside it, or the record contradicts itself. A QSO whose stored
+        // country is wrong is a job for Verify Log, not something to paper over at export time.
+        private readonly Dictionary<string, int> codeByCountryName =
+            new Dictionary<string, int>(400, StringComparer.OrdinalIgnoreCase);
+
         // Entities Club Log knows and we could not line up with cty.dat. Empty today; if the ARRL adds
         // an entity and only one of the two databases has it yet, it lands here and the lookup simply
         // reports Club Log's own name for it.
@@ -137,7 +151,7 @@ namespace DXCCManager
                     catch { historic = null; }
                     if (historic != null) return Combine(historic, fromCty);
                 }
-                return fromCty;
+                return WithEntityNumber(fromCty);
             }
 
             // THE MORE SPECIFIC MATCH WINS. Club Log is consulted first, but its answer may rest on a
@@ -149,7 +163,7 @@ namespace DXCCManager
             // anything cty.dat could not match at all.
             if (!cl.ExactCall && fromCty != null && fromCty.MatchedLength > cl.MatchedLength
                 && fromCty.Name != "Unknown")
-                return fromCty;
+                return WithEntityNumber(fromCty);   // cty.dat's country, Club Log's number for it
 
             return Combine(cl, fromCty);
         }
@@ -276,6 +290,40 @@ namespace DXCCManager
 
                 unbridged.Add(code + " " + clubLogPrefix + " " + clubLogName);
             }
+
+            // Invert it. First code wins if two ever mapped to one cty.dat entity, which would mean the
+            // bridge had gone wrong rather than that the country genuinely has two numbers.
+            foreach (KeyValuePair<int, string> pair in ctyEntityByCode)
+            {
+                if (string.IsNullOrEmpty(pair.Value)) continue;
+                if (!codeByCtyEntity.ContainsKey(pair.Value)) codeByCtyEntity[pair.Value] = pair.Key;
+
+                // ...and by the name that same entity is written under, which is what a stored QSO holds.
+                DXCC named = cty.GetDXCCbyEntityCode(pair.Value);
+                if (named != null && !string.IsNullOrEmpty(named.Name) && named.Name != "Unknown"
+                    && !codeByCountryName.ContainsKey(named.Name))
+                    codeByCountryName[named.Name] = pair.Key;
+            }
+        }
+
+        // The ARRL entity number for a country as it is WRITTEN in a logged QSO, or 0 when no database
+        // knows that wording. Used by the ADIF export, so <dxcc> and <country> can never disagree.
+        public int EntityCodeForCountry(string countryName)
+        {
+            string name = (countryName ?? string.Empty).Trim();
+            if (name.Length == 0) return 0;
+            int code;
+            return codeByCountryName.TryGetValue(name, out code) ? code : 0;
+        }
+
+        // Puts the ARRL entity number on an answer that came from cty.dat, which has none of its own.
+        // Only ever fills a blank: an answer that already carries a number is left exactly as it is.
+        private DXCC WithEntityNumber(DXCC answer)
+        {
+            if (answer == null || answer.DxccCode != 0 || string.IsNullOrEmpty(answer.Entity)) return answer;
+            int code;
+            if (codeByCtyEntity.TryGetValue(answer.Entity, out code)) answer.DxccCode = code;
+            return answer;
         }
 
         // Two spellings of one country. The databases differ in case, punctuation and in whether they
