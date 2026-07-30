@@ -19,6 +19,7 @@ namespace DXCCManager
         public bool DeletedEntity;   // the entity itself has been deleted from the DXCC list
         public bool ExactCall;       // matched a full-callsign exception, not merely a prefix
         public int MatchedLength;    // how many characters of the callsign the match covered
+        public bool Historic;        // no record covered the date; this is the last one that did
     }
 
     // A date-aware DXCC lookup built from Club Log's prefix and exception database (cty.xml, by G7VJR).
@@ -210,6 +211,75 @@ namespace DXCCManager
                 if (hit != null) return ToMatch(hit, false, l);
             }
             return null;
+        }
+
+        // Last resort: the last country a callsign is KNOWN to have belonged to, when nothing covers the
+        // date. Prefixes are dropped from both databases once they stop being issued - 4N (Serbia) and
+        // the Olympic-year 2O (England) are gone - which leaves such a call nameless even though its
+        // country is perfectly well known; it simply belongs to the past.
+        //
+        // Two limits keep this honest. Only records that name a real entity are kept, because a lapsed
+        // "invalid operation" window says nothing about later use of the callsign. And only records that
+        // had already begun by the date asked about, so a 1993 QSO is never answered from a 2015 record.
+        // The caller must still refuse this whenever anything current names the callsign, otherwise a
+        // block that has been reassigned (3C was Canada until 1967, and is Equatorial Guinea now) would
+        // be answered from its history.
+        public ClubLogMatch ResolveHistoric(string callsign, DateTime whenUtc)
+        {
+            if (string.IsNullOrWhiteSpace(callsign)) return null;
+            string call = callsign.Trim().ToUpperInvariant();
+
+            // A full-callsign record still comes first: it is about this station, not a block.
+            ClubLogMatch found = LastKnown(exceptions, call, whenUtc, true, call.Length);
+            if (found != null) return found;
+
+            // Among prefixes it is the FRESHEST record that wins, not the longest key - the longer key
+            // may have lapsed decades earlier, and then the shorter one is the newer fact. 4N25K is the
+            // case: "4N2" was Croatia until 1992, while "4N" was Serbia until 2013, so Serbia is what is
+            // last known about the callsign. Key length only breaks ties.
+            Record best = null;
+            int bestLength = 0;
+            int len = Math.Min(call.Length, maxPrefixLength);
+            for (int l = len; l >= 1; l--)
+            {
+                Record candidate = LastKnownRecord(prefixes, call.Substring(0, l), whenUtc);
+                if (candidate == null) continue;
+                if (best == null || candidate.End > best.End)
+                {
+                    best = candidate;
+                    bestLength = l;
+                }
+            }
+            if (best == null) return null;
+
+            ClubLogMatch m = ToMatch(best, false, bestLength);
+            m.Historic = true;
+            return m;
+        }
+
+        private ClubLogMatch LastKnown(Dictionary<string, List<Record>> from, string key, DateTime whenUtc,
+                                       bool exactCall, int matchedLength)
+        {
+            Record best = LastKnownRecord(from, key, whenUtc);
+            if (best == null) return null;
+            ClubLogMatch m = ToMatch(best, exactCall, matchedLength);
+            m.Historic = true;
+            return m;
+        }
+
+        private static Record LastKnownRecord(Dictionary<string, List<Record>> from, string key, DateTime whenUtc)
+        {
+            List<Record> list;
+            if (!from.TryGetValue(key, out list)) return null;
+
+            Record best = null;
+            foreach (Record r in list)
+            {
+                if (r.Adif <= 0) continue;          // no entity to remember
+                if (r.Start > whenUtc) continue;    // did not exist yet at the date asked about
+                if (best == null || r.End > best.End) best = r;
+            }
+            return best;
         }
 
         private static Record Pick(Dictionary<string, List<Record>> from, string key, DateTime whenUtc)

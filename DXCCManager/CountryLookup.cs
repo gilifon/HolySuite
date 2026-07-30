@@ -122,7 +122,23 @@ namespace DXCCManager
             ClubLogMatch cl;
             try { cl = clubLog.Resolve(callsign, whenUtc); }
             catch { cl = null; }
-            if (cl == null) return fromCty;
+
+            // Nothing current names this callsign in either database - 4N (Serbia) and the Olympic-year
+            // 2O (England) were withdrawn, so they are simply gone from both. The last country the call
+            // is known to have belonged to beats "Unknown", and because this only ever fills a blank it
+            // can never overrule a live assignment: a 3C1 station today still reports Equatorial Guinea,
+            // not the Canada its block held until 1967.
+            if (cl == null)
+            {
+                if (fromCty == null || fromCty.Name == "Unknown")
+                {
+                    ClubLogMatch historic = null;
+                    try { historic = clubLog.ResolveHistoric(callsign, whenUtc); }
+                    catch { historic = null; }
+                    if (historic != null) return Combine(historic, fromCty);
+                }
+                return fromCty;
+            }
 
             // THE MORE SPECIFIC MATCH WINS. Club Log is consulted first, but its answer may rest on a
             // short fallback prefix while cty.dat matched far more of the callsign, and then cty.dat is
@@ -135,6 +151,13 @@ namespace DXCCManager
                 && fromCty.Name != "Unknown")
                 return fromCty;
 
+            return Combine(cl, fromCty);
+        }
+
+        // Turns a Club Log match into the answer the rest of the program sees, saying it in cty.dat's
+        // words wherever the same entity exists there.
+        private DXCC Combine(ClubLogMatch cl, DXCC fromCty)
+        {
             // Club Log lists this call and date as an operation that never counted. "INVALID" is not a
             // country, so the country stays whatever cty.dat believes and only the flag is raised -
             // that way the logger can warn the operator without writing nonsense into the log.
