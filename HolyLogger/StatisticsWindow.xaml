@@ -75,6 +75,12 @@
                                 <Style TargetType="ListBoxItem">
                                     <Setter Property="Padding" Value="20,7,20,7"/>
                                     <Setter Property="FontSize" Value="14"/>
+                                    <!-- Both tabs the same width. Selecting one makes it BOLD, which is
+                                         wider than the same word unselected, so without a fixed width the
+                                         strip - and with it the whole left column - would breathe in and
+                                         out as you switch, shoving the source folders sideways. -->
+                                    <Setter Property="MinWidth" Value="92"/>
+                                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
                                     <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
                                     <Setter Property="Template">
                                         <Setter.Value>
@@ -222,7 +228,11 @@
                                  belongs to every cell it was worked in, so percentages would come to
                                  several hundred (see the note below the table). -->
                             <StackPanel x:Name="DxccViewPanel" Visibility="Collapsed">
+                                <!-- Wrapped and capped at the width of the tables below: this heading
+                                     carries the source name ("… — Club Log"), and left free to grow it
+                                     would widen the whole left column and move the source folders. -->
                                 <TextBlock x:Name="TB_CountryPivotHeader" Text="Countries by Bands &amp; Mode" FontSize="16" FontWeight="Bold"
+                                           TextWrapping="Wrap" MaxWidth="390" HorizontalAlignment="Left"
                                            Margin="0,0,0,6" Foreground="{DynamicResource AccentBrush}"/>
                                 <Border x:Name="CountryPivotOuterBorder" HorizontalAlignment="Left"
                                         BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="2">
