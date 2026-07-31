@@ -55,9 +55,16 @@
                             <RowDefinition Height="*"/>
                             <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
-                        <StackPanel Grid.Row="0" VerticalAlignment="Center" MaxWidth="440">
-                            <TextBlock Text="Log file:" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}"/>
+                        <!-- Label and name side by side, not stacked: one line instead of two lifts this
+                             whole row - and both sets of folder tabs with it - up by a line.
+                             MaxWidth on the NAME (not the panel) so a long one still wraps rather than
+                             widening the column and shoving the source folders across. -->
+                        <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Text="Log file:" FontSize="13" FontWeight="Bold" Margin="0,0,7,0"
+                                       VerticalAlignment="Center" Foreground="{DynamicResource MutedTextBrush}"/>
                             <TextBlock x:Name="TB_LogName" FontSize="15" FontWeight="Bold" TextWrapping="Wrap"
+                                       MaxWidth="360" VerticalAlignment="Center"
+                                       ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                        Foreground="{DynamicResource AccentBrush}"/>
                         </StackPanel>
                         <!-- What the table below is counting: contacts, or countries. Same look as the
