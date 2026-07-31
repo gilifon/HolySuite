@@ -189,7 +189,9 @@ namespace HolyLogger
             if (total == 0)
             {
                 int totalDxcc = _masterResolver.GetAllEntityNames().Count;
-                TB_UniqueCalls.Text     = "0";
+                _uniqueCallsText        = "0";
+                _countryCountText       = "0";
+                ApplyUniqueTile();
                 TB_UniqueCountries.Text = $"0 / {totalDxcc}";
                 TB_MissingDxcc.Text     = totalDxcc.ToString();
                 TB_DateStart.Text = "—";
@@ -199,11 +201,12 @@ namespace HolyLogger
                 return;
             }
 
-            TB_UniqueCalls.Text = _allQsos
+            _uniqueCallsText = _allQsos
                 .Select(q => q.DXCall)
                 .Where(c => !string.IsNullOrEmpty(c))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count().ToString();
+            ApplyUniqueTile();   // ComputeStats no longer writes the tile directly - the folder decides
 
             TB_UniqueCountries.Text = _allQsos
                 .Select(q => !string.IsNullOrEmpty(q.DXCC) ? q.DXCC : q.Country)
@@ -592,6 +595,10 @@ namespace HolyLogger
 
             CountryPivotBorder.Child = tbl;
 
+            // Feed the tile from the same count the table just made, so the two can never disagree.
+            _countryCountText = grand.Count.ToString("N0");
+            ApplyUniqueTile();
+
             if (TB_CountryPivotHeader != null)
                 TB_CountryPivotHeader.Text = "Countries by Bands & Mode — " + SourceTitle(_source)
                                              + "\n(" + grand.Count.ToString("N0") + ")";
@@ -609,6 +616,12 @@ namespace HolyLogger
         // sources times two views would be twelve tabs on a single line.
         private enum LeftView { Qso, Dxcc }
         private LeftView _leftView = LeftView.Qso;
+
+        // The second tile shows one or the other, so both values are kept and the tile is repainted when
+        // the folder changes: unique callsigns worked (QSO folder) or countries (DXCC folder). The
+        // country figure is whatever the DXCC table last counted, so tile and table always agree.
+        private string _uniqueCallsText = "0";
+        private string _countryCountText = "0";
 
         private void BuildLeftViewFolders()
         {
@@ -656,6 +669,18 @@ namespace HolyLogger
             QsoViewPanel.Visibility = qso ? Visibility.Visible : Visibility.Collapsed;
             DxccViewPanel.Visibility = qso ? Visibility.Collapsed : Visibility.Visible;
             if (!qso) BuildCountryPivot();   // it follows the source folder, so rebuild on the way in
+            ApplyUniqueTile();
+        }
+
+        // The middle tile belongs to whichever folder is open: "Unique Calls" counts callsigns, which
+        // means nothing on the DXCC folder, so there it becomes "Countries" and shows what the table
+        // below it totals.
+        private void ApplyUniqueTile()
+        {
+            if (TB_UniqueCalls == null || TB_UniqueCallsLabel == null) return;
+            bool qso = _leftView == LeftView.Qso;
+            TB_UniqueCallsLabel.Text = qso ? "Unique Calls" : "Countries";
+            TB_UniqueCalls.Text = qso ? _uniqueCallsText : _countryCountText;
         }
 
         // The folder's name as the operator sees it on its tab.

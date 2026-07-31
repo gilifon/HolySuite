@@ -173,7 +173,9 @@
                             </Border>
                             <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                                 <StackPanel>
-                                    <TextBlock Text="Unique Calls" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                    <!-- This tile changes with the left folder: unique callsigns worked on
+                                         the QSO folder, countries on the DXCC one (see ApplyLeftView). -->
+                                    <TextBlock x:Name="TB_UniqueCallsLabel" Text="Unique Calls" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
                                     <TextBlock x:Name="TB_UniqueCalls" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
