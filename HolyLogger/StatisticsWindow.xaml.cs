@@ -1948,9 +1948,9 @@ namespace HolyLogger
                     if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) qrzDeleted.Add(c.DxccCode);
                 }
                 var qs = Properties.Settings.Default;
-                qs.QrzConfirmedEntities = string.Join("|", qrzNames);
-                qs.QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
-                qs.QrzConfirmedQsoCount = confirmations.Count;   // what QRZ reported (frame "Confirmed on QRZ")
+                QrzConfirmedEntities = string.Join("|", qrzNames);
+                QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
+                QrzConfirmedQsoCount = confirmations.Count;   // what QRZ reported (frame "Confirmed on QRZ")
                 qs.Save();
 
                 // Re-read the log so the QSO confirmation flags (which the zone lists use) are live, then
@@ -2321,9 +2321,9 @@ namespace HolyLogger
                         names.Add(name);
                     if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) deleted.Add(c.DxccCode);
                 }
-                s0.ClublogConfirmedEntities = string.Join("|", names);
-                s0.ClublogConfirmedDeletedCodes = string.Join(",", deleted);
-                s0.ClublogConfirmedQsoCount = all.Count;   // what Club Log reported (frame "Confirmed on Club Log")
+                ClublogConfirmedEntities = string.Join("|", names);
+                ClublogConfirmedDeletedCodes = string.Join(",", deleted);
+                ClublogConfirmedQsoCount = all.Count;   // what Club Log reported (frame "Confirmed on Club Log")
                 s0.Save();
 
                 ReloadQsosAfterCheck();
@@ -2970,7 +2970,7 @@ namespace HolyLogger
 
     // One newly-confirmed QSO, captured from the last incremental LoTW check for the "see the new
     // QSOs" viewer. The top-level fields drive the overview grid; Fields holds EVERY ADIF field from
-    // the record for the drill-down. Persisted as JSON in Settings.LotwLastNewJson.
+    // the record for the drill-down. Persisted as JSON in LotwLastNewJson.
     public class LotwNewQso
     {
         public string Call { get; set; }
