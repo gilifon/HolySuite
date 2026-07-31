@@ -42,6 +42,10 @@ namespace HolyLogger
         // different cache whenever the source folder changes (see LoadConfirmedCache / _source).
         private HashSet<string> _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // The DELETED entities among them, by ARRL entity number. Built in the same pass as the set
+        // above, from the log's own QSOs, so it needs nothing saved from a past download.
+        private HashSet<int> _confirmedDeletedCodes = new HashSet<int>();
+
         // The confirmation source whose analysis the window is currently showing - one folder each in the
         // vertical tab strip. "Worked" is the plain log with no confirmation overlay; the rest color the
         // worked list by that service's confirmations. Only LoTW and QRZ are wired in this first step.
@@ -941,33 +945,39 @@ namespace HolyLogger
         private void LoadConfirmedCache()
         {
             _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _confirmedDeletedCodes = new HashSet<int>();
 
-            // Paper QSL has nothing to download - it is manually marked per QSO - so its confirmed set is
-            // computed LIVE from the log itself: the entities of the QSOs the operator ticked. This is what
-            // makes it recalculate automatically the moment a paper-QSL checkbox changes, with no button.
-            if (_source == ConfSource.Paper)
+            // Computed LIVE from the log, for EVERY source - the entities of the QSOs carrying that
+            // service's tick. It used to be read back from a list of country names saved at download
+            // time, which went wrong in three separate ways: the list was written only by a download, so
+            // a log whose marks arrived some other way showed nothing (QRZ: 431 confirmed QSOs, 91
+            // countries, and a tile reading 0); it was one list shared by every log; and it froze the
+            // country names as they were understood on the day of the download, so the two entities
+            // whose identification depends on the QSO's date came back wrong for ever.
+            //
+            // The marks themselves are on the QSOs, which is the only place they belong. Reading them
+            // means the tile, the table and the highlighted rows are all the same count by construction.
+            if (_source == ConfSource.Worked || _allQsos == null) return;
+
+            foreach (var q in _allQsos)
             {
-                if (_allQsos != null)
-                    foreach (var q in _allQsos)
-                    {
-                        if (q == null || q.PaperQslRcvd != 1) continue;
-                        string name = Resolve(q.DXCall, q.Date)?.Name;
-                        if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
-                            _confirmedEntities.Add(name);
-                    }
-                return;
-            }
+                if (q == null || !IsAchievedForSource(q)) continue;
+                DXCCManager.DXCC d = Resolve(q.DXCall, q.Date);
+                if (d == null || string.IsNullOrEmpty(d.Name)
+                    || string.Equals(d.Name, "Unknown", StringComparison.OrdinalIgnoreCase)) continue;
+                _confirmedEntities.Add(d.Name);
 
-            // The Worked folder has no confirmation overlay; each other folder reads its own cache.
-            string cached =
-                _source == ConfSource.Lotw    ? LotwConfirmedEntities :
-                _source == ConfSource.Qrz     ? QrzConfirmedEntities  :
-                _source == ConfSource.Eqsl    ? EqslConfirmedEntities :
-                _source == ConfSource.Clublog ? ClublogConfirmedEntities :
-                string.Empty;
-            if (string.IsNullOrWhiteSpace(cached)) return;
-            foreach (var n in cached.Split('|'))
-                if (!string.IsNullOrWhiteSpace(n)) _confirmedEntities.Add(n.Trim());
+                // The deleted-entity split, from the same pass. The entity NUMBER now comes with the
+                // answer and Club Log says which numbers are deleted, so this no longer needs a list of
+                // codes saved by whichever download last ran.
+                try
+                {
+                    if (d.DxccCode > 0 && DXCCManager.CountryLookup.Shared.IsDeletedEntityCode(d.DxccCode))
+                        _confirmedDeletedCodes.Add(d.DxccCode);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            return;
 
             // Self-heal a bogus total left over from earlier broken-download testing: the confirmed-QSO
             // count can never be below the number of confirmed countries (each country has >=1 confirmed
@@ -987,19 +997,10 @@ namespace HolyLogger
         // Does not re-sort; the caller refreshes the list (BuildCountryTables / the button both do).
         // Count of distinct DELETED entities confirmed by the current source, from the codes that
         // source's last download stored.
+        // Built alongside the confirmed set, from the log itself - see LoadConfirmedCache.
         private int CountConfirmedDeleted()
         {
-            string csv =
-                _source == ConfSource.Lotw    ? LotwConfirmedDeletedCodes :
-                _source == ConfSource.Qrz     ? QrzConfirmedDeletedCodes  :
-                _source == ConfSource.Eqsl    ? EqslConfirmedDeletedCodes :
-                _source == ConfSource.Clublog ? ClublogConfirmedDeletedCodes :
-                string.Empty;
-            if (string.IsNullOrWhiteSpace(csv)) return 0;
-            var set = new HashSet<int>();
-            foreach (var part in csv.Split(','))
-                if (int.TryParse(part.Trim(), out int c)) set.Add(c);
-            return set.Count;
+            return _confirmedDeletedCodes.Count;
         }
 
         // The current source's display name, for the confirmed tile and status line.
