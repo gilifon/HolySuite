@@ -1257,6 +1257,20 @@ namespace HolyLogger
         private string ClublogConfirmedDeletedCodes { get { return LogState("ClublogConfirmedDeletedCodes"); } set { LogState("ClublogConfirmedDeletedCodes", value); } }
         private int ClublogConfirmedQsoCount { get { return LogStateInt("ClublogConfirmedQsoCount"); } set { LogState("ClublogConfirmedQsoCount", value.ToString()); } }
 
+        // The callsign the open log belongs to, or "" when it has no identity set.
+        private string ActiveLogCallsign()
+        {
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal == null) return string.Empty;
+                string call;
+                dal.GetLogIdentity(dal.ActiveLogId, out call, out _);
+                return (call ?? string.Empty).Trim();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
         // Every station callsign this log actually contains - the log's own identity plus each stroke
         // variant present in its QSOs. One LoTW request is made per entry, because qso_owncall matches
         // the callsign as it was UPLOADED: asking for 4Z5SL alone would leave whatever was signed
@@ -2013,6 +2027,26 @@ namespace HolyLogger
             catch (Exception ex) { HolyMessageBox.Show("Couldn't read eQSL accounts: " + ex.Message, "eQSL confirmations", HolyMsgType.Warning, this); return; }
 
             accounts = accounts.Where(a => !string.IsNullOrWhiteSpace(a.Username) && !string.IsNullOrWhiteSpace(a.Password)).ToList();
+
+            // ONLY the account for the callsign this log belongs to. eQSL keeps one In Box per callsign,
+            // and downloading every configured account on every log fetched a special-event station's
+            // cards while standing in the everyday log, where not one of them could ever match.
+            // Compared by identity, so an account registered as 4Z5SL serves a log of 4Z5SL/6 QSOs.
+            string eqslLogCall = ActiveLogCallsign();
+            if (!string.IsNullOrWhiteSpace(eqslLogCall))
+            {
+                var mine = accounts.Where(a => CallsignIdentity.Same(a.Callsign, eqslLogCall)).ToList();
+                if (mine.Count == 0)
+                {
+                    HolyMessageBox.Show(
+                        $"No eQSL account is set up for {eqslLogCall}, the callsign this log belongs to.\n\n" +
+                        "Add one in Options → eQSL, or open the log whose callsign you do have an account for.",
+                        "eQSL confirmations", HolyMsgType.Warning, this);
+                    return;
+                }
+                accounts = mine;
+            }
+
             if (accounts.Count == 0)
             {
                 bool openOptions = HolyMessageBox.ShowConfirm(
@@ -2179,14 +2213,20 @@ namespace HolyLogger
                 return;
             }
 
-            // A Club Log account belongs to ONE operator, so we only ever ask about THIS operator's own
-            // callsign - the personal callsign in Settings. We must NOT loop over every my_callsign in the
-            // database: a shared/club machine holds other operators' logs too, and asking Club Log about a
-            // friend's call under your login is both wrong and pointless (Club Log rejects it).
-            string myCall = s0.my_callsign?.Trim();
+            // The callsign THIS LOG belongs to - not the personal callsign in Settings, which is a
+            // different thing the moment you keep a log for a special-event or club station. Asking Club
+            // Log about 4Z5SL while standing in the 4X2XMAS log downloaded a set that could not match a
+            // single QSO in front of you.
+            //
+            // Still exactly one callsign, never a loop over every my_callsign in the database: a shared
+            // machine holds other operators' logs too, and asking Club Log about a friend's call under
+            // your login is both wrong and pointless (Club Log rejects it).
+            string myCall = ActiveLogCallsign();
+            if (string.IsNullOrWhiteSpace(myCall)) myCall = s0.my_callsign?.Trim();
             if (string.IsNullOrWhiteSpace(myCall))
             {
-                HolyMessageBox.Show("Your own callsign isn't set (Options → General), so there is nothing to download from Club Log.",
+                HolyMessageBox.Show("This log has no station callsign set, so there is nothing to download from Club Log.\n\n" +
+                    "Set it with \"Set Identity\" in the Log Manager.",
                     "Club Log confirmations", HolyMsgType.Warning, this);
                 return;
             }
