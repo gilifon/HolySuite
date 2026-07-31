@@ -157,10 +157,51 @@ namespace HolyLogger
 
         // ── top-level entry point ─────────────────────────────────────────
 
+        // The QSOs the open folder is about: every QSO on the Worked folder, and only the ones that
+        // service has confirmed on any other. Everything on the left of the window - both tiles, the
+        // date range and the QSO table - is counted from this, so standing on the LoTW folder answers
+        // "what have I got confirmed at LoTW" rather than repeating the whole log six times over.
+        private List<QSO> SourceQsos()
+        {
+            if (_allQsos == null) return new List<QSO>();
+            if (_source == ConfSource.Worked) return _allQsos.ToList();
+            return _allQsos.Where(q => q != null && IsAchievedForSource(q)).ToList();
+        }
+
+        // Repaints everything that depends on which source folder is open. Cheap enough to run on every
+        // folder change: one pass over the log to filter, then the pivot's own pass.
+        private void ApplySourceCounts()
+        {
+            if (TB_TotalQSOs == null) return;
+            List<QSO> qsos = SourceQsos();
+
+            TB_TotalQSOs.Text = qsos.Count.ToString("N0");
+
+            _uniqueCallsText = qsos
+                .Select(q => q.DXCall)
+                .Where(c => !string.IsNullOrEmpty(c))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count().ToString("N0");
+            ApplyUniqueTile();
+
+            // The dates follow too, so the range is the span of the QSOs actually being counted - the
+            // first and last CONFIRMED contact on a confirmation folder, not the first and last logged.
+            List<string> dates = qsos
+                .Where(q => !string.IsNullOrEmpty(q.Date))
+                .Select(q => q.Date).OrderBy(d => d, StringComparer.Ordinal).ToList();
+            TB_DateStart.Text = dates.Count > 0 ? FormatAdifDate(dates[0]) : "—";
+            TB_DateEnd.Text = dates.Count > 0 ? FormatAdifDate(dates[dates.Count - 1]) : "—";
+
+            BuildPivot(qsos);
+
+            TB_PivotHeader.Text = "QSOs by Bands & Mode"
+                + (_source == ConfSource.Worked ? "" : " — " + SourceTitle(_source))
+                + "\n(" + qsos.Count.ToString("N0") + ")";
+        }
+
         private void ComputeStats()
         {
             int total = _allQsos != null ? _allQsos.Count : 0;
-            TB_TotalQSOs.Text = total.ToString();
 
             // Name of the log these statistics are for, shown top-left. Wraps in the UI, so a long name
             // is shown in full.
@@ -171,7 +212,6 @@ namespace HolyLogger
                 TB_LogName.Text = string.IsNullOrWhiteSpace(logName) ? "(unnamed log)" : logName;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-            TB_PivotHeader.Text = "QSOs by Bands & Mode\n(" + total + ")";
 
             // Warn if the country file is overdue for a refresh (e.g. AD1C moved the download URL). The
             // cty.dat version tile was removed from the window; the warning still surfaces a stale file.
@@ -189,6 +229,7 @@ namespace HolyLogger
             if (total == 0)
             {
                 int totalDxcc = _masterResolver.GetAllEntityNames().Count;
+                TB_TotalQSOs.Text       = "0";
                 _uniqueCallsText        = "0";
                 _countryCountText       = "0";
                 ApplyUniqueTile();
@@ -201,26 +242,13 @@ namespace HolyLogger
                 return;
             }
 
-            _uniqueCallsText = _allQsos
-                .Select(q => q.DXCall)
-                .Where(c => !string.IsNullOrEmpty(c))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count().ToString();
-            ApplyUniqueTile();   // ComputeStats no longer writes the tile directly - the folder decides
-
             TB_UniqueCountries.Text = _allQsos
                 .Select(q => !string.IsNullOrEmpty(q.DXCC) ? q.DXCC : q.Country)
                 .Where(c => !string.IsNullOrEmpty(c))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count().ToString();
 
-            var dates = _allQsos
-                .Where(q => !string.IsNullOrEmpty(q.Date))
-                .Select(q => q.Date).OrderBy(d => d).ToList();
-            TB_DateStart.Text = dates.Count > 0 ? FormatAdifDate(dates.First()) : "—";
-            TB_DateEnd.Text   = dates.Count > 0 ? FormatAdifDate(dates.Last())  : "—";
-
-            BuildPivot();
+            ApplySourceCounts();     // the tiles, the dates and the QSO table, for the open folder
             BuildCountryPivot();
             BuildCountryTables();
 
@@ -317,7 +345,9 @@ namespace HolyLogger
 
         // ── pivot table builder ───────────────────────────────────────────
 
-        private void BuildPivot()
+        // qsos is the set for the OPEN FOLDER (see SourceQsos): the whole log on Worked, only that
+        // service's confirmed contacts on any other.
+        private void BuildPivot(List<QSO> qsos)
         {
             // 1. Accumulate counts
             var counts = new Dictionary<string, Dictionary<string, int>>();
@@ -329,7 +359,7 @@ namespace HolyLogger
             var other = new Dictionary<string, int>
                     { { "SSB", 0 }, { "CW", 0 }, { "DIGI", 0 }, { "FM", 0 } };
 
-            foreach (var q in _allQsos)
+            foreach (var q in qsos)
             {
                 string b = NormalizeBand(q.Band);
                 string m = NormalizeMode(q.Mode); // always SSB/CW/DIGI/FM — never null
@@ -887,6 +917,7 @@ namespace HolyLogger
         {
             LoadConfirmedCache();
             RebuildMissingCountries();   // Missing Countries list for this source
+            ApplySourceCounts();         // tiles, dates and the QSO table, for this source
             BuildCountryPivot();         // countries by band and mode, for this source
             PopulateMissingZones();      // Missing CQ / ITU zones for this source
             ApplyConfirmedHighlight();   // tiles read the freshly-built _missingList

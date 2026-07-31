@@ -212,7 +212,10 @@
                                  Cell grid is built entirely in code-behind (BuildPivot).
                                  PivotOuterBorder.ActualHeight drives the country-table scroll heights. -->
                             <StackPanel x:Name="QsoViewPanel">
+                                <!-- Wrapped and capped like its DXCC twin: this heading also carries the
+                                     source name now, and must not be able to widen the column. -->
                                 <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Bands &amp; Mode" FontSize="16" FontWeight="Bold"
+                                           TextWrapping="Wrap" MaxWidth="390" HorizontalAlignment="Left"
                                            Margin="0,0,0,6" Foreground="{DynamicResource AccentBrush}"/>
                                 <Border x:Name="PivotOuterBorder" HorizontalAlignment="Left"
                                         BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="2">
