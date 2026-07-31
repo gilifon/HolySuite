@@ -2002,13 +2002,12 @@ namespace HolyLogger
                 }
                 else
                 {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) are now marked QRZ-confirmed, across all your logs:");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) are marked QRZ-confirmed across your logs - this one included:");
                     text.AppendLine();
                     foreach (var p in perLog)
                         text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
                     text.AppendLine();
-                    text.AppendLine("A confirmation belongs to the contact, so every log holding a matching " +
-                                    "QSO - under any of your station callsigns - was updated, not only the one open now.");
+                    text.AppendLine("Only THIS log was checked, and only it was changed - a download asks about one log's station callsign. The other logs above are shown as they stand from their own last check.");
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -2183,10 +2182,13 @@ namespace HolyLogger
                     text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on eQSL.");
                 else
                 {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) are now marked eQSL-confirmed, across all your logs:");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) are marked eQSL-confirmed across your logs - this one included:");
                     text.AppendLine();
                     foreach (var p in perLog)
                         text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
+                    text.AppendLine();
+                    text.AppendLine("Only THIS log was checked, and only it was changed - a download asks about one log's " +
+                                    "station callsign. The other logs above are shown as they stand from their own last check.");
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -2364,10 +2366,13 @@ namespace HolyLogger
                     text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on Club Log.");
                 else
                 {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) are now marked Club Log-confirmed, across all your logs:");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) are marked Club Log-confirmed across your logs - this one included:");
                     text.AppendLine();
                     foreach (var p in perLog)
                         text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
+                    text.AppendLine();
+                    text.AppendLine("Only THIS log was checked, and only it was changed - a download asks about one log's " +
+                                    "station callsign. The other logs above are shown as they stand from their own last check.");
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -2406,13 +2411,12 @@ namespace HolyLogger
                 }
                 else
                 {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) are now marked confirmed, across all your logs:");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) are marked confirmed across your logs - this one included:");
                     text.AppendLine();
                     foreach (var p in perLog)
                         text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
                     text.AppendLine();
-                    text.AppendLine("A confirmation belongs to the contact, so every log that holds a matching " +
-                                    "QSO - under any of your station callsigns - was updated, not only the one open now.");
+                    text.AppendLine("Only THIS log was checked, and only it was changed - a download asks about one log's station callsign. The other logs above are shown as they stand from their own last check.");
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
