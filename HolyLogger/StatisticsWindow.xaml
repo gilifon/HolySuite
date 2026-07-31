@@ -42,7 +42,11 @@
 
                 <!-- Above the left column: the name of the log these statistics are for. Wraps (MaxWidth)
                      so even a long name shows in full without widening the column. -->
-                <Border Grid.Row="0" Grid.Column="0" x:Name="LeftTopSpacer">
+                <!-- Panel.ZIndex on THIS Border, not on the tab strip inside it: ZIndex only orders
+                     siblings, and the left page frame below is this Border's sibling. Without it the
+                     frame paints over the tabs and the selected one cannot hide the line beneath it,
+                     which is the whole trick that makes a tab and its page read as one sheet. -->
+                <Border Grid.Row="0" Grid.Column="0" x:Name="LeftTopSpacer" Panel.ZIndex="1">
                     <!-- Log name on top, the QSO/DXCC folder tabs along the bottom edge. Bottom-aligned
                          on purpose: the source tabs on the right are bottom-aligned too, so the two
                          strips meet on one line however tall this row grows. -->
