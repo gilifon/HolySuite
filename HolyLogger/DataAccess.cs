@@ -2521,18 +2521,26 @@ Environment.NewLine +
                             $"UPDATE qso SET {rcvdCol} = 0, {rdateCol} = NULL, {deletedCol} = 0 WHERE {rcvdCol} = 1", con, tx))
                             clear.ExecuteNonQuery();
 
-                    // The station callsign is REQUIRED to match: my_callsign = @mycall. A confirmation
-                    // whose station is empty matches nothing here (my_callsign is never blank), which is
-                    // the safe direction - better to leave a QSO unticked than to tick a QSO some OTHER
-                    // operator made that merely shares the call+band+mode+date. Removing the old
-                    // "@mycall = '' OR ..." escape is what stops confirmations leaking across logs.
+                    // The station callsign is REQUIRED to match. A confirmation whose station is empty
+                    // matches nothing here (my_callsign is never blank), which is the safe direction -
+                    // better to leave a QSO unticked than to tick a QSO some OTHER operator made that
+                    // merely shares the call+band+mode+date. That is what stops confirmations leaking
+                    // across logs.
+                    //
+                    // But it matches by IDENTITY, not letter for letter: 4Z5SL and 4Z5SL/6 are one
+                    // station, and the awards treat them as one, so a confirmation reported under either
+                    // has to find the QSO logged under the other. Compared as "the base callsign, or the
+                    // base callsign followed by a stroke", which is precisely the set of spellings
+                    // CallsignIdentity.Base collapses to that base - a leading stroke (4X/OK1DL) is a
+                    // DIFFERENT station and is left out, because Base keeps it.
                     using (var exact = new SQLiteCommand(
                         $"UPDATE qso SET {rcvdCol} = 1, {rdateCol} = @rdate, {deletedCol} = @deleted " +
                         "WHERE dx_callsign = @call COLLATE NOCASE " +
                         "  AND band  = @band COLLATE NOCASE " +
                         "  AND mode  = @mode COLLATE NOCASE " +
                         "  AND date  = @date " +
-                        "  AND my_callsign = @mycall COLLATE NOCASE", con, tx))
+                        "  AND (my_callsign = @mycall COLLATE NOCASE " +
+                        "       OR my_callsign LIKE @mycallStroke COLLATE NOCASE)", con, tx))
                     // Fallback for the digital sub-modes. The report gives the exact sub-mode (PSK31,
                     // PSK63, DATA...) while the log stores the family (PSK), so the exact query above
                     // misses them. This one drops the mode test to "the log's mode is in the SAME
@@ -2543,7 +2551,8 @@ Environment.NewLine +
                         "WHERE dx_callsign = @call COLLATE NOCASE " +
                         "  AND band  = @band COLLATE NOCASE " +
                         "  AND date  = @date " +
-                        "  AND my_callsign = @mycall COLLATE NOCASE " +
+                        "  AND (my_callsign = @mycall COLLATE NOCASE " +
+                        "       OR my_callsign LIKE @mycallStroke COLLATE NOCASE) " +
                         "  AND UPPER(TRIM(mode)) IN (" + PskFamilyInList + ")", con, tx))
                     {
                         foreach (var cmd in new[] { exact, family })
@@ -2553,6 +2562,7 @@ Environment.NewLine +
                             cmd.Parameters.Add(new SQLiteParameter("@band"));
                             cmd.Parameters.Add(new SQLiteParameter("@date"));
                             cmd.Parameters.Add(new SQLiteParameter("@mycall"));
+                            cmd.Parameters.Add(new SQLiteParameter("@mycallStroke"));
                             cmd.Parameters.Add(new SQLiteParameter("@deleted"));
                         }
                         exact.Parameters.Add(new SQLiteParameter("@mode"));
@@ -2577,13 +2587,18 @@ Environment.NewLine +
                             string call   = c.Call.Trim();
                             string band   = (c.Band ?? string.Empty).Trim();
                             string date   = c.QsoDate.Trim();
-                            string mycall = (c.StationCallsign ?? string.Empty).Trim();
+                            // The station's IDENTITY, so a confirmation reported under 4Z5SL finds the
+                            // QSO logged as 4Z5SL/6 and the other way round. Base() drops a trailing
+                            // stroke modifier and keeps a leading one, so 4X/OK1DL stays its own station.
+                            string mycall = CallsignIdentity.Base((c.StationCallsign ?? string.Empty).Trim());
+                            string mycallStroke = mycall + "/%";
 
                             exact.Parameters["@rdate"].Value = rdate;
                             exact.Parameters["@call"].Value = call;
                             exact.Parameters["@band"].Value = band;
                             exact.Parameters["@date"].Value = date;
                             exact.Parameters["@mycall"].Value = mycall;
+                            exact.Parameters["@mycallStroke"].Value = mycallStroke;
                             exact.Parameters["@mode"].Value = (c.Mode ?? string.Empty).Trim();
 
                             int rows = exact.ExecuteNonQuery();
@@ -2597,6 +2612,7 @@ Environment.NewLine +
                                 family.Parameters["@band"].Value = band;
                                 family.Parameters["@date"].Value = date;
                                 family.Parameters["@mycall"].Value = mycall;
+                                family.Parameters["@mycallStroke"].Value = mycallStroke;
                                 rows = family.ExecuteNonQuery();
                             }
 
