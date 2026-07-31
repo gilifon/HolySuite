@@ -43,17 +43,68 @@
                 <!-- Above the left column: the name of the log these statistics are for. Wraps (MaxWidth)
                      so even a long name shows in full without widening the column. -->
                 <Border Grid.Row="0" Grid.Column="0" x:Name="LeftTopSpacer">
-                    <StackPanel VerticalAlignment="Center" Margin="14,2,12,2" MaxWidth="440">
-                        <TextBlock Text="Log file:" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}"/>
-                        <TextBlock x:Name="TB_LogName" FontSize="15" FontWeight="Bold" TextWrapping="Wrap"
-                                   Foreground="{DynamicResource AccentBrush}"/>
-                    </StackPanel>
+                    <!-- Log name on top, the QSO/DXCC folder tabs along the bottom edge. Bottom-aligned
+                         on purpose: the source tabs on the right are bottom-aligned too, so the two
+                         strips meet on one line however tall this row grows. -->
+                    <Grid Margin="14,2,12,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0" VerticalAlignment="Center" MaxWidth="440">
+                            <TextBlock Text="Log file:" FontSize="13" FontWeight="Bold" Foreground="{DynamicResource MutedTextBrush}"/>
+                            <TextBlock x:Name="TB_LogName" FontSize="15" FontWeight="Bold" TextWrapping="Wrap"
+                                       Foreground="{DynamicResource AccentBrush}"/>
+                        </StackPanel>
+                        <!-- What the table below is counting: contacts, or countries. Same look as the
+                             source folders opposite, so the two strips read as one row of tabs. -->
+                        <ListBox x:Name="LB_LeftView" Grid.Row="1" Panel.ZIndex="1" Margin="0,6,0,0"
+                                 BorderThickness="0" Background="Transparent" ClipToBounds="False"
+                                 SelectionChanged="LB_LeftView_SelectionChanged">
+                            <ListBox.Template>
+                                <ControlTemplate TargetType="ListBox"><ItemsPresenter/></ControlTemplate>
+                            </ListBox.Template>
+                            <ListBox.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" ClipToBounds="False"/></ItemsPanelTemplate>
+                            </ListBox.ItemsPanel>
+                            <ListBox.ItemContainerStyle>
+                                <Style TargetType="ListBoxItem">
+                                    <Setter Property="Padding" Value="20,7,20,7"/>
+                                    <Setter Property="FontSize" Value="14"/>
+                                    <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                                    <Setter Property="Template">
+                                        <Setter.Value>
+                                            <ControlTemplate TargetType="ListBoxItem">
+                                                <Border x:Name="Bd" Background="{Binding Background, RelativeSource={RelativeSource TemplatedParent}}"
+                                                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                                                        BorderThickness="1" CornerRadius="7,7,0,0"
+                                                        Margin="2,0,0,0" Padding="{TemplateBinding Padding}">
+                                                    <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                </Border>
+                                                <ControlTemplate.Triggers>
+                                                    <Trigger Property="IsSelected" Value="True">
+                                                        <Setter Property="FontWeight" Value="Bold"/>
+                                                        <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                                        <Setter TargetName="Bd" Property="BorderThickness" Value="1,1,1,0"/>
+                                                        <Setter TargetName="Bd" Property="Margin" Value="2,0,0,-2"/>
+                                                    </Trigger>
+                                                </ControlTemplate.Triggers>
+                                            </ControlTemplate>
+                                        </Setter.Value>
+                                    </Setter>
+                                </Style>
+                            </ListBox.ItemContainerStyle>
+                        </ListBox>
+                    </Grid>
                 </Border>
 
                 <!-- Horizontal "folder" tabs across the top of the per-source page. The SELECTED tab takes
                      its source colour and drops its bottom edge (a -1 margin) so it overlaps the page's top
                      border and reads as one piece with the page below it. Panel.ZIndex keeps it on top. -->
+                <!-- VerticalAlignment=Bottom so this strip sits on the same line as the QSO/DXCC strip
+                     on the left, whatever height the log name gives that row. -->
                 <ListBox x:Name="LB_Source" Grid.Row="0" Grid.Column="1" Panel.ZIndex="1" Margin="8,6,8,0"
+                         VerticalAlignment="Bottom"
                          BorderThickness="0" Background="Transparent" ClipToBounds="False"
                          SelectionChanged="LB_Source_SelectionChanged">
                     <!-- Plain items host (no ScrollViewer), so the selected tab's 1px overhang is NOT
@@ -100,9 +151,14 @@
                     </ListBox.ItemContainerStyle>
                 </ListBox>
 
-                <!-- Col 0: LEFT static part — pure log analysis (QSO + callsign counts, dates) and the
-                     Band×Mode pivot. Identical on every folder, so it sits outside the folder selection. -->
-                <ScrollViewer Grid.Row="1" Grid.Column="0" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
+                <!-- Col 0: the LEFT PAGE, framed on all four sides exactly like the per-source page
+                     opposite, so the QSO/DXCC tabs above read as folders on one sheet. The selected tab
+                     carries a -2 bottom margin and hides the top border directly under it.
+                     Left/right margins match the tab strip's own (14 / 12) so the frame and the tabs
+                     share an edge. -->
+                <Border Grid.Row="1" Grid.Column="0" Margin="14,0,12,8"
+                        BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+                <ScrollViewer x:Name="SV_LeftContent" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Auto">
                     <StackPanel VerticalAlignment="Top" Margin="12,10,12,10">
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
                             <Border Margin="0,0,14,0" Padding="18,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
@@ -132,32 +188,51 @@
                             </Border>
                         </StackPanel>
 
-                            <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Bands &amp; Mode" FontSize="16" FontWeight="Bold"
-                                       Margin="0,0,0,6" Foreground="{DynamicResource AccentBrush}"/>
-                            <!--
-                                Inner PivotBorder: left+top edge in blue (1px).
-                                Outer PivotOuterBorder: right+bottom edge in black (2px).
-                                Cell grid is built entirely in code-behind (BuildPivot).
-                                PivotOuterBorder.ActualHeight drives the country-table scroll heights.
-                            -->
-                            <Border x:Name="PivotOuterBorder" HorizontalAlignment="Left"
-                                    BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="2">
-                                <Border x:Name="PivotBorder"
-                                        BorderBrush="Transparent"
-                                        BorderThickness="0"/>
-                            </Border>
-                            <TextBlock x:Name="TB_DataQuality"
-                                       Margin="0,8,0,0" FontSize="13" Foreground="{DynamicResource Danger}"
-                                       FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"/>
-                            <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
-                                    Margin="0,6,0,0" Padding="10,4" FontSize="13"
-                                    Visibility="Collapsed" Click="BTN_EditProblems_Click"/>
+                            <!-- THE QSO FOLDER. Shown when the QSO tab is selected.
+                                 Inner PivotBorder: left+top edge in blue (1px).
+                                 Outer PivotOuterBorder: right+bottom edge in black (2px).
+                                 Cell grid is built entirely in code-behind (BuildPivot).
+                                 PivotOuterBorder.ActualHeight drives the country-table scroll heights. -->
+                            <StackPanel x:Name="QsoViewPanel">
+                                <TextBlock x:Name="TB_PivotHeader" Text="QSOs by Bands &amp; Mode" FontSize="16" FontWeight="Bold"
+                                           Margin="0,0,0,6" Foreground="{DynamicResource AccentBrush}"/>
+                                <Border x:Name="PivotOuterBorder" HorizontalAlignment="Left"
+                                        BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="2">
+                                    <Border x:Name="PivotBorder"
+                                            BorderBrush="Transparent"
+                                            BorderThickness="0"/>
+                                </Border>
+                                <TextBlock x:Name="TB_DataQuality"
+                                           Margin="0,8,0,0" FontSize="13" Foreground="{DynamicResource Danger}"
+                                           FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"/>
+                                <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
+                                        Margin="0,6,0,0" Padding="10,4" FontSize="13"
+                                        Visibility="Collapsed" Click="BTN_EditProblems_Click"/>
+                            </StackPanel>
+
+                            <!-- THE DXCC FOLDER. The same table, counting COUNTRIES instead of contacts,
+                                 for whichever SOURCE folder is selected opposite. Shares this space with
+                                 the QSO table rather than sitting under it. No percentage pair: a country
+                                 belongs to every cell it was worked in, so percentages would come to
+                                 several hundred (see the note below the table). -->
+                            <StackPanel x:Name="DxccViewPanel" Visibility="Collapsed">
+                                <TextBlock x:Name="TB_CountryPivotHeader" Text="Countries by Bands &amp; Mode" FontSize="16" FontWeight="Bold"
+                                           Margin="0,0,0,6" Foreground="{DynamicResource AccentBrush}"/>
+                                <Border x:Name="CountryPivotOuterBorder" HorizontalAlignment="Left"
+                                        BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="2">
+                                    <Border x:Name="CountryPivotBorder" BorderBrush="Transparent" BorderThickness="0"/>
+                                </Border>
+                                <TextBlock x:Name="TB_CountryPivotNote" Margin="0,5,0,0" FontSize="13"
+                                           Foreground="{DynamicResource MutedTextBrush}" FontStyle="Italic"
+                                           TextWrapping="Wrap" MaxWidth="390"/>
+                            </StackPanel>
 
                             <!-- Shown only when the country file is overdue for a refresh. -->
                             <TextBlock x:Name="TB_CtyWarning" Foreground="{DynamicResource Danger}" FontSize="13" FontWeight="SemiBold"
                                        TextWrapping="Wrap" Margin="2,8,2,0" MaxWidth="390" Visibility="Collapsed"/>
                         </StackPanel>
                     </ScrollViewer>
+                </Border>
 
                     <!-- The per-source PAGE (Row 1, Col 1): framed on all four sides. The selected tab
                          overlaps and hides the TOP border directly under it (a -1 margin + matching tint),

@@ -106,6 +106,8 @@ namespace HolyLogger
             LoadConfirmedCache();
             ComputeStats();
             BuildSourceFolders();
+            BuildLeftViewFolders();
+            ApplyLeftView();
 
             // Match country-table scroll heights to the pivot table height whenever the pivot resizes.
             PivotOuterBorder.SizeChanged += (sender, e) =>
@@ -216,6 +218,7 @@ namespace HolyLogger
             TB_DateEnd.Text   = dates.Count > 0 ? FormatAdifDate(dates.Last())  : "—";
 
             BuildPivot();
+            BuildCountryPivot();
             BuildCountryTables();
 
             int needsEdit = _allQsos.Count(q => string.IsNullOrEmpty(q.Band) || string.IsNullOrEmpty(q.Mode));
@@ -472,6 +475,203 @@ namespace HolyLogger
             PivotBorder.Child = tbl;
         }
 
+        // ── countries by band and mode ─────────────────────────────────────
+        //
+        // The QSO pivot above answers "how many contacts"; this one answers "how many COUNTRIES", for
+        // whichever confirmation folder is selected. Same shape, one column fewer.
+        //
+        // There is no percentage pair here, and that is deliberate. A QSO sits on exactly one band in
+        // exactly one mode, so its percentages split 100% between the cells. A COUNTRY sits in every
+        // cell it was worked in - 15m SSB and 20m CW and 40m CW - so percentages would add to several
+        // hundred and invite the reasonable question "how can 99.6% and 23.5% come to more than 100%".
+        // The counts say the same thing without the trap.
+        private static readonly double[] CountryColW = { 70, 61, 61, 61, 61, 69 };
+
+        private void BuildCountryPivot()
+        {
+            if (CountryPivotBorder == null) return;
+
+            // A set per cell, not a counter: the same country worked ten times on 20m SSB is one country.
+            var cell = new Dictionary<string, HashSet<string>>();
+            var bandTotal = new Dictionary<string, HashSet<string>>();
+            var modeTotal = new Dictionary<string, HashSet<string>>();
+            var grand = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            HashSet<string> Bucket(Dictionary<string, HashSet<string>> d, string key)
+            {
+                HashSet<string> set;
+                if (!d.TryGetValue(key, out set)) { set = new HashSet<string>(StringComparer.OrdinalIgnoreCase); d[key] = set; }
+                return set;
+            }
+
+            foreach (QSO q in _allQsos ?? new ObservableCollection<QSO>())
+            {
+                if (q == null || !IsAchievedForSource(q)) continue;
+
+                // Resolved live from the callsign and the QSO's own date, exactly as the worked/missing
+                // lists do, so this table can never disagree with the tiles beside it.
+                string country = Resolve(q.DXCall, q.Date)?.Name;
+                if (string.IsNullOrEmpty(country) || string.Equals(country, "Unknown", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                string b = NormalizeBand(q.Band);
+                if (b == null || Array.IndexOf(PivotBands, b) < 0) b = "Other";
+                string m = NormalizeMode(q.Mode);
+
+                Bucket(cell, b + "|" + m).Add(country);
+                Bucket(bandTotal, b).Add(country);
+                Bucket(modeTotal, m).Add(country);
+                grand.Add(country);
+            }
+
+            int Count(Dictionary<string, HashSet<string>> d, string key)
+            {
+                HashSet<string> set;
+                return d.TryGetValue(key, out set) ? set.Count : 0;
+            }
+
+            bool hasOther = Count(bandTotal, "Other") > 0;
+            int numBands = PivotBands.Length;
+            int numRows = 2 + numBands + (hasOther ? 1 : 0) + 1;
+
+            var tbl = new Grid();
+            foreach (double w in CountryColW)
+                tbl.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(w) });
+            for (int i = 0; i < numRows; i++)
+                tbl.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            Brush headerBg = ThemeManager.Brush("GridHeaderBg");
+            Brush yellowBg = ThemeManager.Brush("EditFieldBg");
+            Brush evenBg = ThemeManager.Brush("GridRowBg");
+            Brush oddBg = ThemeManager.Brush("GridAltRowBg");
+            Brush gridLine = Br(0xAA, 0xAA, 0xAA);
+            Brush black = ThemeManager.Brush("ThemeBorderBrush");
+
+            Border TL(Border inner) => new Border { BorderBrush = black, BorderThickness = new Thickness(0, 2, 0, 0), Child = inner };
+            Border VL(Border inner) => new Border { BorderBrush = black, BorderThickness = new Thickness(2, 0, 0, 0), Child = inner };
+
+            // Row 0: Band [m] | "mode" over the four mode columns | "Total"
+            Put(tbl, 0, 0, 1, 1, MkCell("Band [m]", headerBg, gridLine, bold: true));
+            Put(tbl, 0, 1, 1, 4, VL(MkCell("mode", headerBg, gridLine, bold: true)));
+            Put(tbl, 0, 5, 1, 1, VL(MkCell("Total", headerBg, gridLine, bold: true)));
+
+            // Row 1: sub-headers
+            Put(tbl, 1, 0, 1, 1, MkCell("", headerBg, gridLine, bold: true));
+            Put(tbl, 1, 1, 1, 1, VL(MkCell("SSB", headerBg, gridLine, bold: true)));
+            Put(tbl, 1, 2, 1, 1, MkCell("CW", headerBg, gridLine, bold: true));
+            Put(tbl, 1, 3, 1, 1, MkCell("DIGI", headerBg, gridLine, bold: true));
+            Put(tbl, 1, 4, 1, 1, MkCell("FM", headerBg, gridLine, bold: true));
+            Put(tbl, 1, 5, 1, 1, VL(MkCell("countries", headerBg, gridLine, bold: true)));
+
+            void BandRow(string label, int r, Brush bg, bool topLine)
+            {
+                int ssb = Count(cell, label + "|SSB"), cw = Count(cell, label + "|CW");
+                int digi = Count(cell, label + "|DIGI"), fm = Count(cell, label + "|FM");
+                int tot = Count(bandTotal, label);
+                Border Wrap(Border inner) => topLine ? TL(inner) : inner;
+                Put(tbl, r, 0, 1, 1, Wrap(MkCell(label, bg, gridLine, align: TextAlignment.Left)));
+                Put(tbl, r, 1, 1, 1, VL(Wrap(MkCell(N(ssb), bg, gridLine))));
+                Put(tbl, r, 2, 1, 1, Wrap(MkCell(N(cw), bg, gridLine)));
+                Put(tbl, r, 3, 1, 1, Wrap(MkCell(N(digi), bg, gridLine)));
+                Put(tbl, r, 4, 1, 1, Wrap(MkCell(N(fm), bg, gridLine)));
+                Put(tbl, r, 5, 1, 1, VL(Wrap(MkCell(N(tot), bg, gridLine, bold: tot > 0))));
+            }
+
+            for (int i = 0; i < numBands; i++)
+                BandRow(PivotBands[i], 2 + i, (Brush)(i % 2 == 0 ? evenBg : oddBg), i == 0);
+            if (hasOther)
+                BandRow("Other", 2 + numBands, (Brush)(numBands % 2 == 0 ? evenBg : oddBg), false);
+
+            // Footer: one row only - the mode totals are counts, and there is no percentage row.
+            int fr = 2 + numBands + (hasOther ? 1 : 0);
+            Put(tbl, fr, 0, 1, 1, TL(MkCell("Total", headerBg, gridLine, bold: true, align: TextAlignment.Left)));
+            Put(tbl, fr, 1, 1, 1, VL(TL(MkCell(N(Count(modeTotal, "SSB")), headerBg, gridLine, bold: true))));
+            Put(tbl, fr, 2, 1, 1, TL(MkCell(N(Count(modeTotal, "CW")), headerBg, gridLine, bold: true)));
+            Put(tbl, fr, 3, 1, 1, TL(MkCell(N(Count(modeTotal, "DIGI")), headerBg, gridLine, bold: true)));
+            Put(tbl, fr, 4, 1, 1, TL(MkCell(N(Count(modeTotal, "FM")), headerBg, gridLine, bold: true)));
+            Put(tbl, fr, 5, 1, 1, VL(TL(MkCell(grand.Count > 0 ? grand.Count.ToString() : "", yellowBg, gridLine, bold: true))));
+
+            CountryPivotBorder.Child = tbl;
+
+            if (TB_CountryPivotHeader != null)
+                TB_CountryPivotHeader.Text = "Countries by Bands & Mode — " + SourceTitle(_source)
+                                             + "\n(" + grand.Count.ToString("N0") + ")";
+
+            // An empty table is not a fault - it means that service has confirmed nothing in this log -
+            // so say which it is rather than leaving a blank grid to be puzzled over.
+            if (TB_CountryPivotNote != null)
+                TB_CountryPivotNote.Text = grand.Count == 0
+                    ? "Nothing is marked as confirmed by " + SourceTitle(_source) + " in this log, so there is nothing to count yet."
+                    : "A country counts once in every cell it belongs to, so the rows and columns do not add up to the total — one country worked on two bands is still one country.";
+        }
+
+        // WHAT the left-hand table counts. The source strip opposite says WHICH SOURCE; this one says
+        // whether you are looking at contacts or countries. Two small strips beat one long one: six
+        // sources times two views would be twelve tabs on a single line.
+        private enum LeftView { Qso, Dxcc }
+        private LeftView _leftView = LeftView.Qso;
+
+        private void BuildLeftViewFolders()
+        {
+            if (LB_LeftView == null || LB_LeftView.Items.Count > 0) return;
+            LB_LeftView.Items.Add(new ListBoxItem
+            {
+                Content = "QSO", Tag = LeftView.Qso,
+                ToolTip = "How many CONTACTS, by band and mode"
+            });
+            LB_LeftView.Items.Add(new ListBoxItem
+            {
+                Content = "DXCC", Tag = LeftView.Dxcc,
+                ToolTip = "How many COUNTRIES, by band and mode, for the source folder selected on the right"
+            });
+            LB_LeftView.SelectedIndex = 0;
+            ApplyLeftViewColour();
+        }
+
+        // The left tabs and page wear the colour of the source folder open on the right. The left table
+        // belongs to that source - DXCC on the eQSL folder counts eQSL's countries - so it would be
+        // confusing for the two halves to be different colours.
+        private void ApplyLeftViewColour()
+        {
+            System.Windows.Media.Brush tint = SourceBackground(_source);
+            if (SV_LeftContent != null) SV_LeftContent.Background = tint;
+            if (LB_LeftView == null) return;
+            foreach (object o in LB_LeftView.Items)
+            {
+                ListBoxItem item = o as ListBoxItem;
+                if (item != null) item.Background = tint;
+            }
+        }
+
+        private void LB_LeftView_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (!(LB_LeftView.SelectedItem is ListBoxItem item) || !(item.Tag is LeftView v)) return;
+            _leftView = v;
+            ApplyLeftView();
+        }
+
+        private void ApplyLeftView()
+        {
+            if (QsoViewPanel == null || DxccViewPanel == null) return;
+            bool qso = _leftView == LeftView.Qso;
+            QsoViewPanel.Visibility = qso ? Visibility.Visible : Visibility.Collapsed;
+            DxccViewPanel.Visibility = qso ? Visibility.Collapsed : Visibility.Visible;
+            if (!qso) BuildCountryPivot();   // it follows the source folder, so rebuild on the way in
+        }
+
+        // The folder's name as the operator sees it on its tab.
+        private static string SourceTitle(ConfSource s)
+        {
+            switch (s)
+            {
+                case ConfSource.Lotw: return "LoTW";
+                case ConfSource.Qrz: return "QRZ";
+                case ConfSource.Eqsl: return "eQSL";
+                case ConfSource.Clublog: return "Club Log";
+                case ConfSource.Paper: return "Paper QSL";
+                default: return "Worked";
+            }
+        }
+
         // ── country tables ────────────────────────────────────────────────
 
         private void BuildCountryTables()
@@ -662,12 +862,17 @@ namespace HolyLogger
         {
             LoadConfirmedCache();
             RebuildMissingCountries();   // Missing Countries list for this source
+            BuildCountryPivot();         // countries by band and mode, for this source
             PopulateMissingZones();      // Missing CQ / ITU zones for this source
             ApplyConfirmedHighlight();   // tiles read the freshly-built _missingList
             ApplyWorkedSort();
 
             // Tint the per-source content area to match the selected folder's colour.
             if (SV_SourceContent != null) SV_SourceContent.Background = SourceBackground(_source);
+
+            // ...and tint the LEFT page and its two tabs to the same colour, so the whole window reads as
+            // one open folder rather than two unrelated halves wearing different colours.
+            ApplyLeftViewColour();
 
             // Only "Check LoTW Updates" (incremental) lives in the header; the per-source full-download
             // buttons live in the summary frame and are toggled by PopulateConfirmedSummary.
