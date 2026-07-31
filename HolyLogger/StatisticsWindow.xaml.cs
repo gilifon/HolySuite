@@ -1994,7 +1994,7 @@ namespace HolyLogger
 
                 if (perLog.Count == 0)
                 {
-                    text.AppendLine("No QSO in any of your logs matched a QRZ confirmation yet.");
+                    text.AppendLine("None of them matched a QSO in this log.");
                 }
                 else if (perLog.Count == 1)
                 {
@@ -2178,7 +2178,7 @@ namespace HolyLogger
                 var perLog = Dal?.GetEqslConfirmedCountsByLog() ?? new List<KeyValuePair<string, int>>();
                 int totalMarked = perLog.Sum(p => p.Value);
                 if (perLog.Count == 0)
-                    text.AppendLine("No QSO in any of your logs matched an eQSL confirmation yet.");
+                    text.AppendLine("None of them matched a QSO in this log.");
                 else if (perLog.Count == 1)
                     text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on eQSL.");
                 else
@@ -2359,7 +2359,7 @@ namespace HolyLogger
                 var perLog = Dal?.GetClublogConfirmedCountsByLog() ?? new List<KeyValuePair<string, int>>();
                 int totalMarked = perLog.Sum(p => p.Value);
                 if (perLog.Count == 0)
-                    text.AppendLine("No QSO in any of your logs matched a Club Log confirmation yet.");
+                    text.AppendLine("None of them matched a QSO in this log.");
                 else if (perLog.Count == 1)
                     text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on Club Log.");
                 else
@@ -2398,7 +2398,7 @@ namespace HolyLogger
 
                 if (perLog.Count == 0)
                 {
-                    text.AppendLine("No QSO in any of your logs matched a confirmation yet.");
+                    text.AppendLine("None of them matched a QSO in this log.");
                 }
                 else if (perLog.Count == 1)
                 {
