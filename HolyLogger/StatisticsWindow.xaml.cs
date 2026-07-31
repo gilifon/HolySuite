@@ -2090,9 +2090,22 @@ namespace HolyLogger
 
                 if (all.Count == 0)
                 {
+                    // Same as Club Log: an empty result is still an answer, and has to be written down
+                    // or the folder claims it was never checked. A FAILED download writes nothing.
+                    if (failed.Count == 0)
+                    {
+                        EqslConfirmedQsoCount = 0;
+                        EqslConfirmedEntities = string.Empty;
+                        EqslConfirmedDeletedCodes = string.Empty;
+                    }
                     string why = failed.Count > 0 ? "\n\n" + string.Join("\n", failed) : "";
-                    HolyMessageBox.Show("No eQSL confirmations were downloaded." + why,
+                    HolyMessageBox.Show(
+                        (failed.Count > 0
+                            ? "The eQSL In Box could not be read." + why
+                            : "Your eQSL In Box has no confirmations for this log's callsign.")
+                        + "\n\nNothing in your log was changed.",
                         "eQSL confirmations", HolyMsgType.Warning, this);
+                    RefreshForSource();
                     return;
                 }
 
@@ -2257,9 +2270,25 @@ namespace HolyLogger
 
                 if (all.Count == 0)
                 {
+                    // Record that the check RAN even though it found nothing. Without this, a download
+                    // that legitimately returns nothing is indistinguishable from never having asked,
+                    // and the folder says "not checked yet" for ever however many times you press the
+                    // button. Only when the download actually FAILED is nothing written - because then
+                    // we genuinely do not know.
+                    if (failed.Count == 0)
+                    {
+                        ClublogConfirmedQsoCount = 0;
+                        ClublogConfirmedEntities = string.Empty;
+                        ClublogConfirmedDeletedCodes = string.Empty;
+                    }
                     string why = failed.Count > 0 ? "\n\n" + string.Join("\n", failed) : "";
-                    HolyMessageBox.Show("No Club Log confirmations were downloaded." + why,
+                    HolyMessageBox.Show(
+                        (failed.Count > 0
+                            ? "Club Log could not be read." + why
+                            : $"Club Log has no confirmations for {myCall}.")
+                        + "\n\nNothing in your log was changed.",
                         "Club Log confirmations", HolyMsgType.Warning, this);
+                    RefreshForSource();
                     return;
                 }
 
