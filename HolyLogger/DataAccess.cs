@@ -2588,12 +2588,22 @@ Environment.NewLine +
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
 
+                // EVERY statement below is confined to the log being checked.
+                //
+                // A download is now asked for ONE log's station callsign, so it can only speak for that
+                // log. The clear-and-rebuild used to wipe the flag across the whole table: a full check
+                // on one log erased every other log's confirmations and could not put them back, because
+                // the confirmations that would have restored them were never downloaded. A 1,771-QSO
+                // special-event log lost all 809 of its LoTW ticks that way, silently.
+                string logScope = " AND log_id = " + ActiveLogId + " ";
+
                 int changed = 0;
                 using (var tx = con.BeginTransaction())
                 {
                     if (fullReset)
                         using (var clear = new SQLiteCommand(
-                            $"UPDATE qso SET {rcvdCol} = 0, {rdateCol} = NULL, {deletedCol} = 0 WHERE {rcvdCol} = 1", con, tx))
+                            $"UPDATE qso SET {rcvdCol} = 0, {rdateCol} = NULL, {deletedCol} = 0 " +
+                            $"WHERE {rcvdCol} = 1" + logScope, con, tx))
                             clear.ExecuteNonQuery();
 
                     // The station callsign is REQUIRED to match. A confirmation whose station is empty
@@ -2615,7 +2625,7 @@ Environment.NewLine +
                         "  AND mode  = @mode COLLATE NOCASE " +
                         "  AND date  = @date " +
                         "  AND (my_callsign = @mycall COLLATE NOCASE " +
-                        "       OR my_callsign LIKE @mycallStroke COLLATE NOCASE)", con, tx))
+                        "       OR my_callsign LIKE @mycallStroke COLLATE NOCASE)" + logScope, con, tx))
                     // Fallback for the digital sub-modes. The report gives the exact sub-mode (PSK31,
                     // PSK63, DATA...) while the log stores the family (PSK), so the exact query above
                     // misses them. This one drops the mode test to "the log's mode is in the SAME
@@ -2628,7 +2638,7 @@ Environment.NewLine +
                         "  AND date  = @date " +
                         "  AND (my_callsign = @mycall COLLATE NOCASE " +
                         "       OR my_callsign LIKE @mycallStroke COLLATE NOCASE) " +
-                        "  AND UPPER(TRIM(mode)) IN (" + PskFamilyInList + ")", con, tx))
+                        "  AND UPPER(TRIM(mode)) IN (" + PskFamilyInList + ")" + logScope, con, tx))
                     {
                         foreach (var cmd in new[] { exact, family })
                         {
