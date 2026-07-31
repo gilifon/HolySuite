@@ -70,6 +70,64 @@ namespace HolyLogger
             
         }
 
+        // PER-LOG STATE. Everything a confirmation service remembers about a log - what it last reported,
+        // which countries it confirmed, how far the incremental download has got - belongs to THAT log
+        // and nothing else. It used to live in the application settings, one copy shared by every log,
+        // so opening a second log showed the first one's figures as if they were its own: a brand new
+        // log claimed 5,936 confirmations at LoTW before it had ever been checked.
+        //
+        // A key/value table rather than columns, because each service keeps a different handful of
+        // values and they change as services are added. An ABSENT key is the honest answer "this log has
+        // never been checked", which the caller can show as such instead of borrowing someone else's
+        // number.
+        public string GetLogState(long logId, string key)
+        {
+            if (logId <= 0 || string.IsNullOrEmpty(key)) return string.Empty;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return string.Empty;
+                try
+                {
+                    using (var cmd = new SQLiteCommand("SELECT value FROM log_state WHERE log_id = @l AND key = @k", con))
+                    {
+                        cmd.Parameters.AddWithValue("@l", logId);
+                        cmd.Parameters.AddWithValue("@k", key);
+                        object v = cmd.ExecuteScalar();
+                        return v == null || v == DBNull.Value ? string.Empty : v.ToString();
+                    }
+                }
+                catch (Exception ex) { Log.Swallow(ex); return string.Empty; }
+            }
+        }
+
+        public void SetLogState(long logId, string key, string value)
+        {
+            if (logId <= 0 || string.IsNullOrEmpty(key)) return;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return;
+                try
+                {
+                    using (var cmd = new SQLiteCommand(
+                        "INSERT OR REPLACE INTO log_state (log_id, key, value) VALUES (@l, @k, @v)", con))
+                    {
+                        cmd.Parameters.AddWithValue("@l", logId);
+                        cmd.Parameters.AddWithValue("@k", key);
+                        cmd.Parameters.AddWithValue("@v", (object)value ?? string.Empty);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            }
+        }
+
+        // True when this log has never been checked by that service - so the window can say so rather
+        // than showing a zero that looks like a real answer.
+        public bool HasLogState(long logId, string key)
+        {
+            return !string.IsNullOrEmpty(GetLogState(logId, key));
+        }
+
         // The folder holding logDB.db (and the Backups subfolder).
         public string DataFolder => Path.GetDirectoryName(dbPath);
 
@@ -1271,6 +1329,23 @@ Environment.NewLine +
             }
             return category_list;
             }
+        }
+
+        // What each confirmation service remembers about each log. Keyed on the pair, so a log that has
+        // never been checked simply has no rows and reports nothing rather than another log's figures.
+        private void EnsureLogStateTable()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS [log_state] (" +
+                    "[log_id] INTEGER NOT NULL, " +
+                    "[key] nvarchar(60) NOT NULL COLLATE NOCASE, " +
+                    "[value] TEXT NULL, " +
+                    "PRIMARY KEY ([log_id], [key]))", con))
+                    cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
         }
 
         private void AddColToTable(string tableName, string colName, string definition)
@@ -3600,6 +3675,7 @@ Environment.NewLine +
             AddClublogColumn();
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();
+            EnsureLogStateTable();
             // Real-time copy-to-log feature: a log may copy its new QSOs into another log.
             AddColToTable("logs", "copy_target_log_id", "INTEGER NULL");   // where this log's new QSOs are copied (NULL = off)
             AddColToTable("logs", "log_callsign", "nvarchar(50) NULL");    // this log's station-callsign identity

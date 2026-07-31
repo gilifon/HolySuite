@@ -1,4 +1,4 @@
-﻿using DXCCManager;
+using DXCCManager;
 using HolyParser;
 using Newtonsoft.Json;
 using System;
@@ -817,20 +817,20 @@ namespace HolyLogger
             var s = Properties.Settings.Default;
             LB_Source.Items.Clear();
             AddSourceFolder(ConfSource.Worked, "Worked");
-            if (s.UseLotwService || !string.IsNullOrWhiteSpace(s.LotwConfirmedEntities))
+            if (s.UseLotwService || !string.IsNullOrWhiteSpace(LotwConfirmedEntities))
                 AddSourceFolder(ConfSource.Lotw, "LoTW");
-            if (s.UseQrzLogbook || !string.IsNullOrWhiteSpace(s.QrzConfirmedEntities))
+            if (s.UseQrzLogbook || !string.IsNullOrWhiteSpace(QrzConfirmedEntities))
                 AddSourceFolder(ConfSource.Qrz, "QRZ");
             // eQSL is configured by the per-callsign accounts table, so show the folder when an account
             // exists (or the service is on, or a past download left a cache).
             bool hasEqsl = false;
             try { hasEqsl = (DataAccess.GetInstance()?.GetEqslAccounts().Count ?? 0) > 0; }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
-            if (s.UseEqslService || hasEqsl || !string.IsNullOrWhiteSpace(s.EqslConfirmedEntities))
+            if (s.UseEqslService || hasEqsl || !string.IsNullOrWhiteSpace(EqslConfirmedEntities))
                 AddSourceFolder(ConfSource.Eqsl, "eQSL");
             // Club Log is a single account (e-mail + password), so show the folder when the service is on
             // or a past download left a cached confirmed set.
-            if (s.UseClublogService || !string.IsNullOrWhiteSpace(s.ClublogConfirmedEntities))
+            if (s.UseClublogService || !string.IsNullOrWhiteSpace(ClublogConfirmedEntities))
                 AddSourceFolder(ConfSource.Clublog, "Club Log");
             // Paper QSL is manual (no service to configure), so it is ALWAYS available.
             AddSourceFolder(ConfSource.Paper, "Paper QSL");
@@ -960,10 +960,10 @@ namespace HolyLogger
 
             // The Worked folder has no confirmation overlay; each other folder reads its own cache.
             string cached =
-                _source == ConfSource.Lotw    ? Properties.Settings.Default.LotwConfirmedEntities :
-                _source == ConfSource.Qrz     ? Properties.Settings.Default.QrzConfirmedEntities  :
-                _source == ConfSource.Eqsl    ? Properties.Settings.Default.EqslConfirmedEntities :
-                _source == ConfSource.Clublog ? Properties.Settings.Default.ClublogConfirmedEntities :
+                _source == ConfSource.Lotw    ? LotwConfirmedEntities :
+                _source == ConfSource.Qrz     ? QrzConfirmedEntities  :
+                _source == ConfSource.Eqsl    ? EqslConfirmedEntities :
+                _source == ConfSource.Clublog ? ClublogConfirmedEntities :
                 string.Empty;
             if (string.IsNullOrWhiteSpace(cached)) return;
             foreach (var n in cached.Split('|'))
@@ -976,9 +976,9 @@ namespace HolyLogger
             // the incremental marker belongs to the LoTW download.
             if (_source != ConfSource.Lotw) return;
             var s = Properties.Settings.Default;
-            if (s.LotwConfirmedQsoCount < _confirmedEntities.Count && !string.IsNullOrWhiteSpace(s.LotwLastQsl))
+            if (LotwConfirmedQsoCount < _confirmedEntities.Count && !string.IsNullOrWhiteSpace(LotwLastQsl))
             {
-                s.LotwLastQsl = string.Empty;
+                LotwLastQsl = string.Empty;
                 s.Save();
             }
         }
@@ -990,10 +990,10 @@ namespace HolyLogger
         private int CountConfirmedDeleted()
         {
             string csv =
-                _source == ConfSource.Lotw    ? Properties.Settings.Default.LotwConfirmedDeletedCodes :
-                _source == ConfSource.Qrz     ? Properties.Settings.Default.QrzConfirmedDeletedCodes  :
-                _source == ConfSource.Eqsl    ? Properties.Settings.Default.EqslConfirmedDeletedCodes :
-                _source == ConfSource.Clublog ? Properties.Settings.Default.ClublogConfirmedDeletedCodes :
+                _source == ConfSource.Lotw    ? LotwConfirmedDeletedCodes :
+                _source == ConfSource.Qrz     ? QrzConfirmedDeletedCodes  :
+                _source == ConfSource.Eqsl    ? EqslConfirmedDeletedCodes :
+                _source == ConfSource.Clublog ? ClublogConfirmedDeletedCodes :
                 string.Empty;
             if (string.IsNullOrWhiteSpace(csv)) return 0;
             var set = new HashSet<int>();
@@ -1112,22 +1112,28 @@ namespace HolyLogger
                 TB_SumConfirmedLabel.Text = "Confirmed at LoTW";
                 // Never show a bogus total: it can't be below the confirmed-country count. If it is (stale
                 // value from earlier broken downloads), show "—" until a full check recomputes it.
-                bool totalKnown = s.LotwConfirmedQsoCount > 0 && s.LotwConfirmedQsoCount >= _confirmedEntities.Count;
-                TB_SumTotalQsls.Text = totalKnown ? s.LotwConfirmedQsoCount.ToString("N0", inv) : "—";
+                // ...and never show a number this log has not earned. A log nobody has checked yet has no
+                // stored count at all, and must say so - a figure borrowed from another log is worse than
+                // no figure, because it looks like an answer.
+                bool totalKnown = HasBeenChecked(ConfSource.Lotw)
+                                  && LotwConfirmedQsoCount > 0
+                                  && LotwConfirmedQsoCount >= _confirmedEntities.Count;
+                TB_SumTotalQsls.Text = totalKnown ? LotwConfirmedQsoCount.ToString("N0", inv)
+                                     : HasBeenChecked(ConfSource.Lotw) ? "—" : "not checked yet";
 
                 int matched = 0;
                 try { if (dal != null) matched = dal.GetLotwConfirmedCount(dal.ActiveLogId); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
                 TB_SumMatchedInLog.Text = matched.ToString("N0", inv);
 
-                bool fullDownload = string.IsNullOrWhiteSpace(s.LotwLastCheckSince);
-                TB_SumNewQsls.Text = fullDownload ? "—" : s.LotwLastNewQsls.ToString(inv);
-                TB_SumSince.Text = fullDownload ? "   (full download)" : $"   (since {s.LotwLastCheckSince})";
-                bool hasNew = !fullDownload && s.LotwLastNewQsls > 0 && !string.IsNullOrWhiteSpace(s.LotwLastNewJson);
+                bool fullDownload = string.IsNullOrWhiteSpace(LotwLastCheckSince);
+                TB_SumNewQsls.Text = fullDownload ? "—" : LotwLastNewQsls.ToString(inv);
+                TB_SumSince.Text = fullDownload ? "   (full download)" : $"   (since {LotwLastCheckSince})";
+                bool hasNew = !fullDownload && LotwLastNewQsls > 0 && !string.IsNullOrWhiteSpace(LotwLastNewJson);
                 StyleSummaryLink(LNK_NewQsls, hasNew, muted);
 
-                TB_SumNewCountries.Text = fullDownload ? "—" : s.LotwLastNewCountries.ToString(inv);
-                bool hasNewCountry = !fullDownload && s.LotwLastNewCountries > 0 && !string.IsNullOrWhiteSpace(s.LotwLastNewJson);
+                TB_SumNewCountries.Text = fullDownload ? "—" : LotwLastNewCountries.ToString(inv);
+                bool hasNewCountry = !fullDownload && LotwLastNewCountries > 0 && !string.IsNullOrWhiteSpace(LotwLastNewJson);
                 StyleSummaryLink(LNK_NewCountries, hasNewCountry, muted);
             }
             else
@@ -1142,9 +1148,9 @@ namespace HolyLogger
                 int total = 0, matched = 0;
                 try
                 {
-                    if (_source == ConfSource.Qrz)          total = s.QrzConfirmedQsoCount;
-                    else if (_source == ConfSource.Clublog) total = s.ClublogConfirmedQsoCount;
-                    else                                    total = s.EqslConfirmedQsoCount;
+                    if (_source == ConfSource.Qrz)          total = QrzConfirmedQsoCount;
+                    else if (_source == ConfSource.Clublog) total = ClublogConfirmedQsoCount;
+                    else                                    total = EqslConfirmedQsoCount;
 
                     if (dal != null)
                     {
@@ -1156,7 +1162,7 @@ namespace HolyLogger
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
 
                 TB_SumConfirmedLabel.Text = $"Confirmed on {SourceName}";
-                TB_SumTotalQsls.Text = total.ToString("N0", inv);
+                TB_SumTotalQsls.Text = HasBeenChecked(_source) ? total.ToString("N0", inv) : "not checked yet";
                 TB_SumMatchedInLog.Text = matched.ToString("N0", inv);
                 TB_SumNewQsls.Text = "—";
                 TB_SumSince.Text = "   (full download)";
@@ -1181,6 +1187,108 @@ namespace HolyLogger
                 link.TextDecorations = null;
                 link.Cursor = Cursors.Arrow;
             }
+        }
+
+        // ── per-log confirmation memory ────────────────────────────────────
+        //
+        // These stand in for what used to be application settings shared by every log. Same names, same
+        // call sites, but each value now belongs to the log it was measured on. That is what stops a log
+        // created five minutes ago from announcing 5,936 confirmations at LoTW.
+        //
+        // An unset value reads as empty / 0, and HasBeenChecked below tells the difference between "this
+        // log has nothing confirmed" and "nobody has ever asked" - two very different statements.
+        private long StateLogId
+        {
+            get { try { return DataAccess.GetInstance()?.ActiveLogId ?? 0; } catch { return 0; } }
+        }
+
+        private string LogState(string key)
+        {
+            try { return DataAccess.GetInstance()?.GetLogState(StateLogId, key) ?? string.Empty; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
+        private void LogState(string key, string value)
+        {
+            try { DataAccess.GetInstance()?.SetLogState(StateLogId, key, value ?? string.Empty); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private int LogStateInt(string key)
+        {
+            int n;
+            return int.TryParse(LogState(key), out n) ? n : 0;
+        }
+
+        // Has this log ever been checked against the given source? The confirmed-QSO count is written on
+        // every completed download - even a download that found nothing - so its presence is the marker.
+        private bool HasBeenChecked(ConfSource src)
+        {
+            switch (src)
+            {
+                case ConfSource.Lotw: return LogState("LotwConfirmedQsoCount").Length > 0;
+                case ConfSource.Qrz: return LogState("QrzConfirmedQsoCount").Length > 0;
+                case ConfSource.Eqsl: return LogState("EqslConfirmedQsoCount").Length > 0;
+                case ConfSource.Clublog: return LogState("ClublogConfirmedQsoCount").Length > 0;
+                default: return true;                 // Worked and Paper QSL are read from the log itself
+            }
+        }
+
+        private string LotwConfirmedEntities { get { return LogState("LotwConfirmedEntities"); } set { LogState("LotwConfirmedEntities", value); } }
+        private string LotwConfirmedDeletedCodes { get { return LogState("LotwConfirmedDeletedCodes"); } set { LogState("LotwConfirmedDeletedCodes", value); } }
+        private int LotwConfirmedQsoCount { get { return LogStateInt("LotwConfirmedQsoCount"); } set { LogState("LotwConfirmedQsoCount", value.ToString()); } }
+        private string LotwLastQsl { get { return LogState("LotwLastQsl"); } set { LogState("LotwLastQsl", value); } }
+        private string LotwLastCheckSince { get { return LogState("LotwLastCheckSince"); } set { LogState("LotwLastCheckSince", value); } }
+        private string LotwLastNewJson { get { return LogState("LotwLastNewJson"); } set { LogState("LotwLastNewJson", value); } }
+        private int LotwLastNewQsls { get { return LogStateInt("LotwLastNewQsls"); } set { LogState("LotwLastNewQsls", value.ToString()); } }
+        private int LotwLastNewCountries { get { return LogStateInt("LotwLastNewCountries"); } set { LogState("LotwLastNewCountries", value.ToString()); } }
+        private string LotwSeenKeysJson { get { return LogState("LotwSeenKeysJson"); } set { LogState("LotwSeenKeysJson", value); } }
+
+        private string QrzConfirmedEntities { get { return LogState("QrzConfirmedEntities"); } set { LogState("QrzConfirmedEntities", value); } }
+        private string QrzConfirmedDeletedCodes { get { return LogState("QrzConfirmedDeletedCodes"); } set { LogState("QrzConfirmedDeletedCodes", value); } }
+        private int QrzConfirmedQsoCount { get { return LogStateInt("QrzConfirmedQsoCount"); } set { LogState("QrzConfirmedQsoCount", value.ToString()); } }
+
+        private string EqslConfirmedEntities { get { return LogState("EqslConfirmedEntities"); } set { LogState("EqslConfirmedEntities", value); } }
+        private string EqslConfirmedDeletedCodes { get { return LogState("EqslConfirmedDeletedCodes"); } set { LogState("EqslConfirmedDeletedCodes", value); } }
+        private int EqslConfirmedQsoCount { get { return LogStateInt("EqslConfirmedQsoCount"); } set { LogState("EqslConfirmedQsoCount", value.ToString()); } }
+
+        private string ClublogConfirmedEntities { get { return LogState("ClublogConfirmedEntities"); } set { LogState("ClublogConfirmedEntities", value); } }
+        private string ClublogConfirmedDeletedCodes { get { return LogState("ClublogConfirmedDeletedCodes"); } set { LogState("ClublogConfirmedDeletedCodes", value); } }
+        private int ClublogConfirmedQsoCount { get { return LogStateInt("ClublogConfirmedQsoCount"); } set { LogState("ClublogConfirmedQsoCount", value.ToString()); } }
+
+        // Every station callsign this log actually contains - the log's own identity plus each stroke
+        // variant present in its QSOs. One LoTW request is made per entry, because qso_owncall matches
+        // the callsign as it was UPLOADED: asking for 4Z5SL alone would leave whatever was signed
+        // 4Z5SL/6 undownloaded, and those are the same station.
+        //
+        // Returns a single empty string when the log has no QSOs and no identity, which asks LoTW for
+        // everything exactly as before - the old behaviour, kept for the case where we know nothing.
+        private List<string> OwnCallsForActiveLog()
+        {
+            var calls = new List<string>();
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal != null)
+                {
+                    string logCall;
+                    dal.GetLogIdentity(dal.ActiveLogId, out logCall, out _);
+                    if (!string.IsNullOrWhiteSpace(logCall)) calls.Add(logCall.Trim());
+
+                    if (_allQsos != null)
+                        foreach (var q in _allQsos)
+                        {
+                            string c = (q?.MyCall ?? string.Empty).Trim();
+                            if (c.Length == 0) continue;
+                            if (!calls.Any(x => string.Equals(x, c, StringComparison.OrdinalIgnoreCase)))
+                                calls.Add(c);
+                        }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (calls.Count == 0) calls.Add(string.Empty);   // nothing known: ask for the whole account
+            return calls;
         }
 
         // ONLY the confirmations that belong to the log now open.
@@ -1241,7 +1349,7 @@ namespace HolyLogger
             List<LotwNewQso> list = null;
             try
             {
-                var json = Properties.Settings.Default.LotwLastNewJson;
+                var json = LotwLastNewJson;
                 if (!string.IsNullOrWhiteSpace(json))
                     list = JsonConvert.DeserializeObject<List<LotwNewQso>>(json);
             }
@@ -1261,7 +1369,7 @@ namespace HolyLogger
             List<LotwNewQso> list = null;
             try
             {
-                var json = Properties.Settings.Default.LotwLastNewJson;
+                var json = LotwLastNewJson;
                 if (!string.IsNullOrWhiteSpace(json))
                     list = JsonConvert.DeserializeObject<List<LotwNewQso>>(json);
             }
@@ -1472,11 +1580,11 @@ namespace HolyLogger
             // check after that is incremental.
             bool incremental = !_forceFullDownload
                                && _confirmedEntities.Count > 0
-                               && !string.IsNullOrWhiteSpace(s.LotwLastQsl)
-                               && !string.IsNullOrWhiteSpace(s.LotwSeenKeysJson);
+                               && !string.IsNullOrWhiteSpace(LotwLastQsl)
+                               && !string.IsNullOrWhiteSpace(LotwSeenKeysJson);
             _forceFullDownload = false;   // one-shot: only the click that set it gets the full run
-            string sinceQuery = incremental ? MarkerDate(s.LotwLastQsl) : "1970-01-01";
-            string sinceDisplay = incremental ? PrettySince(s.LotwLastQsl) : string.Empty;
+            string sinceQuery = incremental ? MarkerDate(LotwLastQsl) : "1970-01-01";
+            string sinceDisplay = incremental ? PrettySince(LotwLastQsl) : string.Empty;
 
             BTN_CheckLotw.IsEnabled = false;
             LB_Source.IsEnabled = false;   // no folder switching mid-download/mark (it would block the UI)
@@ -1506,12 +1614,24 @@ namespace HolyLogger
                 // the authoritative, DATE-CORRECT entity - a 1985 East-Germany QSO comes back as East
                 // Germany, not modern Germany - which our own cty.dat resolver (current-only) cannot
                 // give. It is what lets the confirmations be split into active vs deleted entities.
+                // qso_owncall scopes the report to ONE of your station callsigns, which is what stops a
+                // 1,771-QSO log downloading the whole account's 5,936 confirmations. It is asked for the
+                // log's own callsign - and separately for each stroke variant the log actually contains,
+                // because LoTW matches this parameter as the callsign was UPLOADED: ask for 4Z5SL and
+                // whatever was signed 4Z5SL/6 does not come back. Enumerating the variants FROM THE LOG
+                // means we ask for exactly what this log could hold and nothing else.
+                List<string> ownCalls = OwnCallsForActiveLog();
+                string adifAll = string.Empty;
+                int eorSoFar = 0;
+                foreach (string own in ownCalls)
+                {
                 string url = "https://lotw.arrl.org/lotwuser/lotwreport.adi"
                            + "?login=" + Uri.EscapeDataString(user)
                            + "&password=" + Uri.EscapeDataString(pass)
+                           + (string.IsNullOrEmpty(own) ? "" : "&qso_owncall=" + Uri.EscapeDataString(own))
                            + "&qso_query=1&qso_qsl=yes&qso_mydetail=yes&qso_qsldetail=yes&qso_qslsince=" + Uri.EscapeDataString(sinceQuery);
 
-                string adif;
+                string adifOne;
                 // Decompress gzip/deflate — otherwise a compressed response reads back as binary garbage.
                 using (var handler = new System.Net.Http.HttpClientHandler
                 {
@@ -1548,15 +1668,18 @@ namespace HolyLogger
                             }
                             carry = hay.Length >= 4 ? hay.Substring(hay.Length - 4) : hay;
 
-                            TB_LotwLoadingText.Text = $"Downloaded {eor:N0} confirmations from LoTW…";
+                            TB_LotwLoadingText.Text = ownCalls.Count > 1
+                                ? $"Downloaded {eorSoFar + eor:N0} confirmations from LoTW… ({own})"
+                                : $"Downloaded {eor:N0} confirmations from LoTW…";
                         }
                     }
-                    adif = sb.ToString();
+                    adifOne = sb.ToString();
+                    eorSoFar += eor;
                 }
 
-                if (adif.IndexOf("Invalid password", StringComparison.OrdinalIgnoreCase) >= 0
-                    || adif.IndexOf("login incorrect", StringComparison.OrdinalIgnoreCase) >= 0
-                    || adif.IndexOf("<Error>", StringComparison.OrdinalIgnoreCase) >= 0)
+                if (adifOne.IndexOf("Invalid password", StringComparison.OrdinalIgnoreCase) >= 0
+                    || adifOne.IndexOf("login incorrect", StringComparison.OrdinalIgnoreCase) >= 0
+                    || adifOne.IndexOf("<Error>", StringComparison.OrdinalIgnoreCase) >= 0)
                 {
                     TB_LotwStatus.Foreground = System.Windows.Media.Brushes.IndianRed;
                     TB_LotwStatus.Text = "LoTW rejected the login — check your username and password.";
@@ -1565,19 +1688,24 @@ namespace HolyLogger
 
                 // Sanity-check the payload really is the ADIF report (not an error/login web page, and
                 // not unreadable compressed bytes). Catches auth failures whose wording we didn't match.
-                bool looksAdif = adif.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase) >= 0
-                              || adif.IndexOf("<eor>", StringComparison.OrdinalIgnoreCase) >= 0
-                              || adif.IndexOf("<call:", StringComparison.OrdinalIgnoreCase) >= 0;
+                bool looksAdif = adifOne.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase) >= 0
+                              || adifOne.IndexOf("<eor>", StringComparison.OrdinalIgnoreCase) >= 0
+                              || adifOne.IndexOf("<call:", StringComparison.OrdinalIgnoreCase) >= 0;
                 if (!looksAdif)
                 {
-                    bool looksHtml = adif.IndexOf("<html", StringComparison.OrdinalIgnoreCase) >= 0
-                                  || adif.IndexOf("<!doctype", StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool looksHtml = adifOne.IndexOf("<html", StringComparison.OrdinalIgnoreCase) >= 0
+                                  || adifOne.IndexOf("<!doctype", StringComparison.OrdinalIgnoreCase) >= 0;
                     TB_LotwStatus.Foreground = System.Windows.Media.Brushes.IndianRed;
                     TB_LotwStatus.Text = looksHtml
                         ? "LoTW returned a web page, not data — the login was likely rejected. Check your username and password."
-                        : $"LoTW returned no usable data ({adif.Length} chars). Check your LoTW login and try again.";
+                        : $"LoTW returned no usable data ({adifOne.Length} chars). Check your LoTW login and try again.";
                     return;
                 }
+
+                adifAll += adifOne;
+                }   // next station callsign of this log
+
+                string adif = adifAll;
 
                 // Everything from here - splitting the reply into records, resolving each callsign, and
                 // marking the log - is CPU/DB work that used to run on the UI thread, freezing the window
@@ -1588,13 +1716,13 @@ namespace HolyLogger
                 int eohIdx = adif.IndexOf("<eoh>", StringComparison.OrdinalIgnoreCase);
                 string recordsBody = eohIdx >= 0 ? adif.Substring(eohIdx + 5) : adif;
 
-                string boundaryDate = incremental ? MarkerDate(s.LotwLastQsl) : string.Empty;
+                string boundaryDate = incremental ? MarkerDate(LotwLastQsl) : string.Empty;
                 var seenKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                if (incremental && !string.IsNullOrWhiteSpace(s.LotwSeenKeysJson))
+                if (incremental && !string.IsNullOrWhiteSpace(LotwSeenKeysJson))
                 {
                     try
                     {
-                        foreach (var k in JsonConvert.DeserializeObject<List<string>>(s.LotwSeenKeysJson) ?? new List<string>())
+                        foreach (var k in JsonConvert.DeserializeObject<List<string>>(LotwSeenKeysJson) ?? new List<string>())
                             seenKeys.Add(k);
                     }
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -1657,24 +1785,24 @@ namespace HolyLogger
                 // Persist. The total adds only genuinely-new QSLs on an incremental run (no same-day
                 // re-count), or the whole set on a full run. The marker is a DATE (matching qso_qslsince),
                 // plus the de-dupe key set for that date.
-                s.LotwConfirmedEntities = string.Join("|", _confirmedEntities);
-                s.LotwConfirmedQsoCount = incremental ? s.LotwConfirmedQsoCount + newCount : qslCount;
-                s.LotwLastNewQsls = incremental ? newCount : qslCount;
-                s.LotwLastNewCountries = newCountries;
-                s.LotwLastCheckSince = sinceDisplay;   // empty = a full download
+                LotwConfirmedEntities = string.Join("|", _confirmedEntities);
+                LotwConfirmedQsoCount = incremental ? LotwConfirmedQsoCount + newCount : qslCount;
+                LotwLastNewQsls = incremental ? newCount : qslCount;
+                LotwLastNewCountries = newCountries;
+                LotwLastCheckSince = sinceDisplay;   // empty = a full download
                 // The list of new confirmations, for the viewer. Cleared on a full download (no delta).
-                s.LotwLastNewJson = newList != null ? JsonConvert.SerializeObject(newList) : string.Empty;
-                if (!string.IsNullOrWhiteSpace(maxRxDate)) s.LotwLastQsl = maxRxDate;   // stored as a date
-                s.LotwSeenKeysJson = JsonConvert.SerializeObject(newSeenKeys);
+                LotwLastNewJson = newList != null ? JsonConvert.SerializeObject(newList) : string.Empty;
+                if (!string.IsNullOrWhiteSpace(maxRxDate)) LotwLastQsl = maxRxDate;   // stored as a date
+                LotwSeenKeysJson = JsonConvert.SerializeObject(newSeenKeys);
 
                 // Confirmed DELETED entities, by DXCC code. Full run replaces the set; an incremental
                 // run adds to it (a deleted entity newly confirmed since last check). Stored as codes so
                 // re-confirming the same entity never inflates the count.
                 var deletedCodes = new HashSet<int>(result.ConfirmedDeletedCodes);
-                if (incremental && !string.IsNullOrWhiteSpace(s.LotwConfirmedDeletedCodes))
-                    foreach (var part in s.LotwConfirmedDeletedCodes.Split(','))
+                if (incremental && !string.IsNullOrWhiteSpace(LotwConfirmedDeletedCodes))
+                    foreach (var part in LotwConfirmedDeletedCodes.Split(','))
                         if (int.TryParse(part.Trim(), out int old)) deletedCodes.Add(old);
-                s.LotwConfirmedDeletedCodes = string.Join(",", deletedCodes);
+                LotwConfirmedDeletedCodes = string.Join(",", deletedCodes);
                 s.Save();
 
                 // Re-read the log so QSO confirmation flags are live (the zone lists read them), then
@@ -1963,9 +2091,9 @@ namespace HolyLogger
                         names.Add(name);
                 }
                 var s = Properties.Settings.Default;
-                s.EqslConfirmedEntities = string.Join("|", names);
-                s.EqslConfirmedDeletedCodes = string.Empty;
-                s.EqslConfirmedQsoCount = all.Count;   // what eQSL reported (frame "Confirmed on eQSL")
+                EqslConfirmedEntities = string.Join("|", names);
+                EqslConfirmedDeletedCodes = string.Empty;
+                EqslConfirmedQsoCount = all.Count;   // what eQSL reported (frame "Confirmed on eQSL")
                 s.Save();
 
                 ReloadQsosAfterCheck();
