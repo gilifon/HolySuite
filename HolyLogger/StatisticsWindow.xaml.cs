@@ -1183,6 +1183,44 @@ namespace HolyLogger
             }
         }
 
+        // ONLY the confirmations that belong to the log now open.
+        //
+        // Every service reports for the whole ACCOUNT, not for one callsign: LoTW's report carries no
+        // callsign in the request at all, so an operator with certificates for 4Z5SL, 4X2XMAS and
+        // 4Z73SL gets all three back in one file. Handing the lot to the matcher meant thousands of
+        // confirmations for OTHER stations were tried against this log, failed, and were then counted
+        // and reported as "unmatched" - which reads as something being wrong when nothing is.
+        //
+        // Compared by IDENTITY, so 4Z5SL/6 counts as 4Z5SL. A confirmation that names no station at all
+        // is KEPT: it cannot be attributed either way, and dropping it would silently lose whatever a
+        // service that does not report the station callsign sends us.
+        private List<DataAccess.LotwConfirmation> ForThisLog(
+            IEnumerable<DataAccess.LotwConfirmation> all, out int otherStations)
+        {
+            otherStations = 0;
+            var kept = new List<DataAccess.LotwConfirmation>();
+            if (all == null) return kept;
+
+            string logCall = string.Empty;
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal != null) dal.GetLogIdentity(dal.ActiveLogId, out logCall, out _);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // No identity set on this log: nothing to scope by, so behave exactly as before.
+            if (string.IsNullOrWhiteSpace(logCall)) return all.ToList();
+
+            foreach (var c in all)
+            {
+                string station = c?.StationCallsign;
+                if (string.IsNullOrWhiteSpace(station) || CallsignIdentity.Same(station, logCall)) kept.Add(c);
+                else otherStations++;
+            }
+            return kept;
+        }
+
         // The confirmations that actually matched a QSO in the log = everything downloaded MINUS the
         // unmatched list the marker returns. Used to build each source's confirmed-country cache from
         // real matches, so the "Confirmed (X)" tile never counts entities the log has no confirmed QSO
@@ -1319,7 +1357,8 @@ namespace HolyLogger
 
         // Writes the confirmations that matched no QSO, each followed by what the log holds for that
         // same callsign. Desktop file, same place as the other diagnostics.
-        private static void WriteUnmatchedReport(int total, int matched, List<DataAccess.LotwConfirmation> unmatched)
+        private static void WriteUnmatchedReport(int total, int matched, List<DataAccess.LotwConfirmation> unmatched,
+                                                 int otherStations = 0)
         {
             string path = System.IO.Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
@@ -1329,7 +1368,12 @@ namespace HolyLogger
             var text = new System.Text.StringBuilder();
             text.AppendLine($"LoTW confirmations that matched no QSO — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             text.AppendLine(new string('=', 78));
-            text.AppendLine($"Confirmations received from LoTW : {total:N0}");
+            if (otherStations > 0)
+            {
+                text.AppendLine($"For your OTHER callsigns, set aside : {otherStations:N0}");
+                text.AppendLine("  (LoTW reports the whole account; those belong in their own logs)");
+            }
+            text.AppendLine($"Confirmations for this log       : {total:N0}");
             text.AppendLine($"Matched to a QSO                 : {matched:N0}");
             text.AppendLine($"NOT matched                      : {(unmatched?.Count ?? 0):N0}");
             text.AppendLine();
@@ -1732,6 +1776,8 @@ namespace HolyLogger
                 var markProgress = new Progress<int>(done =>
                     TB_LotwLoadingText.Text = $"Marking QRZ confirmations…  {done:N0} of {confirmations.Count:N0}");
                 List<DataAccess.LotwConfirmation> unmatched = null;
+                int otherStations;
+                confirmations = ForThisLog(confirmations, out otherStations);   // this log's callsign only
                 int marked = await Task.Run(() =>
                     Dal.MarkQrzConfirmed(confirmations, true, ((IProgress<int>)markProgress).Report, ct, out unmatched));
 
@@ -1894,6 +1940,8 @@ namespace HolyLogger
                 var markProgress = new Progress<int>(done =>
                     TB_LotwLoadingText.Text = $"Marking eQSL confirmations…  {done:N0} of {all.Count:N0}");
                 List<DataAccess.LotwConfirmation> unmatched = null;
+                int otherStations;
+                all = ForThisLog(all, out otherStations);   // this log's callsign only
                 int marked = await Task.Run(() =>
                     Dal.MarkEqslConfirmed(all, true, ((IProgress<int>)markProgress).Report, ct, out unmatched));
 
@@ -2051,6 +2099,8 @@ namespace HolyLogger
                 var markProgress = new Progress<int>(done =>
                     TB_LotwLoadingText.Text = $"Marking Club Log confirmations…  {done:N0} of {all.Count:N0}");
                 List<DataAccess.LotwConfirmation> unmatched = null;
+                int otherStations;
+                all = ForThisLog(all, out otherStations);   // this log's callsign only
                 int marked = await Task.Run(() =>
                     Dal.MarkClublogConfirmed(all, true, ((IProgress<int>)markProgress).Report, ct, out unmatched));
 
@@ -2183,6 +2233,11 @@ namespace HolyLogger
             public List<string> NewSeenKeys;
             public int MarkedConfirmed;
 
+            // How many of the downloaded confirmations belong to a DIFFERENT station callsign of yours
+            // and were therefore set aside rather than tried against this log. Reported so the operator
+            // can see WHY the download was bigger than the number matched.
+            public int OtherStationConfirmations;
+
             // Distinct DXCC entity CODES confirmed, split by whether the entity is deleted. Taken from
             // LoTW's own <DXCC> per record (date-correct), so a deleted entity is counted as deleted
             // even though our cty.dat resolver would map its callsign to the modern parent.
@@ -2300,6 +2355,11 @@ namespace HolyLogger
             // first and rebuild - which also scrubs any bad marks a pre-station-scoping build left behind.
             // The matching is its own phase with its own counter, so the overlay keeps moving through the
             // slow database work instead of freezing on the last "Reading…" number.
+            // Only what belongs to THIS log's station callsign - LoTW sends the whole account.
+            int otherStations;
+            confirmations = ForThisLog(confirmations, out otherStations);
+            result.OtherStationConfirmations = otherStations;
+
             int totalConf = confirmations.Count;
             Action<int> matchProgress = n => progress?.Report(("Matching to your log", n, totalConf));
             List<DataAccess.LotwConfirmation> unmatched = null;
@@ -2328,7 +2388,7 @@ namespace HolyLogger
                 }
             }
 
-            try { WriteUnmatchedReport(confirmations.Count, result.MarkedConfirmed, unmatched); }
+            try { WriteUnmatchedReport(confirmations.Count, result.MarkedConfirmed, unmatched, result.OtherStationConfirmations); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             return result;
