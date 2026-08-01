@@ -652,8 +652,15 @@ namespace HolyLogger
             _countriesView.Filter = o =>
             {
                 if (string.IsNullOrEmpty(_countryFilter)) return true;
-                // Prefix match: show only countries that START WITH the typed text.
-                return ((SearchCountryItem)o).Name.StartsWith(_countryFilter, StringComparison.OrdinalIgnoreCase);
+                var item = (SearchCountryItem)o;
+                int code; string name;
+                ReadCountryText(_countryFilter, out code, out name);
+
+                // Both are prefix matches, so 33 narrows to 336 (Israel) and everything else
+                // beginning 33, exactly as Isr narrows to Israel.
+                if (code > 0 && name.Length > 0) return item.Code == code;   // a country already picked
+                if (code > 0) return item.CodeText.StartsWith(code.ToString(), StringComparison.Ordinal);
+                return item.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase);
             };
             CB_Country.ItemsSource = _countriesView;
 
@@ -672,6 +679,7 @@ namespace HolyLogger
             Mouse.AddPreviewMouseDownOutsideCapturedElementHandler(this, OnMouseDownOutsideCapture);
 
             PopulateFilterLists();
+            WatchSourceForNewValues();
             UpdateClearButton();
 
             // Placement via the shared helper, like every other window. The bespoke code this replaces
@@ -682,6 +690,10 @@ namespace HolyLogger
             // A correction to the last QSO touched would otherwise never be offered, because the row
             // is left by closing the window rather than by moving off it.
             Closing += (s, e) => OfferReupload();
+
+            // The collection outlives this window (the main window owns it), so leaving the handler
+            // attached would keep the closed window alive with it.
+            Closed += (s, e) => { if (_allQsos != null) _allQsos.CollectionChanged -= OnSourceCollectionChanged; };
 
             // Keep the "Received Confirmation" overlay tracking the LoTW..Paper QSL header group's
             // actual on-screen bounds — column widths change (Auto-sizing) and the window resizes.
@@ -741,9 +753,98 @@ namespace HolyLogger
                 RunSearch();
         }
 
+        // The Country box has two faces.
+        //
+        // TYPING face: an ordinary editable text box, where a name or an entity number is entered.
+        // PICKED face: the chosen row itself - number, flag, name - which only a NON-editable
+        // ComboBox can draw, because an editable one is a text box and text has no flag in it.
+        //
+        // Both faces leave ComboBox.Text holding "336  Israel", which is the only thing the search
+        // reads, so switching between them never changes what a search finds.
+        private void ShowCountryAsPicked(SearchCountryItem item)
+        {
+            if (item == null) return;
+            _countryFilter = "";
+            _countriesView?.Refresh();
+            if (CB_Country.IsEditable) CB_Country.IsEditable = false;
+            CB_Country.SelectedItem = item;
+            UpdateClearButton();
+        }
+
+        // Back to the typing face, carrying `text` into the box (empty to clear it).
+        private void ReturnCountryToTyping(string text)
+        {
+            if (!CB_Country.IsEditable)
+            {
+                CB_Country.IsEditable = true;
+                // The editable text box is recreated when IsEditable flips back on; re-hook the
+                // type-to-filter handler to the new instance.
+                CB_Country.Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        CB_Country.ApplyTemplate();
+                        var box = CB_Country.Template.FindName("PART_EditableTextBox", CB_Country) as TextBox;
+                        if (box != null)
+                        {
+                            _countryEditBox = box;
+                            _countryEditBox.TextChanged -= OnCountryTextChanged;
+                            _countryEditBox.TextChanged += OnCountryTextChanged;
+                            // The caret belongs after what is already there, so the next character
+                            // extends the text instead of replacing it.
+                            box.CaretIndex = box.Text.Length;
+                        }
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+
+            CB_Country.SelectedItem = null;
+            CB_Country.Text = text ?? "";
+            if (_countryEditBox != null) _countryEditBox.Text = text ?? "";
+            _countryFilter = text ?? "";
+            _countriesView?.Refresh();
+        }
+
+        // The Country box can hold three things: a name ("Israel"), an entity number being typed
+        // ("33"), or the two together as the list writes them once a country is picked ("336  Israel").
+        // This is the ONE reader for all three, so the dropdown's filter and the search itself can
+        // never disagree about what the operator meant.
+        //
+        // No country name begins with a digit, so leading digits are always a number and never part
+        // of a name.
+        private static void ReadCountryText(string typed, out int code, out string name)
+        {
+            code = 0;
+            name = (typed ?? string.Empty).Trim();
+            if (name.Length == 0) return;
+
+            int digits = 0;
+            while (digits < name.Length && name[digits] >= '0' && name[digits] <= '9') digits++;
+            if (digits == 0) return;                       // starts with a letter: a plain name
+
+            int parsed;
+            if (!int.TryParse(name.Substring(0, digits), out parsed) || parsed <= 0) return;
+
+            code = parsed;
+            name = name.Substring(digits).Trim();          // empty when only digits were typed
+        }
+
         // Keep filter in sync whenever text changes (from typing or selection)
         private void OnCountryTextChanged(object sender, TextChangedEventArgs e)
         {
+            // Only GENUINE typing drives the filter. Highlighting or clicking a row makes WPF rewrite
+            // the edit box to that row's own text ("336  Israel"), and letting that drive the filter
+            // caused two faults: arrowing collapsed the browsed list down to the one highlighted row,
+            // and — because a leading number is read as an entity code — picking a country then left
+            // the filter stuck on that country ("336"), so after clearing the box every keystroke
+            // still returned only Israel. Detect the rewrite by content, not timing (a held arrow key
+            // was unreliable and never covered the mouse): if the text equals the selected row's text,
+            // it wasn't typed, so leave the filter alone.
+            var selected = CB_Country.SelectedItem as SearchCountryItem;
+            if (selected != null && string.Equals(CB_Country.Text, selected.ToString(), StringComparison.Ordinal))
+                return;
+
             _countryFilter = CB_Country.Text;
             _countriesView.Refresh();
             UpdateClearButton();
@@ -752,11 +853,79 @@ namespace HolyLogger
         // Enter before the ComboBox processes it → search (only when dropdown is closed)
         private void CB_Country_PreviewKeyDown(object sender, KeyEventArgs e)
         {
+            // Enter while the list is open commits the country the Up/Down highlight is on (moving the
+            // highlight no longer picks on its own — that is exactly the change this fixes). With
+            // nothing highlighted, Enter just closes the list, leaving the typed text to search on the
+            // next Enter, as it did before.
+            if (e.Key == Key.Enter && CB_Country.IsDropDownOpen)
+            {
+                var highlighted = CB_Country.SelectedItem as SearchCountryItem;
+                CB_Country.IsDropDownOpen = false;
+                if (highlighted != null) ShowCountryAsPicked(highlighted);
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.Enter && !CB_Country.IsDropDownOpen)
             {
                 RunSearch();
                 e.Handled = true;
+                return;
             }
+
+            // Typing over a picked country: the flag row is a display, not a lock. Any character
+            // turns the box back into a text box and becomes its first character - carried across by
+            // hand, because the text box does not exist yet at this instant and the keystroke would
+            // otherwise be swallowed by the switch.
+            if (!CB_Country.IsEditable)
+            {
+                string typed = TypedCharacter(e.Key);
+                if (typed != null)
+                {
+                    ReturnCountryToTyping(typed);
+                    CB_Country.IsDropDownOpen = true;
+                    UpdateClearButton();
+                    e.Handled = true;
+                }
+                else if (e.Key == Key.Back || e.Key == Key.Delete)
+                {
+                    ReturnCountryToTyping("");
+                    UpdateClearButton();
+                    e.Handled = true;
+                }
+            }
+        }
+
+        // The character a key stands for, or null when the key types nothing (arrows, F-keys,
+        // modifiers). Only what a country name or an entity number can be made of.
+        private static string TypedCharacter(Key key)
+        {
+            if (Keyboard.Modifiers != ModifierKeys.None && Keyboard.Modifiers != ModifierKeys.Shift) return null;
+            if (key >= Key.A && key <= Key.Z) return ((char)('A' + (key - Key.A))).ToString();
+            if (key >= Key.D0 && key <= Key.D9) return ((char)('0' + (key - Key.D0))).ToString();
+            if (key >= Key.NumPad0 && key <= Key.NumPad9) return ((char)('0' + (key - Key.NumPad0))).ToString();
+            return null;
+        }
+
+        // True while an Up/Down (or Page Up/Down) key is physically held — i.e. the selection change
+        // now firing was caused by moving the highlight through the open list, not by a mouse click or
+        // Enter. Reading the live key state needs no flag to set and clear, so a keystroke that moves
+        // nothing (already at the end of the list) can't leave a stale "suppress" behind to swallow
+        // the next mouse click.
+        private static bool IsListNavKeyDown() =>
+            Keyboard.IsKeyDown(Key.Down) || Keyboard.IsKeyDown(Key.Up) ||
+            Keyboard.IsKeyDown(Key.PageDown) || Keyboard.IsKeyDown(Key.PageUp);
+
+        // Picking a row from the list shows that row - number, flag, name - in the closed box.
+        // Moving the highlight with the keyboard must NOT pick: selection is committed only by a mouse
+        // click or by Enter (handled in PreviewKeyDown). So ignore the selection change while an arrow
+        // key is driving it, leaving the list open for the operator to keep browsing.
+        private void CB_Country_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (IsListNavKeyDown()) return;
+
+            var picked = CB_Country.SelectedItem as SearchCountryItem;
+            if (picked != null) ShowCountryAsPicked(picked);
         }
 
         // KeyUp bubbles up from the internal text box AFTER the text is already updated.
@@ -783,20 +952,44 @@ namespace HolyLogger
             CB_Country.IsDropDownOpen = !string.IsNullOrEmpty(CB_Country.Text);
         }
 
-        // Opening the dropdown makes WPF auto-select the whole edit-box text, so the next
-        // character would REPLACE it (the first letter vanished when typing fast). This
-        // fires synchronously right before each character is committed: if the text is
-        // fully selected, collapse the selection to the caret so the character appends
-        // instead. Doing it here (not via an async Dispatcher call) removes the race, so
-        // it works at any typing speed.
+        // What to do with a keystroke when the whole edit box is selected depends on WHAT is selected:
+        //
+        //  - The in-progress typed filter. Opening the dropdown makes WPF auto-select the whole box, so
+        //    the next character would REPLACE it and the first letter vanished when typing fast (type
+        //    "I", it selects "I", type "s" → "s" not "Is"). Collapse the selection to the caret so the
+        //    character APPENDS. Nothing is committed here, so SelectedItem is null.
+        //
+        //  - A committed country ("336  Israel", SelectedItem set). The operator is starting over, so
+        //    the keystroke should REPLACE the whole thing and begin a fresh list from that one
+        //    character — the standard behaviour of typing into a fully selected field. Leave the
+        //    selection alone and let WPF replace it.
+        //
+        // Runs synchronously right before each character commits, so it works at any typing speed.
         private void CB_Country_PreviewTextInput(object sender, TextCompositionEventArgs e)
         {
             var tb = _countryEditBox;
-            if (tb != null && tb.SelectionLength > 0 && tb.SelectionLength == tb.Text.Length)
+            if (tb == null || tb.SelectionLength == 0 || tb.SelectionLength != tb.Text.Length)
+                return;
+
+            var selected = CB_Country.SelectedItem as SearchCountryItem;
+            bool holdsCommittedCountry = selected != null &&
+                string.Equals(tb.Text, selected.ToString(), StringComparison.Ordinal);
+            if (holdsCommittedCountry)
             {
-                tb.SelectionStart  = tb.Text.Length;
-                tb.SelectionLength = 0;
+                // Start a brand-new list from this one character. Leaning on WPF's own "replace the
+                // selection" fought the ComboBox's text↔SelectedItem sync: it blanked the box and
+                // swallowed the first keystroke, so the list only appeared on the second. Do the reset
+                // ourselves — drop the picked country and seed the filter with this character — and
+                // mark the keystroke handled so WPF doesn't also insert it.
+                e.Handled = true;
+                ReturnCountryToTyping(e.Text);
+                tb.CaretIndex = tb.Text.Length;
+                CB_Country.IsDropDownOpen = true;
+                return;
             }
+
+            tb.SelectionStart  = tb.Text.Length;
+            tb.SelectionLength = 0;
         }
 
         // Callsign box: clear results immediately when text is fully deleted
@@ -868,32 +1061,7 @@ namespace HolyLogger
                 else
                 {
                     CB_Country.IsEnabled = true;
-                    if (!CB_Country.IsEditable)
-                    {
-                        CB_Country.IsEditable = true;
-                        // The editable text box is recreated when IsEditable flips back on; re-hook the
-                        // type-to-filter handler to the new instance.
-                        CB_Country.Dispatcher.BeginInvoke(new Action(() =>
-                        {
-                            try
-                            {
-                                CB_Country.ApplyTemplate();
-                                var box = CB_Country.Template.FindName("PART_EditableTextBox", CB_Country) as TextBox;
-                                if (box != null)
-                                {
-                                    _countryEditBox = box;
-                                    _countryEditBox.TextChanged -= OnCountryTextChanged;
-                                    _countryEditBox.TextChanged += OnCountryTextChanged;
-                                }
-                            }
-                            catch (Exception swallowed) { Log.Swallow(swallowed); }
-                        }), System.Windows.Threading.DispatcherPriority.Loaded);
-                    }
-                    CB_Country.SelectedItem = null;
-                    CB_Country.Text = "";
-                    if (_countryEditBox != null) _countryEditBox.Text = "";
-                    _countryFilter = "";
-                    _countriesView?.Refresh();
+                    ReturnCountryToTyping("");
                 }
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -951,19 +1119,12 @@ namespace HolyLogger
             SizeToCharacters(TB_Prefix, 6);
             SizeToCharacters(TB_Suffix, 10);
 
-            // These were far wider than anything they can hold. Sized to a real worst-case value instead
-            // of a round number: a six-character grid square, a Holyland square, the longest entry the
-            // log actually produced for the callsign list (so the box fits 4X2XMAS without leaving room
-            // for a callsign nobody has), and the longest Band / Mode value currently offered.
+            // This was far wider than anything it can hold: sized to a real worst-case value, a
+            // six-character grid square, instead of a round number.
             SizeToSample(TB_Locator, "KM72OR");
-            SizeToSample(TB_Square, "K07YZ");
-            SizeToSample(CB_MyCall, LongestItem(CB_MyCall), dropDownArrow);
-            SizeComboToSample(CB_Band, LongestItem(CB_Band), maxWidth: 68);
-            SizeComboToSample(CB_Mode, LongestItem(CB_Mode), maxWidth: 68);
-            SizeComboToSample(CB_Submode, LongestItem(CB_Submode), maxWidth: 92);
 
-            // After the above: it measures the row, so the fields must already be their final size.
-            AlignCommentBox();
+            // Sizes the dropdowns to this log's values and re-aligns the Comment box behind them.
+            SizeFilterListsToContent();
 
             // The filter rows (Prefix/Suffix/.../Submode, and the rest below) must never be allowed to
             // clip or wrap - so the window can't be resized narrower than what they actually need. Rather
@@ -977,6 +1138,28 @@ namespace HolyLogger
 
             TB_Prefix.Focus();
             Keyboard.Focus(TB_Prefix);
+        }
+
+        // Sizes each log-built dropdown to the longest value THIS log put in it, rather than to a fixed
+        // width that has to assume the worst. Re-run whenever the lists are rebuilt, so the boxes follow
+        // the log that is loaded: a log of 4X callsigns should not keep a box sized for 4X2XMAS.
+        //
+        // "(any)" is itself one of the items, so a log with nothing in the field still gets a box wide
+        // enough to read it. maxWidth keeps one freakish value from pushing the row past the window.
+        private void SizeFilterListsToContent()
+        {
+            SizeToSample(CB_MyCall, LongestItem(CB_MyCall), dropDownArrow);
+            SizeComboToSample(CB_Band,    LongestItem(CB_Band),    maxWidth: 68);
+            SizeComboToSample(CB_Mode,    LongestItem(CB_Mode),    maxWidth: 68);
+            SizeComboToSample(CB_Submode, LongestItem(CB_Submode), maxWidth: 92);
+            SizeComboToSample(CB_CqZone,  LongestItem(CB_CqZone),  maxWidth: 62);
+            SizeComboToSample(CB_ItuZone, LongestItem(CB_ItuZone), maxWidth: 62);
+            SizeComboToSample(CB_State,   LongestItem(CB_State),   maxWidth: 80);
+            SizeComboToSample(CB_Square,  LongestItem(CB_Square),  maxWidth: 92);
+
+            // Last: it measures where Band and Submode ended up, so they must already be their final
+            // size. Re-run here rather than only at load, because a rebuild can change those widths.
+            AlignCommentBox();
         }
 
         // Raises MinWidth (and Width, if it is currently smaller) to whatever the filter rows actually
@@ -1157,17 +1340,17 @@ namespace HolyLogger
             if (CB_MyCall.Items.Count > 0) CB_MyCall.SelectedIndex = 0;
             if (CB_Lotw.Items.Count > 0)   CB_Lotw.SelectedIndex = 0;
             TB_Locator.Text = "";
-            TB_Square.Text  = "";
             TB_Comment.Text = "";
             DP_From.SelectedDate = null;
             DP_To.SelectedDate   = null;
             // The rest of the fields added so every QSO field is searchable.
             TB_Name.Text = ""; TB_Operator.Text = ""; TB_Freq.Text = "";
-            if (CB_Submode.Items.Count > 0) CB_Submode.SelectedIndex = 0;
-            TB_MyGrid.Text = ""; TB_MySquare.Text = ""; TB_CqZone.Text = ""; TB_ItuZone.Text = "";
+            TB_MyGrid.Text = ""; TB_MySquare.Text = "";
             TB_PropMode.Text = ""; TB_SatName.Text = ""; TB_Soapbox.Text = "";
-            TB_Time.Text = ""; TB_StateFilter.Text = "";
-            if (CB_Continent.Items.Count > 0) CB_Continent.SelectedIndex = 0;
+            TB_Time.Text = "";
+            // The dropdowns built from the log: back to "(any)".
+            foreach (var cb in new[] { CB_Submode, CB_CqZone, CB_ItuZone, CB_State, CB_Square, CB_Continent })
+                if (cb.Items.Count > 0) cb.SelectedIndex = 0;
             if (CB_Qrz.Items.Count > 0)     CB_Qrz.SelectedIndex = 0;
             if (CB_Eqsl.Items.Count > 0)    CB_Eqsl.SelectedIndex = 0;
             if (CB_Clublog.Items.Count > 0) CB_Clublog.SelectedIndex = 0;
@@ -1187,7 +1370,7 @@ namespace HolyLogger
                               !string.IsNullOrEmpty(TB_Suffix.Text) ||
                               !string.IsNullOrEmpty(CB_Country.Text) ||
                               !string.IsNullOrEmpty(TB_Locator.Text) ||
-                              !string.IsNullOrEmpty(TB_Square.Text) ||
+                              SelectedFilter(CB_Square) != null ||
                               !string.IsNullOrEmpty(TB_Comment.Text) ||
                               SelectedFilter(CB_Band) != null ||
                               SelectedFilter(CB_Mode) != null ||
@@ -1201,14 +1384,14 @@ namespace HolyLogger
                               SelectedFilter(CB_Submode) != null ||
                               !string.IsNullOrEmpty(TB_MyGrid.Text) ||
                               !string.IsNullOrEmpty(TB_MySquare.Text) ||
-                              !string.IsNullOrEmpty(TB_CqZone.Text) ||
-                              !string.IsNullOrEmpty(TB_ItuZone.Text) ||
+                              SelectedFilter(CB_CqZone) != null ||
+                              SelectedFilter(CB_ItuZone) != null ||
                               SelectedFilter(CB_Continent) != null ||
                               !string.IsNullOrEmpty(TB_PropMode.Text) ||
                               !string.IsNullOrEmpty(TB_SatName.Text) ||
                               !string.IsNullOrEmpty(TB_Soapbox.Text) ||
                               !string.IsNullOrEmpty(TB_Time.Text) ||
-                              !string.IsNullOrEmpty(TB_StateFilter.Text) ||
+                              SelectedFilter(CB_State) != null ||
                               SelectedFilter(CB_Qrz) != null ||
                               SelectedFilter(CB_Eqsl) != null ||
                               SelectedFilter(CB_Clublog) != null ||
@@ -1230,8 +1413,11 @@ namespace HolyLogger
             "SSB", "USB", "LSB", "CW", "FM", "RTTY", "FT8", "FT4", "PSK31", "DIGI"
         };
 
-        // The full official ADIF Submode enumeration (adif.org), so the Submode filter offers every
-        // submode value the standard defines, not just what happens to be in this log.
+        // The full official ADIF Submode enumeration (adif.org). The Submode filter used to be built
+        // from this, so it offered every value the standard defines; it is now built from the log like
+        // every other dropdown, and nothing else reads this list. Kept because it is the authoritative
+        // spelling of each submode, and the QSO editor's free-text Submode box is the obvious next
+        // place for it.
         public static readonly string[] KnownSubmodes =
         {
             "8PSK125", "8PSK125F", "8PSK125FL", "8PSK250", "8PSK250F", "8PSK250FL",
@@ -1526,7 +1712,7 @@ namespace HolyLogger
             string mode     = SelectedFilter(CB_Mode);
             string myCall   = SelectedFilter(CB_MyCall);
             string locator  = TB_Locator.Text.Trim();
-            string square   = TB_Square.Text.Trim();
+            string square   = SelectedFilter(CB_Square);
             string comment  = TB_Comment.Text.Trim();
             string lotw     = SelectedFilter(CB_Lotw);
             DateTime? from  = DP_From.SelectedDate;
@@ -1538,10 +1724,10 @@ namespace HolyLogger
             string submode   = SelectedFilter(CB_Submode);
             string myGrid    = TB_MyGrid.Text.Trim();
             string mySquare  = TB_MySquare.Text.Trim();
-            string cqz       = TB_CqZone.Text.Trim();
-            string ituz      = TB_ItuZone.Text.Trim();
+            string cqz       = SelectedFilter(CB_CqZone);
+            string ituz      = SelectedFilter(CB_ItuZone);
             string continent = SelectedFilter(CB_Continent);
-            string state     = TB_StateFilter.Text.Trim();
+            string state     = SelectedFilter(CB_State);
             string propMode  = TB_PropMode.Text.Trim();
             string satName   = TB_SatName.Text.Trim();
             string soapbox   = TB_Soapbox.Text.Trim();
@@ -1577,8 +1763,28 @@ namespace HolyLogger
             // auto-filled from it for display, but the real criterion is the callsign prefix - so a QSO
             // with that prefix but a blank/differing Country field is still found.
             if (!string.IsNullOrEmpty(country) && string.IsNullOrEmpty(prefix))
-                results = results.Where(q => q.Country != null &&
-                    q.Country.IndexOf(country, StringComparison.OrdinalIgnoreCase) >= 0);
+            {
+                // An entity NUMBER is matched as a number - against the countries in this log that
+                // carry it - never as text inside a country name. Typing 5 must mean entity 5, not
+                // every QSO whose country happens to contain the character 5. A picked country
+                // arrives here as "336  Israel" and is matched by its number alone, so the name half
+                // may be clipped in the box without changing what the search does.
+                int wantedCode; string wantedName;
+                ReadCountryText(country, out wantedCode, out wantedName);
+
+                if (wantedCode > 0)
+                {
+                    var named = new HashSet<string>(
+                        _allCountries.Where(c => c.Code == wantedCode).Select(c => c.Name),
+                        StringComparer.OrdinalIgnoreCase);
+                    results = results.Where(q => q.Country != null && named.Contains(q.Country.Trim()));
+                }
+                else
+                {
+                    results = results.Where(q => q.Country != null &&
+                        q.Country.IndexOf(wantedName, StringComparison.OrdinalIgnoreCase) >= 0);
+                }
+            }
 
             // Band / mode / my callsign come from dropdowns built out of the log itself, so they are
             // exact matches - picking "20M" must not also bring in "20M" QSOs of some other band whose
@@ -1601,9 +1807,11 @@ namespace HolyLogger
                 results = results.Where(q => q.DXLocator != null &&
                     q.DXLocator.IndexOf(locator, StringComparison.OrdinalIgnoreCase) >= 0);
 
-            if (!string.IsNullOrEmpty(square))
-                results = results.Where(q => q.SRX != null &&
-                    q.SRX.IndexOf(square, StringComparison.OrdinalIgnoreCase) >= 0);
+            // Holyland square, CQ / ITU zone and State are picked from the log's own values now, so they
+            // are exact matches like Band and Mode. As free text they were "contains" matches, where
+            // zone 1 also returned 10, 11, 12 ... 19 and every other zone with a 1 in it.
+            if (square != null)
+                results = results.Where(q => string.Equals(q.SRX, square, StringComparison.OrdinalIgnoreCase));
 
             if (lotw != null)
             {
@@ -1624,16 +1832,16 @@ namespace HolyLogger
                 results = results.Where(q => q.MyLocator != null && q.MyLocator.IndexOf(myGrid, StringComparison.OrdinalIgnoreCase) >= 0);
             if (!string.IsNullOrEmpty(mySquare))
                 results = results.Where(q => q.STX != null && q.STX.IndexOf(mySquare, StringComparison.OrdinalIgnoreCase) >= 0);
-            if (!string.IsNullOrEmpty(cqz))
-                results = results.Where(q => q.CQZone != null && q.CQZone.IndexOf(cqz, StringComparison.OrdinalIgnoreCase) >= 0);
-            if (!string.IsNullOrEmpty(ituz))
-                results = results.Where(q => q.ITUZone != null && q.ITUZone.IndexOf(ituz, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (cqz != null)
+                results = results.Where(q => string.Equals(q.CQZone, cqz, StringComparison.OrdinalIgnoreCase));
+            if (ituz != null)
+                results = results.Where(q => string.Equals(q.ITUZone, ituz, StringComparison.OrdinalIgnoreCase));
             // Continent is enforced ONLY when no prefix is given - with a prefix the continent is implied by
             // the callsign (and shown locked), so the prefix is the real criterion.
             if (continent != null && string.IsNullOrEmpty(prefix))
                 results = results.Where(q => string.Equals(q.Continent, continent, StringComparison.OrdinalIgnoreCase));
-            if (!string.IsNullOrEmpty(state))
-                results = results.Where(q => q.State != null && q.State.IndexOf(state, StringComparison.OrdinalIgnoreCase) >= 0);
+            if (state != null)
+                results = results.Where(q => string.Equals(q.State, state, StringComparison.OrdinalIgnoreCase));
             if (!string.IsNullOrEmpty(propMode))
                 results = results.Where(q => q.PROP_MODE != null && q.PROP_MODE.IndexOf(propMode, StringComparison.OrdinalIgnoreCase) >= 0);
             if (!string.IsNullOrEmpty(satName))
@@ -1723,22 +1931,54 @@ namespace HolyLogger
                 Col_Date.SortDirection = ListSortDirection.Descending;
         }
 
-        // Fills Band / Mode / My callsign from what the log actually contains, so the lists can only
-        // offer choices that can return something.
+        // Fills every "pick one" filter from what the log actually contains, so the lists can only
+        // offer choices that can return something. A dropdown of the log's own values also answers a
+        // question a text box could not: what IS in this log - which zones, which states, which
+        // squares - without searching for each one to find out.
+        //
+        // Called again whenever the window is pointed at a different collection (ReplaceSource), because
+        // the lists describe THAT log: a Holyland square list left over from the previous log would
+        // offer squares this one never worked, and hide the ones it did.
         private void PopulateFilterLists()
         {
-            void Fill(ComboBox box, System.Func<QSO, string> pick)
+            // Puts a list into a box while keeping whatever was selected, if the new list still has it.
+            // Re-populating must not silently drop a filter the operator set - the grid would widen
+            // underneath them with no visible reason.
+            void SetItems(ComboBox box, List<string> values)
+            {
+                string keep = box.SelectedItem as string;
+                box.ItemsSource = values;
+                int at = keep == null ? 0 : values.FindIndex(v => string.Equals(v, keep, StringComparison.OrdinalIgnoreCase));
+                box.SelectedIndex = at >= 0 ? at : 0;
+            }
+
+            // numeric: sort as numbers, not text. The zones are held as text, so plain string ordering
+            // put 10 before 9 (and 1, 10, 11, ... 2). Any value that isn't a number sorts after the
+            // numbers, alphabetically, rather than being dropped.
+            void Fill(ComboBox box, System.Func<QSO, string> pick, bool numeric = false, bool disableWhenEmpty = false)
             {
                 var values = _allQsos
                     .Select(pick)
                     .Where(v => !string.IsNullOrWhiteSpace(v))
                     .Select(v => v.Trim())
                     .Distinct(StringComparer.OrdinalIgnoreCase)
-                    .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
                     .ToList();
+
+                if (numeric)
+                    values = values
+                        .OrderBy(v => { int n; return int.TryParse(v, out n) ? 0 : 1; })
+                        .ThenBy(v => { int n; return int.TryParse(v, out n) ? n : 0; })
+                        .ThenBy(v => v, StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+                else
+                    values = values.OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToList();
+
+                // Greyed out when the log holds no value at all for that field - so an empty State or
+                // Holyland Square list reads as "this log has none", not as a filter that failed to load.
+                if (disableWhenEmpty) box.IsEnabled = values.Count > 0;
+
                 values.Insert(0, AnyItem);
-                box.ItemsSource = values;
-                box.SelectedIndex = 0;
+                SetItems(box, values);
             }
 
             Fill(CB_Band, q => q.Band);
@@ -1746,28 +1986,18 @@ namespace HolyLogger
             Fill(CB_MyCall, q => q.MyCall);
             Fill(CB_Continent, q => q.Continent);
 
-            // Submode: the full official ADIF list, plus anything unusual already logged that isn't in
-            // it (e.g. a value from another program's export), so nothing already in the log is hidden.
-            var submodeValues = KnownSubmodes
-                .Concat(_allQsos.Select(q => q.SUBMode).Where(v => !string.IsNullOrWhiteSpace(v)).Select(v => v.Trim()))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(v => v, StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            submodeValues.Insert(0, AnyItem);
-            CB_Submode.ItemsSource = submodeValues;
-            CB_Submode.SelectedIndex = 0;
+            // Band and Continent are left out of disableWhenEmpty on purpose: both are also switched on
+            // and off by the Frequency / Prefix boxes, and a second rule touching IsEnabled would fight it.
+            Fill(CB_Submode, q => q.SUBMode, disableWhenEmpty: true);
+            Fill(CB_CqZone,  q => q.CQZone,  numeric: true, disableWhenEmpty: true);
+            Fill(CB_ItuZone, q => q.ITUZone, numeric: true, disableWhenEmpty: true);
+            Fill(CB_State,   q => q.State,   disableWhenEmpty: true);
+            Fill(CB_Square,  q => q.SRX,     disableWhenEmpty: true);
 
             // Fixed choices, not values found in the log: "not confirmed" has to be offerable even when
             // every QSO happens to be confirmed, and the other way round.
-            CB_Lotw.ItemsSource = new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed };
-            CB_Lotw.SelectedIndex = 0;
-
-            // The other four confirmation sources, same fixed choices.
-            foreach (var cb in new[] { CB_Qrz, CB_Eqsl, CB_Clublog, CB_Paper })
-            {
-                cb.ItemsSource = new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed };
-                cb.SelectedIndex = 0;
-            }
+            foreach (var cb in new[] { CB_Lotw, CB_Qrz, CB_Eqsl, CB_Clublog, CB_Paper })
+                SetItems(cb, new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed });
         }
 
         private const string LotwConfirmed = "Confirmed";
@@ -1917,8 +2147,44 @@ namespace HolyLogger
         public void ReplaceSource(ObservableCollection<QSO> qsos)
         {
             if (qsos == null || _cellInEdit) return;
+            if (_allQsos != null) _allQsos.CollectionChanged -= OnSourceCollectionChanged;
             _allQsos = qsos;
-            try { RunSearch(); }
+            try
+            {
+                // The dropdowns are built FROM the log, so a new collection means new lists. Selections
+                // that still exist in the new log survive; ones that don't fall back to "(any)".
+                PopulateFilterLists();
+                SizeFilterListsToContent();
+                WatchSourceForNewValues();
+                RunSearch();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // A QSO logged while this window is open can carry a value no other QSO has - the first QSO
+        // into a state, a zone or a Holyland square. Without this the dropdowns would keep describing
+        // the log as it was when the window opened, and that square could not be picked until it was
+        // closed and reopened.
+        private void WatchSourceForNewValues()
+        {
+            if (_allQsos == null) return;
+            _allQsos.CollectionChanged += OnSourceCollectionChanged;
+        }
+
+        private void OnSourceCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            // Not while a cell is being edited, and not while a list is open under the operator's
+            // cursor - replacing the items of an open dropdown closes it mid-choice.
+            if (_cellInEdit) return;
+            foreach (var cb in new[] { CB_Band, CB_Mode, CB_MyCall, CB_Continent, CB_Submode,
+                                       CB_CqZone, CB_ItuZone, CB_State, CB_Square })
+                if (cb != null && cb.IsDropDownOpen) return;
+
+            try
+            {
+                PopulateFilterLists();
+                SizeFilterListsToContent();
+            }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
@@ -2323,7 +2589,8 @@ namespace HolyLogger
         }
     }
 
-    // Represents one country entry in the dropdown: name + flag image (same PNG assets as StatisticsWindow)
+    // Represents one country entry in the dropdown: name + flag image (same PNG assets as
+    // StatisticsWindow) + the ARRL entity number, shown at the right of the row.
     public class SearchCountryItem
     {
         private static readonly System.Collections.Generic.Dictionary<string, BitmapImage> _flagCache =
@@ -2332,13 +2599,33 @@ namespace HolyLogger
         public string      Name      { get; }
         public BitmapImage FlagImage { get; }
 
+        // The ARRL entity number for this country, 0 when no database knows the wording the log used.
+        // The award world speaks in these numbers, so the list shows both and either can be typed.
+        public int    Code     { get; }
+        public string CodeText => Code > 0 ? Code.ToString() : "";
+
         public SearchCountryItem(string name)
         {
             Name      = name;
+            Code      = CodeOf(name);
             FlagImage = GetFlagImage(name);
         }
 
-        public override string ToString() => Name;  // shown in editable text box after selection
+        // A country whose wording nothing recognises still belongs in the list - it is in the log -
+        // it simply shows no number, rather than being hidden or shown as 0.
+        private static int CodeOf(string name)
+        {
+            try { return CountryLookup.Shared.EntityCodeForCountry(name); }
+            catch { return 0; }
+        }
+
+        // What the editable box shows once a country is picked: the NUMBER FIRST, then the name.
+        //
+        // The box is one fixed width and several DXCC names are longer than it - "Bonaire, Curacao
+        // (Neth Antilles)" among them - so whatever sits at the end is the part that disappears.
+        // Putting the number first means the name is what clips, exactly as it already did, and the
+        // number stays readable for every country. The search reads the number back out of this.
+        public override string ToString() => Code > 0 ? Code + "  " + Name : Name;
 
         private static BitmapImage GetFlagImage(string countryName)
         {

@@ -108,21 +108,47 @@
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                   </StackPanel>
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
-                    <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                               ToolTip="Type the country name or its ARRL entity number — 336 finds Israel"/>
                     <ComboBox x:Name="CB_Country" Width="210" FontSize="14" VerticalAlignment="Center"
                               IsEditable="True" StaysOpenOnEdit="True" IsTextSearchEnabled="False" MaxDropDownHeight="280"
                               IsSynchronizedWithCurrentItem="False"
+                              ToolTip="Type the country name or its ARRL entity number — 336 finds Israel"
                               PreviewKeyDown="CB_Country_PreviewKeyDown"
                               PreviewTextInput="CB_Country_PreviewTextInput"
+                              SelectionChanged="CB_Country_SelectionChanged"
                               KeyUp="CB_Country_KeyUp">
+                        <!-- Each row fills the dropdown's full width, so the three parts line up in
+                             columns down the list. BasedOn keeps the theme's ComboBoxItem look
+                             (highlight, bold selection). -->
+                        <ComboBox.ItemContainerStyle>
+                            <Style TargetType="ComboBoxItem" BasedOn="{StaticResource {x:Type ComboBoxItem}}">
+                                <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            </Style>
+                        </ComboBox.ItemContainerStyle>
+                        <!-- Number, flag, then name. This same row is what the CLOSED box shows once a
+                             country is picked, and the box is one fixed width: with the name last it
+                             is the name that runs out of room (and says so with an ellipsis) while the
+                             number and the flag stay readable for every country. -->
                         <ComboBox.ItemTemplate>
                             <DataTemplate>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <Image Source="{Binding FlagImage}" Width="24" Height="16"
+                                <Grid VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+                                    <!-- Blank for a country wording no database recognises: better an
+                                         empty column than a 0 that reads like an entity number. -->
+                                    <TextBlock Grid.Column="0" Text="{Binding CodeText}" VerticalAlignment="Center"
+                                               TextAlignment="Right" Margin="0,0,8,0" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource MutedTextBrush}"/>
+                                    <Image Grid.Column="1" Source="{Binding FlagImage}" Width="24" Height="16"
                                            VerticalAlignment="Center" Margin="0,0,6,0"
                                            RenderOptions.BitmapScalingMode="HighQuality"/>
-                                    <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
-                                </StackPanel>
+                                    <TextBlock Grid.Column="2" Text="{Binding Name}" VerticalAlignment="Center"
+                                               TextTrimming="CharacterEllipsis"/>
+                                </Grid>
                             </DataTemplate>
                         </ComboBox.ItemTemplate>
                     </ComboBox>
@@ -145,9 +171,9 @@
                     <ComboBox x:Name="CB_Mode" Width="90" FontSize="14" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
                     <TextBlock Text="Submode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,6,0"/>
-                    <!-- The full official ADIF submode enumeration (~150 values), plus anything unusual
-                         already in this log. Type-ahead (built into ComboBox) jumps to a match by typing
-                         its first letters, so the long list stays usable without a custom filter. -->
+                    <!-- Filled from the log, like Band and Mode. It used to offer the full official ADIF
+                         submode enumeration (~150 values), which meant scrolling past a hundred and forty
+                         choices that could only ever return nothing. -->
                     <ComboBox x:Name="CB_Submode" Width="110" FontSize="14" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
                   </StackPanel>
@@ -155,10 +181,12 @@
                   </StackPanel>
 
                   <!-- Row 2: name, DX locator, CQ zone, ITU zone, continent, state, Holyland square, comment.
-                       Gaps between items are tightened (12px, was 20px) and the zone boxes are sized to
-                       their real content (2 digits) rather than the generic width, so the saved space
-                       can go to Comment - the field most worth having room to read. Comment stays the
-                       rightmost item in the row. -->
+                       Gaps between items are tightened (12px, was 20px) and every box is sized to its
+                       real content rather than a generic width, so the saved space can go to Comment -
+                       the field most worth having room to read. Comment stays the rightmost item.
+
+                       All but Name and DX Locator are dropdowns filled from the log itself: the widths
+                       here are only the fallback, Window_Loaded measures the real contents. -->
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,6,0,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                       <TextBlock Text="Name:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -174,13 +202,17 @@
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                       <TextBlock Text="CQ zone:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_CqZone" Width="30" FontSize="14" VerticalAlignment="Center" MaxLength="2"
-                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                      <!-- Filled from the log, like Band / Mode: the zones offered are the zones worked.
+                           Sorted as numbers, so 9 comes before 10 rather than after 1. -->
+                      <ComboBox x:Name="CB_CqZone" Width="62" FontSize="14" VerticalAlignment="Center"
+                                ToolTip="CQ zones this log actually contains"
+                                SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                       <TextBlock Text="ITU zone:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_ItuZone" Width="30" FontSize="14" VerticalAlignment="Center" MaxLength="2"
-                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                      <ComboBox x:Name="CB_ItuZone" Width="62" FontSize="14" VerticalAlignment="Center"
+                                ToolTip="ITU zones this log actually contains"
+                                SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                       <TextBlock Text="Continent:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
@@ -192,9 +224,9 @@
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                       <TextBlock Text="State:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="The worked station's state / province, e.g. CA"/>
-                      <TextBox x:Name="TB_StateFilter" Width="46" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
-                               ToolTip="The worked station's state / province, e.g. CA"
-                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                      <ComboBox x:Name="CB_State" Width="72" FontSize="14" VerticalAlignment="Center"
+                                ToolTip="The worked station's state / province — the ones this log contains"
+                                SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
                       <!-- "Holyland Square" stacked on two lines instead of one wide label, to save the
@@ -206,9 +238,9 @@
                                  ToolTip="Holyland square received (the Exchange column)">
                         <Run Text="Holyland"/><LineBreak/><Run Text="Square:"/>
                       </TextBlock>
-                      <TextBox x:Name="TB_Square" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
-                               ToolTip="Holyland square received (the Exchange column)"
-                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                      <ComboBox x:Name="CB_Square" Width="90" FontSize="14" VerticalAlignment="Center"
+                                ToolTip="Holyland square received (the Exchange column) — the squares this log contains"
+                                SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel x:Name="CommentGroup" Orientation="Horizontal" VerticalAlignment="Center">
                       <TextBlock Text="Comment:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
