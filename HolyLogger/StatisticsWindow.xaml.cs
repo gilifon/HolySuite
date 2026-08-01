@@ -2162,21 +2162,31 @@ namespace HolyLogger
 
                 if (all.Count == 0)
                 {
-                    // Same as Club Log: an empty result is still an answer, and has to be written down
-                    // or the folder claims it was never checked. A FAILED download writes nothing.
-                    if (failed.Count == 0)
+                    // An empty result is still an answer and has to be written down, or the folder
+                    // claims it was never checked. A FAILED download writes nothing.
+                    //
+                    // But NOTHING NEW is not the same as NOTHING AT ALL: on a quick check an empty
+                    // answer means only that the window since the last check was quiet, so the running
+                    // total must be left exactly as it is. Zeroing it here would have thrown away the
+                    // whole count every time nothing had arrived - which is most of the time.
+                    if (failed.Count == 0 && !incremental)
                     {
                         EqslConfirmedQsoCount = 0;
                         EqslConfirmedEntities = string.Empty;
                         EqslConfirmedDeletedCodes = string.Empty;
                     }
+                    if (failed.Count == 0) LogState("EqslLastCheck", stampedAt);
+
                     string why = failed.Count > 0 ? "\n\n" + string.Join("\n", failed) : "";
                     HolyMessageBox.Show(
                         (failed.Count > 0
                             ? "The eQSL In Box could not be read." + why
-                            : "Your eQSL In Box has no confirmations for this log's callsign.")
+                            : incremental
+                                ? "Nothing new at eQSL since your last check."
+                                : "Your eQSL In Box has no confirmations for this log's callsign.")
                         + "\n\nNothing in your log was changed.",
-                        "eQSL confirmations", HolyMsgType.Warning, this);
+                        "eQSL confirmations",
+                        failed.Count > 0 ? HolyMsgType.Warning : HolyMsgType.Info, this);
                     RefreshForSource();
                     return;
                 }

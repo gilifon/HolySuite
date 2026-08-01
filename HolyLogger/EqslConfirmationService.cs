@@ -90,6 +90,15 @@ namespace HolyLogger
             var m = Regex.Match(html, @"downloadedfiles/([A-Za-z0-9_.\-]+\.adi)", RegexOptions.IgnoreCase);
             if (!m.Success)
             {
+                // With a RcvdSince filter, no link means eQSL found nothing in that window - which is
+                // the ordinary answer to "anything new since yesterday?", not a failure. Reporting it as
+                // one told the operator their In Box could not be read when in truth it had nothing to
+                // add. An unfiltered request with no link IS a fault, and still says so.
+                if (!string.IsNullOrWhiteSpace(rcvdSince))
+                {
+                    result.Ok = true;              // nothing new; Confirmations stays empty
+                    return result;
+                }
                 result.Reason = "eQSL did not return a download link";
                 return result;
             }
