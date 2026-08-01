@@ -167,6 +167,11 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(apiKey)) { result.Reason = "auth"; return result; }
 
             // STATUS:CONFIRMED -> only confirmed records; MAX high enough to never page.
+            //
+            // The separator is a COMMA because that is what QRZ's own example uses
+            // ("BAND:80m,MODE:SSB,MAX:400") and what this request has always used successfully - even
+            // though the prose above it says options are separated by "&" or ";". Where a document
+            // disagrees with itself, the form already proven against the live service wins.
             string option = "STATUS:CONFIRMED,MAX:100000";
             if (!string.IsNullOrWhiteSpace(modifiedSince))
                 option += ",MODSINCE:" + modifiedSince.Trim();

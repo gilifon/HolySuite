@@ -1928,6 +1928,19 @@ namespace HolyLogger
                 QrzLogbookService.QrzFetchResult fetch =
                     await QrzLogbookService.FetchConfirmationsAsync(key, incremental ? since : null, ct);
 
+                // QRZ's own documentation contradicts itself on how FETCH options are combined (it says
+                // "&" or ";", its example uses commas), and does not say whether MODSINCE may be used
+                // alongside STATUS at all. So an incremental request that comes back REJECTED is not
+                // treated as a failure: it falls back to the full download, which is known to work, and
+                // the operator gets their confirmations either way. Only the extra speed is lost.
+                if (incremental && !fetch.Ok && !fetch.NetworkError)
+                {
+                    incremental = false;
+                    TB_LotwLoadingText.Text = "QRZ would not take the quick check — downloading everything…";
+                    TB_LotwLoadingSub.Text = "Reading your confirmed QSOs from QRZ.com.";
+                    fetch = await QrzLogbookService.FetchConfirmationsAsync(key, null, ct);
+                }
+
                 if (fetch.NetworkError)
                 {
                     HolyMessageBox.Show(
