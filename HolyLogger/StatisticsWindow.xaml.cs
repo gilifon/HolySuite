@@ -2026,7 +2026,10 @@ namespace HolyLogger
                 // repaint the current folder - no manual reopen needed.
                 ReloadQsosAfterCheck();
 
-                ShowQrzDownloadSummary(fetch.Count);
+                // "now marked" only when this run actually marked something. A full rebuild always
+                // counts as a change (it rewrote every mark); a quick check that found nothing has
+                // changed nothing, and saying "now" would claim work that did not happen.
+                ShowQrzDownloadSummary(fetch.Count, !incremental || ConfirmedInLog(ConfSource.Qrz) > confirmedBefore);
             }
             catch (OperationCanceledException)
             {
@@ -2050,7 +2053,7 @@ namespace HolyLogger
 
         // QRZ counterpart of ShowFullDownloadSummary: reports the download and shows, per log, that the
         // marks reached every log holding a matching QSO - not only the one open now.
-        private void ShowQrzDownloadSummary(int downloaded)
+        private void ShowQrzDownloadSummary(int downloaded, bool anythingChanged)
         {
             var text = new System.Text.StringBuilder();
             text.AppendLine($"Downloaded {downloaded:N0} confirmed QSO(s) from QRZ.com.");
@@ -2067,7 +2070,7 @@ namespace HolyLogger
                 }
                 else if (perLog.Count == 1)
                 {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are already marked confirmed on QRZ.");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on QRZ.");
                 }
                 else
                 {
@@ -2245,7 +2248,8 @@ namespace HolyLogger
                 s.Save();
 
                 ReloadQsosAfterCheck();
-                ShowEqslDownloadSummary(all.Count, failed);
+                ShowEqslDownloadSummary(all.Count, failed,
+                                        !incremental || ConfirmedInLog(ConfSource.Eqsl) > confirmedBefore);
             }
             catch (OperationCanceledException)
             {
@@ -2268,7 +2272,7 @@ namespace HolyLogger
             }
         }
 
-        private void ShowEqslDownloadSummary(int downloaded, List<string> failed)
+        private void ShowEqslDownloadSummary(int downloaded, List<string> failed, bool anythingChanged)
         {
             var text = new System.Text.StringBuilder();
             text.AppendLine($"Downloaded {downloaded:N0} received eQSL(s) from your In Box.");
@@ -2280,7 +2284,7 @@ namespace HolyLogger
                 if (perLog.Count == 0)
                     text.AppendLine("None of them matched a QSO in this log.");
                 else if (perLog.Count == 1)
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are already marked confirmed on eQSL.");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on eQSL.");
                 else
                 {
                     text.AppendLine($"{totalMarked:N0} QSO(s) are marked eQSL-confirmed across your logs - this one included:");
@@ -2430,7 +2434,7 @@ namespace HolyLogger
                 s0.Save();
 
                 ReloadQsosAfterCheck();
-                ShowClublogDownloadSummary(all.Count, failed);
+                ShowClublogDownloadSummary(all.Count, failed, true);   // Club Log is always a full rebuild
             }
             catch (OperationCanceledException)
             {
@@ -2452,7 +2456,7 @@ namespace HolyLogger
             }
         }
 
-        private void ShowClublogDownloadSummary(int downloaded, List<string> failed)
+        private void ShowClublogDownloadSummary(int downloaded, List<string> failed, bool anythingChanged)
         {
             var text = new System.Text.StringBuilder();
             text.AppendLine($"Downloaded {downloaded:N0} confirmed QSO(s) from Club Log.");
@@ -2464,7 +2468,7 @@ namespace HolyLogger
                 if (perLog.Count == 0)
                     text.AppendLine("None of them matched a QSO in this log.");
                 else if (perLog.Count == 1)
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are already marked confirmed on Club Log.");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on Club Log.");
                 else
                 {
                     text.AppendLine($"{totalMarked:N0} QSO(s) are marked Club Log-confirmed across your logs - this one included:");
