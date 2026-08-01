@@ -1870,7 +1870,12 @@ namespace HolyLogger
                 // quick check to avoid nagging, which meant pressing the button and getting no answer
                 // at all - and it read as a fault beside eQSL and QRZ, which do report. Consistency
                 // wins: press a button, get told what happened.
-                ShowFullDownloadSummary(qslCount, markedConfirmed,
+                // On a quick check report the NEW count, not the raw download. LoTW's qso_qslsince
+                // honours the DATE only, so every check re-sends whatever arrived on the boundary date
+                // - typically the last confirmation, over and over. It is recognised as already seen
+                // and changes nothing, but saying "downloaded 1" made it look like something had
+                // arrived each time. What matters is how many were new, which is 0.
+                ShowFullDownloadSummary(incremental ? newCount : qslCount, markedConfirmed,
                                         anythingChanged: !incremental || newCount > 0,
                                         quickCheck: incremental);
             }
