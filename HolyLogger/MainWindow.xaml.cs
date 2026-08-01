@@ -4695,10 +4695,26 @@ namespace HolyLogger
                 //}
 
 
-                // A QSO needs to say where on the dial it happened - but a band on its own says that too,
-                // and ADIF has always allowed BAND without FREQ. So a band picked by hand (Manual mode,
-                // no frequency) is enough; without either, the frequency box is still what is missing.
-                if (FrequencyIsEmpty && string.IsNullOrWhiteSpace(TB_Band.Text))
+                // Where on the dial did this QSO happen? In Manual mode the operator types the frequency,
+                // and it must be a real one: the band is read out of it, so a blank or out-of-band value
+                // (convertFreqToBand finds no band) would leave the QSO with no dial position at all.
+                // Refuse it with a clear message rather than logging a QSO that can't say where it was.
+                //
+                // Under CAT the frequency comes from the radio; there the old rule stands — a band on its
+                // own is enough, since ADIF has always allowed BAND without FREQ.
+                bool manualFreq = Properties.Settings.Default.isManualMode;
+                string bandFromFreq = FrequencyIsEmpty
+                    ? string.Empty
+                    : HolyLogParser.convertFreqToBand(TB_Frequency.Text);
+
+                if (manualFreq && string.IsNullOrWhiteSpace(bandFromFreq))
+                {
+                    allOK = false;
+                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
+                    TB_Frequency.BorderThickness = new Thickness(2);
+                    HolyMessageBox.ShowWarning("No Frequency is defined.", "Frequency required", this);
+                }
+                else if (FrequencyIsEmpty && string.IsNullOrWhiteSpace(TB_Band.Text))
                 {
                     allOK = false;
                     TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
@@ -4861,10 +4877,11 @@ namespace HolyLogger
 
                 bool chosenManual = Properties.Settings.Default.isManualMode;
 
-                // CAT stays clickable while Manual was CHOSEN even if no radio is connected - otherwise
-                // there would be no way back out of Manual on a station without CAT. It is only greyed
-                // when it is both unavailable and not something the operator is currently in.
-                RB_CatMode.IsEnabled = catAvailable || chosenManual;
+                // CAT is ALWAYS clickable, even with no radio connected: a greyed-out, unpressable CAT
+                // button left a station whose rig was offline (or has no CAT at all) with no way to select
+                // CAT. It still dims (0.5) while CAT can't actually read the frequency, as a cue that the
+                // frequency stays typed until a radio comes online — but the click itself is never blocked.
+                RB_CatMode.IsEnabled = true;
                 RB_CatMode.Opacity = catAvailable ? 1.0 : 0.5;
                 // The tooltips speak of the frequency and the mode ONLY. They used to promise that Manual
                 // also held the date and time still; it no longer does (see UTCTimer_Elapsed), and a
@@ -4880,15 +4897,19 @@ namespace HolyLogger
                 // Manual is shown for two different reasons - because it was chosen, or because there is
                 // no CAT to read from - and they behave differently (a chosen Manual lets you pick the
                 // band, and holds even after a radio comes online). Bold says which one this is.
-                RB_ManualMode.FontWeight = chosenManual ? FontWeights.Bold : FontWeights.Normal;
+                // Manual is BOLD whenever it is the active mode — which includes the automatic fallback
+                // when CAT can't be used (no radio, or the rig has stopped responding): there is no dial
+                // to read, so Manual takes focus by itself and CAT is left unselected. Only when CAT is
+                // truly live and selected does Manual drop to regular weight.
+                RB_ManualMode.FontWeight = typed ? FontWeights.Bold : FontWeights.Normal;
                 RB_ManualMode.ToolTip = chosenManual
                     ? "Manual: you type the frequency and pick the mode yourself, and the program leaves "
                       + "them alone even when a radio is online."
                     : catAvailable
                         ? "You type the frequency and pick the mode yourself instead of reading them from "
                           + "the radio."
-                        : "CAT is not connected, so the frequency is typed anyway. Click to choose Manual "
-                          + "properly, which also lets you pick the band yourself.";
+                        : "CAT is not connected, so the frequency is typed. HolyLogger stays in Manual "
+                          + "until a radio comes online.";
             }
             finally { _settingFreqModeRadios = false; }
         }
@@ -4900,6 +4921,19 @@ namespace HolyLogger
         // "Change mode" context item both come through here.
         private void ToggleManualMode()
         {
+            // CAT needs a radio. Trying to switch from Manual to CAT with none connected does nothing:
+            // there is no dial to read, so pressing CAT must leave Manual exactly as it was — still
+            // chosen, still bold, CAT never lit. (The CAT button stays clickable, not greyed; the click
+            // simply has no effect until a radio is actually there.) Only the Manual->CAT direction is
+            // guarded — leaving CAT for Manual is always allowed.
+            bool wouldChooseCat = Properties.Settings.Default.isManualMode;
+            if (wouldChooseCat && !IsCatFrequencyAvailable)
+            {
+                UpdateFreqModeRadios();   // re-assert Manual (selected + bold); undo the radio's own click
+                RB_ManualMode?.Focus();   // and take focus off CAT, which never became the mode
+                return;
+            }
+
             Properties.Settings.Default.isManualMode = !Properties.Settings.Default.isManualMode;
             // Drive the radios from the setting, not from their own click, so they follow the state
             // however it was changed.
@@ -8577,8 +8611,11 @@ namespace HolyLogger
             }
         }
 
-        private bool BandPickAvailable =>
-            Properties.Settings.Default.isManualMode && FrequencyIsEmpty;
+        // The band is always READ from the frequency now — manual mode included — and shown read-only, so
+        // the hand-pick drop-down is never offered. In manual mode you type a frequency and the band
+        // follows it; a QSO with no legal frequency is refused at save time (see Validate). Left as a
+        // single flag so UpdateBandPickAvailability and the CB_Band handlers simply stay dormant.
+        private bool BandPickAvailable => false;
 
         // Guard so filling the list, or following TB_Band, is not mistaken for the operator picking.
         private bool _settingBandPick;
