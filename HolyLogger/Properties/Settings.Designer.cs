@@ -47,6 +47,18 @@ namespace HolyLogger.Properties {
                 this["validation_enabled"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("True")]
+        public bool ValidateHamFrequency {
+            get {
+                return ((bool)(this["ValidateHamFrequency"]));
+            }
+            set {
+                this["ValidateHamFrequency"] = value;
+            }
+        }
         
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]

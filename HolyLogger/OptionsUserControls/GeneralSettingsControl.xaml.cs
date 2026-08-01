@@ -128,6 +128,36 @@ namespace HolyLogger.OptionsUserControls
             }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
+        // Land the operator directly on the "Validate for HAM frequency" checkbox: scroll it into view,
+        // give it keyboard focus, and park the MOUSE POINTER on it so it doesn't have to be hunted for.
+        // Used by the "here" link in the non-HAM-frequency warning. Same deferred/retry dance as
+        // FocusSoundDevicePicker, for the same reason (the General page may only just have been shown).
+        public void FocusHamFrequencyValidation(int attempt = 0)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    if (CBX_ValidateHamFrequency == null) return;
+
+                    if (!CBX_ValidateHamFrequency.IsVisible || CBX_ValidateHamFrequency.ActualWidth <= 0 || CBX_ValidateHamFrequency.ActualHeight <= 0)
+                    {
+                        if (attempt < 10) FocusHamFrequencyValidation(attempt + 1);
+                        return;
+                    }
+
+                    CBX_ValidateHamFrequency.BringIntoView();
+                    CBX_ValidateHamFrequency.Focus();
+                    Keyboard.Focus(CBX_ValidateHamFrequency);
+
+                    Point centre = CBX_ValidateHamFrequency.PointToScreen(
+                        new Point(CBX_ValidateHamFrequency.ActualWidth / 2.0, CBX_ValidateHamFrequency.ActualHeight / 2.0));
+                    SetCursorPos((int)centre.X, (int)centre.Y);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
+        }
+
         private void CB_SoundDevice_SelectionChanged(object sender, SelectionChangedEventArgs e)
         {
             Properties.Settings.Default.SoundOutputDevice = DeviceSettingFrom(CB_SoundDevice);

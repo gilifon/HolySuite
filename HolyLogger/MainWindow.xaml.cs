@@ -1535,6 +1535,11 @@ namespace HolyLogger
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
             if (!Validate()) return;
+            // Optional HAM-frequency check (Options > General). Applies in Manual AND CAT: if the
+            // frequency is not an amateur band the operator is warned and can save anyway, bail out, or
+            // jump to the setting to switch the check off. Runs after Validate so field-presence is
+            // already satisfied and this is the only thing standing between here and the log.
+            if (!ConfirmHamFrequencyBeforeSave()) return;
             // A QSO can't be logged into a log that has no identity yet — enforce it here too (belt and
             // suspenders; startup / log-switch already prompt).
             if (!EnsureActiveLogHasIdentity())
@@ -4695,39 +4700,12 @@ namespace HolyLogger
                 //}
 
 
-                // Where on the dial did this QSO happen? In Manual mode the operator types the frequency,
-                // and it must be a real one: the band is read out of it, so a blank or out-of-band value
-                // (convertFreqToBand finds no band) would leave the QSO with no dial position at all.
-                // Refuse it with a clear message rather than logging a QSO that can't say where it was.
-                //
-                // Under CAT the frequency comes from the radio; there the old rule stands — a band on its
-                // own is enough, since ADIF has always allowed BAND without FREQ.
-                bool manualFreq = Properties.Settings.Default.isManualMode;
-                string bandFromFreq = FrequencyIsEmpty
-                    ? string.Empty
-                    : HolyLogParser.convertFreqToBand(TB_Frequency.Text);
-
-                if (manualFreq && string.IsNullOrWhiteSpace(bandFromFreq))
-                {
-                    allOK = false;
-                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
-                    TB_Frequency.BorderThickness = new Thickness(2);
-                    HolyMessageBox.ShowWarning("No Frequency is defined.", "Frequency required", this);
-                }
-                else if (FrequencyIsEmpty && string.IsNullOrWhiteSpace(TB_Band.Text))
-                {
-                    allOK = false;
-                    TB_Frequency.BorderBrush = System.Windows.Media.Brushes.Red;
-                    TB_Frequency.BorderThickness = new Thickness(2);
-                }
-                else
-                {
-                    // Do NOT force the border back to grey here: this border also signals whether the
-                    // frequency is driven by the radio (red = CAT off/offline, or Manual Mode). Hard-coding
-                    // grey on a filled box wiped that out and made Manual Mode look like live CAT.
-                    // UpdateStatus owns the colour; it re-applies the correct one.
-                    UpdateStatus();
-                }
+                // The frequency/band check is no longer here. Whether a QSO must sit on a real amateur band
+                // is its own opt-in setting ("Validate for HAM frequency"), enforced as a soft warning in
+                // ConfirmHamFrequencyBeforeSave on Add (F1) — independent of this general validation flag.
+                // Still refresh the status so the frequency box keeps the right border colour (red = CAT
+                // off/offline or Manual, which UpdateStatus owns and re-applies).
+                UpdateStatus();
 
                 if (string.IsNullOrWhiteSpace(TB_MyCallsign.Text))
                 {
@@ -5581,6 +5559,8 @@ namespace HolyLogger
                 }
             }
 
+            UpdateBandWarningIcon();
+
             UpdateClusterFrequencyHighlight();
             UpdateFrequencyDisplay();
 
@@ -5590,6 +5570,19 @@ namespace HolyLogger
             // first, it still saw the empty box a moment earlier and left the picker up over a frequency
             // that had just been filled in.
             UpdateBandPickAvailability();
+        }
+
+        // Show a red attention glyph over the band box when the operator has entered a frequency that maps
+        // to no amateur band (TB_Band is then blank). Only while the HAM-frequency check is on, and never
+        // for an empty frequency box — that is "not entered yet", not "wrong". Kept in step wherever the
+        // frequency changes (typing, or a CAT update that writes TB_Frequency).
+        private void UpdateBandWarningIcon()
+        {
+            if (BandWarningOverlay == null) return;
+            bool wrongBand = Properties.Settings.Default.ValidateHamFrequency
+                             && !FrequencyIsEmpty
+                             && string.IsNullOrWhiteSpace(HolyLogParser.convertFreqToBand(TB_Frequency.Text));
+            BandWarningOverlay.Visibility = wrongBand ? Visibility.Visible : Visibility.Collapsed;
         }
 
         private void TB_Frequency_GotFocus(object sender, RoutedEventArgs e)
@@ -6080,6 +6073,69 @@ namespace HolyLogger
                     options.Activate();
                     // Put the caret on the audio-device picker so it doesn't have to be hunted for.
                     options.GeneralSettingsControlControlInstance?.FocusSoundDevicePicker();
+                }
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Soft HAM-frequency guard on Add (F1). Returns true to let the save proceed, false to stop it.
+        // Does nothing unless "Validate for HAM frequency" (Options > General) is ticked; a real amateur
+        // band always passes. Otherwise it warns — Yes saves anyway, No stops, and the "here" link stops
+        // and opens the setting so the check can be switched off. Deliberately mode-agnostic: it fires in
+        // Manual and in CAT alike, because an out-of-band frequency is wrong however it got there.
+        private bool ConfirmHamFrequencyBeforeSave()
+        {
+            if (!Properties.Settings.Default.ValidateHamFrequency) return true;
+
+            string band = FrequencyIsEmpty
+                ? string.Empty
+                : HolyLogParser.convertFreqToBand(TB_Frequency.Text);
+            if (!string.IsNullOrWhiteSpace(band)) return true;   // a real amateur band -> nothing to warn
+
+            var dlg = new HamFreqWarningWindow(FrequencyInKhzText()) { Owner = this };
+            dlg.ShowDialog();
+
+            if (dlg.OpenSettingsRequested)
+            {
+                OpenOptionsOnHamFreqValidation();
+                return false;   // don't save; the operator went to change the setting
+            }
+            return dlg.SaveAnyway;
+        }
+
+        // The entered frequency, in kHz, for the warning. The visible no-CAT box already shows kHz (its
+        // "kHz" label sits right beside it), so use exactly what the operator typed — verbatim, no
+        // conversion. That is the box in play whenever this warning fires (Manual / CAT off/offline). Only
+        // if it is not the active box (e.g. live CAT) fall back to the stored value, which is MHz, x1000.
+        private string FrequencyInKhzText()
+        {
+            bool noCatBoxShowing = FreqNoCatBezel != null && FreqNoCatBezel.Visibility == Visibility.Visible;
+            if (noCatBoxShowing)
+            {
+                string typed = (TB_FreqNoCat?.Text ?? string.Empty).Trim();
+                if (typed.Length > 0) return typed;
+            }
+
+            string raw = (TB_Frequency.Text ?? string.Empty).Trim();
+            if (raw.Length == 0) return string.Empty;
+            if (!double.TryParse(raw, System.Globalization.NumberStyles.Float,
+                                 System.Globalization.CultureInfo.InvariantCulture, out double mhz))
+                return raw;
+            return (mhz * 1000.0).ToString("0.###", System.Globalization.CultureInfo.InvariantCulture);
+        }
+
+        // Open Options on the General page with focus + the mouse pointer parked on the
+        // "Validate for HAM frequency" checkbox. Reached from the "here" link in the warning above.
+        internal void OpenOptionsOnHamFreqValidation()
+        {
+            try
+            {
+                OptionsMenuItemMenuItem_Click(null, null);
+                if (options != null)
+                {
+                    options.GeneralItem.IsSelected = true;
+                    options.Activate();
+                    options.GeneralSettingsControlControlInstance?.FocusHamFrequencyValidation();
                 }
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }

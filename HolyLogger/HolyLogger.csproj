@@ -189,6 +189,9 @@
     <Compile Include="StationServicesAlertWindow.xaml.cs">
       <DependentUpon>StationServicesAlertWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="HamFreqWarningWindow.xaml.cs">
+      <DependentUpon>HamFreqWarningWindow.xaml</DependentUpon>
+    </Compile>
     <Compile Include="BackupRestoreWindow.xaml.cs">
       <DependentUpon>BackupRestoreWindow.xaml</DependentUpon>
     </Compile>
@@ -390,6 +393,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="StationServicesAlertWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="HamFreqWarningWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

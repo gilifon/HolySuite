@@ -12,28 +12,31 @@
         <CheckBox x:Name="CBX_ShowOnTheAir" Content="Send heartbeat to HolyLogger On The Air" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ShowOnTheAir, Source={StaticResource Settings}, Mode=TwoWay}" Margin="0,51,0,0" FontSize="16"/>
         <CheckBox x:Name="CBX_CallsignSyncVerboseLog" Content="Verbose callsign sync log" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.CallsignSyncVerboseLog, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,76,0,0"/>
 
-        <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,101,0,0" Click="CBX_EnableOmniRigCAT_Changed"/>
+        <CheckBox x:Name="CBX_ValidateHamFrequency" Content="Validate for HAM frequency" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.ValidateHamFrequency, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,101,0,0"
+                  ToolTip="Warn on Add (F1) when the frequency is not an amateur-radio band. You can still save; turn this off to stop the warning."/>
+
+        <CheckBox x:Name="CBX_EnableOmniRigCAT" Content="Enable Omni-Rig CAT" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableOmniRigCAT, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,126,0,0" Click="CBX_EnableOmniRigCAT_Changed"/>
 
         <!-- Left edge lines up with the word "Enable" (checkbox text starts after the ~20px glyph).
              Narrow: a rig name is short (~15 chars), so ~half the old width is plenty. -->
-        <GroupBox x:Name="groupBox" Header="Select Rig" Height="90" Margin="20,126,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Width="180" FontSize="16">
+        <GroupBox x:Name="groupBox" Header="Select Rig" Height="90" Margin="20,151,0,0" HorizontalAlignment="Left" VerticalAlignment="Top" Width="180" FontSize="16">
             <StackPanel>
                 <RadioButton x:Name="Rig1_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="1: Rig Number 1"  Click="HasChanged_Click" IsChecked="{Binding Default.SelectedOmniRig1, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
                 <RadioButton x:Name="Rig2_RB" HorizontalAlignment="Left" Margin="0,8,0,0" VerticalAlignment="Top" Content="2: Rig Number 2" Click="HasChanged_Click" IsChecked="{Binding Default.SelectedOmniRig2, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16"/>
             </StackPanel>
         </GroupBox>
 
-        <CheckBox x:Name="CBX_EnableUDPClient" Content="Enable UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,230,0,0" Click="HasChanged_Click"/>
-        <Label x:Name="label" Content="Port" HorizontalAlignment="Left" Margin="199,224,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="textBox" HorizontalAlignment="Left" Height="23" Margin="243,228,0,0" TextWrapping="Wrap" Text="{Binding Default.UDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
+        <CheckBox x:Name="CBX_EnableUDPClient" Content="Enable UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,255,0,0" Click="HasChanged_Click"/>
+        <Label x:Name="label" Content="Port" HorizontalAlignment="Left" Margin="199,249,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="textBox" HorizontalAlignment="Left" Height="23" Margin="243,253,0,0" TextWrapping="Wrap" Text="{Binding Default.UDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
 
-        <CheckBox x:Name="CBX_EnableN1MMUDPClient" Content="N1MM+ UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableN1MMUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,255,0,0" Click="HasChanged_Click"/>
-        <Label x:Name="label2" Content="Port" HorizontalAlignment="Left" Margin="199,249,0,0" VerticalAlignment="Top" FontSize="16"/>
-        <TextBox x:Name="textBox2" HorizontalAlignment="Left" Height="23" Margin="243,254,0,0" TextWrapping="Wrap" Text="{Binding Default.N1MMUDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
+        <CheckBox x:Name="CBX_EnableN1MMUDPClient" Content="N1MM+ UDP Client" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableN1MMUDPClient, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,280,0,0" Click="HasChanged_Click"/>
+        <Label x:Name="label2" Content="Port" HorizontalAlignment="Left" Margin="199,274,0,0" VerticalAlignment="Top" FontSize="16"/>
+        <TextBox x:Name="textBox2" HorizontalAlignment="Left" Height="23" Margin="243,279,0,0" TextWrapping="Wrap" Text="{Binding Default.N1MMUDPPort, Mode=TwoWay, Source={StaticResource Settings}}" VerticalAlignment="Top" Width="112" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5" />
 
         <!-- HolyCluster spot listener: catches the WSJT-X-format UDP datagram HolyCluster sends when
              you select a spot (the same one it sends to Log4OM) and fills the DX callsign. -->
-        <GroupBox Header="HolyCluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,285,0,0" Width="580" FontSize="16">
+        <GroupBox Header="HolyCluster" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,310,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <CheckBox x:Name="CBX_EnableHolyClusterUDP" Content="Fill DX callsign from HolyCluster spots" HorizontalAlignment="Left" VerticalAlignment="Top" IsChecked="{Binding Default.EnableHolyClusterUDP, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Click="HasChanged_Click"/>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
@@ -47,7 +50,7 @@
 
         <!-- Audio Alerts: both sound options plus a single shared output-device picker, so alerts can
              go to the speakers instead of a USB radio codec. Left-justified with the checkboxes. -->
-        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,435,0,0" Width="580" FontSize="16">
+        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,460,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <!-- Beep when typing -->
                 <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,2,0,0" Click="HasChanged_Click">

@@ -1210,6 +1210,16 @@
                   Template="{StaticResource FlatComboTemplate}"
                   SelectionChanged="CB_Band_SelectionChanged" DropDownOpened="CB_Band_DropDownOpened"
                   ToolTip="No frequency — choose the band this QSO was on"/>
+        <!-- Red attention glyph laid over the band box when a frequency has been entered that maps to no
+             amateur band (so TB_Band is blank). TB_Band.Text stays the program's real band answer; this
+             is a purely visual cue that the frequency needs fixing, and it never blocks the click. -->
+        <Border x:Name="BandWarningOverlay" Margin="419,49,0,0" Grid.Row="1" Width="58" Height="28"
+                HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent"
+                IsHitTestVisible="False" Visibility="Collapsed"
+                ToolTip="This frequency is not an amateur band">
+            <TextBlock Text="&#x26A0;" Foreground="#C0392B" FontSize="18" FontWeight="Bold"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
         <TextBlock HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,87,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
