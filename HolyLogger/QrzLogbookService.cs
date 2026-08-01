@@ -153,14 +153,9 @@ namespace HolyLogger
             public List<DataAccess.LotwConfirmation> Confirmations = new List<DataAccess.LotwConfirmation>();
         }
 
-        // Downloads CONFIRMED QSOs from the logbook this key belongs to.
-        //
-        // modifiedSince (yyyy-MM-dd, or null/empty for everything) becomes QRZ's MODSINCE option -
-        // "only return records modified since this date" - which is what makes a quick repeat check
-        // possible instead of pulling the whole confirmed set every time. The caller marks WITHOUT a
-        // full reset when it passes a date, since a partial answer must only ever add.
+        // Downloads every CONFIRMED QSO from the logbook this key belongs to. There is no "only what is
+        // new" variant - see the note on the option string below for what was tried.
         public static async Task<QrzFetchResult> FetchConfirmationsAsync(string apiKey,
-                                                                         string modifiedSince = null,
                                                                          System.Threading.CancellationToken ct = default(System.Threading.CancellationToken))
         {
             var result = new QrzFetchResult();
@@ -168,13 +163,23 @@ namespace HolyLogger
 
             // STATUS:CONFIRMED -> only confirmed records; MAX high enough to never page.
             //
-            // The separator is a COMMA because that is what QRZ's own example uses
-            // ("BAND:80m,MODE:SSB,MAX:400") and what this request has always used successfully - even
-            // though the prose above it says options are separated by "&" or ";". Where a document
-            // disagrees with itself, the form already proven against the live service wins.
+            // Separator: QRZ's prose says options are joined by "&" or ";", while its own example uses
+            // commas ("BAND:80m,MODE:SSB,MAX:400"). Commas are proven for STATUS+MAX, but adding
+            // MODSINCE that way came back REJECTED, so the request that carries MODSINCE uses the
+            // documented semicolon instead. The plain request keeps the commas that have always worked
+            // - there is no reason to disturb it.
+            // ALWAYS the whole confirmed set. QRZ documents a MODSINCE option - "only return records
+            // modified since this date" - which would make a quick repeat check possible, and it does
+            // not work on this API. Tried against the live service in three forms, all rejected with a
+            // valid key that uploads and fetches perfectly well otherwise:
+            //
+            //     STATUS:CONFIRMED,MAX:100000,MODSINCE:2026-07-31     (commas, as QRZ's own example)
+            //     STATUS:CONFIRMED;MAX:100000;MODSINCE:2026-07-31     (semicolons, as QRZ's prose)
+            //     MODSINCE:2026-07-31,MAX:100000                      (alone, no STATUS)
+            //
+            // So do not spend time on it again without new information from QRZ. The full set is a few
+            // hundred KB and cheap enough; the caller marks with fullReset.
             string option = "STATUS:CONFIRMED,MAX:100000";
-            if (!string.IsNullOrWhiteSpace(modifiedSince))
-                option += ",MODSINCE:" + modifiedSince.Trim();
 
             var fields = new List<KeyValuePair<string, string>>
             {

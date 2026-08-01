@@ -934,15 +934,17 @@ namespace HolyLogger
             // one open folder rather than two unrelated halves wearing different colours.
             ApplyLeftViewColour();
 
-            // The header button is the INCREMENTAL check - "just what is new". It is offered by every
-            // service whose download can be asked for only recent records: LoTW (qso_qslsince), QRZ
-            // (MODSINCE) and eQSL (RcvdSince). Club Log cannot - its date filters apply to OQRS card
-            // requests, not to the log export - and Paper QSL has nothing to download at all, so on
-            // those two folders the button is hidden and the full download in the frame is the only way.
+            // The header button is the INCREMENTAL check - "just what is new". Only LoTW
+            // (qso_qslsince) and eQSL (RcvdSince) can actually answer that.
+            //
+            // NOT QRZ: it documents a MODSINCE option but rejects every form of it (see
+            // QrzLogbookService), so a button there would have been slower than the full download and
+            // no different in result. NOT Club Log: its date parameters filter OQRS card requests, not
+            // the log export. NOT Paper QSL: nothing to download. On those three the button is hidden
+            // and the full download in the frame is the only way, which is the honest offer.
             if (BTN_CheckLotw != null)
             {
                 bool canCheckUpdates = _source == ConfSource.Lotw
-                                    || _source == ConfSource.Qrz
                                     || _source == ConfSource.Eqsl;
                 BTN_CheckLotw.Visibility = canCheckUpdates ? Visibility.Visible : Visibility.Collapsed;
                 BTN_CheckLotw.Content = "Check " + SourceName + " Updates";
@@ -1589,12 +1591,11 @@ namespace HolyLogger
             BTN_CheckLotw_Click(sender, e);
         }
 
-        // The header button now serves three folders, so it routes to whichever is open. QRZ and eQSL
-        // run the same download as their full button, only asked for recent records and marking WITHOUT
-        // a reset - a partial answer must only ever add.
+        // The header button serves the two folders that can answer "just what is new", so it routes to
+        // whichever is open. eQSL runs the same download as its full button, only asked for recent
+        // cards and marking WITHOUT a reset - a partial answer must only ever add.
         private async void BTN_CheckLotw_Click(object sender, RoutedEventArgs e)
         {
-            if (_source == ConfSource.Qrz) { await RunQrzCheck(incremental: true); return; }
             if (_source == ConfSource.Eqsl) { await RunEqslCheck(incremental: true); return; }
 
             var s = Properties.Settings.Default;
@@ -1896,19 +1897,11 @@ namespace HolyLogger
         // when the other operator also logged it on QRZ), so it fills its own qrz_qsl_rcvd column and its
         // own tick and is never mixed with LoTW. One button, always a full fetch: the confirmed set is
         // small and cheap to download, so there is no incremental mode to get subtly wrong.
+        // Always the authoritative rebuild: QRZ has no working "only what is new" request, so there is
+        // one button and it does the whole thing.
         private async void BTN_CheckQrz_Click(object sender, RoutedEventArgs e)
         {
-            await RunQrzCheck(incremental: false);
-        }
-
-        // incremental=true asks QRZ only for records modified since the last check (MODSINCE) and marks
-        // WITHOUT clearing first, so a partial answer can only add. false is the authoritative rebuild.
-        private async System.Threading.Tasks.Task RunQrzCheck(bool incremental)
-        {
-            // Nothing to be incremental FROM on the first run, so that falls back to a full download.
-            string since = incremental ? LogState("QrzLastCheck") : string.Empty;
-            if (string.IsNullOrWhiteSpace(since)) incremental = false;
-
+            const bool incremental = false;
             string key = Properties.Settings.Default.qrz_api_key?.Trim();
             if (string.IsNullOrWhiteSpace(key))
             {
@@ -1933,35 +1926,12 @@ namespace HolyLogger
             _checkCts = new System.Threading.CancellationTokenSource();
             var ct = _checkCts.Token;
             BTN_StopCheck.IsEnabled = true;
-            TB_LotwLoadingText.Text = incremental
-                ? "Checking QRZ for what is new…"
-                : "Downloading confirmations from QRZ…";
-            TB_LotwLoadingSub.Text = incremental
-                ? $"Records changed at QRZ since {since}."
-                : "Reading your confirmed QSOs from QRZ.com.";
+            TB_LotwLoadingText.Text = "Downloading confirmations from QRZ…";
+            TB_LotwLoadingSub.Text = "Reading your confirmed QSOs from QRZ.com.";
             ShowLotwSpinner(true);
-
-            // Stamped BEFORE the request, so anything QRZ records while we are downloading is caught by
-            // the next check rather than falling in the gap between the two.
-            string stampedAt = DateTime.UtcNow.ToString("yyyy-MM-dd");
-            int confirmedBefore = ConfirmedInLog(ConfSource.Qrz);   // to count what this run actually adds
             try
             {
-                QrzLogbookService.QrzFetchResult fetch =
-                    await QrzLogbookService.FetchConfirmationsAsync(key, incremental ? since : null, ct);
-
-                // QRZ's own documentation contradicts itself on how FETCH options are combined (it says
-                // "&" or ";", its example uses commas), and does not say whether MODSINCE may be used
-                // alongside STATUS at all. So an incremental request that comes back REJECTED is not
-                // treated as a failure: it falls back to the full download, which is known to work, and
-                // the operator gets their confirmations either way. Only the extra speed is lost.
-                if (incremental && !fetch.Ok && !fetch.NetworkError)
-                {
-                    incremental = false;
-                    TB_LotwLoadingText.Text = "QRZ would not take the quick check — downloading everything…";
-                    TB_LotwLoadingSub.Text = "Reading your confirmed QSOs from QRZ.com.";
-                    fetch = await QrzLogbookService.FetchConfirmationsAsync(key, null, ct);
-                }
+                QrzLogbookService.QrzFetchResult fetch = await QrzLogbookService.FetchConfirmationsAsync(key, ct);
 
                 if (fetch.NetworkError)
                 {
@@ -2024,20 +1994,7 @@ namespace HolyLogger
                 var qs = Properties.Settings.Default;
                 QrzConfirmedEntities = string.Join("|", qrzNames);
                 QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
-                // On an incremental run this is only what came back THIS time, so it is added to the
-                // running total rather than replacing it - the row means "confirmed on QRZ", not
-                // "confirmed in the last five minutes".
-                //
-                // What is added is the number of QSOs that actually CHANGED from unconfirmed to
-                // confirmed, not the number of records the service sent. A "since" filter is inclusive
-                // of its boundary, so a repeat check re-delivers whatever sat exactly on it; counting
-                // records would creep the total upward every time. A record already marked changes
-                // nothing and therefore adds nothing. No list of seen records to keep, and it cannot
-                // drift. A full download still sets the true figure outright.
-                QrzConfirmedQsoCount = incremental
-                    ? QrzConfirmedQsoCount + Math.Max(0, ConfirmedInLog(ConfSource.Qrz) - confirmedBefore)
-                    : confirmations.Count;
-                LogState("QrzLastCheck", stampedAt);
+                QrzConfirmedQsoCount = confirmations.Count;   // what QRZ reported, always the whole set
                 qs.Save();
 
                 // Re-read the log so the QSO confirmation flags (which the zone lists use) are live, then
