@@ -1866,11 +1866,13 @@ namespace HolyLogger
                 // colors the rows, and fills the 3-row summary. No manual reopen needed.
                 ReloadQsosAfterCheck();
 
-                // A full download (Get All Confirmations, or a first-ever check) ends with a summary,
-                // so the operator knows it finished and can SEE that every log was updated, not only the
-                // one open now. Left off an incremental check, which would nag on each routine run.
-                if (!incremental)
-                    ShowFullDownloadSummary(qslCount, markedConfirmed);
+                // EVERY check ends with a summary, incremental included. It used to be left off the
+                // quick check to avoid nagging, which meant pressing the button and getting no answer
+                // at all - and it read as a fault beside eQSL and QRZ, which do report. Consistency
+                // wins: press a button, get told what happened.
+                ShowFullDownloadSummary(qslCount, markedConfirmed,
+                                        anythingChanged: !incremental || newCount > 0,
+                                        quickCheck: incremental);
             }
             catch (OperationCanceledException)
             {
@@ -2029,7 +2031,9 @@ namespace HolyLogger
                 // "now marked" only when this run actually marked something. A full rebuild always
                 // counts as a change (it rewrote every mark); a quick check that found nothing has
                 // changed nothing, and saying "now" would claim work that did not happen.
-                ShowQrzDownloadSummary(fetch.Count, !incremental || ConfirmedInLog(ConfSource.Qrz) > confirmedBefore);
+                ShowQrzDownloadSummary(fetch.Count,
+                                       !incremental || ConfirmedInLog(ConfSource.Qrz) > confirmedBefore,
+                                       incremental);
             }
             catch (OperationCanceledException)
             {
@@ -2053,36 +2057,18 @@ namespace HolyLogger
 
         // QRZ counterpart of ShowFullDownloadSummary: reports the download and shows, per log, that the
         // marks reached every log holding a matching QSO - not only the one open now.
-        private void ShowQrzDownloadSummary(int downloaded, bool anythingChanged)
+        private void ShowQrzDownloadSummary(int downloaded, bool anythingChanged, bool quickCheck = false)
         {
             var text = new System.Text.StringBuilder();
-            text.AppendLine($"Downloaded {downloaded:N0} confirmed QSO(s) from QRZ.com.");
+            text.AppendLine(quickCheck && downloaded == 0
+                ? "Nothing new at QRZ since your last check."
+                : $"Downloaded {downloaded:N0} confirmed QSO(s) from QRZ.com.");
             text.AppendLine();
-
-            try
-            {
-                var perLog = Dal?.GetQrzConfirmedCountsByLog() ?? new List<KeyValuePair<string, int>>();
-                int totalMarked = perLog.Sum(p => p.Value);
-
-                if (perLog.Count == 0)
-                {
-                    text.AppendLine("None of them matched a QSO in this log.");
-                }
-                else if (perLog.Count == 1)
-                {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on QRZ.");
-                }
-                else
-                {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) are marked QRZ-confirmed across your logs - this one included:");
-                    text.AppendLine();
-                    foreach (var p in perLog)
-                        text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
-                    text.AppendLine();
-                    text.AppendLine("Only THIS log was checked, and only it was changed - a download asks about one log's station callsign. The other logs above are shown as they stand from their own last check.");
-                }
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // THIS log only - see the note in ShowFullDownloadSummary for why the cross-log list went.
+            int marked = ConfirmedInLog(ConfSource.Qrz);
+            text.AppendLine(marked == 0
+                ? "None of them matched a QSO in this log."
+                : $"{marked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on QRZ.");
 
             HolyMessageBox.Show(text.ToString().TrimEnd(), "QRZ confirmations updated", HolyMsgType.Info, this);
         }
@@ -2192,16 +2178,19 @@ namespace HolyLogger
                     }
                     if (failed.Count == 0) LogState("EqslLastCheck", stampedAt);
 
-                    string why = failed.Count > 0 ? "\n\n" + string.Join("\n", failed) : "";
-                    HolyMessageBox.Show(
-                        (failed.Count > 0
-                            ? "The eQSL In Box could not be read." + why
-                            : incremental
-                                ? "Nothing new at eQSL since your last check."
-                                : "Your eQSL In Box has no confirmations for this log's callsign.")
-                        + "\n\nNothing in your log was changed.",
-                        "eQSL confirmations",
-                        failed.Count > 0 ? HolyMsgType.Warning : HolyMsgType.Info, this);
+                    // A real failure is its own message; an empty result goes through the SAME summary
+                    // every other service uses, so the four folders answer alike.
+                    if (failed.Count > 0)
+                    {
+                        HolyMessageBox.Show(
+                            "The eQSL In Box could not be read.\n\n" + string.Join("\n", failed) +
+                            "\n\nNothing in your log was changed.",
+                            "eQSL confirmations", HolyMsgType.Warning, this);
+                    }
+                    else
+                    {
+                        ShowEqslDownloadSummary(0, failed, false, incremental);
+                    }
                     RefreshForSource();
                     return;
                 }
@@ -2249,7 +2238,8 @@ namespace HolyLogger
 
                 ReloadQsosAfterCheck();
                 ShowEqslDownloadSummary(all.Count, failed,
-                                        !incremental || ConfirmedInLog(ConfSource.Eqsl) > confirmedBefore);
+                                        !incremental || ConfirmedInLog(ConfSource.Eqsl) > confirmedBefore,
+                                        incremental);
             }
             catch (OperationCanceledException)
             {
@@ -2272,31 +2262,18 @@ namespace HolyLogger
             }
         }
 
-        private void ShowEqslDownloadSummary(int downloaded, List<string> failed, bool anythingChanged)
+        private void ShowEqslDownloadSummary(int downloaded, List<string> failed, bool anythingChanged, bool quickCheck = false)
         {
             var text = new System.Text.StringBuilder();
-            text.AppendLine($"Downloaded {downloaded:N0} received eQSL(s) from your In Box.");
+            text.AppendLine(quickCheck && downloaded == 0
+                ? "Nothing new at eQSL since your last check."
+                : $"Downloaded {downloaded:N0} received eQSL(s) from your In Box.");
             text.AppendLine();
-            try
-            {
-                var perLog = Dal?.GetEqslConfirmedCountsByLog() ?? new List<KeyValuePair<string, int>>();
-                int totalMarked = perLog.Sum(p => p.Value);
-                if (perLog.Count == 0)
-                    text.AppendLine("None of them matched a QSO in this log.");
-                else if (perLog.Count == 1)
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on eQSL.");
-                else
-                {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) are marked eQSL-confirmed across your logs - this one included:");
-                    text.AppendLine();
-                    foreach (var p in perLog)
-                        text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
-                    text.AppendLine();
-                    text.AppendLine("Only THIS log was checked, and only it was changed - a download asks about one log's " +
-                                    "station callsign. The other logs above are shown as they stand from their own last check.");
-                }
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // THIS log only - see the note in ShowFullDownloadSummary for why the cross-log list went.
+            int marked = ConfirmedInLog(ConfSource.Eqsl);
+            text.AppendLine(marked == 0
+                ? "None of them matched a QSO in this log."
+                : $"{marked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on eQSL.");
 
             if (failed != null && failed.Count > 0)
             {
@@ -2461,26 +2438,11 @@ namespace HolyLogger
             var text = new System.Text.StringBuilder();
             text.AppendLine($"Downloaded {downloaded:N0} confirmed QSO(s) from Club Log.");
             text.AppendLine();
-            try
-            {
-                var perLog = Dal?.GetClublogConfirmedCountsByLog() ?? new List<KeyValuePair<string, int>>();
-                int totalMarked = perLog.Sum(p => p.Value);
-                if (perLog.Count == 0)
-                    text.AppendLine("None of them matched a QSO in this log.");
-                else if (perLog.Count == 1)
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on Club Log.");
-                else
-                {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) are marked Club Log-confirmed across your logs - this one included:");
-                    text.AppendLine();
-                    foreach (var p in perLog)
-                        text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
-                    text.AppendLine();
-                    text.AppendLine("Only THIS log was checked, and only it was changed - a download asks about one log's " +
-                                    "station callsign. The other logs above are shown as they stand from their own last check.");
-                }
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // THIS log only - see the note in ShowFullDownloadSummary for why the cross-log list went.
+            int marked = ConfirmedInLog(ConfSource.Clublog);
+            text.AppendLine(marked == 0
+                ? "None of them matched a QSO in this log."
+                : $"{marked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on Club Log.");
 
             if (failed != null && failed.Count > 0)
             {
@@ -2494,37 +2456,27 @@ namespace HolyLogger
         // Reports the outcome of a full confirmation download, and shows plainly that the marks reached
         // EVERY log - the per-log breakdown makes the cross-log effect visible instead of leaving the
         // operator to wonder whether their other logs were touched.
-        private void ShowFullDownloadSummary(int downloaded, int matched)
+        private void ShowFullDownloadSummary(int downloaded, int matched, bool anythingChanged = true, bool quickCheck = false)
         {
             var text = new System.Text.StringBuilder();
-            text.AppendLine($"Downloaded {downloaded:N0} confirmation(s) from LoTW.");
+            // A quick check that brought nothing back should say so in those words, rather than
+            // announcing "downloaded 0" as though a download were the point.
+            text.AppendLine(quickCheck && downloaded == 0
+                ? "Nothing new at LoTW since your last check."
+                : $"Downloaded {downloaded:N0} confirmation(s) from LoTW.");
             text.AppendLine();
 
-            try
-            {
-                var perLog = DataAccess.GetInstance()?.GetLotwConfirmedCountsByLog()
-                             ?? new List<KeyValuePair<string, int>>();
-                int totalMarked = perLog.Sum(p => p.Value);
-
-                if (perLog.Count == 0)
-                {
-                    text.AppendLine("None of them matched a QSO in this log.");
-                }
-                else if (perLog.Count == 1)
-                {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are already marked confirmed.");
-                }
-                else
-                {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) are marked confirmed across your logs - this one included:");
-                    text.AppendLine();
-                    foreach (var p in perLog)
-                        text.AppendLine($"    • {p.Key}:  {p.Value:N0}");
-                    text.AppendLine();
-                    text.AppendLine("Only THIS log was checked, and only it was changed - a download asks about one log's station callsign. The other logs above are shown as they stand from their own last check.");
-                }
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            // THIS log only, in the same two lines every other service uses.
+            //
+            // It used to print a count for every log that had marks, with a paragraph explaining that
+            // only this one was actually checked. That was worth saying while one download wrote into
+            // all of them; now that each download asks about a single callsign it is just other logs'
+            // numbers on a screen about this one - and it is exactly what led to "why does it mention
+            // 4Z5SL 2,760 when I asked for 4X2XMAS?".
+            int marked = ConfirmedInLog(ConfSource.Lotw);
+            text.AppendLine(marked == 0
+                ? "None of them matched a QSO in this log."
+                : $"{marked:N0} QSO(s) in your log are {(anythingChanged ? "now" : "already")} marked confirmed on LoTW.");
 
             HolyMessageBox.Show(text.ToString().TrimEnd(), "LoTW confirmations updated", HolyMsgType.Info, this);
         }
