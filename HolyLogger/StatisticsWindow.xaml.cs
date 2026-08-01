@@ -1268,6 +1268,27 @@ namespace HolyLogger
         private string ClublogConfirmedDeletedCodes { get { return LogState("ClublogConfirmedDeletedCodes"); } set { LogState("ClublogConfirmedDeletedCodes", value); } }
         private int ClublogConfirmedQsoCount { get { return LogStateInt("ClublogConfirmedQsoCount"); } set { LogState("ClublogConfirmedQsoCount", value.ToString()); } }
 
+        // How many QSOs in the open log currently carry that service's tick. Read from the database, so
+        // it is the truth at this instant - taken either side of a marking pass, the difference is
+        // exactly how many QSOs the pass newly confirmed.
+        private int ConfirmedInLog(ConfSource src)
+        {
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal == null) return 0;
+                switch (src)
+                {
+                    case ConfSource.Lotw: return dal.GetLotwConfirmedCount(dal.ActiveLogId);
+                    case ConfSource.Qrz: return dal.GetQrzConfirmedCount(dal.ActiveLogId);
+                    case ConfSource.Eqsl: return dal.GetEqslConfirmedCount(dal.ActiveLogId);
+                    case ConfSource.Clublog: return dal.GetClublogConfirmedCount(dal.ActiveLogId);
+                    default: return 0;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
         // The callsign the open log belongs to, or "" when it has no identity set.
         private string ActiveLogCallsign()
         {
@@ -1923,6 +1944,7 @@ namespace HolyLogger
             // Stamped BEFORE the request, so anything QRZ records while we are downloading is caught by
             // the next check rather than falling in the gap between the two.
             string stampedAt = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            int confirmedBefore = ConfirmedInLog(ConfSource.Qrz);   // to count what this run actually adds
             try
             {
                 QrzLogbookService.QrzFetchResult fetch =
@@ -2005,8 +2027,15 @@ namespace HolyLogger
                 // On an incremental run this is only what came back THIS time, so it is added to the
                 // running total rather than replacing it - the row means "confirmed on QRZ", not
                 // "confirmed in the last five minutes".
+                //
+                // What is added is the number of QSOs that actually CHANGED from unconfirmed to
+                // confirmed, not the number of records the service sent. A "since" filter is inclusive
+                // of its boundary, so a repeat check re-delivers whatever sat exactly on it; counting
+                // records would creep the total upward every time. A record already marked changes
+                // nothing and therefore adds nothing. No list of seen records to keep, and it cannot
+                // drift. A full download still sets the true figure outright.
                 QrzConfirmedQsoCount = incremental
-                    ? QrzConfirmedQsoCount + confirmations.Count
+                    ? QrzConfirmedQsoCount + Math.Max(0, ConfirmedInLog(ConfSource.Qrz) - confirmedBefore)
                     : confirmations.Count;
                 LogState("QrzLastCheck", stampedAt);
                 qs.Save();
@@ -2090,6 +2119,7 @@ namespace HolyLogger
             string since = incremental ? LogState("EqslLastCheck") : string.Empty;
             if (string.IsNullOrWhiteSpace(since)) incremental = false;   // nothing to be incremental from
             string stampedAt = DateTime.UtcNow.ToString("yyyyMMddHHmm");
+            int confirmedBefore = ConfirmedInLog(ConfSource.Eqsl);   // to count what this run actually adds
 
             List<EqslAccount> accounts;
             try { accounts = Dal?.GetEqslAccounts() ?? new List<EqslAccount>(); }
@@ -2224,8 +2254,10 @@ namespace HolyLogger
                 var s = Properties.Settings.Default;
                 EqslConfirmedEntities = string.Join("|", names);
                 EqslConfirmedDeletedCodes = string.Empty;
+                // Added: how many QSOs actually changed to confirmed, not how many cards arrived - see
+                // the QRZ path for why counting records would creep upward.
                 EqslConfirmedQsoCount = incremental
-                    ? EqslConfirmedQsoCount + all.Count
+                    ? EqslConfirmedQsoCount + Math.Max(0, ConfirmedInLog(ConfSource.Eqsl) - confirmedBefore)
                     : all.Count;                     // what eQSL reported (frame "Confirmed on eQSL")
                 LogState("EqslLastCheck", stampedAt);
                 s.Save();
