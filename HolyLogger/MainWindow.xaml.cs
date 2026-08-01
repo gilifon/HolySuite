@@ -2055,6 +2055,15 @@ namespace HolyLogger
                 {
                     ShowLogLoadingOverlay(false);
                     Mouse.OverrideCursor = null;
+
+                    // Switching logs changes the station callsign to the new log's identity (set above
+                    // by SyncCallsignToActiveLog) — the same situation as startup, so run the same
+                    // services check. It couldn't run on its own: SyncCallsignToActiveLog sets the box
+                    // programmatically, which never fires LostFocus, so the manual-edit path missed it.
+                    // Startup semantics (isStartup: true) keep routine switches quiet, only interrupting
+                    // when the new log's callsign has a real gap in an in-use eQSL/LoTW/Club Log service.
+                    // Deferred to here so the grid has painted and the busy cursor is gone first.
+                    ShowStationCallsignServicesAlert(TB_MyCallsign.Text?.Trim(), isStartup: true);
                 }), System.Windows.Threading.DispatcherPriority.ContextIdle);
             }
         }
