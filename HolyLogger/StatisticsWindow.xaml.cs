@@ -945,6 +945,7 @@ namespace HolyLogger
             if (BTN_CheckLotw != null)
             {
                 bool canCheckUpdates = _source == ConfSource.Lotw
+                                    || _source == ConfSource.Qrz
                                     || _source == ConfSource.Eqsl;
                 BTN_CheckLotw.Visibility = canCheckUpdates ? Visibility.Visible : Visibility.Collapsed;
                 BTN_CheckLotw.Content = "Check " + SourceName + " Updates";
@@ -1596,6 +1597,7 @@ namespace HolyLogger
         // cards and marking WITHOUT a reset - a partial answer must only ever add.
         private async void BTN_CheckLotw_Click(object sender, RoutedEventArgs e)
         {
+            if (_source == ConfSource.Qrz) { await RunQrzCheck(incremental: true); return; }
             if (_source == ConfSource.Eqsl) { await RunEqslCheck(incremental: true); return; }
 
             var s = Properties.Settings.Default;
@@ -1897,11 +1899,17 @@ namespace HolyLogger
         // when the other operator also logged it on QRZ), so it fills its own qrz_qsl_rcvd column and its
         // own tick and is never mixed with LoTW. One button, always a full fetch: the confirmed set is
         // small and cheap to download, so there is no incremental mode to get subtly wrong.
-        // Always the authoritative rebuild: QRZ has no working "only what is new" request, so there is
-        // one button and it does the whole thing.
         private async void BTN_CheckQrz_Click(object sender, RoutedEventArgs e)
         {
-            const bool incremental = false;
+            await RunQrzCheck(incremental: false);
+        }
+
+        // incremental=true adds MODSINCE, asking only for what changed since the last check.
+        private async System.Threading.Tasks.Task RunQrzCheck(bool incremental)
+        {
+            string since = incremental ? LogState("QrzLastCheck") : string.Empty;
+            if (string.IsNullOrWhiteSpace(since)) incremental = false;
+
             string key = Properties.Settings.Default.qrz_api_key?.Trim();
             if (string.IsNullOrWhiteSpace(key))
             {
@@ -1926,12 +1934,26 @@ namespace HolyLogger
             _checkCts = new System.Threading.CancellationTokenSource();
             var ct = _checkCts.Token;
             BTN_StopCheck.IsEnabled = true;
-            TB_LotwLoadingText.Text = "Downloading confirmations from QRZ…";
+            TB_LotwLoadingText.Text = incremental ? "Checking QRZ for what is new…" : "Downloading confirmations from QRZ…";
             TB_LotwLoadingSub.Text = "Reading your confirmed QSOs from QRZ.com.";
             ShowLotwSpinner(true);
+            string stampedAt = DateTime.UtcNow.ToString("yyyy-MM-dd");
+            int confirmedBefore = ConfirmedInLog(ConfSource.Qrz);
             try
             {
-                QrzLogbookService.QrzFetchResult fetch = await QrzLogbookService.FetchConfirmationsAsync(key, ct);
+                QrzLogbookService.QrzFetchResult fetch =
+                    await QrzLogbookService.FetchConfirmationsAsync(key, incremental ? since : null, ct);
+
+                // A quick check that QRZ genuinely refuses falls back to the full download, so the
+                // operator gets their confirmations either way. An EMPTY answer is not a refusal and
+                // does not come through here - see the note in QrzLogbookService about RESULT=FAIL
+                // with COUNT=0, which simply means nothing has changed.
+                if (incremental && !fetch.Ok && !fetch.NetworkError)
+                {
+                    incremental = false;
+                    TB_LotwLoadingText.Text = "QRZ would not take the quick check — downloading everything…";
+                    fetch = await QrzLogbookService.FetchConfirmationsAsync(key, null, ct);
+                }
 
                 if (fetch.NetworkError)
                 {
@@ -1994,7 +2016,10 @@ namespace HolyLogger
                 var qs = Properties.Settings.Default;
                 QrzConfirmedEntities = string.Join("|", qrzNames);
                 QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
-                QrzConfirmedQsoCount = confirmations.Count;   // what QRZ reported, always the whole set
+                QrzConfirmedQsoCount = incremental
+                    ? QrzConfirmedQsoCount + Math.Max(0, ConfirmedInLog(ConfSource.Qrz) - confirmedBefore)
+                    : confirmations.Count;
+                LogState("QrzLastCheck", stampedAt);
                 qs.Save();
 
                 // Re-read the log so the QSO confirmation flags (which the zone lists use) are live, then
@@ -2042,7 +2067,7 @@ namespace HolyLogger
                 }
                 else if (perLog.Count == 1)
                 {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on QRZ.");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are already marked confirmed on QRZ.");
                 }
                 else
                 {
@@ -2255,7 +2280,7 @@ namespace HolyLogger
                 if (perLog.Count == 0)
                     text.AppendLine("None of them matched a QSO in this log.");
                 else if (perLog.Count == 1)
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on eQSL.");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are already marked confirmed on eQSL.");
                 else
                 {
                     text.AppendLine($"{totalMarked:N0} QSO(s) are marked eQSL-confirmed across your logs - this one included:");
@@ -2439,7 +2464,7 @@ namespace HolyLogger
                 if (perLog.Count == 0)
                     text.AppendLine("None of them matched a QSO in this log.");
                 else if (perLog.Count == 1)
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed on Club Log.");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are already marked confirmed on Club Log.");
                 else
                 {
                     text.AppendLine($"{totalMarked:N0} QSO(s) are marked Club Log-confirmed across your logs - this one included:");
@@ -2483,7 +2508,7 @@ namespace HolyLogger
                 }
                 else if (perLog.Count == 1)
                 {
-                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are now marked confirmed.");
+                    text.AppendLine($"{totalMarked:N0} QSO(s) in your log are already marked confirmed.");
                 }
                 else
                 {

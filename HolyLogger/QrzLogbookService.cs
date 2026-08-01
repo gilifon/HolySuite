@@ -151,11 +151,17 @@ namespace HolyLogger
             public string Reason;
             public int Count;
             public List<DataAccess.LotwConfirmation> Confirmations = new List<DataAccess.LotwConfirmation>();
+
+            // The envelope QRZ sent back, minus the ADIF payload - "RESULT=...&REASON=..." and nothing
+            // more. Kept so a refusal can be shown in the operator's own words instead of a guess, and
+            // so the API key never has to leave the program to diagnose one.
+            public string RawHead;
         }
 
-        // Downloads every CONFIRMED QSO from the logbook this key belongs to. There is no "only what is
-        // new" variant - see the note on the option string below for what was tried.
+        // Downloads CONFIRMED QSOs from the logbook this key belongs to. modifiedSince (yyyy-MM-dd)
+        // adds MODSINCE; empty fetches the lot.
         public static async Task<QrzFetchResult> FetchConfirmationsAsync(string apiKey,
+                                                                         string modifiedSince = null,
                                                                          System.Threading.CancellationToken ct = default(System.Threading.CancellationToken))
         {
             var result = new QrzFetchResult();
@@ -176,10 +182,19 @@ namespace HolyLogger
             //     STATUS:CONFIRMED,MAX:100000,MODSINCE:2026-07-31     (commas, as QRZ's own example)
             //     STATUS:CONFIRMED;MAX:100000;MODSINCE:2026-07-31     (semicolons, as QRZ's prose)
             //     MODSINCE:2026-07-31,MAX:100000                      (alone, no STATUS)
+            //     STATUS:CONFIRMED,MODSINCE:2026-08-01,TYPE:ADIF,MAX:100000
+            //         - the exact form QRZ support/documentation describes, TYPE:ADIF included and
+            //           MODSINCE straight after STATUS. Refused like the rest.
+            //
+            // The endpoint is right (https://logbook.qrz.com/api, same one every other call uses) and
+            // the key is valid - it uploads, and the plain FETCH above returns all 453 records happily.
+            // Whatever MODSINCE needs, it is not in the published documentation.
             //
             // So do not spend time on it again without new information from QRZ. The full set is a few
             // hundred KB and cheap enough; the caller marks with fullReset.
-            string option = "STATUS:CONFIRMED,MAX:100000";
+            string option = string.IsNullOrWhiteSpace(modifiedSince)
+                ? "STATUS:CONFIRMED,MAX:100000"
+                : "STATUS:CONFIRMED,MODSINCE:" + modifiedSince.Trim() + ",TYPE:ADIF,MAX:100000";
 
             var fields = new List<KeyValuePair<string, string>>
             {
@@ -212,6 +227,7 @@ namespace HolyLogger
             string head = adifAt >= 0 ? body.Substring(0, adifAt) : body;
             string adifEscaped = adifAt >= 0 ? body.Substring(adifAt + 5) : string.Empty;
 
+            result.RawHead = (head ?? string.Empty).Trim();
             var map = ParseKeyValues(head);
             string rv;
             map.TryGetValue("RESULT", out rv);
@@ -220,6 +236,19 @@ namespace HolyLogger
             if (map.TryGetValue("REASON", out reason)) result.Reason = reason;
             string cnt;
             if (map.TryGetValue("COUNT", out cnt)) { int c; if (int.TryParse(cnt.Trim(), out c)) result.Count = c; }
+
+            // QRZ answers a FETCH that MATCHED NOTHING with "RESULT=FAIL&COUNT=0" and no REASON. That
+            // is an answer, not an error - and treating it as one is what made MODSINCE look broken for
+            // four attempts: asking for records changed since today rightly finds none, and the empty
+            // reply was read as a rejection. A genuine failure carries a REASON (and a bad key comes
+            // back as RESULT=AUTH), so both are still caught.
+            if (!result.Ok
+                && string.Equals(rv, "FAIL", StringComparison.OrdinalIgnoreCase)
+                && result.Count == 0
+                && string.IsNullOrWhiteSpace(result.Reason))
+            {
+                result.Ok = true;          // nothing matched; Confirmations stays empty
+            }
 
             if (result.Ok && adifEscaped.Length > 0)
             {
