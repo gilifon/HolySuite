@@ -153,21 +153,29 @@ namespace HolyLogger
             public List<DataAccess.LotwConfirmation> Confirmations = new List<DataAccess.LotwConfirmation>();
         }
 
-        // Downloads every CONFIRMED QSO from the logbook this key belongs to. QRZ has no "changed since"
-        // that helps here the way LoTW's qslsince does, and the whole confirmed set is small and cheap
-        // (a few hundred KB), so this always fetches all of them; the caller marks with fullReset.
+        // Downloads CONFIRMED QSOs from the logbook this key belongs to.
+        //
+        // modifiedSince (yyyy-MM-dd, or null/empty for everything) becomes QRZ's MODSINCE option -
+        // "only return records modified since this date" - which is what makes a quick repeat check
+        // possible instead of pulling the whole confirmed set every time. The caller marks WITHOUT a
+        // full reset when it passes a date, since a partial answer must only ever add.
         public static async Task<QrzFetchResult> FetchConfirmationsAsync(string apiKey,
+                                                                         string modifiedSince = null,
                                                                          System.Threading.CancellationToken ct = default(System.Threading.CancellationToken))
         {
             var result = new QrzFetchResult();
             if (string.IsNullOrWhiteSpace(apiKey)) { result.Reason = "auth"; return result; }
 
+            // STATUS:CONFIRMED -> only confirmed records; MAX high enough to never page.
+            string option = "STATUS:CONFIRMED,MAX:100000";
+            if (!string.IsNullOrWhiteSpace(modifiedSince))
+                option += ",MODSINCE:" + modifiedSince.Trim();
+
             var fields = new List<KeyValuePair<string, string>>
             {
                 new KeyValuePair<string, string>("KEY", apiKey.Trim()),
                 new KeyValuePair<string, string>("ACTION", "FETCH"),
-                // STATUS:CONFIRMED -> only confirmed records; MAX high enough to never page.
-                new KeyValuePair<string, string>("OPTION", "STATUS:CONFIRMED,MAX:100000")
+                new KeyValuePair<string, string>("OPTION", option)
             };
 
             string body;

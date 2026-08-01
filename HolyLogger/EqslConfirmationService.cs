@@ -41,7 +41,14 @@ namespace HolyLogger
 
         // Downloads and parses one eQSL account's In Box. stationCallsign is stamped on every confirmation
         // (used to scope the match to this operator's QSOs).
+        //
+        // rcvdSince (yyyyMMddHHmm, or null/empty for the whole In Box) becomes eQSL's RcvdSince
+        // parameter - "everything that was entered into the database on or after this date/time" -
+        // which is what makes a quick repeat check possible. Note it filters on when the CARD ARRIVED,
+        // not on the QSO's date, so the marker the caller stores has to be the moment of the last
+        // check, not the date of any QSO.
         public static async Task<EqslFetchResult> FetchInboxAsync(string username, string password, string stationCallsign,
+                                                                  string rcvdSince = null,
                                                                   System.Threading.CancellationToken ct = default(System.Threading.CancellationToken))
         {
             var result = new EqslFetchResult();
@@ -57,7 +64,8 @@ namespace HolyLogger
             {
                 string url = InboxUrl
                     + "?UserName=" + Uri.EscapeDataString(username.Trim())
-                    + "&Password=" + Uri.EscapeDataString(password);
+                    + "&Password=" + Uri.EscapeDataString(password)
+                    + (string.IsNullOrWhiteSpace(rcvdSince) ? "" : "&RcvdSince=" + Uri.EscapeDataString(rcvdSince.Trim()));
                 using (var resp = await _http.GetAsync(url, ct))
                     html = await resp.Content.ReadAsStringAsync();
             }

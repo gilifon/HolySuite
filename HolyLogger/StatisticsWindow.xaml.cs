@@ -934,10 +934,21 @@ namespace HolyLogger
             // one open folder rather than two unrelated halves wearing different colours.
             ApplyLeftViewColour();
 
-            // Only "Check LoTW Updates" (incremental) lives in the header; the per-source full-download
-            // buttons live in the summary frame and are toggled by PopulateConfirmedSummary.
+            // The header button is the INCREMENTAL check - "just what is new". It is offered by every
+            // service whose download can be asked for only recent records: LoTW (qso_qslsince), QRZ
+            // (MODSINCE) and eQSL (RcvdSince). Club Log cannot - its date filters apply to OQRS card
+            // requests, not to the log export - and Paper QSL has nothing to download at all, so on
+            // those two folders the button is hidden and the full download in the frame is the only way.
             if (BTN_CheckLotw != null)
-                BTN_CheckLotw.Visibility = _source == ConfSource.Lotw ? Visibility.Visible : Visibility.Collapsed;
+            {
+                bool canCheckUpdates = _source == ConfSource.Lotw
+                                    || _source == ConfSource.Qrz
+                                    || _source == ConfSource.Eqsl;
+                BTN_CheckLotw.Visibility = canCheckUpdates ? Visibility.Visible : Visibility.Collapsed;
+                BTN_CheckLotw.Content = "Check " + SourceName + " Updates";
+                BTN_CheckLotw.ToolTip = "Fetches only what is NEW since your last check — the quick, everyday update.\n\n"
+                                      + "To rebuild from scratch instead, use “Get All " + SourceName + " Confirmations” below.";
+            }
         }
 
         // Restore the last downloaded confirmed-entity set so the colors/count show immediately on open
@@ -1557,8 +1568,14 @@ namespace HolyLogger
             BTN_CheckLotw_Click(sender, e);
         }
 
+        // The header button now serves three folders, so it routes to whichever is open. QRZ and eQSL
+        // run the same download as their full button, only asked for recent records and marking WITHOUT
+        // a reset - a partial answer must only ever add.
         private async void BTN_CheckLotw_Click(object sender, RoutedEventArgs e)
         {
+            if (_source == ConfSource.Qrz) { await RunQrzCheck(incremental: true); return; }
+            if (_source == ConfSource.Eqsl) { await RunEqslCheck(incremental: true); return; }
+
             var s = Properties.Settings.Default;
             string user = s.LotwWebUser?.Trim();
             string pass = s.LotwWebPassword;
@@ -1860,6 +1877,17 @@ namespace HolyLogger
         // small and cheap to download, so there is no incremental mode to get subtly wrong.
         private async void BTN_CheckQrz_Click(object sender, RoutedEventArgs e)
         {
+            await RunQrzCheck(incremental: false);
+        }
+
+        // incremental=true asks QRZ only for records modified since the last check (MODSINCE) and marks
+        // WITHOUT clearing first, so a partial answer can only add. false is the authoritative rebuild.
+        private async System.Threading.Tasks.Task RunQrzCheck(bool incremental)
+        {
+            // Nothing to be incremental FROM on the first run, so that falls back to a full download.
+            string since = incremental ? LogState("QrzLastCheck") : string.Empty;
+            if (string.IsNullOrWhiteSpace(since)) incremental = false;
+
             string key = Properties.Settings.Default.qrz_api_key?.Trim();
             if (string.IsNullOrWhiteSpace(key))
             {
@@ -1884,12 +1912,21 @@ namespace HolyLogger
             _checkCts = new System.Threading.CancellationTokenSource();
             var ct = _checkCts.Token;
             BTN_StopCheck.IsEnabled = true;
-            TB_LotwLoadingText.Text = "Downloading confirmations from QRZ…";
-            TB_LotwLoadingSub.Text = "Reading your confirmed QSOs from QRZ.com.";
+            TB_LotwLoadingText.Text = incremental
+                ? "Checking QRZ for what is new…"
+                : "Downloading confirmations from QRZ…";
+            TB_LotwLoadingSub.Text = incremental
+                ? $"Records changed at QRZ since {since}."
+                : "Reading your confirmed QSOs from QRZ.com.";
             ShowLotwSpinner(true);
+
+            // Stamped BEFORE the request, so anything QRZ records while we are downloading is caught by
+            // the next check rather than falling in the gap between the two.
+            string stampedAt = DateTime.UtcNow.ToString("yyyy-MM-dd");
             try
             {
-                QrzLogbookService.QrzFetchResult fetch = await QrzLogbookService.FetchConfirmationsAsync(key, ct);
+                QrzLogbookService.QrzFetchResult fetch =
+                    await QrzLogbookService.FetchConfirmationsAsync(key, incremental ? since : null, ct);
 
                 if (fetch.NetworkError)
                 {
@@ -1921,8 +1958,10 @@ namespace HolyLogger
                 List<DataAccess.LotwConfirmation> unmatched = null;
                 int otherStations;
                 confirmations = ForThisLog(confirmations, out otherStations);   // this log's callsign only
+                // fullReset only on the authoritative rebuild. An incremental answer holds just what
+                // changed, so clearing first would throw away every mark it does not happen to mention.
                 int marked = await Task.Run(() =>
-                    Dal.MarkQrzConfirmed(confirmations, true, ((IProgress<int>)markProgress).Report, ct, out unmatched));
+                    Dal.MarkQrzConfirmed(confirmations, !incremental, ((IProgress<int>)markProgress).Report, ct, out unmatched));
 
                 // The marks went into the database; the open grid is showing QSO objects read when the
                 // log was opened, so re-read them for the QRZ ticks to appear now rather than on restart.
@@ -1950,7 +1989,13 @@ namespace HolyLogger
                 var qs = Properties.Settings.Default;
                 QrzConfirmedEntities = string.Join("|", qrzNames);
                 QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
-                QrzConfirmedQsoCount = confirmations.Count;   // what QRZ reported (frame "Confirmed on QRZ")
+                // On an incremental run this is only what came back THIS time, so it is added to the
+                // running total rather than replacing it - the row means "confirmed on QRZ", not
+                // "confirmed in the last five minutes".
+                QrzConfirmedQsoCount = incremental
+                    ? QrzConfirmedQsoCount + confirmations.Count
+                    : confirmations.Count;
+                LogState("QrzLastCheck", stampedAt);
                 qs.Save();
 
                 // Re-read the log so the QSO confirmation flags (which the zone lists use) are live, then
@@ -2021,6 +2066,18 @@ namespace HolyLogger
         // only approximate. Always a full rebuild.
         private async void BTN_CheckEqsl_Click(object sender, RoutedEventArgs e)
         {
+            await RunEqslCheck(incremental: false);
+        }
+
+        // incremental=true asks eQSL only for cards that ARRIVED since the last check (RcvdSince) and
+        // marks without clearing. Note the filter is on arrival time, not on the QSO's date, so the
+        // marker stored is the moment of the check.
+        private async System.Threading.Tasks.Task RunEqslCheck(bool incremental)
+        {
+            string since = incremental ? LogState("EqslLastCheck") : string.Empty;
+            if (string.IsNullOrWhiteSpace(since)) incremental = false;   // nothing to be incremental from
+            string stampedAt = DateTime.UtcNow.ToString("yyyyMMddHHmm");
+
             List<EqslAccount> accounts;
             try { accounts = Dal?.GetEqslAccounts() ?? new List<EqslAccount>(); }
             catch (Exception ex) { HolyMessageBox.Show("Couldn't read eQSL accounts: " + ex.Message, "eQSL confirmations", HolyMsgType.Warning, this); return; }
@@ -2079,9 +2136,12 @@ namespace HolyLogger
                 {
                     ct.ThrowIfCancellationRequested();
                     idx++;
-                    TB_LotwLoadingText.Text = $"Downloading eQSL In Box… ({idx} of {accounts.Count})";
+                    TB_LotwLoadingText.Text = incremental
+                        ? $"Checking eQSL for new cards… ({idx} of {accounts.Count})"
+                        : $"Downloading eQSL In Box… ({idx} of {accounts.Count})";
                     TB_LotwLoadingSub.Text = $"Account {acct.Callsign}";
-                    var r = await EqslConfirmationService.FetchInboxAsync(acct.Username, acct.Password, acct.Callsign, ct);
+                    var r = await EqslConfirmationService.FetchInboxAsync(
+                        acct.Username, acct.Password, acct.Callsign, incremental ? since : null, ct);
                     if (r.Ok) all.AddRange(r.Confirmations);
                     else if (r.NetworkError) { failed.Add($"{acct.Callsign}: no connection"); }
                     else failed.Add($"{acct.Callsign}: {r.Reason}");
@@ -2117,8 +2177,9 @@ namespace HolyLogger
                 List<DataAccess.LotwConfirmation> unmatched = null;
                 int otherStations;
                 all = ForThisLog(all, out otherStations);   // this log's callsign only
+                // fullReset only on the authoritative rebuild - see the QRZ path for why.
                 int marked = await Task.Run(() =>
-                    Dal.MarkEqslConfirmed(all, true, ((IProgress<int>)markProgress).Report, ct, out unmatched));
+                    Dal.MarkEqslConfirmed(all, !incremental, ((IProgress<int>)markProgress).Report, ct, out unmatched));
 
                 if (marked > 0)
                 {
@@ -2140,7 +2201,10 @@ namespace HolyLogger
                 var s = Properties.Settings.Default;
                 EqslConfirmedEntities = string.Join("|", names);
                 EqslConfirmedDeletedCodes = string.Empty;
-                EqslConfirmedQsoCount = all.Count;   // what eQSL reported (frame "Confirmed on eQSL")
+                EqslConfirmedQsoCount = incremental
+                    ? EqslConfirmedQsoCount + all.Count
+                    : all.Count;                     // what eQSL reported (frame "Confirmed on eQSL")
+                LogState("EqslLastCheck", stampedAt);
                 s.Save();
 
                 ReloadQsosAfterCheck();
