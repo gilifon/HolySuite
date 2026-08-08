@@ -1,4 +1,4 @@
-using DXCCManager;
+﻿using DXCCManager;
 using HolyParser;
 using Newtonsoft.Json;
 using System;
@@ -49,7 +49,14 @@ namespace HolyLogger
         // The confirmation source whose analysis the window is currently showing - one folder each in the
         // vertical tab strip. "Worked" is the plain log with no confirmation overlay; the rest color the
         // worked list by that service's confirmations. Only LoTW and QRZ are wired in this first step.
-        private enum ConfSource { Worked, Lotw, Qrz, Eqsl, Clublog, Paper }
+        // Award is not a service: it is every source the ARRL actually accepts, added together - LoTW,
+        // a paper card, or a credit the ARRL has already granted. It exists because no single tab can
+        // answer "how many countries do I have for DXCC": the sets genuinely differ. In the log this was
+        // built against, LoTW confirms 325 including Bouvet but not Minami Torishima (paper card only),
+        // and the granted credits are a different 325 - Minami yes, Bouvet never submitted. Together: 326.
+        // QRZ, eQSL and Club Log are deliberately NOT in it. The ARRL does not accept them, so counting
+        // them would produce a bigger number that no award will honour.
+        private enum ConfSource { Worked, Lotw, Qrz, Eqsl, Clublog, Paper, Award }
         private ConfSource _source = ConfSource.Worked;
 
         // Cancels the running Check (download + marking) when the operator presses Stop. A fresh source
@@ -172,6 +179,14 @@ namespace HolyLogger
             return _allQsos.Where(q => q != null && IsAchievedForSource(q)).ToList();
         }
 
+        // What the LEFT panel calls the open folder. The LoTW folder counts paper cards alongside LoTW's
+        // own confirmations - the ARRL accepts both - so the left panel says so rather than labelling a
+        // card "LoTW". Everywhere else the folder's own name is the whole truth.
+        private string LeftSourceTitle()
+        {
+            return _source == ConfSource.Lotw ? "LoTW + card" : SourceTitle(_source);
+        }
+
         // Repaints everything that depends on which source folder is open. Cheap enough to run on every
         // folder change: one pass over the log to filter, then the pivot's own pass.
         private void ApplySourceCounts()
@@ -180,6 +195,14 @@ namespace HolyLogger
             List<QSO> qsos = SourceQsos();
 
             TB_TotalQSOs.Text = qsos.Count.ToString("N0");
+
+            // "Total" would be a lie on a confirmation folder - the count under it is that source's
+            // confirmed QSOs, not the log's total - so the tile names the source, like the pivot header
+            // right below it already does.
+            if (TB_TotalQsoLabel != null)
+                TB_TotalQsoLabel.Text = _source == ConfSource.Worked
+                    ? "Total QSOs"
+                    : LeftSourceTitle() + " QSOs";
 
             _uniqueCallsText = qsos
                 .Select(q => q.DXCall)
@@ -199,8 +222,24 @@ namespace HolyLogger
             BuildPivot(qsos);
 
             TB_PivotHeader.Text = "QSOs by Bands & Mode"
-                + (_source == ConfSource.Worked ? "" : " — " + SourceTitle(_source))
+                + (_source == ConfSource.Worked ? "" : " — " + LeftSourceTitle())
                 + "\n(" + qsos.Count.ToString("N0") + ")";
+
+            // The status line lives here, not in ComputeStats, so it FOLLOWS the folder: it used to be
+            // written once at window open and then kept showing the whole-log figure while everything
+            // above it had been recomputed for the open source - "computed for 28,366" over a page of
+            // numbers computed for 19,263. On a confirmation folder it now names both, because both are
+            // worth knowing: what this source has confirmed, and how big the log is underneath it.
+            if (TB_Status != null)
+            {
+                int logTotal = _allQsos != null ? _allQsos.Count : 0;
+                TB_Status.Text =
+                    logTotal == 0            ? "No QSOs to analyze." :
+                    _source == ConfSource.Worked
+                        ? $"Statistics computed for {logTotal:N0} QSO{(logTotal == 1 ? "" : "s")}."
+                        : $"Statistics computed for {qsos.Count:N0} {SourceTitle(_source)}-confirmed "
+                          + $"QSO{(qsos.Count == 1 ? "" : "s")} — this log holds {logTotal:N0}.";
+            }
         }
 
         private void ComputeStats()
@@ -269,8 +308,8 @@ namespace HolyLogger
             }
 
             PopulateMissingZones();
-
-            TB_Status.Text = $"Statistics computed for {total} QSO{(total == 1 ? "" : "s")}.";
+            // The status line is set by ApplySourceCounts (called above), which knows which folder is
+            // open - setting it here too would overwrite the folder-aware text with the whole-log one.
         }
 
         // Fills the "Missing CQ Zones" (1..40) and "Missing ITU Zones" (1..90) scrollable lists with
@@ -631,10 +670,11 @@ namespace HolyLogger
 
             // Feed the tile from the same count the table just made, so the two can never disagree.
             _countryCountText = grand.Count.ToString("N0");
+            _countryBreakdown = BuildCountryBreakdown(grand);
             ApplyUniqueTile();
 
             if (TB_CountryPivotHeader != null)
-                TB_CountryPivotHeader.Text = "Countries by Bands & Mode — " + SourceTitle(_source)
+                TB_CountryPivotHeader.Text = "Countries by Bands & Mode — " + LeftSourceTitle()
                                              + "\n(" + grand.Count.ToString("N0") + ")";
 
             // An empty table is not a fault - it means that service has confirmed nothing in this log -
@@ -656,6 +696,7 @@ namespace HolyLogger
         // country figure is whatever the DXCC table last counted, so tile and table always agree.
         private string _uniqueCallsText = "0";
         private string _countryCountText = "0";
+        private List<KeyValuePair<string, string>> _countryBreakdown = new List<KeyValuePair<string, string>>();
 
         private void BuildLeftViewFolders()
         {
@@ -709,12 +750,86 @@ namespace HolyLogger
         // The middle tile belongs to whichever folder is open: "Unique Calls" counts callsigns, which
         // means nothing on the DXCC folder, so there it becomes "Countries" and shows what the table
         // below it totals.
+        // The parts the country total is made of, written out under it: which source earned each country,
+        // and how many are DELETED entities.
+        //
+        // The total counts deleted entities and the tiles opposite do not, which is why "331" here and
+        // "326" there look like a contradiction and why 326 + 2 never reached 331. Naming the parts is
+        // what makes the two readable side by side - and on the LoTW folder it also says plainly which
+        // countries came from a card rather than from LoTW, since that folder counts both.
+        private List<KeyValuePair<string, string>> BuildCountryBreakdown(HashSet<string> countries)
+        {
+            var empty = new List<KeyValuePair<string, string>>();
+            if (countries == null || countries.Count == 0) return empty;
+
+            var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
+            int deleted = countries.Count(n => !current.Contains(n));
+            int active = countries.Count - deleted;
+
+            // ONE PART PER LINE. Side by side they made the tile far wider than the two beside it, which
+            // dragged the whole left page - and the source folders beyond it - out with them. Stacked, the
+            // tile keeps its original width and the parts can be read at a proper size.
+            // WORD FIRST, NUMBER AFTER, one part per row - the words right-justified against the numbers
+            // so the three read as a small table. No "+" signs: the rows are parts OF the total above
+            // them, and a plus sign invites the reader to add them to it instead.
+            var parts = new List<KeyValuePair<string, string>>();
+            if (_source == ConfSource.Lotw)
+            {
+                // Split the active ones by what actually earned them. Cards first-class, not an asterisk,
+                // and named exactly as their own folder names them.
+                int card = PaperOnlyEntities().Count(n => countries.Contains(n));
+                parts.Add(new KeyValuePair<string, string>("LoTW", (active - card).ToString()));
+                parts.Add(new KeyValuePair<string, string>("Paper QSL", card.ToString()));
+            }
+            else
+            {
+                parts.Add(new KeyValuePair<string, string>("active", active.ToString()));
+            }
+            if (deleted > 0)
+                parts.Add(new KeyValuePair<string, string>("deleted", deleted.ToString()));
+            return parts;
+        }
+
         private void ApplyUniqueTile()
         {
             if (TB_UniqueCalls == null || TB_UniqueCallsLabel == null) return;
             bool qso = _leftView == LeftView.Qso;
+            // "Countries" alone was read as the same thing the tiles opposite count, and it is not: this
+            // one counts every country in the QSOs below it, DELETED entities included, while the tiles
+            // opposite are measured against the 340 that exist today and leave the deleted out. Two honest
+            // numbers, and the sum between them never worked (326 confirmed + 2 unconfirmed against 331
+            // here). Saying "incl. deleted" is what makes 331 = 326 + 5 readable instead of a puzzle.
             TB_UniqueCallsLabel.Text = qso ? "Unique Calls" : "Countries";
             TB_UniqueCalls.Text = qso ? _uniqueCallsText : _countryCountText;
+
+            // The tile is a FIXED width on both folders, so the left page - and the source folders beyond
+            // it - cannot shift sideways when the operator switches between QSO and DXCC. "Unique Calls"
+            // with a five-figure count does not fit that width on one line, so on the QSO folder the
+            // number sits UNDER its label; on the DXCC folder they share a line, leaving room for the
+            // three parts below them.
+            if (UniqueTileHeader != null)
+            {
+                UniqueTileHeader.Orientation = qso ? Orientation.Vertical : Orientation.Horizontal;
+                TB_UniqueCalls.Margin = qso ? new Thickness(0) : new Thickness(8, 0, 0, 0);
+                TB_UniqueCalls.HorizontalAlignment = qso ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+                TB_UniqueCallsLabel.HorizontalAlignment = qso ? HorizontalAlignment.Center : HorizontalAlignment.Left;
+            }
+
+            // The breakdown carries the "incl. deleted" meaning far better than a label could, so the
+            // label goes back to the plain word and the parts are spelled out underneath.
+            if (CountryBreakdownGrid != null)
+            {
+                bool show = !qso && _countryBreakdown != null && _countryBreakdown.Count > 0;
+                CountryBreakdownGrid.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                var labels = new[] { TB_BdL1, TB_BdL2, TB_BdL3 };
+                var values = new[] { TB_BdV1, TB_BdV2, TB_BdV3 };
+                for (int i = 0; i < labels.Length; i++)
+                {
+                    bool has = show && i < _countryBreakdown.Count;
+                    labels[i].Text = has ? _countryBreakdown[i].Key : string.Empty;
+                    values[i].Text = has ? _countryBreakdown[i].Value : string.Empty;
+                }
+            }
         }
 
         // The folder's name as the operator sees it on its tab.
@@ -727,6 +842,7 @@ namespace HolyLogger
                 case ConfSource.Eqsl: return "eQSL";
                 case ConfSource.Clublog: return "Club Log";
                 case ConfSource.Paper: return "Paper QSL";
+                case ConfSource.Award: return "DXCC Award";
                 default: return "Worked";
             }
         }
@@ -775,7 +891,12 @@ namespace HolyLogger
             ApplyWorkedSort();
         }
 
-        // Rebuilds the Missing Countries list for the CURRENT folder, so it always matches the Missing
+        // The list holds only CURRENT ("active") entities - it is built by subtracting from the 340 that
+        // exist today, so a deleted entity can never appear in it however it was worked or confirmed. The
+        // labels say "Missing Active Countries" for that reason, and to pair with "Confirmed Active
+        // Countries": both are measured against the same 340.
+        //
+        // Rebuilds the Missing list for the CURRENT folder, so it always matches the Missing
         // tile: on the Worked folder it is the entities never contacted; on a confirmation folder it is
         // the entities not confirmed by that source (all DXCC minus that source's confirmed set).
         private void RebuildMissingCountries()
@@ -783,7 +904,7 @@ namespace HolyLogger
             var allDxccEntities = _masterResolver.GetAllEntityNames();
             HashSet<string> achieved = _source == ConfSource.Worked
                 ? new HashSet<string>(_workedList.Select(c => c.Name), StringComparer.OrdinalIgnoreCase)
-                : _confirmedEntities;
+                : AchievedEntities();
 
             _missingList = allDxccEntities
                 .Where(n => !achieved.Contains(n))
@@ -794,6 +915,243 @@ namespace HolyLogger
             ApplyMissingSort();
         }
 
+        // Worked entities that still exist as DXCC countries - the basis every "/ 340" on this page uses.
+        private int WorkedActiveCount()
+        {
+            if (_workedList == null) return 0;
+            var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
+            return _workedList.Count(c => current.Contains(c.Name));
+        }
+
+        // A tile number is a TextBlock, not a Hyperlink, so its click arrives as a mouse event; the work
+        // itself is shared with anything else that wants to open the same list.
+        private void WorkedNotConfirmedTile_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            WorkedNotConfirmed_Click(sender, e);
+        }
+
+        // The countries in that tile, named - and, for each, what DOES confirm it. An operator told their
+        // log holds "2 not confirmed" while they know every country they worked came back has no way to
+        // check who is right; this shows them the two rows and the answer next to each.
+        private void WorkedNotConfirmed_Click(object sender, RoutedEventArgs e)
+        {
+            var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
+            HashSet<string> achieved = AchievedEntities();
+
+            // entity -> QSO count, and which services confirmed any of its QSOs
+            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            var sources = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
+            if (_allQsos != null)
+            {
+                foreach (QSO q in _allQsos)
+                {
+                    if (q == null) continue;
+                    DXCC d = Resolve(q.DXCall, q.Date);
+                    if (d == null || string.IsNullOrEmpty(d.Name)) continue;
+                    if (!current.Contains(d.Name) || achieved.Contains(d.Name)) continue;
+
+                    int n;
+                    counts[d.Name] = counts.TryGetValue(d.Name, out n) ? n + 1 : 1;
+                    SortedSet<string> set;
+                    if (!sources.TryGetValue(d.Name, out set)) sources[d.Name] = set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (q.LotwQslRcvd == 1) set.Add("LoTW");
+                    if (q.QrzQslRcvd == 1) set.Add("QRZ");
+                    if (q.EqslQslRcvd == 1) set.Add("eQSL");
+                    if (q.ClublogQslRcvd == 1) set.Add("Club Log");
+                    if (q.PaperQslRcvd == 1) set.Add("Paper QSL");
+                }
+            }
+
+            var rows = counts.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
+                             .Select(p => new
+                             {
+                                 Name = p.Key,
+                                 Count = p.Value,
+                                 ConfirmedBy = sources[p.Key].Count > 0 ? string.Join(", ", sources[p.Key]) : "— nothing —",
+                             }).ToList();
+
+            if (rows.Count == 0)
+            {
+                HolyMessageBox.Show(
+                    "Every current DXCC country in this log is confirmed here.\n\nNothing left to chase.",
+                    SourceName, HolyMsgType.Info, this);
+                return;
+            }
+
+            var grid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                SelectionMode = DataGridSelectionMode.Single,
+                FontSize = 16,
+                ItemsSource = rows,
+            };
+            grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+            ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+            grid.Columns.Add(new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            grid.Columns.Add(new DataGridTextColumn { Header = "QSOs", Binding = new System.Windows.Data.Binding("Count"), Width = 70 });
+            grid.Columns.Add(new DataGridTextColumn { Header = "Confirmed by", Binding = new System.Windows.Data.Binding("ConfirmedBy"), Width = 190 });
+
+            var win = new Window
+            {
+                Title = $"Worked, not confirmed at {SourceName} ({rows.Count})",
+                Owner = this,
+                Width = 560,
+                Height = 300,
+                MinWidth = 380,
+                MinHeight = 200,
+                ResizeMode = ResizeMode.CanResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = (System.Windows.Media.Brush)ThemeManager.Brush("WindowBg"),
+                Content = new Border { Padding = new Thickness(10), Child = grid },
+            };
+            WindowBounds.Attach(win, "WorkedNotConfirmed");
+            win.ShowDialog();
+        }
+
+        // The DELETED entities this folder counts as confirmed, with how many QSOs each rests on.
+        //
+        // Deleted entities are the figures an operator can least easily check: they are excluded from every
+        // "/ 340" on the page (correctly - they no longer exist), so the only trace of them was a bare
+        // count. A DXer who has chased one for years wants to see WHICH ones, and to be able to look again
+        // later without hunting for the window, which is why the list remembers where it was put.
+        private List<CountryItem> DeletedConfirmedCountries()
+        {
+            var byName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            if (_allQsos != null)
+            {
+                var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
+                foreach (QSO q in _allQsos)
+                {
+                    if (q == null || !IsAchievedForSource(q)) continue;
+                    DXCC d = Resolve(q.DXCall, q.Date);
+                    if (d == null || string.IsNullOrEmpty(d.Name)
+                        || string.Equals(d.Name, "Unknown", StringComparison.OrdinalIgnoreCase)) continue;
+                    if (current.Contains(d.Name)) continue;   // still exists - not a deleted entity
+                    int n;
+                    byName[d.Name] = byName.TryGetValue(d.Name, out n) ? n + 1 : 1;
+                }
+            }
+            return byName.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
+                         .Select(p => new CountryItem { Name = p.Key, Count = p.Value, FlagImage = GetFlagImage(p.Key) })
+                         .ToList();
+        }
+
+        // Click the "N deleted" count -> the list of those countries. The window keeps its position and
+        // size between openings (and between sessions) through WindowBounds, like the other windows.
+        private void DeletedCountries_Click(object sender, RoutedEventArgs e)
+        {
+            var list = DeletedConfirmedCountries();
+            if (list.Count == 0)
+            {
+                HolyMessageBox.Show("No deleted DXCC entities are confirmed here.", SourceName, HolyMsgType.Info, this);
+                return;
+            }
+
+            var grid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                SelectionMode = DataGridSelectionMode.Single,
+                FontSize = 16,
+                ItemsSource = list,
+            };
+            grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+            ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+            grid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "Deleted country",
+                Binding = new System.Windows.Data.Binding("Name"),
+                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
+            });
+            grid.Columns.Add(new DataGridTextColumn
+            {
+                Header = "QSOs",
+                Binding = new System.Windows.Data.Binding("Count"),
+                Width = 80,
+            });
+
+            var win = new Window
+            {
+                Title = $"Deleted countries confirmed — {SourceName} ({list.Count})",
+                Owner = this,
+                Width = 380,
+                Height = 300,
+                MinWidth = 300,
+                MinHeight = 200,
+                ResizeMode = ResizeMode.CanResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = (System.Windows.Media.Brush)ThemeManager.Brush("WindowBg"),
+                Content = new Border { Padding = new Thickness(10), Child = grid },
+            };
+            // Remembers where the operator put it, for this and every future session.
+            WindowBounds.Attach(win, "DeletedCountries");
+            win.ShowDialog();
+        }
+
+        // How many CURRENT entities the operator holds a paper card for that the folder's own source has
+        // not confirmed. Deleted entities are left out: the figure sits beside a count measured against
+        // the 340 entities that exist today, and mixing the two is what made "330 / 340" unreadable.
+        // THE ONE SET the whole folder counts against: the entities this folder treats as achieved.
+        //
+        // Every number on the page reads from here - the Confirmed tile, the Missing list, the "worked,
+        // not confirmed" tile and the ticks in the table - so they cannot contradict each other. They did:
+        // when the LoTW folder started counting paper cards, only the Confirmed tile and the Missing list
+        // learned about it, and the middle tile kept measuring against LoTW alone. Minami Torishima was
+        // then confirmed AND not-confirmed at once, and the tiles read 326 + 3 against 333 worked.
+        //
+        // On the LoTW folder that means LoTW's own confirmations plus the paper cards, because the ARRL
+        // accepts both. Every other folder answers only for its own service.
+        private HashSet<string> AchievedEntities()
+        {
+            // The folder's confirmed set already IS the answer: on the LoTW folder LoadConfirmedCache
+            // counts a paper card as a confirmation (see IsAchievedForSource), so the cards are in here
+            // alongside LoTW's own. Every tile, the Missing list and the tick column read this one set.
+            return _confirmedEntities;
+        }
+
+        private HashSet<string> PaperOnlyEntities()
+        {
+            var paper = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var lotw = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            if (_allQsos == null) return paper;
+
+            // Both sets are read from the QSOs themselves rather than from the folder's confirmed set,
+            // because that set now HOLDS the paper cards - comparing against it would always answer zero
+            // and the line explaining the tile would quietly disappear.
+            var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
+            foreach (QSO q in _allQsos)
+            {
+                if (q == null) continue;
+                if (q.LotwQslRcvd != 1 && q.PaperQslRcvd != 1) continue;
+                DXCC d = Resolve(q.DXCall, q.Date);
+                if (d == null || string.IsNullOrEmpty(d.Name)) continue;
+                if (!current.Contains(d.Name)) continue;   // deleted entity - not part of "/ 340"
+                if (q.LotwQslRcvd == 1) lotw.Add(d.Name);
+                if (q.PaperQslRcvd == 1) paper.Add(d.Name);
+            }
+            paper.ExceptWith(lotw);   // what the card brings that LoTW does not
+            return paper;
+        }
+
+        // Whether an ADIF CREDIT_GRANTED list awards any DXCC credit. The field is a comma list of awards
+        // ("DXCC,DXCC-M,DXCC-CHAL,DXCC-5B,DXCC-20…"), each optionally qualified by how it was earned; every
+        // DXCC flavour means the entity itself has been credited. WAZ and other non-DXCC awards do not.
+        private static bool HasDxccCredit(string creditGranted)
+        {
+            if (string.IsNullOrWhiteSpace(creditGranted)) return false;
+            foreach (string token in creditGranted.Split(','))
+                if (token.Trim().StartsWith("DXCC", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+
         // Whether a QSO counts as "achieved" for the current folder - i.e. removes its entity/zone from
         // the Missing lists. On the Worked folder any logged QSO counts; on a confirmation folder only a
         // QSO confirmed by that source counts. Reads the per-QSO confirmation flags.
@@ -801,11 +1159,18 @@ namespace HolyLogger
         {
             switch (_source)
             {
-                case ConfSource.Lotw:    return q.LotwQslRcvd == 1;
+                // The LoTW folder counts the paper cards too, so the QSO list, the pivots and the country
+                // counts on the left agree with the tiles on the right instead of quietly using a narrower
+                // rule. The ARRL accepts a card exactly as it accepts a LoTW confirmation.
+                case ConfSource.Lotw:    return q.LotwQslRcvd == 1 || q.PaperQslRcvd == 1;
                 case ConfSource.Qrz:     return q.QrzQslRcvd == 1;
                 case ConfSource.Eqsl:    return q.EqslQslRcvd == 1;
                 case ConfSource.Clublog: return q.ClublogQslRcvd == 1;
                 case ConfSource.Paper:   return q.PaperQslRcvd == 1;
+                // Everything the ARRL accepts, in one answer: confirmed at LoTW, a paper card in hand, or
+                // a credit they have already granted for this contact.
+                case ConfSource.Award:   return q.LotwQslRcvd == 1 || q.PaperQslRcvd == 1
+                                             || HasDxccCredit(q.CreditGranted);
                 default:                 return true;
             }
         }
@@ -838,6 +1203,10 @@ namespace HolyLogger
                 AddSourceFolder(ConfSource.Clublog, "Club Log");
             // Paper QSL is manual (no service to configure), so it is ALWAYS available.
             AddSourceFolder(ConfSource.Paper, "Paper QSL");
+            // ...and last, the one that answers the question every DXer actually asks. Always shown: it
+            // needs no service and no setup, and it is the only tab whose number can be compared with an
+            // award standing. Placed at the end so no existing folder moves.
+            AddSourceFolder(ConfSource.Award, "DXCC Award");
             LB_Source.SelectedIndex = 0;   // Worked; fires LB_Source_SelectionChanged -> RefreshForSource
         }
 
@@ -865,6 +1234,7 @@ namespace HolyLogger
                 case ConfSource.Eqsl:    return HexBrush("#E6CCFF");                  // purple (the Msg buttons)
                 case ConfSource.Clublog: return HexBrush("#EAD9BF");                  // light brown
                 case ConfSource.Paper:   return HexBrush("#FFFFFF");                  // white
+                case ConfSource.Award:   return HexBrush("#FAD7A0");                  // award gold
                 default:                 return ThemeManager.Brush("RowOnFreqBg");    // Worked = on-frequency green
             }
         }
@@ -1023,18 +1393,23 @@ namespace HolyLogger
             _source == ConfSource.Qrz     ? "QRZ" :
             _source == ConfSource.Eqsl    ? "eQSL" :
             _source == ConfSource.Clublog ? "Club Log" :
-            _source == ConfSource.Paper   ? "Paper QSL" : "Worked";
+            _source == ConfSource.Paper   ? "Paper QSL" :
+            _source == ConfSource.Award   ? "DXCC Award" : "Worked";
 
         private void ApplyConfirmedHighlight()
         {
             if (_workedList == null) return;
             // The Worked folder has no confirmation source, so its Conf. column is blank (not all-crosses).
             bool showConf = _source != ConfSource.Worked;
+            // The same achieved set the Missing list is built from - so "worked, not confirmed" is exactly
+            // the worked countries that are NOT in the Missing list's achieved set, and the three tiles
+            // add up to the worked total instead of contradicting it.
+            HashSet<string> achieved = AchievedEntities();
             int confirmed = 0;
             foreach (var item in _workedList)
             {
                 item.ShowConfirmation = showConf;
-                item.IsConfirmed = _confirmedEntities.Contains(item.Name);
+                item.IsConfirmed = achieved.Contains(item.Name);
                 if (item.IsConfirmed) confirmed++;
             }
 
@@ -1045,23 +1420,80 @@ namespace HolyLogger
             // a separate clause.
             int deletedConfirmed = CountConfirmedDeleted();
 
-            // Kept to one line to fit the worked column (wrapping would misalign the four column
-            // headers, which share a fixed height). "of N" is dropped because the worked-countries
-            // header right above already shows that total.
-            TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
-            TB_LotwStatus.Text = (_source == ConfSource.Worked || _confirmedEntities.Count == 0)
-                ? string.Empty
-                : $"Confirmed ({SourceName}): {confirmed} active,  {deletedConfirmed} deleted";
-
             // The three source tiles. Confirmed and Missing PARTITION all DXCC entities (out of the full
-            // 340): Confirmed = entities confirmed by this source, Missing = 340 - Confirmed. "Worked,
-            // not confirmed" is the chaseable SUBSET of Missing - entities already contacted but not yet
-            // confirmed here (worked - confirmed) - so it is not a third partition, just a highlight.
+            // 340): Confirmed = CURRENT entities confirmed by this source, Missing = 340 - Confirmed.
+            // "Worked, not confirmed" is the chaseable SUBSET of Missing - entities already contacted but
+            // not yet confirmed here (worked - confirmed) - so it is not a third partition, just a
+            // highlight.
             int workedDxcc = _workedList.Count;                                  // 265 - entities contacted
             int totalDxcc  = _masterResolver.GetAllEntityNames().Count;         // 340 - all DXCC entities
             // The Missing tile ALWAYS reads the Missing Countries list, so tile and list can never
             // disagree (that mismatch is the bug this fixes). The list itself is source-aware.
             int missingCount = _missingList != null ? _missingList.Count : 0;
+
+            // Confirmed CURRENT ("active") entities - the number DXCC is actually awarded on. The
+            // `confirmed` counted above is every confirmed name in the worked list, and the resolver is
+            // date-aware, so a 1991 QSO resolves to the DELETED entity that existed then and lands in
+            // that figure too. The 340 total is cty.dat's list of entities that exist TODAY and has no
+            // deleted ones in it, so printing the mixed number against it read as "330 / 340" while
+            // Missing said 15 - three numbers that could not all be true at once.
+            // Deriving it as 340 minus Missing makes the two tiles a real partition of the current list
+            // by construction: Missing IS the current entities this source has not confirmed.
+            int confirmedActive = Math.Max(0, totalDxcc - missingCount);
+
+            // Kept to one line to fit the worked column (wrapping would misalign the four column
+            // headers, which share a fixed height). "of N" is dropped because the worked-countries
+            // header right above already shows that total. The two figures are disjoint - the deleted
+            // ones are NOT inside the active count - so the reader can add them up.
+            // On the LoTW folder ONLY: the current entities a paper card confirms and LoTW does not. The
+            // ARRL accepts both, so those countries count towards DXCC just as much - but they are NOT
+            // added into the LoTW figure, because that tile answers "what has LoTW confirmed" and must
+            // keep answering exactly that. Shown beside it instead, so the operator can see both halves
+            // of their real position without either number being quietly redefined. (The DXCC Award
+            // folder is where the two are actually added together.)
+            string paperNote = string.Empty;
+            if (_source == ConfSource.Lotw)
+            {
+                // Its OWN line. The line above it already fills the worked column at this font size, so
+                // anything appended is cut off mid-sentence - it read "…5 deleted,  +1" and stopped,
+                // which tells the operator nothing at all.
+                int paperOnly = PaperOnlyEntities().Count;
+                if (paperOnly > 0)
+                    paperNote = $"\n{confirmedActive - paperOnly} at LoTW  +  {paperOnly} by paper card";
+            }
+
+            // Built from inlines rather than one string, so the DELETED count can be a link: those
+            // entities are the hardest thing on this page to check, and the operator had no way to see
+            // WHICH ones they are without exporting the log and reading it elsewhere.
+            TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
+            TB_LotwStatus.Inlines.Clear();
+            if (_source != ConfSource.Worked && _confirmedEntities.Count > 0)
+            {
+                TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run(
+                    $"Confirmed ({SourceName}): {confirmedActive} active,  "));
+
+                if (deletedConfirmed > 0)
+                {
+                    var link = new System.Windows.Documents.Hyperlink(
+                        new System.Windows.Documents.Run($"{deletedConfirmed} deleted"))
+                    {
+                        ToolTip = "Click to see which deleted countries these are",
+                        Foreground = System.Windows.Media.Brushes.ForestGreen,
+                    };
+                    link.Click += DeletedCountries_Click;
+                    TB_LotwStatus.Inlines.Add(link);
+                }
+                else
+                {
+                    TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run("0 deleted"));
+                }
+
+                if (!string.IsNullOrEmpty(paperNote))
+                    TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run(paperNote));
+            }
+            // The tile above now counts the paper cards on the LoTW folder, so the deleted/active clause
+            // alone would no longer explain it - the second line does, by splitting the tile's own number
+            // into the two things it is made of.
 
             // The Confirmed tile only makes sense for a confirmation source; the Worked folder is the
             // plain log, so it shows just Worked / DXCC and Missing DXCC.
@@ -1074,7 +1506,7 @@ namespace HolyLogger
                 // "Countries" (the number is a country count); the source is named by the folder tab.
                 TB_WorkedTileLabel.Text = "Worked Countries";
                 TB_UniqueCountries.Text = $"{workedDxcc} / {totalDxcc}";
-                TB_MissingTileLabel.Text = "Missing Countries";
+                TB_MissingTileLabel.Text = "Missing Active Countries";
                 TB_MissingDxcc.Text = missingCount.ToString();
             }
             else
@@ -1082,11 +1514,30 @@ namespace HolyLogger
                 // Confirmation folder: Confirmed + Missing partition all 340. Worked-not-confirmed is
                 // the chaseable subset (contacted but not confirmed here). Labels spell out "Countries";
                 // the source name is dropped here because the folder tab (and status line) already show it.
-                TB_ConfirmedTileLabel.Text = "Confirmed Countries";
-                TB_WorkedTileLabel.Text = "Worked Countries, not confirmed";
-                TB_MissingTileLabel.Text = "Missing Countries";
-                TB_ConfirmedDxcc.Text = $"{confirmed} / {totalDxcc}";
-                TB_UniqueCountries.Text = Math.Max(0, workedDxcc - confirmed).ToString();
+                TB_ConfirmedTileLabel.Text = "Confirmed Active Countries";
+                // Two lines, because the label area is a fixed 44px shared by all three tiles: the full
+                // sentence needed three and the first one was cut off. The tooltip carries the long form.
+                TB_WorkedTileLabel.Text = "Worked Active, not confirmed";
+                TB_WorkedTileLabel.ToolTip = "Countries that still exist as DXCC entities, which you have worked but this source has not confirmed";
+                TB_MissingTileLabel.Text = "Missing Active Countries";
+                TB_ConfirmedDxcc.Text = $"{confirmedActive} / {totalDxcc}";
+                // ACTIVE only, like the two tiles beside it. It used to be worked-minus-confirmed over
+                // every entity, deleted ones included, so a deleted entity confirmed somewhere else (this
+                // operator's Blenheim Reef, on eQSL) showed up here as "worked, not confirmed" while the
+                // tiles either side of it were counting only the 340 that exist. Now all three answer for
+                // the same 340: this one is the part of Missing that has already been contacted.
+                int workedNotConfirmed = Math.Max(0, WorkedActiveCount() - confirmedActive);
+                TB_UniqueCountries.Text = workedNotConfirmed.ToString();
+
+                // Clickable, like the deleted count below: the number is an accusation ("you have worked
+                // countries that are not confirmed") and the operator is entitled to see which, and to
+                // see what DOES confirm each of them.
+                TB_UniqueCountries.MouseLeftButtonUp -= WorkedNotConfirmedTile_MouseUp;
+                bool clickable = workedNotConfirmed > 0;
+                if (clickable) TB_UniqueCountries.MouseLeftButtonUp += WorkedNotConfirmedTile_MouseUp;
+                TB_UniqueCountries.Cursor = clickable ? System.Windows.Input.Cursors.Hand : null;
+                TB_UniqueCountries.TextDecorations = clickable ? System.Windows.TextDecorations.Underline : null;
+                TB_UniqueCountries.ToolTip = clickable ? "Click to see which countries, and what confirms them" : null;
                 TB_MissingDxcc.Text = missingCount.ToString();
             }
 
@@ -1113,7 +1564,10 @@ namespace HolyLogger
 
             // Worked and Paper QSL have no downloaded summary (Paper is manual). Keep the frame's SPACE
             // (Hidden) so the zone lists still line up with the download folders.
-            if (_source == ConfSource.Worked || _source == ConfSource.Paper)
+            // Worked, Paper QSL and DXCC Award have no download of their own (Paper is manual, and Award is
+            // computed from the other sources), so there is no summary to show. Keep the frame's SPACE
+            // (Hidden) so the zone lists still line up with the download folders.
+            if (_source == ConfSource.Worked || _source == ConfSource.Paper || _source == ConfSource.Award)
             {
                 ConfirmSummaryPanel.Visibility = Visibility.Hidden;
                 return;
@@ -1575,8 +2029,15 @@ namespace HolyLogger
         // code with the "since" date reset to the beginning, so there is one download path, not two.
         private void BTN_GetAllConfirmations_Click(object sender, RoutedEventArgs e)
         {
+            // How many QSOs of THIS log are already marked. It used to count every marked QSO in the
+            // database, across all logs - a figure that belongs to no log the operator is looking at, and
+            // that reads as a promise about the log in front of them.
             int already = 0;
-            try { already = DataAccess.GetInstance()?.GetLotwConfirmedCount() ?? 0; }
+            try
+            {
+                var d = DataAccess.GetInstance();
+                if (d != null) already = d.GetLotwConfirmedCount(d.ActiveLogId);
+            }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             if (!HolyMessageBox.ShowConfirm(

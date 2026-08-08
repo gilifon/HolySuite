@@ -85,7 +85,15 @@ namespace HolyParser
 
         // contestId (optional) tags every exported QSO with <contest_id:…>. Defaults to null so all
         // existing callers produce byte-identical output; only the contest-log file exports pass it.
-        public static string GenerateAdif(IEnumerable<QSO> qso_list, string contestId = null)
+        //
+        // includeImportedFields writes back the fields an imported QSO carried that HolyLogger has no
+        // column for (QSO.ExtraAdif), so a log that came in from another program leaves again intact.
+        // OFF by default, and deliberately so: this same method builds the payload UPLOADED to LoTW,
+        // eQSL, QRZ and Club Log, and those services must be sent the fields they expect and nothing
+        // else - TQSL in particular rejects records carrying fields it does not know. Only the exports
+        // that write a FILE for the operator turn it on.
+        public static string GenerateAdif(IEnumerable<QSO> qso_list, string contestId = null,
+                                          bool includeImportedFields = false)
         {
             string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
@@ -99,6 +107,12 @@ namespace HolyParser
 
             foreach (QSO qso in qso_list)
             {
+                // The imported fields this QSO carries, and where its record starts in the buffer - the
+                // de-duplication below compares the two so no field can be written twice.
+                string imported = includeImportedFields ? qso.ExtraAdif : null;
+                if (string.IsNullOrWhiteSpace(imported)) imported = null;
+                int recordStart = adif.Length;
+
                 string[] datetime = string.IsNullOrWhiteSpace(qso.Date) ? new string[] { "", "" } : qso.Date.Split(new char[] { ' ' });
                 if (datetime.Length > 1)
                 {
@@ -139,7 +153,14 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.RST_SENT)) adif.AppendFormat("<rst_sent:{0}>{1}", qso.RST_SENT.Length, qso.RST_SENT);
                 if (!string.IsNullOrWhiteSpace(qso.Date)) adif.AppendFormat("<qso_date:{0}>{1}", qso.Date.Length, qso.Date);
                 if (!string.IsNullOrWhiteSpace(qso.Time)) adif.AppendFormat("<time_on:{0}>{1}", qso.Time.Length, qso.Time);
-                if (!string.IsNullOrWhiteSpace(qso.Time)) adif.AppendFormat("<time_off:{0}>{1}", qso.Time.Length, qso.Time);
+                // <time_off>: the real end time when the QSO was imported with one, otherwise a copy of
+                // time_on - HolyLogger does not record an end time of its own, and the field has always
+                // gone out. An imported truth always beats our copy.
+                string timeOff = !string.IsNullOrWhiteSpace(qso.TimeOff) ? qso.TimeOff.Trim() : qso.Time;
+                if (!string.IsNullOrWhiteSpace(timeOff) && !CarriesField(imported, "time_off"))
+                    adif.AppendFormat("<time_off:{0}>{1}", timeOff.Length, timeOff);
+                if (!string.IsNullOrWhiteSpace(qso.DateOff))
+                    adif.AppendFormat("<qso_date_off:{0}>{1}", qso.DateOff.Trim().Length, qso.DateOff.Trim());
                 if (!string.IsNullOrWhiteSpace(qso.Comment)) adif.AppendFormat("<comment:{0}>{1}", qso.Comment.Length, qso.Comment);
                 if (!string.IsNullOrWhiteSpace(qso.MyLocator)) adif.AppendFormat("<my_gridsquare:{0}>{1}", qso.MyLocator.Length, qso.MyLocator);
                 if (!string.IsNullOrWhiteSpace(qso.DXLocator)) adif.AppendFormat("<gridsquare:{0}>{1}", qso.DXLocator.Length, qso.DXLocator);
@@ -217,10 +238,91 @@ namespace HolyParser
                     // A received paper / bureau card is exactly what the standard QSL_RCVD field means.
                     adif.Append("<qsl_rcvd:1>Y");
                 }
+
+                // THE OPERATOR'S AWARD AND QSL RECORD, in the official ADIF fields ADIF defines for them.
+                // CREDIT_GRANTED especially: it is the ARRL's own record of what has been awarded for this
+                // contact, it cannot be recovered from anywhere else once lost, and it belongs in every
+                // file the operator takes out of here.
+                if (!string.IsNullOrWhiteSpace(qso.CreditGranted))
+                {
+                    string cg = qso.CreditGranted.Trim();
+                    adif.AppendFormat("<credit_granted:{0}>{1}", cg.Length, cg);
+                }
+                if (!string.IsNullOrWhiteSpace(qso.Cnty))
+                {
+                    string cnty = qso.Cnty.Trim();
+                    adif.AppendFormat("<cnty:{0}>{1}", cnty.Length, cnty);
+                }
+                if (!string.IsNullOrWhiteSpace(qso.QslVia))
+                {
+                    string via = qso.QslVia.Trim();
+                    adif.AppendFormat("<qsl_via:{0}>{1}", via.Length, via);
+                }
+                if (!string.IsNullOrWhiteSpace(qso.QslRDate))
+                {
+                    string qrd = qso.QslRDate.Trim();
+                    adif.AppendFormat("<qslrdate:{0}>{1}", qrd.Length, qrd);
+                }
+                if (!string.IsNullOrWhiteSpace(qso.QslSent))
+                {
+                    string qs = qso.QslSent.Trim();
+                    adif.AppendFormat("<qsl_sent:{0}>{1}", qs.Length, qs);
+                }
+                // The contest this QSO belongs to. An ACTIVE contest names the file being exported (the
+                // contestId argument above), so it wins; otherwise the QSO's own imported contest stands.
+                if (string.IsNullOrWhiteSpace(contestId) && !string.IsNullOrWhiteSpace(qso.ContestId))
+                {
+                    string cid = qso.ContestId.Trim();
+                    adif.AppendFormat("<contest_id:{0}>{1}", cid.Length, cid);
+                }
+
+                // Last in the record: everything this QSO arrived with that HolyLogger has no column for.
+                AppendImportedFields(adif, recordStart, imported);
+
                 adif.AppendLine("<eor>");
             }
 
             return adif.ToString();
+        }
+
+        // True when the carried text holds that field, so the exporter can stand aside and let the
+        // operator's own imported value be the one that goes out.
+        private static bool CarriesField(string imported, string field)
+        {
+            if (string.IsNullOrEmpty(imported)) return false;
+            foreach (System.Text.RegularExpressions.Match m in HolyLogParser.AdifTagPattern.Matches(imported))
+                if (string.Equals(m.Groups[1].Value, field, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+
+        // Writes the imported-but-unmodelled fields into the record just built, skipping any field the
+        // record ALREADY carries.
+        //
+        // The skip list is read from the record itself rather than kept as a hand-maintained list of what
+        // this method writes: the two can then never drift apart, and a field is suppressed only when a
+        // real value for it was actually written (my_sig, for instance, is only written for a QSO that
+        // has a contest exchange - so an imported my_sig still goes out on every QSO that has none).
+        private static void AppendImportedFields(StringBuilder adif, int recordStart, string imported)
+        {
+            if (string.IsNullOrEmpty(imported)) return;
+
+            string written = adif.ToString(recordStart, adif.Length - recordStart);
+            var already = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (System.Text.RegularExpressions.Match m in HolyLogParser.AdifTagPattern.Matches(written))
+                already.Add(m.Groups[1].Value);
+
+            foreach (System.Text.RegularExpressions.Match m in HolyLogParser.AdifTagPattern.Matches(imported))
+            {
+                if (already.Contains(m.Groups[1].Value)) continue;
+
+                int len;
+                if (!int.TryParse(m.Groups[2].Value, out len) || len < 0) continue;
+                int start = m.Index + m.Length;
+                if (start + len > imported.Length) continue;   // stored text is already normalised
+
+                adif.Append(imported, m.Index, m.Length + len);
+            }
         }
 
         public static string GenerateCabrillo(IEnumerable<QSO> qso_list, Contester participant)

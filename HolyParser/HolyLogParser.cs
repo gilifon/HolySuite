@@ -536,6 +536,22 @@ namespace HolyParser
             string st = AdifValue(row, "state");
             if (!string.IsNullOrWhiteSpace(st)) qso_row.State = st.Trim();
 
+            // The award and QSL record the operator built up in whatever program they used before. These
+            // used to be dropped: CREDIT_GRANTED is the ARRL's own verdict on what has been awarded, and
+            // CNTY is the whole basis of USA-CA. See the QSO properties for what each one means.
+            qso_row.CreditGranted = Trimmed(AdifValue(row, "credit_granted"));
+            qso_row.Cnty          = Trimmed(AdifValue(row, "cnty"));
+            qso_row.QslVia        = Trimmed(AdifValue(row, "qsl_via"));
+            qso_row.QslRDate      = Trimmed(AdifValue(row, "qslrdate"));
+            qso_row.QslSent       = Trimmed(AdifValue(row, "qsl_sent"));
+            qso_row.ContestId     = Trimmed(AdifValue(row, "contest_id"));
+            qso_row.TimeOff       = Trimmed(AdifValue(row, "time_off"));
+            qso_row.DateOff       = Trimmed(AdifValue(row, "qso_date_off"));
+
+            // Everything else in the record - every field HolyLogger has no column for - kept verbatim so
+            // the operator's log survives the import intact. See QSO.ExtraAdif.
+            qso_row.ExtraAdif = ExtraAdifFields(row);
+
             ResolveCountryForDate(qso_row);
             qso_row.StandartizeQSO();
             return qso_row;
@@ -600,6 +616,76 @@ namespace HolyParser
         {
             string v = AdifValue(row, field);
             return v != null && v.Trim().StartsWith("Y", StringComparison.OrdinalIgnoreCase) ? 1 : 0;
+        }
+
+        // ── lossless import: the fields we do NOT understand ──────────────
+        //
+        // Every ADIF field this parser maps onto a QSO property - the patterns declared at the top of the
+        // class, plus the ones read by name through AdifValue. Anything NOT in here is a field HolyLogger
+        // has no column for, and is carried verbatim instead of being dropped (see QSO.ExtraAdif).
+        //
+        // Keep this list in step with the patterns above: a field added to the parser but forgotten here
+        // would be stored twice - once in its own column and once in the carried text - and would then be
+        // written out twice on export. (The export side de-duplicates as a second guard.)
+        private static readonly HashSet<string> KnownFields = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+        {
+            "station_callsign", "operator", "rst_rcvd", "rst_sent", "call", "qso_date", "time_on",
+            "band", "mode", "submode", "comment", "dxcc", "freq", "srx_string", "stx_string",
+            "srx", "stx", "name", "country", "gridsquare", "my_gridsquare", "prop_mode",
+            "sat_name", "soapbox", "lotw_qsl_sent", "cqz", "ituz",
+            "iota", "sota_ref", "pota_ref", "wwff_ref", "sig", "sig_info",
+            "lotw_qsl_rcvd", "lotw_qslrdate", "eqsl_qsl_rcvd", "eqsl_qslrdate", "qsl_rcvd", "state",
+            // The award / QSL record, each in a column of its own since 8.8.4.
+            "credit_granted", "cnty", "qsl_via", "qslrdate", "qsl_sent", "contest_id",
+            "time_off", "qso_date_off",
+            // Header fields. They belong to the FILE, not to a QSO, so they are never carried onto one -
+            // a record picked up from a file with no <eoh> would otherwise drag the header along with it.
+            "adif_ver", "programid", "programversion",
+        };
+
+        // One ADIF tag: <field:length> or <field:length:type>. Compiled - it runs over every record of a
+        // file that can hold tens of thousands of them. Shared with the exporter (Services.GenerateAdif),
+        // which scans records with the same pattern to make sure a carried field is not written twice.
+        internal static readonly Regex AdifTagPattern =
+            new Regex(@"<([A-Za-z0-9_]+):(\d{1,7})(:[a-zA-Z])?>", RegexOptions.Compiled);
+
+        // The part of an imported record HolyLogger has no column for, returned as raw ADIF text ready to
+        // be written straight back out, or null when the record holds nothing beyond what we understand.
+        //
+        // Each tag is copied out EXACTLY as it arrived, type indicator and all, in its original order - no
+        // trimming, no case folding, no re-encoding. A field we do not model is a field we cannot safely
+        // tidy, so we do not touch it.
+        public static string ExtraAdifFields(string row)
+        {
+            if (string.IsNullOrEmpty(row)) return null;
+
+            StringBuilder kept = null;
+            foreach (Match m in AdifTagPattern.Matches(row))
+            {
+                if (KnownFields.Contains(m.Groups[1].Value)) continue;
+
+                int len;
+                if (!int.TryParse(m.Groups[2].Value, out len) || len < 0) continue;
+                int start = m.Index + m.Length;
+                if (start > row.Length) continue;
+
+                if (kept == null) kept = new StringBuilder(256);
+                if (start + len <= row.Length)
+                {
+                    // The normal case: tag and value copied byte for byte.
+                    kept.Append(row, m.Index, m.Length + len);
+                }
+                else
+                {
+                    // A length that runs off the end of the record - a truncated or malformed file. Keep
+                    // what is actually there and correct the length, so what we write back stays readable
+                    // ADIF rather than a second copy of the same corruption.
+                    int actual = row.Length - start;
+                    kept.Append('<').Append(m.Groups[1].Value).Append(':').Append(actual)
+                        .Append(m.Groups[3].Value).Append('>').Append(row, start, actual);
+                }
+            }
+            return kept == null ? null : kept.ToString();
         }
 
         public QSO ParseN1MMRawQSO(string row)

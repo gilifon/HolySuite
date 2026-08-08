@@ -1,4 +1,4 @@
-using HolyParser;
+﻿using HolyParser;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -433,8 +433,8 @@ Environment.NewLine +
         {
             const int es = 1, qs = 1, ls = 1, cs = 1;
             using (var ins = new SQLiteCommand(
-                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
-                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info,@es,@qs,@ls,@cs,@log_id,@src)", con))
+                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
+                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
             {
                 ins.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
                 ins.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
@@ -461,6 +461,8 @@ Environment.NewLine +
                 ins.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                 ins.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
                 AddActivityParams(ins, qso, "@");
+                // A copy is a mirror of the contact, so it carries the same imported fields as its original.
+                AddCarriedParams(ins, qso);
                 ins.Parameters.Add(new SQLiteParameter("@es", es));
                 ins.Parameters.Add(new SQLiteParameter("@qs", qs));
                 ins.Parameters.Add(new SQLiteParameter("@ls", ls));
@@ -601,7 +603,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -651,6 +653,19 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("wwff_ref"));
                 insertSQL.Parameters.Add(new SQLiteParameter("sig"));
                 insertSQL.Parameters.Add(new SQLiteParameter("sig_info"));
+                // The award / QSL record carried in from the file - positional, so this order matches the
+                // column list above exactly.
+                insertSQL.Parameters.Add(new SQLiteParameter("credit_granted"));
+                insertSQL.Parameters.Add(new SQLiteParameter("cnty"));
+                insertSQL.Parameters.Add(new SQLiteParameter("qsl_via"));
+                insertSQL.Parameters.Add(new SQLiteParameter("qsl_rdate"));
+                insertSQL.Parameters.Add(new SQLiteParameter("qsl_sent"));
+                insertSQL.Parameters.Add(new SQLiteParameter("contest_id"));
+                insertSQL.Parameters.Add(new SQLiteParameter("time_off"));
+                insertSQL.Parameters.Add(new SQLiteParameter("date_off"));
+                // Every field of the imported record HolyLogger has no column for, kept verbatim so an
+                // operator's log is never quietly stripped by passing through here. Last, positionally.
+                insertSQL.Parameters.Add(new SQLiteParameter("extra_adif"));
 
                 foreach (var qso in qsos)
                 {
@@ -699,6 +714,15 @@ Environment.NewLine +
                     insertSQL.Parameters[42].Value = Blank(qso.WwffRef);
                     insertSQL.Parameters[43].Value = Blank(qso.Sig);
                     insertSQL.Parameters[44].Value = Blank(qso.SigInfo);
+                    insertSQL.Parameters[45].Value = Blank(qso.CreditGranted);
+                    insertSQL.Parameters[46].Value = Blank(qso.Cnty);
+                    insertSQL.Parameters[47].Value = Blank(qso.QslVia);
+                    insertSQL.Parameters[48].Value = Blank(qso.QslRDate);
+                    insertSQL.Parameters[49].Value = Blank(qso.QslSent);
+                    insertSQL.Parameters[50].Value = Blank(qso.ContestId);
+                    insertSQL.Parameters[51].Value = Blank(qso.TimeOff);
+                    insertSQL.Parameters[52].Value = Blank(qso.DateOff);
+                    insertSQL.Parameters[53].Value = Blank(qso.ExtraAdif);
 
                     try
                     {
@@ -882,9 +906,9 @@ Environment.NewLine +
                     cmd.ExecuteNonQuery();
                 }
         }
-        // The six activity-program columns, read in one place. Every QSO reader in this file calls
-        // this rather than repeating six lines, so a seventh program field can never be added to
-        // some readers and forgotten in others.
+        // The six activity-program columns AND the carried ADIF text, read in one place. Every QSO
+        // reader in this file calls this rather than repeating the lines, so a seventh program field
+        // can never be added to some readers and forgotten in others.
         //
         // Guarded by HasColumn because a database that has not been through the migration yet - an old
         // backup opened by the Restore button, for instance - has no such columns, and rdr["iota"]
@@ -897,6 +921,18 @@ Environment.NewLine +
             if (HasColumn(rdr, "wwff_ref")) q.WwffRef = rdr["wwff_ref"] as string;
             if (HasColumn(rdr, "sig")) q.Sig = rdr["sig"] as string;
             if (HasColumn(rdr, "sig_info")) q.SigInfo = rdr["sig_info"] as string;
+            // The award / QSL record and the carried remainder. Read alongside the activity references for
+            // the same reason: this is the ONE place every reader goes through, and a field that is
+            // written but not read back is a field silently lost on the next export.
+            if (HasColumn(rdr, "credit_granted")) q.CreditGranted = rdr["credit_granted"] as string;
+            if (HasColumn(rdr, "cnty")) q.Cnty = rdr["cnty"] as string;
+            if (HasColumn(rdr, "qsl_via")) q.QslVia = rdr["qsl_via"] as string;
+            if (HasColumn(rdr, "qsl_rdate")) q.QslRDate = rdr["qsl_rdate"] as string;
+            if (HasColumn(rdr, "qsl_sent")) q.QslSent = rdr["qsl_sent"] as string;
+            if (HasColumn(rdr, "contest_id")) q.ContestId = rdr["contest_id"] as string;
+            if (HasColumn(rdr, "time_off")) q.TimeOff = rdr["time_off"] as string;
+            if (HasColumn(rdr, "date_off")) q.DateOff = rdr["date_off"] as string;
+            if (HasColumn(rdr, "extra_adif")) q.ExtraAdif = rdr["extra_adif"] as string;
         }
 
         // The write half of ReadActivityFields: binds the same six fields in the same fixed order.
@@ -910,6 +946,29 @@ Environment.NewLine +
             cmd.Parameters.Add(new SQLiteParameter(prefix + "wwff_ref", Blank(qso.WwffRef)));
             cmd.Parameters.Add(new SQLiteParameter(prefix + "sig", Blank(qso.Sig)));
             cmd.Parameters.Add(new SQLiteParameter(prefix + "sig_info", Blank(qso.SigInfo)));
+        }
+
+        // ── the fields a QSO CARRIES from the file it was imported from ───
+        //
+        // The award / QSL record plus the raw remainder. Kept as one named group with one binder, so the
+        // statements that write a whole QSO (undo-delete, copy-to-log) cannot list a different set of
+        // columns from the values they bind - the failure mode that quietly empties a field.
+        private const string CarriedColumns = "credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif";
+        // NB @qslrd, not @qrd: @qrd is already the QRZ confirmation date in the undo-delete statement, and
+        // two parameters of one name would silently bind the same value to both columns.
+        private const string CarriedValues = "@cg,@cnty,@qvia,@qslrd,@qsent,@cid,@toff,@doff,@extra";
+
+        private static void AddCarriedParams(SQLiteCommand cmd, QSO qso)
+        {
+            cmd.Parameters.Add(new SQLiteParameter("@cg", Blank(qso.CreditGranted)));
+            cmd.Parameters.Add(new SQLiteParameter("@cnty", Blank(qso.Cnty)));
+            cmd.Parameters.Add(new SQLiteParameter("@qvia", Blank(qso.QslVia)));
+            cmd.Parameters.Add(new SQLiteParameter("@qslrd", Blank(qso.QslRDate)));
+            cmd.Parameters.Add(new SQLiteParameter("@qsent", Blank(qso.QslSent)));
+            cmd.Parameters.Add(new SQLiteParameter("@cid", Blank(qso.ContestId)));
+            cmd.Parameters.Add(new SQLiteParameter("@toff", Blank(qso.TimeOff)));
+            cmd.Parameters.Add(new SQLiteParameter("@doff", Blank(qso.DateOff)));
+            cmd.Parameters.Add(new SQLiteParameter("@extra", Blank(qso.ExtraAdif)));
         }
 
         private static object Blank(string s)
@@ -2336,6 +2395,217 @@ Environment.NewLine +
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // ── importing a file the log already holds ────────────────────────
+        //
+        // Splits a freshly parsed ADIF against the QSOs a log already has: records that match a QSO in the
+        // log COMPLETE it (filling only what is empty), and the ones that match nothing are handed back to
+        // be inserted as new QSOs.
+        //
+        // This is what makes re-importing the same file safe, and it is the whole answer to a problem
+        // HolyLogger created for itself. Until 8.8.4 the importer kept about a third of an ADIF file and
+        // dropped the rest - on a real 28,366-QSO Log4OM export, 64% of the bytes, including the ARRL award
+        // credits and the counties a USA-CA chase is built on. Those QSOs are already in people's logs, and
+        // the only copy of the missing fields is the operator's original file. Asking them to import it
+        // again used to mean doubling their log; now it simply completes it.
+        //
+        // It also protects the operator who imported once and has been logging here ever since: their newer
+        // QSOs are not in the file, so nothing in this pass can touch them.
+        //
+        // Matching is on the four things that identify a contact - callsign, date, band, mode - with the
+        // time used only to choose between several contacts with the same station on the same band and mode
+        // that day. Measured against a real 28,366-QSO log: 28,197 records identify a QSO outright, 169
+        // share a key with another, and none of those were inseparable by time.
+        public List<QSO> CompleteExistingQsos(List<QSO> parsed, long logId, out int completed, out int ambiguous,
+                                              Action<int> progress = null)
+        {
+            completed = 0; ambiguous = 0;
+            var unmatched = new List<QSO>();
+            if (parsed == null || parsed.Count == 0) return unmatched;
+
+            ObservableCollection<QSO> existing = GetQSOsForLog(logId);
+            if (existing == null || existing.Count == 0)
+            {
+                // Nothing to match against - an empty or brand-new log. Every record is new.
+                unmatched.AddRange(parsed);
+                return unmatched;
+            }
+
+            // call|date|band|mode -> the QSOs in the log that match it.
+            var index = new Dictionary<string, List<QSO>>(StringComparer.OrdinalIgnoreCase);
+            foreach (QSO q in existing)
+            {
+                if (q == null) continue;
+                string k = MatchKey(q);
+                if (k == null) continue;
+                List<QSO> bucket;
+                if (!index.TryGetValue(k, out bucket)) index[k] = bucket = new List<QSO>();
+                bucket.Add(q);
+            }
+
+            int done = 0;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open)
+                {
+                    unmatched.AddRange(parsed);
+                    return unmatched;
+                }
+
+                // Only ever writes into a column that is currently EMPTY, so anything the operator has
+                // typed, corrected or downloaded since the first import survives untouched.
+                const string sql =
+                    "UPDATE qso SET " +
+                    "extra_adif     = CASE WHEN extra_adif     IS NULL OR extra_adif     = '' THEN @extra ELSE extra_adif     END, " +
+                    "state          = CASE WHEN state          IS NULL OR state          = '' THEN @state ELSE state          END, " +
+                    "iota           = CASE WHEN iota           IS NULL OR iota           = '' THEN @iota  ELSE iota           END, " +
+                    "sota_ref       = CASE WHEN sota_ref       IS NULL OR sota_ref       = '' THEN @sota  ELSE sota_ref       END, " +
+                    "pota_ref       = CASE WHEN pota_ref       IS NULL OR pota_ref       = '' THEN @pota  ELSE pota_ref       END, " +
+                    "wwff_ref       = CASE WHEN wwff_ref       IS NULL OR wwff_ref       = '' THEN @wwff  ELSE wwff_ref       END, " +
+                    "sig            = CASE WHEN sig            IS NULL OR sig            = '' THEN @sig   ELSE sig            END, " +
+                    "sig_info       = CASE WHEN sig_info       IS NULL OR sig_info       = '' THEN @siginfo ELSE sig_info     END, " +
+                    "credit_granted = CASE WHEN credit_granted IS NULL OR credit_granted = '' THEN @cg    ELSE credit_granted END, " +
+                    "cnty           = CASE WHEN cnty           IS NULL OR cnty           = '' THEN @cnty  ELSE cnty           END, " +
+                    "qsl_via        = CASE WHEN qsl_via        IS NULL OR qsl_via        = '' THEN @qvia  ELSE qsl_via        END, " +
+                    "qsl_rdate      = CASE WHEN qsl_rdate      IS NULL OR qsl_rdate      = '' THEN @qslrd ELSE qsl_rdate      END, " +
+                    "qsl_sent       = CASE WHEN qsl_sent       IS NULL OR qsl_sent       = '' THEN @qsent ELSE qsl_sent       END, " +
+                    "contest_id     = CASE WHEN contest_id     IS NULL OR contest_id     = '' THEN @cid   ELSE contest_id     END, " +
+                    "time_off       = CASE WHEN time_off       IS NULL OR time_off       = '' THEN @toff  ELSE time_off       END, " +
+                    "date_off       = CASE WHEN date_off       IS NULL OR date_off       = '' THEN @doff  ELSE date_off       END " +
+                    "WHERE Id = @id";
+
+                using (SQLiteTransaction tx = con.BeginTransaction())
+                using (var cmd = new SQLiteCommand(sql, con, tx))
+                {
+                    foreach (string p in new[] { "@extra", "@state", "@iota", "@sota", "@pota", "@wwff", "@sig",
+                                                 "@siginfo", "@cg", "@cnty", "@qvia", "@qslrd", "@qsent", "@cid",
+                                                 "@toff", "@doff", "@id" })
+                        cmd.Parameters.Add(new SQLiteParameter(p));
+
+                    foreach (QSO p in parsed)
+                    {
+                        done++;
+                        if (progress != null && (done % 500 == 0 || done == parsed.Count)) progress(done);
+
+                        string k = p == null ? null : MatchKey(p);
+                        List<QSO> bucket;
+                        if (k == null || !index.TryGetValue(k, out bucket) || bucket.Count == 0)
+                        {
+                            if (p != null) unmatched.Add(p);   // a QSO this log does not have yet
+                            continue;
+                        }
+
+                        QSO target = bucket[0];
+                        if (bucket.Count > 1)
+                        {
+                            // Several contacts with that station on the same band and mode that day: the one
+                            // logged nearest the same minute is the one this record belongs to. If two are
+                            // equally close there is no honest way to choose - and since the log clearly
+                            // HAS this contact, the record is skipped rather than added as a duplicate.
+                            bool tie;
+                            target = ClosestByTime(bucket, p.Time, out tie);
+                            if (tie || target == null) { ambiguous++; continue; }
+                        }
+
+                        // A record that has nothing to give still counts as "already in this log" - it
+                        // simply needs no write. Skipping those keeps a re-import of a plain file (a
+                        // WSJT-X log, say, whose records hold nothing beyond what we already model) from
+                        // paying for tens of thousands of pointless UPDATEs and the page writes behind
+                        // them.
+                        if (!CarriesAnything(p)) { completed++; continue; }
+
+                        cmd.Parameters[0].Value = Blank(p.ExtraAdif);
+                        cmd.Parameters[1].Value = Blank(p.State);
+                        cmd.Parameters[2].Value = Blank(p.Iota);
+                        cmd.Parameters[3].Value = Blank(p.SotaRef);
+                        cmd.Parameters[4].Value = Blank(p.PotaRef);
+                        cmd.Parameters[5].Value = Blank(p.WwffRef);
+                        cmd.Parameters[6].Value = Blank(p.Sig);
+                        cmd.Parameters[7].Value = Blank(p.SigInfo);
+                        cmd.Parameters[8].Value = Blank(p.CreditGranted);
+                        cmd.Parameters[9].Value = Blank(p.Cnty);
+                        cmd.Parameters[10].Value = Blank(p.QslVia);
+                        cmd.Parameters[11].Value = Blank(p.QslRDate);
+                        cmd.Parameters[12].Value = Blank(p.QslSent);
+                        cmd.Parameters[13].Value = Blank(p.ContestId);
+                        cmd.Parameters[14].Value = Blank(p.TimeOff);
+                        cmd.Parameters[15].Value = Blank(p.DateOff);
+                        cmd.Parameters[16].Value = target.id;
+
+                        try { if (cmd.ExecuteNonQuery() > 0) completed++; }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }
+
+                    tx.Commit();
+                }
+            }
+            return unmatched;
+        }
+
+        // Whether a parsed record holds anything the completion pass could actually write.
+        private static bool CarriesAnything(QSO p)
+        {
+            return !string.IsNullOrWhiteSpace(p.ExtraAdif)
+                || !string.IsNullOrWhiteSpace(p.State) || !string.IsNullOrWhiteSpace(p.Iota)
+                || !string.IsNullOrWhiteSpace(p.SotaRef) || !string.IsNullOrWhiteSpace(p.PotaRef)
+                || !string.IsNullOrWhiteSpace(p.WwffRef) || !string.IsNullOrWhiteSpace(p.Sig)
+                || !string.IsNullOrWhiteSpace(p.SigInfo) || !string.IsNullOrWhiteSpace(p.CreditGranted)
+                || !string.IsNullOrWhiteSpace(p.Cnty) || !string.IsNullOrWhiteSpace(p.QslVia)
+                || !string.IsNullOrWhiteSpace(p.QslRDate) || !string.IsNullOrWhiteSpace(p.QslSent)
+                || !string.IsNullOrWhiteSpace(p.ContestId) || !string.IsNullOrWhiteSpace(p.TimeOff)
+                || !string.IsNullOrWhiteSpace(p.DateOff);
+        }
+
+        // callsign | date | band | mode - what makes two records the same contact. Null when the record is
+        // too incomplete to identify, which is safer than matching it to the wrong QSO.
+        private static string MatchKey(QSO q)
+        {
+            string call = (q.DXCall ?? string.Empty).Trim();
+            string date = (q.Date ?? string.Empty).Trim();
+            string band = (q.Band ?? string.Empty).Trim();
+            string mode = (q.Mode ?? string.Empty).Trim();
+            if (call.Length == 0 || date.Length == 0) return null;
+            // The date sometimes arrives as "yyyyMMdd HHmmss"; only the day identifies the contact.
+            int space = date.IndexOf(' ');
+            if (space > 0) date = date.Substring(0, space);
+            return call.ToUpperInvariant() + "|" + date + "|" + band.ToUpperInvariant() + "|" + mode.ToUpperInvariant();
+        }
+
+        // The QSO in the bucket logged closest to that time. tie = two are equally close, so the caller
+        // leaves them alone rather than guessing.
+        private static QSO ClosestByTime(List<QSO> bucket, string time, out bool tie)
+        {
+            tie = false;
+            int want = TimeToSeconds(time);
+            if (want < 0) { tie = true; return null; }
+
+            QSO best = null;
+            int bestGap = int.MaxValue;
+            foreach (QSO q in bucket)
+            {
+                int t = TimeToSeconds(q.Time);
+                if (t < 0) continue;
+                int gap = Math.Abs(t - want);
+                if (gap < bestGap) { bestGap = gap; best = q; tie = false; }
+                else if (gap == bestGap) tie = true;
+            }
+            return best;
+        }
+
+        // "HHmmss" or "HHmm" -> seconds past midnight; -1 when it is neither.
+        private static int TimeToSeconds(string time)
+        {
+            string t = (time ?? string.Empty).Trim();
+            int space = t.IndexOf(' ');
+            if (space >= 0) t = t.Substring(space + 1);
+            t = t.Replace(":", "");
+            if (t.Length < 4) return -1;
+            int hh, mm, ss = 0;
+            if (!int.TryParse(t.Substring(0, 2), out hh)) return -1;
+            if (!int.TryParse(t.Substring(2, 2), out mm)) return -1;
+            if (t.Length >= 6) int.TryParse(t.Substring(4, 2), out ss);
+            return hh * 3600 + mm * 60 + ss;
+        }
+
         // Sets (or clears) the manual Paper QSL flag on one QSO and persists it immediately - called when
         // the operator ticks/unticks the Paper QSL checkbox in the log grid.
         public void SetPaperQslConfirmed(long qsoId, bool confirmed)
@@ -2377,8 +2647,8 @@ Environment.NewLine +
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
-                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) " +
-                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info,@log)";
+                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",log_id) " +
+                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@log)";
                 using (var cmd = new SQLiteCommand(sql, con))
                 {
                     cmd.Parameters.AddWithValue("@my", (object)qso.MyCall ?? DBNull.Value);
@@ -2407,6 +2677,8 @@ Environment.NewLine +
                     cmd.Parameters.AddWithValue("@sat", (object)qso.SAT_NAME ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@soap", (object)qso.SOAPBOX ?? DBNull.Value);
                     AddActivityParams(cmd, qso, "@");
+                    // Undoing a delete must give back the QSO the operator had, not a stripped copy of it.
+                    AddCarriedParams(cmd, qso);
                     cmd.Parameters.AddWithValue("@es", qso.EqslStatus);
                     cmd.Parameters.AddWithValue("@qs", qso.QrzStatus);
                     cmd.Parameters.AddWithValue("@ls", qso.LotwStatus);
@@ -3531,6 +3803,15 @@ Environment.NewLine +
             , [wwff_ref] nvarchar(30) NULL COLLATE NOCASE
             , [sig] nvarchar(50) NULL COLLATE NOCASE
             , [sig_info] nvarchar(100) NULL COLLATE NOCASE
+            , [credit_granted] nvarchar(200) NULL COLLATE NOCASE
+            , [cnty] nvarchar(100) NULL COLLATE NOCASE
+            , [qsl_via] nvarchar(100) NULL COLLATE NOCASE
+            , [qsl_rdate] nvarchar(20) NULL COLLATE NOCASE
+            , [qsl_sent] nvarchar(10) NULL COLLATE NOCASE
+            , [contest_id] nvarchar(50) NULL COLLATE NOCASE
+            , [time_off] nvarchar(20) NULL COLLATE NOCASE
+            , [date_off] nvarchar(20) NULL COLLATE NOCASE
+            , [extra_adif] text NULL
             , [eqsl_status] INTEGER NOT NULL DEFAULT 0
             , [qrz_status] INTEGER NOT NULL DEFAULT 0
             , [qrz_logid] nvarchar(50) NULL
@@ -3674,6 +3955,24 @@ Environment.NewLine +
             AddColToTable("qso", "wwff_ref", "nvarchar(30) NULL");
             AddColToTable("qso", "sig", "nvarchar(50) NULL");
             AddColToTable("qso", "sig_info", "nvarchar(100) NULL");
+            // The operator's AWARD and QSL record, imported from whatever program they used before.
+            // credit_granted is the ARRL's own list of awards granted for a QSO, and is the only thing in
+            // a log that can answer "what have I actually been credited with" - a different question from
+            // "what is confirmed". cnty is what USA-CA counts. The rest complete the QSL story: who the
+            // card goes via, when it arrived, whether one was sent, and which contest the QSO belongs to.
+            AddColToTable("qso", "credit_granted", "nvarchar(200) NULL");
+            AddColToTable("qso", "cnty", "nvarchar(100) NULL");
+            AddColToTable("qso", "qsl_via", "nvarchar(100) NULL");
+            AddColToTable("qso", "qsl_rdate", "nvarchar(20) NULL");
+            AddColToTable("qso", "qsl_sent", "nvarchar(10) NULL");
+            AddColToTable("qso", "contest_id", "nvarchar(50) NULL");
+            AddColToTable("qso", "time_off", "nvarchar(20) NULL");
+            AddColToTable("qso", "date_off", "nvarchar(20) NULL");
+            // LOSSLESS IMPORT: every ADIF field of an imported record that HolyLogger has no column of
+            // its own for, kept verbatim and written back out on export. Untyped text with no length
+            // limit on purpose - it holds whatever the operator's previous program wrote, which is not
+            // ours to truncate. Measured on a real 28,366-QSO Log4OM log: ~900 bytes per QSO.
+            AddColToTable("qso", "extra_adif", "text NULL");
             AddEqslStatusColumn();
             AddQrzColumns();
             AddLotwColumns();

@@ -260,6 +260,57 @@ namespace HolyParser
         // (a manual paper card carries no DXCC code), so it is simply confirmed (2) or not (0).
         public int PaperQslStatusRank => PaperQslRcvd == 1 ? 2 : 0;
 
+        // ── fields an operator's award and QSL record is made of ──────────
+
+        // ADIF CREDIT_GRANTED: the awards the ARRL has actually GRANTED for this QSO, as the comma list
+        // ADIF defines ("DXCC,DXCC-M,DXCC-CHAL,DXCC-5B,DXCC-20…").
+        //
+        // This is not a confirmation and must never be confused with one. A confirmation says the other
+        // station agrees the contact happened; a granted credit says the ARRL has counted it towards an
+        // award. They genuinely differ: measured on a real 28,366-QSO log, its owner had 325 current
+        // entities granted, while his logger's award page said 326 - the extra one was Bouvet, confirmed
+        // at LoTW but never submitted for credit. Only the log itself can tell you that, which is why
+        // this field is worth keeping.
+        public string CreditGranted { get; set; }
+
+        // ADIF CNTY: the worked station's county ("Greenfield Park"), the unit the USA-CA award counts.
+        public string Cnty { get; set; }
+
+        // ADIF QSL_VIA: how a card travels for this station - a manager's callsign, "Bureau", "Direct".
+        public string QslVia { get; set; }
+
+        // ADIF QSLRDATE / QSL_SENT: when the paper card was RECEIVED (pairs with PaperQslRcvd, which only
+        // says whether it arrived), and whether one has been SENT.
+        public string QslRDate { get; set; }
+        public string QslSent { get; set; }
+
+        // ADIF CONTEST_ID: which contest this QSO belongs to ("CQ-WW-SSB"), so a contact's history is not
+        // lost when it comes in from another program.
+        public string ContestId { get; set; }
+
+        // ADIF TIME_OFF / QSO_DATE_OFF: when the contact ENDED. HolyLogger records only a start time of
+        // its own, so these are carried for imported QSOs rather than invented.
+        public string TimeOff { get; set; }
+        public string DateOff { get; set; }
+
+        // EVERY OTHER ADIF FIELD OF THE IMPORTED RECORD THAT HOLYLOGGER HAS NO COLUMN FOR, kept verbatim as the
+        // raw "<field:len>value" text in the order the source program wrote it.
+        //
+        // The point is that an operator's log must survive a trip through HolyLogger with nothing lost.
+        // The importer understands ~36 fields; a Log4OM export carries 101, and measured on a real 28,366
+        // QSO log, 64% of the file was being dropped on the floor - award credits (CREDIT_GRANTED), the
+        // counties a USA-CA chase is built on, QSL routes, contest IDs, rig and antenna, years of work
+        // that the operator can never get back once the original file is gone.
+        //
+        // Nothing is interpreted here: fields we do not model are simply carried, and written back out on
+        // export. That is what makes the guarantee hold for fields no version of HolyLogger has heard of,
+        // including ones ADIF has not defined yet. Empty for a QSO logged in HolyLogger itself, which has
+        // no foreign fields to carry.
+        //
+        // [JsonIgnore] - the contest server has no use for it and its payloads stay exactly as they are.
+        [JsonIgnore]
+        public string ExtraAdif { get; set; }
+
         // Name of the log this QSO belongs to. Display-only: filled in by the upload-queue queries so the
         // (global) queue window can show which log each pending/dismissed QSO came from. Not persisted.
         public string LogName { get; set; }

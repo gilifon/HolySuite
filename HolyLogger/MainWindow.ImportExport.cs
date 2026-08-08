@@ -46,6 +46,11 @@ namespace HolyLogger
         {
             public int FaultyQso { get; set; }
             public int ImportedQsoCount { get; set; }
+            // Records that turned out to be QSOs the log ALREADY had: they filled in that QSO's empty
+            // fields instead of being added again. See DataAccess.CompleteExistingQsos.
+            public int CompletedQsoCount { get; set; }
+            // Matched a QSO in the log but could not be told apart from another one, so left alone.
+            public int AmbiguousQsoCount { get; set; }
             public ObservableCollection<QSO> RefreshedQsos { get; set; }
         }
 
@@ -54,7 +59,11 @@ namespace HolyLogger
         // Reusable ADIF export of a given QSO list (used by the File menu and by View Logs per-log).
         public void ExportQsosToAdif(System.Collections.ObjectModel.ObservableCollection<QSO> qsos, Window owner)
         {
-            string adif = Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName);
+            // A file written FOR THE OPERATOR carries everything their QSOs arrived with, including the
+            // fields HolyLogger has no column for - an export they can re-import anywhere and still have
+            // the log they started with. (Service uploads deliberately do not; see GenerateAdif.)
+            string adif = Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName,
+                                                includeImportedFields: true);
             var save = new SaveFileDialog { Filter = "ADIF File|*.adi", Title = "Export ADIF" };
             if (save.ShowDialog() != true) return;
             try
@@ -479,10 +488,32 @@ namespace HolyLogger
             }
             else
             {
-                if (result.ImportedQsoCount > 0)
+                // The report spells out BOTH halves of what an import now does, because "0 added" on a file
+                // the operator just imported would otherwise look like a failure when it is the opposite:
+                // their QSOs were already here and the file completed them.
+                if (result.ImportedQsoCount > 0 || result.CompletedQsoCount > 0)
                 {
-                    int totalQsos = result.RefreshedQsos != null ? result.RefreshedQsos.Count : dal.GetQsoCount();
-                    HolyMessageBox.ShowSuccess($"Import completed successfully!\nImported QSOs: {result.ImportedQsoCount}\nTotal QSOs in log: {totalQsos}", "Import Complete", this);
+                    // The count of THIS log, asked of the database directly. It used to be taken from the
+                    // refreshed collection, which is every QSO in every log (GetAllQSOs has no log filter),
+                    // so a line headed "Total QSOs in log" reported the whole database: importing 28,366
+                    // QSOs into a log that then held exactly 28,366 announced 67,622.
+                    int totalQsos;
+                    try { totalQsos = dal.GetQsoCountForLog(dal.ActiveLogId); }
+                    catch (Exception swallowed)
+                    {
+                        // Fall back to the collection just loaded for THIS log - never to a database-wide
+                        // total, which would be a meaningless number under a label that says "in log".
+                        Log.Swallow(swallowed);
+                        totalQsos = result.RefreshedQsos != null ? result.RefreshedQsos.Count : 0;
+                    }
+                    string msg = $"Import completed successfully!\n\n" +
+                                 $"New QSOs added: {result.ImportedQsoCount:N0}";
+                    if (result.CompletedQsoCount > 0)
+                        msg += $"\nAlready in this log — fields filled in: {result.CompletedQsoCount:N0}";
+                    if (result.AmbiguousQsoCount > 0)
+                        msg += $"\nAlready in this log — too alike to match: {result.AmbiguousQsoCount:N0}";
+                    msg += $"\n\nTotal QSOs in log: {totalQsos:N0}";
+                    HolyMessageBox.ShowSuccess(msg, "Import Complete", this);
                 }
             }
             // Give the imported log the identity the user confirmed before the import (if it had none).
@@ -517,6 +548,8 @@ namespace HolyLogger
 
             int faultyQSO = 0;
             int importedQsoCount = 0;
+            int completedQso = 0;    // records that completed a QSO the log already had
+            int ambiguousQso = 0;    // matched, but two candidates were equally close - left alone
             const int importBatchSize = 500;
             int lastReportedPercent = 0;
             const int readPhasePercent = 3;
@@ -615,6 +648,27 @@ namespace HolyLogger
                         }
                     }
 
+                    // IMPORTING A FILE THE LOG ALREADY HOLDS. Every record is first matched against the
+                    // QSOs already in this log: the ones that are already here COMPLETE those QSOs (filling
+                    // only empty fields), and only the genuinely new ones go on to be inserted.
+                    //
+                    // That is what makes "just import your file again" a safe instruction. Older versions
+                    // kept about a third of an ADIF and dropped the rest, so the only copy of an operator's
+                    // award credits, counties and QSL routes is the file they imported from - and asking
+                    // them to import it again used to double their log. It also means someone who has been
+                    // logging here since their first import keeps those newer QSOs: they are not in the
+                    // file, so nothing here touches them.
+                    AdifHandlerWorker.ReportProgress(lastReportedPercent, "Checking for QSOs already in this log");
+                    int completedThisFile = 0, ambiguousThisFile = 0;
+                    lock (_syncLock)
+                    {
+                        rawQSOList = dal.CompleteExistingQsos(rawQSOList, dal.ActiveLogId,
+                                                              out completedThisFile, out ambiguousThisFile);
+                    }
+                    completedQso += completedThisFile;
+                    ambiguousQso += ambiguousThisFile;
+                    count = rawQSOList.Count;   // what is left is what actually gets inserted
+
                     for (int i = 0; i < count; i += importBatchSize)
                     {
                         List<QSO> batch = rawQSOList.Skip(i).Take(importBatchSize).ToList();
@@ -661,7 +715,12 @@ namespace HolyLogger
             ObservableCollection<QSO> refreshedQsos;
             lock (_syncLock)
             {
-                refreshedQsos = dal.GetAllQSOs(refreshProgress =>
+                // THE LOG THAT IS OPEN, not the whole database. This used to reload every QSO of every log
+                // into the main grid, so an import left the window showing other logs' contacts mixed in
+                // with this one's until the next restart or log switch - and the count in the completion
+                // message came from the same collection, announcing 67,622 after an import into a log
+                // holding 28,366. A total across all logs is not a number this program has any use for.
+                refreshedQsos = dal.GetQSOsForLog(dal.ActiveLogId, refreshProgress =>
                 {
                     int percent = refreshPhaseStartPercent + (int)Math.Floor((refreshProgress * (refreshPhaseEndPercent - refreshPhaseStartPercent)) / 100.0);
                     if (percent > lastReportedPercent)
@@ -678,6 +737,8 @@ namespace HolyLogger
             {
                 FaultyQso = faultyQSO,
                 ImportedQsoCount = importedQsoCount,
+                CompletedQsoCount = completedQso,
+                AmbiguousQsoCount = ambiguousQso,
                 RefreshedQsos = refreshedQsos
             };
             this.Dispatcher.Invoke(() => ImportFileQ.Clear());

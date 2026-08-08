@@ -200,7 +200,7 @@ namespace HolyLogger
                 {
                     if (ext == ".adif")
                     {
-                        sw.Write(HolyParser.Services.GenerateAdif(qsos));
+                        sw.Write(HolyParser.Services.GenerateAdif(qsos, includeImportedFields: true));
                     }
                     else if (ext == ".txt")
                     {

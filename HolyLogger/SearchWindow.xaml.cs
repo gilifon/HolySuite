@@ -546,7 +546,8 @@ namespace HolyLogger
             if (qsos == null || qsos.Count == 0) return;
             try
             {
-                string adif = HolyParser.Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName);
+                string adif = HolyParser.Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName,
+                                                               includeImportedFields: true);
                 var save = new Microsoft.Win32.SaveFileDialog
                 {
                     Filter = "ADIF File|*.adi",

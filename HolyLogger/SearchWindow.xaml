@@ -859,6 +859,46 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+
+                <!-- THE AWARD / QSL RECORD imported from the operator's previous program, appended at the
+                     far right so no existing column moves. Read-only here: these are a record of what has
+                     already happened (the ARRL granted a credit; a card went via a manager), not something
+                     to be typed over in a grid.
+                     DXCC Credit is the headline: it is the ARRL's own verdict, it exists in no other field,
+                     and before 8.8.4 HolyLogger discarded it at import. -->
+                <DataGridTemplateColumn Header="DXCC Credit" IsReadOnly="True" SortMemberPath="CreditGranted"
+                                        Width="Auto" MinWidth="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding CreditGranted}" Padding="5,0,5,0"
+                                       ToolTip="{Binding CreditGranted}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="County" IsReadOnly="True" SortMemberPath="Cnty"
+                                        Width="Auto" MinWidth="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Cnty}" Padding="5,0,5,0" ToolTip="{Binding Cnty}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="QSL Via" IsReadOnly="True" SortMemberPath="QslVia"
+                                        Width="Auto" MinWidth="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding QslVia}" Padding="5,0,5,0" ToolTip="{Binding QslVia}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTemplateColumn Header="Contest" IsReadOnly="True" SortMemberPath="ContestId"
+                                        Width="Auto" MinWidth="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding ContestId}" Padding="5,0,5,0" ToolTip="{Binding ContestId}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

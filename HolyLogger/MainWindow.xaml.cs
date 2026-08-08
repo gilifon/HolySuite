@@ -4197,7 +4197,9 @@ namespace HolyLogger
             try
             {
                 // Back up ONLY the active log (Replace replaces just this log, not every log).
-                string adif = Services.GenerateAdif(dal.GetQSOsForLog(dal.ActiveLogId), Contests.ContestService.Active?.CabrilloName);
+                // A backup that drops fields is not a backup: carried imported fields go in too.
+                string adif = Services.GenerateAdif(dal.GetQSOsForLog(dal.ActiveLogId), Contests.ContestService.Active?.CabrilloName,
+                                                    includeImportedFields: true);
                 System.IO.File.WriteAllText(saveDialog.FileName, adif);
             }
             catch (Exception ex)
@@ -5912,7 +5914,9 @@ namespace HolyLogger
             {
 
                 // PROPOSED contest_id tag — the pre-clear backup file is tagged with the active contest.
-                string adif = Services.GenerateAdif(dal.GetAllQSOs(), Contests.ContestService.Active?.CabrilloName);
+                // Everything the QSOs carry goes into it: this file is the only copy left after a Clear.
+                string adif = Services.GenerateAdif(dal.GetAllQSOs(), Contests.ContestService.Active?.CabrilloName,
+                                                    includeImportedFields: true);
                 try
                 {
                     // Saves the Image via a FileStream created by the OpenFile method.
