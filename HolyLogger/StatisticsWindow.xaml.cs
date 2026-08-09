@@ -276,7 +276,7 @@ namespace HolyLogger
                 _countryCountText       = "0";
                 ApplyUniqueTile();
                 TB_UniqueCountries.Text = $"0 / {totalDxcc}";
-                TB_MissingDxcc.Text     = totalDxcc.ToString();
+                SetMissingTile(totalDxcc, totalDxcc);   // an empty log is missing every one of them
                 TB_DateStart.Text = "—";
                 TB_DateEnd.Text   = "—";
                 PopulateMissingZones();
@@ -1046,6 +1046,55 @@ namespace HolyLogger
 
         // Click the "N deleted" count -> the list of those countries. The window keeps its position and
         // size between openings (and between sessions) through WindowBounds, like the other windows.
+        // The Missing tile's two lines: what is missing out of every entity that exists, and what is
+        // missing for the DXCC Honor Roll.
+        //
+        // Honor Roll is the numerical TOP TEN of the current DXCC List, so it asks for nine fewer than
+        // the total - 331 against today's 340 (ARRL Honor Roll listing, 4 August 2026). Derived from
+        // totalDxcc rather than written as 331, so the day the ARRL adds or removes an entity this line
+        // follows the same list the rest of the window already counts against.
+        //
+        // The arithmetic reduces to "nine may be missing": missing-for-Honor-Roll = missing - 9. Shown
+        // only while it is still out of reach; at 9 or fewer missing the operator IS on the Honor Roll,
+        // and a line reading "0 for Honor Roll" would be a strange way to say so.
+        private void SetMissingTile(int missingCount, int totalDxcc)
+        {
+            const int honorRollShortfall = 9;          // top ten of the list = total - 9
+            int honorTarget = Math.Max(0, totalDxcc - honorRollShortfall);
+            int missingForHonor = Math.Max(0, missingCount - honorRollShortfall);
+
+            TB_MissingDxcc.Text = $"{missingCount} for {totalDxcc}";
+
+            // The target itself, spelled out beside the words - smaller and in plain text, so it reads as
+            // the definition of "Honor Roll" rather than as a second count competing with the one in
+            // front of it. Written as Inlines because the two halves are different sizes and colours.
+            TB_MissingHonor.Inlines.Clear();
+            if (missingForHonor > 0)
+            {
+                TB_MissingHonor.Inlines.Add(new System.Windows.Documents.Run($"{missingForHonor} for Honor Roll "));
+                TB_MissingHonor.Inlines.Add(new System.Windows.Documents.Run($"({honorTarget})")
+                {
+                    FontSize = 12,
+                    FontWeight = FontWeights.Normal,
+                    Foreground = System.Windows.Media.Brushes.Black,
+                });
+                TB_MissingHonor.ToolTip = $"The DXCC Honor Roll is the top ten of the current list — {honorTarget} "
+                                        + $"of today's {totalDxcc} entities, so up to {honorRollShortfall} may be missing.";
+            }
+            else
+            {
+                TB_MissingHonor.Inlines.Add(new System.Windows.Documents.Run("Honor Roll reached "));
+                TB_MissingHonor.Inlines.Add(new System.Windows.Documents.Run($"({honorTarget})")
+                {
+                    FontSize = 12,
+                    FontWeight = FontWeights.Normal,
+                    Foreground = System.Windows.Media.Brushes.Black,
+                });
+                TB_MissingHonor.ToolTip = $"{honorTarget} or more of today's {totalDxcc} entities — the top ten of the "
+                                        + "current DXCC List.";
+            }
+        }
+
         private void DeletedCountries_Click(object sender, RoutedEventArgs e)
         {
             var list = DeletedConfirmedCountries();
@@ -1222,7 +1271,7 @@ namespace HolyLogger
             // line, and a second line is only free if the line spacing and padding are pulled in to match
             // what one 14pt line plus its padding already occupies. Done that way the tab is neither
             // taller nor wider than its neighbours.
-            AddSourceFolder(ConfSource.Award, "ARRL\nDXCC Award", 11);
+            AddSourceFolder(ConfSource.Award, "ARRL Granted\nDXCC Award", 11);
             LB_Source.SelectedIndex = 0;   // Worked; fires LB_Source_SelectionChanged -> RefreshForSource
         }
 
@@ -1582,7 +1631,7 @@ namespace HolyLogger
                 TB_WorkedTileLabel.ToolTip = "Countries that still exist as DXCC entities and appear in this log";
                 TB_UniqueCountries.Text = $"{workedActive} / {totalDxcc}";
                 TB_MissingTileLabel.Text = "Missing Active Countries";
-                TB_MissingDxcc.Text = missingCount.ToString();
+                SetMissingTile(missingCount, totalDxcc);
 
                 // The deleted entities this log has worked, stated plainly - the Worked folder had no line
                 // of its own, so the difference between the two numbers had nowhere to be explained. The
@@ -1636,7 +1685,7 @@ namespace HolyLogger
                 TB_UniqueCountries.Cursor = clickable ? System.Windows.Input.Cursors.Hand : null;
                 TB_UniqueCountries.TextDecorations = clickable ? System.Windows.TextDecorations.Underline : null;
                 TB_UniqueCountries.ToolTip = clickable ? "Click to see which countries, and what confirms them" : null;
-                TB_MissingDxcc.Text = missingCount.ToString();
+                SetMissingTile(missingCount, totalDxcc);
             }
 
             PopulateConfirmedSummary();

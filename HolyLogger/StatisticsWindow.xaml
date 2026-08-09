@@ -1,16 +1,17 @@
-<!-- Width fits the SEVEN source folders across the top of the right-hand page. Measured, not guessed:
-     the tabs come to 630px (Worked 92, LoTW 80, QRZ 71, eQSL 76, Club Log 99, Paper QSL 107, ARRL
-     DXCC Award 105) plus their 16px margins, and the left page cannot go below 565 (its 513 MinWidth
-     plus margins and border). 630 + 16 + 565 + chrome = 1227, so at the old 950 the last folders were
-     cut off the right edge for anyone with all the services on. MinWidth carries the same number: a
+﻿<!-- Width fits the SEVEN source folders across the top of the right-hand page. Measured, not guessed:
+     the tabs come to 636px (Worked 92, LoTW 80, QRZ 71, eQSL 76, Club Log 99, Paper QSL 107, ARRL
+     Granted / DXCC Award 112) plus their 16px margins, and the left page cannot go below 565 (its 513
+     MinWidth plus margins and border). 636 + 16 + 565 + chrome = 1233, so at the old 950 the last
+     folders were cut off the right edge for anyone with all the services on. MinWidth carries the
+     same number as Width: a
      saved width below MinWidth is ignored on restore (see the constructor), which is what makes an
      upgrade fix itself instead of reopening at the old, too-narrow size. -->
 <Window x:Class="HolyLogger.StatisticsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Log Statistics &amp; Confirmations"
-        Height="962" Width="1240"
-        MinHeight="622" MinWidth="1240"
+        Height="962" Width="1270"
+        MinHeight="622" MinWidth="1270"
         ResizeMode="CanResize"
         WindowStartupLocation="Manual"
         LocationChanged="Window_LocationChanged"
@@ -40,11 +41,11 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>   <!-- left: static log analysis + pivot -->
-                    <!-- MinWidth = the folder strip's own width (630) plus its margins. The left column
+                    <!-- MinWidth = the folder strip's own width (636) plus its margins. The left column
                          is Auto, so a wide pivot table would otherwise eat into this one and clip the
                          tabs off the right edge; this keeps the folders' room reserved whatever the
                          left page does. -->
-                    <ColumnDefinition Width="*" MinWidth="646"/>  <!-- right: the per-source page (tabs + content) -->
+                    <ColumnDefinition Width="*" MinWidth="672"/>  <!-- right: the per-source page (tabs + content) -->
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>      <!-- top: tab strip (right) / free space (left) -->
@@ -351,31 +352,55 @@
                                 <Border x:Name="TileConfirmed" Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="#2E9E4F" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed Active Countries" Width="150" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed Active Countries" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
-                                        <TextBlock x:Name="TB_ConfirmedDxcc" FontSize="30" FontWeight="Bold" Foreground="#2E9E4F" HorizontalAlignment="Center"/>
+                                        <!-- Fixed 44, the same as the Missing tile beside it, which now
+                                             carries two lines. Without it these tiles would be 4px
+                                             shorter than that one and the row would stop reading as one
+                                             strip - the thing the label areas are already fixed for. -->
+                                        <Grid Height="44">
+                                            <TextBlock x:Name="TB_ConfirmedDxcc" FontSize="30" FontWeight="Bold" Foreground="#2E9E4F" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                                 <Border Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked Active, not confirmed" Width="150" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked Active, not confirmed" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
-                                        <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
+                                        <Grid Height="44">
+                                            <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
                                 <Border Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Danger}" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_MissingTileLabel" Text="Missing Active Countries" Width="150" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_MissingTileLabel" Text="Missing Active Countries" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
-                                        <!-- 30, like the two tiles beside it. At 34 this number's line was
-                                             taller than theirs, and since each tile is only as tall as its
-                                             contents, the Missing frame stood higher than the others in a
-                                             row that is meant to read as one strip. Red already gives it
-                                             the emphasis; size was buying that twice, at the cost of the
-                                             alignment. -->
-                                        <TextBlock x:Name="TB_MissingDxcc" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Center"/>
+                                        <!-- TWO answers, not one: how many entities are missing out of the
+                                             340 that exist, and how many are missing for the DXCC Honor
+                                             Roll - which asks for the top ten of the list, i.e. 331, so it
+                                             allows nine to be missing. A DXer near the top cares far more
+                                             about the second number, and it cannot be worked out from the
+                                             first without knowing that rule.
+
+                                             Both lines are 16 (the floor) and come to 42.6px against the
+                                             39.9px the single 30pt number used, so the fixed 44 height
+                                             above absorbs the difference and the three tiles stay level.
+                                             "(331)" is in the tooltip, not the line: at 16 it measures
+                                             165px against the tile's 150, and putting it in would widen
+                                             all three tiles and shift the row. -->
+                                        <!-- LEFT-aligned, both lines: they are two readings of the same
+                                             thing, and a common left edge is what lets the eye run down
+                                             "15 …" and "6 …" and compare them. Centred, the two numbers
+                                             sat at different x positions and read as unrelated. -->
+                                        <Grid Height="44">
+                                            <StackPanel VerticalAlignment="Center" HorizontalAlignment="Left">
+                                                <TextBlock x:Name="TB_MissingDxcc" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Left"/>
+                                                <TextBlock x:Name="TB_MissingHonor" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Left"/>
+                                            </StackPanel>
+                                        </Grid>
                                     </StackPanel>
                                 </Border>
 
