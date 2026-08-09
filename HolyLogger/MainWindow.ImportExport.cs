@@ -52,6 +52,42 @@ namespace HolyLogger
             // Matched a QSO in the log but could not be told apart from another one, so left alone.
             public int AmbiguousQsoCount { get; set; }
             public ObservableCollection<QSO> RefreshedQsos { get; set; }
+            // Records the file held that could not be stored, and where the operator can read about
+            // them. RejectsAdifPath is the same records as a file they can correct and import again.
+            public int RejectedCount { get; set; }
+            public int FilledCount { get; set; }
+            // Records the file(s) held, so the completion message can say what was CHECKED and not
+            // leave "nothing was rejected" to be inferred from the absence of a line.
+            public int RecordsRead { get; set; }
+            public string ReportPath { get; set; }
+            public string RejectsAdifPath { get; set; }
+        }
+
+        // One record that did not make it into the log, from whichever stage turned it away: the
+        // parser (a field it cannot do without) or the database (the INSERT itself). Both end up in
+        // the same report, because to the operator they are the same thing - a contact in their file
+        // that is not in their log.
+        private sealed class ImportReject
+        {
+            public string FileName { get; set; }
+            public int Number { get; set; }
+            public string Reason { get; set; }
+            public string Raw { get; set; }
+            public string Call { get; set; }
+            public string Date { get; set; }
+            public string Time { get; set; }
+            public string Band { get; set; }
+            public string Mode { get; set; }
+
+            public string Describe()
+            {
+                string F(string v, int w)
+                {
+                    v = string.IsNullOrWhiteSpace(v) ? "—" : v.Trim();
+                    return v.Length >= w ? v : v.PadRight(w);
+                }
+                return $"{F(Call, 12)} {F(Date, 10)} {F(Time, 6)} {F(Band, 6)} {F(Mode, 6)}";
+            }
         }
 
         List<string> ImportFileQ = new List<string>();
@@ -173,7 +209,11 @@ namespace HolyLogger
             if (openFileDialog.ShowDialog() == true)
             {
                 // First: does this file become its OWN new log, or get added to the log open now?
-                ImportTarget target = AskImportTarget();
+                // With NO log open there is no "log open now" to add to, so the question is not asked -
+                // the file becomes its own new log, which is the only answer there is. Import is
+                // deliberately NOT blocked when no log is open: bringing a file in is exactly how an
+                // operator with no logs gets one.
+                ImportTarget target = dal != null && !dal.HasActiveLog ? ImportTarget.NewLog : AskImportTarget();
                 if (target == ImportTarget.Cancel) return;
 
                 if (target == ImportTarget.NewLog)
@@ -482,39 +522,92 @@ namespace HolyLogger
             UpdateLotwMenuCount();
             UpdateQrzMenuCount();
 
-            if (result.FaultyQso > 0)
+            // ONE report, whatever happened. It used to be either/or: a single record the database
+            // refused replaced the whole summary with "N QSO(s) failed to import. Check the file format
+            // and try again." - so an operator who imported 28,000 QSOs and lost 3 was told nothing
+            // about the 28,000, and nothing about WHICH 3 either. Both halves are always said now, and
+            // the ones that did not make it are named in a file on the Desktop.
+            if (result.ImportedQsoCount > 0 || result.CompletedQsoCount > 0 || result.RejectedCount > 0)
             {
-                HolyMessageBox.ShowWarning($"{result.FaultyQso} QSO(s) failed to import. Check the file format and try again.", "Import Complete with Errors", this);
-            }
-            else
-            {
-                // The report spells out BOTH halves of what an import now does, because "0 added" on a file
-                // the operator just imported would otherwise look like a failure when it is the opposite:
-                // their QSOs were already here and the file completed them.
-                if (result.ImportedQsoCount > 0 || result.CompletedQsoCount > 0)
+                // The count of THIS log, asked of the database directly. It used to be taken from the
+                // refreshed collection, which was every QSO in every log (the old GetAllQSOs had no
+                // log filter; it is gone now), so a line headed "Total QSOs in log" reported the whole
+                // database: importing 28,366 QSOs into a log that then held exactly 28,366 announced
+                // 67,622.
+                int totalQsos;
+                try { totalQsos = dal.GetQsoCountForLog(dal.ActiveLogId); }
+                catch (Exception swallowed)
                 {
-                    // The count of THIS log, asked of the database directly. It used to be taken from the
-                    // refreshed collection, which was every QSO in every log (the old GetAllQSOs had no
-                    // log filter; it is gone now), so a line headed "Total QSOs in log" reported the whole
-                    // database: importing 28,366 QSOs into a log that then held exactly 28,366 announced
-                    // 67,622.
-                    int totalQsos;
-                    try { totalQsos = dal.GetQsoCountForLog(dal.ActiveLogId); }
-                    catch (Exception swallowed)
+                    // Fall back to the collection just loaded for THIS log - never to a database-wide
+                    // total, which would be a meaningless number under a label that says "in log".
+                    Log.Swallow(swallowed);
+                    totalQsos = result.RefreshedQsos != null ? result.RefreshedQsos.Count : 0;
+                }
+
+                bool anyRejected = result.RejectedCount > 0;
+                string msg = anyRejected ? "Import finished.\n\n" : "Import completed successfully!\n\n";
+                msg += $"New QSOs added: {result.ImportedQsoCount:N0}";
+                if (result.CompletedQsoCount > 0)
+                    msg += $"\nAlready in this log — fields filled in: {result.CompletedQsoCount:N0}";
+                if (result.AmbiguousQsoCount > 0)
+                    msg += $"\nAlready in this log — too alike to match: {result.AmbiguousQsoCount:N0}";
+                if (anyRejected)
+                    msg += $"\nNOT stored: {result.RejectedCount:N0}";
+                msg += $"\n\nTotal QSOs in log: {totalQsos:N0}";
+
+                // SAY that the file was checked, and out of how many. A check that reports only when it
+                // finds something is a check the operator cannot tell apart from one that never ran -
+                // "how do I know the verification was with no errors?" has to be answered on the screen
+                // they are already looking at, not by the absence of a line.
+                if (result.RecordsRead > 0)
+                {
+                    if (!anyRejected)
+                        msg += $"\n\nAll {result.RecordsRead:N0} records in the file were checked, and every one "
+                             + "of them had a callsign, a date, a time, a band, a mode and a station callsign. "
+                             + "None was turned away.";
+                    else
+                        msg += $"\n\nAll {result.RecordsRead:N0} records in the file were checked.";
+                }
+
+                // A record can be short of a field and still be kept, when the rest of it answers for
+                // that field - the band from the frequency. That is a change to the operator's data and
+                // is named in the report, so the report must be offered even when nothing was rejected.
+                if (!anyRejected && result.FilledCount > 0)
+                {
+                    msg += $"\n\n{result.FilledCount:N0} record{(result.FilledCount == 1 ? " was" : "s were")} "
+                         + "missing a field that the rest of the record already answered — the band, worked out "
+                         + "from the frequency. The report lists each one.";
+                }
+
+                if (anyRejected)
+                {
+                    msg += $"\n\n{result.RejectedCount:N0} QSO{(result.RejectedCount == 1 ? "" : "s")} in your file "
+                         + $"{(result.RejectedCount == 1 ? "is" : "are")} missing something a QSO cannot be stored "
+                         + "without — a callsign, a date, a time, a band, a mode or the station callsign it was "
+                         + "made under.\n\nThe report names every one of them and says what is missing. The same "
+                         + "QSOs are saved beside it as an ADIF file you can correct and import again — nothing "
+                         + "already in your log will be duplicated.";
+
+                    if (!string.IsNullOrEmpty(result.ReportPath))
                     {
-                        // Fall back to the collection just loaded for THIS log - never to a database-wide
-                        // total, which would be a meaningless number under a label that says "in log".
-                        Log.Swallow(swallowed);
-                        totalQsos = result.RefreshedQsos != null ? result.RefreshedQsos.Count : 0;
+                        HolyMessageBox.ShowWithLinks(msg, "Import Complete", HolyMsgType.Warning, this,
+                            FileLinks(result), OpenPath, 620);
                     }
-                    string msg = $"Import completed successfully!\n\n" +
-                                 $"New QSOs added: {result.ImportedQsoCount:N0}";
-                    if (result.CompletedQsoCount > 0)
-                        msg += $"\nAlready in this log — fields filled in: {result.CompletedQsoCount:N0}";
-                    if (result.AmbiguousQsoCount > 0)
-                        msg += $"\nAlready in this log — too alike to match: {result.AmbiguousQsoCount:N0}";
-                    msg += $"\n\nTotal QSOs in log: {totalQsos:N0}";
-                    HolyMessageBox.ShowSuccess(msg, "Import Complete", this);
+                    else
+                    {
+                        HolyMessageBox.ShowWarning(msg, "Import Complete", this, 620);
+                    }
+                }
+                else if (!string.IsNullOrEmpty(result.ReportPath))
+                {
+                    // Nothing rejected, but there IS a report - fields were filled in. Still success,
+                    // and still reachable in one click.
+                    HolyMessageBox.ShowWithLinks(msg, "Import Complete", HolyMsgType.Success, this,
+                        FileLinks(result), OpenPath, 620);
+                }
+                else
+                {
+                    HolyMessageBox.ShowSuccess(msg, "Import Complete", this, 620);
                 }
             }
             // Give the imported log the identity the user confirmed before the import (if it had none).
@@ -551,6 +644,9 @@ namespace HolyLogger
             int importedQsoCount = 0;
             int completedQso = 0;    // records that completed a QSO the log already had
             int ambiguousQso = 0;    // matched, but two candidates were equally close - left alone
+            var rejects = new List<ImportReject>();                    // what did not make it, and why
+            var filledIn = new List<HolyLogParser.FilledField>();      // what was worked out from the record
+            int recordsRead = 0;                                       // what the file(s) held, all told
             const int importBatchSize = 500;
             int lastReportedPercent = 0;
             const int readPhasePercent = 3;
@@ -589,6 +685,12 @@ namespace HolyLogger
                         HolyLogParser.IsIsraeliStation(myCallsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign,
                         isParseDuplicates, isParseWARC);
 
+                    // Whose log this is, for records that name no station callsign at all. The identity
+                    // just confirmed for a brand-new log comes first (it is not written to the log until
+                    // the import finishes), then the log's stored identity, then the station callsign
+                    // the program is set to.
+                    parser.DefaultStationCall = FallbackStationCall(myCallsign);
+
                     parser.Parse(parseProgress =>
                     {
                         int percent = readPhasePercent + (int)Math.Floor((parseProgress * (parsePhaseEndPercent - readPhasePercent)) / 100.0);
@@ -599,13 +701,34 @@ namespace HolyLogger
                         }
                     });
                     List<QSO> rawQSOList = parser.GetRawQSO();
+
+                    // Everything the file held that could not become a QSO, kept with its own text so
+                    // the report can name it and hand it back.
+                    string shortName = System.IO.Path.GetFileName(filename);
+                    foreach (var r in parser.GetRejected())
+                        rejects.Add(new ImportReject
+                        {
+                            FileName = shortName, Number = r.Number, Reason = r.Reason, Raw = r.Raw,
+                            Call = r.Call, Date = r.Date, Time = r.Time, Band = r.Band, Mode = r.Mode,
+                        });
+                    filledIn.AddRange(parser.GetFilled());
+                    recordsRead += parser.RecordsRead;
+
                     RawAdif = null;   // large file string no longer needed; free it before the save phase
                     int count = rawQSOList.Count;
 
                     if (count == 0)
                     {
+                        // "Nothing here" and "everything here was turned away" are two different
+                        // things, and the operator of a file whose every record is missing a field
+                        // must not be told their file is empty. The report written at the end says
+                        // which records and why; this only points at it.
+                        int turnedAway = parser.GetRejected().Count;
+                        string why = turnedAway > 0
+                            ? $"All {turnedAway:N0} of its records were turned away - the report on your Desktop says which and why."
+                            : "The file may be in an unsupported format or empty.";
                         this.Dispatcher.Invoke(() =>
-                            HolyMessageBox.ShowWarning($"No QSOs found in file:\n{filename}\n\nThe file may be in an unsupported format or empty.", "Import Warning", this));
+                            HolyMessageBox.ShowWarning($"No QSOs were taken from:\n{filename}\n\n{why}", "Import Warning", this));
                         continue;
                     }
 
@@ -675,6 +798,7 @@ namespace HolyLogger
                         List<QSO> batch = rawQSOList.Skip(i).Take(importBatchSize).ToList();
                         int batchFaulty;
                         int batchStartIndex = i;
+                        var refused = new List<KeyValuePair<QSO, string>>();
                         lock (_syncLock)
                         {
                             batchFaulty = dal.InsertBatch(batch, processedInBatch =>
@@ -687,8 +811,22 @@ namespace HolyLogger
                                     lastReportedPercent = percent;
                                     AdifHandlerWorker.ReportProgress(percent, $"Saving to log {savePercent}%");
                                 }
-                            });
+                            }, refused);
                         }
+
+                        // A QSO the database itself refused. It parsed fine, so its record is rebuilt
+                        // from what was read rather than kept from the file - the operator still gets
+                        // a correctable ADIF record and the reason the database gave.
+                        foreach (var f in refused)
+                            rejects.Add(new ImportReject
+                            {
+                                FileName = shortName,
+                                Number   = 0,
+                                Reason   = "the log would not store it: " + f.Value,
+                                Raw      = SafeRecordText(f.Key),
+                                Call     = f.Key?.DXCall, Date = f.Key?.Date, Time = f.Key?.Time,
+                                Band     = f.Key?.Band,   Mode = f.Key?.Mode,
+                            });
 
                         faultyQSO += batchFaulty;
                         importedQsoCount += batch.Count - batchFaulty;
@@ -734,19 +872,209 @@ namespace HolyLogger
 
             AdifHandlerWorker.ReportProgress(100, "Import complete 100%");
 
+            string reportPath = null, rejectsAdifPath = null;
+            if (rejects.Count > 0 || filledIn.Count > 0)
+                WriteImportReport(rejects, filledIn, importedQsoCount, completedQso, ambiguousQso,
+                                  out reportPath, out rejectsAdifPath);
+
             e.Result = new AdifImportResult
             {
                 FaultyQso = faultyQSO,
                 ImportedQsoCount = importedQsoCount,
                 CompletedQsoCount = completedQso,
                 AmbiguousQsoCount = ambiguousQso,
-                RefreshedQsos = refreshedQsos
+                RefreshedQsos = refreshedQsos,
+                RejectedCount = rejects.Count,
+                FilledCount = filledIn.Count,
+                RecordsRead = recordsRead,
+                ReportPath = reportPath,
+                RejectsAdifPath = rejectsAdifPath,
             };
             this.Dispatcher.Invoke(() => ImportFileQ.Clear());
         }
 
+        // The two files, each as a caption and its FULL path - shown as links, so the path can be read
+        // and copied like text and opened with one click like a link.
+        private static List<KeyValuePair<string, string>> FileLinks(AdifImportResult r)
+        {
+            var links = new List<KeyValuePair<string, string>>();
+            if (!string.IsNullOrEmpty(r.ReportPath))
+                links.Add(new KeyValuePair<string, string>("The report:", r.ReportPath));
+            if (!string.IsNullOrEmpty(r.RejectsAdifPath))
+                links.Add(new KeyValuePair<string, string>("The QSOs to correct:", r.RejectsAdifPath));
+            return links;
+        }
+
+        // Opens a file in whatever the operator uses for it. If Windows has nothing associated, the
+        // folder is shown instead with the file picked out, so the button always leads somewhere.
+        private void OpenPath(string path)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(path) { UseShellExecute = true });
+            }
+            catch (Exception first)
+            {
+                Log.Swallow(first);
+                try { System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + path + "\""); }
+                catch (Exception swallowed)
+                {
+                    Log.Swallow(swallowed);
+                    HolyMessageBox.ShowWarning("The report could not be opened. It is on your Desktop:\n\n" + path,
+                                               "Import report", this);
+                }
+            }
+        }
+
+        // The callsign to give a record that names no station of its own: the identity just confirmed
+        // for a new log (not stored until the import finishes), else the log's own identity, else the
+        // callsign the program is set to. Empty when nothing is known - such records are then rejected
+        // rather than attributed to a station that may not have made them.
+        private string FallbackStationCall(string programCallsign)
+        {
+            if (!string.IsNullOrWhiteSpace(_pendingImportCallsign)) return _pendingImportCallsign.Trim();
+            try
+            {
+                if (dal != null)
+                {
+                    dal.GetLogIdentity(dal.ActiveLogId, out string logCall, out _);
+                    if (!string.IsNullOrWhiteSpace(logCall)) return logCall.Trim();
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return (programCallsign ?? string.Empty).Trim();
+        }
+
+        // One ADIF record rebuilt from a QSO the database refused, so the rejects file holds a real
+        // record for it too. Never throws: a report is not worth losing over a formatting slip.
+        private static string SafeRecordText(QSO q)
+        {
+            if (q == null) return string.Empty;
+            try { return BuildQrzAdif(q); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+        }
+
+        // The two files this import leaves on the Desktop:
+        //
+        //   holylogger_import_report_<when>.txt   - what happened, in words: every record that did not
+        //                                           make it, named, with the reason.
+        //   holylogger_rejected_qsos_<when>.adi   - those same records, verbatim, as an ADIF file the
+        //                                           operator can correct in any editor and import again.
+        //
+        // The pair is the point: the first says what is wrong, the second is the thing to fix. Import
+        // matches a re-imported record against what is already in the log, so bringing the corrected
+        // file back adds the missing contacts without duplicating anything.
+        private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,
+                                       int imported, int completed, int ambiguous,
+                                       out string reportPath, out string rejectsAdifPath)
+        {
+            reportPath = null;
+            rejectsAdifPath = null;
+            try
+            {
+                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string stamp = DateTime.Now.ToString("yyyy-MM-dd_HHmm");
+                string txt = System.IO.Path.Combine(desktop, $"holylogger_import_report_{stamp}.txt");
+                string adi = System.IO.Path.Combine(desktop, $"holylogger_rejected_qsos_{stamp}.adi");
+
+                var sb = new StringBuilder();
+                sb.AppendLine("HolyLogger — import report");
+                sb.AppendLine(DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm"));
+                sb.AppendLine();
+                sb.AppendLine($"Added to the log         : {imported:N0}");
+                if (completed > 0) sb.AppendLine($"Already here, filled in  : {completed:N0}");
+                if (ambiguous > 0) sb.AppendLine($"Already here, too alike  : {ambiguous:N0}");
+                sb.AppendLine($"NOT stored               : {rejects.Count:N0}");
+                sb.AppendLine();
+
+                if (rejects.Count > 0)
+                {
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine("QSOs THAT DID NOT MAKE IT");
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine();
+                    sb.AppendLine("Each of these is in your file and is NOT in your log. A QSO cannot be");
+                    sb.AppendLine("stored without a callsign, a date, a time, a band, a mode and the");
+                    sb.AppendLine("station callsign it was made under.");
+                    sb.AppendLine();
+                    sb.AppendLine("The same records are saved beside this report as:");
+                    sb.AppendLine("    " + System.IO.Path.GetFileName(adi));
+                    sb.AppendLine("Correct them there and import that file — anything already in your log");
+                    sb.AppendLine("is recognised, so nothing will be duplicated.");
+                    sb.AppendLine();
+                    sb.AppendLine("  " + "CALL".PadRight(12) + " " + "DATE".PadRight(10) + " " + "TIME".PadRight(6)
+                                  + " " + "BAND".PadRight(6) + " " + "MODE".PadRight(6) + "  WHY IT WAS NOT STORED");
+                    sb.AppendLine();
+
+                    foreach (var r in rejects)
+                    {
+                        string where = r.Number > 0 ? $"record {r.Number:N0}" : "record";
+                        sb.AppendLine($"  {r.Describe()}  {r.Reason}");
+                        sb.AppendLine($"        in {r.FileName}, {where}");
+                    }
+                    sb.AppendLine();
+                }
+
+                if (filled.Count > 0)
+                {
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine($"FILLED IN FOR YOU ({filled.Count:N0})");
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine();
+                    sb.AppendLine("These records were missing a field that the rest of the record already");
+                    sb.AppendLine("answered, so it was worked out instead of turning the QSO away.");
+                    sb.AppendLine();
+                    foreach (var f in filled)
+                        sb.AppendLine($"  {(string.IsNullOrWhiteSpace(f.Call) ? "—" : f.Call).PadRight(12)} "
+                                      + $"{f.Field} = {f.Value}   (from {f.From})");
+                    sb.AppendLine();
+                }
+
+                System.IO.File.WriteAllText(txt, sb.ToString(), Encoding.UTF8);
+                reportPath = txt;
+
+                if (rejects.Count > 0)
+                {
+                    var adif = new StringBuilder();
+                    adif.AppendLine("HolyLogger — QSOs that could not be imported.");
+                    adif.AppendLine("Each record below is preceded by the reason it was turned away.");
+                    adif.AppendLine("Correct them and import this file; QSOs already in the log are recognised.");
+                    adif.AppendLine("<adif_ver:5>3.1.4");
+                    adif.AppendLine("<programid:10>HolyLogger");
+                    adif.AppendLine("<eoh>");
+                    adif.AppendLine();
+                    foreach (var r in rejects)
+                    {
+                        // A record rebuilt from a refused QSO already ends with its own <eor>; one
+                        // taken verbatim from the file does not, because the file's <EOR> is what the
+                        // reader stopped at. Strip either way and write exactly one.
+                        string body = (r.Raw ?? string.Empty).Trim();
+                        if (body.EndsWith("<eor>", StringComparison.OrdinalIgnoreCase))
+                            body = body.Substring(0, body.Length - "<eor>".Length).TrimEnd();
+                        if (body.Length == 0) continue;   // nothing to correct; the report still names it
+
+                        // The reason sits OUTSIDE the record's fields: a reader that understands ADIF
+                        // takes the tags and ignores this line, and a person opening the file in an
+                        // editor sees straight away what to fix.
+                        adif.AppendLine($"// {r.Reason}");
+                        adif.AppendLine(body);
+                        adif.AppendLine("<eor>");
+                        adif.AppendLine();
+                    }
+                    System.IO.File.WriteAllText(adi, adif.ToString(), Encoding.UTF8);
+                    rejectsAdifPath = adi;
+                }
+            }
+            catch (Exception swallowed)
+            {
+                // The import itself succeeded; failing to write a report must not undo it.
+                Log.Swallow(swallowed);
+            }
+        }
+
         private void ExportMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (!RequireActiveLog("export")) return;
             // Export the ACTIVE log only (the "(Active Log)" menu label). Uses the same helper /
             // save dialog as the View Logs window's Export ADIF button, so behaviour is identical.
             ExportQsosToAdif(dal.GetQSOsForLog(dal.ActiveLogId), this);
@@ -754,6 +1082,7 @@ namespace HolyLogger
 
         private void ExportCabrilloMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (!RequireActiveLog("export")) return;
             // Export the ACTIVE log only (the "(Active Log)" menu label). Uses the same helper /
             // save dialog as the View Logs window's Export Cabrillo button.
             ExportQsosToCabrillo(dal.GetQSOsForLog(dal.ActiveLogId), dal.ActiveLogId, this);

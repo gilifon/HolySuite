@@ -34,7 +34,9 @@
                    FontSize="18" TextWrapping="Wrap"
                    VerticalAlignment="Center"/>
 
-        <!-- OK button (info/success/warning/error mode) -->
+        <!-- OK button (info/success/warning/error mode). Right by default, as every dialog in the
+             program has always had it; ShowWithLinks centres it for the one kind of message that ends
+             in a list of files rather than in a sentence. -->
         <Button Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                 x:Name="OkBtn" Content="OK"
                 Width="110" Height="38" FontSize="17"

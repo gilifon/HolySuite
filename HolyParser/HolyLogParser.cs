@@ -131,6 +131,55 @@ namespace HolyParser
             qso_row.Sig = sig;
         }
 
+        // ── What the file held but the log could not take ────────────────────────────────────────
+        //
+        // A record that cannot become a QSO used to disappear: either the INSERT failed on a NOT NULL
+        // column and only a count reached the operator, or the parse threw and a counter nobody reads
+        // was incremented. Either way the contact was in their file and gone from their log, with no
+        // way to find out which one. Every such record is now kept here WITH ITS OWN TEXT, so it can be
+        // named, explained, and handed back in a file the operator can correct and import again.
+        //
+        // Only failing records hold their text. This parser walks a file that can be 70 MB in a 32-bit
+        // process, and keeping every record's raw string would undo the memory work above.
+        public class RejectedRecord
+        {
+            public int Number { get; set; }        // 1-based position of the record in the file
+            public string Reason { get; set; }     // in plain words, e.g. "no MODE"
+            public string Raw { get; set; }        // the record exactly as the file had it
+            public string Call { get; set; }       // whatever could be read, to identify it by
+            public string Date { get; set; }
+            public string Time { get; set; }
+            public string Band { get; set; }
+            public string Mode { get; set; }
+        }
+
+        // A field that was EMPTY in the record and worked out from something else in it. Reported
+        // beside the rejections rather than filled in behind the operator's back.
+        public class FilledField
+        {
+            public int Number { get; set; }
+            public string Call { get; set; }
+            public string Field { get; set; }
+            public string Value { get; set; }
+            public string From { get; set; }
+        }
+
+        private readonly List<RejectedRecord> m_rejected = new List<RejectedRecord>();
+        private readonly List<FilledField> m_filled = new List<FilledField>();
+
+        // How many records the file actually held. Reported so the operator can see that every one of
+        // them was looked at - "none was turned away" means nothing unless it also says out of how many.
+        private int m_recordsRead;
+        public int RecordsRead { get { return m_recordsRead; } }
+
+        public List<RejectedRecord> GetRejected() { return m_rejected; }
+        public List<FilledField> GetFilled() { return m_filled; }
+
+        // The station callsign to fall back on when a record names neither STATION_CALLSIGN nor
+        // OPERATOR. Set by the importer to the log's own identity; left empty, such a record is
+        // rejected rather than guessed at.
+        public string DefaultStationCall { get; set; }
+
         public HolyLogParser() : this("", Operator.Israeli)
         {
 
@@ -183,7 +232,7 @@ namespace HolyParser
             int pos = eohIndex >= 0 ? eohIndex + eohTag.Length : 0;
             int total = m_fileText.Length;
 
-            int debugCounter = 0;
+            int recordNumber = 0;
             int lastReportedProgress = -1;
 
             // Progress is measured by position in the file instead of by record count, which also drops
@@ -198,6 +247,7 @@ namespace HolyParser
                     string row = m_fileText.Substring(pos, end - pos);
                     if (!string.IsNullOrWhiteSpace(row))
                     {
+                        recordNumber++;
                         try
                         {
                             // Strip line breaks from THIS record (the old code stripped them from the
@@ -206,11 +256,25 @@ namespace HolyParser
                                 ? row.Replace("\r", string.Empty).Replace("\n", string.Empty)
                                 : row;
                             QSO qso_row = ParseRawQSO(cleanRow);
-                            m_qsoList.Add(qso_row);
+
+                            // A record only joins the list once it CAN be stored. What cannot is set
+                            // aside with its text and its reason instead of being dropped in silence.
+                            if (qso_row == null)
+                            {
+                                Reject(recordNumber, cleanRow, null, "the record held no fields this program could read");
+                            }
+                            else
+                            {
+                                string whatIsMissing = CompleteRequiredFields(qso_row, recordNumber, cleanRow);
+                                if (whatIsMissing != null)
+                                    Reject(recordNumber, cleanRow, qso_row, whatIsMissing);
+                                else
+                                    m_qsoList.Add(qso_row);
+                            }
                         }
-                        catch (Exception)
+                        catch (Exception ex)
                         {
-                            debugCounter++;
+                            Reject(recordNumber, row, null, "the record could not be read (" + ex.Message + ")");
                         }
                     }
                 }
@@ -227,12 +291,87 @@ namespace HolyParser
             }
 
             // Done with the raw text; the caller may still hold its own reference to it.
+            m_recordsRead = recordNumber;
             m_fileText = null;
             if (!IsParseDuplicates)
             {
                 m_qsoList= m_qsoList.DistinctBy(p => p.HASH).ToList();
             }
             m_qsoList = m_qsoList.OrderBy(p => p.Date).ThenBy(p => p.Time).ToList();
+        }
+
+        private void Reject(int number, string raw, QSO partial, string reason)
+        {
+            m_rejected.Add(new RejectedRecord
+            {
+                Number = number,
+                Reason = reason,
+                Raw    = raw,
+                Call   = partial != null ? partial.DXCall : null,
+                Date   = partial != null ? partial.Date : null,
+                Time   = partial != null ? partial.Time : null,
+                Band   = partial != null ? partial.Band : null,
+                Mode   = partial != null ? partial.Mode : null,
+            });
+        }
+
+        // The six fields a QSO cannot be stored without - the log's NOT NULL columns. Anything that can
+        // be WORKED OUT from the rest of the record is filled in first (and reported); only what is
+        // genuinely absent is named, so a file is never rejected over something the record already
+        // says in another way.
+        //
+        // Returns null when the record is complete, otherwise the reason it is not.
+        private string CompleteRequiredFields(QSO q, int recordNumber, string row)
+        {
+            // BAND from FREQ, by the same conversion the QSO editor uses. A file that carries the
+            // frequency but not the band - which ADIF fully allows - used to lose EVERY record it had.
+            //
+            // Whether it is filled in HERE depends on the record: QSO.IsValidBand() already does this
+            // for a QSO it validates, so by now it is usually done. What must not depend on that is the
+            // REPORT - a band the operator never wrote is a band worked out for them either way, and
+            // only the record itself can say which it was.
+            bool fileHadBand = !string.IsNullOrWhiteSpace(AdifValue(row, "band"))
+                               || row.IndexOf("<band>", StringComparison.OrdinalIgnoreCase) >= 0;  // N1MM
+            if (string.IsNullOrWhiteSpace(q.Band) && !string.IsNullOrWhiteSpace(q.Freq))
+            {
+                string band = convertFreqToBand(NormalizeFreqToMhz(q.Freq) ?? q.Freq);
+                if (!string.IsNullOrWhiteSpace(band)) q.Band = band;
+            }
+            if (!fileHadBand && !string.IsNullOrWhiteSpace(q.Band) && !string.IsNullOrWhiteSpace(q.Freq))
+                m_filled.Add(new FilledField
+                {
+                    Number = recordNumber, Call = q.DXCall,
+                    Field = "BAND", Value = q.Band, From = "FREQ " + q.Freq.Trim(),
+                });
+
+            // STATION_CALLSIGN from the log's own identity. The record naming neither a station
+            // callsign nor an operator is normal in files exported per-station; the log knows whose
+            // it is. With no identity to fall back on this stays empty and the record is rejected -
+            // the callsign a QSO was made under is not something to invent.
+            if (string.IsNullOrWhiteSpace(q.MyCall) && !string.IsNullOrWhiteSpace(DefaultStationCall))
+            {
+                q.MyCall = DefaultStationCall.Trim().ToUpper();
+                m_filled.Add(new FilledField
+                {
+                    Number = recordNumber, Call = q.DXCall,
+                    Field = "STATION_CALLSIGN", Value = q.MyCall, From = "this log's callsign",
+                });
+            }
+
+            var missing = new List<string>();
+            if (string.IsNullOrWhiteSpace(q.DXCall)) missing.Add("CALL (the station worked)");
+            if (string.IsNullOrWhiteSpace(q.Date))   missing.Add("QSO_DATE");
+            if (string.IsNullOrWhiteSpace(q.Time))   missing.Add("TIME_ON");
+            if (string.IsNullOrWhiteSpace(q.Mode))   missing.Add("MODE");
+            if (string.IsNullOrWhiteSpace(q.Band))
+                missing.Add(string.IsNullOrWhiteSpace(q.Freq)
+                    ? "BAND (and no FREQ to work it out from)"
+                    : "BAND (FREQ " + q.Freq.Trim() + " is not on a band this program knows)");
+            if (string.IsNullOrWhiteSpace(q.MyCall))
+                missing.Add("STATION_CALLSIGN (and no OPERATOR, and this log has no callsign of its own)");
+
+            if (missing.Count == 0) return null;
+            return "no " + string.Join(", no ", missing);
         }
 
         public QSO ParseRawQSO(string row)

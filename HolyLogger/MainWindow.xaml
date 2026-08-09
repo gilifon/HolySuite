@@ -1041,7 +1041,9 @@
                 Visibility="Collapsed" Panel.ZIndex="60" Cursor="Hand"
                 MouseLeftButtonDown="CallsignLockOverlay_MouseDown"
                 ToolTip="No log is set for your current station callsign. Click to open the Log Manager and open or create a log for it before logging QSOs.">
-            <TextBlock Text="Select Log" Foreground="Red" FontWeight="Bold" FontSize="13"
+            <!-- Named: the caption changes with the reason - "Select Log" when this callsign has no
+                 log of its own, "No log" when nothing is open at all. -->
+            <TextBlock x:Name="CallsignLockText" Text="Select Log" Foreground="Red" FontWeight="Bold" FontSize="13"
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"

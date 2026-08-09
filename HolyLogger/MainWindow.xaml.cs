@@ -1534,6 +1534,9 @@ namespace HolyLogger
 
         private void AddBtn_Click(object sender, RoutedEventArgs e)
         {
+            // Before anything else: a QSO must have a log to go into. Without this the INSERT would
+            // name a log id that matches no row, and the contact would be stored where nothing reads.
+            if (!RequireActiveLog("log a QSO into")) return;
             if (!Validate()) return;
             // Optional HAM-frequency check (Options > General). Applies in Manual AND CAT: if the
             // frequency is not an amateur band the operator is warned and can save anyway, bail out, or
@@ -1913,7 +1916,13 @@ namespace HolyLogger
                 else
                 {
                     dal.ActiveLogId = Properties.Settings.Default.ActiveLogId;
-                    if (dal.GetLogName(dal.ActiveLogId) == null)   // saved log gone -> fall back to first
+                    // NoLogId is not a missing setting - it is the operator having closed or deleted
+                    // their last log. That choice survives a restart; the program opens with no log,
+                    // exactly as they left it. Any OTHER id that no longer exists is a log that went
+                    // missing (a restore, a file swapped underneath us) - or a setting never written,
+                    // which is every user upgrading from before this existed - and opening the first
+                    // log is still the right answer for those.
+                    if (dal.ActiveLogId != DataAccess.NoLogId && dal.GetLogName(dal.ActiveLogId) == null)
                     {
                         var logs = dal.GetLogs();
                         if (logs.Count > 0) dal.ActiveLogId = logs[0].Id;
@@ -1966,10 +1975,14 @@ namespace HolyLogger
             }
             if (string.IsNullOrEmpty(name))
             {
-                this.Title = title;
+                // No log open is a state the operator chose (they deleted the last one), so the title
+                // says it outright rather than going quiet and leaving them to wonder which log the
+                // empty table belongs to.
+                bool noLog = dal != null && !dal.HasActiveLog;
+                this.Title = noLog ? title + "  —  no log open" : title;
                 TitlePrefix = title;
-                TitleLogLabel = string.Empty;
-                TitleLogName = string.Empty;
+                TitleLogLabel = noLog ? "  —  " : string.Empty;
+                TitleLogName = noLog ? "no log open" : string.Empty;
             }
             else
             {
@@ -2009,6 +2022,27 @@ namespace HolyLogger
                 AddBtn_Click(null, null);   // add the QSO to the log before the action proceeds
         }
 
+        // Closes whatever log is open and leaves NONE open. Everything SwitchActiveLog does for a real
+        // log - guarding an unsaved QSO, emptying the grid, resetting the entry form, retitling the
+        // window, closing Search and Statistics - is exactly what closing needs, so it is the same road
+        // with NoLogId at the end of it. A query scoped to it returns nothing, which is the truth.
+        public void CloseActiveLog() => SwitchActiveLog(DataAccess.NoLogId);
+
+        // The one gate for everything that cannot mean anything without a log: logging a QSO, importing
+        // into one, exporting one, its statistics, its confirmations, its uploads. Says which action was
+        // asked for, so the message answers "why can't I?" rather than only "you can't".
+        //
+        // Returns true when there IS a log and the caller may go ahead.
+        public bool RequireActiveLog(string action)
+        {
+            if (dal != null && dal.HasActiveLog) return true;
+            HolyMessageBox.ShowWarning(
+                "No log is open, so there is nothing to " + action + ".\n\n" +
+                "Open an existing log or create a new one:  Tools → Logs.",
+                "No log open", this);
+            return false;
+        }
+
         public void SwitchActiveLog(long logId)
         {
             // Guard the in-progress QSO before the log changes: it is added to the CURRENT log
@@ -2039,7 +2073,9 @@ namespace HolyLogger
                 UpdateEqslQueueIndicator();
                 UpdateQrzMenuCount();
                 RefreshCopyIndicator();           // show/hide the red "copying is live" dot for this log
-                EnsureActiveLogHasIdentity(promptIfEmpty: false);   // legacy log with QSOs gets its identity now
+                // No log open: there is no identity to check and nothing to ask about.
+                if (dal.HasActiveLog)
+                    EnsureActiveLogHasIdentity(promptIfEmpty: false);   // legacy log with QSOs gets its identity now
                 SyncCallsignToActiveLog();        // show this log's callsign; clears any "Select Log" lock
                 // Recompute worked countries from the newly active log so the cluster's "new
                 // country" (red) flags reflect THIS log immediately -- e.g. a brand-new empty log
@@ -3284,6 +3320,7 @@ namespace HolyLogger
 
         private async void UploadQueueToClublogMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (!RequireActiveLog("upload")) return;
             if (!ClublogService.HasApiKey)
             {
                 HolyMessageBox.ShowError("This copy of HolyLogger has no Club Log application key.", "Club Log", this);
@@ -5956,6 +5993,7 @@ namespace HolyLogger
 
         private void SearchMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (!RequireActiveLog("search")) return;
             OpenSearchWindow();
         }
 
@@ -5997,6 +6035,9 @@ namespace HolyLogger
 
         private void StatisticsMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            // Statistics are a log's statistics, and confirmations are fetched INTO a log. With none
+            // open the window would offer to check LoTW for a log that is not there.
+            if (!RequireActiveLog("show statistics for")) return;
             OpenStatisticsWindow();
         }
 
@@ -8282,22 +8323,43 @@ namespace HolyLogger
         // callsign. The station callsign box stays editable; only starting a QSO is blocked until a log is
         // set for the current station callsign. `pending` = the station callsign with no log yet, used to
         // filter the Log Manager when the overlay is clicked.
-        private void SetCallsignLocked(bool locked, string pending)
+        // caption: what the overlay says. "Select Log" for a callsign with no log of its own; "No log"
+        // when nothing at all is open, because those are two different things to be told.
+        private void SetCallsignLocked(bool locked, string pending, string caption = "Select Log")
         {
             _callsignLocked = locked;
             _pendingStationCallsign = locked ? pending : null;
             if (CallsignLockOverlay != null)
+            {
                 CallsignLockOverlay.Visibility = locked ? Visibility.Visible : Visibility.Collapsed;
+                if (CallsignLockText != null) CallsignLockText.Text = caption;
+                CallsignLockOverlay.ToolTip = caption == "No log"
+                    ? "No log is open, so there is nowhere to put a QSO. Click to open the Log Manager and open or create one."
+                    : "No log is set for your current station callsign. Click to open the Log Manager and open or create a log for it before logging QSOs.";
+            }
             if (TB_DXCallsign != null)
                 TB_DXCallsign.IsReadOnly = locked;
         }
 
-        // Locks the box iff the current callsign differs from the active log's identity callsign.
+        // Locks the box iff the current callsign differs from the active log's identity callsign - or
+        // there is no log open at all, which is the same situation in its purest form: there is nowhere
+        // for the QSO to go. Locking the DX callsign box stops a QSO being STARTED, which is far better
+        // than letting the operator fill in the whole form and refusing it at the end.
         private void RefreshCallsignLockState()
         {
             if (dal == null || TB_MyCallsign == null) return;
-            string idCall = ActiveLogIdentityCallsign();
             string boxCall = (TB_MyCallsign.Text ?? string.Empty).Trim();
+
+            if (!dal.HasActiveLog)
+            {
+                // No filter callsign: with nothing open, the Log Manager must show EVERY log, not only
+                // those matching whatever is in the station box - the operator is choosing a log, not
+                // resolving a callsign.
+                SetCallsignLocked(true, null, "No log");
+                return;
+            }
+
+            string idCall = ActiveLogIdentityCallsign();
             bool mismatch = idCall.Length > 0 && boxCall.Length > 0
                             && !CallsignIdentity.Same(idCall, boxCall);
             SetCallsignLocked(mismatch, boxCall);

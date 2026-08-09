@@ -226,13 +226,62 @@ namespace HolyLogger
             return dlg.Confirmed;
         }
 
-        public static void ShowSuccess(string message, string title = "HolyLogger", Window owner = null)
-            => Show(message, title, HolyMsgType.Success, owner);
+        public static void ShowSuccess(string message, string title = "HolyLogger", Window owner = null, double width = 0)
+            => Show(message, title, HolyMsgType.Success, owner, width);
 
         public static void ShowError(string message, string title = "HolyLogger", Window owner = null)
             => Show(message, title, HolyMsgType.Error, owner);
 
         public static void ShowWarning(string message, string title = "HolyLogger", Window owner = null, double width = 0)
             => Show(message, title, HolyMsgType.Warning, owner, width);
+
+        // A message with file paths written out at the end as LINKS the operator can click. A path is
+        // worth printing in full - it can be read, copied, and pasted into an editor - but a path that
+        // is only text makes the reader go and find the file by hand. Printed and clickable is both,
+        // which is why there is no "open it" button beside OK: the path IS the button.
+        //
+        // links is caption -> path; onLink is given the path that was clicked, so the caller decides
+        // how a file gets opened rather than this dialog deciding for it.
+        public static void ShowWithLinks(string message, string title, HolyMsgType type, Window owner,
+                                         System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>> links,
+                                         Action<string> onLink, double width = 0)
+        {
+            var dlg = new HolyMessageBox(message, title, type, owner, confirm: false, width);
+
+            if (links != null)
+                foreach (var entry in links)
+                {
+                    string path = entry.Value;
+                    if (string.IsNullOrWhiteSpace(path)) continue;
+
+                    dlg.MessageText.Inlines.Add(new System.Windows.Documents.LineBreak());
+                    dlg.MessageText.Inlines.Add(new System.Windows.Documents.LineBreak());
+                    if (!string.IsNullOrWhiteSpace(entry.Key))
+                    {
+                        dlg.MessageText.Inlines.Add(new System.Windows.Documents.Run(entry.Key));
+                        dlg.MessageText.Inlines.Add(new System.Windows.Documents.LineBreak());
+                    }
+
+                    // A shade smaller than the message: a full path is long, and it is a reference
+                    // rather than something to read at the same weight as the sentence above it.
+                    var link = new System.Windows.Documents.Hyperlink(
+                        new System.Windows.Documents.Run(path) { FontSize = 16 })
+                    {
+                        ToolTip = "Click to open this file",
+                    };
+                    link.Click += (s, e) =>
+                    {
+                        try { onLink?.Invoke(path); }
+                        catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                    };
+                    dlg.MessageText.Inlines.Add(link);
+                }
+
+            // OK in the middle for this kind of message only. The rest of the program keeps it on the
+            // right, where every dialog has always had it.
+            dlg.OkBtn.HorizontalAlignment = HorizontalAlignment.Center;
+
+            dlg.ShowDialog();
+        }
     }
 }

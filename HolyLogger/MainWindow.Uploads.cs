@@ -342,6 +342,7 @@ namespace HolyLogger
 
         private async void SendQueueToEqslMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (!RequireActiveLog("upload")) return;
             int before = dal?.GetPendingEqslCount() ?? 0;
             if (before == 0)
             {
@@ -386,6 +387,7 @@ namespace HolyLogger
 
         private async void UploadQueueToQrzMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (!RequireActiveLog("upload")) return;
             string key = (Properties.Settings.Default.qrz_api_key ?? string.Empty).Trim();
             if (string.IsNullOrWhiteSpace(key))
             {
@@ -488,6 +490,7 @@ namespace HolyLogger
 
         private async void SendQueueToLotwMenuItem_Click(object sender, RoutedEventArgs e)
         {
+            if (!RequireActiveLog("upload")) return;
             string tqslPath = Properties.Settings.Default.LotwTqslPath?.Trim();
             string password = Properties.Settings.Default.LotwTqslPassword;
 

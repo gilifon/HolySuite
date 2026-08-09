@@ -294,16 +294,11 @@ namespace HolyLogger
             if (!RequireSelection()) return;
             long id = Selected.Id;
 
-            if (id == _dal.ActiveLogId)
-            {
-                HolyMessageBox.ShowWarning("This log is currently open. Open a different log first, then delete this one.", "Delete Log", this);
-                return;
-            }
-            if (_dal.GetLogCount() <= 1)
-            {
-                HolyMessageBox.ShowWarning("You cannot delete your only log.", "Delete Log", this);
-                return;
-            }
+            // The open log CAN be deleted, and so can the last one. Neither is a hazard once the program
+            // is allowed to hold nothing open: what used to be dangerous was leaving ActiveLogId naming
+            // a row that no longer exists, so new QSOs went to a log nothing could read. Deleting the
+            // open log now closes it - the id becomes 0 and the window says so.
+            bool deletingOpenLog = id == _dal.ActiveLogId;
 
             // Warn if OTHER logs copy their new QSOs INTO this one — deleting it turns their copying off.
             var sources = (LogsGrid.ItemsSource as System.Collections.Generic.IEnumerable<Row>)
@@ -314,11 +309,23 @@ namespace HolyLogger
                   " new QSOs into this log; that copying will be turned off. QSOs already copied elsewhere are not affected."
                 : string.Empty;
 
+            // Deleting the log that is OPEN closes it, and the operator is told so before they agree:
+            // the log table empties, and nothing can be logged until a log is opened or created.
+            string openNote = deletingOpenLog
+                ? "\n\nThis log is the one currently open. Deleting it will CLOSE it — no log will be open, " +
+                  "and you will not be able to log a QSO until you open or create one."
+                : string.Empty;
+
             if (!HolyMessageBox.ShowConfirm(
                     "Delete the log \"" + _dal.GetLogName(id) + "\" and ALL " + Selected.QsoCount.ToString("N0") +
-                    " QSO(s) in it?\n\nThis permanently removes those QSOs from the database and cannot be undone." + copyNote,
+                    " QSO(s) in it?\n\nThis permanently removes those QSOs from the database and cannot be undone."
+                    + openNote + copyNote,
                     "Delete Log", HolyMsgType.Warning, this))
                 return;
+
+            // Close it BEFORE the row goes, so ActiveLogId never names a log that is not there - that
+            // gap is what would have let a QSO be written to a log nothing could read.
+            if (deletingOpenLog) _main.CloseActiveLog();
 
             _dal.DeleteLog(id);
             _main.RefreshCopyIndicator();

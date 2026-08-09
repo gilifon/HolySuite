@@ -30,7 +30,20 @@ namespace HolyLogger
         public bool SchemaHasChanged { get; set; }
 
         // The log currently loaded in the log table. New QSOs are stored under this log.
+        // NO LOG IS OPEN - a real state, not an error: the operator may delete or close every log they
+        // have, and the program then holds nothing open rather than adopting a log they did not choose.
+        //
+        // It is -1 and not 0 because the two must not be confused at startup. 0 is what the saved
+        // setting reads when it was NEVER set - an upgrade from a version before this - and that user
+        // must go on getting their first log opened for them. -1 can only have been written by closing
+        // a log deliberately, and that choice is kept across a restart.
+        public const long NoLogId = -1;
+
         public long ActiveLogId { get; set; }
+
+        // Everything that needs a log asks this first. A query scoped to a log id that matches no row
+        // returns nothing, which is the truthful answer to "what is in the log" when there is no log.
+        public bool HasActiveLog => ActiveLogId > 0;
 
         private DataAccess()
         {
@@ -592,7 +605,11 @@ Environment.NewLine +
             }
         }
 
-        public int InsertBatch(IEnumerable<QSO> qsos, Action<int> progressCallback = null)
+        // failed, when supplied, receives every QSO the database refused ALONG WITH what it said. The
+        // count on its own told the operator that contacts had been lost without telling them which,
+        // and a number is not something anyone can act on.
+        public int InsertBatch(IEnumerable<QSO> qsos, Action<int> progressCallback = null,
+                               List<KeyValuePair<QSO, string>> failed = null)
         {
             lock (_dbLock)
             {
@@ -731,6 +748,7 @@ Environment.NewLine +
                     catch (Exception ex)
                     {
                         faultyQso++;
+                        if (failed != null) failed.Add(new KeyValuePair<QSO, string>(qso, ex.Message));
                         System.Diagnostics.Debug.WriteLine($"Failed to insert QSO in batch: {ex.Message}");
                     }
 
