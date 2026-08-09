@@ -179,12 +179,11 @@ namespace HolyLogger
             return _allQsos.Where(q => q != null && IsAchievedForSource(q)).ToList();
         }
 
-        // What the LEFT panel calls the open folder. The LoTW folder counts paper cards alongside LoTW's
-        // own confirmations - the ARRL accepts both - so the left panel says so rather than labelling a
-        // card "LoTW". Everywhere else the folder's own name is the whole truth.
+        // What the LEFT panel calls the open folder. The folder's own name is the whole truth: each one
+        // now counts exactly what it is named after.
         private string LeftSourceTitle()
         {
-            return _source == ConfSource.Lotw ? "LoTW + card" : SourceTitle(_source);
+            return SourceTitle(_source);
         }
 
         // Repaints everything that depends on which source folder is open. Cheap enough to run on every
@@ -773,6 +772,7 @@ namespace HolyLogger
             // so the three read as a small table. No "+" signs: the rows are parts OF the total above
             // them, and a plus sign invites the reader to add them to it instead.
             var parts = new List<KeyValuePair<string, string>>();
+            parts.Add(new KeyValuePair<string, string>("active", active.ToString()));
             if (_source == ConfSource.Lotw)
             {
                 // Split the active ones by what actually earned them. Cards first-class, not an asterisk,
@@ -842,7 +842,7 @@ namespace HolyLogger
                 case ConfSource.Eqsl: return "eQSL";
                 case ConfSource.Clublog: return "Club Log";
                 case ConfSource.Paper: return "Paper QSL";
-                case ConfSource.Award: return "DXCC Award";
+                case ConfSource.Award: return "ARRL DXCC Award";
                 default: return "Worked";
             }
         }
@@ -1159,10 +1159,10 @@ namespace HolyLogger
         {
             switch (_source)
             {
-                // The LoTW folder counts the paper cards too, so the QSO list, the pivots and the country
-                // counts on the left agree with the tiles on the right instead of quietly using a narrower
-                // rule. The ARRL accepts a card exactly as it accepts a LoTW confirmation.
-                case ConfSource.Lotw:    return q.LotwQslRcvd == 1 || q.PaperQslRcvd == 1;
+                // LoTW answers for LoTW ALONE. A paper card the ARRL would accept is reported beside this
+                // folder's number ("+1 by paper card") and counted in the ARRL DXCC Award folder, which is
+                // the one whose name promises that sum. Counting it here made the two folders identical.
+                case ConfSource.Lotw:    return q.LotwQslRcvd == 1;
                 case ConfSource.Qrz:     return q.QrzQslRcvd == 1;
                 case ConfSource.Eqsl:    return q.EqslQslRcvd == 1;
                 case ConfSource.Clublog: return q.ClublogQslRcvd == 1;
@@ -1206,13 +1206,39 @@ namespace HolyLogger
             // ...and last, the one that answers the question every DXer actually asks. Always shown: it
             // needs no service and no setup, and it is the only tab whose number can be compared with an
             // award standing. Placed at the end so no existing folder moves.
-            AddSourceFolder(ConfSource.Award, "DXCC Award");
+            // Two rows INSIDE the height the strip already has: the longest name here needs a second
+            // line, and a second line is only free if the line spacing and padding are pulled in to match
+            // what one 14pt line plus its padding already occupies. Done that way the tab is neither
+            // taller nor wider than its neighbours.
+            AddSourceFolder(ConfSource.Award, "ARRL\nDXCC Award", 11);
             LB_Source.SelectedIndex = 0;   // Worked; fires LB_Source_SelectionChanged -> RefreshForSource
         }
 
-        private void AddSourceFolder(ConfSource src, string label)
+        // fontSize overrides the strip's own size for a tab whose name is longer than the rest; 0 keeps
+        // the shared size from the ListBox style. A label containing a newline becomes a two-line tab that
+        // still fits the strip's existing height: the line box is tightened to the font (LineHeight) and
+        // the vertical padding cut to match, so two small lines occupy what one normal line did.
+        private void AddSourceFolder(ConfSource src, string label, double fontSize = 0)
         {
-            LB_Source.Items.Add(new ListBoxItem { Content = label, Tag = src, Background = SourceBackground(src) });
+            var item = new ListBoxItem { Tag = src, Background = SourceBackground(src) };
+            if (fontSize > 0) item.FontSize = fontSize;
+
+            if (label.IndexOf('\n') >= 0)
+            {
+                item.Content = new TextBlock
+                {
+                    Text = label,
+                    TextAlignment = TextAlignment.Center,
+                    LineHeight = (fontSize > 0 ? fontSize : 14) + 2,
+                    LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                };
+                item.Padding = new Thickness(20, 3, 20, 3);
+            }
+            else
+            {
+                item.Content = label;
+            }
+            LB_Source.Items.Add(item);
         }
 
         // The light tint that identifies each confirmation source - used both for the folder tab and for
@@ -1394,7 +1420,7 @@ namespace HolyLogger
             _source == ConfSource.Eqsl    ? "eQSL" :
             _source == ConfSource.Clublog ? "Club Log" :
             _source == ConfSource.Paper   ? "Paper QSL" :
-            _source == ConfSource.Award   ? "DXCC Award" : "Worked";
+            _source == ConfSource.Award   ? "ARRL DXCC Award" : "Worked";
 
         private void ApplyConfirmedHighlight()
         {
@@ -1457,9 +1483,13 @@ namespace HolyLogger
                 // Its OWN line. The line above it already fills the worked column at this font size, so
                 // anything appended is cut off mid-sentence - it read "…5 deleted,  +1" and stopped,
                 // which tells the operator nothing at all.
+                // The tile above counts LoTW ALONE, so the card is an ADDITION to it - not a slice of it.
+                // This line used to subtract the card from the tile (325 - 1 = "324 at LoTW"), which was
+                // right only while the tile counted cards too, and became a number belonging to nothing
+                // the moment LoTW went back to answering for itself.
                 int paperOnly = PaperOnlyEntities().Count;
                 if (paperOnly > 0)
-                    paperNote = $"\n{confirmedActive - paperOnly} at LoTW  +  {paperOnly} by paper card";
+                    paperNote = $"\n+{paperOnly} by Paper QSL  →  {confirmedActive + paperOnly} for the award";
             }
 
             // Built from inlines rather than one string, so the DELETED count can be a link: those
@@ -1470,7 +1500,7 @@ namespace HolyLogger
             if (_source != ConfSource.Worked && _confirmedEntities.Count > 0)
             {
                 TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run(
-                    $"Confirmed ({SourceName}): {confirmedActive} active,  "));
+                    $"Confirmed: {confirmedActive} active,  "));
 
                 if (deletedConfirmed > 0)
                 {

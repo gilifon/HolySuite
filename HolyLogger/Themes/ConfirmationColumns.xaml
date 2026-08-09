@@ -165,7 +165,7 @@
     <DataTemplate x:Key="PaperQslTemplate">
         <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
                   IsChecked="{Binding PaperQslConfirmed, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
-                  ToolTip="Tick when you receive this QSO's paper QSL card by post"/>
+                  ToolTip="Tick when you receive this QSO's Paper QSL by post"/>
     </DataTemplate>
 
 </ResourceDictionary>
