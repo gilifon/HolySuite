@@ -494,9 +494,10 @@ namespace HolyLogger
                 if (result.ImportedQsoCount > 0 || result.CompletedQsoCount > 0)
                 {
                     // The count of THIS log, asked of the database directly. It used to be taken from the
-                    // refreshed collection, which is every QSO in every log (GetAllQSOs has no log filter),
-                    // so a line headed "Total QSOs in log" reported the whole database: importing 28,366
-                    // QSOs into a log that then held exactly 28,366 announced 67,622.
+                    // refreshed collection, which was every QSO in every log (the old GetAllQSOs had no
+                    // log filter; it is gone now), so a line headed "Total QSOs in log" reported the whole
+                    // database: importing 28,366 QSOs into a log that then held exactly 28,366 announced
+                    // 67,622.
                     int totalQsos;
                     try { totalQsos = dal.GetQsoCountForLog(dal.ActiveLogId); }
                     catch (Exception swallowed)

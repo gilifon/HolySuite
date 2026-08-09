@@ -4284,9 +4284,9 @@ namespace HolyLogger
 
             var progressIndicator = new Progress<int>();           
 
-            // Send exactly what the operator has open — the ACTIVE log. GetAllQSOs() would sweep in every
-            // other log in the database (an imported friend's log, an old contest), and the file that
-            // reached the organisers would not be the log shown on screen.
+            // Send exactly what the operator has open — the ACTIVE log. This used to read every QSO in
+            // the database (an imported friend's log, an old contest), so the file that reached the
+            // organisers was not the log shown on screen.
             var logToSend = dal.GetQSOsForLog(dal.ActiveLogId);
 
             if (w.selectedRadioEvent.Name.ToLower() == "holyland")
@@ -4384,7 +4384,6 @@ namespace HolyLogger
 
         private List<List<QSO>> SplitQSOList(ObservableCollection<QSO> QSOList)
         {
-            //var QSOList = dal.GetAllQSOs();
             int numOfQSO = QSOList.Count;
             int iterations = numOfQSO / SEND_CHUNK_SIZE;
             int reminter = numOfQSO % SEND_CHUNK_SIZE;
