@@ -2532,6 +2532,40 @@ namespace HolyLogger
                                       bool anythingChanged, List<string> failed = null)
         {
             string name = SourceTitle(src);
+
+            // A FULL download that brought back nothing, for a log signed with a callsign that is not the
+            // operator's own. "Downloaded 0 confirmation(s)" reads as "you have none", when what actually
+            // happened is that LoTW was asked about someone else's callsign and answered - correctly -
+            // with nothing. It only ever reports what the logged-in account uploaded itself.
+            //
+            // Said on EVERY empty full download, and it names the ACCOUNT that did the asking. It first
+            // compared the log's callsign with the station-callsign setting and stayed quiet when they
+            // matched - useless, because opening another operator's log sets that field to THEIR callsign,
+            // which is exactly the case the message exists for. The account is the thing that decides what
+            // LoTW will send, and it is not the same as the callsign a log is signed with.
+            //
+            // It states only what is CERTAIN - this account holds no confirmations for that callsign - and
+            // does not say the log belongs to someone else, because that cannot be known from here: a LoTW
+            // username need not be a callsign at all, and one account can hold certificates for several
+            // (a club station, a contest call, a previous call). LoTW answers the same empty report when
+            // the account genuinely owns the callsign but has never uploaded under it.
+            if (src == ConfSource.Lotw && newOrDownloaded == 0 && !quickCheck)
+            {
+                string logCall = ActiveLogCallsign();
+                if (string.IsNullOrWhiteSpace(logCall)) logCall = "this log's callsign";
+                string account = (Properties.Settings.Default.LotwWebUser ?? string.Empty).Trim();
+
+                HolyMessageBox.Show(
+                    $"Nothing came back for {logCall}.\n\n" +
+                    "Your LoTW account" + (account.Length > 0 ? $" ({account})" : "") +
+                    " has no confirmations for that callsign. Only the account that uploaded those QSOs " +
+                    "can download them.",
+                    // Red, not the blue "i": a check that came back with nothing is a result the operator
+                    // has to act on (ask the log's owner to run it), not a note they can wave past.
+                    name + " confirmations", HolyMsgType.Error, this);
+                return;
+            }
+
             var text = new System.Text.StringBuilder();
 
             // A quick check that brought nothing back says so in those words, rather than announcing
