@@ -1,4 +1,4 @@
-using System.Reflection;
+﻿using System.Reflection;
 // Version information for an assembly consists of the following four values:
 //
 //      Major Version
@@ -9,6 +9,6 @@ using System.Reflection;
 // You can specify all the values or you can default the Build and Revision Numbers 
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
-[assembly: AssemblyVersion("8.8.4")]
-[assembly: AssemblyFileVersion("8.8.4")]
+[assembly: AssemblyVersion("8.8.5")]
+[assembly: AssemblyFileVersion("8.8.5")]
 

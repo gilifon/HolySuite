@@ -444,11 +444,26 @@
                                                 <TextBlock x:Name="TB_SortWorkedName" Text="Country ▲"
                                                            Width="160" FontSize="13" FontWeight="Bold"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
+                                                <!-- Beside the NAME, not out past the counts: this number IS
+                                                     the country - the award world's way of saying which one -
+                                                     so it belongs with the name it identifies rather than
+                                                     among the tallies.
+
+                                                     Every width below is the SORTED header, which is the
+                                                     wide case: "DXCC ▼" measures 48 against "DXCC" 33,
+                                                     "Conf. ▼" 47 against "Conf." 32. Sizing to the bare
+                                                     word is what made "Conf. ▼" clip as soon as that
+                                                     column was sorted. -->
+                                                <TextBlock x:Name="TB_SortWorkedCode" Text="DXCC"
+                                                           Width="50" FontSize="13" FontWeight="Bold" Margin="0,0,8,0"
+                                                           Cursor="Hand" TextAlignment="Right"
+                                                           Foreground="{DynamicResource TextBrush}"
+                                                           ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock x:Name="TB_SortWorkedCount" Text="Count ▼"
-                                                           Width="50" FontSize="13" FontWeight="Bold"
+                                                           Width="52" FontSize="13" FontWeight="Bold"
                                                            Cursor="Hand" TextAlignment="Right" Foreground="{DynamicResource TextBrush}"/>
                                                 <TextBlock x:Name="TB_SortWorkedConfirmed" Text="Conf."
-                                                           Width="70" FontSize="13" FontWeight="Bold" Margin="10,0,0,0"
+                                                           Width="48" FontSize="13" FontWeight="Bold" Margin="8,0,0,0"
                                                            Cursor="Hand" TextAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
                                         </Border>
@@ -478,15 +493,19 @@
                                                                            VerticalAlignment="Center"
                                                                            Width="160"
                                                                            TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock Text="{Binding CodeText}" FontSize="13"
+                                                                           VerticalAlignment="Center"
+                                                                           TextAlignment="Right" Width="50" Margin="0,0,8,0"
+                                                                           Foreground="{DynamicResource MutedTextBrush}"/>
                                                                 <TextBlock Text="{Binding CountStr}" FontSize="13"
                                                                            FontWeight="Bold"
                                                                            VerticalAlignment="Center"
-                                                                           TextAlignment="Right" Width="50"
+                                                                           TextAlignment="Right" Width="52"
                                                                            Foreground="{DynamicResource AccentBrush}"/>
                                                                 <TextBlock Text="{Binding ConfirmedMark}" FontSize="16"
-                                                                           FontWeight="Bold" Margin="10,0,0,0"
+                                                                           FontWeight="Bold" Margin="8,0,0,0"
                                                                            VerticalAlignment="Center"
-                                                                           TextAlignment="Center" Width="70"
+                                                                           TextAlignment="Center" Width="48"
                                                                            Foreground="{Binding ConfirmedBrush}"
                                                                            ToolTip="{Binding ConfirmedTip}"/>
                                                             </StackPanel>
@@ -560,6 +579,11 @@
                                                 <TextBlock x:Name="TB_SortMissingName" Text="Country ▲"
                                                            Width="130" FontSize="13" FontWeight="Bold"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
+                                                <TextBlock x:Name="TB_SortMissingCode" Text="DXCC"
+                                                           Width="50" FontSize="13" FontWeight="Bold"
+                                                           Cursor="Hand" TextAlignment="Right"
+                                                           Foreground="{DynamicResource TextBrush}"
+                                                           ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                             </StackPanel>
                                         </Border>
                                         <ScrollViewer x:Name="SV_MissingCountries"
@@ -586,6 +610,10 @@
                                                                            VerticalAlignment="Center"
                                                                            Width="130"
                                                                            TextTrimming="CharacterEllipsis"/>
+                                                                <TextBlock Text="{Binding CodeText}" FontSize="13"
+                                                                           VerticalAlignment="Center"
+                                                                           TextAlignment="Right" Width="50"
+                                                                           Foreground="{DynamicResource MutedTextBrush}"/>
                                                             </StackPanel>
                                                         </Border>
                                                     </DataTemplate>

@@ -1,9 +1,9 @@
-; Inno Setup script for HolyLogger
+﻿; Inno Setup script for HolyLogger
 ; Builds a single setup.exe from the Release (x86) build output.
 ; Compile with: "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" HolyLogger.iss
 
 #define MyAppName "HolyLogger"
-#define MyAppVersion "8.8.4"
+#define MyAppVersion "8.8.5"
 #define MyAppPublisher "HolyLogger"
 #define MyAppExeName "HolyLogger.exe"
 #define SrcDir "..\HolyLogger\bin\x86\Release"

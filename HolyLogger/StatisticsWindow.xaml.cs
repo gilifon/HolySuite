@@ -70,8 +70,8 @@ namespace HolyLogger
             TB_LotwLoadingSub.Text = "Stopping…";
         }
 
-        private enum WorkedSort { CountDesc, CountAsc, NameAsc, NameDesc, ConfirmedDesc, ConfirmedAsc }
-        private enum MissingSort { NameAsc, NameDesc }
+        private enum WorkedSort { CountDesc, CountAsc, NameAsc, NameDesc, ConfirmedDesc, ConfirmedAsc, CodeAsc, CodeDesc }
+        private enum MissingSort { NameAsc, NameDesc, CodeAsc, CodeDesc }
         private WorkedSort  _workedSort  = WorkedSort.CountDesc;
         private MissingSort _missingSort = MissingSort.NameAsc;
 
@@ -888,8 +888,12 @@ namespace HolyLogger
             TB_SortWorkedCount.MouseLeftButtonUp += SortWorkedByCount;
             TB_SortWorkedConfirmed.MouseLeftButtonUp -= SortWorkedByConfirmed;
             TB_SortWorkedConfirmed.MouseLeftButtonUp += SortWorkedByConfirmed;
+            TB_SortWorkedCode.MouseLeftButtonUp  -= SortWorkedByCode;
+            TB_SortWorkedCode.MouseLeftButtonUp  += SortWorkedByCode;
             TB_SortMissingName.MouseLeftButtonUp -= SortMissingByName;
             TB_SortMissingName.MouseLeftButtonUp += SortMissingByName;
+            TB_SortMissingCode.MouseLeftButtonUp -= SortMissingByCode;
+            TB_SortMissingCode.MouseLeftButtonUp += SortMissingByCode;
 
             ApplyConfirmedHighlight();   // sets the tiles + colors the worked rows for the current source
             ApplyWorkedSort();
@@ -3801,9 +3805,24 @@ namespace HolyLogger
             ApplyWorkedSort();
         }
 
+        // By ENTITY NUMBER. Countries with no number sort last whichever way the arrow points: they are
+        // not "0", they are unknown, and burying them under the top of an ascending list would put the
+        // rows nothing recognises where the eye lands first.
+        private void SortWorkedByCode(object sender, MouseButtonEventArgs e)
+        {
+            _workedSort = _workedSort == WorkedSort.CodeAsc ? WorkedSort.CodeDesc : WorkedSort.CodeAsc;
+            ApplyWorkedSort();
+        }
+
         private void SortMissingByName(object sender, MouseButtonEventArgs e)
         {
             _missingSort = _missingSort == MissingSort.NameAsc ? MissingSort.NameDesc : MissingSort.NameAsc;
+            ApplyMissingSort();
+        }
+
+        private void SortMissingByCode(object sender, MouseButtonEventArgs e)
+        {
+            _missingSort = _missingSort == MissingSort.CodeAsc ? MissingSort.CodeDesc : MissingSort.CodeAsc;
             ApplyMissingSort();
         }
 
@@ -3830,6 +3849,13 @@ namespace HolyLogger
                     ? confirmed.Concat(unconfirmed).ToList()    // confirmed first, unconfirmed (A–Z) below
                     : unconfirmed.Concat(confirmed).ToList();   // unconfirmed (A–Z) first
             }
+            // By entity NUMBER. A country whose wording no database knows has no number (0) and is put
+            // LAST either way - it is unknown, not "before number 1", and an ascending sort would
+            // otherwise open with the rows that say least.
+            else if (_workedSort == WorkedSort.CodeAsc)
+                sorted = shown.OrderBy(c => c.Code == 0 ? 1 : 0).ThenBy(c => c.Code).ThenBy(c => c.Name).ToList();
+            else if (_workedSort == WorkedSort.CodeDesc)
+                sorted = shown.OrderBy(c => c.Code == 0 ? 1 : 0).ThenByDescending(c => c.Code).ThenBy(c => c.Name).ToList();
             else                                         sorted = shown.OrderByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
 
             for (int i = 0; i < sorted.Count; i++)
@@ -3841,9 +3867,13 @@ namespace HolyLogger
 
         private void ApplyMissingSort()
         {
-            List<CountryItem> sorted = _missingSort == MissingSort.NameAsc
-                ? _missingList.OrderBy(c => c.Name).ToList()
-                : _missingList.OrderByDescending(c => c.Name).ToList();
+            List<CountryItem> sorted;
+            if      (_missingSort == MissingSort.NameAsc)  sorted = _missingList.OrderBy(c => c.Name).ToList();
+            else if (_missingSort == MissingSort.NameDesc) sorted = _missingList.OrderByDescending(c => c.Name).ToList();
+            else if (_missingSort == MissingSort.CodeAsc)
+                sorted = _missingList.OrderBy(c => c.Code == 0 ? 1 : 0).ThenBy(c => c.Code).ThenBy(c => c.Name).ToList();
+            else
+                sorted = _missingList.OrderBy(c => c.Code == 0 ? 1 : 0).ThenByDescending(c => c.Code).ThenBy(c => c.Name).ToList();
 
             for (int i = 0; i < sorted.Count; i++)
                 sorted[i].RowBg = i % 2 == 0 ? ThemeManager.Brush("GridRowBg") : ThemeManager.Brush("GridAltRowBg");
@@ -3860,6 +3890,9 @@ namespace HolyLogger
             TB_SortWorkedCount.Text = _workedSort == WorkedSort.CountDesc ? "Count ▼"
                                     : _workedSort == WorkedSort.CountAsc  ? "Count ▲"
                                     :                                        "Count";
+            TB_SortWorkedCode.Text  = _workedSort == WorkedSort.CodeAsc  ? "DXCC ▲"
+                                    : _workedSort == WorkedSort.CodeDesc ? "DXCC ▼"
+                                    :                                       "DXCC";
             // Blank on the Worked folder (no confirmation source), so there is no "Conf." header over an
             // empty column.
             TB_SortWorkedConfirmed.Text = _source == ConfSource.Worked ? ""
@@ -3870,7 +3903,12 @@ namespace HolyLogger
 
         private void UpdateMissingSortHeaders()
         {
-            TB_SortMissingName.Text = _missingSort == MissingSort.NameAsc ? "Country ▲" : "Country ▼";
+            TB_SortMissingName.Text = _missingSort == MissingSort.NameAsc  ? "Country ▲"
+                                    : _missingSort == MissingSort.NameDesc ? "Country ▼"
+                                    :                                        "Country";
+            TB_SortMissingCode.Text = _missingSort == MissingSort.CodeAsc  ? "DXCC ▲"
+                                    : _missingSort == MissingSort.CodeDesc ? "DXCC ▼"
+                                    :                                        "DXCC";
         }
 
         private static BitmapImage GetFlagImage(string countryName)
@@ -4027,6 +4065,29 @@ namespace HolyLogger
         public int Count { get; set; }
         public string CountStr => Count > 0 ? Count.ToString() : "";
         public Brush RowBg { get; set; }
+
+        // The ARRL/ADIF entity number - the thing the award world actually speaks in, and the only way
+        // to say WHICH country when two databases word the same entity differently. Worked out from the
+        // name on first use rather than at build time, so both tables that use this class get it without
+        // either of them having to remember to fill it in; the lists are virtualized, so only the rows
+        // on screen ever ask.
+        //
+        // 0 when no database recognises the wording the log used - shown as an empty cell, never as "0".
+        // A country nothing can put a number to is still in the log and still belongs in the list.
+        private int? _code;
+        public int Code
+        {
+            get
+            {
+                if (!_code.HasValue)
+                {
+                    try { _code = CountryLookup.Shared.EntityCodeForCountry(Name); }
+                    catch { _code = 0; }
+                }
+                return _code.Value;
+            }
+        }
+        public string CodeText => Code > 0 ? Code.ToString() : "";
 
         // True for an entity that no longer exists as a DXCC country. The worked table shows the CURRENT
         // ones, so that its count is the same 326 the tile above it prints against 340; the deleted ones
