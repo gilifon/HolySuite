@@ -4120,6 +4120,18 @@ Environment.NewLine +
         public static bool Same(string a, string b)
             => string.Equals(Base(a), Base(b), StringComparison.OrdinalIgnoreCase);
 
+        // True when a string is shaped like an amateur callsign. Used where something that MAY be a
+        // callsign has to be told apart from something that is not - a LoTW website username, for
+        // instance, which the operator is free to choose and which is often not a callsign at all.
+        public static bool LooksLikeCallsign(string s)
+        {
+            string b = Base(s);
+            if (b.Length == 0) return false;
+            foreach (string part in b.Split('/'))
+                if (FullCall.IsMatch(part)) return true;
+            return false;
+        }
+
         // Splits a callsign into its prefix and suffix halves, cutting at the LAST digit of the base
         // callsign - the digit belongs to the prefix, being part of what identifies the country/area:
         //

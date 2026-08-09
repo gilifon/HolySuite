@@ -1283,15 +1283,34 @@ namespace HolyLogger
 
         // Re-reads the active log's QSOs so their (now updated) confirmation flags are current, then
         // repaints the folder. Called after a Check so every value stays live - nothing needs a reopen.
-        private void ReloadQsosAfterCheck()
+        // Re-reads the log after a check and repaints. MEASURED as the real cause of the "spinner stops"
+        // freeze: this read pulled all 28,366 QSOs of a large log out of SQLite ON THE UI THREAD, which
+        // held the window for 10.8 seconds - long after the download itself had finished in under four.
+        // The watchdog put the stall squarely here ("while: storing the result").
+        //
+        // Two things fix it. The read now happens on a background thread, and it does not happen at all
+        // when the check marked nothing: re-reading a log to find it unchanged is pure cost, and the
+        // commonest case of all - a check that brings back nothing - paid it in full.
+        private async System.Threading.Tasks.Task ReloadQsosAfterCheck(bool reread)
         {
-            try
+            if (reread)
             {
-                var dal = DataAccess.GetInstance();
-                if (dal != null) _allQsos = dal.GetQSOsForLog(dal.ActiveLogId);
+                try
+                {
+                    var dal = DataAccess.GetInstance();
+                    if (dal != null)
+                    {
+                        long logId = dal.ActiveLogId;
+                        _uiPhase = "re-reading the log";
+                        var fresh = await Task.Run(() => dal.GetQSOsForLog(logId));
+                        _allQsos = fresh;
+                        _resolveCache = null;   // rebuilt lazily against the fresh list
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            _resolveCache = null;   // rebuilt lazily against the fresh list
+
+            _uiPhase = "repainting the tables";
             RefreshForSource();
         }
 
@@ -1790,6 +1809,96 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
         }
 
+        // ---- "is this log even mine?" ----------------------------------------------------------------
+        //
+        // No confirmation service will hand over another station's QSLs: each one answers only for the
+        // account that uploaded the QSOs. Downloading into a log that belongs to someone else - an ADIF a
+        // friend sent - therefore cannot work, and it used to be found out the slow way or not at all:
+        // LoTW spent a long minute downloading nothing and said so only afterwards, while QRZ never
+        // noticed, announcing a successful download of confirmations that could not match a single QSO in
+        // front of the operator. This says it before one request is made.
+        //
+        // The callsigns this installation can show the operator set up for themselves: TQSL certificates
+        // (LoTW), eQSL accounts, and the LoTW website login when it is a callsign at all. Deliberately NOT
+        // my_callsign or the station-callsign box - opening someone else's log sets those to THEIR
+        // callsign, which is the very case this exists to catch.
+        private List<string> MyOwnCallsigns()
+        {
+            var calls = new List<string>();
+            try
+            {
+                foreach (var loc in TqslStationData.Read())
+                    AddCallsign(calls, loc?.Call);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            try
+            {
+                var accounts = Dal != null ? Dal.GetEqslAccounts() : null;
+                if (accounts != null)
+                    foreach (var a in accounts) AddCallsign(calls, a?.Callsign);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // Service logins are usually the operator's own callsign, but none of them has to be, so each
+            // counts only when it is shaped like one - otherwise it would be listed back to the operator
+            // as a callsign they own, which it is not. The more of these are set, the less often an
+            // operator whose everyday call has no TQSL certificate is asked about their own log.
+            var s = Properties.Settings.Default;
+            foreach (string login in new[] { s.LotwWebUser, s.EqslUsername, s.qrz_username })
+            {
+                string v = (login ?? string.Empty).Trim();
+                if (CallsignIdentity.LooksLikeCallsign(v)) AddCallsign(calls, v);
+            }
+
+            return calls;
+        }
+
+        private static void AddCallsign(List<string> into, string call)
+        {
+            string c = (call ?? string.Empty).Trim();
+            if (c.Length == 0) return;
+            if (!into.Any(x => CallsignIdentity.Same(x, c))) into.Add(c);
+        }
+
+        // "Try anyway" is remembered for as long as this window is open, so a deliberate override is not
+        // re-asked on the next button. It is not persisted: the answer belongs to this sitting.
+        private bool _otherStationAccepted;
+
+        // True when the caller must STOP. Returns instantly - it asks nothing of the network.
+        //
+        // It only speaks when it is sure enough to be useful: a log with no identity, or an installation
+        // with no callsign set up anywhere, teaches us nothing and is waved through. And the answer is a
+        // question, never a lock: one account can hold certificates for a club or contest call that is
+        // configured nowhere on this machine, and that operator must still be able to press the button.
+        private bool BlockedAsAnotherStationsLog(string serviceName)
+        {
+            if (_otherStationAccepted) return false;
+
+            string logCall = ActiveLogCallsign();
+            if (string.IsNullOrWhiteSpace(logCall)) return false;   // no identity -> nothing to compare
+
+            var mine = MyOwnCallsigns();
+            if (mine.Count == 0) return false;                      // nothing set up -> we know nothing
+
+            // The LoTW login is compared even when it is not callsign-shaped: it costs nothing and covers
+            // the operator whose account name simply is not a callsign we recognise.
+            string web = (Properties.Settings.Default.LotwWebUser ?? string.Empty).Trim();
+            if (mine.Any(c => CallsignIdentity.Same(c, logCall)) || CallsignIdentity.Same(web, logCall))
+                return false;
+
+            bool goAhead = HolyMessageBox.ShowConfirm(
+                $"This log belongs to {logCall}, which is not one of your callsigns.\n\n" +
+                $"Set up on this computer: {string.Join(", ", mine)}.\n\n" +
+                $"{serviceName} sends confirmations only to the account that uploaded the QSOs, so asking " +
+                $"for {logCall} would bring back nothing. Only {logCall} can download them.\n\n" +
+                "Ask anyway?",
+                serviceName + " — this log is another station's", HolyMsgType.Warning, this);
+
+            if (goAhead) _otherStationAccepted = true;
+            return !goAhead;
+        }
+
         // Every station callsign this log actually contains - the log's own identity plus each stroke
         // variant present in its QSOs. One LoTW request is made per entry, because qso_owncall matches
         // the callsign as it was UPLOADED: asking for 4Z5SL alone would leave whatever was signed
@@ -2059,6 +2168,10 @@ namespace HolyLogger
         // code with the "since" date reset to the beginning, so there is one download path, not two.
         private void BTN_GetAllConfirmations_Click(object sender, RoutedEventArgs e)
         {
+            // Asked here as well as in the check itself, so the ownership question comes FIRST - before
+            // the operator is asked to approve a long download that could never return anything.
+            if (BlockedAsAnotherStationsLog("LoTW")) return;
+
             // How many QSOs of THIS log are already marked. It used to count every marked QSO in the
             // database, across all logs - a figure that belongs to no log the operator is looking at, and
             // that reads as a promise about the log in front of them.
@@ -2090,6 +2203,10 @@ namespace HolyLogger
         {
             if (_source == ConfSource.Qrz) { await RunQrzCheck(incremental: true); return; }
             if (_source == ConfSource.Eqsl) { await RunEqslCheck(incremental: true); return; }
+
+            // Before anything else: LoTW cannot answer for a log that is not this operator's, and finding
+            // that out took a full download that came back empty.
+            if (BlockedAsAnotherStationsLog("LoTW")) return;
 
             var s = Properties.Settings.Default;
             string user = s.LotwWebUser?.Trim();
@@ -2170,8 +2287,34 @@ namespace HolyLogger
                 List<string> ownCalls = OwnCallsForActiveLog();
                 string adifAll = string.Empty;
                 int eorSoFar = 0;
+                int callIndex = 0;
+
+                // ONE client for every callsign, built once. A fresh HttpClientHandler per request pays
+                // the connection and proxy-detection cost again each time, for nothing.
+                using (var handler = new System.Net.Http.HttpClientHandler
+                {
+                    AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
+                })
+                using (var http = new System.Net.Http.HttpClient(handler))
+                {
+                http.Timeout = TimeSpan.FromSeconds(300);   // large accounts can take a while server-side
+
                 foreach (string own in ownCalls)
                 {
+                callIndex++;
+
+                // Said BEFORE the request goes out, not only when bytes come back. The old text was
+                // written solely inside the read loop, so through the whole wait for LoTW to answer -
+                // the longest part, and the entire operation when the answer turns out to be empty - the
+                // overlay kept showing the PREVIOUS callsign's "Downloaded 0 confirmations", which reads
+                // exactly like a program that has stopped.
+                _uiPhase = $"asking LoTW about {own} ({callIndex} of {ownCalls.Count})";
+                TB_LotwLoadingText.Text = ownCalls.Count > 1 && !string.IsNullOrEmpty(own)
+                    ? $"Asking LoTW about {own}…   ({callIndex} of {ownCalls.Count})"
+                    : "Asking LoTW…";
+                TB_LotwLoadingSub.Text = "Waiting for LoTW to answer. It builds the report before sending it, "
+                                       + "so nothing arrives for a while.";
+
                 string url = "https://lotw.arrl.org/lotwuser/lotwreport.adi"
                            + "?login=" + Uri.EscapeDataString(user)
                            + "&password=" + Uri.EscapeDataString(pass)
@@ -2179,49 +2322,87 @@ namespace HolyLogger
                            + "&qso_query=1&qso_qsl=yes&qso_mydetail=yes&qso_qsldetail=yes&qso_qslsince=" + Uri.EscapeDataString(sinceQuery);
 
                 string adifOne;
-                // Decompress gzip/deflate — otherwise a compressed response reads back as binary garbage.
-                using (var handler = new System.Net.Http.HttpClientHandler
                 {
-                    AutomaticDecompression = System.Net.DecompressionMethods.GZip | System.Net.DecompressionMethods.Deflate
-                })
-                using (var http = new System.Net.Http.HttpClient(handler))
-                {
-                    http.Timeout = TimeSpan.FromSeconds(300);   // large accounts can take a while server-side
-
+                    // NOTHING of the request may touch the UI thread. This is .NET Framework 4.8, where
+                    // HttpClient sits on HttpWebRequest and resolves the proxy (App.config turns the
+                    // system proxy on) and the DNS name SYNCHRONOUSLY on whichever thread calls it,
+                    // before any of it goes async. Called from the UI thread that froze the window solid
+                    // for the whole wait - the spinner stopped turning and the elapsed clock stopped
+                    // counting, which is precisely how a working program comes to look hung.
+                    //
+                    // So the request AND the reading run on a background thread, and the only thing that
+                    // crosses back is text, through Progress<T> - which marshals each report onto the UI
+                    // thread by itself. Same treatment the matching phase below already had, for the same
+                    // reason.
+                    //
                     // Stream the reply rather than take it whole, and count <eor> records as they arrive,
                     // so the overlay shows a real "Downloaded N confirmations…" climbing instead of a
                     // spinner. ResponseHeadersRead hands us the body stream before it has all arrived; the
                     // AutomaticDecompression above means the stream we read is already un-gzipped.
-                    var sb = new System.Text.StringBuilder();
-                    int eor = 0;
-                    using (var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct))
-                    using (var stream = await resp.Content.ReadAsStreamAsync())
-                    using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
+                    int soFar = eorSoFar;
+                    string thisCall = own;
+                    var report = new Progress<(string main, string sub)>(t =>
                     {
-                        char[] buf = new char[16384];
-                        string carry = string.Empty;   // last 4 chars, to catch an <eor> split across reads
-                        int n;
-                        while ((n = await reader.ReadAsync(buf, 0, buf.Length)) > 0)
+                        TB_LotwLoadingText.Text = t.main;
+                        TB_LotwLoadingSub.Text = t.sub;
+                    });
+                    var reporter = (IProgress<(string main, string sub)>)report;
+
+                    var got = await Task.Run(async () =>
+                    {
+                        var sb = new System.Text.StringBuilder();
+                        int eor = 0;
+                        // Progress<T> posts to the UI thread at Normal priority, which OUTRANKS Render.
+                        // Reporting on every 16 KB chunk of a large report therefore floods the dispatcher
+                        // with work that keeps jumping the queue ahead of drawing - the text updates while
+                        // the spinner stops, which is the other way a working download looks stuck. Five
+                        // updates a second is plenty for a human to read.
+                        var lastReport = System.Diagnostics.Stopwatch.StartNew();
+                        using (var resp = await http.GetAsync(url, System.Net.Http.HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false))
+                        using (var stream = await resp.Content.ReadAsStreamAsync().ConfigureAwait(false))
+                        using (var reader = new System.IO.StreamReader(stream, System.Text.Encoding.UTF8))
                         {
-                            ct.ThrowIfCancellationRequested();
-                            sb.Append(buf, 0, n);
-
-                            string hay = carry + new string(buf, 0, n);
-                            int idx = 0;
-                            while ((idx = hay.IndexOf("<eor>", idx, StringComparison.OrdinalIgnoreCase)) >= 0)
+                            char[] buf = new char[16384];
+                            string carry = string.Empty;   // last 4 chars, to catch an <eor> split across reads
+                            int n;
+                            while ((n = await reader.ReadAsync(buf, 0, buf.Length).ConfigureAwait(false)) > 0)
                             {
-                                eor++;
-                                idx += 5;
-                            }
-                            carry = hay.Length >= 4 ? hay.Substring(hay.Length - 4) : hay;
+                                ct.ThrowIfCancellationRequested();
+                                sb.Append(buf, 0, n);
 
-                            TB_LotwLoadingText.Text = ownCalls.Count > 1
-                                ? $"Downloaded {eorSoFar + eor:N0} confirmations from LoTW… ({own})"
-                                : $"Downloaded {eor:N0} confirmations from LoTW…";
+                                string hay = carry + new string(buf, 0, n);
+                                int idx = 0;
+                                while ((idx = hay.IndexOf("<eor>", idx, StringComparison.OrdinalIgnoreCase)) >= 0)
+                                {
+                                    eor++;
+                                    idx += 5;
+                                }
+                                carry = hay.Length >= 4 ? hay.Substring(hay.Length - 4) : hay;
+
+                                if (lastReport.ElapsedMilliseconds >= 200)
+                                {
+                                    lastReport.Restart();
+                                    _uiPhase = $"reading LoTW's reply for {thisCall} ({soFar + eor} records so far)";
+                                    reporter.Report((
+                                        ownCalls.Count > 1
+                                            ? $"Downloaded {soFar + eor:N0} confirmations from LoTW… ({thisCall})"
+                                            : $"Downloaded {eor:N0} confirmations from LoTW…",
+                                        "Reading the confirmations LoTW is sending back."));
+                                }
+                            }
                         }
-                    }
-                    adifOne = sb.ToString();
-                    eorSoFar += eor;
+                        // The throttle can swallow the last chunk's update, so the final figure is always
+                        // reported - the number left on screen must be the one that actually arrived.
+                        reporter.Report((
+                            ownCalls.Count > 1
+                                ? $"Downloaded {soFar + eor:N0} confirmations from LoTW… ({thisCall})"
+                                : $"Downloaded {eor:N0} confirmations from LoTW…",
+                            "Reading the confirmations LoTW is sending back."));
+                        return (body: sb.ToString(), eor: eor);
+                    }, ct);
+
+                    adifOne = got.body;
+                    eorSoFar += got.eor;
                 }
 
                 if (adifOne.IndexOf("Invalid password", StringComparison.OrdinalIgnoreCase) >= 0
@@ -2251,6 +2432,7 @@ namespace HolyLogger
 
                 adifAll += adifOne;
                 }   // next station callsign of this log
+                }   // the one HttpClient serving every callsign
 
                 string adif = adifAll;
 
@@ -2293,8 +2475,10 @@ namespace HolyLogger
                         : "Reading the confirmations LoTW sent back.";
                 });
 
+                _uiPhase = "matching the reply to the log";
                 LotwRunResult result = await Task.Run(() =>
                     ProcessLotwConfirmations(recordsBody, incremental, boundaryDate, seenKeys, confirmedSnapshot, progress, ct));
+                _uiPhase = "storing the result";
 
                 // Locals the UI-thread tail below still expects.
                 int qslCount = result.QslCount;
@@ -2316,46 +2500,65 @@ namespace HolyLogger
                     catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
-                // How many NEW countries this check added = growth of the entity set.
-                int countriesBefore = _confirmedEntities.Count;
+                // A full download that came back with NOTHING AT ALL is the absence of an answer, not an
+                // answer of zero, and what this log already knows must survive it. Overwriting here turned
+                // "Confirmed on LoTW: 3,672" into 0 the moment a download was aimed at the wrong account -
+                // a real figure replaced by a worse one on the strength of a reply that said nothing.
+                // Confirmations only ever accumulate at LoTW; they are never taken away. So an empty full
+                // reply means we asked the wrong question far more often than it means the QSLs are gone.
+                //
+                // Only when something IS stored: a first-ever download that finds nothing writes its zero
+                // as before, so a genuinely empty account still reads "checked, none" rather than
+                // "not checked yet".
+                bool nothingCameBack = !incremental && qslCount == 0;
+                bool keepWhatIsStored = nothingCameBack
+                                        && (LotwConfirmedQsoCount > 0
+                                            || !string.IsNullOrWhiteSpace(LotwConfirmedEntities));
 
-                // Full run replaces the set; incremental run adds the new confirmations to the cached set.
-                if (incremental)
-                    _confirmedEntities.UnionWith(resolvedNames);
-                else
-                    _confirmedEntities = resolvedNames;
+                if (!keepWhatIsStored)
+                {
+                    // How many NEW countries this check added = growth of the entity set.
+                    int countriesBefore = _confirmedEntities.Count;
 
-                int newCountries = incremental
-                    ? Math.Max(0, _confirmedEntities.Count - countriesBefore)
-                    : _confirmedEntities.Count;   // a full (re)build treats the whole set as "found"
+                    // Full run replaces the set; incremental run adds the new confirmations to the cached set.
+                    if (incremental)
+                        _confirmedEntities.UnionWith(resolvedNames);
+                    else
+                        _confirmedEntities = resolvedNames;
 
-                // Persist. The total adds only genuinely-new QSLs on an incremental run (no same-day
-                // re-count), or the whole set on a full run. The marker is a DATE (matching qso_qslsince),
-                // plus the de-dupe key set for that date.
-                LotwConfirmedEntities = string.Join("|", _confirmedEntities);
-                LotwConfirmedQsoCount = incremental ? LotwConfirmedQsoCount + newCount : qslCount;
-                LotwLastNewQsls = incremental ? newCount : qslCount;
-                LotwLastNewCountries = newCountries;
-                LotwLastCheckSince = sinceDisplay;   // empty = a full download
-                // The list of new confirmations, for the viewer. Cleared on a full download (no delta).
-                LotwLastNewJson = newList != null ? JsonConvert.SerializeObject(newList) : string.Empty;
-                if (!string.IsNullOrWhiteSpace(maxRxDate)) LotwLastQsl = maxRxDate;   // stored as a date
-                LotwSeenKeysJson = JsonConvert.SerializeObject(newSeenKeys);
+                    int newCountries = incremental
+                        ? Math.Max(0, _confirmedEntities.Count - countriesBefore)
+                        : _confirmedEntities.Count;   // a full (re)build treats the whole set as "found"
 
-                // Confirmed DELETED entities, by DXCC code. Full run replaces the set; an incremental
-                // run adds to it (a deleted entity newly confirmed since last check). Stored as codes so
-                // re-confirming the same entity never inflates the count.
-                var deletedCodes = new HashSet<int>(result.ConfirmedDeletedCodes);
-                if (incremental && !string.IsNullOrWhiteSpace(LotwConfirmedDeletedCodes))
-                    foreach (var part in LotwConfirmedDeletedCodes.Split(','))
-                        if (int.TryParse(part.Trim(), out int old)) deletedCodes.Add(old);
-                LotwConfirmedDeletedCodes = string.Join(",", deletedCodes);
-                s.Save();
+                    // Persist. The total adds only genuinely-new QSLs on an incremental run (no same-day
+                    // re-count), or the whole set on a full run. The marker is a DATE (matching qso_qslsince),
+                    // plus the de-dupe key set for that date.
+                    LotwConfirmedEntities = string.Join("|", _confirmedEntities);
+                    LotwConfirmedQsoCount = incremental ? LotwConfirmedQsoCount + newCount : qslCount;
+                    LotwLastNewQsls = incremental ? newCount : qslCount;
+                    LotwLastNewCountries = newCountries;
+                    LotwLastCheckSince = sinceDisplay;   // empty = a full download
+                    // The list of new confirmations, for the viewer. Cleared on a full download (no delta).
+                    LotwLastNewJson = newList != null ? JsonConvert.SerializeObject(newList) : string.Empty;
+                    if (!string.IsNullOrWhiteSpace(maxRxDate)) LotwLastQsl = maxRxDate;   // stored as a date
+                    LotwSeenKeysJson = JsonConvert.SerializeObject(newSeenKeys);
+
+                    // Confirmed DELETED entities, by DXCC code. Full run replaces the set; an incremental
+                    // run adds to it (a deleted entity newly confirmed since last check). Stored as codes so
+                    // re-confirming the same entity never inflates the count.
+                    var deletedCodes = new HashSet<int>(result.ConfirmedDeletedCodes);
+                    if (incremental && !string.IsNullOrWhiteSpace(LotwConfirmedDeletedCodes))
+                        foreach (var part in LotwConfirmedDeletedCodes.Split(','))
+                            if (int.TryParse(part.Trim(), out int old)) deletedCodes.Add(old);
+                    LotwConfirmedDeletedCodes = string.Join(",", deletedCodes);
+                    s.Save();
+                }
 
                 // Re-read the log so QSO confirmation flags are live (the zone lists read them), then
                 // repaint the folder - RefreshForSource rebuilds the Missing lists, sets the tiles/status,
-                // colors the rows, and fills the 3-row summary. No manual reopen needed.
-                ReloadQsosAfterCheck();
+                // colors the rows, and fills the 3-row summary. No manual reopen needed. Only worth
+                // re-reading when a flag actually changed.
+                await ReloadQsosAfterCheck(markedConfirmed > 0);
 
                 // EVERY check ends with a summary, incremental included. It used to be left off the
                 // quick check to avoid nagging, which meant pressing the button and getting no answer
@@ -2404,6 +2607,11 @@ namespace HolyLogger
         // incremental=true adds MODSINCE, asking only for what changed since the last check.
         private async System.Threading.Tasks.Task RunQrzCheck(bool incremental)
         {
+            // QRZ used to miss this case completely: the key's own logbook downloaded happily, every
+            // confirmation was then discarded for belonging to another callsign, and the operator was told
+            // the check had succeeded.
+            if (BlockedAsAnotherStationsLog("QRZ.com")) return;
+
             string since = incremental ? LogState("QrzLastCheck") : string.Empty;
             if (string.IsNullOrWhiteSpace(since)) incremental = false;
 
@@ -2438,8 +2646,11 @@ namespace HolyLogger
             int confirmedBefore = ConfirmedInLog(ConfSource.Qrz);
             try
             {
-                QrzLogbookService.QrzFetchResult fetch =
-                    await QrzLogbookService.FetchConfirmationsAsync(key, incremental ? since : null, ct);
+                // Off the UI thread - see the note in the LoTW download. On .NET Framework the request
+                // resolves proxy and DNS synchronously on the calling thread, which freezes the window
+                // (spinner included) until the server answers.
+                QrzLogbookService.QrzFetchResult fetch = await Task.Run(
+                    () => QrzLogbookService.FetchConfirmationsAsync(key, incremental ? since : null, ct), ct);
 
                 // A quick check that QRZ genuinely refuses falls back to the full download, so the
                 // operator gets their confirmations either way. An EMPTY answer is not a refusal and
@@ -2449,7 +2660,7 @@ namespace HolyLogger
                 {
                     incremental = false;
                     TB_LotwLoadingText.Text = "QRZ would not take the quick check — downloading everything…";
-                    fetch = await QrzLogbookService.FetchConfirmationsAsync(key, null, ct);
+                    fetch = await Task.Run(() => QrzLogbookService.FetchConfirmationsAsync(key, null, ct), ct);
                 }
 
                 if (fetch.NetworkError)
@@ -2482,6 +2693,25 @@ namespace HolyLogger
                 List<DataAccess.LotwConfirmation> unmatched = null;
                 int otherStations;
                 confirmations = ForThisLog(confirmations, out otherStations);   // this log's callsign only
+
+                // QRZ answered in full, and not one of its confirmations was logged under this log's
+                // callsign. That is proof, not a guess: the logbook this API key opens belongs to another
+                // station. Said plainly, and nothing is written - clearing the existing marks here would
+                // wipe a set this key was never entitled to rebuild.
+                if (confirmations.Count == 0 && otherStations > 0)
+                {
+                    string qrzLogCall = ActiveLogCallsign();
+                    if (string.IsNullOrWhiteSpace(qrzLogCall)) qrzLogCall = "this log's callsign";
+                    ShowLotwSpinner(false);
+                    HolyMessageBox.Show(
+                        $"Your QRZ logbook holds {otherStations:N0} confirmation(s), and every one of them is " +
+                        $"for a different callsign — none for {qrzLogCall}.\n\n" +
+                        "A QRZ API key opens one logbook, and that logbook belongs to whoever it was issued " +
+                        $"to. Only {qrzLogCall} can download these.\n\nNothing in your log was changed.",
+                        "QRZ confirmations", HolyMsgType.Error, this);
+                    return;
+                }
+
                 // fullReset only on the authoritative rebuild. An incremental answer holds just what
                 // changed, so clearing first would throw away every mark it does not happen to mention.
                 int marked = await Task.Run(() =>
@@ -2511,17 +2741,27 @@ namespace HolyLogger
                     if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) qrzDeleted.Add(c.DxccCode);
                 }
                 var qs = Properties.Settings.Default;
-                QrzConfirmedEntities = string.Join("|", qrzNames);
-                QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
-                QrzConfirmedQsoCount = incremental
-                    ? QrzConfirmedQsoCount + Math.Max(0, ConfirmedInLog(ConfSource.Qrz) - confirmedBefore)
-                    : confirmations.Count;
+
+                // As on the LoTW and Club Log paths: a full download that returned nothing at all leaves
+                // a figure this log was already given alone. QRZ does not un-confirm QSOs, so an empty
+                // reply says the question was wrong, not that the confirmations went away. A log with
+                // nothing stored yet still records the zero, so "checked, none" stays distinguishable
+                // from "not checked yet".
+                bool qrzHasStored = QrzConfirmedQsoCount > 0 || !string.IsNullOrWhiteSpace(QrzConfirmedEntities);
+                if (!(!incremental && confirmations.Count == 0 && qrzHasStored))
+                {
+                    QrzConfirmedEntities = string.Join("|", qrzNames);
+                    QrzConfirmedDeletedCodes = string.Join(",", qrzDeleted);
+                    QrzConfirmedQsoCount = incremental
+                        ? QrzConfirmedQsoCount + Math.Max(0, ConfirmedInLog(ConfSource.Qrz) - confirmedBefore)
+                        : confirmations.Count;
+                }
                 LogState("QrzLastCheck", stampedAt);
                 qs.Save();
 
                 // Re-read the log so the QSO confirmation flags (which the zone lists use) are live, then
                 // repaint the current folder - no manual reopen needed.
-                ReloadQsosAfterCheck();
+                await ReloadQsosAfterCheck(marked > 0);
 
                 // "now marked" only when this run actually marked something. A full rebuild always
                 // counts as a change (it rewrote every mark); a quick check that found nothing has
@@ -2589,7 +2829,7 @@ namespace HolyLogger
                     $"Nothing came back for {logCall}.\n\n" +
                     "Your LoTW account" + (account.Length > 0 ? $" ({account})" : "") +
                     " has no confirmations for that callsign. Only the account that uploaded those QSOs " +
-                    "can download them.",
+                    "can download them." + FreezeNote(),
                     // Red, not the blue "i": a check that came back with nothing is a result the operator
                     // has to act on (ask the log's owner to run it), not a note they can wave past.
                     name + " confirmations", HolyMsgType.Error, this);
@@ -2621,7 +2861,7 @@ namespace HolyLogger
                 foreach (var f in failed) text.AppendLine("    • " + f);
             }
 
-            HolyMessageBox.Show(text.ToString().TrimEnd(), name + " confirmations updated", HolyMsgType.Info, this);
+            HolyMessageBox.Show(text.ToString().TrimEnd() + FreezeNote(), name + " confirmations updated", HolyMsgType.Info, this);
         }
 
         // The eQSL side of the confirmation feature. eQSL is per-callsign, so this loops over every eQSL
@@ -2638,6 +2878,8 @@ namespace HolyLogger
         // marker stored is the moment of the check.
         private async System.Threading.Tasks.Task RunEqslCheck(bool incremental)
         {
+            if (BlockedAsAnotherStationsLog("eQSL")) return;
+
             string since = incremental ? LogState("EqslLastCheck") : string.Empty;
             if (string.IsNullOrWhiteSpace(since)) incremental = false;   // nothing to be incremental from
             string stampedAt = DateTime.UtcNow.ToString("yyyyMMddHHmm");
@@ -2705,8 +2947,10 @@ namespace HolyLogger
                         ? $"Checking eQSL for new cards… ({idx} of {accounts.Count})"
                         : $"Downloading eQSL In Box… ({idx} of {accounts.Count})";
                     TB_LotwLoadingSub.Text = $"Account {acct.Callsign}";
-                    var r = await EqslConfirmationService.FetchInboxAsync(
-                        acct.Username, acct.Password, acct.Callsign, incremental ? since : null, ct);
+                    // Off the UI thread - see the note in the LoTW download.
+                    var acctCopy = acct;
+                    var r = await Task.Run(() => EqslConfirmationService.FetchInboxAsync(
+                        acctCopy.Username, acctCopy.Password, acctCopy.Callsign, incremental ? since : null, ct), ct);
                     if (r.Ok) all.AddRange(r.Confirmations);
                     else if (r.NetworkError) { failed.Add($"{acct.Callsign}: no connection"); }
                     else failed.Add($"{acct.Callsign}: {r.Reason}");
@@ -2721,7 +2965,14 @@ namespace HolyLogger
                     // answer means only that the window since the last check was quiet, so the running
                     // total must be left exactly as it is. Zeroing it here would have thrown away the
                     // whole count every time nothing had arrived - which is most of the time.
-                    if (failed.Count == 0 && !incremental)
+                    //
+                    // And a FULL download that brings back nothing does not disprove what this log was
+                    // already told: cards are not taken back once received. So a stored figure stands,
+                    // and only a log with nothing stored yet records the zero. (Same reasoning as the
+                    // LoTW path above - see the note there.)
+                    bool eqslHasStored = EqslConfirmedQsoCount > 0
+                                         || !string.IsNullOrWhiteSpace(EqslConfirmedEntities);
+                    if (failed.Count == 0 && !incremental && !eqslHasStored)
                     {
                         EqslConfirmedQsoCount = 0;
                         EqslConfirmedEntities = string.Empty;
@@ -2787,7 +3038,7 @@ namespace HolyLogger
                 LogState("EqslLastCheck", stampedAt);
                 s.Save();
 
-                ReloadQsosAfterCheck();
+                await ReloadQsosAfterCheck(marked > 0);
                 ShowCheckSummary(ConfSource.Eqsl, all.Count, incremental,
                                  !incremental || ConfirmedInLog(ConfSource.Eqsl) > confirmedBefore, failed);
             }
@@ -2820,6 +3071,8 @@ namespace HolyLogger
         // Always a full rebuild.
         private async void BTN_CheckClublog_Click(object sender, RoutedEventArgs e)
         {
+            if (BlockedAsAnotherStationsLog("Club Log")) return;
+
             var s0 = Properties.Settings.Default;
             string email = s0.ClublogEmail?.Trim();
             string password = s0.ClublogPassword;
@@ -2875,7 +3128,9 @@ namespace HolyLogger
                     idx++;
                     TB_LotwLoadingText.Text = $"Downloading Club Log export… ({idx} of {calls.Count})";
                     TB_LotwLoadingSub.Text = $"Callsign {call}";
-                    var r = await ClublogService.FetchLogAsync(email, password, call, ct);
+                    // Off the UI thread - see the note in the LoTW download.
+                    var callCopy = call;
+                    var r = await Task.Run(() => ClublogService.FetchLogAsync(email, password, callCopy, ct), ct);
                     if (r.Ok) all.AddRange(r.Confirmations);
                     else if (r.NetworkError) failed.Add($"{call}: no connection");
                     else failed.Add($"{call}: {r.Reason}");
@@ -2888,7 +3143,14 @@ namespace HolyLogger
                     // and the folder says "not checked yet" for ever however many times you press the
                     // button. Only when the download actually FAILED is nothing written - because then
                     // we genuinely do not know.
-                    if (failed.Count == 0)
+                    //
+                    // Nor is a figure this log was already given thrown away on an empty reply: Club Log
+                    // does not un-confirm QSOs, so "nothing came back" is far likelier to mean the wrong
+                    // callsign was asked for than that the confirmations vanished. A log with nothing
+                    // stored yet still records the zero. (Same reasoning as the LoTW path - see there.)
+                    bool clublogHasStored = ClublogConfirmedQsoCount > 0
+                                            || !string.IsNullOrWhiteSpace(ClublogConfirmedEntities);
+                    if (failed.Count == 0 && !clublogHasStored)
                     {
                         ClublogConfirmedQsoCount = 0;
                         ClublogConfirmedEntities = string.Empty;
@@ -2939,7 +3201,7 @@ namespace HolyLogger
                 ClublogConfirmedQsoCount = all.Count;   // what Club Log reported (frame "Confirmed on Club Log")
                 s0.Save();
 
-                ReloadQsosAfterCheck();
+                await ReloadQsosAfterCheck(marked > 0);
                 ShowCheckSummary(ConfSource.Clublog, all.Count, false, true, failed);   // Club Log is always a full rebuild
             }
             catch (OperationCanceledException)
@@ -3140,6 +3402,98 @@ namespace HolyLogger
         }
 
         // Show/hide the download overlay and run (or stop) the spinner's continuous rotation.
+        // Ticks the overlay's clock. Deliberately a DispatcherTimer on the UI thread: that is the point.
+        // A rotating ring proves nothing to an operator who has just watched the same sentence sit still
+        // for a minute, and it cannot tell "waiting for the server" from "hung". A number that changes
+        // every second can.
+        private System.Windows.Threading.DispatcherTimer _spinnerClock;
+        private DateTime _spinnerStartedUtc;
+
+        // The timer is set to fire every second. When it fires LATE, the UI thread was busy and could not
+        // service it - and for exactly as long, nothing was redrawn either, which is what makes a spinner
+        // stop turning. The worst gap seen is kept and shown, so "the spinner froze" stops being a
+        // judgement call and becomes a number: no "paused" means the UI thread was free the whole way and
+        // any stall is in the animation itself, not in the work.
+        private DateTime _spinnerLastTickUtc;
+        private double _spinnerWorstGapSeconds;
+
+        // ---- UI-thread freeze watchdog ---------------------------------------------------------------
+        //
+        // The clock above can only report a stall AFTER it ends, because a frozen window is not drawn.
+        // This measures from OUTSIDE instead: a background thread posts a do-nothing message to the UI
+        // thread every 100ms and times how long the answer takes. That timing is unaffected by the UI
+        // being stuck - which is the whole point - so it records exactly when the freeze began, how long
+        // it lasted, and what the window was doing at the time. The result is written to a file, so it
+        // survives and can be read afterwards.
+        private System.Threading.Thread _uiWatchdog;
+        private volatile bool _uiWatchdogRun;
+        private volatile string _uiPhase = string.Empty;
+        private readonly List<string> _uiStalls = new List<string>();
+        private readonly object _uiStallsLock = new object();
+        private DateTime _watchdogStartedUtc;
+
+        private void UiWatchdogLoop()
+        {
+            var dispatcher = Dispatcher;
+            while (_uiWatchdogRun)
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                string phase = _uiPhase;
+                try
+                {
+                    using (var answered = new System.Threading.ManualResetEventSlim(false))
+                    {
+                        dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Send,
+                                               new Action(() => answered.Set()));
+                        answered.Wait(120000);
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return; }
+
+                double ms = sw.Elapsed.TotalMilliseconds;
+                if (ms >= 500)
+                {
+                    double atSecond = (DateTime.UtcNow - _watchdogStartedUtc).TotalSeconds - (ms / 1000.0);
+                    lock (_uiStallsLock)
+                        _uiStalls.Add($"  at {atSecond,6:0.0}s   frozen {ms / 1000.0,6:0.0}s   while: {phase}");
+                }
+
+                System.Threading.Thread.Sleep(100);
+            }
+        }
+
+        private void WriteFreezeReport()
+        {
+            try
+            {
+                List<string> stalls;
+                lock (_uiStallsLock) stalls = new List<string>(_uiStalls);
+
+                // Only a stall long enough to be FELT is worth a file. A checkup that leaves a report on
+                // the operator's Desktop every single time is litter; one that stays silent until the
+                // window genuinely locks up is evidence, gathered without anyone having to reproduce the
+                // fault to order. (Everything under 3s still shows in the report when one is written.)
+                if (_spinnerWorstGapSeconds < 3) return;
+
+                string path = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    "holylogger_ui_freeze.txt");
+
+                var t = new System.Text.StringBuilder();
+                t.AppendLine($"UI-thread responsiveness during the last confirmation check — {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+                t.AppendLine(new string('=', 78));
+                t.AppendLine($"Check lasted           : {(DateTime.UtcNow - _watchdogStartedUtc).TotalSeconds:0.0}s");
+                t.AppendLine($"Times the window froze : {stalls.Count}  (anything over 0.5s is listed)");
+                t.AppendLine();
+                if (stalls.Count == 0)
+                    t.AppendLine("  none — the UI thread answered within half a second, every time.");
+                else
+                    foreach (string s in stalls) t.AppendLine(s);
+                System.IO.File.WriteAllText(path, t.ToString(), System.Text.Encoding.UTF8);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private void ShowLotwSpinner(bool show)
         {
             if (show)
@@ -3151,12 +3505,81 @@ namespace HolyLogger
                     RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
                 };
                 SpinnerRotate.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, spin);
+
+                _spinnerStartedUtc = DateTime.UtcNow;
+                _spinnerLastTickUtc = _spinnerStartedUtc;
+                _spinnerWorstGapSeconds = 0;
+
+                _watchdogStartedUtc = _spinnerStartedUtc;
+                lock (_uiStallsLock) _uiStalls.Clear();
+                _uiPhase = "starting the check";
+                _uiWatchdogRun = true;
+                _uiWatchdog = new System.Threading.Thread(UiWatchdogLoop)
+                {
+                    IsBackground = true,
+                    Name = "UiFreezeWatchdog"
+                };
+                _uiWatchdog.Start();
+                if (TB_LotwElapsed != null) TB_LotwElapsed.Text = "running  0:00";
+                if (_spinnerClock == null)
+                {
+                    // Send priority, above Render: the clock must be serviced whenever the thread is free
+                    // at all, so a stalled clock means a stalled thread rather than a busy dispatcher
+                    // queue outranking it.
+                    _spinnerClock = new System.Windows.Threading.DispatcherTimer(
+                        System.Windows.Threading.DispatcherPriority.Send)
+                    {
+                        Interval = TimeSpan.FromSeconds(1)
+                    };
+                    _spinnerClock.Tick += (s, e) =>
+                    {
+                        if (TB_LotwElapsed == null) return;
+                        DateTime now = DateTime.UtcNow;
+
+                        double gap = (now - _spinnerLastTickUtc).TotalSeconds;
+                        _spinnerLastTickUtc = now;
+                        if (gap > _spinnerWorstGapSeconds) _spinnerWorstGapSeconds = gap;
+
+                        TimeSpan t = now - _spinnerStartedUtc;
+                        string text = $"running  {(int)t.TotalMinutes}:{t.Seconds:00}";
+                        // Only a real stall is worth saying. A second or two of scheduling jitter is not.
+                        if (_spinnerWorstGapSeconds >= 3)
+                            text += $"    (window frozen {_spinnerWorstGapSeconds:0.0}s at worst)";
+                        TB_LotwElapsed.Text = text;
+                    };
+                }
+                _spinnerClock.Start();
             }
             else
             {
+                MeasureFreeze();          // a stall that ran right up to the end still counts
+                _uiWatchdogRun = false;   // the thread exits on its own; never joined from the UI thread
+                WriteFreezeReport();
+                _spinnerClock?.Stop();
+                if (TB_LotwElapsed != null) TB_LotwElapsed.Text = string.Empty;
                 SpinnerRotate.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, null);
                 LotwLoadingOverlay.Visibility = Visibility.Collapsed;
             }
+        }
+
+        // Folds the time since the last tick into the worst-gap figure. Called whenever the UI thread is
+        // known to be running, so a freeze that ended only when the work did is not missed.
+        private void MeasureFreeze()
+        {
+            if (_spinnerClock == null || !_spinnerClock.IsEnabled) return;
+            double gap = (DateTime.UtcNow - _spinnerLastTickUtc).TotalSeconds;
+            if (gap > _spinnerWorstGapSeconds) _spinnerWorstGapSeconds = gap;
+        }
+
+        // The overlay cannot show a freeze WHILE it is frozen - it is not being drawn - so the figure has
+        // to outlive the overlay. It is put in the message that ends the check, where it can be read at
+        // leisure and screenshotted. Silent unless there really was a stall worth naming.
+        private string FreezeNote()
+        {
+            MeasureFreeze();
+            return _spinnerWorstGapSeconds >= 3
+                ? $"\n\n(The window stopped responding for up to {_spinnerWorstGapSeconds:0.0}s during this check.)"
+                : string.Empty;
         }
 
         // The date (yyyy-MM-dd) to send as qso_qslsince, from the stored marker (which may be a legacy
