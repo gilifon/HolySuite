@@ -4284,16 +4284,21 @@ namespace HolyLogger
 
             var progressIndicator = new Progress<int>();           
 
+            // Send exactly what the operator has open — the ACTIVE log. GetAllQSOs() would sweep in every
+            // other log in the database (an imported friend's log, an old contest), and the file that
+            // reached the organisers would not be the log shown on screen.
+            var logToSend = dal.GetQSOsForLog(dal.ActiveLogId);
+
             if (w.selectedRadioEvent.Name.ToLower() == "holyland")
             {
-                string UploadCabrilloToIARC_result = await UploadCabrilloToIARC(bareCallsign, w.selectedOperator.Name, w.selectedMode.Name, w.selectedBand.Name, w.selectedPower.Name, w.selectedOverlay.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country, dal.GetAllQSOs());
+                string UploadCabrilloToIARC_result = await UploadCabrilloToIARC(bareCallsign, w.selectedOperator.Name, w.selectedMode.Name, w.selectedBand.Name, w.selectedPower.Name, w.selectedOverlay.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country, logToSend);
                 w.Close();
                 HolyMessageBox.Show(UploadCabrilloToIARC_result, "Log Upload", HolyMsgType.Info, this);
             }
             else
             {
                 string AddParticipant_result = await AddParticipant(bareCallsign, w.selectedOperator.Name, w.selectedMode.Name, w.selectedPower.Name, Properties.Settings.Default.PersonalInfoEmail, Properties.Settings.Default.PersonalInfoName, country);
-                string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), dal.GetAllQSOs());
+                string UploadLogToIARC_result = await UploadLogToIARC(new Progress<int>(percent => w.UploadProgress = percent), logToSend);
                 w.Close();
                 HolyMessageBox.Show(UploadLogToIARC_result, "Log Upload", HolyMsgType.Info, this);
             }
@@ -5906,45 +5911,6 @@ namespace HolyLogger
             {
                 e.Handled = true;
             }
-        }
-
-        private void ClearLogMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            if (HolyMessageBox.ShowConfirm("Are you sure you want to clear the entire log?", "Delete Confirmation", HolyMsgType.Warning, this))
-            {
-
-                // PROPOSED contest_id tag — the pre-clear backup file is tagged with the active contest.
-                // Everything the QSOs carry goes into it: this file is the only copy left after a Clear.
-                string adif = Services.GenerateAdif(dal.GetAllQSOs(), Contests.ContestService.Active?.CabrilloName,
-                                                    includeImportedFields: true);
-                try
-                {
-                    // Saves the Image via a FileStream created by the OpenFile method.
-                    using (System.IO.StreamWriter file = new System.IO.StreamWriter(AppDomain.CurrentDomain.BaseDirectory + "\\" + DateTime.Now.Ticks.ToString() + ".adi"))
-                    {
-                        file.Write(adif);
-                        file.Close();
-                    }
-                }
-                catch (Exception ex)
-                {
-                    HolyMessageBox.ShowError("Backup failed: " + ex.Message, "Clear Log", this);
-                }
-                finally
-                {
-                    Properties.Settings.Default.RecentQSOCounter = 0;
-                    Qsos.Clear();
-                    dal.DeleteAll();
-                    ClearBtn_Click(null, null);
-                    UpdateNumOfQSOs();
-                    UpdateEqslQueueIndicator();
-                    UpdateQrzMenuCount();
-                }
-            }
-            else
-            {
-                e.Handled = true;
-            }            
         }
 
         private void UploadMenuItem_Click(object sender, RoutedEventArgs e)

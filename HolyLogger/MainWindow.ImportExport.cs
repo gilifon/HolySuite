@@ -776,8 +776,9 @@ namespace HolyLogger
                 c.Name = name.Trim();
                 c.Country = country.Trim();
 
-                //generate cabrillo
-                string cabrillo = Services.GenerateCabrillo(dal.GetAllQSOs(), c);
+                //generate cabrillo from the QSOs the caller handed us (the active log), NOT every log in
+                //the database - the caller decides which log is being sent.
+                string cabrillo = Services.GenerateCabrillo(QSOList, c);
 
                 //set multipart
                 var formData = new MultipartFormDataContent();
@@ -843,20 +844,6 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 return $"Error uploading file: {ex.Message}";
-            }
-        }
-
-        private void parseAdif()
-        {
-            try
-            {
-                string adif = Services.GenerateAdif(dal.GetAllQSOs());
-                _holyLogParser = new HolyLogParser(adif, (HolyLogParser.IsIsraeliStation(TB_MyCallsign.Text)) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign, Properties.Settings.Default.IsParseDuplicates, Properties.Settings.Default.IsParseWARC);
-                _holyLogParser.Parse();
-            }
-            catch (Exception e)
-            {
-                HolyMessageBox.ShowError("Parsing failed.", "HolyLogger", this);
             }
         }
 
