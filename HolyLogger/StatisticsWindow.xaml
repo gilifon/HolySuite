@@ -358,7 +358,13 @@
                                         <Grid Height="44">
                                             <TextBlock x:Name="TB_MissingTileLabel" Text="Missing Active Countries" Width="150" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
-                                        <TextBlock x:Name="TB_MissingDxcc" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Center"/>
+                                        <!-- 30, like the two tiles beside it. At 34 this number's line was
+                                             taller than theirs, and since each tile is only as tall as its
+                                             contents, the Missing frame stood higher than the others in a
+                                             row that is meant to read as one strip. Red already gives it
+                                             the emphasis; size was buying that twice, at the cost of the
+                                             alignment. -->
+                                        <TextBlock x:Name="TB_MissingDxcc" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource Danger}" HorizontalAlignment="Center"/>
                                     </StackPanel>
                                 </Border>
 
@@ -374,7 +380,7 @@
                                      button on one row; the status wraps on its own line below. -->
                                 <StackPanel Height="76">
                                     <StackPanel Orientation="Horizontal" Margin="0,0,0,2" VerticalAlignment="Center">
-                                        <TextBlock x:Name="TB_WorkedHeader" Text="Worked Countries"
+                                        <TextBlock x:Name="TB_WorkedHeader" Text="Worked Active Countries"
                                                    FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                                                    VerticalAlignment="Center" Margin="0,0,12,0"/>
                                         <Button x:Name="BTN_CheckLotw" Content="Check LoTW Updates" FontSize="12" Padding="8,3"

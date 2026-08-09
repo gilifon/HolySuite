@@ -781,10 +781,9 @@ namespace HolyLogger
                 parts.Add(new KeyValuePair<string, string>("LoTW", (active - card).ToString()));
                 parts.Add(new KeyValuePair<string, string>("Paper QSL", card.ToString()));
             }
-            else
-            {
-                parts.Add(new KeyValuePair<string, string>("active", active.ToString()));
-            }
+            // Nothing more on the other folders: "active" is already the line above. An else-branch here
+            // added it a SECOND time, so every folder except LoTW printed "active 326" twice under the
+            // total and the reader was left looking for the difference between two identical rows.
             if (deleted > 0)
                 parts.Add(new KeyValuePair<string, string>("deleted", deleted.ToString()));
             return parts;
@@ -863,16 +862,21 @@ namespace HolyLogger
                 .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
+            var currentEntities = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
             _workedList = workedCounts.Keys
                 .Select(name => new CountryItem
                 {
-                    Name      = name,
-                    Count     = workedCounts[name],
-                    FlagImage = GetFlagImage(name),
+                    Name            = name,
+                    Count           = workedCounts[name],
+                    FlagImage       = GetFlagImage(name),
+                    IsDeletedEntity = !currentEntities.Contains(name),
                 }).ToList();
 
             // Single line now — the LoTW button sits beside it on the same row.
-            TB_WorkedHeader.Text = $"Worked Countries ({_workedList.Count})";
+            // The CURRENT entities only, so this header, the table under it and the tile above it are one
+            // number - the same 326 that "326 / 340" prints. It used to count deleted entities too, and a
+            // header reading 333 sat directly beneath a tile reading 326.
+            TB_WorkedHeader.Text = $"Worked Active Countries ({_workedList.Count(c => !c.IsDeletedEntity)})";
 
             // The Missing list is source-aware, so it is built in its own method that the folder switch
             // also calls. The tiles are set by ApplyConfirmedHighlight from the same _missingList.
@@ -1045,9 +1049,15 @@ namespace HolyLogger
         private void DeletedCountries_Click(object sender, RoutedEventArgs e)
         {
             var list = DeletedConfirmedCountries();
+            // On the Worked folder every logged QSO counts, so this same list is the deleted entities the
+            // operator has WORKED - the wording follows, rather than claiming a confirmation.
+            bool workedFolder = _source == ConfSource.Worked;
             if (list.Count == 0)
             {
-                HolyMessageBox.Show("No deleted DXCC entities are confirmed here.", SourceName, HolyMsgType.Info, this);
+                HolyMessageBox.Show(workedFolder
+                        ? "No deleted DXCC entities have been worked in this log."
+                        : "No deleted DXCC entities are confirmed here.",
+                    SourceName, HolyMsgType.Info, this);
                 return;
             }
 
@@ -1079,7 +1089,9 @@ namespace HolyLogger
 
             var win = new Window
             {
-                Title = $"Deleted countries confirmed — {SourceName} ({list.Count})",
+                Title = workedFolder
+                    ? $"Deleted countries worked ({list.Count})"
+                    : $"Deleted countries confirmed — {SourceName} ({list.Count})",
                 Owner = this,
                 Width = 380,
                 Height = 300,
@@ -1553,10 +1565,47 @@ namespace HolyLogger
             {
                 // Plain log folder: Worked = worked / total; Missing = never contacted. The tiles spell out
                 // "Countries" (the number is a country count); the source is named by the folder tab.
-                TB_WorkedTileLabel.Text = "Worked Countries";
-                TB_UniqueCountries.Text = $"{workedDxcc} / {totalDxcc}";
+                //
+                // ACTIVE entities only, because the 340 it is printed over is the list of entities that
+                // exist TODAY. It used to print the whole worked list, deleted entities included, so the
+                // tile read "333 / 340" beside a Missing tile of 14 - and 333 + 14 = 347, which is not
+                // 340. The same log's worked-active count is 326, and 326 + 14 = 340 exactly. The deleted
+                // ones are not lost: they are said on their own line below, where they can be added up
+                // rather than silently folded into a total they do not belong to.
+                int workedActive = WorkedActiveCount();
+                // "Active", like the two tiles beside it and the one on every confirmation folder. The
+                // number counts only entities that still exist, and the label now says so rather than
+                // leaving the reader to work out why it is not the log's whole country total.
+                TB_WorkedTileLabel.Text = "Worked Active Countries";
+                // Set here too, or the confirmation folders' tooltip ("...but this source has not
+                // confirmed") stays attached to a tile that no longer means that after a folder switch.
+                TB_WorkedTileLabel.ToolTip = "Countries that still exist as DXCC entities and appear in this log";
+                TB_UniqueCountries.Text = $"{workedActive} / {totalDxcc}";
                 TB_MissingTileLabel.Text = "Missing Active Countries";
                 TB_MissingDxcc.Text = missingCount.ToString();
+
+                // The deleted entities this log has worked, stated plainly - the Worked folder had no line
+                // of its own, so the difference between the two numbers had nowhere to be explained. The
+                // count is a link to the list, exactly as on the confirmation folders: an operator who
+                // worked a country that no longer exists is entitled to see which, and it is the one
+                // figure on this page they cannot arrive at any other way.
+                int workedDeleted = Math.Max(0, workedDxcc - workedActive);
+                TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
+                TB_LotwStatus.Inlines.Clear();
+                TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run($"Worked: {workedActive} active"));
+                if (workedDeleted > 0)
+                {
+                    TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run(",  "));
+                    var workedDeletedLink = new System.Windows.Documents.Hyperlink(
+                        new System.Windows.Documents.Run($"{workedDeleted} deleted"))
+                    {
+                        ToolTip = "Click to see which deleted countries these are",
+                        Foreground = System.Windows.Media.Brushes.ForestGreen,
+                    };
+                    workedDeletedLink.Click += DeletedCountries_Click;
+                    TB_LotwStatus.Inlines.Add(workedDeletedLink);
+                    TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run($"  =  {workedDxcc} Total"));
+                }
             }
             else
             {
@@ -3711,22 +3760,28 @@ namespace HolyLogger
 
         private void ApplyWorkedSort()
         {
+            // CURRENT entities only. Every figure on this page is measured against the 340 that exist
+            // today, and a table holding seven more rows than the tile above it counts is a table nobody
+            // can reconcile. The deleted ones are not dropped from the program - they are counted on the
+            // status line and listed in full behind its "N deleted" link.
+            var shown = _workedList.Where(c => !c.IsDeletedEntity).ToList();
+
             List<CountryItem> sorted;
-            if      (_workedSort == WorkedSort.NameAsc)  sorted = _workedList.OrderBy(c => c.Name).ToList();
-            else if (_workedSort == WorkedSort.NameDesc) sorted = _workedList.OrderByDescending(c => c.Name).ToList();
-            else if (_workedSort == WorkedSort.CountAsc) sorted = _workedList.OrderBy(c => c.Count).ThenBy(c => c.Name).ToList();
+            if      (_workedSort == WorkedSort.NameAsc)  sorted = shown.OrderBy(c => c.Name).ToList();
+            else if (_workedSort == WorkedSort.NameDesc) sorted = shown.OrderByDescending(c => c.Name).ToList();
+            else if (_workedSort == WorkedSort.CountAsc) sorted = shown.OrderBy(c => c.Count).ThenBy(c => c.Name).ToList();
             else if (_workedSort == WorkedSort.ConfirmedDesc || _workedSort == WorkedSort.ConfirmedAsc)
             {
                 // Group by confirmed state. The UNCONFIRMED group (the countries you still need) is
                 // sub-sorted alphabetically by country name so it's easy to scan; the confirmed group
                 // keeps its count order.
-                var confirmed   = _workedList.Where(c => c.IsConfirmed).OrderByDescending(c => c.Count).ThenBy(c => c.Name);
-                var unconfirmed = _workedList.Where(c => !c.IsConfirmed).OrderBy(c => c.Name);
+                var confirmed   = shown.Where(c => c.IsConfirmed).OrderByDescending(c => c.Count).ThenBy(c => c.Name);
+                var unconfirmed = shown.Where(c => !c.IsConfirmed).OrderBy(c => c.Name);
                 sorted = _workedSort == WorkedSort.ConfirmedDesc
                     ? confirmed.Concat(unconfirmed).ToList()    // confirmed first, unconfirmed (A–Z) below
                     : unconfirmed.Concat(confirmed).ToList();   // unconfirmed (A–Z) first
             }
-            else                                         sorted = _workedList.OrderByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
+            else                                         sorted = shown.OrderByDescending(c => c.Count).ThenBy(c => c.Name).ToList();
 
             for (int i = 0; i < sorted.Count; i++)
                 sorted[i].RowBg = i % 2 == 0 ? ThemeManager.Brush("GridRowBg") : ThemeManager.Brush("GridAltRowBg");
@@ -3923,6 +3978,12 @@ namespace HolyLogger
         public int Count { get; set; }
         public string CountStr => Count > 0 ? Count.ToString() : "";
         public Brush RowBg { get; set; }
+
+        // True for an entity that no longer exists as a DXCC country. The worked table shows the CURRENT
+        // ones, so that its count is the same 326 the tile above it prints against 340; the deleted ones
+        // are reached from the "N deleted" link beside it rather than mixed into a list measured against
+        // a total they are not part of.
+        public bool IsDeletedEntity { get; set; }
 
         // Confirmation state, shown in the Confirmed column: green check when confirmed, bold red cross
         // when not. ✓ = check mark, ✗ = ballot X (clearer than a thin minus). ShowConfirmation is false

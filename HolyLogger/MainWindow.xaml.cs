@@ -4129,14 +4129,26 @@ namespace HolyLogger
         // count be computed from the CURRENT country file (matching the Statistics window) instead of from
         // possibly-stale stored country strings, so the headline number is always fresh and never drifts.
         private readonly Dictionary<string, string> _dxccEntityCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        private string ResolveEntityName(string call)
+
+        // The entity a LOGGED callsign belongs to, answered for the day the QSO was made.
+        //
+        // It used to ask CountryLookup.Shared.Resolve(call) - the no-date overload, which means "as things
+        // stand today". That is right for a call being typed or a cluster spot, and wrong for a QSO made
+        // in 1990: prefixes are retired and reassigned, so an old contact was credited to an entity that
+        // today's rules put somewhere else, or nowhere. The status bar therefore counted a different set
+        // of entities from the Statistics window, which has always passed the QSO's date - and it showed:
+        // "DXCCs (worked) 324" beside "Confirmed 325", a log confirmed for more entities than it had
+        // worked, which cannot happen. Same call, same date, same answer, everywhere.
+        private string ResolveEntityName(string call, string adifDate)
         {
             call = (call ?? string.Empty).Trim();
             if (call.Length == 0 || rem == null) return null;
-            if (!_dxccEntityCache.TryGetValue(call, out var name))
+            string key = call + "|" + (adifDate ?? string.Empty).Trim();
+            if (!_dxccEntityCache.TryGetValue(key, out var name))
             {
-                try { name = CountryLookup.Shared.Resolve(call)?.Name; } catch { name = null; }
-                _dxccEntityCache[call] = name;
+                try { name = CountryLookup.Shared.Resolve(call, CountryLookup.QsoDate(adifDate))?.Name; }
+                catch { name = null; }
+                _dxccEntityCache[key] = name;
             }
             return name;
         }
@@ -4154,7 +4166,7 @@ namespace HolyLogger
                 rem != null ? rem.GetAllEntityNames() : Enumerable.Empty<string>(),
                 StringComparer.OrdinalIgnoreCase);
             NumOfDXCCs = (Qsos ?? new ObservableCollection<QSO>())
-                .Select(q => ResolveEntityName(q.DXCall))
+                .Select(q => ResolveEntityName(q.DXCall, q.Date))
                 .Where(n => !string.IsNullOrEmpty(n) && officialEntities.Contains(n))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Count().ToString();
