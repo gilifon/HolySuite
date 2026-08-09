@@ -1,9 +1,16 @@
+<!-- Width fits the SEVEN source folders across the top of the right-hand page. Measured, not guessed:
+     the tabs come to 630px (Worked 92, LoTW 80, QRZ 71, eQSL 76, Club Log 99, Paper QSL 107, ARRL
+     DXCC Award 105) plus their 16px margins, and the left page cannot go below 565 (its 513 MinWidth
+     plus margins and border). 630 + 16 + 565 + chrome = 1227, so at the old 950 the last folders were
+     cut off the right edge for anyone with all the services on. MinWidth carries the same number: a
+     saved width below MinWidth is ignored on restore (see the constructor), which is what makes an
+     upgrade fix itself instead of reopening at the old, too-narrow size. -->
 <Window x:Class="HolyLogger.StatisticsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Log Statistics &amp; Confirmations"
-        Height="962" Width="950"
-        MinHeight="622" MinWidth="940"
+        Height="962" Width="1240"
+        MinHeight="622" MinWidth="1240"
         ResizeMode="CanResize"
         WindowStartupLocation="Manual"
         LocationChanged="Window_LocationChanged"
@@ -33,7 +40,11 @@
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>   <!-- left: static log analysis + pivot -->
-                    <ColumnDefinition Width="*"/>       <!-- right: the per-source page (tabs + content) -->
+                    <!-- MinWidth = the folder strip's own width (630) plus its margins. The left column
+                         is Auto, so a wide pivot table would otherwise eat into this one and clip the
+                         tabs off the right edge; this keeps the folders' room reserved whatever the
+                         left page does. -->
+                    <ColumnDefinition Width="*" MinWidth="646"/>  <!-- right: the per-source page (tabs + content) -->
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>      <!-- top: tab strip (right) / free space (left) -->
