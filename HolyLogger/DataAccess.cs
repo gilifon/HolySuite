@@ -447,8 +447,8 @@ Environment.NewLine +
         {
             const int es = 1, qs = 1, ls = 1, cs = 1;
             using (var ins = new SQLiteCommand(
-                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,qth,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
-                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@qth,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
+                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
+                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@state,@qth,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
             {
                 ins.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
                 ins.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
@@ -471,6 +471,10 @@ Environment.NewLine +
                 ins.Parameters.Add(new SQLiteParameter("@continent", qso.Continent));
                 ins.Parameters.Add(new SQLiteParameter("@cq_zone", qso.CQZone));
                 ins.Parameters.Add(new SQLiteParameter("@itu_zone", qso.ITUZone));
+                // A copy is the same contact, so it carries the same STATE. It did not: the column was
+                // missing here while every other writer had it, so a mirrored QSO arrived in the target
+                // log with its state blank and the operator had no way to tell where it went.
+                ins.Parameters.Add(new SQLiteParameter("@state", qso.State));
                 ins.Parameters.Add(new SQLiteParameter("@qth", qso.Qth));
                 ins.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                 ins.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
