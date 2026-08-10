@@ -596,49 +596,7 @@ namespace HolyLogger
             // (Pinned My Favorite Channels is reopened in MainWindow_Loaded, not here: ChannelsWindow
             //  sets Owner = this, and WPF refuses to take an owner that has not been shown yet.)
 
-            List<KeyValuePair<string, int>> gridColumnOrder = new List<KeyValuePair<string, int>>();
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Date", Properties.Settings.Default.Date_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Time", Properties.Settings.Default.Time_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Callsign", Properties.Settings.Default.Callsign_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Name", Properties.Settings.Default.Name_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Country", Properties.Settings.Default.Country_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Frequency", Properties.Settings.Default.Frequency_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Band", Properties.Settings.Default.Band_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("RST-R", Properties.Settings.Default.RSTrcvd_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("RST-S", Properties.Settings.Default.RSTsent_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Mode", Properties.Settings.Default.Mode_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Exchange", Properties.Settings.Default.Exchange_index));
-            gridColumnOrder.Add(new KeyValuePair<string, int>("Comment", Properties.Settings.Default.Comment_index));
-            
-            gridColumnOrder.Add(new KeyValuePair<string, int>("LoTW", Properties.Settings.Default.Lotw_index));
-
-            foreach (var item in QSODataGrid.Columns)
-            {
-                string header = item.Header?.ToString() ?? string.Empty;
-                var saved = gridColumnOrder.FirstOrDefault(p => p.Key == header);
-
-                // A column with NO saved position keeps the place the XAML gave it.
-                //
-                // FirstOrDefault returns an empty pair when the header is not in the list, and its Value
-                // is 0 - so the old code silently moved any column it did not know about to DisplayIndex
-                // 0, the far LEFT. That is what happened to the LoTW column: it was added at the right
-                // end of the XAML and still appeared first, because this loop dragged it there on every
-                // start. -1 means "never saved" for a known column, and is left alone for the same reason.
-                if (saved.Key == null) continue;
-                if (saved.Value < 0 || saved.Value >= QSODataGrid.Columns.Count) continue;
-
-                item.DisplayIndex = saved.Value;
-            }
-            // Only LoTW's position is remembered out of the five confirmation columns, so after restoring
-            // the saved order the other four are still wherever the XAML put them. Pull the block back
-            // together around LoTW, or the group would arrive split - see ConfirmationColumnGroup.
-            ConfirmationColumnGroup.Normalize(QSODataGrid);
-            var _rwCallsign = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Callsign");
-            var _rwName     = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Name");
-            var _rwCountry  = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Country");
-            if (_rwCallsign != null) _rwCallsign.Width = new DataGridLength(Properties.Settings.Default.ColWidthCallsign);
-            if (_rwName     != null) _rwName.Width     = new DataGridLength(Properties.Settings.Default.ColWidthName);
-            if (_rwCountry  != null) _rwCountry.Width  = new DataGridLength(Properties.Settings.Default.ColWidthCountry);
+            ApplyLogColumnLayout();
             ToggleMatrixControl();
             ToggleAzimuthControl();
             NetworkFlag.Fill = isNetworkAvailable ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00)) : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
@@ -4573,35 +4531,157 @@ namespace HolyLogger
 
         private void QSODataGrid_ColumnDisplayIndexChanged(object sender, DataGridColumnEventArgs e)
         {
-            foreach (var item in QSODataGrid.Columns)
+            SaveLogColumnLayout();
+        }
+
+        // ── THE LOG TABLE'S COLUMN LAYOUT ─────────────────────────────────
+        //
+        // Where each column sits and how wide it is, remembered as ONE string: "Header=width" per column,
+        // left to right, separated by |. For example "Date=90|Time=64|Callsign=110|...".
+        //
+        // WHY ONE STRING AND NOT A SETTING PER COLUMN: it used to be Date_index, Time_index, Callsign_index
+        // and so on - thirteen settings, hand-written, for what is now nineteen columns. Every column added
+        // since needed someone to remember to add a setting too, and nobody did: the confirmation columns
+        // and QTH had no position of their own, so the operator could drag QTH next to Country, close the
+        // program, and find it back at the far right. A layout read straight off the grid cannot forget a
+        // column, including ones added in versions after this one.
+        //
+        // Keyed by the header TEXT, taken through GetBaseColumnHeader so the sort arrow the header carries
+        // ("Date  ▼") is not part of the key - that suffix comes and goes as the operator sorts.
+        private const char LayoutColumnSeparator = '|';
+
+        // Set while the saved layout is being applied, so the DisplayIndex changes made here do not each
+        // fire the handler and write a half-applied order back over the setting.
+        private bool _applyingLogColumnLayout;
+
+        // False until the saved layout has been put on the grid. WPF raises ColumnDisplayIndexChanged
+        // while it is still assigning the XAML's own indexes at load, and saving then would write the
+        // default arrangement straight over the one the operator arranged in the last session.
+        private bool _logColumnLayoutApplied;
+
+        private void SaveLogColumnLayout()
+        {
+            if (_applyingLogColumnLayout || !_logColumnLayoutApplied || QSODataGrid == null) return;
+            try
             {
-                if (item.Header.ToString() == "Date")
-                    Properties.Settings.Default.Date_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Time")
-                    Properties.Settings.Default.Time_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Callsign")
-                    Properties.Settings.Default.Callsign_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Name")
-                    Properties.Settings.Default.Name_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Country")
-                    Properties.Settings.Default.Country_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Frequency")
-                    Properties.Settings.Default.Frequency_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Band")
-                    Properties.Settings.Default.Band_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "RST-R")
-                    Properties.Settings.Default.RSTrcvd_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "RST-S")
-                    Properties.Settings.Default.RSTsent_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Mode")
-                    Properties.Settings.Default.Mode_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Exchange")
-                    Properties.Settings.Default.Exchange_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "Comment")
-                    Properties.Settings.Default.Comment_index = item.DisplayIndex;
-                else if (item.Header.ToString() == "LoTW")
-                    Properties.Settings.Default.Lotw_index = item.DisplayIndex;
+                var parts = new List<string>(QSODataGrid.Columns.Count);
+                foreach (var col in QSODataGrid.Columns.OrderBy(c => c.DisplayIndex))
+                {
+                    string key = GetBaseColumnHeader(col);
+                    if (string.IsNullOrWhiteSpace(key)) continue;
+                    // Rounded: a fractional pixel is noise, and it would rewrite the setting on every run.
+                    int width = (int)Math.Round(col.ActualWidth);
+                    parts.Add(key + "=" + width.ToString(CultureInfo.InvariantCulture));
+                }
+                Properties.Settings.Default.LogColumnLayout = string.Join(LayoutColumnSeparator.ToString(), parts);
+                SettingsFlush.RequestSave();
             }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void ApplyLogColumnLayout()
+        {
+            if (QSODataGrid == null) return;
+            try
+            {
+                _applyingLogColumnLayout = true;
+
+                // Nothing saved by this scheme yet - so this is either a new installation or the first run
+                // after upgrading from the per-column settings. Seed from those, so an operator who has
+                // already arranged their table does not find it rearranged by the upgrade.
+                string layout = (Properties.Settings.Default.LogColumnLayout ?? string.Empty).Trim();
+                if (layout.Length == 0)
+                {
+                    ApplyLegacyLogColumnLayout();
+                    return;
+                }
+
+                // Left to right, one pass: assigning DisplayIndex shifts the other columns along, and only
+                // this direction is immune to that - a column placed at i can only have come from at or
+                // right of i, so everything already placed stays put. (Same reason as in
+                // ConfirmationColumnGroup.MoveGroupTo.)
+                int next = 0;
+                foreach (string part in layout.Split(LayoutColumnSeparator))
+                {
+                    if (part.Length == 0) continue;
+                    int eq = part.LastIndexOf('=');
+                    string key = eq < 0 ? part : part.Substring(0, eq);
+                    string widthText = eq < 0 ? string.Empty : part.Substring(eq + 1);
+
+                    var col = QSODataGrid.Columns.FirstOrDefault(c =>
+                        string.Equals(GetBaseColumnHeader(c), key, StringComparison.Ordinal));
+                    if (col == null) continue;              // a column this version no longer has
+
+                    col.DisplayIndex = next++;
+
+                    int width;
+                    if (int.TryParse(widthText, NumberStyles.Integer, CultureInfo.InvariantCulture, out width)
+                        && width > 0 && col.Visibility == Visibility.Visible)
+                        col.Width = new DataGridLength(width);
+                }
+
+                // A column the saved layout has never heard of - one added by THIS version - keeps the
+                // place the XAML gave it, which is the far right, and is picked up the next time the
+                // layout is saved.
+                ConfirmationColumnGroup.Normalize(QSODataGrid);
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            finally
+            {
+                _applyingLogColumnLayout = false;
+                _logColumnLayoutApplied = true;   // from here on, a drag or a resize is the operator's
+            }
+        }
+
+        // The layout as the pre-8.8.7 settings held it: a position for thirteen of the columns and a width
+        // for three. Read once, on the first run after the upgrade, and then written back out in the new
+        // form - after which these settings are never read again.
+        private void ApplyLegacyLogColumnLayout()
+        {
+            var saved = new List<KeyValuePair<string, int>>
+            {
+                new KeyValuePair<string, int>("Date", Properties.Settings.Default.Date_index),
+                new KeyValuePair<string, int>("Time", Properties.Settings.Default.Time_index),
+                new KeyValuePair<string, int>("Callsign", Properties.Settings.Default.Callsign_index),
+                new KeyValuePair<string, int>("Name", Properties.Settings.Default.Name_index),
+                new KeyValuePair<string, int>("Country", Properties.Settings.Default.Country_index),
+                new KeyValuePair<string, int>("Frequency", Properties.Settings.Default.Frequency_index),
+                new KeyValuePair<string, int>("Band", Properties.Settings.Default.Band_index),
+                new KeyValuePair<string, int>("RST-R", Properties.Settings.Default.RSTrcvd_index),
+                new KeyValuePair<string, int>("RST-S", Properties.Settings.Default.RSTsent_index),
+                new KeyValuePair<string, int>("Mode", Properties.Settings.Default.Mode_index),
+                new KeyValuePair<string, int>("Exchange", Properties.Settings.Default.Exchange_index),
+                new KeyValuePair<string, int>("Comment", Properties.Settings.Default.Comment_index),
+                new KeyValuePair<string, int>("LoTW", Properties.Settings.Default.Lotw_index),
+            };
+
+            foreach (var col in QSODataGrid.Columns)
+            {
+                string header = GetBaseColumnHeader(col);
+                var pos = saved.FirstOrDefault(p => p.Key == header);
+                // A column with no saved position keeps the place the XAML gave it. -1 means "never
+                // saved" for a known column and is left alone for the same reason.
+                if (pos.Key == null) continue;
+                if (pos.Value < 0 || pos.Value >= QSODataGrid.Columns.Count) continue;
+                col.DisplayIndex = pos.Value;
+            }
+
+            // Only LoTW's position was remembered out of the five confirmation columns, so the other four
+            // are still where the XAML put them. Pull the block back together around LoTW, or the group
+            // arrives split - see ConfirmationColumnGroup.
+            ConfirmationColumnGroup.Normalize(QSODataGrid);
+
+            ApplyLegacyWidth("Callsign", Properties.Settings.Default.ColWidthCallsign);
+            ApplyLegacyWidth("Name", Properties.Settings.Default.ColWidthName);
+            ApplyLegacyWidth("Country", Properties.Settings.Default.ColWidthCountry);
+        }
+
+        private void ApplyLegacyWidth(string header, double width)
+        {
+            if (width <= 0 || double.IsNaN(width)) return;
+            var col = QSODataGrid.Columns.FirstOrDefault(c =>
+                string.Equals(GetBaseColumnHeader(c), header, StringComparison.Ordinal));
+            if (col != null) col.Width = new DataGridLength(width);
         }
 
         private void QSODataGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -5660,12 +5740,9 @@ namespace HolyLogger
             Properties.Settings.Default.SignBoardWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == signboard) != null;
             Properties.Settings.Default.MatrixWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == matrix) != null;
             Properties.Settings.Default.TimerWindowIsOpen = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == timerscreen) != null;
-            var _cwCallsign = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Callsign");
-            var _cwName     = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Name");
-            var _cwCountry  = QSODataGrid.Columns.FirstOrDefault(c => c.Header.ToString() == "Country");
-            if (_cwCallsign != null) Properties.Settings.Default.ColWidthCallsign = _cwCallsign.ActualWidth;
-            if (_cwName     != null) Properties.Settings.Default.ColWidthName     = _cwName.ActualWidth;
-            if (_cwCountry  != null) Properties.Settings.Default.ColWidthCountry  = _cwCountry.ActualWidth;
+            // Where every column sits AND how wide it is - the widths can only be read now, since dragging
+            // a column divider raises no event we listen for. See SaveLogColumnLayout.
+            SaveLogColumnLayout();
             try { Properties.Settings.Default.Save(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { MapControl?.DisposeBrowser(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             if (dal != null) dal.Close();
