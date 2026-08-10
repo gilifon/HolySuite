@@ -393,7 +393,7 @@ Environment.NewLine +
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
@@ -416,6 +416,7 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("cq_zone", qso.CQZone));
                 insertSQL.Parameters.Add(new SQLiteParameter("itu_zone", qso.ITUZone));
                 insertSQL.Parameters.Add(new SQLiteParameter("state", qso.State));
+                insertSQL.Parameters.Add(new SQLiteParameter("qth", qso.Qth));
                 insertSQL.Parameters.Add(new SQLiteParameter("prop_mode", qso.PROP_MODE));
                 insertSQL.Parameters.Add(new SQLiteParameter("sat_name", qso.SAT_NAME));
                 insertSQL.Parameters.Add(new SQLiteParameter("soapbox", qso.SOAPBOX));
@@ -446,8 +447,8 @@ Environment.NewLine +
         {
             const int es = 1, qs = 1, ls = 1, cs = 1;
             using (var ins = new SQLiteCommand(
-                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
-                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
+                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,qth,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
+                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@qth,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
             {
                 ins.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
                 ins.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
@@ -470,6 +471,7 @@ Environment.NewLine +
                 ins.Parameters.Add(new SQLiteParameter("@continent", qso.Continent));
                 ins.Parameters.Add(new SQLiteParameter("@cq_zone", qso.CQZone));
                 ins.Parameters.Add(new SQLiteParameter("@itu_zone", qso.ITUZone));
+                ins.Parameters.Add(new SQLiteParameter("@qth", qso.Qth));
                 ins.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                 ins.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                 ins.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
@@ -620,7 +622,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -683,6 +685,9 @@ Environment.NewLine +
                 // Every field of the imported record HolyLogger has no column for, kept verbatim so an
                 // operator's log is never quietly stripped by passing through here. Last, positionally.
                 insertSQL.Parameters.Add(new SQLiteParameter("extra_adif"));
+                // ADIF QTH. Appended after extra_adif rather than next to state, because these parameters
+                // are POSITIONAL: a new one in the middle would shift every index below it.
+                insertSQL.Parameters.Add(new SQLiteParameter("qth"));
 
                 foreach (var qso in qsos)
                 {
@@ -740,6 +745,7 @@ Environment.NewLine +
                     insertSQL.Parameters[51].Value = Blank(qso.TimeOff);
                     insertSQL.Parameters[52].Value = Blank(qso.DateOff);
                     insertSQL.Parameters[53].Value = Blank(qso.ExtraAdif);
+                    insertSQL.Parameters[54].Value = Blank(qso.Qth);
 
                     try
                     {
@@ -798,7 +804,7 @@ Environment.NewLine +
                 }
                 catch { /* best-effort; at minimum the QSO itself is updated below */ }
 
-                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info WHERE id = @id";
+                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,qth = @qth,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info WHERE id = @id";
                 try
                 {
                     foreach (var uid in ids)
@@ -826,6 +832,7 @@ Environment.NewLine +
                         insertSQL.Parameters.Add(new SQLiteParameter("@cq_zone", qso.CQZone));
                         insertSQL.Parameters.Add(new SQLiteParameter("@itu_zone", qso.ITUZone));
                         insertSQL.Parameters.Add(new SQLiteParameter("@state", qso.State));
+                        insertSQL.Parameters.Add(new SQLiteParameter("@qth", qso.Qth));
                         insertSQL.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                         insertSQL.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                         insertSQL.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
@@ -951,6 +958,11 @@ Environment.NewLine +
             if (HasColumn(rdr, "time_off")) q.TimeOff = rdr["time_off"] as string;
             if (HasColumn(rdr, "date_off")) q.DateOff = rdr["date_off"] as string;
             if (HasColumn(rdr, "extra_adif")) q.ExtraAdif = rdr["extra_adif"] as string;
+            // ADIF QTH (the worked station's town). Read here, in the one place every reader in this file
+            // goes through, rather than repeated per query the way state is - a field that is written but
+            // read back by only some of the readers is a field that vanishes from whichever screen uses
+            // the other query.
+            if (HasColumn(rdr, "qth")) q.Qth = rdr["qth"] as string;
         }
 
         // The write half of ReadActivityFields: binds the same six fields in the same fixed order.
@@ -2403,7 +2415,8 @@ Environment.NewLine +
                     "qsl_sent       = CASE WHEN qsl_sent       IS NULL OR qsl_sent       = '' THEN @qsent ELSE qsl_sent       END, " +
                     "contest_id     = CASE WHEN contest_id     IS NULL OR contest_id     = '' THEN @cid   ELSE contest_id     END, " +
                     "time_off       = CASE WHEN time_off       IS NULL OR time_off       = '' THEN @toff  ELSE time_off       END, " +
-                    "date_off       = CASE WHEN date_off       IS NULL OR date_off       = '' THEN @doff  ELSE date_off       END " +
+                    "date_off       = CASE WHEN date_off       IS NULL OR date_off       = '' THEN @doff  ELSE date_off       END, " +
+                    "qth            = CASE WHEN qth            IS NULL OR qth            = '' THEN @qth   ELSE qth            END " +
                     "WHERE Id = @id";
 
                 using (SQLiteTransaction tx = con.BeginTransaction())
@@ -2411,7 +2424,7 @@ Environment.NewLine +
                 {
                     foreach (string p in new[] { "@extra", "@state", "@iota", "@sota", "@pota", "@wwff", "@sig",
                                                  "@siginfo", "@cg", "@cnty", "@qvia", "@qslrd", "@qsent", "@cid",
-                                                 "@toff", "@doff", "@id" })
+                                                 "@toff", "@doff", "@qth", "@id" })
                         cmd.Parameters.Add(new SQLiteParameter(p));
 
                     foreach (QSO p in parsed)
@@ -2462,7 +2475,8 @@ Environment.NewLine +
                         cmd.Parameters[13].Value = Blank(p.ContestId);
                         cmd.Parameters[14].Value = Blank(p.TimeOff);
                         cmd.Parameters[15].Value = Blank(p.DateOff);
-                        cmd.Parameters[16].Value = target.id;
+                        cmd.Parameters[16].Value = Blank(p.Qth);
+                        cmd.Parameters[17].Value = target.id;
 
                         try { if (cmd.ExecuteNonQuery() > 0) completed++; }
                         catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -2485,7 +2499,7 @@ Environment.NewLine +
                 || !string.IsNullOrWhiteSpace(p.Cnty) || !string.IsNullOrWhiteSpace(p.QslVia)
                 || !string.IsNullOrWhiteSpace(p.QslRDate) || !string.IsNullOrWhiteSpace(p.QslSent)
                 || !string.IsNullOrWhiteSpace(p.ContestId) || !string.IsNullOrWhiteSpace(p.TimeOff)
-                || !string.IsNullOrWhiteSpace(p.DateOff);
+                || !string.IsNullOrWhiteSpace(p.DateOff) || !string.IsNullOrWhiteSpace(p.Qth);
         }
 
         // callsign | date | band | mode - what makes two records the same contact. Null when the record is
@@ -2580,8 +2594,8 @@ Environment.NewLine +
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
-                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",log_id) " +
-                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@log)";
+                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",log_id) " +
+                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@qth,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@log)";
                 using (var cmd = new SQLiteCommand(sql, con))
                 {
                     cmd.Parameters.AddWithValue("@my", (object)qso.MyCall ?? DBNull.Value);
@@ -2606,6 +2620,7 @@ Environment.NewLine +
                     cmd.Parameters.AddWithValue("@cqz", (object)qso.CQZone ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@ituz", (object)qso.ITUZone ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@state", (object)qso.State ?? DBNull.Value);
+                    cmd.Parameters.AddWithValue("@qth", (object)qso.Qth ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@prop", (object)qso.PROP_MODE ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@sat", (object)qso.SAT_NAME ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@soap", (object)qso.SOAPBOX ?? DBNull.Value);
@@ -3727,6 +3742,7 @@ Environment.NewLine +
             , [cq_zone] nvarchar(10) NULL COLLATE NOCASE
             , [itu_zone] nvarchar(10) NULL COLLATE NOCASE
             , [state] nvarchar(20) NULL COLLATE NOCASE
+            , [qth] nvarchar(100) NULL COLLATE NOCASE
             , [prop_mode] nvarchar(100) NULL COLLATE NOCASE
             , [sat_name] nvarchar(100) NULL COLLATE NOCASE
             , [soapbox] nvarchar(100) NULL COLLATE NOCASE
@@ -3880,6 +3896,7 @@ Environment.NewLine +
                 AddColToTable("qso", "itu_zone", "nvarchar(10) NULL");
             }
             AddColToTable("qso", "state", "nvarchar(20) NULL");   // ADIF STATE (worked station's subdivision)
+            AddColToTable("qso", "qth", "nvarchar(100) NULL");    // ADIF QTH (the worked station's town)
             // Activity-program references. POTA is the wide one on purpose: ADIF allows a comma-
             // separated LIST there, because a contact can be inside two overlapping parks at once.
             AddColToTable("qso", "iota", "nvarchar(20) NULL");

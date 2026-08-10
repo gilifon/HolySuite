@@ -1740,6 +1740,16 @@
                                         HeaderStyle="{StaticResource ConfirmHeaderStyle}"
                                         HeaderTemplate="{StaticResource ConfirmHeaderTemplate}"
                                         CellTemplate="{StaticResource PaperQslTemplate}"/>
+                <!-- ADIF QTH: the worked station's town, filled from the QRZ lookup on the form above.
+                     After the confirmation block, at the far right, so nothing an operator has learned
+                     the position of moves. -->
+                <DataGridTemplateColumn Header="QTH" IsReadOnly="True" SortMemberPath="Qth" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Qth}" HorizontalAlignment="Center" Padding="5,0,5,0" ToolTip="{Binding Qth}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

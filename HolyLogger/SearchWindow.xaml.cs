@@ -1348,7 +1348,7 @@ namespace HolyLogger
             TB_Name.Text = ""; TB_Operator.Text = ""; TB_Freq.Text = "";
             TB_MyGrid.Text = ""; TB_MySquare.Text = "";
             TB_PropMode.Text = ""; TB_SatName.Text = ""; TB_Soapbox.Text = "";
-            TB_Time.Text = "";
+            TB_Time.Text = ""; TB_Qth.Text = "";
             // The dropdowns built from the log: back to "(any)".
             foreach (var cb in new[] { CB_Submode, CB_CqZone, CB_ItuZone, CB_State, CB_Square, CB_Continent })
                 if (cb.Items.Count > 0) cb.SelectedIndex = 0;
@@ -1392,6 +1392,7 @@ namespace HolyLogger
                               !string.IsNullOrEmpty(TB_SatName.Text) ||
                               !string.IsNullOrEmpty(TB_Soapbox.Text) ||
                               !string.IsNullOrEmpty(TB_Time.Text) ||
+                              !string.IsNullOrEmpty(TB_Qth.Text) ||
                               SelectedFilter(CB_State) != null ||
                               SelectedFilter(CB_Qrz) != null ||
                               SelectedFilter(CB_Eqsl) != null ||
@@ -1733,6 +1734,7 @@ namespace HolyLogger
             string satName   = TB_SatName.Text.Trim();
             string soapbox   = TB_Soapbox.Text.Trim();
             string time      = TB_Time.Text.Trim();
+            string qth       = TB_Qth.Text.Trim();
             string qrz       = SelectedFilter(CB_Qrz);
             string eqsl      = SelectedFilter(CB_Eqsl);
             string clublog   = SelectedFilter(CB_Clublog);
@@ -1753,6 +1755,7 @@ namespace HolyLogger
                               continent == null && string.IsNullOrEmpty(propMode) &&
                               string.IsNullOrEmpty(satName) && string.IsNullOrEmpty(soapbox) &&
                               string.IsNullOrEmpty(time) && string.IsNullOrEmpty(state) &&
+                              string.IsNullOrEmpty(qth) &&
                               qrz == null && eqsl == null && clublog == null && paper == null;
 
             var results = _allQsos.AsEnumerable();
@@ -1851,6 +1854,10 @@ namespace HolyLogger
                 results = results.Where(q => q.SOAPBOX != null && q.SOAPBOX.IndexOf(soapbox, StringComparison.OrdinalIgnoreCase) >= 0);
             if (!string.IsNullOrEmpty(time))
                 results = results.Where(q => q.Time != null && q.Time.IndexOf(time, StringComparison.OrdinalIgnoreCase) >= 0);
+            // QTH is free text rather than a dropdown of the log's own values: a log can hold thousands of
+            // distinct towns, which is not a list anyone picks from. "Contains", so haifa finds Haifa Bay.
+            if (!string.IsNullOrEmpty(qth))
+                results = results.Where(q => q.Qth != null && q.Qth.IndexOf(qth, StringComparison.OrdinalIgnoreCase) >= 0);
 
             // The other confirmation sources, same "confirmed / not confirmed" logic as LoTW.
             if (qrz != null)     { bool w = qrz == LotwConfirmed;     results = results.Where(q => (q.QrzQslRcvd == 1) == w); }

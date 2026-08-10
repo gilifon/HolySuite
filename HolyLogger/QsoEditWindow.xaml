@@ -188,7 +188,8 @@
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="100"/>
                     <ColumnDefinition Width="120"/>
-                    <ColumnDefinition Width="480"/>
+                    <ColumnDefinition Width="350"/>
+                    <ColumnDefinition Width="130"/>
                 </Grid.ColumnDefinitions>
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
@@ -198,11 +199,17 @@
                 <TextBlock Grid.Row="0" Grid.Column="0" Text="Prop Mode" Style="{StaticResource Hdr}"/>
                 <TextBlock Grid.Row="0" Grid.Column="1" Text="Sat Name"  Style="{StaticResource Hdr}"/>
                 <TextBlock Grid.Row="0" Grid.Column="2" Text="Comment"   Style="{StaticResource Hdr}"/>
+                <TextBlock Grid.Row="0" Grid.Column="3" Text="QTH"       Style="{StaticResource Hdr}"/>
 
                 <TextBox Grid.Row="1" Grid.Column="0" x:Name="TB_PropMode" Style="{StaticResource Cell}" CharacterCasing="Upper"
                          ToolTip="ADIF propagation mode, e.g. SAT, EME, TR"/>
                 <TextBox Grid.Row="1" Grid.Column="1" x:Name="TB_SatName"  Style="{StaticResource Cell}" CharacterCasing="Upper"/>
                 <TextBox Grid.Row="1" Grid.Column="2" x:Name="TB_Comment"  Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
+                <!-- QTH goes on this row, not beside State: row 2 is already 700px wide, which is the
+                     width of the window, so a column added there would have pushed the window wider. The
+                     130px comes out of Comment, which had more room than its 65-character content. -->
+                <TextBox Grid.Row="1" Grid.Column="3" x:Name="TB_Qth"      Style="{StaticResource Cell}" HorizontalContentAlignment="Left"
+                         ToolTip="The DX station's town (ADIF QTH), e.g. Haifa"/>
             </Grid>
 
             <!-- ACTIVITY PROGRAMS. Four have a field of their own in ADIF; every other program -

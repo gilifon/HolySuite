@@ -330,10 +330,16 @@
                       <TextBox x:Name="TB_Soapbox" Width="150" FontSize="14" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                       <TextBlock Text="Time:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="Any part of the QSO time (UTC), e.g. 20 or 2034"/>
                       <TextBox x:Name="TB_Time" Width="80" FontSize="14" VerticalAlignment="Center"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="QTH:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="The worked station's town, e.g. Haifa"/>
+                      <TextBox x:Name="TB_Qth" Width="120" FontSize="14" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                   </StackPanel>
@@ -896,6 +902,15 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding ContestId}" Padding="5,0,5,0" ToolTip="{Binding ContestId}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <!-- ADIF QTH: the worked station's town. Far right, so no existing column moves. -->
+                <DataGridTemplateColumn Header="QTH" IsReadOnly="True" SortMemberPath="Qth"
+                                        Width="Auto" MinWidth="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding Qth}" Padding="5,0,5,0" ToolTip="{Binding Qth}"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>

@@ -144,6 +144,7 @@ namespace HolyLogger
             TB_CqZone.Text    = S(_qso.CQZone);
             TB_ItuZone.Text   = S(_qso.ITUZone);
             TB_State.Text     = S(_qso.State);
+            TB_Qth.Text       = S(_qso.Qth);
             TB_PropMode.Text  = S(_qso.PROP_MODE);
             TB_SatName.Text   = S(_qso.SAT_NAME);
 
@@ -324,6 +325,7 @@ namespace HolyLogger
                 _qso.CQZone    = TB_CqZone.Text.Trim();
                 _qso.ITUZone   = TB_ItuZone.Text.Trim();
                 _qso.State     = TB_State.Text.Trim();
+                _qso.Qth       = TB_Qth.Text.Trim();
                 _qso.PROP_MODE = TB_PropMode.Text.Trim();
                 _qso.SAT_NAME  = TB_SatName.Text.Trim();
                 // MyCall is deliberately NOT written back: the station callsign is the log's identity and

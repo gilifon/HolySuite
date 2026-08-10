@@ -675,6 +675,9 @@ namespace HolyParser
             string st = AdifValue(row, "state");
             if (!string.IsNullOrWhiteSpace(st)) qso_row.State = st.Trim();
 
+            // ADIF QTH: the worked station's town.
+            qso_row.Qth = Trimmed(AdifValue(row, "qth"));
+
             // The award and QSL record the operator built up in whatever program they used before. These
             // used to be dropped: CREDIT_GRANTED is the ARRL's own verdict on what has been awarded, and
             // CNTY is the whole basis of USA-CA. See the QSO properties for what each one means.
@@ -774,6 +777,7 @@ namespace HolyParser
             "sat_name", "soapbox", "lotw_qsl_sent", "cqz", "ituz",
             "iota", "sota_ref", "pota_ref", "wwff_ref", "sig", "sig_info",
             "lotw_qsl_rcvd", "lotw_qslrdate", "eqsl_qsl_rcvd", "eqsl_qslrdate", "qsl_rcvd", "state",
+            "qth",
             // The award / QSL record, each in a column of its own since 8.8.4.
             "credit_granted", "cnty", "qsl_via", "qslrdate", "qsl_sent", "contest_id",
             "time_off", "qso_date_off",

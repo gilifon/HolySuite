@@ -93,6 +93,12 @@ namespace HolyParser
         [JsonProperty("state")]
         public string State { get; set; }
 
+        // The worked station's town (ADIF QTH, e.g. "Haifa"). QRZ.com has no field of that name - its
+        // mailing address splits into addr1 (house number and street) and addr2 (the city), and addr2 is
+        // what ADIF calls QTH, which is where the main form fills this from.
+        [JsonProperty("qth")]
+        public string Qth { get; set; }
+
         // ACTIVITY PROGRAM REFERENCES ("on the air" programs).
         //
         // ADIF gives its own field to exactly four programs - islands, summits, parks and nature
