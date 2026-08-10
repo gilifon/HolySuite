@@ -84,6 +84,14 @@ namespace HolyLogger
             InitializeComponent();
             _allQsos = qsos;
 
+            // A QSO edited in the log table or the Log Workshop changes the very objects these numbers
+            // were counted from, and tells this window nothing. Coming back to the window is the moment
+            // the operator expects to see the result, so that is where the page is recounted from
+            // scratch. Switching folders while reading it still costs nothing.
+            Activated += (s2, e2) => RebuildAfterPossibleEdit();
+            if (qsos != null)
+                qsos.CollectionChanged += (s2, e2) => InvalidateSourceStats();   // a QSO added or deleted
+
             var s = Properties.Settings.Default;
 
             // Restore size first so the on-screen test below uses the real window size.
@@ -126,6 +134,7 @@ namespace HolyLogger
 
             LoadConfirmedCache();
             ComputeStats();
+            _statsBuilt = true;      // from here on, coming back to the window recounts the page
             BuildSourceFolders();
             BuildLeftViewFolders();
             ApplyLeftView();
@@ -182,11 +191,160 @@ namespace HolyLogger
         // service has confirmed on any other. Everything on the left of the window - both tiles, the
         // date range and the QSO table - is counted from this, so standing on the LoTW folder answers
         // "what have I got confirmed at LoTW" rather than repeating the whole log six times over.
-        private List<QSO> SourceQsos()
+        // True once the constructor's own first build has run, so the activation that comes WITH opening
+        // the window does not build the page a second time.
+        private bool _statsBuilt;
+
+        // Counts the whole page again, from the QSOs as they are now. The operator edits a callsign in
+        // the log, a country changes, and the statistics have to say so - nothing about a QSO edit
+        // reaches this window on its own, so returning to it is the trigger.
+        private void RebuildAfterPossibleEdit()
         {
-            if (_allQsos == null) return new List<QSO>();
-            if (_source == ConfSource.Worked) return _allQsos.ToList();
-            return _allQsos.Where(q => q != null && IsAchievedForSource(q)).ToList();
+            if (!_statsBuilt) return;
+            try
+            {
+                InvalidateSourceStats();
+                ComputeStats();        // the left page: tiles, worked and missing country tables
+                RefreshForSource();    // the open folder, off the freshly counted numbers
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // ── EVERYTHING A FOLDER NEEDS, FROM ONE PASS ──────────────────────
+        //
+        // Opening a folder used to walk the whole log SEVEN times: filter it, count distinct callsigns,
+        // collect and SORT every date for the first/last, the QSO pivot, the country pivot, missing CQ
+        // zones, missing ITU zones - the last three each resolving the DXCC entity of every QSO again.
+        // All of it on the UI thread, so the window sat frozen for the duration, and going back to a
+        // folder just visited paid the whole cost a second time. On a 28,000-QSO log that is what the
+        // operator felt as "it takes time to switch folder".
+        //
+        // One pass now fills this, and the answer is kept per folder until the log or its confirmations
+        // change (see InvalidateSourceStats). Nothing here decides anything - it only counts - so the
+        // painters below read it instead of the log and produce exactly what they always did.
+        private sealed class SourceStats
+        {
+            public int QsoCount;
+            public int UniqueCalls;
+            public string FirstDate;                 // ADIF yyyyMMdd, null when the folder holds none
+            public string LastDate;
+
+            // QSO counts: band -> mode -> count. "Other" collects bands outside the pivot's own list.
+            public readonly Dictionary<string, Dictionary<string, int>> QsoByBandMode =
+                new Dictionary<string, Dictionary<string, int>>();
+
+            // COUNTRIES are sets, not counters: the same country worked ten times on 20m SSB is one
+            // country. Keyed "band|mode", plus the per-band, per-mode and overall sets.
+            public readonly Dictionary<string, HashSet<string>> CountryCell =
+                new Dictionary<string, HashSet<string>>();
+            public readonly Dictionary<string, HashSet<string>> CountryByBand =
+                new Dictionary<string, HashSet<string>>();
+            public readonly Dictionary<string, HashSet<string>> CountryByMode =
+                new Dictionary<string, HashSet<string>>();
+            public readonly HashSet<string> Countries =
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            public readonly HashSet<int> CqZones = new HashSet<int>();
+            public readonly HashSet<int> ItuZones = new HashSet<int>();
+        }
+
+        private readonly Dictionary<ConfSource, SourceStats> _statsCache =
+            new Dictionary<ConfSource, SourceStats>();
+
+        // Throw the per-folder answers away, and the resolved entities with them. Called whenever the QSOs
+        // behind them can have changed - a reload after a confirmation check, a Paper QSL tick, and every
+        // time this window is activated, because a QSO edited in the log or the Log Workshop changes the
+        // objects in the very list these numbers were counted from and raises nothing this window hears.
+        //
+        // A cached count of stale data is worse than a slow count of fresh data: the whole point of the
+        // page is to be believed. Recomputing on activation costs ONE pass, which is what this rewrite
+        // made it - the folder switching the operator does while reading the page stays instant.
+        private void InvalidateSourceStats()
+        {
+            _statsCache.Clear();
+            _qsoDxcc = null;     // a QSO whose callsign or date was edited resolves to a different entity
+        }
+
+        // The resolved DXCC entity of one QSO, remembered against the QSO OBJECT. Resolve(call, date)
+        // keeps its own cache too, but keyed by a "call|date" string it has to build on every lookup -
+        // one throwaway string per QSO per pass, which on a large log ran into six figures per folder
+        // click. Here the key is the object already in hand.
+        private Dictionary<QSO, DXCC> _qsoDxcc;
+
+        private DXCC ResolveQso(QSO q)
+        {
+            if (q == null) return null;
+            if (_qsoDxcc == null) _qsoDxcc = new Dictionary<QSO, DXCC>();
+            DXCC d;
+            if (!_qsoDxcc.TryGetValue(q, out d))
+            {
+                d = Resolve(q.DXCall, q.Date);
+                _qsoDxcc[q] = d;
+            }
+            return d;
+        }
+
+        private SourceStats StatsForCurrentSource()
+        {
+            SourceStats cached;
+            if (_statsCache.TryGetValue(_source, out cached)) return cached;
+
+            var st = new SourceStats();
+            foreach (string b in PivotBands)
+                st.QsoByBandMode[b] = new Dictionary<string, int> { { "SSB", 0 }, { "CW", 0 }, { "DIGI", 0 }, { "FM", 0 } };
+            st.QsoByBandMode["Other"] = new Dictionary<string, int> { { "SSB", 0 }, { "CW", 0 }, { "DIGI", 0 }, { "FM", 0 } };
+
+            var calls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            HashSet<string> Bucket(Dictionary<string, HashSet<string>> d, string key)
+            {
+                HashSet<string> set;
+                if (!d.TryGetValue(key, out set)) { set = new HashSet<string>(StringComparer.OrdinalIgnoreCase); d[key] = set; }
+                return set;
+            }
+
+            foreach (QSO q in _allQsos ?? (System.Collections.Generic.IEnumerable<QSO>)new QSO[0])
+            {
+                if (q == null || !IsAchievedForSource(q)) continue;
+
+                st.QsoCount++;
+
+                if (!string.IsNullOrEmpty(q.DXCall)) calls.Add(q.DXCall);
+
+                // First and last date without sorting anything: the extremes of a yyyyMMdd string are the
+                // extremes of the date, and two comparisons per QSO beat sorting 28,000 strings.
+                if (!string.IsNullOrEmpty(q.Date))
+                {
+                    if (st.FirstDate == null || string.CompareOrdinal(q.Date, st.FirstDate) < 0) st.FirstDate = q.Date;
+                    if (st.LastDate == null || string.CompareOrdinal(q.Date, st.LastDate) > 0) st.LastDate = q.Date;
+                }
+
+                string band = NormalizeBand(q.Band);
+                string mode = NormalizeMode(q.Mode);           // always SSB/CW/DIGI/FM - never null
+                string pivotBand = (band != null && Array.IndexOf(PivotBands, band) >= 0) ? band : "Other";
+                st.QsoByBandMode[pivotBand][mode]++;
+
+                // Resolved live from the callsign and the QSO's own date, exactly as the worked/missing
+                // lists do, so these tables can never disagree with the tiles beside them.
+                DXCC d = ResolveQso(q);
+                if (d == null) continue;
+
+                if (!string.IsNullOrEmpty(d.Name)
+                    && !string.Equals(d.Name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                {
+                    Bucket(st.CountryCell, pivotBand + "|" + mode).Add(d.Name);
+                    Bucket(st.CountryByBand, pivotBand).Add(d.Name);
+                    Bucket(st.CountryByMode, mode).Add(d.Name);
+                    st.Countries.Add(d.Name);
+                }
+
+                if (d.CqZone >= 1 && d.CqZone <= 40) st.CqZones.Add(d.CqZone);
+                if (d.ItuZone >= 1 && d.ItuZone <= 90) st.ItuZones.Add(d.ItuZone);
+            }
+
+            st.UniqueCalls = calls.Count;
+            _statsCache[_source] = st;
+            return st;
         }
 
         // What the LEFT panel calls the open folder. The folder's own name is the whole truth: each one
@@ -201,9 +359,9 @@ namespace HolyLogger
         private void ApplySourceCounts()
         {
             if (TB_TotalQSOs == null) return;
-            List<QSO> qsos = SourceQsos();
+            SourceStats st = StatsForCurrentSource();
 
-            TB_TotalQSOs.Text = qsos.Count.ToString("N0");
+            TB_TotalQSOs.Text = st.QsoCount.ToString("N0");
 
             // "Total" would be a lie on a confirmation folder - the count under it is that source's
             // confirmed QSOs, not the log's total - so the tile names the source, like the pivot header
@@ -213,26 +371,19 @@ namespace HolyLogger
                     ? "Total QSOs"
                     : LeftSourceTitle() + " QSOs";
 
-            _uniqueCallsText = qsos
-                .Select(q => q.DXCall)
-                .Where(c => !string.IsNullOrEmpty(c))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Count().ToString("N0");
+            _uniqueCallsText = st.UniqueCalls.ToString("N0");
             ApplyUniqueTile();
 
             // The dates follow too, so the range is the span of the QSOs actually being counted - the
             // first and last CONFIRMED contact on a confirmation folder, not the first and last logged.
-            List<string> dates = qsos
-                .Where(q => !string.IsNullOrEmpty(q.Date))
-                .Select(q => q.Date).OrderBy(d => d, StringComparer.Ordinal).ToList();
-            TB_DateStart.Text = dates.Count > 0 ? FormatAdifDate(dates[0]) : "—";
-            TB_DateEnd.Text = dates.Count > 0 ? FormatAdifDate(dates[dates.Count - 1]) : "—";
+            TB_DateStart.Text = st.FirstDate != null ? FormatAdifDate(st.FirstDate) : "—";
+            TB_DateEnd.Text = st.LastDate != null ? FormatAdifDate(st.LastDate) : "—";
 
-            BuildPivot(qsos);
+            BuildPivot(st);
 
             TB_PivotHeader.Text = "QSOs by Bands & Mode"
                 + (_source == ConfSource.Worked ? "" : " — " + LeftSourceTitle())
-                + "\n(" + qsos.Count.ToString("N0") + ")";
+                + "\n(" + st.QsoCount.ToString("N0") + ")";
 
             // The status line lives here, not in ComputeStats, so it FOLLOWS the folder: it used to be
             // written once at window open and then kept showing the whole-log figure while everything
@@ -246,8 +397,8 @@ namespace HolyLogger
                     logTotal == 0            ? "No QSOs to analyze." :
                     _source == ConfSource.Worked
                         ? $"Statistics computed for {logTotal:N0} QSO{(logTotal == 1 ? "" : "s")}."
-                        : $"Statistics computed for {qsos.Count:N0} {SourceTitle(_source)}-confirmed "
-                          + $"QSO{(qsos.Count == 1 ? "" : "s")} — this log holds {logTotal:N0}.";
+                        : $"Statistics computed for {st.QsoCount:N0} {SourceTitle(_source)}-confirmed "
+                          + $"QSO{(st.QsoCount == 1 ? "" : "s")} — this log holds {logTotal:N0}.";
             }
         }
 
@@ -325,8 +476,9 @@ namespace HolyLogger
         // the zones not yet present in any QSO, and shows the count in each header.
         private void PopulateMissingZones()
         {
-            List<int> missingCq  = MissingZones(40, d => d.CqZone);
-            List<int> missingItu = MissingZones(90, d => d.ItuZone);
+            SourceStats st = StatsForCurrentSource();
+            List<int> missingCq  = MissingZones(40, st.CqZones);
+            List<int> missingItu = MissingZones(90, st.ItuZones);
 
             IC_MissingCQ.ItemsSource  = ToZoneRows(missingCq);
             IC_MissingITU.ItemsSource = ToZoneRows(missingItu);
@@ -378,20 +530,11 @@ namespace HolyLogger
             return d;
         }
 
-        private List<int> MissingZones(int maxZone, Func<DXCC, int> zoneOf)
+        // The zones this folder has NOT reached. The achieved set was gathered in the folder's single
+        // pass; this used to be two more walks of the whole log, one per zone system, each resolving
+        // every QSO's entity over again.
+        private List<int> MissingZones(int maxZone, HashSet<int> achieved)
         {
-            var achieved = new HashSet<int>();
-            if (_allQsos != null)
-            {
-                foreach (QSO q in _allQsos)
-                {
-                    if (!IsAchievedForSource(q)) continue;   // confirmation folders count only confirmed QSOs
-                    var d = Resolve(q.DXCall, q.Date);
-                    if (d == null) continue;
-                    int z = zoneOf(d);
-                    if (z >= 1 && z <= maxZone) achieved.Add(z);
-                }
-            }
             return Enumerable.Range(1, maxZone).Where(z => !achieved.Contains(z)).ToList();
         }
 
@@ -399,27 +542,11 @@ namespace HolyLogger
 
         // qsos is the set for the OPEN FOLDER (see SourceQsos): the whole log on Worked, only that
         // service's confirmed contacts on any other.
-        private void BuildPivot(List<QSO> qsos)
+        private void BuildPivot(SourceStats st)
         {
-            // 1. Accumulate counts
-            var counts = new Dictionary<string, Dictionary<string, int>>();
-            foreach (var b in PivotBands)
-                counts[b] = new Dictionary<string, int>
-                    { { "SSB", 0 }, { "CW", 0 }, { "DIGI", 0 }, { "FM", 0 } };
-
-            // Bucket for QSOs whose band is missing or not in PivotBands
-            var other = new Dictionary<string, int>
-                    { { "SSB", 0 }, { "CW", 0 }, { "DIGI", 0 }, { "FM", 0 } };
-
-            foreach (var q in qsos)
-            {
-                string b = NormalizeBand(q.Band);
-                string m = NormalizeMode(q.Mode); // always SSB/CW/DIGI/FM — never null
-                if (b != null && counts.ContainsKey(b))
-                    counts[b][m]++;
-                else
-                    other[m]++;
-            }
+            // The counting was done in the folder's single pass (see SourceStats); this only draws it.
+            var counts = st.QsoByBandMode;
+            var other = counts["Other"];
 
             int totSSB = 0, totCW = 0, totDIGI = 0, totFM = 0;
             foreach (var b in PivotBands)
@@ -577,36 +704,12 @@ namespace HolyLogger
             if (CountryPivotBorder == null) return;
 
             // A set per cell, not a counter: the same country worked ten times on 20m SSB is one country.
-            var cell = new Dictionary<string, HashSet<string>>();
-            var bandTotal = new Dictionary<string, HashSet<string>>();
-            var modeTotal = new Dictionary<string, HashSet<string>>();
-            var grand = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            HashSet<string> Bucket(Dictionary<string, HashSet<string>> d, string key)
-            {
-                HashSet<string> set;
-                if (!d.TryGetValue(key, out set)) { set = new HashSet<string>(StringComparer.OrdinalIgnoreCase); d[key] = set; }
-                return set;
-            }
-
-            foreach (QSO q in _allQsos ?? new ObservableCollection<QSO>())
-            {
-                if (q == null || !IsAchievedForSource(q)) continue;
-
-                // Resolved live from the callsign and the QSO's own date, exactly as the worked/missing
-                // lists do, so this table can never disagree with the tiles beside it.
-                string country = Resolve(q.DXCall, q.Date)?.Name;
-                if (string.IsNullOrEmpty(country) || string.Equals(country, "Unknown", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                string b = NormalizeBand(q.Band);
-                if (b == null || Array.IndexOf(PivotBands, b) < 0) b = "Other";
-                string m = NormalizeMode(q.Mode);
-
-                Bucket(cell, b + "|" + m).Add(country);
-                Bucket(bandTotal, b).Add(country);
-                Bucket(modeTotal, m).Add(country);
-                grand.Add(country);
-            }
+            // All four sets come from the folder's single pass (see SourceStats); this only draws them.
+            SourceStats st = StatsForCurrentSource();
+            var cell = st.CountryCell;
+            var bandTotal = st.CountryByBand;
+            var modeTotal = st.CountryByMode;
+            var grand = st.Countries;
 
             int Count(Dictionary<string, HashSet<string>> d, string key)
             {
@@ -1368,6 +1471,10 @@ namespace HolyLogger
         // commonest case of all - a check that brings back nothing - paid it in full.
         private async System.Threading.Tasks.Task ReloadQsosAfterCheck(bool reread)
         {
+            // The check has just changed confirmation flags, which is exactly what the per-folder counts
+            // are counting - so they are recounted, reread or not.
+            InvalidateSourceStats();
+
             if (reread)
             {
                 try
@@ -1400,6 +1507,7 @@ namespace HolyLogger
                 if (_allQsos != null)
                     foreach (var q in _allQsos)
                         if (q != null && q.id == qsoId) { q.PaperQslRcvd = confirmed ? 1 : 0; break; }
+                InvalidateSourceStats();   // the Paper folder's confirmed set just changed
                 if (_source == ConfSource.Paper) RefreshForSource();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
