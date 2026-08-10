@@ -4012,9 +4012,11 @@ namespace HolyLogger
             TB_SortWorkedCount.Text = _workedSort == WorkedSort.CountDesc ? "Count ▼"
                                     : _workedSort == WorkedSort.CountAsc  ? "Count ▲"
                                     :                                        "Count";
-            TB_SortWorkedCode.Text  = _workedSort == WorkedSort.CodeAsc  ? "DXCC ▲"
-                                    : _workedSort == WorkedSort.CodeDesc ? "DXCC ▼"
-                                    :                                       "DXCC";
+            // Two lines: "Country" over "Code", the sort arrow beside the second. \n in a TextBlock's Text
+            // is a line break, so the header can still be assigned as one string from here.
+            TB_SortWorkedCode.Text  = _workedSort == WorkedSort.CodeAsc  ? "Country\nCode ▲"
+                                    : _workedSort == WorkedSort.CodeDesc ? "Country\nCode ▼"
+                                    :                                      "Country\nCode";
             // Blank on the Worked folder (no confirmation source), so there is no "Conf." header over an
             // empty column.
             TB_SortWorkedConfirmed.Text = _source == ConfSource.Worked ? ""
@@ -4028,9 +4030,9 @@ namespace HolyLogger
             TB_SortMissingName.Text = _missingSort == MissingSort.NameAsc  ? "Country ▲"
                                     : _missingSort == MissingSort.NameDesc ? "Country ▼"
                                     :                                        "Country";
-            TB_SortMissingCode.Text = _missingSort == MissingSort.CodeAsc  ? "DXCC ▲"
-                                    : _missingSort == MissingSort.CodeDesc ? "DXCC ▼"
-                                    :                                        "DXCC";
+            TB_SortMissingCode.Text = _missingSort == MissingSort.CodeAsc  ? "Country\nCode ▲"
+                                    : _missingSort == MissingSort.CodeDesc ? "Country\nCode ▼"
+                                    :                                        "Country\nCode";
         }
 
         private static BitmapImage GetFlagImage(string countryName)
