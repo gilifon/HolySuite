@@ -453,21 +453,21 @@
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock x:Name="TB_SortWorkedCode" Text="Country&#10;Code"
                                                            Width="60" FontSize="13" FontWeight="Bold" Margin="0,0,8,0"
-                                                           Cursor="Hand" TextAlignment="Right" VerticalAlignment="Bottom"
+                                                           Cursor="Hand" TextAlignment="Right" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource TextBrush}"
                                                            ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortWorkedName" Text="Country ▲"
                                                            Width="160" FontSize="13" FontWeight="Bold"
-                                                           VerticalAlignment="Bottom"
+                                                           VerticalAlignment="Center"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                                 <TextBlock x:Name="TB_SortWorkedCount" Text="Count ▼"
                                                            Width="52" FontSize="13" FontWeight="Bold"
-                                                           VerticalAlignment="Bottom"
+                                                           VerticalAlignment="Center"
                                                            Cursor="Hand" TextAlignment="Right" Foreground="{DynamicResource TextBrush}"/>
                                                 <TextBlock x:Name="TB_SortWorkedConfirmed" Text="Conf."
                                                            Width="48" FontSize="13" FontWeight="Bold" Margin="8,0,0,0"
-                                                           VerticalAlignment="Bottom"
+                                                           VerticalAlignment="Center"
                                                            Cursor="Hand" TextAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
                                         </Border>
@@ -582,13 +582,13 @@
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock x:Name="TB_SortMissingCode" Text="Country&#10;Code"
                                                            Width="60" FontSize="13" FontWeight="Bold" Margin="0,0,8,0"
-                                                           Cursor="Hand" TextAlignment="Right" VerticalAlignment="Bottom"
+                                                           Cursor="Hand" TextAlignment="Right" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource TextBrush}"
                                                            ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortMissingName" Text="Country ▲"
                                                            Width="130" FontSize="13" FontWeight="Bold"
-                                                           VerticalAlignment="Bottom"
+                                                           VerticalAlignment="Center"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
                                         </Border>
@@ -823,3 +823,4 @@
         </Border>
     </Grid>
 </Window>
+
