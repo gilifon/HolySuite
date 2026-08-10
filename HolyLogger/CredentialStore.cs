@@ -17,6 +17,11 @@ namespace HolyLogger
     // re-enter their QRZ / eQSL / Club Log / LoTW logins. This mirror lives at a FIXED path under
     // Roaming AppData, independent of version and install identity, so those credentials can always be
     // restored. The file is DPAPI-encrypted (CurrentUser) so it is not a new plaintext password file.
+    //
+    // It mirrors ALL user settings now, not only the logins - the class keeps its name because the
+    // credentials are why it has to be encrypted. An operator upgrading to 8.8.5 found their grid
+    // square, Holyland square and operator name blank, for exactly the reason described above; nothing
+    // they have typed should ever be lost that way, not just the passwords.
     public static class CredentialStore
     {
         // Credential settings grouped by service. The FIRST name in each group is the "primary": a group
@@ -31,6 +36,20 @@ namespace HolyLogger
             new[] { "ClublogEmail", "ClublogPassword", "ClublogAutoUpload" },
             new[] { "LotwWebUser", "LotwWebPassword" },
             new[] { "LotwTqslPath", "LotwTqslPassword", "LotwStationLocation", "LotwCallsignLocations" },
+            // WHO THE OPERATOR IS. Typed once and expected to stay typed - and it did not: an operator
+            // who upgraded found their grid square, their Holyland square and their operator name all
+            // blank again, because the install identity had changed and Upgrade() had nothing to carry.
+            // Callsign is the primary: if this store already knows who the station is, the rest of the
+            // identity in it is the current one and the mirror must not talk over it.
+            new[] { "my_callsign", "my_locator", "my_square", "Operator", "selectedOperator" },
+        };
+
+        // Settings the general mirror must NOT carry between installs. Everything else the operator ever
+        // typed or chose is fair game - the point of this file is that nothing has to be typed twice.
+        private static readonly HashSet<string> NeverMirrored = new HashSet<string>
+        {
+            "UpdateSettings",   // the run-once flag that drives Settings.Upgrade; per-version by design
+            "ActiveLogId",      // a row id in this machine's log database, not a preference
         };
 
         private static string FilePath
@@ -52,12 +71,16 @@ namespace HolyLogger
             {
                 var s = Properties.Settings.Default;
                 var map = new Dictionary<string, string>();
-                foreach (var group in Groups)
-                    foreach (var name in group)
-                    {
-                        object v = ReadSetting(s, name);
-                        if (v != null) map[name] = Convert.ToString(v, CultureInfo.InvariantCulture);
-                    }
+
+                // EVERY setting, not just the credentials. Anything the operator typed or chose is
+                // something they should never have to enter a second time because a new version landed
+                // in a folder with a different name.
+                foreach (System.Configuration.SettingsProperty prop in s.Properties)
+                {
+                    if (prop == null || NeverMirrored.Contains(prop.Name)) continue;
+                    object v = ReadSetting(s, prop.Name);
+                    if (v != null) map[prop.Name] = Convert.ToString(v, CultureInfo.InvariantCulture);
+                }
 
                 string json = JsonConvert.SerializeObject(map);
                 byte[] enc = ProtectedData.Protect(Encoding.UTF8.GetBytes(json), null, DataProtectionScope.CurrentUser);
@@ -93,6 +116,26 @@ namespace HolyLogger
                         string stored;
                         if (map.TryGetValue(name, out stored) && WriteSetting(s, name, stored)) changed = true;
                     }
+                }
+
+                // ...then everything else this store has never had a value for. A setting still sitting
+                // at its compiled-in default was never set HERE, so filling it from the mirror takes
+                // nothing away; a setting the operator has touched differs from that default and is left
+                // exactly as it is. The credential pass above runs first, so anything it restored is no
+                // longer at its default and this pass steps over it.
+                foreach (System.Configuration.SettingsProperty prop in s.Properties)
+                {
+                    if (prop == null || NeverMirrored.Contains(prop.Name)) continue;
+
+                    string stored;
+                    if (!map.TryGetValue(prop.Name, out stored)) continue;
+
+                    string live = Convert.ToString(ReadSetting(s, prop.Name), CultureInfo.InvariantCulture) ?? "";
+                    string dflt = Convert.ToString(prop.DefaultValue, CultureInfo.InvariantCulture) ?? "";
+                    if (!string.Equals(live, dflt, StringComparison.Ordinal)) continue;   // operator set it
+                    if (string.Equals(stored, live, StringComparison.Ordinal)) continue;  // nothing to add
+
+                    if (WriteSetting(s, prop.Name, stored)) changed = true;
                 }
 
                 if (changed) s.Save();
