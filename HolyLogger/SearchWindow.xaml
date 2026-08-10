@@ -229,17 +229,15 @@
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                      <!-- "Holyland Square" stacked on two lines instead of one wide label, to save the
-                           horizontal room a single-line "Holyland Square:" would need. LineHeight tightens
-                           the gap between the two words (the font's default line spacing left them looking
-                           too far apart), and centers the whole two-line block against the text box. -->
-                      <TextBlock FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" TextAlignment="Center" Margin="0,0,6,0"
-                                 LineHeight="15" LineStackingStrategy="BlockLineHeight"
-                                 ToolTip="Holyland square received (the Exchange column)">
-                        <Run Text="Holyland"/><LineBreak/><Run Text="Square:"/>
-                      </TextBlock>
+                      <!-- CALLED "EXCHANGE", NOT "HOLYLAND SQUARE". The field behind it is SRX - whatever
+                           the worked station SENT - and that is a Holyland area code (F15TA) only in the
+                           Holyland contest. In every other contest it is a serial number, so the list read
+                           as a column of squares called 1538, 155, 1573. Exchange is also what this field
+                           is called in the log table, on the main form and in the QSO editor. -->
+                      <TextBlock Text="Exchange:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="What the worked station SENT — their Holyland square in the Holyland contest, a serial number in others"/>
                       <ComboBox x:Name="CB_Square" Width="90" FontSize="14" VerticalAlignment="Center"
-                                ToolTip="Holyland square received (the Exchange column) — the squares this log contains"
+                                ToolTip="What the worked station SENT — their Holyland square in the Holyland contest, a serial number in others. The list is what this log contains."
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                   </StackPanel>

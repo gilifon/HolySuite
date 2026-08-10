@@ -1990,8 +1990,8 @@ namespace HolyLogger
         // squares - without searching for each one to find out.
         //
         // Called again whenever the window is pointed at a different collection (ReplaceSource), because
-        // the lists describe THAT log: a Holyland square list left over from the previous log would
-        // offer squares this one never worked, and hide the ones it did.
+        // the lists describe THAT log: an Exchange list left over from the previous log would offer
+        // values this one never received, and hide the ones it did.
         private void PopulateFilterLists()
         {
             // Puts a list into a box while keeping whatever was selected, if the new list still has it.
@@ -2027,7 +2027,7 @@ namespace HolyLogger
                     values = values.OrderBy(v => v, StringComparer.OrdinalIgnoreCase).ToList();
 
                 // Greyed out when the log holds no value at all for that field - so an empty State or
-                // Holyland Square list reads as "this log has none", not as a filter that failed to load.
+                // Exchange list reads as "this log has none", not as a filter that failed to load.
                 if (disableWhenEmpty) box.IsEnabled = values.Count > 0;
 
                 values.Insert(0, AnyItem);
