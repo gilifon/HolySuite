@@ -703,6 +703,51 @@ namespace HolyLogger
 
             // The same five columns drag as one block and admit no column between them.
             ConfirmationColumnGroup.Attach(ResultsGrid);
+
+            // Where the operator put each column, and how wide they made it, kept between sessions - the
+            // same as the main window's log table. See GridColumnLayout.
+            ApplyWorkshopColumnLayout();
+            ResultsGrid.ColumnDisplayIndexChanged += (s, e) => SaveWorkshopColumnLayout();
+            // Widths can only be read on the way out: dragging a column divider raises no event we can
+            // listen for, so this is the moment they are still true.
+            Closed += (s, e) =>
+            {
+                SaveWorkshopColumnLayout();
+                try { Properties.Settings.Default.Save(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
+        }
+
+        // Guards, for the same reasons as the main window's: nothing is written back while the saved
+        // layout is being applied, and nothing at all until it HAS been - WPF raises
+        // ColumnDisplayIndexChanged while it is still assigning the XAML's own indexes, and saving then
+        // would put the default arrangement over the operator's.
+        private bool _applyingWorkshopColumnLayout;
+        private bool _workshopColumnLayoutApplied;
+
+        private void SaveWorkshopColumnLayout()
+        {
+            if (_applyingWorkshopColumnLayout || !_workshopColumnLayoutApplied || ResultsGrid == null) return;
+            try
+            {
+                Properties.Settings.Default.WorkshopColumnLayout = GridColumnLayout.Capture(ResultsGrid);
+                SettingsFlush.RequestSave();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void ApplyWorkshopColumnLayout()
+        {
+            try
+            {
+                _applyingWorkshopColumnLayout = true;
+                GridColumnLayout.Apply(ResultsGrid, Properties.Settings.Default.WorkshopColumnLayout);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            finally
+            {
+                _applyingWorkshopColumnLayout = false;
+                _workshopColumnLayoutApplied = true;   // from here on, a drag or a resize is the operator's
+            }
         }
 
         private Rect _confirmationStripLastRect = Rect.Empty;

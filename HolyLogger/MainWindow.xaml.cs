@@ -4536,19 +4536,8 @@ namespace HolyLogger
 
         // ── THE LOG TABLE'S COLUMN LAYOUT ─────────────────────────────────
         //
-        // Where each column sits and how wide it is, remembered as ONE string: "Header=width" per column,
-        // left to right, separated by |. For example "Date=90|Time=64|Callsign=110|...".
-        //
-        // WHY ONE STRING AND NOT A SETTING PER COLUMN: it used to be Date_index, Time_index, Callsign_index
-        // and so on - thirteen settings, hand-written, for what is now nineteen columns. Every column added
-        // since needed someone to remember to add a setting too, and nobody did: the confirmation columns
-        // and QTH had no position of their own, so the operator could drag QTH next to Country, close the
-        // program, and find it back at the far right. A layout read straight off the grid cannot forget a
-        // column, including ones added in versions after this one.
-        //
-        // Keyed by the header TEXT, taken through GetBaseColumnHeader so the sort arrow the header carries
-        // ("Date  ▼") is not part of the key - that suffix comes and goes as the operator sorts.
-        private const char LayoutColumnSeparator = '|';
+        // Captured and restored by GridColumnLayout, which the Log Workshop's table uses too - see there
+        // for the format and for why it replaced the old one-setting-per-column scheme.
 
         // Set while the saved layout is being applied, so the DisplayIndex changes made here do not each
         // fire the handler and write a half-applied order back over the setting.
@@ -4564,16 +4553,7 @@ namespace HolyLogger
             if (_applyingLogColumnLayout || !_logColumnLayoutApplied || QSODataGrid == null) return;
             try
             {
-                var parts = new List<string>(QSODataGrid.Columns.Count);
-                foreach (var col in QSODataGrid.Columns.OrderBy(c => c.DisplayIndex))
-                {
-                    string key = GetBaseColumnHeader(col);
-                    if (string.IsNullOrWhiteSpace(key)) continue;
-                    // Rounded: a fractional pixel is noise, and it would rewrite the setting on every run.
-                    int width = (int)Math.Round(col.ActualWidth);
-                    parts.Add(key + "=" + width.ToString(CultureInfo.InvariantCulture));
-                }
-                Properties.Settings.Default.LogColumnLayout = string.Join(LayoutColumnSeparator.ToString(), parts);
+                Properties.Settings.Default.LogColumnLayout = GridColumnLayout.Capture(QSODataGrid);
                 SettingsFlush.RequestSave();
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -4596,34 +4576,7 @@ namespace HolyLogger
                     return;
                 }
 
-                // Left to right, one pass: assigning DisplayIndex shifts the other columns along, and only
-                // this direction is immune to that - a column placed at i can only have come from at or
-                // right of i, so everything already placed stays put. (Same reason as in
-                // ConfirmationColumnGroup.MoveGroupTo.)
-                int next = 0;
-                foreach (string part in layout.Split(LayoutColumnSeparator))
-                {
-                    if (part.Length == 0) continue;
-                    int eq = part.LastIndexOf('=');
-                    string key = eq < 0 ? part : part.Substring(0, eq);
-                    string widthText = eq < 0 ? string.Empty : part.Substring(eq + 1);
-
-                    var col = QSODataGrid.Columns.FirstOrDefault(c =>
-                        string.Equals(GetBaseColumnHeader(c), key, StringComparison.Ordinal));
-                    if (col == null) continue;              // a column this version no longer has
-
-                    col.DisplayIndex = next++;
-
-                    int width;
-                    if (int.TryParse(widthText, NumberStyles.Integer, CultureInfo.InvariantCulture, out width)
-                        && width > 0 && col.Visibility == Visibility.Visible)
-                        col.Width = new DataGridLength(width);
-                }
-
-                // A column the saved layout has never heard of - one added by THIS version - keeps the
-                // place the XAML gave it, which is the far right, and is picked up the next time the
-                // layout is saved.
-                ConfirmationColumnGroup.Normalize(QSODataGrid);
+                GridColumnLayout.Apply(QSODataGrid, layout);
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             finally
