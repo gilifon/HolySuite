@@ -542,8 +542,11 @@ namespace HolyLogger
 
             TB_MyCallsign.Focus();
 
-            Left = Properties.Settings.Default.MainWindowLeft < 0 ? 0 : Properties.Settings.Default.MainWindowLeft;
-            Top = Properties.Settings.Default.MainWindowTop < 0 ? 0 : Properties.Settings.Default.MainWindowTop;
+            // POSITION IS NOT SET HERE. It used to be, with a "< 0 ? 0" clamp - and that clamp is wrong
+            // on any desk whose second monitor sits to the left of or above the primary one, where every
+            // position is legitimately negative: it dragged HolyLogger onto the primary screen. The real
+            // restore is in Window_SourceInitialized, which runs before the window is shown and checks
+            // that the saved spot is still reachable instead of squashing it to zero.
             Width = Properties.Settings.Default.MainWindowWidth;
             Height = Properties.Settings.Default.MainWindowHeight;
 
@@ -1291,6 +1294,29 @@ namespace HolyLogger
             hasRestoredMainWindowBounds = true;
         }
 
+        // The working area of the monitor that holds the given point - the primary one only if the
+        // point really is there. Used to open a window on the screen HolyLogger is on rather than on
+        // whichever monitor Windows calls primary, which is all SystemParameters.WorkArea can tell us.
+        private static Rect WorkAreaContaining(double x, double y)
+        {
+            try
+            {
+                double scale;
+                using (var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero))
+                    scale = g.DpiX / 96.0;
+                if (scale <= 0) scale = 1.0;
+
+                foreach (var sc in System.Windows.Forms.Screen.AllScreens)
+                {
+                    var wa = sc.WorkingArea;
+                    var inDips = new Rect(wa.Left / scale, wa.Top / scale, wa.Width / scale, wa.Height / scale);
+                    if (inDips.Contains(x, y)) return inDips;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return SystemParameters.WorkArea;
+        }
+
         // True when the given top-left corner falls inside the current virtual screen
         // (with a margin so at least a grabbable sliver of the title bar is reachable).
         private static bool IsPositionOnScreen(double left, double top)
@@ -1299,12 +1325,38 @@ namespace HolyLogger
                 double.IsInfinity(left) || double.IsInfinity(top))
                 return false;
 
+            // The virtual screen is the BOUNDING BOX around every monitor, so on any arrangement that
+            // is not a neat row it includes corners no monitor covers - and a saved position in one of
+            // those passed this test and opened the window where it could not be seen or grabbed. Ask
+            // the monitors themselves, and ask about the one spot that matters: a point on the title
+            // bar, past the icon, which is what the mouse needs to drag the window anywhere else.
+            double grabX = left + 60;
+            double grabY = top + 12;
+
+            try
+            {
+                double scale;
+                using (var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero))
+                    scale = g.DpiX / 96.0;
+                if (scale <= 0) scale = 1.0;
+
+                foreach (var sc in System.Windows.Forms.Screen.AllScreens)
+                {
+                    var wa = sc.WorkingArea;
+                    if (grabX >= wa.Left / scale && grabX <= wa.Right  / scale - 40 &&
+                        grabY >= wa.Top  / scale && grabY <= wa.Bottom / scale - 40)
+                        return true;
+                }
+                return false;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
             double vsLeft   = SystemParameters.VirtualScreenLeft;
             double vsTop    = SystemParameters.VirtualScreenTop;
             double vsRight  = vsLeft + SystemParameters.VirtualScreenWidth;
             double vsBottom = vsTop  + SystemParameters.VirtualScreenHeight;
 
-            return left >= vsLeft - 10 && top >= vsTop - 10 &&
+            return left >= vsLeft - 10 && top >= vsTop &&
                    left <= vsRight - 100 && top <= vsBottom - 60;
         }
 
@@ -1894,7 +1946,22 @@ namespace HolyLogger
                     var savedCursor = System.Windows.Input.Mouse.OverrideCursor;
                     System.Windows.Input.Mouse.OverrideCursor = null;
 
-                    var setup = new LogSetupWindow(existing);   // no Owner: main window not shown yet
+                    // No Owner: the main window has no position yet at this point in startup (its Left
+                    // and Top are restored further down). But it WILL open where its saved position
+                    // says, so put this dialog on THAT monitor. The XAML asked for CenterScreen, and
+                    // CenterScreen always means the primary screen - so on a two-monitor desk the first
+                    // thing a new operator ever sees appeared on the other screen from the program.
+                    var setup = new LogSetupWindow(existing);
+                    Rect setupArea = WorkAreaContaining(Properties.Settings.Default.MainWindowLeft,
+                                                        Properties.Settings.Default.MainWindowTop);
+                    setup.WindowStartupLocation = WindowStartupLocation.Manual;
+                    // Centred once its real size is known - the window sizes itself to its content, so
+                    // the height does not exist until it has been laid out.
+                    setup.Loaded += (snd, ev) =>
+                    {
+                        setup.Left = setupArea.Left + Math.Max(0, (setupArea.Width  - setup.ActualWidth)  / 2);
+                        setup.Top  = setupArea.Top  + Math.Max(0, (setupArea.Height - setup.ActualHeight) / 2);
+                    };
                     setup.ShowDialog();
 
                     System.Windows.Input.Mouse.OverrideCursor = savedCursor;
@@ -6783,16 +6850,32 @@ namespace HolyLogger
         
         private void GenerateNewMatrixWindow()
         {
-            matrix = new MatrixWindow();
-            matrix.Left = Properties.Settings.Default.MatrixWindowLeft < 0 ? 0 : Properties.Settings.Default.MatrixWindowLeft;
-            matrix.Top = Properties.Settings.Default.MatrixWindowTop < 0 ? 0 : Properties.Settings.Default.MatrixWindowTop;
+            matrix = new MatrixWindow { Owner = this };
+
+            // A saved spot is used only when it is REACHABLE. Clamping a negative Left to 0 - what this
+            // used to do - is not a fix but a bug of its own: on a desk whose second monitor sits to the
+            // LEFT of the primary, every position on that monitor is negative, so the clamp dragged this
+            // window onto the primary screen every single time, away from the program that opened it.
+            double mLeft = Properties.Settings.Default.MatrixWindowLeft;
+            double mTop  = Properties.Settings.Default.MatrixWindowTop;
+            if (IsPositionOnScreen(mLeft, mTop))
+            {
+                matrix.Left = mLeft;
+                matrix.Top  = mTop;
+            }
+            else
+            {
+                matrix.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+            }
             matrix.Show();
         }
 
         // File > Profile Manager
         private void ProfilesMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            new ProfilesWindow(this).ShowDialog();
+            // Owner, not just a constructor argument: the XAML asks for CenterOwner, and without an
+            // Owner WPF quietly falls back to centring on the PRIMARY screen.
+            new ProfilesWindow(this) { Owner = this }.ShowDialog();
         }
 
         private void GenerateNewLogInfoWindow()

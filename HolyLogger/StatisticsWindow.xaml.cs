@@ -110,8 +110,18 @@ namespace HolyLogger
             }
             else
             {
-                Left = SystemParameters.WorkArea.Left + 60;
-                Top  = SystemParameters.WorkArea.Top  + 60;
+                // Open on the screen HOLYLOGGER is on, not on whichever monitor Windows calls primary.
+                // SystemParameters.WorkArea always answers for the primary one, so on a two-screen desk
+                // this put the statistics on the opposite screen from the program that opened them -
+                // which reads as the window having gone missing.
+                Rect wa = ProgramWorkArea();
+                Left = wa.Left + 60;
+                Top  = wa.Top  + 60;
+
+                // Keep the whole window on that screen where it can be: an opening position is ours to
+                // choose, unlike a position the operator has since dragged it to.
+                if (Left + Width > wa.Right)  Left = Math.Max(wa.Left, wa.Right  - Width);
+                if (Top + Height > wa.Bottom) Top  = Math.Max(wa.Top,  wa.Bottom - Height);
             }
 
             LoadConfirmedCache();
@@ -1395,6 +1405,115 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // Opens the window wide enough to SHOW the page instead of leaving part of it behind a scrollbar
+        // - but never wider than the screen it is on.
+        //
+        // The XAML width was measured against the folder strip across the top, and only that. Anything
+        // added to the page BELOW the folders - the Missing CQ / ITU Zones columns were - makes the
+        // content wider than the window without changing a number anybody thought to update, and the
+        // last column ends up behind a horizontal scrollbar. Asking the ScrollViewer how much it is
+        // hiding (ExtentWidth - ViewportWidth) needs no measured constant, so it cannot go stale the way
+        // the last one did: whatever the page holds, the window opens to it.
+        //
+        // IT NEVER MOVES THE WINDOW. The first version of this did, and it was a disaster: it capped the
+        // width with SystemParameters.WorkArea, which is the PRIMARY screen only, so a window opened on
+        // a second monitor was dragged back onto the primary one - carrying a Top that belonged to the
+        // other screen, which put the title bar above the visible area. Nothing left to grab, no way to
+        // drag it back, and the only way out was killing the program. Widening is a convenience;
+        // stranding a window where it cannot be reached is not a trade worth making, so Left and Top are
+        // not touched here under any circumstance, and growing stops at the edge of whatever room the
+        // window already has.
+        private void FitWidthToContent()
+        {
+            try
+            {
+                if (SV_SourceContent == null) return;
+
+                // Measured after layout, so these are real numbers rather than the pre-layout zeros.
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        if (WindowState != WindowState.Normal) return;   // maximised: not ours to resize
+
+                        double hidden = 0;
+                        if (SV_SourceContent != null)
+                            hidden += Math.Max(0, SV_SourceContent.ExtentWidth - SV_SourceContent.ViewportWidth);
+                        if (SV_LeftContent != null)
+                            hidden += Math.Max(0, SV_LeftContent.ExtentWidth - SV_LeftContent.ViewportWidth);
+
+                        if (hidden < 1) return;   // nothing is being cut off
+
+                        // The monitor THIS window is on, not the primary one.
+                        Rect work = MonitorWorkArea();
+
+                        // Only the room that already exists to the right of the window. Growing past it
+                        // would push the right-hand edge off the screen, and moving the window to make
+                        // that fit is exactly what is forbidden above.
+                        double room = work.Right - Left;
+                        double target = Math.Min(Width + hidden, room);
+                        if (target <= Width + 1) return;   // no room, or nothing to gain
+
+                        Width = target;
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }), System.Windows.Threading.DispatcherPriority.Loaded);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // The working area of the monitor the MAIN HolyLogger window is on. Used only to choose where
+        // this window first opens - this one has no handle of its own yet at that point.
+        private static Rect ProgramWorkArea()
+        {
+            try
+            {
+                Window main = Application.Current != null ? Application.Current.MainWindow : null;
+                if (main != null)
+                {
+                    IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(main).Handle;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        var wa = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea;
+                        double scale;
+                        using (var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero))
+                            scale = g.DpiX / 96.0;
+                        if (scale <= 0) scale = 1.0;
+                        return new Rect(wa.Left / scale, wa.Top / scale, wa.Width / scale, wa.Height / scale);
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return SystemParameters.WorkArea;
+        }
+
+        // The working area of the monitor this window is actually on, in the units Left/Width use.
+        // SystemParameters.WorkArea answers for the PRIMARY screen whatever monitor you are on, which is
+        // the trap that stranded the window; Screen.FromHandle answers for this one. Its rectangle is in
+        // device pixels, so it is converted, or a scaled display would give a wrong edge.
+        private Rect MonitorWorkArea()
+        {
+            try
+            {
+                IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                if (hwnd != IntPtr.Zero)
+                {
+                    var wa = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea;
+                    var src = System.Windows.Interop.HwndSource.FromHwnd(hwnd);
+                    if (src != null && src.CompositionTarget != null)
+                    {
+                        var m = src.CompositionTarget.TransformFromDevice;
+                        Point tl = m.Transform(new Point(wa.Left, wa.Top));
+                        Point br = m.Transform(new Point(wa.Right, wa.Bottom));
+                        return new Rect(tl, br);
+                    }
+                    return new Rect(wa.Left, wa.Top, wa.Width, wa.Height);
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return SystemParameters.WorkArea;   // single-screen answer, and never used to MOVE anything
+        }
+
         // Repaints the tables for the selected source: load that source's confirmed cache, recolor the
         // worked list, and show only that source's download button (none on the Worked folder).
         private void RefreshForSource()
@@ -1409,6 +1528,9 @@ namespace HolyLogger
 
             // Tint the per-source content area to match the selected folder's colour.
             if (SV_SourceContent != null) SV_SourceContent.Background = SourceBackground(_source);
+
+            // Folders differ in width, so what fits on one can be cut off on the next.
+            FitWidthToContent();
 
             // ...and tint the LEFT page and its two tabs to the same colour, so the whole window reads as
             // one open folder rather than two unrelated halves wearing different colours.
@@ -4048,12 +4170,44 @@ namespace HolyLogger
                 double.IsInfinity(left) || double.IsInfinity(top))
                 return false;
 
+            // THE TITLE BAR HAS TO BE GRABBABLE. Not "the window is somewhere on the desktop" - that is
+            // what this used to ask, against the virtual screen, which is the bounding box around ALL
+            // monitors and therefore includes empty corners no monitor covers. A saved position from
+            // above the visible area passed that test, the window opened with its title bar off the top
+            // of the screen, and with nothing to grab the only way out was killing the program.
+            //
+            // So test the one point the mouse actually needs - a spot on the title bar, past the icon -
+            // and require it to be inside ONE REAL MONITOR's working area.
+            double grabX = left + 60;
+            double grabY = top + 12;
+
+            try
+            {
+                // Screen rectangles are device pixels; Left/Top are WPF units.
+                double scale;
+                using (var g = System.Drawing.Graphics.FromHwnd(IntPtr.Zero))
+                    scale = g.DpiX / 96.0;
+                if (scale <= 0) scale = 1.0;
+
+                foreach (var sc in System.Windows.Forms.Screen.AllScreens)
+                {
+                    var wa = sc.WorkingArea;
+                    if (grabX >= wa.Left / scale && grabX <= wa.Right  / scale - 40 &&
+                        grabY >= wa.Top  / scale && grabY <= wa.Bottom / scale - 40)
+                        return true;
+                }
+                return false;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // Could not ask the monitors: fall back to the bounding box, with the top tested exactly
+            // rather than with the old slack that let an off-top position through.
             double vsLeft   = SystemParameters.VirtualScreenLeft;
             double vsTop    = SystemParameters.VirtualScreenTop;
             double vsRight  = vsLeft + SystemParameters.VirtualScreenWidth;
             double vsBottom = vsTop  + SystemParameters.VirtualScreenHeight;
 
-            return left >= vsLeft - 10 && top >= vsTop - 10 &&
+            return left >= vsLeft - 10 && top >= vsTop &&
                    left <= vsRight - 100 && top <= vsBottom - 60;
         }
     }
