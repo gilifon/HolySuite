@@ -18,6 +18,21 @@ namespace HolyLogger
 
         private const long MaxBytes = 2 * 1024 * 1024;   // start fresh past 2 MB so it can't grow unbounded
 
+        // Where the log is being written. A message that tells the operator "the details are in the
+        // log" and leaves them to find it has told them nothing, so the path is available to be
+        // printed - and clicked. Null when logging to disk could not be set up.
+        public static string FilePath
+        {
+            get
+            {
+                lock (_sync)
+                {
+                    if (_path == null) _path = ResolvePath();
+                    return _path.Length == 0 ? null : _path;
+                }
+            }
+        }
+
         // For exceptions that are deliberately swallowed (catch-and-continue sites).
         public static void Swallow(Exception ex,
             [CallerMemberName] string member = "", [CallerFilePath] string file = "", [CallerLineNumber] int line = 0)

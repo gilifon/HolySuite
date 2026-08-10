@@ -490,10 +490,15 @@ namespace HolyLogger
         
         private void AdifHandlerWorker_RunWorkerCompleted(object sender, RunWorkerCompletedEventArgs e)
         {
+            // Whatever got past the per-file catch - the reload at the end of the import runs outside it,
+            // and that is the very phase where a big log is most likely to run out of room. It gets the
+            // same report rather than the one-line "Import failed." it used to get.
             if (e.Error != null)
             {
                 ToggleUploadProgress(Visibility.Hidden);
-                HolyMessageBox.ShowError($"Import failed.\n\n{e.Error.Message}", "Import Error", this);
+                Log.Warn($"Import failed while {_importPhase}" + Environment.NewLine
+                       + MemoryReport() + Environment.NewLine + e.Error);
+                ShowImportFailure(ImportFailureText(e.Error, null, 0, null, -1));
                 return;
             }
 
@@ -624,6 +629,165 @@ namespace HolyLogger
             UpdateNumOfQSOs();
         }
 
+        // ── What the import was doing when it went wrong ──────────────────────────────────────────
+        //
+        // An import that fails with "Error: Exception of type 'System.OutOfMemoryException' was thrown"
+        // tells the operator nothing they can act on and tells whoever has to fix it even less: not
+        // which file, not how big, not how far it got, not what else was in the way. Reconstructing one
+        // real report from a photograph of that dialog took an afternoon. So the failure now carries
+        // its own context - the phase it died in, the file, the log it was importing into, and the
+        // memory figures - on screen and in holylogger.log.
+
+        // The phase the ADIF worker is in, in words fit to be shown to an operator. Read by the
+        // failure report and by RunWorkerCompleted, which catches whatever escapes the per-file try.
+        private volatile string _importPhase = "getting ready";
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MEMORYSTATUSEX
+        {
+            public uint dwLength;
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys;
+            public ulong ullAvailPhys;
+            public ulong ullTotalPageFile;
+            public ulong ullAvailPageFile;
+            public ulong ullTotalVirtual;
+            public ulong ullAvailVirtual;
+            public ulong ullAvailExtendedVirtual;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GlobalMemoryStatusEx(ref MEMORYSTATUSEX lpBuffer);
+
+        private static string Mb(double bytes)
+        {
+            if (bytes >= 1024d * 1024d * 1024d) return (bytes / (1024d * 1024d * 1024d)).ToString("0.00") + " GB";
+            if (bytes >= 1024d * 1024d) return (bytes / (1024d * 1024d)).ToString("0.0") + " MB";
+            return (bytes / 1024d).ToString("0") + " KB";
+        }
+
+        // The numbers that actually explain an out-of-memory in this program. ADDRESS SPACE is the one
+        // that matters and the one nobody thinks to look at: a 32-bit program is given a limited range
+        // of memory addresses no matter how much RAM the machine has, and it is that range, not the
+        // RAM, that runs out first. Printing both side by side stops the next report being "but my PC
+        // has 16 GB free".
+        private static string MemoryReport()
+        {
+            var sb = new StringBuilder();
+            try
+            {
+                var st = new MEMORYSTATUSEX();
+                st.dwLength = (uint)Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+                if (GlobalMemoryStatusEx(ref st))
+                {
+                    double usedVirtual = st.ullTotalVirtual - st.ullAvailVirtual;
+                    sb.AppendLine($"    Address space this program may use:  {Mb(st.ullTotalVirtual)}"
+                                + $"   ({Mb(usedVirtual)} of it in use, {Mb(st.ullAvailVirtual)} free)");
+                    sb.AppendLine($"    RAM in this PC:                      {Mb(st.ullTotalPhys)}"
+                                + $"   ({Mb(st.ullAvailPhys)} free)");
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            try
+            {
+                using (var me = Process.GetCurrentProcess())
+                    sb.AppendLine($"    HolyLogger is using:                 {Mb(me.PrivateMemorySize64)}"
+                                + $"   ({Mb(GC.GetTotalMemory(false))} of that is log data)");
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            sb.Append($"    Program build:                       {(Environment.Is64BitProcess ? "64-bit" : "32-bit")}"
+                    + $" on {(Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit")} Windows");
+            return sb.ToString();
+        }
+
+        // The whole story of a failed import, in the order a reader needs it: what failed, where it
+        // was, what it was working on, why, and what to do about it.
+        private string ImportFailureText(Exception ex, string filename, long fileBytes, string logName, int qsosAlreadyInLog)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine("The import could not be finished.");
+            sb.AppendLine();
+
+            sb.AppendLine("WHAT IT WAS DOING");
+            if (!string.IsNullOrEmpty(filename))
+            {
+                sb.AppendLine($"    File:      {System.IO.Path.GetFileName(filename)}"
+                            + (fileBytes > 0 ? $"   ({Mb(fileBytes)})" : ""));
+                sb.AppendLine($"    Folder:    {System.IO.Path.GetDirectoryName(filename)}");
+            }
+            sb.AppendLine($"    Stopped:   while {_importPhase}");
+            if (!string.IsNullOrEmpty(logName))
+                sb.AppendLine($"    Into log:  {logName}"
+                            + (qsosAlreadyInLog >= 0 ? $"   ({qsosAlreadyInLog:N0} QSOs already in it)" : ""));
+            sb.AppendLine();
+
+            if (ex is OutOfMemoryException)
+            {
+                sb.AppendLine("WHY IT STOPPED");
+                sb.AppendLine("    HolyLogger ran out of room to hold the import.");
+                sb.AppendLine();
+                sb.AppendLine("    This is almost never about how much RAM the PC has. HolyLogger is a");
+                sb.AppendLine("    32-bit program, so Windows allows it only a limited RANGE OF MEMORY");
+                sb.AppendLine("    ADDRESSES, and that range is what filled up. An import needs the whole");
+                sb.AppendLine("    file held at once, every record read out of it, and every QSO already in");
+                sb.AppendLine("    the log it is importing into - all at the same moment.");
+                sb.AppendLine();
+                sb.AppendLine(MemoryReport());
+                sb.AppendLine();
+                sb.AppendLine("WHAT TO TRY, best first");
+                sb.AppendLine("    1. Close the Cluster, Statistics and Map windows, restart HolyLogger,");
+                sb.AppendLine("       and import before doing anything else. A freshly started program has");
+                sb.AppendLine("       its memory in one unbroken piece, which is what a big file needs.");
+                sb.AppendLine("    2. Split the ADIF into two or three smaller files and import them one");
+                sb.AppendLine("       after the other. Nothing is lost by importing in parts - a record");
+                sb.AppendLine("       already in the log fills that QSO in rather than being added twice.");
+                sb.AppendLine("    3. Import into a new, empty log. Matching against a log that already");
+                sb.AppendLine("       holds tens of thousands of QSOs is the most expensive part of all.");
+            }
+            else
+            {
+                sb.AppendLine("WHY IT STOPPED");
+                sb.AppendLine("    " + ex.Message);
+                if (ex.InnerException != null)
+                    sb.AppendLine("    " + ex.InnerException.Message);
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("FOR WHOEVER FIXES IT");
+            sb.AppendLine($"    {ex.GetType().FullName}   (HolyLogger {AppVersionText()})");
+            sb.AppendLine("    The full details, with the stack trace, are in the log file below. Sending");
+            sb.AppendLine("    that file is the fastest way to get this looked at.");
+
+            return sb.ToString();
+        }
+
+        private static string AppVersionText()
+        {
+            try
+            {
+                return System.Reflection.Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return "version unknown"; }
+        }
+
+        // Shown with the log file as a link at the bottom, so "the details are in the log" is one
+        // click rather than a hunt through AppData.
+        private void ShowImportFailure(string text)
+        {
+            var links = new List<KeyValuePair<string, string>>();
+            string logPath = Log.FilePath;
+            if (!string.IsNullOrEmpty(logPath))
+                links.Add(new KeyValuePair<string, string>("Log file", logPath));
+
+            if (links.Count > 0)
+                HolyMessageBox.ShowWithLinks(text, "Import Error", HolyMsgType.Error, this, links, OpenPath, 760);
+            else
+                HolyMessageBox.ShowError(text, "Import Error", this, 760);
+        }
+
         private void AdifHandlerWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
             ToggleUploadProgress(Visibility.Visible);
@@ -656,10 +820,26 @@ namespace HolyLogger
             const int refreshPhaseStartPercent = 96;
             const int refreshPhaseEndPercent = 100;
 
+            // Named once, for the failure report: which log the operator is importing INTO and how much
+            // it already holds is half the explanation when an import runs out of room.
+            string logName = null;
+            int qsosAlreadyInLog = -1;
+            try
+            {
+                lock (_syncLock)
+                {
+                    logName = dal.GetLogName(dal.ActiveLogId);
+                    qsosAlreadyInLog = dal.GetQsoCountForLog(dal.ActiveLogId);
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
             foreach (var filename in files)
             {
+                long fileBytes = 0;
                 try
                 {
+                    _importPhase = "getting ready";
                     lastReportedPercent = 1;
                     AdifHandlerWorker.ReportProgress(lastReportedPercent, "Preparing import 1%");
 
@@ -670,6 +850,10 @@ namespace HolyLogger
                         continue;
                     }
 
+                    try { fileBytes = new FileInfo(filename).Length; }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                    _importPhase = "reading the file from the disk";
                     lastReportedPercent = readPhasePercent;
                     AdifHandlerWorker.ReportProgress(lastReportedPercent, "Reading file 3%");
                     string RawAdif = File.ReadAllText(filename, Encoding.UTF8);
@@ -691,8 +875,12 @@ namespace HolyLogger
                     // the program is set to.
                     parser.DefaultStationCall = FallbackStationCall(myCallsign);
 
+                    _importPhase = "reading the records out of the file";
                     parser.Parse(parseProgress =>
                     {
+                        // The phase carries HOW FAR, because "it died reading the file" and "it died
+                        // reading the file at 96%" point at different things.
+                        _importPhase = $"reading the records out of the file ({parseProgress}% of it read)";
                         int percent = readPhasePercent + (int)Math.Floor((parseProgress * (parsePhaseEndPercent - readPhasePercent)) / 100.0);
                         if (percent > lastReportedPercent)
                         {
@@ -782,6 +970,7 @@ namespace HolyLogger
                     // them to import it again used to double their log. It also means someone who has been
                     // logging here since their first import keeps those newer QSOs: they are not in the
                     // file, so nothing here touches them.
+                    _importPhase = $"checking which of the file's {count:N0} QSOs this log already has";
                     AdifHandlerWorker.ReportProgress(lastReportedPercent, "Checking for QSOs already in this log");
                     int completedThisFile = 0, ambiguousThisFile = 0;
                     lock (_syncLock)
@@ -795,6 +984,7 @@ namespace HolyLogger
 
                     for (int i = 0; i < count; i += importBatchSize)
                     {
+                        _importPhase = $"saving to the log (QSO {i + 1:N0} of {count:N0})";
                         List<QSO> batch = rawQSOList.Skip(i).Take(importBatchSize).ToList();
                         int batchFaulty;
                         int batchStartIndex = i;
@@ -834,14 +1024,15 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
-                    string failedFile = filename;
-                    string errorMsg = $"Failed to load file:\n{failedFile}\n\nError: {ex.Message}";
-                    if (ex.InnerException != null)
-                    {
-                        errorMsg += $"\n\nDetails: {ex.InnerException.Message}";
-                    }
-                    this.Dispatcher.Invoke(() =>
-                        HolyMessageBox.ShowError(errorMsg, "Import Error", this));
+                    // Written to the log FIRST: the operator may close the dialog without reading it,
+                    // and the stack trace is the half they cannot read out over the air anyway.
+                    Log.Warn($"Import failed while {_importPhase} - file={filename} "
+                           + $"({fileBytes:N0} bytes), log=\"{logName}\" ({qsosAlreadyInLog:N0} QSOs)"
+                           + Environment.NewLine + MemoryReport()
+                           + Environment.NewLine + ex);
+
+                    string errorMsg = ImportFailureText(ex, filename, fileBytes, logName, qsosAlreadyInLog);
+                    this.Dispatcher.Invoke(() => ShowImportFailure(errorMsg));
                 }
             }
 
@@ -851,6 +1042,7 @@ namespace HolyLogger
                 AdifHandlerWorker.ReportProgress(lastReportedPercent, $"Saving to log {savePhaseEndPercent}%");
             }
 
+            _importPhase = "reloading the log to show it on screen";
             ObservableCollection<QSO> refreshedQsos;
             lock (_syncLock)
             {

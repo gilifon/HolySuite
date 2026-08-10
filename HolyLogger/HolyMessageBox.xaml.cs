@@ -229,8 +229,8 @@ namespace HolyLogger
         public static void ShowSuccess(string message, string title = "HolyLogger", Window owner = null, double width = 0)
             => Show(message, title, HolyMsgType.Success, owner, width);
 
-        public static void ShowError(string message, string title = "HolyLogger", Window owner = null)
-            => Show(message, title, HolyMsgType.Error, owner);
+        public static void ShowError(string message, string title = "HolyLogger", Window owner = null, double width = 0)
+            => Show(message, title, HolyMsgType.Error, owner, width);
 
         public static void ShowWarning(string message, string title = "HolyLogger", Window owner = null, double width = 0)
             => Show(message, title, HolyMsgType.Warning, owner, width);
