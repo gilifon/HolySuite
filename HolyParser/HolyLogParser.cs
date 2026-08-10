@@ -497,13 +497,24 @@ namespace HolyParser
                 qso_row.Date = Regex.Split(row, date_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
             }
 
+            // MODE and SUBMODE. GetValidMode answers "which MODE does this value belong to", so PSK31
+            // comes back as PSK and USB as SSB. That is exactly right for the mode field - ADIF says MODE
+            // must hold a mode, and a file that writes MODE=PSK31 is naming a submode there.
+            //
+            // It was being applied to the SUBMODE field as well, which destroyed it: every submode was
+            // replaced by its own parent, so a log imported with SUBMODE=PSK31, USB or JT65B ended up
+            // holding PSK, SSB and JT65 - the mode over again, telling the operator nothing. That is what
+            // put "PSK, RTTY, SSB" in the Log Workshop's Submode list, a list of modes with no submode in
+            // it. A submode is now stored exactly as the file wrote it.
+            string rawMode = null;
             regex = new Regex(mode_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
             if (match.Success)
             {
                 try
                 {
-                    qso_row.Mode = mr.GetValidMode(Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+                    rawMode = Regex.Split(row, mode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim();
+                    qso_row.Mode = mr.GetValidMode(rawMode);
                 }
                 catch
                 {
@@ -517,14 +528,22 @@ namespace HolyParser
             {
                 try
                 {
-                    qso_row.SUBMode = mr.GetValidMode(Regex.Split(row, submode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)));
+                    qso_row.SUBMode = Regex.Split(row, submode_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value)).Trim();
                 }
                 catch
                 {
-                    
-                }                
+
+                }
             }
-            
+
+            // A file that named a submode in the MODE field and wrote no SUBMODE of its own: the detail is
+            // in rawMode and nowhere else, and dropping it loses the difference between a PSK31 contact and
+            // a PSK125 one. Kept only when the record has no submode already, and only when the value
+            // really is a submode - which is precisely when GetValidMode returned something else.
+            if (string.IsNullOrWhiteSpace(qso_row.SUBMode) && !string.IsNullOrWhiteSpace(rawMode)
+                && !string.Equals(rawMode, qso_row.Mode, StringComparison.OrdinalIgnoreCase))
+                qso_row.SUBMode = rawMode;
+
 
             regex = new Regex(time_pattern, RegexOptions.IgnoreCase);
             match = regex.Match(row);
