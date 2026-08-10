@@ -1886,6 +1886,7 @@ namespace HolyLogger
             if (TB_Comment.IsEnabled) TB_Comment.Clear();
             ClearActivityRow();
             TB_State.Text = string.Empty;
+            TB_QTH.Text = string.Empty;
             FName = string.Empty;
             Country = string.Empty;
             UpdateCountryFlag(null);
@@ -4762,6 +4763,7 @@ namespace HolyLogger
             TB_RSTRcvd.Background = backgroundColor;
             TB_DX_Name.Background = backgroundColor;
             TB_State.Background = backgroundColor;
+            TB_QTH.Background = backgroundColor;
             TB_DXLocator.Background = backgroundColor;
             TB_Comment.Background = backgroundColor;
             TB_DXCC.Background = backgroundColor;
@@ -5280,6 +5282,7 @@ namespace HolyLogger
             // The received exchange box gets a label above it, which lowers it. Drop the RST
             // labels+boxes and the Add(F1) button to that same line so the Exchange row aligns.
             if (fe == TB_RSTSent || fe == TB_RSTRcvd || fe == L_RstSLabel || fe == L_RstRLabel
+                || fe == TB_QTH || fe == L_QTHLabel
                 || fe == SMeter || fe == AddBtn) return 52;
 
             if (baseTop < 40) return -5;                    // top row (Station / My Locator / Square) up
@@ -9269,6 +9272,7 @@ namespace HolyLogger
                     TB_DXCC.Text = "";
                     TB_DX_Name.Text = "";
                     TB_State.Text = "";
+                    TB_QTH.Text = "";
                     TB_ITUZone.Text = "";
                     TB_CQZone.Text = "";
                     UpdateCountryFlag(null);
@@ -10777,6 +10781,13 @@ namespace HolyLogger
                             IEnumerable<XElement> stateEl = xDoc.Root.Descendants(ns + "state");
                             TB_State.Text = stateEl.Count() > 0 ? stateEl.FirstOrDefault().Value.Trim() : string.Empty;
 
+                            // The station's town. QRZ has no field called "qth": its mailing address is
+                            // split into addr1 (house number and street) and addr2 (the city), so addr2
+                            // is what ADIF calls QTH. Nothing extra is requested for it - the lookup
+                            // already returns the whole record.
+                            XElement qthEl = xDoc.Root.Descendants(ns + "addr2").FirstOrDefault();
+                            TB_QTH.Text = qthEl != null ? qthEl.Value.Trim() : string.Empty;
+
                             SetAzimuth();
                             SetDXLocator(QRZGrid);
                             //*************************************************//
@@ -10821,6 +10832,7 @@ namespace HolyLogger
                             {
                                 FName = "";
                                 TB_State.Text = "";
+                                TB_QTH.Text = "";
                                 // Keep the offline cty.dat ITU/CQ zones — QRZ not finding this call
                                 // doesn't invalidate the prefix-based zones already shown.
                                 ClearQrzPhoto();
@@ -10832,6 +10844,7 @@ namespace HolyLogger
                 {
                     FName = "";
                     TB_State.Text = "";
+                    TB_QTH.Text = "";
                     // Keep the offline cty.dat ITU/CQ zones (prefix-based, still valid).
                     ClearQrzPhoto();
                 }
@@ -10840,6 +10853,7 @@ namespace HolyLogger
             {
                 FName = "";
                 TB_State.Text = "";
+                TB_QTH.Text = "";
                 TB_ITUZone.Text = "";
                 TB_CQZone.Text = "";
                 ClearQrzPhoto();

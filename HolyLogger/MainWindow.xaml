@@ -1403,8 +1403,19 @@
         <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
         <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,123,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
-        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="349,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
-        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="383,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
+        <!-- RST R + QTH were pulled left off the x=349 RST R used to have, and the whole group is
+             anchored on its RIGHT edge: TB_QTH ends at x=560, exactly under the Time box (496 + 64), so
+             this row lines up with the Date/Time row above it. Move any of the four and the group has to
+             stay 6px clear of Add (F1) at x=572 and end on 560. The RST R label overlapping the RST S
+             box by a couple of pixels is the same idiom as RST S over the Exchange box - the label text
+             is centred in a 40px block, so ~8px of white actually shows. -->
+        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="314,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
+        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="348,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
+        <!-- The DX station's town. Filled from the QRZ.com lookup (its addr2 line is the city) and
+             editable, like Name and Country. Hidden in contest mode, where the contest exchange frame
+             owns this strip - see ApplyContestExchangeUI. -->
+        <Label x:Name="L_QTHLabel" Content="QTH" HorizontalAlignment="Left" Margin="408,121,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The DX station's town (from QRZ.com)"/>
+        <TextBox x:Name="TB_QTH" HorizontalAlignment="Left" Height="28" Margin="452,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="108" Grid.Row="1" FontSize="16" MaxLength="40" TabIndex="12" ToolTip="The DX station's town (from QRZ.com)"/>
         <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="288,83,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
         <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,86,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
         <Label Content="Time" HorizontalAlignment="Left" Margin="451,83,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>

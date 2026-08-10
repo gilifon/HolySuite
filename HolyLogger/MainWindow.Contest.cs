@@ -166,6 +166,10 @@ namespace HolyLogger
             if (TB_RSTRcvd != null) TB_RSTRcvd.Visibility = orig;
             if (L_RstSLabel != null) L_RstSLabel.Visibility = orig;
             if (L_RstRLabel != null) L_RstRLabel.Visibility = orig;
+            // QTH shares the exchange row: in a contest the coloured exchange frame covers this strip,
+            // so the box would sit under it.
+            if (TB_QTH != null) TB_QTH.Visibility = orig;
+            if (L_QTHLabel != null) L_QTHLabel.Visibility = orig;
             // The received label is "Exchange" alone outside a contest, "Exchange / received" inside one.
             SetExchangeLabel(L_ExchangeLabel, "Exchange", "received", inContest);
 
