@@ -3,7 +3,7 @@
 ; Compile with: "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" HolyLogger.iss
 
 #define MyAppName "HolyLogger"
-#define MyAppVersion "8.8.5"
+#define MyAppVersion "8.8.6"
 #define MyAppPublisher "HolyLogger"
 #define MyAppExeName "HolyLogger.exe"
 #define SrcDir "..\HolyLogger\bin\x86\Release"
