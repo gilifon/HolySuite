@@ -9420,7 +9420,14 @@ namespace HolyLogger
             DXCC dXCC = CountryLookup.Shared.Resolve(dxCallText, lookupWhen);
             Country = dXCC.Name;
             UpdateCountryFlag(dXCC.Name);
-            Continent = dXCC.Continent;
+            // "XX" is the resolver saying it did not recognise the prefix, not a continent. Storing it
+            // puts a placeholder in the QSO that every screen then has to read as data - it turned up in
+            // the Log Workshop's Continent filter sitting among AF, AS, EU and the rest, as though the
+            // operator had worked a place called XX. Blank is the honest answer, and it is the same rule
+            // the parser, the Log Verifier and the QSO editor already follow.
+            Continent = string.Equals(dXCC.Continent, "XX", StringComparison.OrdinalIgnoreCase)
+                ? string.Empty
+                : dXCC.Continent;
             QRZGrid = dXCC.Locator;
             // Fill ITU/CQ zones offline from cty.dat (entity default or the prefix-specific
             // override). A later QRZ.com lookup, when available, overrides these as the gold source.
