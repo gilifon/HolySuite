@@ -180,10 +180,10 @@
 
                   </StackPanel>
 
-                  <!-- Row 2: name, DX locator, CQ zone, ITU zone, continent, state, Holyland square, comment.
+                  <!-- Row 2: name, DX locator, CQ zone, ITU zone, continent, state, Holyland square.
                        Gaps between items are tightened (12px, was 20px) and every box is sized to its
-                       real content rather than a generic width, so the saved space can go to Comment -
-                       the field most worth having room to read. Comment stays the rightmost item.
+                       real content rather than a generic width. Comment used to end this row and made it
+                       the widest thing in the window; it now sits on the QTH row below.
 
                        All but Name and DX Locator are dropdowns filled from the log itself: the widths
                        here are only the fallback, Window_Loaded measures the real contents. -->
@@ -241,13 +241,6 @@
                       <ComboBox x:Name="CB_Square" Width="90" FontSize="14" VerticalAlignment="Center"
                                 ToolTip="Holyland square received (the Exchange column) — the squares this log contains"
                                 SelectionChanged="Filter_Changed"/>
-                    </StackPanel>
-                    <StackPanel x:Name="CommentGroup" Orientation="Horizontal" VerticalAlignment="Center">
-                      <TextBlock Text="Comment:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                                 ToolTip="Any part of the QSO's comment text"/>
-                      <TextBox x:Name="TB_Comment" Width="288" FontSize="14" VerticalAlignment="Center"
-                               ToolTip="Any part of the QSO's comment text"
-                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                   </StackPanel>
 
@@ -312,7 +305,7 @@
                   </StackPanel>
                   </Border>
 
-                  <!-- Row 4 (as displayed): prop mode, sat name, soapbox, time - gray background. -->
+                  <!-- Row 5 (as displayed): prop mode, sat name, soapbox, time, QTH, comment - gray. -->
                   <Border Background="#E3E3E3" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
@@ -336,10 +329,23 @@
                       <TextBox x:Name="TB_Time" Width="80" FontSize="14" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                       <TextBlock Text="QTH:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="The worked station's town, e.g. Haifa"/>
                       <TextBox x:Name="TB_Qth" Width="120" FontSize="14" VerticalAlignment="Center"
+                               TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
+                    </StackPanel>
+                    <!-- COMMENT LIVES HERE, not on the identity row above. It is the one box worth having
+                         room to read, and AlignCommentBox stretches it to end exactly under Submode - so
+                         wherever it sits, its row runs the full width of the panel. On the row above that
+                         made every coloured bar as wide as Name + ... + Square + a 288px Comment; here the
+                         longest row is row 1, and the bars end just past the Submode box.
+                         KEEP IT LAST on this row: AlignCommentBox measures from its left edge outwards. -->
+                    <StackPanel x:Name="CommentGroup" Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="Comment:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="Any part of the QSO's comment text"/>
+                      <TextBox x:Name="TB_Comment" Width="288" FontSize="14" VerticalAlignment="Center"
+                               ToolTip="Any part of the QSO's comment text"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                   </StackPanel>
