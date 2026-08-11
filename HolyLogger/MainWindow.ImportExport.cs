@@ -1195,6 +1195,14 @@ namespace HolyLogger
         // The pair is the point: the first says what is wrong, the second is the thing to fix. Import
         // matches a re-imported record against what is already in the log, so bringing the corrected
         // file back adds the missing contacts without duplicating anything.
+        // How many individual rows a report section prints before it stops naming them one by one.
+        //
+        // A 77 MB ADIF holds a few hundred thousand contacts. A finding on even a tenth of them is tens
+        // of thousands of lines - a report too big to open, built in a StringBuilder inside a 32-bit
+        // process that ran out of memory on this very file once already. The COUNTS and the summary of
+        // distinct changes stay complete and are what the operator acts on; only the naming stops.
+        private const int MaxReportRows = 2000;
+
         private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,
                                        List<HolyLogParser.CountryChange> countryChanges,
                                        List<HolyLogParser.EntityNote> entityNotes,
@@ -1296,7 +1304,7 @@ namespace HolyLogger
                                   + " " + "YOUR FILE (kept)".PadRight(28) + " HOLYLOGGER MAKES IT");
                     sb.AppendLine();
 
-                    foreach (var c in countryChanges)
+                    foreach (var c in countryChanges.Take(MaxReportRows))
                     {
                         string call = (string.IsNullOrWhiteSpace(c.Call) ? "—" : c.Call).PadRight(12);
                         string date = (string.IsNullOrWhiteSpace(c.Date) ? "—" : c.Date).PadRight(10);
@@ -1304,6 +1312,9 @@ namespace HolyLogger
                         sb.AppendLine($"  {call} {date} {was.PadRight(28)} {c.OurAnswer}"
                                       + (string.IsNullOrWhiteSpace(c.ResolvedBy) ? "" : $"   (per {c.ResolvedBy})"));
                     }
+                    if (countryChanges.Count > MaxReportRows)
+                        sb.AppendLine($"  … and {countryChanges.Count - MaxReportRows:N0} more. "
+                                      + "Every one of them is counted in the summary below.");
                     sb.AppendLine();
 
                     // The same entities once each, so a file with 900 QSOs from one wrongly-named country
@@ -1339,10 +1350,12 @@ namespace HolyLogger
                         sb.AppendLine("  O typed for a zero is the common one — or a prefix long retired, or a");
                         sb.AppendLine("  callsign that was never valid. Only you can say which.");
                         sb.AppendLine();
-                        foreach (var n in entityNotes.Where(n => n.IsUnknown))
+                        foreach (var n in entityNotes.Where(n => n.IsUnknown).Take(MaxReportRows))
                             sb.AppendLine($"      {(string.IsNullOrWhiteSpace(n.Call) ? "—" : n.Call).PadRight(12)} "
                                           + $"{(string.IsNullOrWhiteSpace(n.Date) ? "—" : n.Date).PadRight(10)} "
                                           + (string.IsNullOrWhiteSpace(n.Country) ? "" : $"your file says {n.Country}"));
+                        if (unknown > MaxReportRows)
+                            sb.AppendLine($"      … and {unknown - MaxReportRows:N0} more.");
                         sb.AppendLine();
                     }
 
@@ -1355,9 +1368,11 @@ namespace HolyLogger
                         sb.AppendLine("  lists as never having counted. They are real contacts and they are in");
                         sb.AppendLine("  your log — they simply add nothing to a country total.");
                         sb.AppendLine();
-                        foreach (var n in entityNotes.Where(n => !n.IsUnknown))
+                        foreach (var n in entityNotes.Where(n => !n.IsUnknown).Take(MaxReportRows))
                             sb.AppendLine($"      {(string.IsNullOrWhiteSpace(n.Call) ? "—" : n.Call).PadRight(12)} "
                                           + $"{(string.IsNullOrWhiteSpace(n.Date) ? "—" : n.Date).PadRight(10)} {n.Note}");
+                        if (nonEntity > MaxReportRows)
+                            sb.AppendLine($"      … and {nonEntity - MaxReportRows:N0} more.");
                         sb.AppendLine();
                     }
                 }
