@@ -817,6 +817,7 @@ namespace HolyParser
             qso_row.ExtraAdif = ExtraAdifFields(row);
 
             ResolveCountryForDate(qso_row);
+            SetEntityCode(qso_row);
 
             // LAST, so it compares the file's country against what was actually stored - after the
             // prefix answer AND the dated answer have each had their say. It also runs when the dated
@@ -940,6 +941,28 @@ namespace HolyParser
             {
                 // A finding is a convenience; failing to work one out must never cost the QSO its import.
             }
+        }
+
+        // THE ENTITY NUMBER FOR THE QSO - the country's identity, stored with the contact.
+        //
+        // THE FILE'S OWN <DXCC> WINS, and it settles arguments nothing else can. A callsign with a
+        // stroke has two sides and only one of them says where the station was: W1AW/KP4 is Puerto Rico
+        // and 9H5G/C6A is the Bahamas, but FR/TU5KG is Reunion while Club Log registers FR/T for
+        // Tromelin - the same shape, opposite answers. When the operator's file already carries the
+        // number, none of that has to be reasoned about at all.
+        //
+        // Failing that, whatever the resolver worked out. 0 means unknown, or a contact that belongs to
+        // no entity - a station at sea counts for nobody, and ADIF writes that as 0 too.
+        private void SetEntityCode(QSO qso_row)
+        {
+            if (m_dxccFromFile > 0) { qso_row.DxccCode = m_dxccFromFile; return; }
+
+            DXCC answer = m_datedAnswer ?? ER_Dxcc;
+            if (answer == null || !answer.IsDxccEntity) return;
+            if (answer.DxccCode > 0) { qso_row.DxccCode = answer.DxccCode; return; }
+
+            try { qso_row.DxccCode = CountryLookup.Shared.EntityCodeForCountry(answer.Name); }
+            catch { /* a number is a bonus here, never a reason to lose the QSO */ }
         }
 
         // Notes a QSO that counts towards no DXCC entity, and why. See EntityNote.

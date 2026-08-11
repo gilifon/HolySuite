@@ -51,6 +51,17 @@ namespace HolyParser
 
         public string DXCC { get; set; }
 
+        // THE ADIF DXCC ENTITY NUMBER - the identity of the country, as opposed to its name.
+        //
+        // A name is not an identity: two databases spell the same country differently, either may
+        // re-spell it, and a name nothing recognises reads as a country that no longer exists. The
+        // number is fixed, unique and never reused, and it is what an award is actually counted on.
+        //
+        // 0 means "not known for this QSO" - either nothing could be resolved, or the contact belongs
+        // to no entity at all (a station at sea counts for nobody, and ADIF says so with 0).
+        [JsonProperty("dxcc_code")]
+        public int DxccCode { get; set; }
+
         [JsonProperty("exchange")]
         public string SRX { get; set; }
 

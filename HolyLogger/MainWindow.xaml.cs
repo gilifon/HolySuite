@@ -1057,8 +1057,33 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // Fills the entity number in for every QSO logged before there was a column to put it in.
+        //
+        // ON A BACKGROUND THREAD and never awaited: it reads tens of thousands of rows and resolves each
+        // callsign, and the operator did not ask for it - it must not hold the window for a second. It
+        // only ever writes rows whose number is missing, so an interrupted run simply finishes next time,
+        // and a number the operator has corrected by hand is never overwritten.
+        private void StartEntityCodeBackfill()
+        {
+            Task.Run(() =>
+            {
+                try
+                {
+                    var dal = DataAccess.GetInstance();
+                    if (dal == null) return;
+                    int filled = dal.BackfillEntityCodes(EntityCodeForCall);
+                    if (filled > 0)
+                        Log.Warn($"Entity numbers filled in for {filled:N0} QSO(s) logged before the column existed.");
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            });
+        }
+
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            // Old QSOs have no entity number; this fills them in, once, quietly, in the background.
+            StartEntityCodeBackfill();
+
             // The active profile's file was gone at startup, so factory defaults were loaded. Say so
             // once the main window exists (it owns the dialog) instead of letting the whole setup
             // change without explanation.
@@ -1580,6 +1605,7 @@ namespace HolyLogger
                 qso.ITUZone = TB_ITUZone.Text;
                 qso.State = TB_State.Text;          // ADIF STATE - now stored with the QSO
                 qso.Qth = TB_QTH.Text;              // ADIF QTH - the worked station's town
+                qso.DxccCode = EntityCodeForCall(qso.DXCall, qso.Date);   // the country's identity
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
                 qso.Operator = TB_Operator.Text;
@@ -1681,6 +1707,7 @@ namespace HolyLogger
                 QsoToUpdate.ITUZone = TB_ITUZone.Text;
                 QsoToUpdate.State = TB_State.Text;   // ADIF STATE - now stored with the QSO
                 QsoToUpdate.Qth = TB_QTH.Text;       // ADIF QTH - the worked station's town
+                QsoToUpdate.DxccCode = EntityCodeForCall(QsoToUpdate.DXCall, QsoToUpdate.Date);
                 QsoToUpdate.Name = TB_DX_Name.Text.Length > 25 ? TB_DX_Name.Text.Substring(0, 25) : TB_DX_Name.Text; //FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.Operator = TB_Operator.Text;
@@ -10317,6 +10344,21 @@ namespace HolyLogger
             {"Western Kiribati","ki"},{"Willis Island","au"},
         };
 
+        // The ADIF entity number for a callsign worked on a given date - the country's identity, stored
+        // with the QSO so nothing downstream has to work it out from the name again. 0 when it cannot be
+        // known, or when the contact belongs to no entity at all (a station at sea counts for nobody).
+        internal static int EntityCodeForCall(string call, string adifDate)
+        {
+            if (string.IsNullOrWhiteSpace(call)) return 0;
+            try
+            {
+                DXCC d = CountryLookup.Shared.Resolve(call.Trim(), CountryLookup.QsoDate(adifDate));
+                if (d == null || !d.IsDxccEntity) return 0;
+                return d.DxccCode > 0 ? d.DxccCode : CountryLookup.Shared.EntityCodeForCountry(d.Name);
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
         private void UpdateCountryFlag(string countryName)
         {
             if (string.IsNullOrWhiteSpace(countryName))
@@ -11707,6 +11749,7 @@ namespace HolyLogger
         }
     }
 }
+
 
 
 

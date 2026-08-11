@@ -393,7 +393,7 @@ Environment.NewLine +
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
             {
-                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
+                SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con);
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign", qso.MyCall));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator", qso.Operator));
                 insertSQL.Parameters.Add(new SQLiteParameter("my_square", qso.STX));
@@ -417,6 +417,8 @@ Environment.NewLine +
                 insertSQL.Parameters.Add(new SQLiteParameter("itu_zone", qso.ITUZone));
                 insertSQL.Parameters.Add(new SQLiteParameter("state", qso.State));
                 insertSQL.Parameters.Add(new SQLiteParameter("qth", qso.Qth));
+
+                insertSQL.Parameters.Add(new SQLiteParameter("dxcc", qso.DxccCode > 0 ? (object)qso.DxccCode : DBNull.Value));
                 insertSQL.Parameters.Add(new SQLiteParameter("prop_mode", qso.PROP_MODE));
                 insertSQL.Parameters.Add(new SQLiteParameter("sat_name", qso.SAT_NAME));
                 insertSQL.Parameters.Add(new SQLiteParameter("soapbox", qso.SOAPBOX));
@@ -447,8 +449,8 @@ Environment.NewLine +
         {
             const int es = 1, qs = 1, ls = 1, cs = 1;
             using (var ins = new SQLiteCommand(
-                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
-                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@state,@qth,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
+                "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",eqsl_status,qrz_status,lotw_status,clublog_status,log_id,source_qso_id) " +
+                "VALUES (@my_callsign,@operator,@my_square,@my_locator,@dx_locator,@frequency,@band,@dx_callsign,@rst_rcvd,@rst_sent,@date,@time,@mode,@submode,@exchange,@comment,@name,@country,@continent,@cq_zone,@itu_zone,@state,@qth,@dxcc,@prop_mode,@sat_name,@soapbox,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@es,@qs,@ls,@cs,@log_id,@src)", con))
             {
                 ins.Parameters.Add(new SQLiteParameter("@my_callsign", qso.MyCall));
                 ins.Parameters.Add(new SQLiteParameter("@operator", qso.Operator));
@@ -476,6 +478,8 @@ Environment.NewLine +
                 // log with its state blank and the operator had no way to tell where it went.
                 ins.Parameters.Add(new SQLiteParameter("@state", qso.State));
                 ins.Parameters.Add(new SQLiteParameter("@qth", qso.Qth));
+
+                ins.Parameters.Add(new SQLiteParameter("@dxcc", qso.DxccCode > 0 ? (object)qso.DxccCode : DBNull.Value));
                 ins.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                 ins.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                 ins.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
@@ -626,7 +630,7 @@ Environment.NewLine +
             int processedQso = 0;
 
             using (SQLiteTransaction transaction = con.BeginTransaction())
-            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
+            using (SQLiteCommand insertSQL = new SQLiteCommand("INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,prop_mode,sat_name,soapbox,cq_zone,itu_zone,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,state,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info,credit_granted,cnty,qsl_via,qsl_rdate,qsl_sent,contest_id,time_off,date_off,extra_adif,qth,dxcc,log_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,1,1,?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?," + ActiveLogId + ")", con, transaction))
             {
                 insertSQL.Parameters.Add(new SQLiteParameter("my_callsign"));
                 insertSQL.Parameters.Add(new SQLiteParameter("operator"));
@@ -693,6 +697,8 @@ Environment.NewLine +
                 // are POSITIONAL: a new one in the middle would shift every index below it.
                 insertSQL.Parameters.Add(new SQLiteParameter("qth"));
 
+                insertSQL.Parameters.Add(new SQLiteParameter("dxcc"));
+
                 foreach (var qso in qsos)
                 {
                     insertSQL.Parameters[0].Value = (object)qso.MyCall ?? DBNull.Value;
@@ -751,6 +757,8 @@ Environment.NewLine +
                     insertSQL.Parameters[53].Value = Blank(qso.ExtraAdif);
                     insertSQL.Parameters[54].Value = Blank(qso.Qth);
 
+                    insertSQL.Parameters[55].Value = qso.DxccCode > 0 ? (object)qso.DxccCode : DBNull.Value;
+
                     try
                     {
                         insertSQL.ExecuteNonQuery();
@@ -808,7 +816,7 @@ Environment.NewLine +
                 }
                 catch { /* best-effort; at minimum the QSO itself is updated below */ }
 
-                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,qth = @qth,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info WHERE id = @id";
+                const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,qth = @qth,dxcc = @dxcc,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info WHERE id = @id";
                 try
                 {
                     foreach (var uid in ids)
@@ -837,6 +845,8 @@ Environment.NewLine +
                         insertSQL.Parameters.Add(new SQLiteParameter("@itu_zone", qso.ITUZone));
                         insertSQL.Parameters.Add(new SQLiteParameter("@state", qso.State));
                         insertSQL.Parameters.Add(new SQLiteParameter("@qth", qso.Qth));
+
+                        insertSQL.Parameters.Add(new SQLiteParameter("@dxcc", qso.DxccCode > 0 ? (object)qso.DxccCode : DBNull.Value));
                         insertSQL.Parameters.Add(new SQLiteParameter("@prop_mode", qso.PROP_MODE));
                         insertSQL.Parameters.Add(new SQLiteParameter("@sat_name", qso.SAT_NAME));
                         insertSQL.Parameters.Add(new SQLiteParameter("@soapbox", qso.SOAPBOX));
@@ -967,6 +977,11 @@ Environment.NewLine +
             // read back by only some of the readers is a field that vanishes from whichever screen uses
             // the other query.
             if (HasColumn(rdr, "qth")) q.Qth = rdr["qth"] as string;
+            if (HasColumn(rdr, "dxcc") && rdr["dxcc"] != DBNull.Value)
+            {
+                int code;
+                if (int.TryParse(Convert.ToString(rdr["dxcc"]), out code)) q.DxccCode = code;
+            }
         }
 
         // The write half of ReadActivityFields: binds the same six fields in the same fixed order.
@@ -1003,6 +1018,76 @@ Environment.NewLine +
             cmd.Parameters.Add(new SQLiteParameter("@toff", Blank(qso.TimeOff)));
             cmd.Parameters.Add(new SQLiteParameter("@doff", Blank(qso.DateOff)));
             cmd.Parameters.Add(new SQLiteParameter("@extra", Blank(qso.ExtraAdif)));
+        }
+
+        // ── FILLING IN THE ENTITY NUMBER FOR QSOs LOGGED BEFORE THERE WAS A COLUMN ────────────────
+        //
+        // Every QSO in every log, once. A column that is filled for new contacts and empty for the
+        // 28,000 already in the log is worse than no column at all: anything reading it would have to
+        // ask "is this a QSO with no entity, or a QSO from before we stored one?", and there would be no
+        // way to tell. So the answer is worked out for the old ones too, from the callsign and the QSO's
+        // own date - the same question the statistics ask every time they open.
+        //
+        // Only ever writes a row whose dxcc is NULL, so it can be interrupted, run again, and never
+        // touches a number that is already there - including one the operator has corrected by hand.
+        // Returns how many rows it filled.
+        public int BackfillEntityCodes(Func<string, string, int> codeForCall, Action<int, int> progress = null)
+        {
+            if (codeForCall == null) return 0;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open) return 0;
+
+                var rows = new List<KeyValuePair<long, KeyValuePair<string, string>>>();
+                try
+                {
+                    using (var cmd = new SQLiteCommand(
+                        "SELECT Id, dx_callsign, date FROM qso WHERE dxcc IS NULL", con))
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            string call = rdr["dx_callsign"] as string;
+                            if (string.IsNullOrWhiteSpace(call)) continue;
+                            rows.Add(new KeyValuePair<long, KeyValuePair<string, string>>(
+                                Convert.ToInt64(rdr["Id"]),
+                                new KeyValuePair<string, string>(call, rdr["date"] as string)));
+                        }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+
+                if (rows.Count == 0) return 0;
+
+                int filled = 0, done = 0;
+                try
+                {
+                    using (var tx = con.BeginTransaction())
+                    using (var upd = new SQLiteCommand("UPDATE qso SET dxcc = @c WHERE Id = @id", con, tx))
+                    {
+                        upd.Parameters.Add(new SQLiteParameter("@c"));
+                        upd.Parameters.Add(new SQLiteParameter("@id"));
+                        foreach (var row in rows)
+                        {
+                            done++;
+                            int code = 0;
+                            try { code = codeForCall(row.Value.Key, row.Value.Value); }
+                            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                            // 0 is written as 0, not left NULL: "this contact belongs to no entity" is an
+                            // answer, and leaving it blank would make the pass do the same work for ever.
+                            upd.Parameters[0].Value = code;
+                            upd.Parameters[1].Value = row.Key;
+                            try { if (upd.ExecuteNonQuery() > 0) filled++; }
+                            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                            if (progress != null && (done % 500 == 0 || done == rows.Count))
+                                progress(done, rows.Count);
+                        }
+                        tx.Commit();
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                return filled;
+            }
         }
 
         private static object Blank(string s)
@@ -2598,8 +2683,8 @@ Environment.NewLine +
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
-                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",log_id) " +
-                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@qth,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@log)";
+                const string sql = "INSERT INTO qso (my_callsign,operator,my_square,my_locator,dx_locator,frequency,band,dx_callsign,rst_rcvd,rst_sent,date,time,mode,submode,exchange,comment,name,country,continent,cq_zone,itu_zone,state,qth,dxcc,prop_mode,sat_name,soapbox,eqsl_status,qrz_status,lotw_status,clublog_status,lotw_qsl_rcvd,lotw_qsl_rdate,lotw_deleted_entity,qrz_qsl_rcvd,qrz_qsl_rdate,qrz_deleted_entity,eqsl_qsl_rcvd,eqsl_qsl_rdate,eqsl_deleted_entity,clublog_qsl_rcvd,clublog_qsl_rdate,clublog_deleted_entity,paper_qsl_rcvd,iota,sota_ref,pota_ref,wwff_ref,sig,sig_info," + CarriedColumns + ",log_id) " +
+                    "VALUES (@my,@op,@mysq,@myloc,@dxloc,@freq,@band,@dx,@rr,@rs,@date,@time,@mode,@sub,@exch,@com,@name,@country,@cont,@cqz,@ituz,@state,@qth,@dxcc,@prop,@sat,@soap,@es,@qs,@ls,@cs,@lr,@lrd,@lde,@qr,@qrd,@qde,@er,@erd,@ede,@cr,@crd,@cde,@paper,@iota,@sota_ref,@pota_ref,@wwff_ref,@sig,@sig_info," + CarriedValues + ",@log)";
                 using (var cmd = new SQLiteCommand(sql, con))
                 {
                     cmd.Parameters.AddWithValue("@my", (object)qso.MyCall ?? DBNull.Value);
@@ -2625,6 +2710,8 @@ Environment.NewLine +
                     cmd.Parameters.AddWithValue("@ituz", (object)qso.ITUZone ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@state", (object)qso.State ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@qth", (object)qso.Qth ?? DBNull.Value);
+
+                    cmd.Parameters.AddWithValue("@dxcc", qso.DxccCode > 0 ? (object)qso.DxccCode : DBNull.Value);
                     cmd.Parameters.AddWithValue("@prop", (object)qso.PROP_MODE ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@sat", (object)qso.SAT_NAME ?? DBNull.Value);
                     cmd.Parameters.AddWithValue("@soap", (object)qso.SOAPBOX ?? DBNull.Value);
@@ -3747,6 +3834,7 @@ Environment.NewLine +
             , [itu_zone] nvarchar(10) NULL COLLATE NOCASE
             , [state] nvarchar(20) NULL COLLATE NOCASE
             , [qth] nvarchar(100) NULL COLLATE NOCASE
+            , [dxcc] INTEGER NULL
             , [prop_mode] nvarchar(100) NULL COLLATE NOCASE
             , [sat_name] nvarchar(100) NULL COLLATE NOCASE
             , [soapbox] nvarchar(100) NULL COLLATE NOCASE
@@ -3901,6 +3989,9 @@ Environment.NewLine +
             }
             AddColToTable("qso", "state", "nvarchar(20) NULL");   // ADIF STATE (worked station's subdivision)
             AddColToTable("qso", "qth", "nvarchar(100) NULL");    // ADIF QTH (the worked station's town)
+            // THE ADIF DXCC ENTITY NUMBER. The country's identity, as opposed to its name - fixed,
+            // unique, never reused, and what an award is counted on. The log held only the name.
+            AddColToTable("qso", "dxcc", "INTEGER NULL");
             // Activity-program references. POTA is the wide one on purpose: ADIF allows a comma-
             // separated LIST there, because a contact can be inside two overlapping parks at once.
             AddColToTable("qso", "iota", "nvarchar(20) NULL");
@@ -4142,3 +4233,7 @@ Environment.NewLine +
         }
     }
 }
+
+
+
+
