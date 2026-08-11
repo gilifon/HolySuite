@@ -89,8 +89,7 @@ namespace HolyLogger
             // the operator expects to see the result, so that is where the page is recounted from
             // scratch. Switching folders while reading it still costs nothing.
             Activated += (s2, e2) => RebuildAfterPossibleEdit();
-            if (qsos != null)
-                qsos.CollectionChanged += (s2, e2) => InvalidateSourceStats();   // a QSO added or deleted
+            HookQsoCollection(null, qsos);
 
             var s = Properties.Settings.Default;
 
@@ -145,8 +144,11 @@ namespace HolyLogger
                 if (e.NewSize.Height > 0)
                 {
                     _tableHeight = e.NewSize.Height;
-                    SV_WorkedCountries.Height  = _tableHeight;
-                    SV_MissingCountries.Height = _tableHeight;
+                    // The height goes on the lists themselves now: each one carries its own ScrollViewer
+                    // inside its template (that is what makes the rows virtualize), so there is no outer
+                    // ScrollViewer left to size.
+                    IC_WorkedCountries.Height  = _tableHeight;
+                    IC_MissingCountries.Height = _tableHeight;
                     AdjustZoneHeights();
                 }
             };
@@ -194,6 +196,44 @@ namespace HolyLogger
         // True once the constructor's own first build has run, so the activation that comes WITH opening
         // the window does not build the page a second time.
         private bool _statsBuilt;
+
+        // ── A QSO LOGGED WHILE THIS WINDOW IS OPEN ────────────────────────
+        //
+        // Every new contact changes these numbers - one more QSO, possibly one more country, possibly a
+        // zone that is no longer missing - so the page follows the log live rather than showing what was
+        // true when it opened.
+        //
+        // Coalesced, not per QSO. The statistics share ONE UI thread with the log window the operator is
+        // typing into, and in a contest a contact lands every few seconds; recounting the whole page on
+        // each one would stutter the very window they are working in. A short quiet period after the last
+        // change is enough to make it feel immediate without paying for every keystroke of a run.
+        private System.Windows.Threading.DispatcherTimer _liveRefreshTimer;
+
+        private void HookQsoCollection(ObservableCollection<QSO> old, ObservableCollection<QSO> fresh)
+        {
+            if (old != null) old.CollectionChanged -= QsoCollectionChanged;
+            if (fresh != null) fresh.CollectionChanged += QsoCollectionChanged;
+        }
+
+        private void QsoCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+        {
+            InvalidateSourceStats();     // at once, so nothing can read a stale count in the meantime
+
+            if (_liveRefreshTimer == null)
+            {
+                _liveRefreshTimer = new System.Windows.Threading.DispatcherTimer
+                {
+                    Interval = TimeSpan.FromMilliseconds(800)
+                };
+                _liveRefreshTimer.Tick += (s, e2) =>
+                {
+                    _liveRefreshTimer.Stop();
+                    RebuildAfterPossibleEdit();
+                };
+            }
+            _liveRefreshTimer.Stop();    // restart the quiet period: a run of QSOs repaints once, at its end
+            _liveRefreshTimer.Start();
+        }
 
         // Counts the whole page again, from the QSOs as they are now. The operator edits a callsign in
         // the log, a country changes, and the statistics have to say so - nothing about a QSO edit
@@ -1485,6 +1525,10 @@ namespace HolyLogger
                         long logId = dal.ActiveLogId;
                         _uiPhase = "re-reading the log";
                         var fresh = await Task.Run(() => dal.GetQSOsForLog(logId));
+                        // The live-QSO subscription has to follow the list, or it stays attached to the
+                        // collection this window has just stopped showing and every QSO logged from here
+                        // on goes unnoticed.
+                        HookQsoCollection(_allQsos, fresh);
                         _allQsos = fresh;
                         _resolveCache = null;   // rebuilt lazily against the fresh list
                     }

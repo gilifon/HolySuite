@@ -471,13 +471,28 @@
                                                            Cursor="Hand" TextAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
                                         </Border>
-                                        <ScrollViewer x:Name="SV_WorkedCountries"
-                                                      VerticalScrollBarVisibility="Auto"
-                                                      CanContentScroll="True"
-                                                      MaxHeight="500">
-                                            <ItemsControl x:Name="IC_WorkedCountries"
-                                                          VirtualizingStackPanel.IsVirtualizing="True"
-                                                          VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                        <!-- THE SCROLLER IS THE ITEMSCONTROL'S OWN, not a ScrollViewer
+                                             wrapped around it. A plain ItemsControl has no scroller in
+                                             its template, so an outer one scrolls the whole control as a
+                                             single block: its VirtualizingStackPanel is handed unlimited
+                                             height and dutifully builds EVERY row. Measured on a 28,454
+                                             QSO log - 324 countries, 324 containers realized - and that
+                                             is what made changing folder take the best part of a second
+                                             when only about fifteen rows are on screen. With the
+                                             ScrollViewer inside the template the panel is given the
+                                             visible height and builds what fits. -->
+                                        <ItemsControl x:Name="IC_WorkedCountries" MaxHeight="500"
+                                                      VirtualizingStackPanel.IsVirtualizing="True"
+                                                      VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                            <ItemsControl.Template>
+                                                <ControlTemplate TargetType="ItemsControl">
+                                                    <ScrollViewer CanContentScroll="True" Focusable="False"
+                                                                  VerticalScrollBarVisibility="Auto"
+                                                                  HorizontalScrollBarVisibility="Disabled">
+                                                        <ItemsPresenter/>
+                                                    </ScrollViewer>
+                                                </ControlTemplate>
+                                            </ItemsControl.Template>
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
                                                 </ItemsControl.ItemsPanel>
@@ -516,8 +531,7 @@
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
+                                        </ItemsControl>
                                         </DockPanel>
                                     </Border>
                                 </Border>
@@ -592,13 +606,19 @@
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
                                         </Border>
-                                        <ScrollViewer x:Name="SV_MissingCountries"
-                                                      VerticalScrollBarVisibility="Auto"
-                                                      CanContentScroll="True"
-                                                      MaxHeight="500">
-                                            <ItemsControl x:Name="IC_MissingCountries"
-                                                          VirtualizingStackPanel.IsVirtualizing="True"
-                                                          VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                        <!-- Its own scroller, so the rows virtualize - see the Worked table. -->
+                                        <ItemsControl x:Name="IC_MissingCountries" MaxHeight="500"
+                                                      VirtualizingStackPanel.IsVirtualizing="True"
+                                                      VirtualizingStackPanel.VirtualizationMode="Recycling">
+                                            <ItemsControl.Template>
+                                                <ControlTemplate TargetType="ItemsControl">
+                                                    <ScrollViewer CanContentScroll="True" Focusable="False"
+                                                                  VerticalScrollBarVisibility="Auto"
+                                                                  HorizontalScrollBarVisibility="Disabled">
+                                                        <ItemsPresenter/>
+                                                    </ScrollViewer>
+                                                </ControlTemplate>
+                                            </ItemsControl.Template>
                                                 <ItemsControl.ItemsPanel>
                                                     <ItemsPanelTemplate><VirtualizingStackPanel/></ItemsPanelTemplate>
                                                 </ItemsControl.ItemsPanel>
@@ -624,8 +644,7 @@
                                                         </Border>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
-                                            </ItemsControl>
-                                        </ScrollViewer>
+                                        </ItemsControl>
                                         </DockPanel>
                                     </Border>
                                 </Border>
