@@ -879,11 +879,21 @@ namespace HolyParser
         private void RecordCountryChange(QSO qso_row)
         {
             string fromFile = (m_countryFromFile ?? string.Empty).Trim();
+
             // OUR answer, which is no longer what gets stored - the file's value is. Prefer the dated
             // answer; fall back to the plain prefix answer when the record carried no usable date.
-            string stored = m_datedAnswer != null && !string.IsNullOrWhiteSpace(m_datedAnswer.Name)
-                ? m_datedAnswer.Name.Trim()
-                : (ER_Dxcc != null && ER_Dxcc.Name != "Unknown" ? (ER_Dxcc.Name ?? string.Empty).Trim() : string.Empty);
+            DXCC ours = m_datedAnswer ?? ER_Dxcc;
+            if (ours == null) return;
+
+            // AND IT HAS TO BE A COUNTRY. "Maritime Mobile" is the resolver saying the station was at
+            // sea and the contact counts for no entity at all - printing it in a column headed
+            // "HolyLogger suggests", against a country the file named, reads as though we were
+            // proposing a country called Maritime Mobile. Those QSOs are reported already, in the
+            // section about contacts that count towards no country, where they belong; this one is
+            // country against country.
+            if (!ours.IsDxccEntity) return;
+
+            string stored = (ours.Name ?? string.Empty).Trim();
             if (fromFile.Length == 0 || stored.Length == 0) return;   // nothing to compare
 
             try
@@ -923,8 +933,7 @@ namespace HolyParser
                     Date = qso_row.Date,
                     FromFile = fromFile,
                     OurAnswer = stored,
-                    ResolvedBy = m_datedAnswer != null ? m_datedAnswer.ResolvedBy
-                                                       : (ER_Dxcc != null ? ER_Dxcc.ResolvedBy : null),
+                    ResolvedBy = ours.ResolvedBy,
                 });
             }
             catch
