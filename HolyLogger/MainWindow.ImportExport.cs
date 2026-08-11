@@ -1309,7 +1309,8 @@ namespace HolyLogger
                     sb.AppendLine($"A DIFFERENT COUNTRY — NOT JUST A DIFFERENT SPELLING ({wrongEntity.Count:N0})");
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
                     sb.AppendLine();
-                    sb.AppendLine("Your file's answer was stored. Nothing here was changed.");
+                    sb.AppendLine("IMPORTED is the country your file gave, and it is what is in your log.");
+                    sb.AppendLine("HOLYLOGGER SUGGESTS is only a suggestion — nothing was changed.");
                     sb.AppendLine();
 
                     // SORTED BY THE IMPORTED COUNTRY, so every QSO the file called by one name stands
