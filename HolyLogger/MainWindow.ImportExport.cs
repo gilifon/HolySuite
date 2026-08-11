@@ -1186,6 +1186,20 @@ namespace HolyLogger
         // The pair is the point: the first says what is wrong, the second is the thing to fix. Import
         // matches a re-imported record against what is already in the log, so bringing the corrected
         // file back adds the missing contacts without duplicating anything.
+        // An ADIF date (yyyyMMdd) as the day the operator reads everywhere else in this program.
+        // Anything that is not a date is passed through rather than guessed at.
+        private static string FormatAdifDate(string adif)
+        {
+            string s = (adif ?? string.Empty).Trim();
+            if (s.Length < 8) return s.Length == 0 ? "—" : s;
+            DateTime d;
+            return DateTime.TryParseExact(s.Substring(0, 8), "yyyyMMdd",
+                       System.Globalization.CultureInfo.InvariantCulture,
+                       System.Globalization.DateTimeStyles.None, out d)
+                   ? d.ToString("dd-MM-yyyy")
+                   : s;
+        }
+
         // How many individual rows a report section prints before it stops naming them one by one.
         //
         // A 77 MB ADIF holds a few hundred thousand contacts. A finding on even a tenth of them is tens
@@ -1295,44 +1309,37 @@ namespace HolyLogger
                     sb.AppendLine($"A DIFFERENT COUNTRY — NOT JUST A DIFFERENT SPELLING ({wrongEntity.Count:N0})");
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
                     sb.AppendLine();
-                    sb.AppendLine("YOUR FILE'S ANSWER WAS STORED. Nothing below was changed in your log.");
-                    sb.AppendLine();
-                    sb.AppendLine("Your file names a country for each QSO. HolyLogger works the country out");
-                    sb.AppendLine("again from the callsign AND THE DATE OF THAT CONTACT. Where the two differ");
-                    sb.AppendLine("it keeps yours and says so here — it is your log, and a country you");
-                    sb.AppendLine("recorded is not ours to overwrite without asking.");
-                    sb.AppendLine();
-                    sb.AppendLine("A difference is worth a look, and is usually one of these:");
-                    sb.AppendLine("  * A prefix can change hands. 4N1DV was Serbia; the 2012 Olympic prefix");
-                    sb.AppendLine("    2O12L was England, not whatever 2O looks like today.");
-                    sb.AppendLine("  * A DXpedition callsign often belongs to an entity its prefix does not");
-                    sb.AppendLine("    suggest — K9W was Wake Island for two weeks in 2013, not the USA.");
-                    sb.AppendLine("  * An entity may have been deleted since the QSO was made.");
-                    sb.AppendLine("  * \"Maritime Mobile\" and \"Aeronautical Mobile\" are NOT countries. They");
-                    sb.AppendLine("    mean the station was at sea or in the air, so the contact counts for");
-                    sb.AppendLine("    no DXCC entity at all.");
-                    sb.AppendLine();
-                    sb.AppendLine("Each of these is a DIFFERENT DXCC ENTITY, not a different way of writing");
-                    sb.AppendLine("the same one — checked against the entity numbers wherever your file or");
-                    sb.AppendLine("the databases carry them. Spellings are counted in their own section.");
-                    sb.AppendLine();
-                    sb.AppendLine("To act on any of these, use Verify in the Log Workshop. Nothing here has");
-                    sb.AppendLine("been changed for you.");
-                    sb.AppendLine();
-                    sb.AppendLine("  " + "CALL".PadRight(12) + " " + "DATE".PadRight(10)
-                                  + " " + "YOUR FILE (kept)".PadRight(28) + " HOLYLOGGER MAKES IT");
+                    sb.AppendLine("Your file's answer was stored. Nothing here was changed.");
                     sb.AppendLine();
 
-                    foreach (var c in countryChanges.Take(MaxReportRows))
+                    // SORTED BY THE IMPORTED COUNTRY, so every QSO the file called by one name stands
+                    // together and the operator reads one country at a time instead of jumping between
+                    // them. Within a country the suggestion, then the date, so identical findings sit in
+                    // an unbroken run and the odd one out is easy to see.
+                    var rows = countryChanges
+                        .OrderBy(c => c.FromFile, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(c => c.OurAnswer, StringComparer.OrdinalIgnoreCase)
+                        .ThenBy(c => c.Date, StringComparer.Ordinal)
+                        .ToList();
+
+                    sb.AppendLine("  " + "#".PadLeft(5) + "  " + "CALL".PadRight(12)
+                                  + "  " + "IMPORTED".PadRight(26)
+                                  + "  " + "HOLYLOGGER SUGGESTS".PadRight(26) + "  DATE");
+                    sb.AppendLine("  " + new string('─', 5) + "  " + new string('─', 12)
+                                  + "  " + new string('─', 26) + "  " + new string('─', 26) + "  " + new string('─', 10));
+
+                    int rowNo = 0;
+                    foreach (var c in rows.Take(MaxReportRows))
                     {
-                        string call = (string.IsNullOrWhiteSpace(c.Call) ? "—" : c.Call).PadRight(12);
-                        string date = (string.IsNullOrWhiteSpace(c.Date) ? "—" : c.Date).PadRight(10);
-                        string was = (c.FromFile ?? "—");
-                        sb.AppendLine($"  {call} {date} {was.PadRight(28)} {c.OurAnswer}"
-                                      + (string.IsNullOrWhiteSpace(c.ResolvedBy) ? "" : $"   (per {c.ResolvedBy})"));
+                        rowNo++;
+                        sb.AppendLine("  " + rowNo.ToString("N0").PadLeft(5)
+                                      + "  " + (string.IsNullOrWhiteSpace(c.Call) ? "—" : c.Call).PadRight(12)
+                                      + "  " + (c.FromFile ?? "—").PadRight(26)
+                                      + "  " + (c.OurAnswer ?? "—").PadRight(26)
+                                      + "  " + FormatAdifDate(c.Date));
                     }
-                    if (countryChanges.Count > MaxReportRows)
-                        sb.AppendLine($"  … and {countryChanges.Count - MaxReportRows:N0} more. "
+                    if (rows.Count > MaxReportRows)
+                        sb.AppendLine($"  … and {rows.Count - MaxReportRows:N0} more. "
                                       + "Every one of them is counted in the summary below.");
                     sb.AppendLine();
 
