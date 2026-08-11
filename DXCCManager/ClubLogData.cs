@@ -218,11 +218,31 @@ namespace DXCCManager
             Record hit = Pick(exceptions, call, whenUtc);
             if (hit != null) return ToMatch(hit, true, call.Length);
 
+            // THE PART THAT SAYS WHERE THE STATION IS, which is not always at the front: 9H5G/C6A is a
+            // Maltese station in the Bahamas, VA7CD/DU7 a Canadian in the Philippines. Matching from the
+            // front of the whole string answered Malta and Canada - the operator's home country, which
+            // is the one thing the stroke exists to say they are NOT in. cty.dat's side of the lookup
+            // learned this; this side had not, and Club Log's answer outranks cty.dat's, so it decided.
+            string operating = EntityResolver.OperatingPart(call);
+            if (!string.Equals(operating, call, StringComparison.Ordinal))
+            {
+                hit = Pick(exceptions, operating, whenUtc);
+                if (hit != null) return ToMatch(hit, true, operating.Length);
+
+                ClubLogMatch fromPart = LongestPrefix(operating, whenUtc);
+                if (fromPart != null) return fromPart;
+            }
+
             // Otherwise the longest prefix that was valid on the day, same rule as cty.dat.
+            return LongestPrefix(call, whenUtc);
+        }
+
+        private ClubLogMatch LongestPrefix(string call, DateTime whenUtc)
+        {
             int len = Math.Min(call.Length, maxPrefixLength);
             for (int l = len; l >= 1; l--)
             {
-                hit = Pick(prefixes, call.Substring(0, l), whenUtc);
+                Record hit = Pick(prefixes, call.Substring(0, l), whenUtc);
                 if (hit != null) return ToMatch(hit, false, l);
             }
             return null;

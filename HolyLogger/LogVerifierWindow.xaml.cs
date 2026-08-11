@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -38,6 +38,11 @@ namespace HolyLogger
             public string Program;      // for Field == "Activity": IOTA / SOTA / POTA / WWFF
             public int NewCq, NewItu;     // zones that travel with a country correction (0 = leave alone)
             public string NewContinent;
+
+            // THE ENTITY ITSELF, which travels with the country name and used not to. Correcting the
+            // name alone left the QSO holding the old entity - the thing every count of countries is
+            // actually made of - so a log could read "Puerto Rico" while still counting as the USA.
+            public string NewDxcc;
 
             public string Call { get; set; }
             public string Time { get; set; }
@@ -121,7 +126,7 @@ namespace HolyLogger
             InitializeComponent();
             _qsos = (qsos ?? Enumerable.Empty<QSO>()).Where(q => q != null).ToList();
             _logName = string.IsNullOrWhiteSpace(logName) ? "" : logName.Trim();
-            Title = string.IsNullOrEmpty(_logName) ? "Verify Log" : "Verify Log — " + _logName;
+            Title = string.IsNullOrEmpty(_logName) ? "Verify Log" : "Verify Log ג€” " + _logName;
 
             // The same header look as the QSO log, the cluster and the Logs window, from the one place
             // that defines it: the LogHeaderBg palette token with black text. Its background is a
@@ -134,8 +139,8 @@ namespace HolyLogger
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            TB_Header.Text = "Checking " + _qsos.Count.ToString("N0") + " QSOs…";
-            TB_Summary.Text = "working…";
+            TB_Header.Text = "Checking " + _qsos.Count.ToString("N0") + " QSOsג€¦";
+            TB_Summary.Text = "workingג€¦";
             await RunCheck();
         }
 
@@ -350,6 +355,7 @@ namespace HolyLogger
                                     dated.ResolvedBy);
                     f.Field = "Country";
                     f.NewValue = dated.Name;
+                    f.NewDxcc = dated.Entity;
                     f.NewContinent = dated.Continent != null && dated.Continent != "XX" ? dated.Continent : null;
                     f.NewCq = dated.CqZone;
                     f.NewItu = dated.ItuZone;
@@ -361,6 +367,7 @@ namespace HolyLogger
                     Finding f = New(q, "No country", "(empty)", dated.Name, dated.ResolvedBy);
                     f.Field = "Country";
                     f.NewValue = dated.Name;
+                    f.NewDxcc = dated.Entity;
                     f.NewContinent = dated.Continent != null && dated.Continent != "XX" ? dated.Continent : null;
                     f.NewCq = dated.CqZone;
                     f.NewItu = dated.ItuZone;
@@ -431,7 +438,7 @@ namespace HolyLogger
         {
             Finding f = New(q, problem, current, note, evidence);
             f.Fixable = false;
-            f.Suggested = "Check by hand — " + note;
+            f.Suggested = "Check by hand ג€” " + note;
             return f;
         }
 
@@ -500,7 +507,7 @@ namespace HolyLogger
                 return;
 
             Btn_Apply.IsEnabled = false;
-            TB_Summary.Text = "applying…";
+            TB_Summary.Text = "applyingג€¦";
 
             int written = 0;
             try
@@ -556,6 +563,9 @@ namespace HolyLogger
                     break;
                 case "Country":
                     qso.Country = f.NewValue;
+                    // The entity travels with the name. Without this the log said one country and
+                    // counted as another, which is the harder error of the two to ever notice.
+                    if (!string.IsNullOrEmpty(f.NewDxcc)) qso.DXCC = f.NewDxcc;
                     if (!string.IsNullOrEmpty(f.NewContinent)) qso.Continent = f.NewContinent;
                     // The zones belong to the entity, so a country correction carries them along - a
                     // Wake Island QSO cannot keep the CQ zone of the United States.
@@ -609,3 +619,4 @@ namespace HolyLogger
         }
     }
 }
+
