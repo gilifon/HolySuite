@@ -60,6 +60,9 @@ namespace HolyLogger
             // it is usually HolyLogger correcting an old file - but the operator is told, and the report
             // names every one, because a country silently rewritten is a country nobody can check.
             public int CountryChangeCount { get; set; }
+            // QSOs stored normally that count towards no DXCC entity - an unrecognised callsign, or a
+            // recognised one that belongs to no country (at sea, in the air, via satellite, invalid).
+            public int NoEntityCount { get; set; }
             // Records the file(s) held, so the completion message can say what was CHECKED and not
             // leave "nothing was rejected" to be inferred from the absence of a line.
             public int RecordsRead { get; set; }
@@ -594,12 +597,24 @@ namespace HolyLogger
                 // this is the operator's first sight of what HolyLogger thinks of their file.
                 if (result.CountryChangeCount > 0)
                 {
-                    msg += $"\n\n{result.CountryChangeCount:N0} QSO{(result.CountryChangeCount == 1 ? "" : "s")} "
-                         + $"named a country your file and HolyLogger disagree on. HolyLogger works the country "
-                         + "out from the callsign AND the date of the contact, which catches prefixes that have "
-                         + "changed hands and DXpeditions whose entity is not what their prefix suggests — so this "
-                         + "is usually a correction rather than a fault.\n\nIts answer was stored, and the report "
-                         + "names every one so you can check any you doubt.";
+                    msg += $"\n\nYour file was stored exactly as it is. On {result.CountryChangeCount:N0} "
+                         + $"QSO{(result.CountryChangeCount == 1 ? "" : "s")} HolyLogger would name a different "
+                         + "country — it works the country out from the callsign AND the date of the contact, "
+                         + "which catches prefixes that have changed hands and operations whose entity is not "
+                         + "what their prefix suggests.\n\nNothing was changed. The report names every one, and "
+                         + "Verify in the Log Workshop is where you can act on them.";
+                }
+
+                // Contacts that are in the log and count towards no country - an unrecognised callsign,
+                // or a recognised one that belongs to no entity. Worth saying out loud to anyone who
+                // counts countries, and invisible otherwise.
+                if (result.NoEntityCount > 0)
+                {
+                    msg += $"\n\n{result.NoEntityCount:N0} QSO{(result.NoEntityCount == 1 ? "" : "s")} "
+                         + $"count{(result.NoEntityCount == 1 ? "s" : "")} towards no country — either the "
+                         + "callsign is one no database recognises, or it belongs to no DXCC entity at all "
+                         + "(a station at sea or in the air, or an operation Club Log says never counted). "
+                         + "They are in your log; the report names them.";
                 }
 
                 if (anyRejected)
@@ -829,6 +844,7 @@ namespace HolyLogger
             var rejects = new List<ImportReject>();                    // what did not make it, and why
             var filledIn = new List<HolyLogParser.FilledField>();      // what was worked out from the record
             var countryChanges = new List<HolyLogParser.CountryChange>();  // countries the file and we disagree on
+            var entityNotes = new List<HolyLogParser.EntityNote>();         // QSOs that count towards no country
             int recordsRead = 0;                                       // what the file(s) held, all told
             const int importBatchSize = 500;
             int lastReportedPercent = 0;
@@ -920,6 +936,7 @@ namespace HolyLogger
                         });
                     filledIn.AddRange(parser.GetFilled());
                     countryChanges.AddRange(parser.GetCountryChanges());
+                    entityNotes.AddRange(parser.GetEntityNotes());
                     recordsRead += parser.RecordsRead;
 
                     RawAdif = null;   // large file string no longer needed; free it before the save phase
@@ -1085,8 +1102,8 @@ namespace HolyLogger
             AdifHandlerWorker.ReportProgress(100, "Import complete 100%");
 
             string reportPath = null, rejectsAdifPath = null;
-            if (rejects.Count > 0 || filledIn.Count > 0 || countryChanges.Count > 0)
-                WriteImportReport(rejects, filledIn, countryChanges, importedQsoCount, completedQso, ambiguousQso,
+            if (rejects.Count > 0 || filledIn.Count > 0 || countryChanges.Count > 0 || entityNotes.Count > 0)
+                WriteImportReport(rejects, filledIn, countryChanges, entityNotes, importedQsoCount, completedQso, ambiguousQso,
                                   out reportPath, out rejectsAdifPath);
 
             e.Result = new AdifImportResult
@@ -1099,6 +1116,7 @@ namespace HolyLogger
                 RejectedCount = rejects.Count,
                 FilledCount = filledIn.Count,
                 CountryChangeCount = countryChanges.Count,
+                NoEntityCount = entityNotes.Count,
                 RecordsRead = recordsRead,
                 ReportPath = reportPath,
                 RejectsAdifPath = rejectsAdifPath,
@@ -1179,6 +1197,7 @@ namespace HolyLogger
         // file back adds the missing contacts without duplicating anything.
         private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,
                                        List<HolyLogParser.CountryChange> countryChanges,
+                                       List<HolyLogParser.EntityNote> entityNotes,
                                        int imported, int completed, int ambiguous,
                                        out string reportPath, out string rejectsAdifPath)
         {
@@ -1250,11 +1269,14 @@ namespace HolyLogger
                     sb.AppendLine($"COUNTRIES YOUR FILE AND HOLYLOGGER DISAGREE ON ({countryChanges.Count:N0})");
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
                     sb.AppendLine();
-                    sb.AppendLine("Your file names a country for each QSO. HolyLogger works the country out");
-                    sb.AppendLine("again from the callsign AND THE DATE OF THAT CONTACT, and where the two");
-                    sb.AppendLine("differ it stores its own answer. These are the ones that differed.");
+                    sb.AppendLine("YOUR FILE'S ANSWER WAS STORED. Nothing below was changed in your log.");
                     sb.AppendLine();
-                    sb.AppendLine("This is usually HolyLogger correcting an old file rather than a fault:");
+                    sb.AppendLine("Your file names a country for each QSO. HolyLogger works the country out");
+                    sb.AppendLine("again from the callsign AND THE DATE OF THAT CONTACT. Where the two differ");
+                    sb.AppendLine("it keeps yours and says so here — it is your log, and a country you");
+                    sb.AppendLine("recorded is not ours to overwrite without asking.");
+                    sb.AppendLine();
+                    sb.AppendLine("A difference is worth a look, and is usually one of these:");
                     sb.AppendLine("  * A prefix can change hands. 4N1DV was Serbia; the 2012 Olympic prefix");
                     sb.AppendLine("    2O12L was England, not whatever 2O looks like today.");
                     sb.AppendLine("  * A DXpedition callsign often belongs to an entity its prefix does not");
@@ -1267,11 +1289,11 @@ namespace HolyLogger
                     sb.AppendLine("Wording alone is never listed here: \"Germany\" and \"Fed. Rep. of Germany\"");
                     sb.AppendLine("are the same entity and are not a disagreement.");
                     sb.AppendLine();
-                    sb.AppendLine("If you believe one of these is wrong, the callsign and date are all that");
-                    sb.AppendLine("is needed to check it against Club Log or the ARRL list.");
+                    sb.AppendLine("To act on any of these, use Verify in the Log Workshop. Nothing here has");
+                    sb.AppendLine("been changed for you.");
                     sb.AppendLine();
                     sb.AppendLine("  " + "CALL".PadRight(12) + " " + "DATE".PadRight(10)
-                                  + " " + "YOUR FILE SAID".PadRight(28) + " STORED AS");
+                                  + " " + "YOUR FILE (kept)".PadRight(28) + " HOLYLOGGER MAKES IT");
                     sb.AppendLine();
 
                     foreach (var c in countryChanges)
@@ -1279,7 +1301,7 @@ namespace HolyLogger
                         string call = (string.IsNullOrWhiteSpace(c.Call) ? "—" : c.Call).PadRight(12);
                         string date = (string.IsNullOrWhiteSpace(c.Date) ? "—" : c.Date).PadRight(10);
                         string was = (c.FromFile ?? "—");
-                        sb.AppendLine($"  {call} {date} {was.PadRight(28)} {c.Stored}"
+                        sb.AppendLine($"  {call} {date} {was.PadRight(28)} {c.OurAnswer}"
                                       + (string.IsNullOrWhiteSpace(c.ResolvedBy) ? "" : $"   (per {c.ResolvedBy})"));
                     }
                     sb.AppendLine();
@@ -1287,13 +1309,57 @@ namespace HolyLogger
                     // The same entities once each, so a file with 900 QSOs from one wrongly-named country
                     // reads as one thing to check rather than 900 lines to scroll past.
                     var pairs = countryChanges
-                        .GroupBy(c => ((c.FromFile ?? "") + " → " + (c.Stored ?? "")), StringComparer.OrdinalIgnoreCase)
+                        .GroupBy(c => ((c.FromFile ?? "") + " → " + (c.OurAnswer ?? "")), StringComparer.OrdinalIgnoreCase)
                         .OrderByDescending(g => g.Count())
                         .ToList();
                     sb.AppendLine($"  SUMMARY — {pairs.Count:N0} distinct change{(pairs.Count == 1 ? "" : "s")}:");
                     foreach (var g in pairs)
                         sb.AppendLine($"      {g.Count(),6:N0}  {g.Key}");
                     sb.AppendLine();
+                }
+
+                if (entityNotes != null && entityNotes.Count > 0)
+                {
+                    int unknown = entityNotes.Count(n => n.IsUnknown);
+                    int nonEntity = entityNotes.Count - unknown;
+
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine($"QSOs THAT COUNT TOWARDS NO COUNTRY ({entityNotes.Count:N0})");
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine();
+                    sb.AppendLine("These QSOs are IN your log and were stored normally. They are listed");
+                    sb.AppendLine("because no DXCC entity can be counted for them, which matters when you");
+                    sb.AppendLine("are counting countries.");
+                    sb.AppendLine();
+
+                    if (unknown > 0)
+                    {
+                        sb.AppendLine($"  NO COUNTRY RECOGNISED ({unknown:N0})");
+                        sb.AppendLine("  No database has heard of this callsign's prefix. Usually a typo — an");
+                        sb.AppendLine("  O typed for a zero is the common one — or a prefix long retired, or a");
+                        sb.AppendLine("  callsign that was never valid. Only you can say which.");
+                        sb.AppendLine();
+                        foreach (var n in entityNotes.Where(n => n.IsUnknown))
+                            sb.AppendLine($"      {(string.IsNullOrWhiteSpace(n.Call) ? "—" : n.Call).PadRight(12)} "
+                                          + $"{(string.IsNullOrWhiteSpace(n.Date) ? "—" : n.Date).PadRight(10)} "
+                                          + (string.IsNullOrWhiteSpace(n.Country) ? "" : $"your file says {n.Country}"));
+                        sb.AppendLine();
+                    }
+
+                    if (nonEntity > 0)
+                    {
+                        sb.AppendLine($"  NOT A DXCC ENTITY ({nonEntity:N0})");
+                        sb.AppendLine("  Nothing is wrong with these records. The databases recognise them and");
+                        sb.AppendLine("  answer that they belong to no country: a station at sea or in the air,");
+                        sb.AppendLine("  one worked through a satellite or repeater, or an operation Club Log");
+                        sb.AppendLine("  lists as never having counted. They are real contacts and they are in");
+                        sb.AppendLine("  your log — they simply add nothing to a country total.");
+                        sb.AppendLine();
+                        foreach (var n in entityNotes.Where(n => !n.IsUnknown))
+                            sb.AppendLine($"      {(string.IsNullOrWhiteSpace(n.Call) ? "—" : n.Call).PadRight(12)} "
+                                          + $"{(string.IsNullOrWhiteSpace(n.Date) ? "—" : n.Date).PadRight(10)} {n.Note}");
+                        sb.AppendLine();
+                    }
                 }
 
                 System.IO.File.WriteAllText(txt, sb.ToString(), Encoding.UTF8);
@@ -1445,3 +1511,4 @@ namespace HolyLogger
 
     }
 }
+
