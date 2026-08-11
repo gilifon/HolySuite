@@ -1461,7 +1461,18 @@
         <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="69,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="264" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" TextChanged="TB_DX_Name_TextChanged" />
         <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="340,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
         <Image x:Name="Img_CountryFlag" HorizontalAlignment="Left" Margin="376,167,0,0" VerticalAlignment="Top" Grid.Row="1" Width="30" Height="20" Stretch="Uniform" Visibility="Collapsed" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
-        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="411,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="169" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="16" />
+        <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="411,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="124" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="16" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
+        <!-- THE COUNTRY'S NUMBER, in a box of its own and NOT inside the one beside it. That box is
+             two-way bound to Country, and Country is what is saved with the QSO - writing "Israel (336)"
+             into it would store the brackets as part of the country's name. Read-only: the number is
+             worked out from the callsign and the date, never typed. The Country box gives up 45px for
+             this, so the longest names now end in an ellipsis; the flag and the tooltip still say which
+             country it is, and the number itself is the least ambiguous answer on the row. -->
+        <TextBox x:Name="TB_DxccCode" HorizontalAlignment="Left" Height="28" Margin="539,163,0,0"
+                 TextWrapping="NoWrap" VerticalAlignment="Top" Width="41" Grid.Row="1" FontSize="16"
+                 IsReadOnly="True" IsTabStop="False" TextAlignment="Center"
+                 Foreground="{DynamicResource MutedTextBrush}"
+                 ToolTip="The ARRL DXCC entity number for this country — what an award is counted on" />
         <Label Content="State" HorizontalAlignment="Left" Margin="580,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="627,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" CharacterCasing="Upper" MaxLength="3" Grid.Row="1" FontSize="16" TabIndex="17" TextChanged="TB_State_TextChanged" />
         <!-- Orphaned QRZ-photo frame: never populated by any code (Img_QRZPhoto is unreferenced),

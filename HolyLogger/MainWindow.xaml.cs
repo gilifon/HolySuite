@@ -1877,6 +1877,8 @@ namespace HolyLogger
             FName = string.Empty;
             Country = string.Empty;
             UpdateCountryFlag(null);
+
+            ShowDxccCode(0);
             ClearQrzPhoto();
             Continent = string.Empty;
             // Clearing the form starts a new contact, so its date and time are now - unless the operator
@@ -4738,6 +4740,8 @@ namespace HolyLogger
                 Country = QsoToUpdate.Country;
                 Continent = QsoToUpdate.Continent;
                 UpdateCountryFlag(QsoToUpdate.Country);
+
+                ShowDxccCode(QsoToUpdate.DxccCode > 0 ? QsoToUpdate.DxccCode : EntityCodeForCall(QsoToUpdate.DXCall, QsoToUpdate.Date));
 
                 // Load the QSO's stored ITU/CQ zones. For QSOs logged before zones were stored
                 // (empty), fall back to re-deriving them from the callsign via cty.dat so the
@@ -9370,6 +9374,8 @@ namespace HolyLogger
                     TB_ITUZone.Text = "";
                     TB_CQZone.Text = "";
                     UpdateCountryFlag(null);
+
+                    ShowDxccCode(0);
                     // Use ClearAzimuth (not ClearAzimuthForTyping) so emptying the DX callsign removes
                     // the azimuth line to the deleted station and immediately restores the cluster-spots
                     // map view, instead of leaving the stale arc until the next spot batch arrives.
@@ -9481,6 +9487,7 @@ namespace HolyLogger
             DXCC dXCC = CountryLookup.Shared.Resolve(dxCallText, lookupWhen);
             Country = dXCC.Name;
             UpdateCountryFlag(dXCC.Name);
+            ShowDxccCode(dXCC.IsDxccEntity ? (dXCC.DxccCode > 0 ? dXCC.DxccCode : EntityCodeForCall(dxCallText, null)) : 0);
             // "XX" is the resolver saying it did not recognise the prefix, not a continent. Storing it
             // puts a placeholder in the QSO that every screen then has to read as data - it turned up in
             // the Log Workshop's Continent filter sitting among AF, AS, EU and the rest, as though the
@@ -10343,6 +10350,14 @@ namespace HolyLogger
             {"Vienna Intl Ctr","un"},{"Wake Island","us"},{"Wallis & Futuna Islands","wf"},
             {"Western Kiribati","ki"},{"Willis Island","au"},
         };
+
+        // Puts the country's number in the small box beside its name. Blank for 0: a contact that belongs
+        // to no entity has no number, and a "0" in that box would read as a country numbered zero.
+        private void ShowDxccCode(int code)
+        {
+            if (TB_DxccCode == null) return;
+            TB_DxccCode.Text = code > 0 ? code.ToString() : string.Empty;
+        }
 
         // The ADIF entity number for a callsign worked on a given date - the country's identity, stored
         // with the QSO so nothing downstream has to work it out from the name again. 0 when it cannot be
@@ -11749,6 +11764,7 @@ namespace HolyLogger
         }
     }
 }
+
 
 
 
