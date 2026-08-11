@@ -79,6 +79,12 @@ namespace HolyLogger
         // filtered by that country.
         public event Action<string> CountrySearchRequested;
 
+        // "Show me these QSOs, properly" - a set of contacts this window has identified, handed to the
+        // Log Workshop rather than shown in a little read-only table of its own. The string names the
+        // slice, so the Workshop's title can say what is in it and nobody mistakes it for the whole log.
+        // Raised here, acted on by the main window, which is what owns the Workshop.
+        public event Action<ObservableCollection<QSO>, string> QsoSubsetRequested;
+
         public StatisticsWindow(ObservableCollection<QSO> qsos)
         {
             InitializeComponent();
@@ -1173,36 +1179,6 @@ namespace HolyLogger
             win.ShowDialog();
         }
 
-        // The DELETED entities this folder counts as confirmed, with how many QSOs each rests on.
-        //
-        // Deleted entities are the figures an operator can least easily check: they are excluded from every
-        // "/ 340" on the page (correctly - they no longer exist), so the only trace of them was a bare
-        // count. A DXer who has chased one for years wants to see WHICH ones, and to be able to look again
-        // later without hunting for the window, which is why the list remembers where it was put.
-        private List<CountryItem> DeletedConfirmedCountries()
-        {
-            var byName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            if (_allQsos != null)
-            {
-                var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
-                foreach (QSO q in _allQsos)
-                {
-                    if (q == null || !IsAchievedForSource(q)) continue;
-                    DXCC d = Resolve(q.DXCall, q.Date);
-                    if (d == null || string.IsNullOrEmpty(d.Name)
-                        || string.Equals(d.Name, "Unknown", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (current.Contains(d.Name)) continue;   // still exists - not a deleted entity
-                    int n;
-                    byName[d.Name] = byName.TryGetValue(d.Name, out n) ? n + 1 : 1;
-                }
-            }
-            return byName.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
-                         .Select(p => new CountryItem { Name = p.Key, Count = p.Value, FlagImage = GetFlagImage(p.Key) })
-                         .ToList();
-        }
-
-        // Click the "N deleted" count -> the list of those countries. The window keeps its position and
-        // size between openings (and between sessions) through WindowBounds, like the other windows.
         // The Missing tile's two lines: what is missing out of every entity that exists, and what is
         // missing for the DXCC Honor Roll.
         //
@@ -1252,13 +1228,45 @@ namespace HolyLogger
             }
         }
 
+        // The QSOs behind the "N deleted" count, and how many distinct entities they cover.
+        private ObservableCollection<QSO> DeletedEntityQsos(out int entityCount)
+        {
+            var subset = new ObservableCollection<QSO>();
+            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            entityCount = 0;
+            if (_allQsos == null) return subset;
+
+            var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
+            foreach (QSO q in _allQsos)
+            {
+                if (q == null || !IsAchievedForSource(q)) continue;
+                DXCC d = ResolveQso(q);
+                if (d == null || string.IsNullOrEmpty(d.Name)
+                    || string.Equals(d.Name, "Unknown", StringComparison.OrdinalIgnoreCase)) continue;
+                if (current.Contains(d.Name)) continue;   // still exists - not a deleted entity
+                names.Add(d.Name);
+                subset.Add(q);
+            }
+            entityCount = names.Count;
+            return subset;
+        }
+
+        // Click the "N deleted" count -> THE QSOs THEMSELVES, in the Log Workshop.
+        //
+        // It used to open a little read-only table of country names and a QSO count each, which answered
+        // "which ones" and nothing else. A deleted entity is often the rarest thing in an operator's log
+        // and the contact they most want to look at: when it was, on what band, whether it is confirmed,
+        // what the card says. The Workshop already shows all of that, sorts it, edits it, exports it and
+        // uploads it, so the honest thing is to hand it the contacts rather than build a lesser table.
         private void DeletedCountries_Click(object sender, RoutedEventArgs e)
         {
-            var list = DeletedConfirmedCountries();
-            // On the Worked folder every logged QSO counts, so this same list is the deleted entities the
-            // operator has WORKED - the wording follows, rather than claiming a confirmation.
+            int entities;
+            ObservableCollection<QSO> qsos = DeletedEntityQsos(out entities);
+
+            // On the Worked folder every logged QSO counts, so these are the deleted entities the operator
+            // has WORKED - the wording follows, rather than claiming a confirmation.
             bool workedFolder = _source == ConfSource.Worked;
-            if (list.Count == 0)
+            if (qsos.Count == 0)
             {
                 HolyMessageBox.Show(workedFolder
                         ? "No deleted DXCC entities have been worked in this log."
@@ -1267,50 +1275,11 @@ namespace HolyLogger
                 return;
             }
 
-            var grid = new DataGrid
-            {
-                AutoGenerateColumns = false,
-                IsReadOnly = true,
-                CanUserAddRows = false,
-                HeadersVisibility = DataGridHeadersVisibility.Column,
-                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
-                SelectionMode = DataGridSelectionMode.Single,
-                FontSize = 16,
-                ItemsSource = list,
-            };
-            grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
-            ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
-            grid.Columns.Add(new DataGridTextColumn
-            {
-                Header = "Deleted country",
-                Binding = new System.Windows.Data.Binding("Name"),
-                Width = new DataGridLength(1, DataGridLengthUnitType.Star),
-            });
-            grid.Columns.Add(new DataGridTextColumn
-            {
-                Header = "QSOs",
-                Binding = new System.Windows.Data.Binding("Count"),
-                Width = 80,
-            });
+            string what = workedFolder
+                ? $"deleted entities worked ({entities} {(entities == 1 ? "country" : "countries")}, {qsos.Count:N0} QSOs)"
+                : $"deleted entities confirmed by {SourceName} ({entities} {(entities == 1 ? "country" : "countries")}, {qsos.Count:N0} QSOs)";
 
-            var win = new Window
-            {
-                Title = workedFolder
-                    ? $"Deleted countries worked ({list.Count})"
-                    : $"Deleted countries confirmed — {SourceName} ({list.Count})",
-                Owner = this,
-                Width = 380,
-                Height = 300,
-                MinWidth = 300,
-                MinHeight = 200,
-                ResizeMode = ResizeMode.CanResize,
-                WindowStartupLocation = WindowStartupLocation.CenterOwner,
-                Background = (System.Windows.Media.Brush)ThemeManager.Brush("WindowBg"),
-                Content = new Border { Padding = new Thickness(10), Child = grid },
-            };
-            // Remembers where the operator put it, for this and every future session.
-            WindowBounds.Attach(win, "DeletedCountries");
-            win.ShowDialog();
+            QsoSubsetRequested?.Invoke(qsos, what);
         }
 
         // How many CURRENT entities the operator holds a paper card for that the folder's own source has
@@ -1865,7 +1834,7 @@ namespace HolyLogger
                     var link = new System.Windows.Documents.Hyperlink(
                         new System.Windows.Documents.Run($"{deletedConfirmed} deleted"))
                     {
-                        ToolTip = "Click to see which deleted countries these are",
+                        ToolTip = "Click to open these QSOs in the Log Workshop",
                         Foreground = System.Windows.Media.Brushes.ForestGreen,
                     };
                     link.Click += DeletedCountries_Click;
@@ -1926,7 +1895,7 @@ namespace HolyLogger
                     var workedDeletedLink = new System.Windows.Documents.Hyperlink(
                         new System.Windows.Documents.Run($"{workedDeleted} deleted"))
                     {
-                        ToolTip = "Click to see which deleted countries these are",
+                        ToolTip = "Click to open these QSOs in the Log Workshop",
                         Foreground = System.Windows.Media.Brushes.ForestGreen,
                     };
                     workedDeletedLink.Click += DeletedCountries_Click;

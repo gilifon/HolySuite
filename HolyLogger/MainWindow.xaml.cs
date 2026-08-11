@@ -6156,8 +6156,42 @@ namespace HolyLogger
             statisticsWindow = new StatisticsWindow(Qsos);
             statisticsWindow.Dal = dal;
             statisticsWindow.CountrySearchRequested += OpenSearchWindowForCountry;
+            statisticsWindow.QsoSubsetRequested += OpenWorkshopForSubset;
             statisticsWindow.Closed += (s, _) => statisticsWindow = null;
             statisticsWindow.Show();
+        }
+
+        // A Log Workshop over a SLICE of the log - the QSOs behind a figure the Statistics window shows,
+        // e.g. the deleted DXCC entities behind its "N deleted" link.
+        //
+        // A SECOND Workshop, not the main one: that one is the operator's view of the whole log, and
+        // quietly repointing it at seven QSOs would take their working window away from them. This one is
+        // single-instance in its own right, so asking twice re-uses it rather than stacking windows, and
+        // its caption names the slice so a small count cannot be mistaken for a shrunken log.
+        private SearchWindow subsetWorkshop;
+
+        private void OpenWorkshopForSubset(ObservableCollection<QSO> qsos, string what)
+        {
+            if (qsos == null || qsos.Count == 0) return;
+            string label = (what ?? "selected QSOs") + " — " + SafeActiveLogName();
+            try
+            {
+                if (subsetWorkshop != null && subsetWorkshop.IsLoaded)
+                {
+                    subsetWorkshop.SetTitleLog(label);
+                    subsetWorkshop.ReplaceSource(qsos);
+                    subsetWorkshop.Activate();
+                    return;
+                }
+                subsetWorkshop = new SearchWindow(qsos, label) { Owner = this };
+                subsetWorkshop.Closed += (s, _) => subsetWorkshop = null;
+                subsetWorkshop.Show();
+            }
+            catch (System.Exception ex)
+            {
+                HolyMessageBox.ShowError("Could not open the Log Workshop for those QSOs.\n\n" + ex.Message,
+                                         "Log Workshop", this);
+            }
         }
 
         private void OptionsMenuItemMenuItem_Click(object sender, RoutedEventArgs e)

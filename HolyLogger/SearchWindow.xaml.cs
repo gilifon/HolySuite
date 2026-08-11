@@ -2197,6 +2197,16 @@ namespace HolyLogger
         // OPEN Search window reflects data that changed underneath it - the LoTW confirmation marking
         // reassigns the main window's collection, and without this the search would keep showing the
         // old objects, which never received the ticks.
+        // What the caption calls the set of QSOs on show. Normally the log's name; a window opened on a
+        // SLICE of a log (the Statistics window's deleted entities, say) says which slice, so a count far
+        // smaller than the log's does not read as data gone missing.
+        public void SetTitleLog(string label)
+        {
+            string text = string.IsNullOrWhiteSpace(label) ? "(unnamed log)" : label.Trim();
+            TB_TitleLog.Text = text;
+            Title = "Log Workshop — " + text;
+        }
+
         public void ReplaceSource(ObservableCollection<QSO> qsos)
         {
             if (qsos == null || _cellInEdit) return;
