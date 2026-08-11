@@ -556,74 +556,57 @@ namespace HolyLogger
                     totalQsos = result.RefreshedQsos != null ? result.RefreshedQsos.Count : 0;
                 }
 
+                // WHAT HAPPENED, IN NUMBERS FIRST.
+                //
+                // This message used to be six paragraphs of prose explaining every number as it arrived,
+                // and an operator finishing a long import had to read an essay to learn that it went
+                // well. Numbers now come first, each on its own short line, and the explaining is done
+                // once at the end in two sentences - the rest is in the report, which is what a report
+                // is for. Anything with nothing to say prints no line at all.
                 bool anyRejected = result.RejectedCount > 0;
+                bool anyFindings = result.CountryChangeCount > 0 || result.NoEntityCount > 0;
+
                 string msg = anyRejected ? "Import finished.\n\n" : "Import completed successfully!\n\n";
-                msg += $"New QSOs added: {result.ImportedQsoCount:N0}";
+
+                msg += $"Added to this log:  {result.ImportedQsoCount:N0}\n";
                 if (result.CompletedQsoCount > 0)
-                    msg += $"\nAlready in this log — fields filled in: {result.CompletedQsoCount:N0}";
+                    msg += $"Already here, filled in:  {result.CompletedQsoCount:N0}\n";
                 if (result.AmbiguousQsoCount > 0)
-                    msg += $"\nAlready in this log — too alike to match: {result.AmbiguousQsoCount:N0}";
+                    msg += $"Already here, too alike to match:  {result.AmbiguousQsoCount:N0}\n";
                 if (anyRejected)
-                    msg += $"\nNOT stored: {result.RejectedCount:N0}";
-                msg += $"\n\nTotal QSOs in log: {totalQsos:N0}";
+                    msg += $"NOT stored:  {result.RejectedCount:N0}\n";
+                msg += $"Total now in this log:  {totalQsos:N0}\n";
 
-                // SAY that the file was checked, and out of how many. A check that reports only when it
-                // finds something is a check the operator cannot tell apart from one that never ran -
-                // "how do I know the verification was with no errors?" has to be answered on the screen
-                // they are already looking at, not by the absence of a line.
+                // The check ran and found nothing is a different statement from the check never ran, and
+                // only one line separates them.
                 if (result.RecordsRead > 0)
+                    msg += anyRejected
+                        ? $"\nAll {result.RecordsRead:N0} records in the file were checked."
+                        : $"\nAll {result.RecordsRead:N0} records were checked — none was turned away.";
+
+                if (anyFindings || result.FilledCount > 0)
                 {
-                    if (!anyRejected)
-                        msg += $"\n\nAll {result.RecordsRead:N0} records in the file were checked, and every one "
-                             + "of them had a callsign, a date, a time, a band, a mode and a station callsign. "
-                             + "None was turned away.";
-                    else
-                        msg += $"\n\nAll {result.RecordsRead:N0} records in the file were checked.";
+                    msg += "\n\nWorth a look:\n";
+                    if (result.CountryChangeCount > 0)
+                        msg += $"\n• {result.CountryChangeCount:N0} QSO{(result.CountryChangeCount == 1 ? "" : "s")} "
+                             + "where HolyLogger would name a different country";
+                    if (result.NoEntityCount > 0)
+                        msg += $"\n• {result.NoEntityCount:N0} QSO{(result.NoEntityCount == 1 ? "" : "s")} "
+                             + "that count towards no country at all";
+                    if (result.FilledCount > 0)
+                        msg += $"\n• {result.FilledCount:N0} record{(result.FilledCount == 1 ? "" : "s")} "
+                             + "missing the band, worked out from the frequency";
                 }
 
-                // A record can be short of a field and still be kept, when the rest of it answers for
-                // that field - the band from the frequency. That is a change to the operator's data and
-                // is named in the report, so the report must be offered even when nothing was rejected.
-                if (!anyRejected && result.FilledCount > 0)
-                {
-                    msg += $"\n\n{result.FilledCount:N0} record{(result.FilledCount == 1 ? " was" : "s were")} "
-                         + "missing a field that the rest of the record already answered — the band, worked out "
-                         + "from the frequency. The report lists each one.";
-                }
-
-                // The country is worked out again from the callsign AND the date, and where that differs
-                // from what the file said, our answer is stored. Saying so is the whole point: a country
-                // rewritten in silence is one nobody can check, and on a first import from another program
-                // this is the operator's first sight of what HolyLogger thinks of their file.
-                if (result.CountryChangeCount > 0)
-                {
-                    msg += $"\n\nYour file was stored exactly as it is. On {result.CountryChangeCount:N0} "
-                         + $"QSO{(result.CountryChangeCount == 1 ? "" : "s")} HolyLogger would name a different "
-                         + "country — it works the country out from the callsign AND the date of the contact, "
-                         + "which catches prefixes that have changed hands and operations whose entity is not "
-                         + "what their prefix suggests.\n\nNothing was changed. The report names every one, and "
-                         + "Verify in the Log Workshop is where you can act on them.";
-                }
-
-                // Contacts that are in the log and count towards no country - an unrecognised callsign,
-                // or a recognised one that belongs to no entity. Worth saying out loud to anyone who
-                // counts countries, and invisible otherwise.
-                if (result.NoEntityCount > 0)
-                {
-                    msg += $"\n\n{result.NoEntityCount:N0} QSO{(result.NoEntityCount == 1 ? "" : "s")} "
-                         + $"count{(result.NoEntityCount == 1 ? "s" : "")} towards no country — either the "
-                         + "callsign is one no database recognises, or it belongs to no DXCC entity at all "
-                         + "(a station at sea or in the air, or an operation Club Log says never counted). "
-                         + "They are in your log; the report names them.";
-                }
+                if (anyFindings)
+                    msg += "\n\nYour file was stored exactly as it is — nothing was changed. The report "
+                         + "names every one, and Verify in the Log Workshop is where you can act on them.";
 
                 if (anyRejected)
                 {
-                    msg += $"\n\n{result.RejectedCount:N0} QSO{(result.RejectedCount == 1 ? "" : "s")} in your file "
-                         + $"{(result.RejectedCount == 1 ? "is" : "are")} missing something a QSO cannot be stored "
-                         + "without — a callsign, a date, a time, a band, a mode or the station callsign it was "
-                         + "made under.\n\nThe report names every one of them and says what is missing. The same "
-                         + "QSOs are saved beside it as an ADIF file you can correct and import again — nothing "
+                    msg += $"\n\nThe {result.RejectedCount:N0} not stored are missing something a QSO cannot be "
+                         + "stored without — a callsign, a date, a time, a band, a mode or the station callsign. "
+                         + "They are saved beside the report as an ADIF you can correct and import again; nothing "
                          + "already in your log will be duplicated.";
 
                     if (!string.IsNullOrEmpty(result.ReportPath))
