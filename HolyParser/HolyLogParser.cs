@@ -164,8 +164,37 @@ namespace HolyParser
             public string From { get; set; }
         }
 
+        // ONE RECORD WHOSE COUNTRY WE OVERRULED.
+        //
+        // The importer reads the <COUNTRY> the file carries and then re-resolves the callsign against the
+        // QSO's own date, because a file's country is only as good as the day it was written: a prefix
+        // that has since changed hands, a DXpedition callsign whose entity is not what its prefix says
+        // (K9W was Wake Island for two weeks, not the USA), an entity deleted years ago. Our answer wins
+        // - and used to win in silence, with nothing kept to say the file had said otherwise.
+        //
+        // That silence is the problem. An operator importing years of logging has no way to see that
+        // hundreds of countries were rewritten, and no way to tell a correction from a mistake of ours.
+        // Only a REAL disagreement is recorded: same entity worded differently ("Germany" against "Fed.
+        // Rep. of Germany") is not a finding and would bury the ones that are.
+        public class CountryChange
+        {
+            public int Number { get; set; }        // the record's position in the file
+            public string Call { get; set; }
+            public string Date { get; set; }
+            public string FromFile { get; set; }   // what the file said
+            public string Stored { get; set; }     // what was stored instead
+            public string ResolvedBy { get; set; } // which database answered: cty.dat or Club Log
+        }
+
         private readonly List<RejectedRecord> m_rejected = new List<RejectedRecord>();
         private readonly List<FilledField> m_filled = new List<FilledField>();
+        private readonly List<CountryChange> m_countryChanges = new List<CountryChange>();
+
+        // Which record is being parsed, so a finding can name it. ParseRawQSO does not take the number.
+        private int m_recordBeingParsed;
+
+        // The <COUNTRY> the current record carried, before anything of ours overwrote it.
+        private string m_countryFromFile;
 
         // How many records the file actually held. Reported so the operator can see that every one of
         // them was looked at - "none was turned away" means nothing unless it also says out of how many.
@@ -174,6 +203,7 @@ namespace HolyParser
 
         public List<RejectedRecord> GetRejected() { return m_rejected; }
         public List<FilledField> GetFilled() { return m_filled; }
+        public List<CountryChange> GetCountryChanges() { return m_countryChanges; }
 
         // The station callsign to fall back on when a record names neither STATION_CALLSIGN nor
         // OPERATOR. Set by the importer to the log's own identity; left empty, such a record is
@@ -248,6 +278,7 @@ namespace HolyParser
                     if (!string.IsNullOrWhiteSpace(row))
                     {
                         recordNumber++;
+                        m_recordBeingParsed = recordNumber;
                         try
                         {
                             // Strip line breaks from THIS record (the old code stripped them from the
@@ -382,6 +413,9 @@ namespace HolyParser
                 return ParseN1MMRawQSO(row);
 
             QSO qso_row = new QSO();
+            // Cleared per record, or a record carrying no <COUNTRY> would be compared against the one
+            // before it - see RecordCountryChange.
+            m_countryFromFile = null;
             qso_row.IsAllowWARC = IsParseWARC;
             qso_row.Continent = "";
             qso_row.Operator = "";
@@ -406,6 +440,12 @@ namespace HolyParser
             if (match.Success)
             {
                 qso_row.Country = Regex.Split(row, country_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                // KEPT SEPARATELY, because qso_row.Country does not survive: the callsign's own prefix
+                // answer overwrites it a few lines below, and the dated answer overwrites that at the end.
+                // Comparing what we finally stored against qso_row.Country would be comparing our answer
+                // with our answer, which is what the first version of this did - and it duly reported
+                // that a file naming Russia for a station we stored as European Russia agreed with us.
+                m_countryFromFile = qso_row.Country;
             }
 
             regex = new Regex(dxcall_pattern, RegexOptions.IgnoreCase);
@@ -714,6 +754,12 @@ namespace HolyParser
             qso_row.ExtraAdif = ExtraAdifFields(row);
 
             ResolveCountryForDate(qso_row);
+
+            // LAST, so it compares the file's country against what was actually stored - after the
+            // prefix answer AND the dated answer have each had their say. It also runs when the dated
+            // pass declined to change anything, because the prefix answer alone can differ from the file.
+            RecordCountryChange(qso_row);
+
             qso_row.StandartizeQSO();
             return qso_row;
         }
@@ -748,6 +794,52 @@ namespace HolyParser
             qso_row.DXCC = dated.Entity;
             if (!string.IsNullOrEmpty(dated.Continent) && dated.Continent != "XX")
                 qso_row.Continent = dated.Continent;
+        }
+
+        // Notes a country the file named and we overruled - but only when it is a REAL disagreement.
+        //
+        // Entity NUMBERS decide it wherever both sides have one: the databases word the same entity
+        // differently often enough that comparing text would report thousands of non-problems and hide
+        // the handful that matter. Where a number is missing (cty.dat carries no entity numbers of its
+        // own) the wording is levelled instead - "St." against "Saint", "Is." against "Islands" - by the
+        // same rule the country databases are matched with.
+        private void RecordCountryChange(QSO qso_row)
+        {
+            string fromFile = (m_countryFromFile ?? string.Empty).Trim();
+            string stored = (qso_row.Country ?? string.Empty).Trim();
+            if (fromFile.Length == 0 || stored.Length == 0) return;   // nothing to compare
+
+            try
+            {
+                DateTime when;
+                bool dated = DateTime.TryParseExact((qso_row.Date ?? string.Empty).Trim(), "yyyyMMdd",
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out when);
+
+                int fileCode = dated ? CountryLookup.Shared.EntityCodeForCountry(fromFile, when)
+                                     : CountryLookup.Shared.EntityCodeForCountry(fromFile);
+                int ourCode = dated ? CountryLookup.Shared.EntityCodeForCountry(stored, when)
+                                    : CountryLookup.Shared.EntityCodeForCountry(stored);
+
+                bool same = (fileCode > 0 && ourCode > 0)
+                    ? fileCode == ourCode
+                    : CountryLookup.IsSameCountryWording(fromFile, stored);
+                if (same) return;
+
+                m_countryChanges.Add(new CountryChange
+                {
+                    Number = m_recordBeingParsed,
+                    Call = qso_row.DXCall,
+                    Date = qso_row.Date,
+                    FromFile = fromFile,
+                    Stored = stored,
+                    ResolvedBy = ER_Dxcc != null ? ER_Dxcc.ResolvedBy : null,
+                });
+            }
+            catch
+            {
+                // A finding is a convenience; failing to work one out must never cost the QSO its import.
+            }
         }
 
         // An ADIF value with its surrounding blanks gone, and null rather than an empty string, so an

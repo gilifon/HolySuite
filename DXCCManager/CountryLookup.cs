@@ -378,6 +378,38 @@ namespace DXCCManager
             return Flatten(a) == Flatten(b) && Flatten(a).Length > 0;
         }
 
+        // The same levelling, offered to callers who have to tell a real disagreement from a difference
+        // in wording - an importer comparing the country a FILE carried against the one resolved from
+        // the callsign, where "Germany" and "Fed. Rep. of Germany" are the same answer and must not be
+        // reported as a problem.
+        public static bool IsSameCountryName(string a, string b)
+        {
+            return SameCountryName(a, b);
+        }
+
+        // The same question asked more forgivingly, for a REPORT rather than for a lookup: is one of
+        // these merely a fuller wording of the other?
+        //
+        // Entity numbers settle it when both sides have one, and this is only reached when they do not -
+        // which happens more than it sounds. Club Log's number for the bare word "Germany" is entity 81,
+        // deleted in 1973, so a modern QSO gets no number for it at all, while our own answer is "Fed.
+        // Rep. of Germany". Compared as text those differ, and a Log4OM log would report every German
+        // contact in it as a disagreement - thousands of lines saying nothing, burying the few that mean
+        // something.
+        //
+        // So one name CONTAINING the other counts as agreement: Germany inside Fed. Rep. of Germany,
+        // Russia inside European Russia. It is a heuristic and it is deliberately generous - the cost of
+        // staying quiet about a real difference here is that one line is missing from a report, while the
+        // cost of crying wolf is a report nobody reads.
+        public static bool IsSameCountryWording(string a, string b)
+        {
+            string x = Flatten(a), y = Flatten(b);
+            if (x.Length == 0 || y.Length == 0) return false;
+            if (x == y) return true;
+            if (x.Length < 4 || y.Length < 4) return false;    // too short to contain anything meaningfully
+            return x.Contains(y) || y.Contains(x);
+        }
+
         // "BONAIRE, CURACAO (NETH ANTILLES)" -> "Bonaire, Curacao (Neth Antilles)". Only used for names
         // that come from Club Log verbatim; cty.dat's own wording is never touched.
         private static string TitleCase(string s)

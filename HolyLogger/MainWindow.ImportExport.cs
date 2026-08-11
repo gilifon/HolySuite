@@ -56,6 +56,10 @@ namespace HolyLogger
             // them. RejectsAdifPath is the same records as a file they can correct and import again.
             public int RejectedCount { get; set; }
             public int FilledCount { get; set; }
+            // Countries the imported file named differently from the answer stored. Not a fault count -
+            // it is usually HolyLogger correcting an old file - but the operator is told, and the report
+            // names every one, because a country silently rewritten is a country nobody can check.
+            public int CountryChangeCount { get; set; }
             // Records the file(s) held, so the completion message can say what was CHECKED and not
             // leave "nothing was rejected" to be inferred from the absence of a line.
             public int RecordsRead { get; set; }
@@ -584,6 +588,20 @@ namespace HolyLogger
                          + "from the frequency. The report lists each one.";
                 }
 
+                // The country is worked out again from the callsign AND the date, and where that differs
+                // from what the file said, our answer is stored. Saying so is the whole point: a country
+                // rewritten in silence is one nobody can check, and on a first import from another program
+                // this is the operator's first sight of what HolyLogger thinks of their file.
+                if (result.CountryChangeCount > 0)
+                {
+                    msg += $"\n\n{result.CountryChangeCount:N0} QSO{(result.CountryChangeCount == 1 ? "" : "s")} "
+                         + $"named a country your file and HolyLogger disagree on. HolyLogger works the country "
+                         + "out from the callsign AND the date of the contact, which catches prefixes that have "
+                         + "changed hands and DXpeditions whose entity is not what their prefix suggests — so this "
+                         + "is usually a correction rather than a fault.\n\nIts answer was stored, and the report "
+                         + "names every one so you can check any you doubt.";
+                }
+
                 if (anyRejected)
                 {
                     msg += $"\n\n{result.RejectedCount:N0} QSO{(result.RejectedCount == 1 ? "" : "s")} in your file "
@@ -810,6 +828,7 @@ namespace HolyLogger
             int ambiguousQso = 0;    // matched, but two candidates were equally close - left alone
             var rejects = new List<ImportReject>();                    // what did not make it, and why
             var filledIn = new List<HolyLogParser.FilledField>();      // what was worked out from the record
+            var countryChanges = new List<HolyLogParser.CountryChange>();  // countries the file and we disagree on
             int recordsRead = 0;                                       // what the file(s) held, all told
             const int importBatchSize = 500;
             int lastReportedPercent = 0;
@@ -900,6 +919,7 @@ namespace HolyLogger
                             Call = r.Call, Date = r.Date, Time = r.Time, Band = r.Band, Mode = r.Mode,
                         });
                     filledIn.AddRange(parser.GetFilled());
+                    countryChanges.AddRange(parser.GetCountryChanges());
                     recordsRead += parser.RecordsRead;
 
                     RawAdif = null;   // large file string no longer needed; free it before the save phase
@@ -1065,8 +1085,8 @@ namespace HolyLogger
             AdifHandlerWorker.ReportProgress(100, "Import complete 100%");
 
             string reportPath = null, rejectsAdifPath = null;
-            if (rejects.Count > 0 || filledIn.Count > 0)
-                WriteImportReport(rejects, filledIn, importedQsoCount, completedQso, ambiguousQso,
+            if (rejects.Count > 0 || filledIn.Count > 0 || countryChanges.Count > 0)
+                WriteImportReport(rejects, filledIn, countryChanges, importedQsoCount, completedQso, ambiguousQso,
                                   out reportPath, out rejectsAdifPath);
 
             e.Result = new AdifImportResult
@@ -1078,6 +1098,7 @@ namespace HolyLogger
                 RefreshedQsos = refreshedQsos,
                 RejectedCount = rejects.Count,
                 FilledCount = filledIn.Count,
+                CountryChangeCount = countryChanges.Count,
                 RecordsRead = recordsRead,
                 ReportPath = reportPath,
                 RejectsAdifPath = rejectsAdifPath,
@@ -1157,6 +1178,7 @@ namespace HolyLogger
         // matches a re-imported record against what is already in the log, so bringing the corrected
         // file back adds the missing contacts without duplicating anything.
         private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,
+                                       List<HolyLogParser.CountryChange> countryChanges,
                                        int imported, int completed, int ambiguous,
                                        out string reportPath, out string rejectsAdifPath)
         {
@@ -1219,6 +1241,58 @@ namespace HolyLogger
                     foreach (var f in filled)
                         sb.AppendLine($"  {(string.IsNullOrWhiteSpace(f.Call) ? "—" : f.Call).PadRight(12)} "
                                       + $"{f.Field} = {f.Value}   (from {f.From})");
+                    sb.AppendLine();
+                }
+
+                if (countryChanges != null && countryChanges.Count > 0)
+                {
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine($"COUNTRIES YOUR FILE AND HOLYLOGGER DISAGREE ON ({countryChanges.Count:N0})");
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine();
+                    sb.AppendLine("Your file names a country for each QSO. HolyLogger works the country out");
+                    sb.AppendLine("again from the callsign AND THE DATE OF THAT CONTACT, and where the two");
+                    sb.AppendLine("differ it stores its own answer. These are the ones that differed.");
+                    sb.AppendLine();
+                    sb.AppendLine("This is usually HolyLogger correcting an old file rather than a fault:");
+                    sb.AppendLine("  * A prefix can change hands. 4N1DV was Serbia; the 2012 Olympic prefix");
+                    sb.AppendLine("    2O12L was England, not whatever 2O looks like today.");
+                    sb.AppendLine("  * A DXpedition callsign often belongs to an entity its prefix does not");
+                    sb.AppendLine("    suggest — K9W was Wake Island for two weeks in 2013, not the USA.");
+                    sb.AppendLine("  * An entity may have been deleted since the QSO was made.");
+                    sb.AppendLine("  * \"Maritime Mobile\" and \"Aeronautical Mobile\" are NOT countries. They");
+                    sb.AppendLine("    mean the station was at sea or in the air, so the contact counts for");
+                    sb.AppendLine("    no DXCC entity at all.");
+                    sb.AppendLine();
+                    sb.AppendLine("Wording alone is never listed here: \"Germany\" and \"Fed. Rep. of Germany\"");
+                    sb.AppendLine("are the same entity and are not a disagreement.");
+                    sb.AppendLine();
+                    sb.AppendLine("If you believe one of these is wrong, the callsign and date are all that");
+                    sb.AppendLine("is needed to check it against Club Log or the ARRL list.");
+                    sb.AppendLine();
+                    sb.AppendLine("  " + "CALL".PadRight(12) + " " + "DATE".PadRight(10)
+                                  + " " + "YOUR FILE SAID".PadRight(28) + " STORED AS");
+                    sb.AppendLine();
+
+                    foreach (var c in countryChanges)
+                    {
+                        string call = (string.IsNullOrWhiteSpace(c.Call) ? "—" : c.Call).PadRight(12);
+                        string date = (string.IsNullOrWhiteSpace(c.Date) ? "—" : c.Date).PadRight(10);
+                        string was = (c.FromFile ?? "—");
+                        sb.AppendLine($"  {call} {date} {was.PadRight(28)} {c.Stored}"
+                                      + (string.IsNullOrWhiteSpace(c.ResolvedBy) ? "" : $"   (per {c.ResolvedBy})"));
+                    }
+                    sb.AppendLine();
+
+                    // The same entities once each, so a file with 900 QSOs from one wrongly-named country
+                    // reads as one thing to check rather than 900 lines to scroll past.
+                    var pairs = countryChanges
+                        .GroupBy(c => ((c.FromFile ?? "") + " → " + (c.Stored ?? "")), StringComparer.OrdinalIgnoreCase)
+                        .OrderByDescending(g => g.Count())
+                        .ToList();
+                    sb.AppendLine($"  SUMMARY — {pairs.Count:N0} distinct change{(pairs.Count == 1 ? "" : "s")}:");
+                    foreach (var g in pairs)
+                        sb.AppendLine($"      {g.Count(),6:N0}  {g.Key}");
                     sb.AppendLine();
                 }
 
