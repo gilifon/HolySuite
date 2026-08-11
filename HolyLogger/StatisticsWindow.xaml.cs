@@ -42,6 +42,10 @@ namespace HolyLogger
         // different cache whenever the source folder changes (see LoadConfirmedCache / _source).
         private HashSet<string> _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // THE SAME SET, BY NUMBER - what every count on the page is actually made of now. The name set
+        // above survives only for the few places that still speak in names.
+        private HashSet<int> _confirmedCodes = new HashSet<int>();
+
         // The DELETED entities among them, by ARRL entity number. Built in the same pass as the set
         // above, from the log's own QSOs, so it needs nothing saved from a past download.
         private HashSet<int> _confirmedDeletedCodes = new HashSet<int>();
@@ -477,7 +481,7 @@ namespace HolyLogger
 
             if (total == 0)
             {
-                int totalDxcc = _masterResolver.GetAllEntityNames().Count;
+                int totalDxcc = ActiveEntityCount();
                 TB_TotalQSOs.Text       = "0";
                 _uniqueCallsText        = "0";
                 _countryCountText       = "0";
@@ -561,6 +565,117 @@ namespace HolyLogger
         // its prefix (Serbia's 4N, Bosnia's T9) counts at all. Omit it only for a live "today" answer.
         // Both sides of a confirmation match must be resolved the same way, or a confirmed country could
         // be matched under one name and counted under another.
+        // ── THE ENTITY LIST, BY NUMBER ────────────────────────────────────
+        //
+        // Every count on this page is made of ADIF entity NUMBERS now, not of country names. A name is
+        // not an identity: two databases spell the same country differently, either may re-spell it, and
+        // a name in nobody's list reads as a deleted country - which is exactly how "Maritime Mobile",
+        // the answer that means no country at all, came to be reported as a deleted entity worked and
+        // confirmed. A number is fixed, unique, and never reused, and Club Log states outright which
+        // numbers are deleted instead of leaving it to be inferred.
+        private Dictionary<int, string> _entityNames;      // code -> the name to print
+        private Dictionary<string, int> _codeByName;       // name -> code, for the fallbacks below
+        private HashSet<int> _activeCodes;                 // the entities that exist today
+        private HashSet<int> _deletedCodes;
+
+        private void EnsureEntityTable()
+        {
+            if (_entityNames != null) return;
+            _entityNames = new Dictionary<int, string>();
+            _codeByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            _activeCodes = new HashSet<int>();
+            _deletedCodes = new HashSet<int>();
+            try
+            {
+                foreach (var e in DXCCManager.CountryLookup.Shared.AllEntities())
+                {
+                    if (e.Code <= 0) continue;
+                    _entityNames[e.Code] = e.Name;
+                    if (!string.IsNullOrEmpty(e.Name)) _codeByName[e.Name] = e.Code;
+                    if (e.Deleted) _deletedCodes.Add(e.Code); else _activeCodes.Add(e.Code);
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (_entityNames.Count > 0) return;
+
+            // NO CLUB LOG FILE - never downloaded, or the download failed. Club Log is where the entity
+            // NUMBERS come from, so without it there are none, and counting by number would count
+            // nothing: an operator with 28,000 QSOs would open this window and be told they had worked
+            // no countries at all. cty.dat still knows every entity by name, so each gets an id of its
+            // own here and the page goes on counting identities rather than spellings - they are simply
+            // OUR ids for this session instead of the ARRL's. Negative, so they can never be mistaken
+            // for a real ADIF code, and cty.dat lists only entities that exist, so none is deleted.
+            try
+            {
+                int next = -1;
+                foreach (string name in _masterResolver.GetAllEntityNames())
+                {
+                    if (string.IsNullOrWhiteSpace(name) || _codeByName.ContainsKey(name)) continue;
+                    _entityNames[next] = name;
+                    _codeByName[name] = next;
+                    _activeCodes.Add(next);
+                    next--;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE DENOMINATOR every "/ 340" on this page is printed over, taken from the SAME set the Missing
+        // list is built from. Two different counts of "how many countries exist" is how a page ends up
+        // saying 326 worked and 15 missing out of 340, which is 341. Club Log's active list when we have
+        // it; cty.dat's names only when we do not.
+        private int ActiveEntityCount()
+        {
+            EnsureEntityTable();
+            if (_activeCodes.Count > 0) return _activeCodes.Count;
+            try { return _masterResolver.GetAllEntityNames().Count; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
+        private string EntityNameOf(int code)
+        {
+            EnsureEntityTable();
+            string name;
+            return _entityNames.TryGetValue(code, out name) && !string.IsNullOrEmpty(name)
+                ? name : ("DXCC " + code);
+        }
+
+        private bool IsDeletedEntityCode(int code)
+        {
+            EnsureEntityTable();
+            return _deletedCodes.Contains(code);
+        }
+
+        // The entity NUMBER a QSO counts towards, or 0 when it counts towards none.
+        //
+        // The resolver supplies the number with the answer nearly always - measured at 28,434 of 28,454
+        // QSOs on a real log. The handful without one are old contacts whose callsign Club Log has no
+        // dated record for; their COUNTRY is known perfectly well, so the number is looked up from that
+        // name rather than throwing the QSO away. Falling back to the name here, and only here, is what
+        // lets everything above be a number.
+        private int EntityCodeOf(QSO q)
+        {
+            if (q == null) return 0;
+            DXCC d = ResolveQso(q);
+            if (d == null || !d.IsDxccEntity) return 0;
+            if (d.DxccCode > 0) return d.DxccCode;
+
+            try
+            {
+                int byName = DXCCManager.CountryLookup.Shared.EntityCodeForCountry(d.Name);
+                if (byName > 0) return byName;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            // Last: the entity table's own id for that name - a real ADIF code for an entity Club Log
+            // knows but could not put a number to on this callsign, or our own session id when there is
+            // no Club Log file at all.
+            EnsureEntityTable();
+            int fallback;
+            return !string.IsNullOrEmpty(d.Name) && _codeByName.TryGetValue(d.Name, out fallback) ? fallback : 0;
+        }
+
         // The entity name to COUNT a callsign under, or null when the answer is not a country at all -
         // "Unknown", or one of Club Log's no-DXCC-entity answers (Maritime Mobile and the rest). Every
         // place that builds a set of worked or confirmed entities goes through this, so none of them can
@@ -1031,21 +1146,29 @@ namespace HolyLogger
             // being counted as countries, and since no current-entity list contains them they were then
             // filed as DELETED entities: an operator with three /MM contacts was told they had worked and
             // confirmed a deleted country called Maritime Mobile.
-            var workedCounts = _allQsos
-                .Select(q => Resolve(q.DXCall, q.Date))
-                .Where(d => d != null && d.IsDxccEntity)
-                .Select(d => d.Name)
-                .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
-                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+            // COUNTED BY ENTITY NUMBER. See EntityCodeOf: the number is the identity, the name is only
+            // what gets printed, and "deleted" is Club Log's own flag rather than "this name is not in
+            // the list of current ones".
+            var workedCounts = new Dictionary<int, int>();
+            foreach (QSO q in _allQsos)
+            {
+                int code = EntityCodeOf(q);
+                // ZERO means no entity. A NEGATIVE code is one of our own session ids, used when there is no
+                // Club Log file to take real ADIF numbers from - it identifies the entity just as well.
+                if (code == 0) continue;
+                int n;
+                workedCounts.TryGetValue(code, out n);
+                workedCounts[code] = n + 1;
+            }
 
-            var currentEntities = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
-            _workedList = workedCounts.Keys
-                .Select(name => new CountryItem
+            _workedList = workedCounts
+                .Select(p => new CountryItem
                 {
-                    Name            = name,
-                    Count           = workedCounts[name],
-                    FlagImage       = GetFlagImage(name),
-                    IsDeletedEntity = !currentEntities.Contains(name),
+                    Code            = p.Key,
+                    Name            = EntityNameOf(p.Key),
+                    Count           = p.Value,
+                    FlagImage       = GetFlagImage(EntityNameOf(p.Key)),
+                    IsDeletedEntity = IsDeletedEntityCode(p.Key),
                 }).ToList();
 
             // Single line now — the LoTW button sits beside it on the same row.
@@ -1085,14 +1208,21 @@ namespace HolyLogger
         // the entities not confirmed by that source (all DXCC minus that source's confirmed set).
         private void RebuildMissingCountries()
         {
-            var allDxccEntities = _masterResolver.GetAllEntityNames();
-            HashSet<string> achieved = _source == ConfSource.Worked
-                ? new HashSet<string>(_workedList.Select(c => c.Name), StringComparer.OrdinalIgnoreCase)
-                : AchievedEntities();
+            // THE ACTIVE ENTITIES BY NUMBER, minus the numbers this folder has achieved. Missing is now
+            // arithmetic on two sets of integers rather than a comparison of two lists of spellings.
+            EnsureEntityTable();
+            HashSet<int> achieved = _source == ConfSource.Worked
+                ? new HashSet<int>(_workedList.Where(c => c.Code != 0).Select(c => c.Code))
+                : AchievedCodes();
 
-            _missingList = allDxccEntities
-                .Where(n => !achieved.Contains(n))
-                .Select(name => new CountryItem { Name = name, FlagImage = GetFlagImage(name) })
+            _missingList = _activeCodes
+                .Where(code => !achieved.Contains(code))
+                .Select(code => new CountryItem
+                {
+                    Code = code,
+                    Name = EntityNameOf(code),
+                    FlagImage = GetFlagImage(EntityNameOf(code)),
+                })
                 .ToList();
 
             TB_MissingHeader.Text = $"Missing Countries\n({_missingList.Count})";
@@ -1103,8 +1233,9 @@ namespace HolyLogger
         private int WorkedActiveCount()
         {
             if (_workedList == null) return 0;
-            var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
-            return _workedList.Count(c => current.Contains(c.Name));
+            // Each item already knows whether its ENTITY is deleted - Club Log said so, by number - so
+            // this no longer asks whether a name appears in a list of names.
+            return _workedList.Count(c => !c.IsDeletedEntity);
         }
 
         // A tile number is a TextBlock, not a Hyperlink, so its click arrives as a mouse event; the work
@@ -1314,6 +1445,13 @@ namespace HolyLogger
         //
         // On the LoTW folder that means LoTW's own confirmations plus the paper cards, because the ARRL
         // accepts both. Every other folder answers only for its own service.
+        // THE ONE SET the whole folder counts against, by number. Everything that used to compare country
+        // names against each other compares these instead.
+        private HashSet<int> AchievedCodes()
+        {
+            return _confirmedCodes;
+        }
+
         private HashSet<string> AchievedEntities()
         {
             // The folder's confirmed set already IS the answer: on the LoTW folder LoadConfirmedCache
@@ -1701,6 +1839,7 @@ namespace HolyLogger
         private void LoadConfirmedCache()
         {
             _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            _confirmedCodes = new HashSet<int>();
             _confirmedDeletedCodes = new HashSet<int>();
 
             // Computed LIVE from the log, for EVERY source - the entities of the QSOs carrying that
@@ -1721,6 +1860,8 @@ namespace HolyLogger
                 DXCCManager.DXCC d = Resolve(q.DXCall, q.Date);
                 if (d == null || !d.IsDxccEntity) continue;   // not a country - see DXCC.IsDxccEntity
                 _confirmedEntities.Add(d.Name);
+                int cCode = d.DxccCode > 0 ? d.DxccCode : EntityCodeOf(q);
+                if (cCode != 0) _confirmedCodes.Add(cCode);
 
                 // The deleted-entity split, from the same pass. The entity NUMBER now comes with the
                 // answer and Club Log says which numbers are deleted, so this no longer needs a list of
@@ -1775,12 +1916,12 @@ namespace HolyLogger
             // The same achieved set the Missing list is built from - so "worked, not confirmed" is exactly
             // the worked countries that are NOT in the Missing list's achieved set, and the three tiles
             // add up to the worked total instead of contradicting it.
-            HashSet<string> achieved = AchievedEntities();
+            HashSet<int> achieved = AchievedCodes();
             int confirmed = 0;
             foreach (var item in _workedList)
             {
                 item.ShowConfirmation = showConf;
-                item.IsConfirmed = achieved.Contains(item.Name);
+                item.IsConfirmed = item.Code != 0 && achieved.Contains(item.Code);
                 if (item.IsConfirmed) confirmed++;
             }
 
@@ -1797,7 +1938,7 @@ namespace HolyLogger
             // not yet confirmed here (worked - confirmed) - so it is not a third partition, just a
             // highlight.
             int workedDxcc = _workedList.Count;                                  // 265 - entities contacted
-            int totalDxcc  = _masterResolver.GetAllEntityNames().Count;         // 340 - all DXCC entities
+            int totalDxcc  = ActiveEntityCount();                                // 340 - all DXCC entities
             // The Missing tile ALWAYS reads the Missing Countries list, so tile and list can never
             // disagree (that mismatch is the bug this fixes). The list itself is source-aware.
             int missingCount = _missingList != null ? _missingList.Count : 0;
@@ -4381,6 +4522,10 @@ namespace HolyLogger
         //
         // 0 when no database recognises the wording the log used - shown as an empty cell, never as "0".
         // A country nothing can put a number to is still in the log and still belongs in the list.
+        // SET when the item is built, because the item is now built FROM the number - the statistics
+        // identify an entity by its ADIF code and carry the name only to print it. The lazy lookup from
+        // the name remains as a fallback for the few places that still construct an item from a name
+        // alone (the missing-countries list before an entity table exists, say).
         private int? _code;
         public int Code
         {
@@ -4393,6 +4538,7 @@ namespace HolyLogger
                 }
                 return _code.Value;
             }
+            set { _code = value; }
         }
         public string CodeText => Code > 0 ? Code.ToString() : "";
 
@@ -4439,4 +4585,8 @@ namespace HolyLogger
         public string Value { get; set; }
     }
 }
+
+
+
+
 
