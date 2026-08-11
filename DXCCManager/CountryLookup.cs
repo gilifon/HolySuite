@@ -106,6 +106,48 @@ namespace DXCCManager
         // Entities Club Log has that we could not match to a cty.dat entity (diagnostic, for Options).
         public IReadOnlyList<string> UnbridgedEntities => unbridged;
 
+        // ── THE ENTITY LIST, BY NUMBER ────────────────────────────────────
+        //
+        // Every DXCC entity with its ADIF number, the name to show it under, and whether it has been
+        // deleted - the three things a count of countries is made of.
+        //
+        // The NUMBER is the identity throughout, because a name is not one. Two databases spell the same
+        // country differently ("Fed. Rep. Germany" against "Fed. Rep. of Germany"), either may re-spell
+        // it, and a name that is in nobody's list reads as a deleted country - which is how "Maritime
+        // Mobile", the answer meaning no country at all, came to be counted as a deleted entity worked
+        // and confirmed. A number cannot do any of that: it is fixed, unique, and never reused.
+        //
+        // Deleted is Club Log's own <deleted> flag, not "this name is absent from the current list".
+        // The name is cty.dat's wherever the two are bridged, so the page reads in the same words as the
+        // log does, and Club Log's (title-cased) only for entities cty.dat cannot name at all.
+        public IEnumerable<EntityRecord> AllEntities()
+        {
+            if (clubLog == null) yield break;
+            foreach (ClubLogData.EntityInfo e in clubLog.AllEntities())
+            {
+                string name = null;
+                string ctyEntity;
+                if (ctyEntityByCode.TryGetValue(e.Code, out ctyEntity))
+                {
+                    DXCC named = cty.GetDXCCbyEntityCode(ctyEntity);
+                    if (named != null && named.Name != "Unknown") name = named.Name;
+                }
+                yield return new EntityRecord
+                {
+                    Code = e.Code,
+                    Name = string.IsNullOrEmpty(name) ? TitleCase(e.Name) : name,
+                    Deleted = e.Deleted,
+                };
+            }
+        }
+
+        public struct EntityRecord
+        {
+            public int Code;
+            public string Name;
+            public bool Deleted;
+        }
+
         // A logged QSO's ADIF date ("yyyyMMdd") as a UTC instant, falling back to now when it cannot be
         // read. Keeps every caller from repeating the same parsing before a dated lookup.
         public static DateTime QsoDate(string adifDate)

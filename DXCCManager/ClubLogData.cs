@@ -170,6 +170,34 @@ namespace DXCCManager
 
         // The active (not deleted) entities, as code/name/prefix triples — used to build the bridge
         // between Club Log's entity list and cty.dat's.
+        // Every entity Club Log knows, by NUMBER, with its name and whether it has been deleted.
+        //
+        // The number is the identity. A name can be spelled two ways by two databases and re-spelled by
+        // either of them next year; the ADIF entity number is fixed, unique, and never reused - Blenheim
+        // Reef is 23 whether or not anything still calls it that, and no deleted entity shares a number
+        // with a live one. Counting worked countries by number instead of by name is what this exists for.
+        public IEnumerable<EntityInfo> AllEntities()
+        {
+            foreach (var pair in deletedByCode)
+            {
+                string name;
+                nameByCode.TryGetValue(pair.Key, out name);
+                yield return new EntityInfo
+                {
+                    Code = pair.Key,
+                    Name = name ?? string.Empty,
+                    Deleted = pair.Value,
+                };
+            }
+        }
+
+        public struct EntityInfo
+        {
+            public int Code;
+            public string Name;
+            public bool Deleted;
+        }
+
         public IEnumerable<KeyValuePair<int, string>> ActiveEntityPrefixes()
         {
             foreach (var pair in prefixByCode)
