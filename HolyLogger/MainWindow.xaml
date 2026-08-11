@@ -1004,7 +1004,7 @@
                         <TextBlock x:Name="RigLabel" Text="RIG1" FontWeight="Normal" FontSize="14" Foreground="{DynamicResource MutedTextBrush}"
                                    VerticalAlignment="Center" Margin="0,0,6,0"
                                    Cursor="Hand" MouseLeftButtonUp="RigLabel_MouseLeftButtonUp"
-                                   ToolTip="Open Tools ג†’ Options"/>
+                                   ToolTip="Open Tools → Options"/>
                         <Label x:Name="L_OmniRig" Content="{Binding Status, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" Margin="0,0,20,0" FontSize="16" />
                     </StackPanel>
                 </StatusBarItem>
@@ -1049,12 +1049,12 @@
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
                     Margin="192,45,0,0" Grid.Row="1">
             <!-- Both LED and no-CAT borders share one Grid so the kHz label never shifts.
-                 Width is the single fixed constraint ג€” content never drives the layout width. -->
+                 Width is the single fixed constraint — content never drives the layout width. -->
             <Grid VerticalAlignment="Center" Width="160">
                 <Border x:Name="FreqLedBezel" Margin="0,1,2,1"
                         Background="#080808" CornerRadius="4" BorderBrush="#3A3A3A" BorderThickness="1"
                         Cursor="Hand" MouseLeftButtonUp="FreqLed_MouseLeftButtonUp"
-                        ToolTip="Working frequency in kHz ג€” click to edit">
+                        ToolTip="Working frequency in kHz — click to edit">
                     <Grid Margin="4,1,4,2">
                         <TextBlock x:Name="FreqLedGhost" FontFamily="./Fonts/#DSEG7 Classic" FontWeight="Bold"
                                    FontSize="18" VerticalAlignment="Center" Foreground="#1E1500"
@@ -1214,7 +1214,7 @@
                   BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
                   Template="{StaticResource FlatComboTemplate}"
                   SelectionChanged="CB_Band_SelectionChanged" DropDownOpened="CB_Band_DropDownOpened"
-                  ToolTip="No frequency ג€” choose the band this QSO was on"/>
+                  ToolTip="No frequency — choose the band this QSO was on"/>
         <!-- Red attention glyph laid over the band box when a frequency has been entered that maps to no
              amateur band (so TB_Band is blank). TB_Band.Text stays the program's real band answer; this
              is a purely visual cue that the frequency needs fixing, and it never blocks the click. -->
@@ -1258,7 +1258,7 @@
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="brBR" Property="Background" Value="#EDF1F5"/>
                         </Trigger>
-                        <!-- ON: pressed INTO the screen ג€” inverted bevel (dark top-left, light
+                        <!-- ON: pressed INTO the screen — inverted bevel (dark top-left, light
                              bottom-right), green fill, no drop shadow, content nudged in (down-right). -->
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="brBR" Property="Background" Value="#7FC988"/>
@@ -1424,7 +1424,7 @@
 
         <Border x:Name="ContestDividerLine" BorderBrush="Gray" BorderThickness="1" HorizontalAlignment="Left" Height="1" Margin="10,78,0,0" VerticalAlignment="Top" Width="657" Grid.Row="1" />
         <!-- "You send" band: shown only in contest mode, in the strip freed when the divider drops. It
-             mirrors the received frame ג€” a coloured background panel (ContestSendBand) with a label
+             mirrors the received frame — a coloured background panel (ContestSendBand) with a label
              (L_SendLabel) and the send cells (ContestTxPanel) laid on top. Background colour is
              user-editable (right-click) and remembered, like the received frame. -->
         <Border x:Name="ContestSendBand" Grid.Row="1" Margin="4,82,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
@@ -1450,7 +1450,7 @@
             <Grid.RenderTransform>
                 <ScaleTransform x:Name="MainUndoIconScale" ScaleX="1" ScaleY="1"/>
             </Grid.RenderTransform>
-            <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" PreviewMouseLeftButtonDown="MainUndoButton_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MainUndoButton_PreviewMouseLeftButtonUp" MouseLeave="MainUndoButton_MouseLeave" PreviewMouseRightButtonUp="MainUndoButton_RightClick" ToolTip="Click to undo radio frequency/mode change ג€¢ Hold to clear all">
+            <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" PreviewMouseLeftButtonDown="MainUndoButton_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MainUndoButton_PreviewMouseLeftButtonUp" MouseLeave="MainUndoButton_MouseLeave" PreviewMouseRightButtonUp="MainUndoButton_RightClick" ToolTip="Click to undo radio frequency/mode change • Hold to clear all">
                 <Grid>
                     <Image Source="Images/UNDO_Icon.png" Width="22" Height="22" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock x:Name="MainUndoCountText" FontSize="10" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
@@ -1472,7 +1472,7 @@
                  TextWrapping="NoWrap" VerticalAlignment="Top" Width="41" Grid.Row="1" FontSize="16"
                  IsReadOnly="True" IsTabStop="False" TextAlignment="Center"
                  Foreground="{DynamicResource MutedTextBrush}"
-                 ToolTip="The ARRL DXCC entity number for this country ג€” what an award is counted on" />
+                 ToolTip="The ARRL DXCC entity number for this country — what an award is counted on" />
         <Label Content="State" HorizontalAlignment="Left" Margin="580,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_State" HorizontalAlignment="Left" Height="28" Margin="627,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="40" CharacterCasing="Upper" MaxLength="3" Grid.Row="1" FontSize="16" TabIndex="17" TextChanged="TB_State_TextChanged" />
         <!-- Orphaned QRZ-photo frame: never populated by any code (Img_QRZPhoto is unreferenced),
@@ -1538,7 +1538,7 @@
                      CharacterCasing="Upper" MaxLength="20" TabIndex="23" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="World Wide Flora and Fauna: the nature-reserve reference - 4XFF-0016"/>
-            <Button x:Name="Btn_OtherActivity" Content="Otherג€¦" Canvas.Left="601" Canvas.Top="0"
+            <Button x:Name="Btn_OtherActivity" Content="Other…" Canvas.Left="601" Canvas.Top="0"
                     Width="66" Height="28" FontSize="14" TabIndex="24" Padding="0"
                     Click="Btn_OtherActivity_Click"
                     ToolTip="Any other program - castles, mills, lighthouses. Shows what is set once you choose one."/>
@@ -1766,7 +1766,27 @@
                      for a contact that belongs to no entity - a station at sea counts for nobody, and a
                      zero in a column of country numbers reads as a country numbered zero. -->
                 <DataGridTemplateColumn Header="Country Code" IsReadOnly="True" SortMemberPath="DxccCode" Width="Auto">
-                                        <DataGridTemplateColumn.CellTemplate>
+                    <!-- "Country" over "Code" WITHOUT making the header bar taller. The bar is 30.28px:
+                         one line of 16pt (21.28) plus this style's 3px of padding top and bottom, plus
+                         its 3px bottom border. The NEGATIVE MARGIN gives that padding back, so these two
+                         lines have the whole 27.28 to live in rather than 21.28 - which is what lets
+                         them be 12pt instead of the 10pt that was all a padded header could hold.
+                         12pt on a 12.5px line measures 25.00, and the header still asks for only 19,
+                         so the bar cannot grow. Measured both ways in a real DataGrid: 30.28 either
+                         way. 13pt is the first size where the 'y' of Country touches the 'C' of Code.
+
+                         The Header stays the plain string "Country Code" because that is the key the
+                         saved column layout is filed under (GridColumnLayout.KeyOf); only its
+                         presentation is templated. -->
+                    <DataGridTemplateColumn.HeaderTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="Country&#10;Code" FontSize="12" FontWeight="Bold"
+                                       LineHeight="12.5" LineStackingStrategy="BlockLineHeight"
+                                       Margin="0,-3,0,-3" TextAlignment="Center"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.HeaderTemplate>
+                    <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DxccCodeText}" HorizontalAlignment="Center" Padding="5,0,5,0"
                                        ToolTip="The ARRL DXCC entity number for this country"/>

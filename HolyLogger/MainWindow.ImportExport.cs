@@ -1200,12 +1200,23 @@ namespace HolyLogger
                    : s;
         }
 
+        // Centres a value in a fixed-width report column. The summary's two number columns sit under
+        // headings much wider than the numbers ("NUMBER OF CASES" over a 7), and a right-justified
+        // column of small numbers hugs the far edge of its heading instead of sitting beneath it.
+        private static string Centred(string s, int width)
+        {
+            if (s == null) s = "";
+            if (s.Length >= width) return s;
+            int left = (width - s.Length) / 2;
+            return new string(' ', left) + s + new string(' ', width - s.Length - left);
+        }
+
         // How many individual rows a report section prints before it stops naming them one by one.
         //
         // A 77 MB ADIF holds a few hundred thousand contacts. A finding on even a tenth of them is tens
         // of thousands of lines - a report too big to open, built in a StringBuilder inside a 32-bit
         // process that ran out of memory on this very file once already. The COUNTS and the summary of
-        // distinct changes stay complete and are what the operator acts on; only the naming stops.
+        // corrections stay complete and are what the operator acts on; only the naming stops.
         private const int MaxReportRows = 2000;
 
         private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,
@@ -1344,15 +1355,45 @@ namespace HolyLogger
                                       + "Every one of them is counted in the summary below.");
                     sb.AppendLine();
 
-                    // The same entities once each, so a file with 900 QSOs from one wrongly-named country
-                    // reads as one thing to check rather than 900 lines to scroll past.
+                    // The same correction once each, so a file with 900 QSOs from one wrongly-named
+                    // country reads as one thing to check rather than 900 lines to scroll past.
+                    //
+                    // A CORRECTION is a pair - this country in your file should be that one. There are
+                    // MORE corrections than there are countries, because one country can be corrected
+                    // two ways: Asiatic Russia becomes European Russia for seven QSOs and European
+                    // Russia becomes Asiatic Russia for four. So the count is of corrections and the
+                    // heading says so - calling them entities would claim 34 countries need fixing
+                    // when the file names 23. The 23 itself is deliberately NOT printed: a second
+                    // number next to the first only invites the question of which one to act on, and
+                    // the answer is neither - what the operator acts on is the table underneath.
                     var pairs = countryChanges
                         .GroupBy(c => ((c.FromFile ?? "") + " → " + (c.OurAnswer ?? "")), StringComparer.OrdinalIgnoreCase)
-                        .OrderByDescending(g => g.Count())
+                        .Select(g => new
+                        {
+                            Cases = g.Count(),
+                            Now = g.First().FromFile ?? "—",
+                            Should = g.First().OurAnswer ?? "—"
+                        })
+                        .OrderByDescending(p => p.Cases)
+                        .ThenBy(p => p.Now, StringComparer.OrdinalIgnoreCase)
                         .ToList();
-                    sb.AppendLine($"  SUMMARY — {pairs.Count:N0} distinct change{(pairs.Count == 1 ? "" : "s")}:");
-                    foreach (var g in pairs)
-                        sb.AppendLine($"      {g.Count(),6:N0}  {g.Key}");
+                    sb.AppendLine($"  SUMMARY — {pairs.Count:N0} different correction{(pairs.Count == 1 ? "" : "s")}:");
+                    sb.AppendLine();
+                    // Headed like the table above it, and the two country columns are the same 26 wide,
+                    // so the eye runs straight down from one table to the other.
+                    sb.AppendLine("  " + Centred("#", 5) + "  " + "NUMBER OF CASES"
+                                  + "  " + "IN THE LOG NOW".PadRight(26) + "  SHALL BE");
+                    sb.AppendLine("  " + new string('─', 5) + "  " + new string('─', 15)
+                                  + "  " + new string('─', 26) + "  " + new string('─', 26));
+                    int pairNo = 0;
+                    foreach (var p in pairs)
+                    {
+                        pairNo++;
+                        sb.AppendLine("  " + Centred(pairNo.ToString("N0"), 5)
+                                      + "  " + Centred(p.Cases.ToString("N0"), 15)
+                                      + "  " + p.Now.PadRight(26)
+                                      + "  " + p.Should);
+                    }
                     sb.AppendLine();
                 }
 

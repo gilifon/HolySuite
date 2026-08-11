@@ -6188,6 +6188,19 @@ namespace HolyLogger
             statisticsWindow.Dal = dal;
             statisticsWindow.CountrySearchRequested += OpenSearchWindowForCountry;
             statisticsWindow.QsoSubsetRequested += OpenWorkshopForSubset;
+
+            // A subset Workshop opened from a figure in this window is OWNED by it, so that opening it
+            // does not throw the main GUI in front (see OpenWorkshopForSubset). An owned window is
+            // closed with its owner, and that part is wrong here: the Workshop is where QSOs get
+            // edited, uploaded and deleted, and closing a window of numbers must not take it away
+            // mid-job. So hand it to the main window on the way out - it stays open, and from then on
+            // behaves like any other Workshop.
+            statisticsWindow.Closing += (s, _) =>
+            {
+                if (subsetWorkshop != null && subsetWorkshop.IsLoaded
+                    && ReferenceEquals(subsetWorkshop.Owner, s))
+                    subsetWorkshop.Owner = this;
+            };
             statisticsWindow.Closed += (s, _) => statisticsWindow = null;
             statisticsWindow.Show();
         }
@@ -6205,6 +6218,18 @@ namespace HolyLogger
         {
             if (qsos == null || qsos.Count == 0) return;
             string label = (what ?? "selected QSOs") + " — " + SafeActiveLogName();
+
+            // OWNED BY THE WINDOW THE OPERATOR CAME FROM, not by the main window. Windows raises the
+            // whole owner chain when an owned window opens, so owning this from the main window threw
+            // the ENTIRE main GUI in front of the Statistics window on the way - the operator clicked
+            // "3 deleted" and watched the log they were not looking at come up first. Owned from the
+            // Statistics window, the only window raised is the one already on screen.
+            //
+            // Ownership by Statistics would normally mean this window closes with it. It must not:
+            // OpenStatisticsWindow hands it to the main window as Statistics closes, so it survives.
+            Window owner = (statisticsWindow != null && statisticsWindow.IsLoaded)
+                ? (Window)statisticsWindow
+                : this;
             try
             {
                 if (subsetWorkshop != null && subsetWorkshop.IsLoaded)
@@ -6214,7 +6239,7 @@ namespace HolyLogger
                     subsetWorkshop.Activate();
                     return;
                 }
-                subsetWorkshop = new SearchWindow(qsos, label) { Owner = this };
+                subsetWorkshop = new SearchWindow(qsos, label) { Owner = owner };
                 subsetWorkshop.Closed += (s, _) => subsetWorkshop = null;
                 subsetWorkshop.Show();
             }
@@ -8566,6 +8591,20 @@ namespace HolyLogger
             RefreshCallsignLockState();
         }
 
+        // Holds a services check that arrived while a dialog was open, until the dialog closes.
+        private DispatcherTimer _servicesAlertWait;
+
+        // True while something is on screen that the services alert must not cover: any modal dialog,
+        // or an ADIF import still running behind its progress window.
+        private bool ServicesAlertMustWait
+        {
+            get
+            {
+                if (System.Windows.Interop.ComponentDispatcher.IsThreadModal) return true;
+                return AdifHandlerWorker != null && AdifHandlerWorker.IsBusy;
+            }
+        }
+
         // When the operator switches to a different Station Callsign, summarise how each upload
         // service will treat QSOs logged under it, so special-event calls aren't silently sent to
         // the wrong place. Only shown when at least one service needs attention.
@@ -8573,6 +8612,40 @@ namespace HolyLogger
         {
             if (string.IsNullOrWhiteSpace(call) || dal == null) return;
             call = call.Trim();
+
+            // NEVER INTERRUPT AN IMPORT, OR A DIALOG THAT IS ALREADY ASKING SOMETHING. This alert is
+            // modal and owned by the main window, so it opens ON TOP of whatever else is up - first over
+            // the import's "Confirm the identity of this file" window, hiding the very button that
+            // continues the import, and then over "Parsing ADIF 36%". Neither is a moment to be told
+            // about eQSL: until the file has been read there is nothing to upload anywhere.
+            //
+            // Two things to wait for. A modal frame is running whenever IsThreadModal is set, whichever
+            // dialog owns it, so that covers every question without naming the windows. And the import
+            // worker covers the long silent stretch in between, which is not modal at all. The import's
+            // own completion message is modal, so the check lands after the operator closes it - which
+            // is the first moment the answer actually matters.
+            //
+            // A timer, not another Dispatcher post: a modal frame goes on pumping the dispatcher, so a
+            // re-queued call would come straight back while the dialog is still up and spin.
+            if (ServicesAlertMustWait)
+            {
+                if (_servicesAlertWait != null) return;   // one deferred check is enough
+                string waitingCall = call;
+                bool waitingStartup = isStartup;
+                _servicesAlertWait = new DispatcherTimer(DispatcherPriority.Background, Dispatcher)
+                {
+                    Interval = TimeSpan.FromMilliseconds(400)
+                };
+                _servicesAlertWait.Tick += (s, e) =>
+                {
+                    if (ServicesAlertMustWait) return;
+                    _servicesAlertWait.Stop();
+                    _servicesAlertWait = null;
+                    ShowStationCallsignServicesAlert(waitingCall, waitingStartup);
+                };
+                _servicesAlertWait.Start();
+                return;
+            }
 
             // Per-service "use this service" master switches (Options pages). A service the user
             // switched off never triggers this alert and is reported as "not in use". With all

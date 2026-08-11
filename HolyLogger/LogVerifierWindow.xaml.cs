@@ -126,7 +126,7 @@ namespace HolyLogger
             InitializeComponent();
             _qsos = (qsos ?? Enumerable.Empty<QSO>()).Where(q => q != null).ToList();
             _logName = string.IsNullOrWhiteSpace(logName) ? "" : logName.Trim();
-            Title = string.IsNullOrEmpty(_logName) ? "Verify Log" : "Verify Log ג€” " + _logName;
+            Title = string.IsNullOrEmpty(_logName) ? "Verify Log" : "Verify Log — " + _logName;
 
             // The same header look as the QSO log, the cluster and the Logs window, from the one place
             // that defines it: the LogHeaderBg palette token with black text. Its background is a
@@ -139,8 +139,8 @@ namespace HolyLogger
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            TB_Header.Text = "Checking " + _qsos.Count.ToString("N0") + " QSOsג€¦";
-            TB_Summary.Text = "workingג€¦";
+            TB_Header.Text = "Checking " + _qsos.Count.ToString("N0") + " QSOs…";
+            TB_Summary.Text = "working…";
             await RunCheck();
         }
 
@@ -438,7 +438,7 @@ namespace HolyLogger
         {
             Finding f = New(q, problem, current, note, evidence);
             f.Fixable = false;
-            f.Suggested = "Check by hand ג€” " + note;
+            f.Suggested = "Check by hand — " + note;
             return f;
         }
 
@@ -507,7 +507,7 @@ namespace HolyLogger
                 return;
 
             Btn_Apply.IsEnabled = false;
-            TB_Summary.Text = "applyingג€¦";
+            TB_Summary.Text = "applying…";
 
             int written = 0;
             try

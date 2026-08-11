@@ -254,8 +254,17 @@ namespace DXCCManager
             string operating = EntityResolver.OperatingPart(call);
             if (!string.Equals(operating, call, StringComparison.Ordinal))
             {
+                // ...but the operating part is a PREFIX, not the station's callsign, and the exception
+                // list is a list of callsigns. Club Log registers the bare prefixes PJ2, PJ4 and PJ7 as
+                // INVALID callsigns - true enough of anyone who logs "PJ4" on its own, and nothing at
+                // all to do with PJ4/W9NJY. Honouring it made Club Log say "invalid operation", which
+                // sends the country back to cty.dat, and cty.dat knows only today's prefixes: 24 QSOs
+                // made before the 2010 split came back Bonaire / Curacao / Sint Maarten instead of the
+                // Netherlands Antilles they were worked in. An exception that names no entity is
+                // therefore not an answer about the operating part - fall through to the prefix table,
+                // which carries the dates and gets the split right.
                 hit = Pick(exceptions, operating, whenUtc);
-                if (hit != null) return ToMatch(hit, true, operating.Length);
+                if (hit != null && hit.Adif != 0) return ToMatch(hit, true, operating.Length);
 
                 ClubLogMatch fromPart = LongestPrefix(operating, whenUtc);
                 if (fromPart != null) return fromPart;

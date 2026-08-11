@@ -295,7 +295,8 @@
                                 </Border>
                                 <TextBlock x:Name="TB_DataQuality"
                                            Margin="0,8,0,0" FontSize="13" Foreground="{DynamicResource Danger}"
-                                           FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"/>
+                                           FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"
+                                           HorizontalAlignment="Left"/>
                                 <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
                                         Margin="0,6,0,0" Padding="10,4" FontSize="13"
                                         Visibility="Collapsed" Click="BTN_EditProblems_Click"/>
@@ -317,14 +318,19 @@
                                         BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="2">
                                     <Border x:Name="CountryPivotBorder" BorderBrush="Transparent" BorderThickness="0"/>
                                 </Border>
+                                <!-- HorizontalAlignment=Left, like the heading and the table it belongs
+                                     to. Without it a StackPanel child stretches, and a stretched block
+                                     capped by MaxWidth is CENTRED in what is left - which is why this
+                                     note sat indented from the table's left edge instead of under it. -->
                                 <TextBlock x:Name="TB_CountryPivotNote" Margin="0,5,0,0" FontSize="13"
                                            Foreground="{DynamicResource MutedTextBrush}" FontStyle="Italic"
-                                           TextWrapping="Wrap" MaxWidth="390"/>
+                                           TextWrapping="Wrap" MaxWidth="390" HorizontalAlignment="Left"/>
                             </StackPanel>
 
                             <!-- Shown only when the country file is overdue for a refresh. -->
                             <TextBlock x:Name="TB_CtyWarning" Foreground="{DynamicResource Danger}" FontSize="13" FontWeight="SemiBold"
-                                       TextWrapping="Wrap" Margin="2,8,2,0" MaxWidth="390" Visibility="Collapsed"/>
+                                       TextWrapping="Wrap" Margin="2,8,2,0" MaxWidth="390" Visibility="Collapsed"
+                                       HorizontalAlignment="Left"/>
                         </StackPanel>
                     </ScrollViewer>
                 </Border>

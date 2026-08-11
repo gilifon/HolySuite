@@ -125,14 +125,25 @@ namespace HolyParser
                 if (!string.IsNullOrWhiteSpace(qso.Name)) adif.AppendFormat("<name:{0}>{1}", qso.Name.Length, qso.Name);
                 if (!string.IsNullOrWhiteSpace(qso.Country)) adif.AppendFormat("<country:{0}>{1}", qso.Country.Length, qso.Country);
                 // ADIF <dxcc> is the ARRL entity NUMBER - what award programs actually match on; the
-                // country name beside it is only for people to read. Looked up from the name in this
-                // very record so the two can never contradict each other, and left out entirely when no
-                // database recognises that wording rather than guessing a number for it.
-                // Judged against the QSO's own date, so a wording that belongs to a country which had
-                // already ceased to exist cannot be attached to a modern contact.
-                int dxccCode = 0;
-                try { dxccCode = CountryLookup.Shared.EntityCodeForCountry(qso.Country, CountryLookup.QsoDate(qso.Date)); }
-                catch (Exception) { dxccCode = 0; }
+                // country name beside it is only for people to read.
+                //
+                // THE NUMBER THE LOG STORES COMES FIRST. Every QSO now carries its own entity code, taken
+                // from the imported file's own <DXCC> where it had one, and it is what the statistics
+                // count. Exporting a number worked out afresh from the country NAME would let a file
+                // leave with a different entity than the one the log counts it as - and it did, for
+                // every contact whose stored code came from the operator's file rather than from us.
+                //
+                // Deriving from the name stays as the fallback, for QSOs logged before the column
+                // existed and not yet filled in. It is judged against the QSO's own date, so a wording
+                // that belongs to a country which had already ceased to exist cannot be attached to a
+                // modern contact, and it writes nothing at all when no database recognises the wording
+                // rather than guessing a number for it.
+                int dxccCode = qso.DxccCode;
+                if (dxccCode <= 0)
+                {
+                    try { dxccCode = CountryLookup.Shared.EntityCodeForCountry(qso.Country, CountryLookup.QsoDate(qso.Date)); }
+                    catch (Exception) { dxccCode = 0; }
+                }
                 if (dxccCode > 0)
                 {
                     string code = dxccCode.ToString();

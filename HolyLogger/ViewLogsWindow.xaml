@@ -47,8 +47,13 @@
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
                     <Button x:Name="Btn_Rename" Content="Rename" Height="32" Padding="9,0" FontSize="14"
                             Margin="0,0,8,0" Click="Btn_Rename_Click"/>
+                    <!-- Red, because it is the one button on this row that destroys a log. Same red as
+                         the Duplicates window's delete, so "this one removes things" looks the same
+                         wherever it appears. -->
                     <Button x:Name="Btn_Delete" Content="Delete" Height="32" Padding="9,0" FontSize="14"
-                            Margin="0,0,8,0" Click="Btn_Delete_Click"/>
+                            Margin="0,0,8,0" Click="Btn_Delete_Click"
+                            Background="#C62828" Foreground="White" FontWeight="Bold"
+                            BorderBrush="#8E1B1B" BorderThickness="1.5"/>
                     <Button x:Name="Btn_CopySettings" Content="Copy QSO to..." Height="32" Padding="9,0" FontSize="14"
                             Margin="0,0,8,0" Click="Btn_CopySettings_Click"
                             ToolTip="Set, change or stop copying this log's new QSOs into another log"/>
