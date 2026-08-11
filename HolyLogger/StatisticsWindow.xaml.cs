@@ -2059,7 +2059,16 @@ namespace HolyLogger
                     };
                     workedDeletedLink.Click += DeletedCountries_Click;
                     TB_LotwStatus.Inlines.Add(workedDeletedLink);
-                    TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run($"  =  {workedDxcc} Total"));
+                    TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run("  =  "));
+
+                    // The total wears the SAME YELLOW as the grand total of the table below it -
+                    // EditFieldBg, the one brush both read from. This line is the only place the page
+                    // explains where 332 comes from, and the colour ties it to the 332 in the table so
+                    // the eye finds the pair without being told.
+                    TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run($"{workedDxcc} Total")
+                    {
+                        Background = ThemeManager.Brush("EditFieldBg")
+                    });
                 }
             }
             else

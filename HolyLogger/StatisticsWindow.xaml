@@ -457,9 +457,13 @@
                                                  against "Conf." 32. Sizing to the bare word is what made
                                                  "Conf. ▼" clip as soon as that column was sorted. -->
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
+                                                <!-- Both words start at the same left edge: "Code" reads as
+                                                     the second half of "Country Code" only when it lines
+                                                     up under it. Right-aligned, "Code" hung off to the
+                                                     right on its own. -->
                                                 <TextBlock x:Name="TB_SortWorkedCode" Text="Country&#10;Code"
                                                            Width="60" FontSize="13" FontWeight="Bold" Margin="0,0,8,0"
-                                                           Cursor="Hand" TextAlignment="Right" VerticalAlignment="Center"
+                                                           Cursor="Hand" TextAlignment="Left" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource TextBrush}"
                                                            ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock Width="30"/>
@@ -509,9 +513,13 @@
                                                                 Cursor="Hand" MouseLeftButtonUp="WorkedCountry_Click"
                                                                 ToolTip="Click to search all QSOs with this country">
                                                             <StackPanel Orientation="Horizontal" Margin="4,1,4,1">
+                                                                <!-- 46 + 22 comes to the same 68 as the header's
+                                                                     60 + 8, so the number moves left and opens a
+                                                                     gap before the flag while the flag and the
+                                                                     country name stay exactly where they were. -->
                                                                 <TextBlock Text="{Binding CodeText}" FontSize="13"
                                                                            VerticalAlignment="Center"
-                                                                           TextAlignment="Right" Width="60" Margin="0,0,8,0"
+                                                                           TextAlignment="Right" Width="46" Margin="0,0,22,0"
                                                                            Foreground="{DynamicResource MutedTextBrush}"/>
                                                                 <Image Source="{Binding FlagImage}"
                                                                        Width="24" Height="16"
@@ -602,7 +610,7 @@
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock x:Name="TB_SortMissingCode" Text="Country&#10;Code"
                                                            Width="60" FontSize="13" FontWeight="Bold" Margin="0,0,8,0"
-                                                           Cursor="Hand" TextAlignment="Right" VerticalAlignment="Center"
+                                                           Cursor="Hand" TextAlignment="Left" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource TextBrush}"
                                                            ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock Width="30"/>
@@ -633,9 +641,13 @@
                                                         <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
                                                                 Background="{Binding RowBg}">
                                                             <StackPanel Orientation="Horizontal" Margin="4,1,4,1">
+                                                                <!-- 46 + 22 comes to the same 68 as the header's
+                                                                     60 + 8, so the number moves left and opens a
+                                                                     gap before the flag while the flag and the
+                                                                     country name stay exactly where they were. -->
                                                                 <TextBlock Text="{Binding CodeText}" FontSize="13"
                                                                            VerticalAlignment="Center"
-                                                                           TextAlignment="Right" Width="60" Margin="0,0,8,0"
+                                                                           TextAlignment="Right" Width="46" Margin="0,0,22,0"
                                                                            Foreground="{DynamicResource MutedTextBrush}"/>
                                                                 <Image Source="{Binding FlagImage}"
                                                                        Width="24" Height="16"
