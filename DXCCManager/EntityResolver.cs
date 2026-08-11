@@ -285,7 +285,29 @@ namespace DXCCManager
                 return exact;
             }
 
-            // 2) Otherwise the longest matching prefix wins.
+            // 2) A callsign with a stroke: match on the part that says WHERE THE STATION IS, which is
+            //    not always the part at the front. See OperatingPart.
+            string operating = OperatingPart(call);
+            if (!string.Equals(operating, call, StringComparison.Ordinal))
+            {
+                if (exactCalls.TryGetValue(operating, out CtyMatch exactPart))
+                {
+                    matchedLength = operating.Length;
+                    return exactPart;
+                }
+                CtyMatch fromPart = LongestPrefix(operating, out matchedLength);
+                if (fromPart != null) return fromPart;
+                matchedLength = 0;      // that part means nothing to cty.dat; fall back to the whole call
+            }
+
+            // 3) Otherwise the longest matching prefix of the callsign as written.
+            return LongestPrefix(call, out matchedLength);
+        }
+
+        private CtyMatch LongestPrefix(string call, out int matchedLength)
+        {
+            matchedLength = 0;
+            if (string.IsNullOrEmpty(call)) return null;
             int len = Math.Min(call.Length, maxPrefixLength);
             for (int l = len; l >= 1; l--)
             {
@@ -297,6 +319,50 @@ namespace DXCCManager
                 }
             }
             return null;
+        }
+
+        // WHICH SIDE OF THE STROKE SAYS WHERE THE STATION IS.
+        //
+        // A travelling operator adds a stroke and the prefix of the place they are in. Most of the world
+        // writes the place first - KP4/W1ABC - and the United States traditionally writes the home call
+        // first and the place after: W1AW/KP4. Both mean the same contact, in Puerto Rico, and the ARRL
+        // counts both as Puerto Rico; that is the entire point of signing it.
+        //
+        // Matching only ever looked at the front of the string, so KP4/W1ABC was right and W1AW/KP4 was
+        // read as plain W1AW - the United States. Every W1AW Centennial operation, every /KH6, /KL7,
+        // /HR9 in a log came out as the operator's home country.
+        //
+        // The rule: throw away the endings that name no place, and of what is left the SHORTER part is
+        // the location - a place prefix is short (KP4, HR9, W4, 9A) and a callsign is not. A tie keeps
+        // the first, which is the older convention.
+        internal static string OperatingPart(string call)
+        {
+            if (string.IsNullOrEmpty(call) || call.IndexOf('/') < 0) return call;
+
+            var parts = new List<string>();
+            foreach (string p in call.Split('/'))
+                if (p.Length > 0 && !IsPlacelessSuffix(p)) parts.Add(p);
+
+            if (parts.Count == 0) return call;
+            if (parts.Count == 1) return parts[0];
+
+            string first = parts[0], last = parts[parts.Count - 1];
+            return last.Length < first.Length ? last : first;
+        }
+
+        // The everyday endings that say something about the STATION, never about the country: mobile,
+        // portable, maritime and aeronautical mobile, low power, a lighthouse, an alternate operator -
+        // and a bare digit, which in the USA moves the station to another call area of the SAME country.
+        private static bool IsPlacelessSuffix(string part)
+        {
+            switch (part)
+            {
+                case "M": case "P": case "MM": case "AM": case "QRP":
+                case "A": case "B": case "J": case "N": case "R": case "LH":
+                    return true;
+            }
+            foreach (char c in part) if (c < '0' || c > '9') return false;
+            return true;      // all digits - a call-area change, not a country
         }
 
         public DXCC GetDXCC(string callsign)
