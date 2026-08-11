@@ -1,4 +1,4 @@
-<Window x:Class="HolyLogger.SearchWindow"
+﻿<Window x:Class="HolyLogger.SearchWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="clr-namespace:HolyLogger"
@@ -61,11 +61,11 @@
                 </StackPanel>
                 <Image Source="Images/crown.png" Width="18" Height="18" Margin="10,0,8,0"
                        VerticalAlignment="Center" DockPanel.Dock="Left"/>
-                <!-- "Log Search —" stays normal weight; the LOG NAME is the part worth reading, so it
+                <!-- "Log Search ג€”" stays normal weight; the LOG NAME is the part worth reading, so it
                      alone is bold. TB_TitleLog is filled in by the constructor. -->
                 <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="17"
                            Foreground="{DynamicResource TextBrush}" TextTrimming="CharacterEllipsis">
-                    <Run Text="Log Workshop"/><Run Text="  —  "/><Run x:Name="TB_TitleLog" FontWeight="Bold"/>
+                    <Run Text="Log Workshop"/><Run Text="  ג€”  "/><Run x:Name="TB_TitleLog" FontWeight="Bold"/>
                 </TextBlock>
             </DockPanel>
         </Border>
@@ -95,25 +95,25 @@
                        suffix (4Z5 + SL/M). Either box alone is a valid search. -->
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <TextBlock Text="Prefix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="How the callsign STARTS. Cut it wherever you like — 4Z, 4Z4 and 4Z4DX all find 4Z4DX."/>
+                               ToolTip="How the callsign STARTS. Cut it wherever you like ג€” 4Z, 4Z4 and 4Z4DX all find 4Z4DX."/>
                     <!-- Widths are recomputed in Window_Loaded to fit exactly 7 and 10 characters of
                          the actual font; these are only the fallback if that measurement is skipped. -->
                     <TextBox x:Name="TB_Prefix" Width="72" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
-                             ToolTip="How the callsign STARTS. Cut it wherever you like — 4Z, 4Z4 and 4Z4DX all find 4Z4DX."
+                             ToolTip="How the callsign STARTS. Cut it wherever you like ג€” 4Z, 4Z4 and 4Z4DX all find 4Z4DX."
                              TextChanged="Prefix_TextChanged" KeyDown="SearchField_KeyDown"/>
                     <TextBlock Text="Suffix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,0,6,0"
-                               ToolTip="How the callsign ENDS: DX, 4DX, SL/M — or the whole call. Either box on its own is enough."/>
+                               ToolTip="How the callsign ENDS: DX, 4DX, SL/M ג€” or the whole call. Either box on its own is enough."/>
                     <TextBox x:Name="TB_Suffix" Width="98" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
-                             ToolTip="How the callsign ENDS: DX, 4DX, SL/M — or the whole call. Either box on its own is enough."
+                             ToolTip="How the callsign ENDS: DX, 4DX, SL/M ג€” or the whole call. Either box on its own is enough."
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                   </StackPanel>
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
                     <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                               ToolTip="Type the country name or its ARRL entity number — 336 finds Israel"/>
+                               ToolTip="Type the country name or its ARRL entity number ג€” 336 finds Israel"/>
                     <ComboBox x:Name="CB_Country" Width="210" FontSize="14" VerticalAlignment="Center"
                               IsEditable="True" StaysOpenOnEdit="True" IsTextSearchEnabled="False" MaxDropDownHeight="280"
                               IsSynchronizedWithCurrentItem="False"
-                              ToolTip="Type the country name or its ARRL entity number — 336 finds Israel"
+                              ToolTip="Type the country name or its ARRL entity number ג€” 336 finds Israel"
                               PreviewKeyDown="CB_Country_PreviewKeyDown"
                               PreviewTextInput="CB_Country_PreviewTextInput"
                               SelectionChanged="CB_Country_SelectionChanged"
@@ -225,7 +225,7 @@
                       <TextBlock Text="State:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="The worked station's state / province, e.g. CA"/>
                       <ComboBox x:Name="CB_State" Width="72" FontSize="14" VerticalAlignment="Center"
-                                ToolTip="The worked station's state / province — the ones this log contains"
+                                ToolTip="The worked station's state / province ג€” the ones this log contains"
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
@@ -235,9 +235,9 @@
                            as a column of squares called 1538, 155, 1573. Exchange is also what this field
                            is called in the log table, on the main form and in the QSO editor. -->
                       <TextBlock Text="Exchange:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
-                                 ToolTip="What the worked station SENT — their Holyland square in the Holyland contest, a serial number in others"/>
+                                 ToolTip="What the worked station SENT ג€” their Holyland square in the Holyland contest, a serial number in others"/>
                       <ComboBox x:Name="CB_Square" Width="90" FontSize="14" VerticalAlignment="Center"
-                                ToolTip="What the worked station SENT — their Holyland square in the Holyland contest, a serial number in others. The list is what this log contains."
+                                ToolTip="What the worked station SENT ג€” their Holyland square in the Holyland contest, a serial number in others. The list is what this log contains."
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                   </StackPanel>
@@ -716,7 +716,7 @@
                     <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding Country}" HorizontalAlignment="Center" Padding="5,0,5,0"
-                                       ToolTip="Set from the callsign's DXCC prefix — not editable"/>
+                                       ToolTip="Set from the callsign's DXCC prefix ג€” not editable"/>
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
@@ -919,16 +919,9 @@
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
                 <!-- The country's identity - the ADIF DXCC entity number. See the log table. -->
-                <DataGridTemplateColumn Header="Country&#10;Code" IsReadOnly="True" SortMemberPath="DxccCode"
+                <DataGridTemplateColumn Header="Country Code" IsReadOnly="True" SortMemberPath="DxccCode"
                                         Width="Auto" MinWidth="60">
-                    <!-- Two lines packed into one line's height - see the log table. -->
-                    <DataGridTemplateColumn.HeaderTemplate>
-                        <DataTemplate>
-                            <TextBlock Text="{Binding}" TextAlignment="Center"
-                                       LineHeight="11" LineStackingStrategy="BlockLineHeight"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.HeaderTemplate>
-                    <DataGridTemplateColumn.CellTemplate>
+                                        <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate>
                             <TextBlock Text="{Binding DxccCodeText}" Padding="5,0,5,0"
                                        ToolTip="The ARRL DXCC entity number for this country"/>
@@ -969,3 +962,4 @@
     </Grid>
     </Border>
 </Window>
+
