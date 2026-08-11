@@ -62,6 +62,11 @@ namespace HolyParser
         [JsonProperty("dxcc_code")]
         public int DxccCode { get; set; }
 
+        // For a grid cell: blank rather than "0" when the contact belongs to no entity. A zero sitting
+        // in a column of country numbers reads as a country numbered zero, which is not what it means.
+        [JsonIgnore]
+        public string DxccCodeText => DxccCode > 0 ? DxccCode.ToString() : "";
+
         [JsonProperty("exchange")]
         public string SRX { get; set; }
 

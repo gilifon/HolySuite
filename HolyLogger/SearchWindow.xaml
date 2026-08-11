@@ -918,6 +918,16 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <!-- The country's identity - the ADIF DXCC entity number. See the log table. -->
+                <DataGridTemplateColumn Header="Country&#10;Code" IsReadOnly="True" SortMemberPath="DxccCode"
+                                        Width="Auto" MinWidth="60">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DxccCodeText}" Padding="5,0,5,0"
+                                       ToolTip="The ARRL DXCC entity number for this country"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 

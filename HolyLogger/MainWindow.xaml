@@ -1750,6 +1750,18 @@
                         </DataTemplate>
                     </DataGridTemplateColumn.CellTemplate>
                 </DataGridTemplateColumn>
+                <!-- THE COUNTRY'S IDENTITY, as opposed to its name: the ADIF DXCC entity number, stored
+                     with every QSO and what every count of countries is made of. Blank rather than "0"
+                     for a contact that belongs to no entity - a station at sea counts for nobody, and a
+                     zero in a column of country numbers reads as a country numbered zero. -->
+                <DataGridTemplateColumn Header="Country&#10;Code" IsReadOnly="True" SortMemberPath="DxccCode" Width="Auto">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding DxccCodeText}" HorizontalAlignment="Center" Padding="5,0,5,0"
+                                       ToolTip="The ARRL DXCC entity number for this country"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
             </DataGrid.Columns>
         </DataGrid>
 
