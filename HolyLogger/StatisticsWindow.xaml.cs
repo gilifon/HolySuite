@@ -4187,17 +4187,29 @@ namespace HolyLogger
                                     :                                        "Country\nCode";
         }
 
+        // A COUNTRY THAT HAS NO FLAG FILE IS REMEMBERED TOO. Only successes used to be cached, so every
+        // entity whose PNG is missing re-attempted the load - and a missing pack: resource THROWS, at
+        // roughly a third of a millisecond a time. Rebuilding the Missing list on a folder where nearly
+        // every country is missing meant a few hundred of those, which measured 134 ms of the ~250 ms a
+        // folder took to open. Storing the null makes each one throw at most once per session.
+        //
+        // Frozen so the image is shareable and cheap to hand to a row: these are handed out to a list
+        // that rebinds on every folder change.
         private static BitmapImage GetFlagImage(string countryName)
         {
             if (!MainWindow.DxccNameToIso.TryGetValue(countryName, out string iso)) return null;
-            if (_flagCache.TryGetValue(iso, out BitmapImage cached)) return cached;
+            if (_flagCache.TryGetValue(iso, out BitmapImage cached)) return cached;   // may be a known miss
+
+            BitmapImage bm = null;
             try
             {
-                var bm = new BitmapImage(new Uri($"pack://application:,,,/Images/flags/{iso}.png"));
-                _flagCache[iso] = bm;
-                return bm;
+                bm = new BitmapImage(new Uri($"pack://application:,,,/Images/flags/{iso}.png"));
+                if (bm.CanFreeze) bm.Freeze();
             }
-            catch { return null; }
+            catch (Exception swallowed) { Log.Swallow(swallowed); bm = null; }
+
+            _flagCache[iso] = bm;
+            return bm;
         }
 
         // ── cell factory ──────────────────────────────────────────────────
