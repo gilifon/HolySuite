@@ -185,6 +185,16 @@ namespace HolyParser
             public string FromFile { get; set; }   // what the file said - and what was STORED
             public string OurAnswer { get; set; }  // what HolyLogger makes of the same callsign and date
             public string ResolvedBy { get; set; } // which database answered: cty.dat or Club Log
+
+            // TWO QUITE DIFFERENT FINDINGS, and mixing them is what made the first report unreadable.
+            //
+            //   Spelling  - the same DXCC entity, written differently. "Fed. Rep. Germany" against
+            //               "Fed. Rep. of Germany". Nothing is wrong with the QSO; the operator may
+            //               simply want one wording through the log.
+            //   Entity    - the callsign belongs to a DIFFERENT DXCC entity from the one the file
+            //               names. That is a country counted wrongly, and it is the finding that
+            //               matters: an award total is built on it.
+            public bool IsSpellingOnly { get; set; }
         }
 
         // A QSO whose callsign HolyLogger cannot put a country to, or can only put a NON-country to.
@@ -223,6 +233,10 @@ namespace HolyParser
         // Our own dated answer for the current record, kept whether or not it was used, so a
         // disagreement can be reported without being imposed.
         private DXCC m_datedAnswer;
+
+        // The ADIF entity NUMBER the record carried in <DXCC>, when it carried one. The best evidence
+        // available for telling a spelling difference from a different country.
+        private int m_dxccFromFile;
 
         // How many records the file actually held. Reported so the operator can see that every one of
         // them was looked at - "none was turned away" means nothing unless it also says out of how many.
@@ -446,6 +460,7 @@ namespace HolyParser
             // before it - see RecordCountryChange.
             m_countryFromFile = null;
             m_datedAnswer = null;
+            m_dxccFromFile = 0;
             qso_row.IsAllowWARC = IsParseWARC;
             qso_row.Continent = "";
             qso_row.Operator = "";
@@ -520,6 +535,9 @@ namespace HolyParser
             if (match.Success)
             {
                 qso_row.DXCC = Regex.Split(row, dxcc_pattern, RegexOptions.IgnoreCase)[2].Substring(0, int.Parse(match.Groups[1].Value));
+                int fromFileCode;
+                if (int.TryParse((qso_row.DXCC ?? string.Empty).Trim(), out fromFileCode) && fromFileCode > 0)
+                    m_dxccFromFile = fromFileCode;
             }
 
             // The file's own CONTINENT, which was not read at all before - the resolver's answer was
@@ -880,13 +898,26 @@ namespace HolyParser
                 int ourCode = dated ? CountryLookup.Shared.EntityCodeForCountry(stored, when)
                                     : CountryLookup.Shared.EntityCodeForCountry(stored);
 
-                bool same = (fileCode > 0 && ourCode > 0)
-                    ? fileCode == ourCode
-                    : CountryLookup.IsSameCountryWording(fromFile, stored);
-                if (same) return;
+                // WRITTEN THE SAME WAY - there is nothing to say about it. Only a difference in the
+                // TEXT gets this far; what follows decides whether that difference matters.
+                if (CountryLookup.IsSameCountryName(fromFile, stored)) return;
+
+                // THE FILE'S OWN <DXCC> NUMBER IS THE BEST EVIDENCE THERE IS, when it carries one: two
+                // numbers settle whether this is one entity or two, with no argument about wording.
+                // Failing that, the numbers the two NAMES resolve to. Failing that - which happens when
+                // a name belongs to an entity long deleted, so no current number exists for it - the
+                // words of the names themselves.
+                bool sameEntity;
+                if (m_dxccFromFile > 0 && ourCode > 0)
+                    sameEntity = m_dxccFromFile == ourCode;
+                else if (fileCode > 0 && ourCode > 0)
+                    sameEntity = fileCode == ourCode;
+                else
+                    sameEntity = CountryLookup.IsSameCountryWording(fromFile, stored);
 
                 m_countryChanges.Add(new CountryChange
                 {
+                    IsSpellingOnly = sameEntity,
                     Number = m_recordBeingParsed,
                     Call = qso_row.DXCall,
                     Date = qso_row.Date,

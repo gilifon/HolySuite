@@ -60,6 +60,10 @@ namespace HolyLogger
             // it is usually HolyLogger correcting an old file - but the operator is told, and the report
             // names every one, because a country silently rewritten is a country nobody can check.
             public int CountryChangeCount { get; set; }
+            // Of those, the ones that are only a difference of spelling - the same DXCC entity written
+            // two ways. Counted apart from the real ones: an award total rests on the entity, never on
+            // how the name is spelled.
+            public int SpellingOnlyCount { get; set; }
             // QSOs stored normally that count towards no DXCC entity - an unrecognised callsign, or a
             // recognised one that belongs to no country (at sea, in the air, via satellite, invalid).
             public int NoEntityCount { get; set; }
@@ -564,7 +568,7 @@ namespace HolyLogger
                 // once at the end in two sentences - the rest is in the report, which is what a report
                 // is for. Anything with nothing to say prints no line at all.
                 bool anyRejected = result.RejectedCount > 0;
-                bool anyFindings = result.CountryChangeCount > 0 || result.NoEntityCount > 0;
+                bool anyFindings = result.CountryChangeCount > 0 || result.SpellingOnlyCount > 0 || result.NoEntityCount > 0;
 
                 string msg = anyRejected ? "Import finished.\n\n" : "Import completed successfully!\n\n";
 
@@ -589,7 +593,10 @@ namespace HolyLogger
                     msg += "\n\nWorth a look:\n";
                     if (result.CountryChangeCount > 0)
                         msg += $"\n• {result.CountryChangeCount:N0} QSO{(result.CountryChangeCount == 1 ? "" : "s")} "
-                             + "where HolyLogger would name a different country";
+                             + "whose callsign belongs to a DIFFERENT country than the file says";
+                    if (result.SpellingOnlyCount > 0)
+                        msg += $"\n• {result.SpellingOnlyCount:N0} QSO{(result.SpellingOnlyCount == 1 ? "" : "s")} "
+                             + "where the country is right but spelled differently";
                     if (result.NoEntityCount > 0)
                         msg += $"\n• {result.NoEntityCount:N0} QSO{(result.NoEntityCount == 1 ? "" : "s")} "
                              + "that count towards no country at all";
@@ -1098,7 +1105,8 @@ namespace HolyLogger
                 RefreshedQsos = refreshedQsos,
                 RejectedCount = rejects.Count,
                 FilledCount = filledIn.Count,
-                CountryChangeCount = countryChanges.Count,
+                CountryChangeCount = countryChanges.Count(c => !c.IsSpellingOnly),
+                SpellingOnlyCount = countryChanges.Count(c => c.IsSpellingOnly),
                 NoEntityCount = entityNotes.Count,
                 RecordsRead = recordsRead,
                 ReportPath = reportPath,
@@ -1254,10 +1262,37 @@ namespace HolyLogger
                     sb.AppendLine();
                 }
 
-                if (countryChanges != null && countryChanges.Count > 0)
+                var wrongEntity = countryChanges == null
+                    ? new List<HolyLogParser.CountryChange>()
+                    : countryChanges.Where(c => !c.IsSpellingOnly).ToList();
+                var spellingOnly = countryChanges == null
+                    ? new List<HolyLogParser.CountryChange>()
+                    : countryChanges.Where(c => c.IsSpellingOnly).ToList();
+
+                if (spellingOnly.Count > 0)
                 {
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
-                    sb.AppendLine($"COUNTRIES YOUR FILE AND HOLYLOGGER DISAGREE ON ({countryChanges.Count:N0})");
+                    sb.AppendLine($"SAME COUNTRY, SPELLED DIFFERENTLY ({spellingOnly.Count:N0})");
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine();
+                    sb.AppendLine("NOTHING IS WRONG WITH THESE QSOs. The callsign belongs to exactly the");
+                    sb.AppendLine("country your file names — the two databases simply write that country's");
+                    sb.AppendLine("name differently. They are listed only so you can choose one wording");
+                    sb.AppendLine("through the log if you would rather have that.");
+                    sb.AppendLine();
+
+                    foreach (var g in spellingOnly
+                                .GroupBy(c => (c.FromFile ?? "") + " → " + (c.OurAnswer ?? ""), StringComparer.OrdinalIgnoreCase)
+                                .OrderByDescending(g => g.Count()))
+                        sb.AppendLine($"  {g.Count(),6:N0}  {g.Key}");
+                    sb.AppendLine();
+                }
+
+                if (wrongEntity.Count > 0)
+                {
+                    countryChanges = wrongEntity;      // the section below is about these alone
+                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
+                    sb.AppendLine($"A DIFFERENT COUNTRY — NOT JUST A DIFFERENT SPELLING ({wrongEntity.Count:N0})");
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
                     sb.AppendLine();
                     sb.AppendLine("YOUR FILE'S ANSWER WAS STORED. Nothing below was changed in your log.");
@@ -1277,8 +1312,9 @@ namespace HolyLogger
                     sb.AppendLine("    mean the station was at sea or in the air, so the contact counts for");
                     sb.AppendLine("    no DXCC entity at all.");
                     sb.AppendLine();
-                    sb.AppendLine("Wording alone is never listed here: \"Germany\" and \"Fed. Rep. of Germany\"");
-                    sb.AppendLine("are the same entity and are not a disagreement.");
+                    sb.AppendLine("Each of these is a DIFFERENT DXCC ENTITY, not a different way of writing");
+                    sb.AppendLine("the same one — checked against the entity numbers wherever your file or");
+                    sb.AppendLine("the databases carry them. Spellings are counted in their own section.");
                     sb.AppendLine();
                     sb.AppendLine("To act on any of these, use Verify in the Log Workshop. Nothing here has");
                     sb.AppendLine("been changed for you.");
@@ -1509,4 +1545,6 @@ namespace HolyLogger
 
     }
 }
+
+
 

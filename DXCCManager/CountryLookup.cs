@@ -403,11 +403,41 @@ namespace DXCCManager
         // cost of crying wolf is a report nobody reads.
         public static bool IsSameCountryWording(string a, string b)
         {
-            string x = Flatten(a), y = Flatten(b);
-            if (x.Length == 0 || y.Length == 0) return false;
-            if (x == y) return true;
-            if (x.Length < 4 || y.Length < 4) return false;    // too short to contain anything meaningfully
-            return x.Contains(y) || y.Contains(x);
+            var x = NameWords(a);
+            var y = NameWords(b);
+            if (x.Count == 0 || y.Count == 0) return false;
+
+            // ONE NAME IS THE OTHER PLUS OR MINUS A WORD. Compared as whole words rather than as one
+            // run of letters, because the words that differ sit in the MIDDLE and a straight "does one
+            // contain the other" cannot see past them:
+            //
+            //   FED REP GERMANY        vs  FED REP OF GERMANY          - an "of" in the middle
+            //   UK BASE AREAS CYPRUS   vs  UK SOV BASE AREAS CYPRUS    - a dropped "Sov."
+            //   UNITED STATES          vs  UNITED STATES OF AMERICA
+            //
+            // Every one of those is the same entity written differently. Whereas ASIATIC RUSSIA and
+            // EUROPEAN RUSSIA share a word and neither contains the other, which is right - they are
+            // two entities.
+            var small = x.Count <= y.Count ? x : y;
+            var large = x.Count <= y.Count ? y : x;
+            foreach (string w in small) if (!large.Contains(w)) return false;
+            return true;
+        }
+
+        // A country name as its meaningful words, levelled the way the databases are matched.
+        private static List<string> NameWords(string name)
+        {
+            var words = new List<string>();
+            if (string.IsNullOrWhiteSpace(name)) return words;
+            foreach (string raw in name.ToUpperInvariant().Split(new[] { ' ', '.', ',', '-', '\'', '(', ')', '&', '/' },
+                                                                 StringSplitOptions.RemoveEmptyEntries))
+            {
+                string w = NonAlphaNumeric.Replace(raw, "");
+                if (w.Length == 0) continue;
+                if (w == "OF" || w == "THE" || w == "AND") continue;   // filler, never distinguishing
+                words.Add(w);
+            }
+            return words;
         }
 
         // "BONAIRE, CURACAO (NETH ANTILLES)" -> "Bonaire, Curacao (Neth Antilles)". Only used for names
