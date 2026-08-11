@@ -40,6 +40,12 @@ namespace HolyLogger
         // DXCC entity names confirmed by the SELECTED confirmation source. Populated from that source's
         // cached download result; drives the Confirmed column (tick) in the worked list. Reloaded from a
         // different cache whenever the source folder changes (see LoadConfirmedCache / _source).
+        // NOT A COUNT OF ANYTHING ANY MORE. Nothing on the page is counted from this: the confirmed
+        // countries, like the worked ones, are a set of entity NUMBERS (_confirmedCodes), resolved from
+        // the QSOs themselves. This survives for one job only - the LoTW check writes it to log state as
+        // a '|'-joined list, and how much it GREW by is what "N new countries" reports after a download.
+        // Kept as names because that is what is already stored in every operator's log state; nothing
+        // reads it back as a count, so the two cannot disagree about a total.
         private HashSet<string> _confirmedEntities = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // THE SAME SET, BY NUMBER - what every count on the page is actually made of now. The name set
@@ -1250,25 +1256,26 @@ namespace HolyLogger
         // check who is right; this shows them the two rows and the answer next to each.
         private void WorkedNotConfirmed_Click(object sender, RoutedEventArgs e)
         {
-            var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
-            HashSet<string> achieved = AchievedEntities();
+            // BY ENTITY NUMBER, like every other count on this page - so the countries listed here are
+            // exactly the ones the tile counted, and the two can never be built from different questions.
+            EnsureEntityTable();
+            HashSet<int> achieved = AchievedCodes();
 
             // entity -> QSO count, and which services confirmed any of its QSOs
-            var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
-            var sources = new Dictionary<string, SortedSet<string>>(StringComparer.OrdinalIgnoreCase);
+            var counts = new Dictionary<int, int>();
+            var sources = new Dictionary<int, SortedSet<string>>();
             if (_allQsos != null)
             {
                 foreach (QSO q in _allQsos)
                 {
                     if (q == null) continue;
-                    DXCC d = Resolve(q.DXCall, q.Date);
-                    if (d == null || string.IsNullOrEmpty(d.Name)) continue;
-                    if (!current.Contains(d.Name) || achieved.Contains(d.Name)) continue;
+                    int code = EntityCodeOf(q);
+                    if (code == 0 || !_activeCodes.Contains(code) || achieved.Contains(code)) continue;
 
                     int n;
-                    counts[d.Name] = counts.TryGetValue(d.Name, out n) ? n + 1 : 1;
+                    counts[code] = counts.TryGetValue(code, out n) ? n + 1 : 1;
                     SortedSet<string> set;
-                    if (!sources.TryGetValue(d.Name, out set)) sources[d.Name] = set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+                    if (!sources.TryGetValue(code, out set)) sources[code] = set = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
                     if (q.LotwQslRcvd == 1) set.Add("LoTW");
                     if (q.QrzQslRcvd == 1) set.Add("QRZ");
                     if (q.EqslQslRcvd == 1) set.Add("eQSL");
@@ -1277,13 +1284,14 @@ namespace HolyLogger
                 }
             }
 
-            var rows = counts.OrderBy(p => p.Key, StringComparer.OrdinalIgnoreCase)
-                             .Select(p => new
+            var rows = counts.Select(p => new
                              {
-                                 Name = p.Key,
+                                 Name = EntityNameOf(p.Key),
                                  Count = p.Value,
                                  ConfirmedBy = sources[p.Key].Count > 0 ? string.Join(", ", sources[p.Key]) : "— nothing —",
-                             }).ToList();
+                             })
+                             .OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase)
+                             .ToList();
 
             if (rows.Count == 0)
             {
@@ -1450,14 +1458,6 @@ namespace HolyLogger
         private HashSet<int> AchievedCodes()
         {
             return _confirmedCodes;
-        }
-
-        private HashSet<string> AchievedEntities()
-        {
-            // The folder's confirmed set already IS the answer: on the LoTW folder LoadConfirmedCache
-            // counts a paper card as a confirmation (see IsAchievedForSource), so the cards are in here
-            // alongside LoTW's own. Every tile, the Missing list and the tick column read this one set.
-            return _confirmedEntities;
         }
 
         private HashSet<string> PaperOnlyEntities()
@@ -1882,7 +1882,7 @@ namespace HolyLogger
             // the incremental marker belongs to the LoTW download.
             if (_source != ConfSource.Lotw) return;
             var s = Properties.Settings.Default;
-            if (LotwConfirmedQsoCount < _confirmedEntities.Count && !string.IsNullOrWhiteSpace(LotwLastQsl))
+            if (LotwConfirmedQsoCount < _confirmedCodes.Count && !string.IsNullOrWhiteSpace(LotwLastQsl))
             {
                 LotwLastQsl = string.Empty;
                 s.Save();
@@ -1983,7 +1983,7 @@ namespace HolyLogger
             // WHICH ones they are without exporting the log and reading it elsewhere.
             TB_LotwStatus.Foreground = System.Windows.Media.Brushes.ForestGreen;
             TB_LotwStatus.Inlines.Clear();
-            if (_source != ConfSource.Worked && _confirmedEntities.Count > 0)
+            if (_source != ConfSource.Worked && _confirmedCodes.Count > 0)
             {
                 TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run(
                     $"Confirmed: {confirmedActive} active,  "));
@@ -2139,7 +2139,7 @@ namespace HolyLogger
                 // no figure, because it looks like an answer.
                 bool totalKnown = HasBeenChecked(ConfSource.Lotw)
                                   && LotwConfirmedQsoCount > 0
-                                  && LotwConfirmedQsoCount >= _confirmedEntities.Count;
+                                  && LotwConfirmedQsoCount >= _confirmedCodes.Count;
                 TB_SumTotalQsls.Text = totalKnown ? LotwConfirmedQsoCount.ToString("N0", inv)
                                      : HasBeenChecked(ConfSource.Lotw) ? "—" : "not checked yet";
 
@@ -2747,7 +2747,7 @@ namespace HolyLogger
             // way, do one full re-download to reset the total cleanly and seed the de-dupe set; every
             // check after that is incremental.
             bool incremental = !_forceFullDownload
-                               && _confirmedEntities.Count > 0
+                               && _confirmedCodes.Count > 0
                                && !string.IsNullOrWhiteSpace(LotwLastQsl)
                                && !string.IsNullOrWhiteSpace(LotwSeenKeysJson);
             _forceFullDownload = false;   // one-shot: only the click that set it gets the full run
@@ -4585,6 +4585,7 @@ namespace HolyLogger
         public string Value { get; set; }
     }
 }
+
 
 
 
