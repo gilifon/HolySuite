@@ -375,8 +375,8 @@ namespace HolyLogger
                 DXCC d = ResolveQso(q);
                 if (d == null) continue;
 
-                if (!string.IsNullOrEmpty(d.Name)
-                    && !string.Equals(d.Name, "Unknown", StringComparison.OrdinalIgnoreCase))
+                // A country, not a "no DXCC entity" answer - see DXCC.IsDxccEntity.
+                if (d.IsDxccEntity)
                 {
                     Bucket(st.CountryCell, pivotBand + "|" + mode).Add(d.Name);
                     Bucket(st.CountryByBand, pivotBand).Add(d.Name);
@@ -561,6 +561,16 @@ namespace HolyLogger
         // its prefix (Serbia's 4N, Bosnia's T9) counts at all. Omit it only for a live "today" answer.
         // Both sides of a confirmation match must be resolved the same way, or a confirmed country could
         // be matched under one name and counted under another.
+        // The entity name to COUNT a callsign under, or null when the answer is not a country at all -
+        // "Unknown", or one of Club Log's no-DXCC-entity answers (Maritime Mobile and the rest). Every
+        // place that builds a set of worked or confirmed entities goes through this, so none of them can
+        // be the one that forgets and lets a non-country into the totals. See DXCC.IsDxccEntity.
+        private string EntityNameFor(string call, string adifDate = null)
+        {
+            DXCC d = Resolve(call, adifDate);
+            return d != null && d.IsDxccEntity ? d.Name : null;
+        }
+
         private DXCC Resolve(string call, string adifDate = null)
         {
             call = (call ?? string.Empty).Trim();
@@ -1015,9 +1025,16 @@ namespace HolyLogger
             // matches, e.g. a retired prefix like T9/4N or an O-for-zero typo. It is not a DXCC entity, and
             // GetAllEntityNames() excludes it, so letting it through would list a 266th "country" while the
             // worked/total box — derived as total minus missing — correctly stayed at 265.
+            //
+            // IsDxccEntity, not just a name test: it also throws out Club Log's "no DXCC entity" answers -
+            // MARITIME MOBILE, AERONAUTICAL MOBILE, SATELLITE/INTERNET OR REPEATER and INVALID. Those were
+            // being counted as countries, and since no current-entity list contains them they were then
+            // filed as DELETED entities: an operator with three /MM contacts was told they had worked and
+            // confirmed a deleted country called Maritime Mobile.
             var workedCounts = _allQsos
-                .Select(q => Resolve(q.DXCall, q.Date)?.Name)
-                .Where(n => !string.IsNullOrEmpty(n) && !string.Equals(n, "Unknown", StringComparison.OrdinalIgnoreCase))
+                .Select(q => Resolve(q.DXCall, q.Date))
+                .Where(d => d != null && d.IsDxccEntity)
+                .Select(d => d.Name)
                 .GroupBy(n => n, StringComparer.OrdinalIgnoreCase)
                 .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
 
@@ -1241,8 +1258,10 @@ namespace HolyLogger
             {
                 if (q == null || !IsAchievedForSource(q)) continue;
                 DXCC d = ResolveQso(q);
-                if (d == null || string.IsNullOrEmpty(d.Name)
-                    || string.Equals(d.Name, "Unknown", StringComparison.OrdinalIgnoreCase)) continue;
+                // A DELETED COUNTRY, not merely something absent from the current list. Maritime Mobile
+                // and the rest of Club Log's "no DXCC entity" answers are in no current-entity list
+                // either, and were being listed here as deleted countries chased and confirmed.
+                if (d == null || !d.IsDxccEntity) continue;
                 if (current.Contains(d.Name)) continue;   // still exists - not a deleted entity
                 names.Add(d.Name);
                 subset.Add(q);
@@ -1700,8 +1719,7 @@ namespace HolyLogger
             {
                 if (q == null || !IsAchievedForSource(q)) continue;
                 DXCCManager.DXCC d = Resolve(q.DXCall, q.Date);
-                if (d == null || string.IsNullOrEmpty(d.Name)
-                    || string.Equals(d.Name, "Unknown", StringComparison.OrdinalIgnoreCase)) continue;
+                if (d == null || !d.IsDxccEntity) continue;   // not a country - see DXCC.IsDxccEntity
                 _confirmedEntities.Add(d.Name);
 
                 // The deleted-entity split, from the same pass. The entity NUMBER now comes with the
@@ -3080,7 +3098,7 @@ namespace HolyLogger
                 var qrzDeleted = new HashSet<int>();
                 foreach (var c in qrzMatched)
                 {
-                    string name = Resolve(c.Call, c.QsoDate)?.Name;
+                    string name = EntityNameFor(c.Call, c.QsoDate);
                     if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                         qrzNames.Add(name);
                     if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) qrzDeleted.Add(c.DxccCode);
@@ -3368,7 +3386,7 @@ namespace HolyLogger
                 var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var c in MatchedOnly(all, unmatched))
                 {
-                    string name = Resolve(c.Call, c.QsoDate)?.Name;
+                    string name = EntityNameFor(c.Call, c.QsoDate);
                     if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                         names.Add(name);
                 }
@@ -3536,7 +3554,7 @@ namespace HolyLogger
                 var deleted = new HashSet<int>();
                 foreach (var c in MatchedOnly(all, unmatched))
                 {
-                    string name = Resolve(c.Call, c.QsoDate)?.Name;
+                    string name = EntityNameFor(c.Call, c.QsoDate);
                     if (!string.IsNullOrEmpty(name) && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                         names.Add(name);
                     if (DXCCManager.DeletedEntities.IsDeleted(c.DxccCode)) deleted.Add(c.DxccCode);
@@ -3638,7 +3656,7 @@ namespace HolyLogger
                 string rxDate = QslRcvdDate(rec);
                 string key = QsoKey(rec);
 
-                string name = Resolve(call, qsoDate)?.Name;
+                string name = EntityNameFor(call, qsoDate);
                 if (!string.IsNullOrEmpty(name)
                     && !string.Equals(name, "Unknown", StringComparison.OrdinalIgnoreCase))
                     result.ResolvedNames.Add(name);
@@ -3730,7 +3748,7 @@ namespace HolyLogger
             foreach (var c in confirmations)
             {
                 if (lotwUnmatched.Contains(c)) continue;
-                string nm = Resolve(c.Call, c.QsoDate)?.Name;
+                string nm = EntityNameFor(c.Call, c.QsoDate);
                 if (!string.IsNullOrEmpty(nm) && !string.Equals(nm, "Unknown", StringComparison.OrdinalIgnoreCase))
                     result.ResolvedNames.Add(nm);
                 if (c.DxccCode > 0)
@@ -4421,3 +4439,4 @@ namespace HolyLogger
         public string Value { get; set; }
     }
 }
+
