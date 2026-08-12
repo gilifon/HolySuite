@@ -21,11 +21,52 @@ namespace HolyLogger
 
         public bool Confirmed { get; private set; }
 
+        // **BOLD** in a message becomes bold on screen. Menu paths and button names have to stand out
+        // from the sentence around them - "select Tools > Log Workshop and press Log Verifier" is three
+        // things to find in a program, buried in prose - and a message box that takes only a flat
+        // string had no way to say so. Two asterisks either side, the convention everybody already
+        // knows from chat and Markdown.
+        //
+        // A message with no asterisks is set as plain text exactly as before, so no existing caller
+        // changes behaviour. An odd number of markers means somebody wrote a literal asterisk: the
+        // trailing piece is added as plain text rather than swallowed.
+        private void SetMessage(string message)
+        {
+            string text = message ?? string.Empty;
+            if (text.IndexOf("**", StringComparison.Ordinal) < 0)
+            {
+                MessageText.Text = text;
+                return;
+            }
+
+            MessageText.Text = string.Empty;
+            MessageText.Inlines.Clear();
+
+            int at = 0;
+            bool bold = false;
+            while (at < text.Length)
+            {
+                int mark = text.IndexOf("**", at, StringComparison.Ordinal);
+                string piece = mark < 0 ? text.Substring(at) : text.Substring(at, mark - at);
+
+                if (piece.Length > 0)
+                {
+                    var run = new System.Windows.Documents.Run(piece);
+                    if (bold) run.FontWeight = FontWeights.Bold;
+                    MessageText.Inlines.Add(run);
+                }
+
+                if (mark < 0) break;
+                at = mark + 2;
+                bold = !bold;
+            }
+        }
+
         private HolyMessageBox(string message, string title, HolyMsgType type, Window owner, bool confirm, double width = 0)
         {
             InitializeComponent();
             Title = title;
-            MessageText.Text = message;
+            SetMessage(message);
             if (owner != null) Owner = owner;
             if (width > 0) Width = width;
             ApplyType(type);

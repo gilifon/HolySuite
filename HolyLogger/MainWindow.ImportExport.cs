@@ -612,10 +612,13 @@ namespace HolyLogger
                 if (anyFindings)
                     msg += "\n\nYour file was stored exactly as it is — nothing was changed, and the "
                          + "report names every one.\n\n"
-                         + "To act on them, open Tools → Log Workshop and press Log Verifier. It checks "
-                         + "the QSOs you have on screen and opens the Log Fixer, where you check the "
-                         + "kinds of problem you want put right and it corrects them for you. Nothing "
-                         + "is written until you press Fix, and your log is copied first.";
+                         // The menu path on its own line and in bold: it is the instruction, and it was
+                         // buried mid-sentence among the words explaining it.
+                         + "To act on them, select\n"
+                         + "**Tools → Log Workshop** and press **Log Verifier**.\n\n"
+                         + "It checks the QSOs you have on screen and opens the Log Fixer, where you "
+                         + "check the kinds of problem you want put right and it corrects them for you. "
+                         + "Nothing is written until you press Fix, and your database is copied first.";
 
                 if (anyRejected)
                 {
@@ -1237,10 +1240,10 @@ namespace HolyLogger
             rejectsAdifPath = null;
             try
             {
-                string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                string folder = DataAccess.ReportsFolder;
                 string stamp = DateTime.Now.ToString("yyyy-MM-dd_HHmm");
-                string txt = System.IO.Path.Combine(desktop, $"holylogger_import_report_{stamp}.txt");
-                string adi = System.IO.Path.Combine(desktop, $"holylogger_rejected_qsos_{stamp}.adi");
+                string txt = System.IO.Path.Combine(folder, $"holylogger_import_report_{stamp}.txt");
+                string adi = System.IO.Path.Combine(folder, $"holylogger_rejected_qsos_{stamp}.adi");
 
                 var sb = new StringBuilder();
                 sb.AppendLine("HolyLogger — import report");

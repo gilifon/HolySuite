@@ -487,7 +487,7 @@ namespace HolyLogger
             var statusText = new TextBlock
             {
                 Text = string.Empty,
-                FontSize = 16,
+                FontSize = 12,
                 Foreground = Brushes.DimGray,
                 Margin = new Thickness(0, 0, 0, 8),
                 VerticalAlignment = VerticalAlignment.Center,
@@ -714,7 +714,7 @@ namespace HolyLogger
             // Resource references (not brush snapshots) so the title bar follows a live scheme
             // switch -- a snapshot froze whatever theme was active when the window opened, leaving
             // a dark bar on a light scheme after toggling.
-            var titleText = new TextBlock { Text = "Cluster", FontSize = 16, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center };
+            var titleText = new TextBlock { Text = "Cluster", FontSize = 15, FontWeight = FontWeights.Bold, VerticalAlignment = VerticalAlignment.Center };
             titleText.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
 
             var dock = new DockPanel { LastChildFill = true };
@@ -913,7 +913,7 @@ namespace HolyLogger
             var undoCountText = new TextBlock
             {
                 Text = string.Empty,
-                FontSize = 16,
+                FontSize = 10,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.Black,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -963,7 +963,7 @@ namespace HolyLogger
                 RowHeaderWidth = 0,
                 AlternationCount = 2,
                 //AlternatingRowBackground = Brushes.Gainsboro,
-                FontSize = 16,
+                FontSize = 13,
                 Margin = new Thickness(0, -(ClusterHeaderCanvasHeight - ClusterTableTopGap), 0, 0),
                 Opacity = 1
             };
@@ -1157,9 +1157,9 @@ namespace HolyLogger
                 HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center
             };
-            freqHeaderText.Inlines.Add(new Run("Freq") { FontSize = 16, FontWeight = FontWeights.Normal });
+            freqHeaderText.Inlines.Add(new Run("Freq") { FontSize = 12, FontWeight = FontWeights.Normal });
             freqHeaderText.Inlines.Add(new LineBreak());
-            freqHeaderText.Inlines.Add(new Run("MHz") { FontSize = 16, FontWeight = FontWeights.Bold });
+            freqHeaderText.Inlines.Add(new Run("MHz") { FontSize = 8, FontWeight = FontWeights.Bold });
 
             var freqColumnTemplate = new DataTemplate();
             var freqTextBlockFactory = new FrameworkElementFactory(typeof(TextBlock));
@@ -1559,7 +1559,7 @@ namespace HolyLogger
             var itemText = new TextBlock
             {
                 Text = text,
-                FontSize = 16,
+                FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Foreground = useTextBackground ? Brushes.Black : color,
                 Background = useTextBackground ? color : Brushes.Transparent,
@@ -1867,7 +1867,7 @@ namespace HolyLogger
             var freqText = new TextBlock
             {
                 Text = string.Empty,
-                FontSize = 16,
+                FontSize = 13,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
                 Background = new SolidColorBrush(Color.FromRgb(0xE0, 0x00, 0x00)),
@@ -2234,7 +2234,7 @@ namespace HolyLogger
             var lastMinutesLabel = new TextBlock
             {
                 Text = "Last",
-                FontSize = 16,
+                FontSize = 12,
                 FontWeight = FontWeights.Bold,
                 Width = ClusterLastMinutesDropdownWidth,
                 HorizontalAlignment = HorizontalAlignment.Left,
@@ -2270,7 +2270,7 @@ namespace HolyLogger
             var minutesUnitLabel = new TextBlock
             {
                 Text = "min",
-                FontSize = 16,
+                FontSize = 12,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(4, 0, 0, 0)
             };
@@ -4832,7 +4832,7 @@ namespace HolyLogger
             {
                 Content = "Reset undo list",
                 Padding = new Thickness(14, 7, 14, 7),
-                FontSize = 16,
+                FontSize = 13,
                 Cursor = Cursors.Hand,
                 // Dark red instead of the old light pink: this button never set its own Foreground, so
                 // it picks up the app-wide Button style's theme text color, which is white in dark mode

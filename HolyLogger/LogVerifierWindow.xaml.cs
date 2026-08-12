@@ -1357,9 +1357,9 @@ namespace HolyLogger
             if (!HolyMessageBox.ShowConfirm(
                     fixes.ToString("N0") + " correction" + (fixes == 1 ? "" : "s")
                     + " will be written to " + qsoCount.ToString("N0") + " QSO" + (qsoCount == 1 ? "" : "s")
-                    // NOT "restore it from Tools > Backups & Restore": that window lists only the dated
-                    // automatic backups (logDB-yyyy-MM-dd.db) and never these .bak safety copies, so
-                    // sending the operator there would send them somewhere the file is not.
+                    // Backups & Restore DOES list these now - they go into the Backups folder with the
+                    // daily ones and restore by the same button - so the message can name the window
+                    // rather than describing a file-rename.
                     + ".\n\nYour WHOLE DATABASE — every log in it, not only this one — is copied first, "
                     + "into\n" + (string.IsNullOrEmpty(dal.BackupsFolder) ? "your Backups folder"
                                                                          : dal.BackupsFolder)

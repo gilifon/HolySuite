@@ -666,7 +666,7 @@ namespace HolyLogger
                 // the queue" list was thrown away, the one time somebody needed to read it. Only the
                 // TQSL output is truncated now; the summary is always at the top.
                 string reportPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "lotw_last_upload.txt");
+                    DataAccess.ReportsFolder, "lotw_last_upload.txt");
                 try
                 {
                     string detail = reportSb.ToString();
@@ -721,7 +721,7 @@ namespace HolyLogger
                 try
                 {
                     string logPath = System.IO.Path.Combine(
-                        Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                        DataAccess.ReportsFolder,
                         "lotw_upload_error.txt");
                     System.IO.File.WriteAllText(logPath,
                         $"LoTW upload error — {DateTime.Now:yyyy-MM-dd HH:mm:ss}\r\n" +

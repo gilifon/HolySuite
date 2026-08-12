@@ -2625,7 +2625,7 @@ namespace HolyLogger
                                                  int otherStations = 0)
         {
             string path = System.IO.Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                DataAccess.ReportsFolder,
                 "lotw_unmatched_confirmations.txt");
 
             var dal = DataAccess.GetInstance();
@@ -3989,7 +3989,7 @@ namespace HolyLogger
                 if (_spinnerWorstGapSeconds < 3) return;
 
                 string path = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    DataAccess.ReportsFolder,
                     "holylogger_ui_freeze.txt");
 
                 var t = new System.Text.StringBuilder();

@@ -1006,7 +1006,7 @@ namespace HolyLogger
                 if (Properties.Settings.Default.FreqRepairDeclinedCount == fixes.Count) return;
 
                 string reportPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    DataAccess.ReportsFolder,
                     "holylogger_frequency_changes.txt");
 
                 var sb = new System.Text.StringBuilder();
@@ -7100,7 +7100,7 @@ namespace HolyLogger
             var modeText = new TextBlock
             {
                 Text = mode,
-                FontSize = 16,
+                FontSize = 9,
                 FontWeight = FontWeights.Bold,
                 // Foreground inherited from the cluster window's themed TextElement.Foreground.
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -7175,7 +7175,7 @@ namespace HolyLogger
             var bandText = new TextBlock
             {
                 Text = band,
-                FontSize = 16,
+                FontSize = 9,
                 FontWeight = FontWeights.Bold,
                 // Foreground inherited from the cluster window's themed TextElement.Foreground.
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -7296,7 +7296,7 @@ namespace HolyLogger
             var bandSpotCountText = new TextBlock
             {
                 Text = "0",
-                FontSize = 16,
+                FontSize = 9,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -11239,7 +11239,7 @@ namespace HolyLogger
             try
             {
                 string debugPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    DataAccess.ReportsFolder,
                     "qrz_missing_debug.txt");
                 var sb = new System.Text.StringBuilder();
                 sb.AppendLine($"QRZ re-query candidates — {DateTime.Now:yyyy-MM-dd HH:mm:ss}  ({needsLookup.Count} QSOs)");
@@ -11296,7 +11296,7 @@ namespace HolyLogger
             try
             {
                 string debugPath = System.IO.Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.Desktop),
+                    DataAccess.ReportsFolder,
                     "qrz_missing_debug.txt");
                 var sb = new System.Text.StringBuilder();
                 sb.AppendLine();

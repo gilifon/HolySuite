@@ -147,6 +147,35 @@ namespace HolyLogger
         // The daily-backups folder (with HOW TO RESTORE.txt) -- for Help > Open Backups Folder.
         public string BackupsFolder => Path.Combine(DataFolder, "Backups");
 
+        // WHERE EVERY REPORT GOES. The import report, the rejected-records ADIF, the LoTW upload log,
+        // the unmatched-confirmations list - all of them used to be dropped on the operator's DESKTOP,
+        // which is somebody's own space and not the program's to litter. One folder of the program's
+        // own, beside the database and the backups, so a report can always be found and the desktop is
+        // left alone.
+        //
+        // Static and independent of any open database, because a report can be written when no log is
+        // open at all. Falls back to the desktop only if the folder cannot be made, which is better
+        // than losing the report entirely.
+        public static string ReportsFolder
+        {
+            get
+            {
+                try
+                {
+                    string dir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "4Z1KD", "HolyLogger", "Reports");
+                    Directory.CreateDirectory(dir);
+                    return dir;
+                }
+                catch (Exception swallowed)
+                {
+                    Log.Swallow(swallowed);
+                    return Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+                }
+            }
+        }
+
         // The live database file itself (logDB.db), for the in-app Restore feature.
         public string DbPath => dbPath;
 
