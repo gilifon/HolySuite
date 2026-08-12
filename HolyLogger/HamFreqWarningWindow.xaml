@@ -1,4 +1,4 @@
-<Window x:Class="HolyLogger.HamFreqWarningWindow"
+﻿<Window x:Class="HolyLogger.HamFreqWarningWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Frequency Check" Width="470" SizeToContent="Height"
@@ -28,9 +28,9 @@
 
         <!-- Yes / No, centred. No is the default (Enter) and cancel (Escape): the safe answer. -->
         <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center">
-            <Button x:Name="Btn_Yes" Content="Yes" Width="96" Height="34" FontSize="15" FontWeight="Bold"
+            <Button x:Name="Btn_Yes" Content="Yes" Width="96" Height="34" FontSize="16" FontWeight="Bold"
                     Margin="0,0,16,0" Click="Btn_Yes_Click"/>
-            <Button x:Name="Btn_No" Content="No" Width="96" Height="34" FontSize="15" FontWeight="Bold"
+            <Button x:Name="Btn_No" Content="No" Width="96" Height="34" FontSize="16" FontWeight="Bold"
                     IsDefault="True" IsCancel="True" Click="Btn_No_Click"/>
         </StackPanel>
     </Grid>

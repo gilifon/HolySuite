@@ -72,9 +72,9 @@
                              MaxWidth on the NAME (not the panel) so a long one still wraps rather than
                              widening the column and shoving the source folders across. -->
                         <StackPanel Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Log file:" FontSize="13" FontWeight="Bold" Margin="0,0,7,0"
+                            <TextBlock Text="Log file:" FontSize="16" FontWeight="Bold" Margin="0,0,7,0"
                                        VerticalAlignment="Center" Foreground="{DynamicResource MutedTextBrush}"/>
-                            <TextBlock x:Name="TB_LogName" FontSize="15" FontWeight="Bold" TextWrapping="Wrap"
+                            <TextBlock x:Name="TB_LogName" FontSize="16" FontWeight="Bold" TextWrapping="Wrap"
                                        MaxWidth="360" VerticalAlignment="Center"
                                        ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"
                                        Foreground="{DynamicResource AccentBrush}"/>
@@ -206,7 +206,7 @@
                                     <!-- Reads "Total QSOs" on the Worked folder and "<source> QSOs" on a
                                          confirmation folder, because the number below it is the FILTERED
                                          count for the open folder, not the whole log. Set in code. -->
-                                    <TextBlock x:Name="TB_TotalQsoLabel" Text="Total QSOs" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
+                                    <TextBlock x:Name="TB_TotalQsoLabel" Text="Total QSOs" FontSize="16" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center"/>
                                     <TextBlock x:Name="TB_TotalQSOs" FontSize="34" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center"/>
                                 </StackPanel>
                             </Border>
@@ -226,7 +226,7 @@
                                          inside that height. The number keeps the bold accent of the other
                                          tiles, just sized to sit on a line with its own label. -->
                                     <StackPanel x:Name="UniqueTileHeader" Orientation="Horizontal" HorizontalAlignment="Center">
-                                        <TextBlock x:Name="TB_UniqueCallsLabel" Text="Unique Calls" FontSize="15"
+                                        <TextBlock x:Name="TB_UniqueCallsLabel" Text="Unique Calls" FontSize="16"
                                                    VerticalAlignment="Center" Foreground="{DynamicResource MutedTextBrush}"/>
                                         <TextBlock x:Name="TB_UniqueCalls" FontSize="20" FontWeight="Bold" Margin="8,0,0,0"
                                                    VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
@@ -241,7 +241,7 @@
                                          against the numbers, so the three parts read as a small table
                                          rather than three ragged phrases. -->
                                     <Grid x:Name="CountryBreakdownGrid" Margin="0,1,0,0" HorizontalAlignment="Center"
-                                          Visibility="Collapsed" TextElement.FontSize="14"
+                                          Visibility="Collapsed" TextElement.FontSize="16"
                                           TextElement.Foreground="{DynamicResource MutedTextBrush}">
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
@@ -263,14 +263,14 @@
                             </Border>
                             <Border VerticalAlignment="Stretch" Width="160" Padding="14,8" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                                 <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Text="Date Range" FontSize="15" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
+                                    <TextBlock Text="Date Range" FontSize="16" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,0,0,4"/>
                                     <StackPanel Orientation="Horizontal">
-                                        <TextBlock Text="Start " FontSize="14" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TB_DateStart" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Start " FontSize="16" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TB_DateStart" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                     <StackPanel Orientation="Horizontal" Margin="0,2,0,0">
-                                        <TextBlock Text="End   " FontSize="14" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
-                                        <TextBlock x:Name="TB_DateEnd" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock Text="End   " FontSize="16" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center"/>
+                                        <TextBlock x:Name="TB_DateEnd" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </StackPanel>
                             </Border>
@@ -294,11 +294,11 @@
                                             BorderThickness="0"/>
                                 </Border>
                                 <TextBlock x:Name="TB_DataQuality"
-                                           Margin="0,8,0,0" FontSize="13" Foreground="{DynamicResource Danger}"
+                                           Margin="0,8,0,0" FontSize="16" Foreground="{DynamicResource Danger}"
                                            FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"
                                            HorizontalAlignment="Left"/>
                                 <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
-                                        Margin="0,6,0,0" Padding="10,4" FontSize="13"
+                                        Margin="0,6,0,0" Padding="10,4" FontSize="16"
                                         Visibility="Collapsed" Click="BTN_EditProblems_Click"/>
                             </StackPanel>
 
@@ -322,13 +322,13 @@
                                      to. Without it a StackPanel child stretches, and a stretched block
                                      capped by MaxWidth is CENTRED in what is left - which is why this
                                      note sat indented from the table's left edge instead of under it. -->
-                                <TextBlock x:Name="TB_CountryPivotNote" Margin="0,5,0,0" FontSize="13"
+                                <TextBlock x:Name="TB_CountryPivotNote" Margin="0,5,0,0" FontSize="16"
                                            Foreground="{DynamicResource MutedTextBrush}" FontStyle="Italic"
                                            TextWrapping="Wrap" MaxWidth="390" HorizontalAlignment="Left"/>
                             </StackPanel>
 
                             <!-- Shown only when the country file is overdue for a refresh. -->
-                            <TextBlock x:Name="TB_CtyWarning" Foreground="{DynamicResource Danger}" FontSize="13" FontWeight="SemiBold"
+                            <TextBlock x:Name="TB_CtyWarning" Foreground="{DynamicResource Danger}" FontSize="16" FontWeight="SemiBold"
                                        TextWrapping="Wrap" Margin="2,8,2,0" MaxWidth="390" Visibility="Collapsed"
                                        HorizontalAlignment="Left"/>
                         </StackPanel>
@@ -358,7 +358,7 @@
                                 <Border x:Name="TileConfirmed" Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="#2E9E4F" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed Active Countries" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_ConfirmedTileLabel" Text="Confirmed Active Countries" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
                                         <!-- Fixed 44, the same as the Missing tile beside it, which now
                                              carries two lines. Without it these tiles would be 4px
@@ -372,7 +372,7 @@
                                 <Border Margin="0,0,14,0" Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked Active, not confirmed" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_WorkedTileLabel" Text="Worked Active, not confirmed" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
                                         <Grid Height="44">
                                             <TextBlock x:Name="TB_UniqueCountries" FontSize="30" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center"/>
@@ -382,7 +382,7 @@
                                 <Border Padding="18,8" VerticalAlignment="Top" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource Danger}" BorderThickness="1">
                                     <StackPanel>
                                         <Grid Height="44">
-                                            <TextBlock x:Name="TB_MissingTileLabel" Text="Missing Active Countries" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="15" Foreground="{DynamicResource MutedTextBrush}"/>
+                                            <TextBlock x:Name="TB_MissingTileLabel" Text="Missing Active Countries" Width="156" TextWrapping="Wrap" TextAlignment="Center" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
                                         </Grid>
                                         <!-- TWO answers, not one: how many entities are missing out of the
                                              340 that exist, and how many are missing for the DXCC Honor
@@ -425,7 +425,7 @@
                                         <TextBlock x:Name="TB_WorkedHeader" Text="Worked Active Countries"
                                                    FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                                                    VerticalAlignment="Center" Margin="0,0,12,0"/>
-                                        <Button x:Name="BTN_CheckLotw" Content="Check LoTW Updates" FontSize="12" Padding="8,3"
+                                        <Button x:Name="BTN_CheckLotw" Content="Check LoTW Updates" FontSize="16" Padding="8,3"
                                                 VerticalAlignment="Center" Click="BTN_CheckLotw_Click">
                                             <Button.ToolTip>
                                                 <ToolTip>
@@ -462,21 +462,21 @@
                                                      up under it. Right-aligned, "Code" hung off to the
                                                      right on its own. -->
                                                 <TextBlock x:Name="TB_SortWorkedCode" Text="Country&#10;Code"
-                                                           Width="60" FontSize="13" FontWeight="Bold" Margin="0,0,8,0"
+                                                           Width="60" FontSize="16" FontWeight="Bold" Margin="0,0,8,0"
                                                            Cursor="Hand" TextAlignment="Left" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource TextBrush}"
                                                            ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortWorkedName" Text="Country ▲"
-                                                           Width="160" FontSize="13" FontWeight="Bold"
+                                                           Width="160" FontSize="16" FontWeight="Bold"
                                                            VerticalAlignment="Center"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                                 <TextBlock x:Name="TB_SortWorkedCount" Text="Count ▼"
-                                                           Width="52" FontSize="13" FontWeight="Bold"
+                                                           Width="52" FontSize="16" FontWeight="Bold"
                                                            VerticalAlignment="Center"
                                                            Cursor="Hand" TextAlignment="Right" Foreground="{DynamicResource TextBrush}"/>
                                                 <TextBlock x:Name="TB_SortWorkedConfirmed" Text="Conf."
-                                                           Width="48" FontSize="13" FontWeight="Bold" Margin="8,0,0,0"
+                                                           Width="48" FontSize="16" FontWeight="Bold" Margin="8,0,0,0"
                                                            VerticalAlignment="Center"
                                                            Cursor="Hand" TextAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
@@ -517,7 +517,7 @@
                                                                      60 + 8, so the number moves left and opens a
                                                                      gap before the flag while the flag and the
                                                                      country name stay exactly where they were. -->
-                                                                <TextBlock Text="{Binding CodeText}" FontSize="13"
+                                                                <TextBlock Text="{Binding CodeText}" FontSize="16"
                                                                            VerticalAlignment="Center"
                                                                            TextAlignment="Right" Width="46" Margin="0,0,22,0"
                                                                            Foreground="{DynamicResource MutedTextBrush}"/>
@@ -525,12 +525,12 @@
                                                                        Width="24" Height="16"
                                                                        Margin="0,0,6,0" VerticalAlignment="Center"
                                                                        Stretch="Fill"/>
-                                                                <TextBlock Text="{Binding Name}" FontSize="13"
+                                                                <TextBlock Text="{Binding Name}" FontSize="16"
                                                                            Foreground="{DynamicResource TextBrush}"
                                                                            VerticalAlignment="Center"
                                                                            Width="160"
                                                                            TextTrimming="CharacterEllipsis"/>
-                                                                <TextBlock Text="{Binding CountStr}" FontSize="13"
+                                                                <TextBlock Text="{Binding CountStr}" FontSize="16"
                                                                            FontWeight="Bold"
                                                                            VerticalAlignment="Center"
                                                                            TextAlignment="Right" Width="52"
@@ -609,13 +609,13 @@
                                             <!-- Country code first, two-line header - see the Worked table. -->
                                             <StackPanel Orientation="Horizontal" Margin="4,3">
                                                 <TextBlock x:Name="TB_SortMissingCode" Text="Country&#10;Code"
-                                                           Width="60" FontSize="13" FontWeight="Bold" Margin="0,0,8,0"
+                                                           Width="60" FontSize="16" FontWeight="Bold" Margin="0,0,8,0"
                                                            Cursor="Hand" TextAlignment="Left" VerticalAlignment="Center"
                                                            Foreground="{DynamicResource TextBrush}"
                                                            ToolTip="The ARRL DXCC entity number — click to sort by it"/>
                                                 <TextBlock Width="30"/>
                                                 <TextBlock x:Name="TB_SortMissingName" Text="Country ▲"
-                                                           Width="130" FontSize="13" FontWeight="Bold"
+                                                           Width="130" FontSize="16" FontWeight="Bold"
                                                            VerticalAlignment="Center"
                                                            Cursor="Hand" Foreground="{DynamicResource TextBrush}"/>
                                             </StackPanel>
@@ -645,7 +645,7 @@
                                                                      60 + 8, so the number moves left and opens a
                                                                      gap before the flag while the flag and the
                                                                      country name stay exactly where they were. -->
-                                                                <TextBlock Text="{Binding CodeText}" FontSize="13"
+                                                                <TextBlock Text="{Binding CodeText}" FontSize="16"
                                                                            VerticalAlignment="Center"
                                                                            TextAlignment="Right" Width="46" Margin="0,0,22,0"
                                                                            Foreground="{DynamicResource MutedTextBrush}"/>
@@ -653,7 +653,7 @@
                                                                        Width="24" Height="16"
                                                                        Margin="0,0,6,0" VerticalAlignment="Center"
                                                                        Stretch="Fill"/>
-                                                                <TextBlock Text="{Binding Name}" FontSize="13"
+                                                                <TextBlock Text="{Binding Name}" FontSize="16"
                                                                            Foreground="{DynamicResource TextBrush}"
                                                                            VerticalAlignment="Center"
                                                                            Width="130"
@@ -700,39 +700,39 @@
                                             <RowDefinition Height="Auto"/>
                                         </Grid.RowDefinitions>
 
-                                        <TextBlock Grid.Row="0" Grid.Column="0" x:Name="TB_SumConfirmedLabel" Text="Confirmed at LoTW" FontSize="13"
+                                        <TextBlock Grid.Row="0" Grid.Column="0" x:Name="TB_SumConfirmedLabel" Text="Confirmed at LoTW" FontSize="16"
                                                    Margin="0,0,18,0" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="14"
+                                        <TextBlock Grid.Row="0" Grid.Column="1" x:Name="TB_SumTotalQsls" FontSize="16"
                                                    FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
                                                    Foreground="#2E9E4F"/>
 
-                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Matched in this log" FontSize="13"
+                                        <TextBlock Grid.Row="1" Grid.Column="0" Text="Matched in this log" FontSize="16"
                                                    Margin="0,0,18,0" VerticalAlignment="Center"
                                                    ToolTip="Confirmations that matched a QSO in the log open now, and carry the LoTW tick"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="TB_SumMatchedInLog" FontSize="14"
+                                        <TextBlock Grid.Row="1" Grid.Column="1" x:Name="TB_SumMatchedInLog" FontSize="16"
                                                    FontWeight="Bold" Margin="0,0,0,0" VerticalAlignment="Center"
                                                    Foreground="#2E9E4F"/>
 
-                                        <TextBlock Grid.Row="2" Grid.Column="0" x:Name="TB_NewConfLabel" Text="New confirmations" FontSize="13"
+                                        <TextBlock Grid.Row="2" Grid.Column="0" x:Name="TB_NewConfLabel" Text="New confirmations" FontSize="16"
                                                    Margin="0,0,18,0" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TB_NewConfValue" FontSize="14" Margin="0,0,0,0"
+                                        <TextBlock Grid.Row="2" Grid.Column="1" x:Name="TB_NewConfValue" FontSize="16" Margin="0,0,0,0"
                                                    VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewQsls" Click="NewQsls_Click"
-                                                   ToolTip="Click to see the new confirmations"><Run x:Name="TB_SumNewQsls" FontWeight="Bold"/></Hyperlink><Run x:Name="TB_SumSince" FontSize="13" Foreground="{DynamicResource MutedTextBrush}"/></TextBlock>
+                                                   ToolTip="Click to see the new confirmations"><Run x:Name="TB_SumNewQsls" FontWeight="Bold"/></Hyperlink><Run x:Name="TB_SumSince" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/></TextBlock>
 
-                                        <TextBlock Grid.Row="3" Grid.Column="0" x:Name="TB_NewCountriesLabel" Text="New countries" FontSize="13"
+                                        <TextBlock Grid.Row="3" Grid.Column="0" x:Name="TB_NewCountriesLabel" Text="New countries" FontSize="16"
                                                    Margin="0,0,18,0" VerticalAlignment="Center"
                                                    Foreground="{DynamicResource MutedTextBrush}"/>
-                                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TB_NewCountriesValue" FontSize="14" Margin="0,0,0,0"
+                                        <TextBlock Grid.Row="3" Grid.Column="1" x:Name="TB_NewCountriesValue" FontSize="16" Margin="0,0,0,0"
                                                    VerticalAlignment="Center"><Hyperlink x:Name="LNK_NewCountries" Click="NewCountries_Click"
                                                    ToolTip="Click to see the QSOs that gave a new country"><Run x:Name="TB_SumNewCountries" FontWeight="Bold"/></Hyperlink></TextBlock>
 
                                         <!-- The source's full-download button lives in the frame; only the one for the
                                              current folder is shown. (LoTW also keeps "Check LoTW Updates" in the header.) -->
                                         <Button x:Name="BTN_GetAllConfirmations" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All LoTW Confirmations" FontSize="12" Padding="8,1"
+                                                Content="Get All LoTW Confirmations" FontSize="16" Padding="8,1"
                                                 HorizontalAlignment="Left" Margin="0,3,0,0"
                                                 Click="BTN_GetAllConfirmations_Click">
                                             <Button.ToolTip>
@@ -743,7 +743,7 @@
                                             </Button.ToolTip>
                                         </Button>
                                         <Button x:Name="BTN_CheckQrz" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All QRZ Confirmations" FontSize="12" Padding="8,1"
+                                                Content="Get All QRZ Confirmations" FontSize="16" Padding="8,1"
                                                 HorizontalAlignment="Left" Margin="0,3,0,0" Visibility="Collapsed"
                                                 Click="BTN_CheckQrz_Click">
                                             <Button.ToolTip>
@@ -754,7 +754,7 @@
                                             </Button.ToolTip>
                                         </Button>
                                         <Button x:Name="BTN_CheckEqsl" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All eQSL Confirmations" FontSize="12" Padding="8,1"
+                                                Content="Get All eQSL Confirmations" FontSize="16" Padding="8,1"
                                                 HorizontalAlignment="Left" Margin="0,3,0,0" Visibility="Collapsed"
                                                 Click="BTN_CheckEqsl_Click">
                                             <Button.ToolTip>
@@ -765,7 +765,7 @@
                                             </Button.ToolTip>
                                         </Button>
                                         <Button x:Name="BTN_CheckClublog" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All Club Log Confirmations" FontSize="12" Padding="8,1"
+                                                Content="Get All Club Log Confirmations" FontSize="16" Padding="8,1"
                                                 HorizontalAlignment="Left" Margin="0,3,0,0" Visibility="Collapsed"
                                                 Click="BTN_CheckClublog_Click">
                                             <Button.ToolTip>
@@ -792,7 +792,7 @@
                                             <Border DockPanel.Dock="Top" Background="{DynamicResource GridHeaderBg}"
                                                     BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1">
                                                 <TextBlock Text="Zone" Margin="4,3" Width="46" TextAlignment="Center"
-                                                           FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
                                             </Border>
                                             <ScrollViewer x:Name="SV_MissingCQ"
                                                           VerticalScrollBarVisibility="Auto" MaxHeight="500">
@@ -801,7 +801,7 @@
                                                         <DataTemplate>
                                                             <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
                                                                     Background="{Binding RowBg}">
-                                                                <TextBlock Text="{Binding Zone}" FontSize="13"
+                                                                <TextBlock Text="{Binding Zone}" FontSize="16"
                                                                            FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                                                                            Margin="4,2" Width="46" TextAlignment="Center"/>
                                                             </Border>
@@ -824,7 +824,7 @@
                                             <Border DockPanel.Dock="Top" Background="{DynamicResource GridHeaderBg}"
                                                     BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1">
                                                 <TextBlock Text="Zone" Margin="4,3" Width="46" TextAlignment="Center"
-                                                           FontSize="13" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
+                                                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"/>
                                             </Border>
                                             <ScrollViewer x:Name="SV_MissingITU"
                                                           VerticalScrollBarVisibility="Auto" MaxHeight="500">
@@ -833,7 +833,7 @@
                                                         <DataTemplate>
                                                             <Border BorderBrush="{DynamicResource GridLine}" BorderThickness="0,0,0,1"
                                                                     Background="{Binding RowBg}">
-                                                                <TextBlock Text="{Binding Zone}" FontSize="13"
+                                                                <TextBlock Text="{Binding Zone}" FontSize="16"
                                                                            FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
                                                                            Margin="4,2" Width="46" TextAlignment="Center"/>
                                                             </Border>
@@ -856,7 +856,7 @@
 
         <!-- Status bar -->
         <Border Grid.Row="2" Background="{DynamicResource GridHeaderBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="0,2,0,0" Padding="10,6">
-            <TextBlock x:Name="TB_Status" FontSize="14" Foreground="{DynamicResource TextBrush}" Text="Ready."/>
+            <TextBlock x:Name="TB_Status" FontSize="16" Foreground="{DynamicResource TextBrush}" Text="Ready."/>
         </Border>
     </Grid>
 </Window>

@@ -1,4 +1,4 @@
-<UserControl x:Class="HolyLogger.OptionsUserControls.ClublogServiceControl"
+﻿<UserControl x:Class="HolyLogger.OptionsUserControls.ClublogServiceControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
@@ -9,7 +9,7 @@
         <!-- Master switch: when off, Club Log uploads are out of use and the settings below are greyed. -->
         <Border DockPanel.Dock="Top" HorizontalAlignment="Left" Background="#FFF59D" Margin="0,4,0,8" Padding="6,4,10,4">
             <CheckBox x:Name="CBX_UseClublog" Content="Use Club Log for QSOs logging"
-                      FontSize="15" FontWeight="Bold"
+                      FontSize="16" FontWeight="Bold"
                       IsChecked="{Binding Default.UseClublogService, Source={StaticResource Settings}, Mode=TwoWay}"
                       Checked="Setting_Changed" Unchecked="Setting_Changed"/>
         </Border>
@@ -41,7 +41,7 @@
             <!-- Service name + description -->
             <StackPanel Grid.Row="0">
                 <TextBlock Text="Club Log" FontSize="17" FontWeight="Bold" Margin="2,2,0,2"/>
-                <TextBlock Margin="2,0,8,10" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+                <TextBlock Margin="2,0,8,10" TextWrapping="Wrap" FontSize="16" Foreground="#555555"
                            Text="Each QSO you log is uploaded to your Club Log account in real time the moment you save it. Enter your Club Log account e-mail and password — a Club Log 'Application Password' is recommended instead of your main password. The station callsign is taken from each QSO, so a single account covers all your callsigns."/>
             </StackPanel>
 
@@ -51,9 +51,9 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Label Grid.Column="0" Content="Club Log e-mail" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="14"/>
+                <Label Grid.Column="0" Content="Club Log e-mail" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="16"/>
                 <TextBox Grid.Column="1" x:Name="TB_Email" Height="26" Width="300" TextWrapping="NoWrap"
-                         VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                         VerticalAlignment="Center" FontSize="16" VerticalContentAlignment="Center"
                          TextChanged="TB_Email_TextChanged"/>
             </Grid>
 
@@ -64,14 +64,14 @@
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <Label Grid.Column="0" Content="Club Log password" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="14"/>
+                <Label Grid.Column="0" Content="Club Log password" HorizontalAlignment="Left" VerticalAlignment="Center" FontSize="16"/>
                 <!-- The masked box and the plain box occupy the same cell; only one is visible. -->
                 <Grid Grid.Column="1">
                     <PasswordBox x:Name="PB_Password" Height="26" Width="300"
-                                 VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                                 VerticalAlignment="Center" FontSize="16" VerticalContentAlignment="Center"
                                  PasswordChanged="PB_Password_Changed"/>
                     <TextBox x:Name="TB_PasswordPlain" Height="26" Width="300" TextWrapping="NoWrap"
-                             VerticalAlignment="Center" FontSize="13" VerticalContentAlignment="Center"
+                             VerticalAlignment="Center" FontSize="16" VerticalContentAlignment="Center"
                              Visibility="Collapsed" TextChanged="TB_PasswordPlain_TextChanged"/>
                 </Grid>
                 <ToggleButton Grid.Column="2" x:Name="TG_ShowPassword" Width="32" Height="26" Margin="6,0,0,0"
@@ -84,7 +84,7 @@
                     </Viewbox>
                 </ToggleButton>
                 <Button Grid.Column="3" x:Name="TestBtn" Content="Test Connection" Height="26" Width="150"
-                        FontSize="13" Margin="12,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
+                        FontSize="16" Margin="12,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
                         Click="TestBtn_Click"
                         ToolTip="Verify your Club Log e-mail and password by logging in — this does NOT create a QSO"/>
             </Grid>
@@ -93,28 +93,28 @@
             <Border Grid.Row="3" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,14,0,0"/>
 
             <CheckBox x:Name="CB_AutoUpload" Grid.Row="4" Content="Automatically upload each QSO to Club Log in real time"
-                      HorizontalAlignment="Left" Margin="2,12,0,0" VerticalAlignment="Top" FontSize="15"
+                      HorizontalAlignment="Left" Margin="2,12,0,0" VerticalAlignment="Top" FontSize="16"
                       IsChecked="{Binding Default.ClublogAutoUpload, Source={StaticResource Settings}, Mode=TwoWay}"
                       Checked="Setting_Changed" Unchecked="Setting_Changed"/>
 
-            <TextBlock Grid.Row="5" Margin="22,4,8,0" TextWrapping="Wrap" FontSize="11" Foreground="#888888"
+            <TextBlock Grid.Row="5" Margin="22,4,8,0" TextWrapping="Wrap" FontSize="16" Foreground="#888888"
                        Text="When on, every QSO you add is sent to Club Log immediately. A QSO that can't be sent right away (no internet, or auto-upload off) waits in the Club Log queue and is uploaded later — from the main window's Tools → Upload Queue to Club Log, or automatically on the next start."/>
 
             <Button Grid.Row="6" x:Name="ClearQueueBtn" Content="Clear Club Log Queue"
-                    HorizontalAlignment="Left" Margin="2,20,0,0" Width="180" FontSize="14"
+                    HorizontalAlignment="Left" Margin="2,20,0,0" Width="180" FontSize="16"
                     Padding="8,4,8,4" Click="ClearQueueBtn_Click"/>
 
             <!-- Separator -->
             <Border Grid.Row="7" BorderBrush="#CCCCCC" BorderThickness="0,1,0,0" Margin="0,14,0,0"/>
 
             <!-- Upload-on-exit section -->
-            <TextBlock Grid.Row="8" Text="Upload Queue on Exit" FontSize="14" FontWeight="SemiBold"
+            <TextBlock Grid.Row="8" Text="Upload Queue on Exit" FontSize="16" FontWeight="SemiBold"
                        Margin="2,10,0,4"/>
-            <TextBlock Grid.Row="9" Margin="2,0,8,8" TextWrapping="Wrap" FontSize="12" Foreground="#555555"
+            <TextBlock Grid.Row="9" Margin="2,0,8,8" TextWrapping="Wrap" FontSize="16" Foreground="#555555"
                        Text="When you close HolyLogger, the pending Club Log queue can be uploaded automatically — only when an internet connection is available. Choose how this should behave."/>
             <StackPanel Grid.Row="10" Orientation="Horizontal" Margin="2,2,0,8" VerticalAlignment="Center">
-                <TextBlock Text="On exit:" FontSize="14" VerticalAlignment="Center" Margin="0,0,10,0"/>
-                <ComboBox x:Name="CB_OnExit" Width="320" FontSize="13"
+                <TextBlock Text="On exit:" FontSize="16" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                <ComboBox x:Name="CB_OnExit" Width="320" FontSize="16"
                           SelectionChanged="CB_OnExit_Changed">
                     <ComboBoxItem Content="Do not upload on exit"/>
                     <ComboBoxItem Content="Ask me before uploading on exit"/>

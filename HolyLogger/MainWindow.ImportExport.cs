@@ -377,7 +377,7 @@ namespace HolyLogger
             root.Children.Add(new TextBlock
             {
                 Text = "Where should the imported QSOs go?",
-                FontSize = 15, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 14)
+                FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 14)
             });
 
             string curName = null;
@@ -385,7 +385,7 @@ namespace HolyLogger
 
             void AddOption(string label, string desc, Thickness margin)
             {
-                var tb = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 14, MaxWidth = 440, Margin = margin };
+                var tb = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440, Margin = margin };
                 tb.Inlines.Add(new System.Windows.Documents.Run(label) { FontWeight = FontWeights.Bold });
                 tb.Inlines.Add(new System.Windows.Documents.Run(" — " + desc));
                 root.Children.Add(tb);
@@ -394,7 +394,7 @@ namespace HolyLogger
             AddOption("Current log", "add the file's QSOs to the log open now" + (string.IsNullOrWhiteSpace(curName) ? "" : " (" + curName + ")") + ".", new Thickness(0, 0, 0, 30));
 
             var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
-            Button MakeButton(string text) => new Button { Content = text, MinWidth = 100, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 14 };
+            Button MakeButton(string text) => new Button { Content = text, MinWidth = 100, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 16 };
             var newBtn = MakeButton("New log");
             var curBtn = MakeButton("Current log");
             var cancelBtn = MakeButton("Cancel"); cancelBtn.IsCancel = true;
@@ -443,7 +443,7 @@ namespace HolyLogger
             headerRow.Children.Add(new TextBlock
             {
                 Text = "Your log already contains " + existingCount + " QSO" + (existingCount == 1 ? "" : "s") + ".",
-                FontSize = 15,
+                FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center
             });
@@ -455,12 +455,12 @@ namespace HolyLogger
             DockPanel MakeOption(string label, string desc, Thickness margin)
             {
                 var row = new DockPanel { MaxWidth = 430, Margin = margin };
-                var lbl = new TextBlock { FontSize = 14, VerticalAlignment = VerticalAlignment.Top };
+                var lbl = new TextBlock { FontSize = 16, VerticalAlignment = VerticalAlignment.Top };
                 lbl.Inlines.Add(new System.Windows.Documents.Run(label) { FontWeight = FontWeights.Bold });
                 lbl.Inlines.Add(new System.Windows.Documents.Run(" — "));
                 DockPanel.SetDock(lbl, Dock.Left);
                 row.Children.Add(lbl);
-                row.Children.Add(new TextBlock { Text = desc, TextWrapping = TextWrapping.Wrap, FontSize = 14 });
+                row.Children.Add(new TextBlock { Text = desc, TextWrapping = TextWrapping.Wrap, FontSize = 16 });
                 return row;
             }
 
@@ -470,7 +470,7 @@ namespace HolyLogger
             var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
             Button MakeButton(string text)
             {
-                return new Button { Content = text, MinWidth = 90, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 14 };
+                return new Button { Content = text, MinWidth = 90, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 16 };
             }
             var mergeBtn = MakeButton("Merge");
             var replaceBtn = MakeButton("Replace");
@@ -605,9 +605,17 @@ namespace HolyLogger
                              + "missing the band, worked out from the frequency";
                 }
 
+                // WHERE TO GO NEXT, named. "Act on them in the Log Workshop" told an operator that
+                // something could be done without saying what to press, and the two windows have
+                // different jobs: the Log Verifier finds, the Log Fixer puts right. Both names appear
+                // here exactly as they appear on screen, so there is nothing to hunt for.
                 if (anyFindings)
-                    msg += "\n\nYour file was stored exactly as it is — nothing was changed. The report "
-                         + "names every one, and Verify in the Log Workshop is where you can act on them.";
+                    msg += "\n\nYour file was stored exactly as it is — nothing was changed, and the "
+                         + "report names every one.\n\n"
+                         + "To act on them, open Tools → Log Workshop and press Log Verifier. It checks "
+                         + "the QSOs you have on screen and opens the Log Fixer, where you check the "
+                         + "kinds of problem you want put right and it corrects them for you. Nothing "
+                         + "is written until you press Fix, and your log is copied first.";
 
                 if (anyRejected)
                 {

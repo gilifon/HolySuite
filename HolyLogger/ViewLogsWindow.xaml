@@ -1,4 +1,4 @@
-<Window x:Class="HolyLogger.ViewLogsWindow"
+﻿<Window x:Class="HolyLogger.ViewLogsWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Logs" SizeToContent="Width" Height="440" MinWidth="640"
@@ -16,48 +16,48 @@
         <StackPanel Grid.Row="0" HorizontalAlignment="Left" Margin="0,0,0,10">
             <!-- Row 1: create / import / per-log actions -->
             <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                <Button x:Name="Btn_NewRegularLog" Content="Create New Regular Log" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
+                <Button x:Name="Btn_NewRegularLog" Content="Create New Regular Log" Height="34" Padding="9,0" FontSize="16" FontWeight="Bold"
                         Margin="0,0,8,0" Click="Btn_NewRegularLog_Click"
                         Background="#00E676" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
-                <Button x:Name="Btn_NewContestLog" Content="Create New Contest Log" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
+                <Button x:Name="Btn_NewContestLog" Content="Create New Contest Log" Height="34" Padding="9,0" FontSize="16" FontWeight="Bold"
                         Margin="0,0,8,0" Click="Btn_NewContestLog_Click"
                         Background="#FFC107" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"/>
-                <Button x:Name="Btn_Import" Content="Import ADIF" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
+                <Button x:Name="Btn_Import" Content="Import ADIF" Height="34" Padding="9,0" FontSize="16" FontWeight="Bold"
                         Margin="0,0,8,0" Click="Btn_Import_Click"
                         Background="#90CAF9" Foreground="#1A1A1A" BorderBrush="#1565C0" BorderThickness="1.5"
                         ToolTip="Import an ADIF file into a new log or the current log"/>
                 <!-- Bigger left gap separates the "generate a new log" group (Regular / Contest / Import)
                      from the per-log actions. Widening row 1 also pushes the right-aligned export pair
                      below, so Export Cabrillo stays lined up with "Activate & Open Log". -->
-                <Button x:Name="Btn_SetIdentity" Content="Set Identity" Height="34" Padding="9,0" FontSize="14"
+                <Button x:Name="Btn_SetIdentity" Content="Set Identity" Height="34" Padding="9,0" FontSize="16"
                         Margin="28,0,8,0" Click="Btn_SetIdentity_Click"
                         ToolTip="Give this log its permanent station callsign + operator identity"/>
-                <Button x:Name="Btn_Open" Content="Activate &amp; Open Log" Height="34" Padding="9,0" FontSize="14" FontWeight="Bold"
+                <Button x:Name="Btn_Open" Content="Activate &amp; Open Log" Height="34" Padding="9,0" FontSize="16" FontWeight="Bold"
                         IsEnabled="False" Click="Btn_Open_Click"/>
             </StackPanel>
             <!-- Row 2: rename / delete / copy settings on the left; the export pair right-aligned so
                  Export Cabrillo lines up with the right edge of "Activate & Open Log" above. -->
             <DockPanel LastChildFill="False">
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button x:Name="Btn_Adif" Content="Export ADIF" Height="32" Padding="9,0" FontSize="14"
+                    <Button x:Name="Btn_Adif" Content="Export ADIF" Height="32" Padding="9,0" FontSize="16"
                             Margin="0,0,8,0" Click="Btn_Adif_Click"/>
-                    <Button x:Name="Btn_Cabrillo" Content="Export Cabrillo" Height="32" Padding="9,0" FontSize="14"
+                    <Button x:Name="Btn_Cabrillo" Content="Export Cabrillo" Height="32" Padding="9,0" FontSize="16"
                             Click="Btn_Cabrillo_Click"/>
                 </StackPanel>
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                    <Button x:Name="Btn_Rename" Content="Rename" Height="32" Padding="9,0" FontSize="14"
+                    <Button x:Name="Btn_Rename" Content="Rename" Height="32" Padding="9,0" FontSize="16"
                             Margin="0,0,8,0" Click="Btn_Rename_Click"/>
                     <!-- Red, because it is the one button on this row that destroys a log. Same red as
                          the Duplicates window's delete, so "this one removes things" looks the same
                          wherever it appears. -->
-                    <Button x:Name="Btn_Delete" Content="Delete" Height="32" Padding="9,0" FontSize="14"
+                    <Button x:Name="Btn_Delete" Content="Delete" Height="32" Padding="9,0" FontSize="16"
                             Margin="0,0,8,0" Click="Btn_Delete_Click"
                             Background="#C62828" Foreground="White" FontWeight="Bold"
                             BorderBrush="#8E1B1B" BorderThickness="1.5"/>
-                    <Button x:Name="Btn_CopySettings" Content="Copy QSO to..." Height="32" Padding="9,0" FontSize="14"
+                    <Button x:Name="Btn_CopySettings" Content="Copy QSO to..." Height="32" Padding="9,0" FontSize="16"
                             Margin="0,0,8,0" Click="Btn_CopySettings_Click"
                             ToolTip="Set, change or stop copying this log's new QSOs into another log"/>
-                    <Button x:Name="Btn_Search" Content="Search In Log" Height="32" Padding="9,0" FontSize="14"
+                    <Button x:Name="Btn_Search" Content="Search In Log" Height="32" Padding="9,0" FontSize="16"
                             Margin="0,0,8,0" Click="Btn_Search_Click"
                             ToolTip="Search this log without activating it — the log you are working in stays open"/>
                     <Button x:Name="Btn_Verify" Content="Verify Log" Height="34" Padding="9,0" FontSize="16"
@@ -69,7 +69,7 @@
 
         <DataGrid x:Name="LogsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
                   CanUserAddRows="False" SelectionMode="Single" HeadersVisibility="Column"
-                  GridLinesVisibility="All" FontSize="14" RowHeaderWidth="0"
+                  GridLinesVisibility="All" FontSize="16" RowHeaderWidth="0"
                   BorderBrush="#1565C0" BorderThickness="1"
                   Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}"
                   RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}"
@@ -96,7 +96,7 @@
                             <StackPanel Orientation="Horizontal" ToolTip="{Binding Name}">
                                 <TextBlock Text="{Binding Name}" VerticalAlignment="Center"/>
                                 <!-- Bold, slightly larger "(Active)" shown only for the active log. -->
-                                <TextBlock Text="  (Active)" VerticalAlignment="Center" FontWeight="Bold" FontSize="15">
+                                <TextBlock Text="  (Active)" VerticalAlignment="Center" FontWeight="Bold" FontSize="16">
                                     <TextBlock.Style>
                                         <Style TargetType="TextBlock">
                                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -135,7 +135,7 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <TextBlock x:Name="Hint" Grid.Row="2" Margin="0,8,0,0" FontSize="15" Foreground="Black" TextWrapping="Wrap">
+        <TextBlock x:Name="Hint" Grid.Row="2" Margin="0,8,0,0" FontSize="16" Foreground="Black" TextWrapping="Wrap">
             <Run Text="Select a log, then Open / Rename / Delete / Export.  " />
             <Run Text="Double-click" FontWeight="Bold" />
             <Run Text=" to Activate and Open it." />

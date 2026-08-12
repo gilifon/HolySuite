@@ -301,6 +301,7 @@
     <Compile Include="Log.cs" />
     <Compile Include="ConfirmationColumnGroup.cs" />
     <Compile Include="GridColumnLayout.cs" />
+    <Compile Include="GridCopy.cs" />
     <Compile Include="RowMenuParts.cs" />
     <Compile Include="ConfirmationStripHelper.cs" />
     <Compile Include="SettingsFlush.cs" />

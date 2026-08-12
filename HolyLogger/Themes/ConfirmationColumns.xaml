@@ -1,4 +1,4 @@
-<!--
+﻿<!--
     The look of the five confirmation columns (LoTW / QRZ / eQSL / Club Log / Paper QSL), defined ONCE
     and used by both log tables: the main window's QSODataGrid and the Log Workshop's ResultsGrid.
 
@@ -51,7 +51,7 @@
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="{DynamicResource RowOnFreqBg}"/>
             <Border Grid.Row="1" BorderBrush="#1565C0" BorderThickness="0,0,1,0">
-                <TextBlock Text="{Binding}" FontSize="11" FontWeight="Bold" Margin="3,0,3,0"
+                <TextBlock Text="{Binding}" FontSize="16" FontWeight="Bold" Margin="3,0,3,0"
                            Foreground="#1A1A1A" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
         </Grid>
@@ -60,7 +60,7 @@
     <!-- LoTW: green tick = confirmed (active entity); RED tick = confirmed but a DELETED DXCC entity;
          blank = not confirmed. Sorted three ways via LotwStatusRank (active 2 / deleted 1 / none 0). -->
     <DataTemplate x:Key="LotwTickTemplate">
-        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="16">
             <TextBlock.Style>
                 <Style TargetType="TextBlock">
                     <Setter Property="Text" Value=""/>
@@ -92,7 +92,7 @@
     <!-- QRZ.com: exactly parallel to LoTW, but a separate and broader set (QRZ confirms when the other
          operator also logged the contact on QRZ). Sorted via QrzStatusRank. -->
     <DataTemplate x:Key="QrzTickTemplate">
-        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="16">
             <TextBlock.Style>
                 <Style TargetType="TextBlock">
                     <Setter Property="Text" Value=""/>
@@ -124,7 +124,7 @@
     <!-- eQSL: always green - eQSL's download carries no DXCC, so the active/deleted split is unavailable
          for it (a known limitation of the source, not a bug here). Sorted via EqslStatusRank. -->
     <DataTemplate x:Key="EqslTickTemplate">
-        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="16">
             <TextBlock.Style>
                 <Style TargetType="TextBlock">
                     <Setter Property="Text" Value=""/>
@@ -142,7 +142,7 @@
 
     <!-- Club Log: green tick when Club Log's export reports QSL_RCVD = Y/V. Sorted via ClublogStatusRank. -->
     <DataTemplate x:Key="ClublogTickTemplate">
-        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="14">
+        <TextBlock HorizontalAlignment="Center" Padding="6,0,6,0" FontWeight="Bold" FontSize="16">
             <TextBlock.Style>
                 <Style TargetType="TextBlock">
                     <Setter Property="Text" Value=""/>

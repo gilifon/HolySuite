@@ -1,4 +1,4 @@
-<Window x:Class="HolyLogger.QsoEditWindow"
+﻿<Window x:Class="HolyLogger.QsoEditWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Edit QSO"
@@ -67,12 +67,12 @@
                     MouseLeftButtonDown="TitleBar_MouseDown">
                 <!-- Grid, not DockPanel: the callsign is centred on the BAR, not on what is left of it. -->
                 <Grid>
-                    <TextBlock Text="Full View &amp; Edit" Foreground="White" FontSize="15" FontWeight="Bold"
+                    <TextBlock Text="Full View &amp; Edit" Foreground="White" FontSize="16" FontWeight="Bold"
                                VerticalAlignment="Center" HorizontalAlignment="Left"/>
                     <TextBlock x:Name="TB_TitleCall" Foreground="#FFFFFF" FontSize="17"
                                FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
                     <!-- Shifted left to leave the corner to the X. -->
-                    <TextBlock x:Name="TB_TitleId" Foreground="#9EC5F5" FontSize="11"
+                    <TextBlock x:Name="TB_TitleId" Foreground="#9EC5F5" FontSize="16"
                                VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,36,0"/>
                     <!-- Close, in the corner where every window keeps it. This window has no system
                          title bar of its own (WindowStyle=None), so without this the only way out is
@@ -132,7 +132,7 @@
                 <TextBox  Grid.Row="1" Grid.Column="3" x:Name="TB_Name"    Style="{StaticResource Cell}" HorizontalContentAlignment="Left"/>
                 <TextBox  Grid.Row="1" Grid.Column="4" x:Name="TB_Country" Style="{StaticResource CellRO}" ToolTip="Set from the callsign's DXCC prefix — not editable"/>
                 <TextBox  Grid.Row="1" Grid.Column="5" x:Name="TB_Freq"    Style="{StaticResource Cell}" ToolTip="MHz" TextChanged="Freq_TextChanged"/>
-                <ComboBox Grid.Row="1" Grid.Column="6" x:Name="CB_Band"    IsEditable="True" FontSize="12" Margin="1,0,1,1"
+                <ComboBox Grid.Row="1" Grid.Column="6" x:Name="CB_Band"    IsEditable="True" FontSize="16" Margin="1,0,1,1"
                           VerticalContentAlignment="Center"
                           ToolTip="Pick the band. When a frequency is set, the band is derived from it and locked."/>
             </Grid>
@@ -382,9 +382,9 @@
             <!-- Save / Cancel -->
             <Border CornerRadius="0,0,12,12" Background="#A9CCF0" Padding="14,10">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                    <Button x:Name="BTN_Save" Content="Save" Width="96" FontSize="14" FontWeight="Bold"
+                    <Button x:Name="BTN_Save" Content="Save" Width="96" FontSize="16" FontWeight="Bold"
                             Padding="10,5" Margin="0,0,14,0" Click="Save_Click" IsDefault="True"/>
-                    <Button x:Name="BTN_Cancel" Content="Cancel" Width="96" FontSize="14"
+                    <Button x:Name="BTN_Cancel" Content="Cancel" Width="96" FontSize="16"
                             Padding="10,5" Click="Cancel_Click" IsCancel="True"/>
                 </StackPanel>
             </Border>

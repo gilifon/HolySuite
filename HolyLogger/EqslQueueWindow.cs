@@ -1,4 +1,4 @@
-using HolyParser;
+﻿using HolyParser;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -109,7 +109,7 @@ namespace HolyLogger
                 {
                     Content = "Remove from queue",
                     Padding = new Thickness(12, 4, 12, 4),
-                    FontSize = 13,
+                    FontSize = 16,
                     Margin = new Thickness(0, 0, 8, 0),
                     IsEnabled = false,
                     ToolTip = "Take the selected QSO out of this upload queue WITHOUT uploading it. " +
@@ -125,7 +125,7 @@ namespace HolyLogger
                 {
                     Content = "Delete QSO",
                     Padding = new Thickness(12, 4, 12, 4),
-                    FontSize = 13,
+                    FontSize = 16,
                     Margin = new Thickness(0, 0, 8, 0),
                     IsEnabled = false,
                     Foreground = new SolidColorBrush(Color.FromRgb(0xC0, 0x00, 0x00)),
@@ -141,7 +141,7 @@ namespace HolyLogger
                 Content = "Upload",
                 MinWidth = 100,
                 Padding = new Thickness(12, 4, 12, 4),
-                FontSize = 14,
+                FontSize = 16,
                 FontWeight = FontWeights.Bold
             };
             _uploadButton.Click += UploadButton_Click;
@@ -167,7 +167,7 @@ namespace HolyLogger
             _statusText = new TextBlock
             {
                 Margin = new Thickness(0, 6, 0, hasDismissed ? 6 : 0),
-                FontSize = 13,
+                FontSize = 16,
                 TextWrapping = TextWrapping.Wrap
             };
             Grid.SetRow(_statusText, 2);
@@ -186,7 +186,7 @@ namespace HolyLogger
 
                 _dismissedCountLabel = new TextBlock
                 {
-                    FontSize = 14,
+                    FontSize = 16,
                     FontWeight = FontWeights.Bold,
                     Foreground = new SolidColorBrush(Color.FromRgb(0xB0, 0x40, 0x40)),
                     VerticalAlignment = VerticalAlignment.Center
@@ -198,7 +198,7 @@ namespace HolyLogger
                 {
                     Content = "Re-queue All",
                     Padding = new Thickness(10, 3, 10, 3),
-                    FontSize = 13,
+                    FontSize = 16,
                     Visibility = Visibility.Collapsed
                 };
                 _requeueButton.Click += RequeueButton_Click;
@@ -239,7 +239,7 @@ namespace HolyLogger
                 HeadersVisibility = DataGridHeadersVisibility.Column,
                 GridLinesVisibility = DataGridGridLinesVisibility.All,
                 SelectionMode = DataGridSelectionMode.Single,
-                FontSize = 14
+                FontSize = 16
             };
             // Same column-header look as the main log table: background comes from the LogHeaderBg theme
             // token, so it follows the "Customize Colors" scheme editor.
@@ -285,7 +285,7 @@ namespace HolyLogger
         {
             var header = new TextBlock();
             header.Inlines.Add(new System.Windows.Documents.Run("Freq "));
-            header.Inlines.Add(new System.Windows.Documents.Run("MHz") { FontSize = 10, FontWeight = FontWeights.Bold });
+            header.Inlines.Add(new System.Windows.Documents.Run("MHz") { FontSize = 16, FontWeight = FontWeights.Bold });
             return new DataGridTextColumn
             {
                 Header = header,

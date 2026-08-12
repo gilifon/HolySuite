@@ -1,8 +1,8 @@
-<Window x:Class="HolyLogger.BackupRestoreWindow"
+﻿<Window x:Class="HolyLogger.BackupRestoreWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Backups &amp; Restore" Width="700"
-        MinWidth="560"
+        Title="Backups &amp; Restore" Width="1000"
+        MinWidth="900"
         SizeToContent="Height"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource WindowBg}">
@@ -13,9 +13,17 @@
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
-        <TextBlock Grid.Row="0" Text="Daily Log Backups &amp; Restore"
-                   FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"
-                   Margin="0,0,0,10"/>
+        <!-- "Log" was wrong and misleading: a backup here is the WHOLE DATABASE, every log in it, and
+             restoring one puts every log back as it was on that day - not just the one being worked in.
+             An operator who read "log backup" could reasonably restore one expecting the rest to be
+             left alone. -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,10">
+            <TextBlock Text="Database Backups &amp; Restore"
+                       FontSize="17" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+            <TextBlock Margin="0,3,0,0" TextWrapping="Wrap" FontSize="16"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       Text="Each backup is your ENTIRE database — every log in it, not one log. Restoring one puts them all back as they were at that moment."/>
+        </StackPanel>
 
         <!-- Restore, done by the app: pick a backup, see what's in it, one confirmation, no manual
              file renaming. The current database is renamed aside (never deleted) before the backup
@@ -26,32 +34,106 @@
                 Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}"
                 BorderThickness="1" CornerRadius="3">
             <StackPanel>
-                <TextBlock Text="Restore from a backup" FontSize="14" FontWeight="Bold"
+                <TextBlock Text="Restore from a backup" FontSize="16" FontWeight="Bold"
                            Foreground="{DynamicResource AccentBrush}"/>
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="210"/>
+                        <!-- Wide enough for the longest line the list can hold, AT 16pt: a date, a
+                             time, what the copy was taken before, and its size - about 44 characters,
+                             so roughly 380px of text plus padding and the scrollbar. 210 cut it to
+                             "12-08-2026 08:38  before..."; 330 was enough at 13pt but wrapped the size
+                             onto a second line once everything grew to 16. -->
+                        <ColumnDefinition Width="450"/>
                         <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
 
-                    <ListBox x:Name="LB_Backups" Grid.Column="0" Height="120" FontSize="13"
-                             DisplayMemberPath="DisplayLabel"
-                             SelectionChanged="LB_Backups_SelectionChanged"/>
+                    <!-- WHAT IS IN EACH ONE, WITHOUT CLICKING. Every backup is opened and counted as
+                         soon as this window appears, in the background, and each line fills itself in
+                         as its answer arrives - so the list can be read straight down instead of being
+                         clicked through one file at a time. -->
+                    <ListBox x:Name="LB_Backups" Grid.Column="0" Height="190" FontSize="16"
+                             HorizontalContentAlignment="Stretch"
+                             ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                             PreviewMouseWheel="LB_Backups_PreviewMouseWheel"
+                             SelectionChanged="LB_Backups_SelectionChanged">
+                        <!-- THE SELECTED ROW HAS TO LOOK SELECTED WITHOUT THE LIST BEING FOCUSED. The
+                             window opens with the newest backup already chosen and the panel opposite
+                             already describing it - but WPF paints an unfocused selection in a grey so
+                             faint it read as nothing at all, so the description looked like it belonged
+                             to no row. A plain blue, and the mouse-over a paler one, so the two never
+                             look alike. -->
+                        <ListBox.ItemContainerStyle>
+                            <Style TargetType="ListBoxItem">
+                                <Setter Property="Padding" Value="6,3,6,3"/>
+                                <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
+                                <!-- THE WHOLE TEMPLATE, not a Background setter. A ListBoxItem paints
+                                     its own selection inside its control template, and that trigger
+                                     targets the Border directly - which outranks anything a style
+                                     setter says about Background. Setting the colour from outside
+                                     therefore did nothing at all, which is why the chosen row still
+                                     came up the system's near-invisible grey. -->
+                                <Setter Property="Template">
+                                    <Setter.Value>
+                                        <ControlTemplate TargetType="ListBoxItem">
+                                            <Border x:Name="Bd" SnapsToDevicePixels="True"
+                                                    Background="Transparent" BorderThickness="0"
+                                                    Padding="{TemplateBinding Padding}">
+                                                <ContentPresenter/>
+                                            </Border>
+                                            <ControlTemplate.Triggers>
+                                                <Trigger Property="IsMouseOver" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#E3EEFF"/>
+                                                </Trigger>
+                                                <!-- After the hover trigger, so the chosen row stays
+                                                     blue while the mouse crosses its neighbours. -->
+                                                <Trigger Property="IsSelected" Value="True">
+                                                    <Setter TargetName="Bd" Property="Background" Value="#1565C0"/>
+                                                    <Setter Property="Foreground" Value="White"/>
+                                                </Trigger>
+                                            </ControlTemplate.Triggers>
+                                        </ControlTemplate>
+                                    </Setter.Value>
+                                </Setter>
+                            </Style>
+                        </ListBox.ItemContainerStyle>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <!-- NEITHER LINE FIXES ITS OWN COLOUR. Both inherit the row's, so the
+                                     selected row turning blue turns its text white with it - a muted
+                                     grey painted here would have stayed grey on the blue and become
+                                     the one thing on the row nobody could read. The second line is
+                                     dimmed with opacity instead, which works on either background. -->
+                                <StackPanel Margin="0,2,0,2">
+                                    <!-- Wrapped, not trimmed: nothing here is optional reading. -->
+                                    <TextBlock Text="{Binding DisplayLabel}" FontWeight="Bold"
+                                               TextWrapping="Wrap"/>
+                                    <TextBlock Text="{Binding Contents}" FontSize="16"
+                                               Opacity="0.75" TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
 
                     <StackPanel Grid.Column="1" Margin="12,0,0,0" VerticalAlignment="Top">
                         <TextBlock Text="Pick a backup on the left to see what it contains."
-                                   x:Name="TB_BackupDetailsHint" TextWrapping="Wrap" FontSize="13"
+                                   x:Name="TB_BackupDetailsHint" TextWrapping="Wrap" FontSize="16"
                                    Foreground="{DynamicResource MutedTextBrush}"/>
-                        <TextBlock x:Name="TB_BackupDetails" TextWrapping="Wrap" FontSize="13"
+                        <TextBlock x:Name="TB_BackupDetails" TextWrapping="Wrap" FontSize="16"
                                    Foreground="{DynamicResource TextBrush}" Visibility="Collapsed"/>
-                        <TextBlock x:Name="TB_BackupWarning" TextWrapping="Wrap" FontSize="13" Margin="0,6,0,0"
+                        <TextBlock x:Name="TB_BackupWarning" TextWrapping="Wrap" FontSize="16" Margin="0,6,0,0"
                                    Foreground="{DynamicResource Danger}" Visibility="Collapsed"/>
                         <Button x:Name="Btn_Restore" Content="Restore This Backup…" Margin="0,12,0,0"
-                                MinWidth="170" Height="32" FontSize="13" HorizontalAlignment="Left"
+                                MinWidth="170" Height="32" FontSize="16" HorizontalAlignment="Left"
                                 IsEnabled="False" Click="Btn_Restore_Click"
                                 Background="{DynamicResource Danger}" Foreground="White"/>
                     </StackPanel>
                 </Grid>
+
+                <!-- WHERE THESE FILES ACTUALLY ARE. A list of backups that never says where they live
+                     leaves the operator hunting through AppData to copy one onto a stick or to see how
+                     much room they are taking. The paths are clickable: each opens its folder. -->
+                <TextBlock x:Name="TB_Folders" Margin="0,10,0,0" TextWrapping="Wrap" FontSize="16"
+                           Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>
         </Border>
 
@@ -61,9 +143,9 @@
                 BorderThickness="1" CornerRadius="3">
             <StackPanel>
                 <TextBlock Text="Extra backup copy folder (optional)"
-                           FontSize="13" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
-                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextBrush}"
-                           Text="A copy of each daily backup is also saved here. A cloud folder (Dropbox / OneDrive / Google Drive) or an external drive is perfectly fine for these copies — they are static files, never opened live by the program. The folder is remembered, so you only pick it once."/>
+                           FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                <TextBlock Margin="0,4,0,0" TextWrapping="Wrap" FontSize="16" Foreground="{DynamicResource TextBrush}"
+                           Text="A copy of each daily database backup is also saved here. A cloud folder (Dropbox / OneDrive / Google Drive) or an external drive is perfectly fine for these copies — they are static files, never opened live by the program. The folder is remembered, so you only pick it once."/>
                 <Grid Margin="0,8,0,0">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
@@ -71,12 +153,12 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
                     <TextBox x:Name="TB_ExtraFolder" Grid.Column="0" IsReadOnly="True"
-                             FontSize="13" Height="30" VerticalContentAlignment="Center" Padding="6,0"
+                             FontSize="16" Height="30" VerticalContentAlignment="Center" Padding="6,0"
                              Background="{DynamicResource WindowBg}" Foreground="{DynamicResource TextBrush}"/>
                     <Button x:Name="Btn_Browse" Grid.Column="1" Content="Browse…" MinWidth="90" Height="30"
-                            FontSize="13" Margin="8,0,0,0" Click="Btn_Browse_Click"/>
+                            FontSize="16" Margin="8,0,0,0" Click="Btn_Browse_Click"/>
                     <Button x:Name="Btn_Clear" Grid.Column="2" Content="Clear" MinWidth="70" Height="30"
-                            FontSize="13" Margin="8,0,0,0" Click="Btn_Clear_Click"/>
+                            FontSize="16" Margin="8,0,0,0" Click="Btn_Clear_Click"/>
                 </Grid>
             </StackPanel>
         </Border>

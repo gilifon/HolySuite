@@ -43,7 +43,7 @@
                     <Label Content="Port" VerticalAlignment="Center" FontSize="16" Padding="0"/>
                     <TextBox x:Name="TB_HolyClusterUDPPort" Width="80" Height="23" Margin="8,0,0,0" VerticalAlignment="Center" Text="{Binding Default.HolyClusterUDPPort, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" PreviewTextInput="PreviewTextInputHandler" DataObject.Pasting="PastingHandler" MaxLength="5"/>
                 </StackPanel>
-                <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12" Foreground="Gray"
+                <TextBlock TextWrapping="Wrap" Margin="0,6,0,0" FontSize="16" Foreground="Gray"
                            Text="Set this to the UDP port HolyCluster sends on (its default is 2237). When you select a station in HolyCluster it sends the callsign here and it is placed in the DX Callsign field. If CAT is not connected, the spot's frequency is filled in too."/>
             </StackPanel>
         </GroupBox>
@@ -58,7 +58,7 @@
                         <!-- Fixed label width shared with the sound-alert row below, so the two Test buttons align. -->
                         <TextBlock Text="Beep when typing in a non-English keyboard" VerticalAlignment="Center" Width="315"/>
                         <Button x:Name="BTN_TestBeep" Margin="10,0,0,0" VerticalAlignment="Center" Padding="8,2"
-                                FontSize="12" Cursor="Hand" Click="BTN_TestBeep_Click"
+                                FontSize="16" Cursor="Hand" Click="BTN_TestBeep_Click"
                                 ToolTip="Click to test — plays the beep on the selected audio device">
                             <StackPanel Orientation="Horizontal">
                                 <Viewbox Width="16" Height="16" VerticalAlignment="Center">
@@ -80,13 +80,13 @@
                      which are configured in the Cluster window's gear). -->
                 <StackPanel Orientation="Horizontal" Margin="0,12,0,2">
                     <TextBlock Text="Select audio device:" Width="150" VerticalAlignment="Center" FontSize="16" Margin="0,0,8,0"/>
-                    <ComboBox x:Name="CB_SoundDevice" Width="175" VerticalAlignment="Center" FontSize="14"
+                    <ComboBox x:Name="CB_SoundDevice" Width="175" VerticalAlignment="Center" FontSize="16"
                               SelectionChanged="CB_SoundDevice_SelectionChanged">
                         <!-- Spelled out as a wrapping TextBlock rather than a plain ToolTip="..." string:
                              as a string it rendered as one very long single line across the screen. -->
                         <ComboBox.ToolTip>
                             <ToolTip>
-                                <TextBlock MaxWidth="330" TextWrapping="Wrap" FontSize="13"
+                                <TextBlock MaxWidth="330" TextWrapping="Wrap" FontSize="16"
                                            Text="Output device for the alert sounds above. Pick your speakers so alerts are NOT sent into a USB radio codec.&#x0a;&#x0a;'System default' uses the Windows default device (only WAV sounds can target a specific device)."/>
                             </ToolTip>
                         </ComboBox.ToolTip>

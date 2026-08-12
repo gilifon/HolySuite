@@ -58,33 +58,33 @@
                     <TextBlock VerticalAlignment="Center" FontSize="16"><Run Text="Mark LOTW User "/><Run Text="(yellow)" Background="{DynamicResource RowLotwBg}"/></TextBlock>
                 </CheckBox>
                 <TextBlock Text="Tints the callsign of a station that uploads to LoTW, in the log table and in the Search window."
-                           FontSize="13" TextWrapping="Wrap" Margin="0,6,0,0"
+                           FontSize="16" TextWrapping="Wrap" Margin="0,6,0,0"
                            Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>
         </GroupBox>
         <GroupBox Header="Color Theme" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,442,0,0" Width="360" FontSize="16">
-            <TextBlock Margin="6,8" FontSize="13" TextWrapping="Wrap"
+            <TextBlock Margin="6,8" FontSize="16" TextWrapping="Wrap"
                        Text="All application colors (form background, table headers, contest frames, …) are now edited in one place: View  ›  Color Scheme  ›  Customize Colors."/>
         </GroupBox>
         <GroupBox Header="Graphics Box" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,0,0,0" Width="300" Height="220" FontSize="16">
             <StackPanel Margin="10">
-                <RadioButton x:Name="RB_MapDisplay_None" Content="Empty" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
-                <RadioButton x:Name="RB_MapDisplay_Map" Content="Map" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
-                <RadioButton x:Name="RB_MapDisplay_Compass" Content="Compass" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
-                <RadioButton x:Name="RB_MapDisplay_QRZPhoto" Content="Photo from QRZ.com" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
-                <RadioButton x:Name="RB_MapDisplay_CustomImage" Content="Custom image" GroupName="MapDisplay" FontSize="14" Margin="0,2" Checked="MapDisplayMode_Changed"/>
-                <TextBox x:Name="TB_CustomImagePath" Height="24" FontSize="11" Margin="0,5,0,0" IsReadOnly="True" VerticalContentAlignment="Center" BorderBrush="#AAAAAA" BorderThickness="1" HorizontalAlignment="Stretch"/>
-                <Button x:Name="Btn_BrowseImage" Content="Browse..." Width="80" Height="24" FontSize="11" Margin="0,5,0,0" HorizontalAlignment="Left" Click="Btn_BrowseImage_Click"/>
+                <RadioButton x:Name="RB_MapDisplay_None" Content="Empty" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <RadioButton x:Name="RB_MapDisplay_Map" Content="Map" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <RadioButton x:Name="RB_MapDisplay_Compass" Content="Compass" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <RadioButton x:Name="RB_MapDisplay_QRZPhoto" Content="Photo from QRZ.com" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <RadioButton x:Name="RB_MapDisplay_CustomImage" Content="Custom image" GroupName="MapDisplay" FontSize="16" Margin="0,2" Checked="MapDisplayMode_Changed"/>
+                <TextBox x:Name="TB_CustomImagePath" Height="24" FontSize="16" Margin="0,5,0,0" IsReadOnly="True" VerticalContentAlignment="Center" BorderBrush="#AAAAAA" BorderThickness="1" HorizontalAlignment="Stretch"/>
+                <Button x:Name="Btn_BrowseImage" Content="Browse..." Width="80" Height="24" FontSize="16" Margin="0,5,0,0" HorizontalAlignment="Left" Click="Btn_BrowseImage_Click"/>
             </StackPanel>
         </GroupBox>
         <GroupBox Header="Map" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="370,228,0,0" Width="300" Height="178" FontSize="16">
             <StackPanel Margin="10">
                 <!-- "Plot spots on map" moved to the Cluster window's gear (Cluster Settings), which is
                      now the single home for the cluster's display/behaviour settings. -->
-                <CheckBox x:Name="CBX_MapShowDayNight" Content="Show day/night overlay" FontSize="14" Margin="0,2" Checked="MapShowDayNight_Changed" Unchecked="MapShowDayNight_Changed"/>
-                <TextBlock Text="Map Color" FontSize="14" FontWeight="SemiBold" Margin="0,8,0,2"/>
-                <RadioButton x:Name="RB_MapColor_Colored" Content="Colored" GroupName="MapColor" FontSize="14" Margin="0,2" Checked="MapColorMode_Changed"/>
-                <RadioButton x:Name="RB_MapColor_BW" Content="Black &amp; White" GroupName="MapColor" FontSize="14" Margin="0,2" Checked="MapColorMode_Changed"/>
+                <CheckBox x:Name="CBX_MapShowDayNight" Content="Show day/night overlay" FontSize="16" Margin="0,2" Checked="MapShowDayNight_Changed" Unchecked="MapShowDayNight_Changed"/>
+                <TextBlock Text="Map Color" FontSize="16" FontWeight="SemiBold" Margin="0,8,0,2"/>
+                <RadioButton x:Name="RB_MapColor_Colored" Content="Colored" GroupName="MapColor" FontSize="16" Margin="0,2" Checked="MapColorMode_Changed"/>
+                <RadioButton x:Name="RB_MapColor_BW" Content="Black &amp; White" GroupName="MapColor" FontSize="16" Margin="0,2" Checked="MapColorMode_Changed"/>
             </StackPanel>
         </GroupBox>
         <!-- Only whether the cluster RUNS and whether its window SHOWS live here. Everything about how
@@ -93,7 +93,7 @@
             <StackPanel Margin="10">
                 <CheckBox x:Name="CBX_ClusterActive" Content="Active" FontSize="16" Margin="0,2" Checked="ClusterActive_Changed" Unchecked="ClusterActive_Changed"/>
                 <CheckBox x:Name="CBX_ClusterVisible" Content="Visible" FontSize="16" Margin="0,2" Checked="ClusterVisible_Changed" Unchecked="ClusterVisible_Changed"/>
-                <TextBlock Text="Display, map and sound options are in the Cluster window's gear." FontSize="14"
+                <TextBlock Text="Display, map and sound options are in the Cluster window's gear." FontSize="16"
                            TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource MutedTextBrush}"/>
             </StackPanel>
         </GroupBox>

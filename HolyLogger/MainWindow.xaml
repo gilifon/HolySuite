@@ -464,7 +464,7 @@
                                 shell:WindowChrome.IsHitTestVisibleInChrome="True" Click="TitleBar_Close_Click" ToolTip="Close"/>
                     </StackPanel>
                     <Image Source="Images/crown.png" Width="16" Height="16" Margin="10,0,6,0" VerticalAlignment="Center" DockPanel.Dock="Left"/>
-                    <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="14" Foreground="{DynamicResource TextBrush}"
+                    <TextBlock DockPanel.Dock="Left" VerticalAlignment="Center" FontSize="16" Foreground="{DynamicResource TextBrush}"
                                DataContext="{Binding RelativeSource={RelativeSource AncestorType=Window}}">
                         <Run Text="{Binding TitlePrefix, Mode=OneWay}"/><Run Text="{Binding TitleLogLabel, Mode=OneWay}" FontWeight="Bold"/><Run Text="{Binding TitleLogName, Mode=OneWay}"/>
                     </TextBlock>
@@ -477,7 +477,7 @@
                                 PreviewMouseLeftButtonUp="CopyLiveDot_Click">
                         <Ellipse Width="12" Height="12" Fill="#E00000" VerticalAlignment="Center"/>
                         <TextBlock Text="{Binding CopyTargetTooltip, RelativeSource={RelativeSource AncestorType={x:Type Window}}}"
-                                   Margin="7,0,0,0" VerticalAlignment="Center" FontSize="14" FontWeight="Bold" Foreground="#E00000"/>
+                                   Margin="7,0,0,0" VerticalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="#E00000"/>
                     </StackPanel>
                 </DockPanel>
             </Border>
@@ -853,7 +853,7 @@
                          footprint as the old "Grids: " (40.1px + 20px), so the number does not move.
                          Left-aligned (both lines share the same left edge) + vertically centered so it
                          is symmetric with the number, leaving room for up to a 3-digit count. -->
-                    <TextBlock Margin="4,0,0,0" FontSize="14" Width="56" TextAlignment="Left"
+                    <TextBlock Margin="4,0,0,0" FontSize="16" Width="56" TextAlignment="Left"
                                VerticalAlignment="Center" LineHeight="15" LineStackingStrategy="BlockLineHeight"><Run Text="Holyland"/><LineBreak/><Run Text="Squares"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
@@ -866,7 +866,7 @@
                          "(active)" rather than "(worked)": the count has always excluded deleted
                          entities - it is filtered to the official current list, the same 340 the
                          Statistics window measures against - and the old word did not say so. -->
-                    <TextBlock Margin="10,0,0,0" FontSize="14" TextAlignment="Left"
+                    <TextBlock Margin="10,0,0,0" FontSize="16" TextAlignment="Left"
                                VerticalAlignment="Center" LineHeight="15" LineStackingStrategy="BlockLineHeight"><Run Text="DXCCs"/><LineBreak/><Run Text="(active)"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
@@ -882,7 +882,7 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                    <TextBlock Margin="10,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Recent"/><LineBreak/><Run Text="QSOs:"/></TextBlock>
+                    <TextBlock Margin="10,0,2,0" FontSize="16" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Recent"/><LineBreak/><Run Text="QSOs:"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
                     <StatusBarItem.ContextMenu>
@@ -931,7 +931,7 @@
                     <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource AccentBrush}"
                             Margin="12,0,0,0" Padding="7,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Freq &amp; Mode" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Freq &amp; Mode" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <!-- The toggle keeps its own hairline frame: it is the control, the outer box
                                  is only the grouping. -->
                             <Border CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -964,7 +964,7 @@
                     <Border CornerRadius="5" BorderThickness="1" BorderBrush="{DynamicResource Danger}"
                             Margin="10,0,0,0" Padding="7,3" VerticalAlignment="Center" SnapsToDevicePixels="True">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                            <TextBlock Text="Time" FontSize="13" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="Time" FontSize="16" VerticalAlignment="Center" Margin="0,0,8,0"/>
                             <Border CornerRadius="4" BorderThickness="1" BorderBrush="{DynamicResource ThemeBorderBrush}"
                                     VerticalAlignment="Center" SnapsToDevicePixels="True">
                                 <StackPanel Orientation="Horizontal">
@@ -993,7 +993,7 @@
                         </Viewbox>
                     </Border>
                     <TextBlock x:Name="L_ContestName" VerticalAlignment="Center" Margin="7,0,0,0"
-                               MaxWidth="150" TextWrapping="Wrap" FontSize="12" LineHeight="14"
+                               MaxWidth="150" TextWrapping="Wrap" FontSize="16" LineHeight="14"
                                LineStackingStrategy="BlockLineHeight"
                                FontWeight="Bold" Foreground="{DynamicResource ContestNameBrush}"/>
                     </StackPanel>
@@ -1001,7 +1001,7 @@
                 <StatusBarItem HorizontalAlignment="Right">
                     <StackPanel Orientation="Horizontal">
                         <!--<TextBlock Text="Omni-Rig: " FontSize="16"/>-->
-                        <TextBlock x:Name="RigLabel" Text="RIG1" FontWeight="Normal" FontSize="14" Foreground="{DynamicResource MutedTextBrush}"
+                        <TextBlock x:Name="RigLabel" Text="RIG1" FontWeight="Normal" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"
                                    VerticalAlignment="Center" Margin="0,0,6,0"
                                    Cursor="Hand" MouseLeftButtonUp="RigLabel_MouseLeftButtonUp"
                                    ToolTip="Open Tools → Options"/>
@@ -1022,7 +1022,7 @@
         <Border x:Name="FormFrame" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
                 Width="680" Height="332" BorderBrush="#1565C0" BorderThickness="3,3,3,0"
                 Background="Transparent" IsHitTestVisible="False" Panel.ZIndex="30"/>
-        <TextBlock HorizontalAlignment="Left" Margin="11,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="11,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="16" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Callsign" />
@@ -1043,7 +1043,7 @@
                 ToolTip="No log is set for your current station callsign. Click to open the Log Manager and open or create a log for it before logging QSOs.">
             <!-- Named: the caption changes with the reason - "Select Log" when this callsign has no
                  log of its own, "No log" when nothing is open at all. -->
-            <TextBlock x:Name="CallsignLockText" Text="Select Log" Foreground="Red" FontWeight="Bold" FontSize="13"
+            <TextBlock x:Name="CallsignLockText" Text="Select Log" Foreground="Red" FontWeight="Bold" FontSize="16"
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Top"
@@ -1081,7 +1081,7 @@
                              GotFocus="TB_FreqNoCat_GotFocus" TextChanged="TB_FreqNoCat_TextChanged"/>
                 </Border>
             </Grid>
-            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"
+            <TextBlock Text="kHz" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource KHzText}"
                        VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
         </StackPanel>
         <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="580,47,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
@@ -1089,7 +1089,7 @@
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0">
-                    <TextBlock Text="Spot (F3)" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                    <TextBlock Text="Spot (F3)" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
                 </StackPanel>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M86,3 C92,8 92,24 86,29"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M81,3 C88,8 88,24 81,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -1123,37 +1123,37 @@
                 </Grid.ColumnDefinitions>
                 <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="1" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg1" FontSize="11" HorizontalAlignment="Center" />
-                        <TextBlock Text="F5" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Msg1" FontSize="16" HorizontalAlignment="Center" />
+                        <TextBlock Text="F5" FontSize="16" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="2" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg2" FontSize="11" HorizontalAlignment="Center" />
-                        <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Msg2" FontSize="16" HorizontalAlignment="Center" />
+                        <TextBlock Text="F6" FontSize="16" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="3" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg3" FontSize="11" HorizontalAlignment="Center" />
-                        <TextBlock Text="F7" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Msg3" FontSize="16" HorizontalAlignment="Center" />
+                        <TextBlock Text="F7" FontSize="16" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="4" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg4" FontSize="11" HorizontalAlignment="Center" />
-                        <TextBlock Text="F8" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Msg4" FontSize="16" HorizontalAlignment="Center" />
+                        <TextBlock Text="F8" FontSize="16" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </Grid>
         </Border>
-        <TextBlock HorizontalAlignment="Left" Margin="192,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="15" ToolTip="Your grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="192,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="16" ToolTip="Your grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="My" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Locator" />
         </TextBlock>
         <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="72" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="6" TabIndex="3"/>
-        <TextBlock HorizontalAlignment="Left" Margin="332,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="15" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="332,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="16" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Holyland" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Square" />
@@ -1186,11 +1186,11 @@
         <Border Grid.Row="2" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="{Binding Visibility, ElementName=UploadProgressSpinner}" Panel.ZIndex="50" Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2" CornerRadius="8" Padding="20,14,20,14">
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                 <TextBlock x:Name="L_UploadProgressTitle" Text="{Binding UploadProgressTitle, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}"
-                           HorizontalAlignment="Center" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"
+                           HorizontalAlignment="Center" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource TextBrush}"
                            Margin="0,0,0,8" IsHitTestVisible="False"/>
                 <Image x:Name="UploadProgressSpinner" gif:ImageBehavior.AnimatedSource="Images\spinner2.gif" HorizontalAlignment="Center" Margin="0" VerticalAlignment="Center" Source="Images/spinner2.gif" Height="44" Width="44" Visibility="Hidden" IsHitTestVisible="False"/>
                 <Label x:Name="L_UploadProgress" Content="{Binding UploadProgress, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" HorizontalAlignment="Center" Margin="0,8,0,0" MinWidth="180" Padding="4,4,4,6" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" FontSize="22" FontWeight="Bold" Foreground="{DynamicResource TextBrush}" Background="Transparent" Visibility="Hidden" IsHitTestVisible="False"/>
-                <Button x:Name="Btn_StopProgress" Content="Stop" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,12,0,0" Padding="20,5" FontSize="14" FontWeight="Bold" Cursor="Hand" Click="Btn_StopProgress_Click"/>
+                <Button x:Name="Btn_StopProgress" Content="Stop" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,12,0,0" Padding="20,5" FontSize="16" FontWeight="Bold" Cursor="Hand" Click="Btn_StopProgress_Click"/>
             </StackPanel>
         </Border>
         <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
@@ -1209,7 +1209,7 @@
              margins 5, leaving 43 for text - and the widest bands (70CM, 23CM) measure 43.7 at 16 bold
              against 41.0 at 15. The read-out beside it has no chevron to pay for and stays at 16. -->
         <ComboBox x:Name="CB_Band" HorizontalAlignment="Left" Margin="419,49,0,0" Grid.Row="1"
-                  VerticalAlignment="Top" Width="58" Height="28" FontSize="15" FontWeight="Bold"
+                  VerticalAlignment="Top" Width="58" Height="28" FontSize="16" FontWeight="Bold"
                   Visibility="Collapsed" IsTabStop="False"
                   BorderBrush="#FFABADB3" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
                   Template="{StaticResource FlatComboTemplate}"
@@ -1225,14 +1225,14 @@
             <TextBlock Text="&#x26A0;" Foreground="#C0392B" FontSize="18" FontWeight="Bold"
                        HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
-        <TextBlock HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="15" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
+        <TextBlock HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The DX Station Callsign" TextAlignment="Left"><Run Text="DX" FontWeight="Bold" /><Run Text=" Callsign" /></TextBlock>
         <TextBox x:Name="TB_DXCallsign" HorizontalAlignment="Left" Height="28" Margin="101,87,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" TextChanged="TB_DXCallsign_TextChanged" LostFocus="TB_DXCallsign_LostFocus" PreviewKeyDown="TB_DXCallsign_KeyDown" PreviewMouseLeftButtonDown="TB_DXCallsign_PreviewMouseLeftButtonDown" FontSize="16" MaxLength="15" TabIndex="8"/>
 
         <!-- Suggest (F4) toggle: shows and controls the callsign-suggestions dropdown mode.
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
         <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
                       HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,101,0,0"
-                      Width="78" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
+                      Width="78" Height="20" FontSize="16" FontWeight="Bold" Foreground="#1E2A36"
                       Focusable="False" Click="BtnSuggestToggle_Click"
                       ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
             <ToggleButton.Template>
@@ -1277,10 +1277,10 @@
                 </ControlTemplate>
             </ToggleButton.Template>
         </ToggleButton>
-        <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,87,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="12" Foreground="#555555" Visibility="Collapsed"/>
+        <Label x:Name="L_CallsignSearchMode" Content="" HorizontalAlignment="Left" Margin="266,87,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Foreground="#555555" Visibility="Collapsed"/>
         <Popup x:Name="CallsignSuggestionsPopup" PlacementTarget="{Binding ElementName=TB_DXCallsign}" Placement="Bottom" StaysOpen="False" AllowsTransparency="True">
             <Border BorderBrush="Gray" BorderThickness="1" Background="White">
-                <ListBox x:Name="LB_DXCallsignSuggestions" Width="160" MaxHeight="440" FontSize="14" PreviewMouseMove="LB_DXCallsignSuggestions_PreviewMouseMove" MouseLeave="LB_DXCallsignSuggestions_MouseLeave" PreviewMouseLeftButtonDown="LB_DXCallsignSuggestions_PreviewMouseLeftButtonDown" MouseDoubleClick="LB_DXCallsignSuggestions_MouseDoubleClick">
+                <ListBox x:Name="LB_DXCallsignSuggestions" Width="160" MaxHeight="440" FontSize="16" PreviewMouseMove="LB_DXCallsignSuggestions_PreviewMouseMove" MouseLeave="LB_DXCallsignSuggestions_MouseLeave" PreviewMouseLeftButtonDown="LB_DXCallsignSuggestions_PreviewMouseLeftButtonDown" MouseDoubleClick="LB_DXCallsignSuggestions_MouseDoubleClick">
                     <ListBox.ItemContainerStyle>
                         <Style TargetType="ListBoxItem">
                             <Setter Property="Template">
@@ -1351,12 +1351,12 @@
         <Label x:Name="L_Duplicate" Content="Duplicate" HorizontalAlignment="Left" Margin="101,110,0,0"
                Padding="8,0,8,0" VerticalAlignment="Top" Grid.Row="1" HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                Background="White" BorderBrush="Red" BorderThickness="2" Foreground="Red" FontWeight="Bold"
-               RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="15" Panel.ZIndex="10"/>
+               RenderTransformOrigin="0.5,0.5" Visibility="Visible" FontStyle="Italic" FontSize="16" Panel.ZIndex="10"/>
         <Border x:Name="L_LegalFrame" HorizontalAlignment="Left" Margin="101,109,0,0" VerticalAlignment="Top"
                 Grid.Row="1" Panel.ZIndex="10" Background="White" BorderBrush="#2E7D32" BorderThickness="1"
                 CornerRadius="2" Visibility="{Binding Visibility, ElementName=L_Legal}">
             <TextBlock x:Name="L_Legal" Padding="8,1,8,1" TextAlignment="Center" Background="Transparent"
-                       FontWeight="Bold" FontStyle="Italic" FontSize="15" Visibility="Hidden"><Run Text="Legal " Foreground="#2E7D32"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#2E7D32"/></TextBlock>
+                       FontWeight="Bold" FontStyle="Italic" FontSize="16" Visibility="Hidden"><Run Text="Legal " Foreground="#2E7D32"/><Run x:Name="L_LegalCount" Foreground="Black"/><Run x:Name="L_LegalSuffix" Text=" QSO Before" Foreground="#2E7D32"/></TextBlock>
         </Border>
         <Border HorizontalAlignment="Left" Margin="237,92,0,0" VerticalAlignment="Top" Grid.Row="1" Width="18" Height="18" CornerRadius="9" Background="#2196F3" Cursor="Hand" ToolTipService.ShowDuration="15000">
             <Border.ToolTip>
@@ -1368,7 +1368,7 @@
                     </StackPanel>
                 </ToolTip>
             </Border.ToolTip>
-            <TextBlock Text="i" Foreground="White" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" FontStyle="Italic"/>
+            <TextBlock Text="i" Foreground="White" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" FontStyle="Italic"/>
         </Border>
         <Image x:Name="QRZBtn" ToolTip="Get Data from QRZ.com and open the callsign's QRZ.com page" HorizontalAlignment="Left" Height="24" Margin="261,89,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
         <!-- "No QRZ.com connection" alert: a red "!" badge on the QRZ icon's top-right corner, shown
@@ -1378,7 +1378,7 @@
                 Margin="275,85,0,0" Width="14" Height="14" CornerRadius="7" Background="#D32F2F"
                 BorderBrush="White" BorderThickness="1.5" Panel.ZIndex="40" IsHitTestVisible="False"
                 Visibility="Collapsed" ToolTip="No connection to QRZ.com">
-            <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="10"
+            <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="16"
                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0"/>
         </Border>
 
@@ -1392,7 +1392,7 @@
         <!-- Foreground of both contest labels is set in code (UpdateContestLabelContrast): black or
              white depending on the brightness of the frame each one sits on, which is user-editable. -->
         <TextBlock x:Name="L_ExchangeLabel" HorizontalAlignment="Left" Margin="12,130,0,0" VerticalAlignment="Top" Grid.Row="1"
-                   Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
+                   Width="85" TextAlignment="Left" FontSize="16" LineHeight="17" LineStackingStrategy="BlockLineHeight"
                    Foreground="{DynamicResource TextBrush}"
                    ToolTip="The exchange received from the DX station"><Run Text="Exchange" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_Exchange" HorizontalAlignment="Left" Height="28" Margin="101,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="130" CharacterCasing="Upper" Grid.Row="1" Text="" FontSize="16" PreviewTextInput="TB_Exchange_PreviewTextInput" MaxLength="15" TabIndex="9" />
@@ -1400,7 +1400,7 @@
              contest is active this replaces the single Exchange box; otherwise it's hidden. -->
         <StackPanel x:Name="ContestRxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="101,122,0,0" Grid.Row="1" Visibility="Collapsed"/>
-        <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
+        <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="16" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
         <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,123,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
         <!-- RST R + QTH were pulled left off the x=349 RST R used to have, and the whole group is
@@ -1409,7 +1409,7 @@
              stay 6px clear of Add (F1) at x=572 and end on 560. The RST R label overlapping the RST S
              box by a couple of pixels is the same idiom as RST S over the Exchange box - the label text
              is centred in a 40px block, so ~8px of white actually shows. -->
-        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="314,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="12" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
+        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="314,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="16" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
         <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="348,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
         <!-- The DX station's town. Filled from the QRZ.com lookup (its addr2 line is the city) and
              editable, like Name and Country. Hidden in contest mode, where the contest exchange frame
@@ -1433,13 +1433,13 @@
                 MouseRightButtonUp="ContestSendBand_MouseRightButtonUp"
                 ToolTip="Right-click to change the send-exchange colour"/>
         <TextBlock x:Name="L_SendLabel" Grid.Row="1" HorizontalAlignment="Left" Margin="12,82,0,0" VerticalAlignment="Top"
-                   Width="85" TextAlignment="Left" FontSize="15" LineHeight="17" LineStackingStrategy="BlockLineHeight"
+                   Width="85" TextAlignment="Left" FontSize="16" LineHeight="17" LineStackingStrategy="BlockLineHeight"
                    Panel.ZIndex="6" Visibility="Collapsed"
                    ToolTip="The exchange your station sends"><Run Text="Exchange" FontWeight="Bold"/><LineBreak/><Run Text="send"/></TextBlock>
         <StackPanel x:Name="ContestTxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="101,82,0,0" Grid.Row="1" Panel.ZIndex="6" Visibility="Collapsed"/>
-        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,123,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="15" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
-        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,84,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="15" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
+        <Button x:Name="AddBtn" Style="{StaticResource ActionButtonStyle}" Content="Add (F1)" HorizontalAlignment="Left" Margin="572,123,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="AddBtn_Click" FontSize="16" ToolTip="Save the current QSO data" TabIndex="14" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0" />
+        <Button x:Name="ClearBtn" Style="{StaticResource ActionButtonStyle}" HorizontalAlignment="Left" Margin="572,84,0,0" VerticalAlignment="Top" Width="95" Height="32" Grid.Row="1" Click="ClearBtn_Click" FontSize="16" ToolTip="Clear the current QSO data" IsTabStop="False" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Padding="0">
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
                 <TextBlock Text="Clear (F9)" VerticalAlignment="Center"/>
             </StackPanel>
@@ -1453,7 +1453,7 @@
             <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" PreviewMouseLeftButtonDown="MainUndoButton_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MainUndoButton_PreviewMouseLeftButtonUp" MouseLeave="MainUndoButton_MouseLeave" PreviewMouseRightButtonUp="MainUndoButton_RightClick" ToolTip="Click to undo radio frequency/mode change • Hold to clear all">
                 <Grid>
                     <Image Source="Images/UNDO_Icon.png" Width="22" Height="22" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-                    <TextBlock x:Name="MainUndoCountText" FontSize="10" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                    <TextBlock x:Name="MainUndoCountText" FontSize="16" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Grid>
             </Button>
         </Grid>
@@ -1482,7 +1482,7 @@
             <Image x:Name="Img_QRZPhoto" Stretch="UniformToFill" Visibility="Collapsed" ToolTip="QRZ callsign image" />
         </Border>
 
-        <TextBlock HorizontalAlignment="Left" Margin="11,201,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" FontSize="15" ToolTip="The DX station grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="11,201,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" FontSize="16" ToolTip="The DX station grid locator" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="DX" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Locator" />
@@ -1539,7 +1539,7 @@
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="World Wide Flora and Fauna: the nature-reserve reference - 4XFF-0016"/>
             <Button x:Name="Btn_OtherActivity" Content="Other…" Canvas.Left="601" Canvas.Top="0"
-                    Width="66" Height="28" FontSize="14" TabIndex="24" Padding="0"
+                    Width="66" Height="28" FontSize="16" TabIndex="24" Padding="0"
                     Click="Btn_OtherActivity_Click"
                     ToolTip="Any other program - castles, mills, lighthouses. Shows what is set once you choose one."/>
         </Canvas>
@@ -1552,7 +1552,7 @@
              the same element the header bounds are measured against (see ConfirmationStripHelper.cs).
              ClipToBounds keeps the overlay from spilling outside the grid when columns scroll sideways. -->
         <Grid Grid.Row="2" ClipToBounds="True">
-        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" BeginningEdit="QSODataGrid_BeginningEdit" CheckBox.Checked="PaperQsl_Changed" CheckBox.Unchecked="PaperQsl_Changed" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
+        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" BeginningEdit="QSODataGrid_BeginningEdit" CheckBox.Checked="PaperQsl_Changed" CheckBox.Unchecked="PaperQsl_Changed" ClipboardCopyMode="IncludeHeader" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
             <DataGrid.Resources>
                 <!-- Keep the selected row blue even when the grid loses focus (e.g. while the right-click
                      context menu is open), so the user clearly sees which row the menu refers to. -->
@@ -1596,7 +1596,7 @@
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{Binding}" VerticalAlignment="Bottom"/>
-                                <TextBlock Text="MHz" FontSize="10" FontWeight="Bold" VerticalAlignment="Bottom" Margin="2,0,0,0"/>
+                                <TextBlock Text="MHz" FontSize="16" FontWeight="Bold" VerticalAlignment="Bottom" Margin="2,0,0,0"/>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.HeaderTemplate>
@@ -1801,7 +1801,7 @@
              non-hit-testable so clicks still reach the header underneath (e.g. to sort). -->
         <Border x:Name="ConfirmationStripLabel" IsHitTestVisible="False" Panel.ZIndex="50"
                 HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent"
-                TextElement.FontSize="11" TextElement.FontWeight="Bold" TextElement.Foreground="#1A1A1A">
+                TextElement.FontSize="16" TextElement.FontWeight="Bold" TextElement.Foreground="#1A1A1A">
             <!-- The letters are created by ConfirmationStripHelper (they are spread apart at runtime to
                  fill the strip's width), and inherit the font settings above. -->
         </Border>
@@ -1844,10 +1844,10 @@
                         </Ellipse>
 
                         <!-- Cardinal direction markers (N, E, S, W) -->
-                        <TextBlock Text="N" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="6" FontFamily="Segoe UI"/>
-                        <TextBlock Text="E" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="82" Canvas.Top="46" FontFamily="Segoe UI"/>
-                        <TextBlock Text="S" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="82" FontFamily="Segoe UI"/>
-                        <TextBlock Text="W" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="8" Canvas.Top="46" FontFamily="Segoe UI"/>
+                        <TextBlock Text="N" FontSize="16" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="6" FontFamily="Segoe UI"/>
+                        <TextBlock Text="E" FontSize="16" FontWeight="Bold" Foreground="#134346" Canvas.Left="82" Canvas.Top="46" FontFamily="Segoe UI"/>
+                        <TextBlock Text="S" FontSize="16" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="82" FontFamily="Segoe UI"/>
+                        <TextBlock Text="W" FontSize="16" FontWeight="Bold" Foreground="#134346" Canvas.Left="8" Canvas.Top="46" FontFamily="Segoe UI"/>
 
                         <!-- Compass needle (rotates based on azimuth) -->
                         <Canvas x:Name="CompassNeedle" Width="100" Height="100" RenderTransformOrigin="0.5,0.5">
@@ -1888,12 +1888,12 @@
 
                 <!-- Azimuth text display in top-left corner -->
                 <Border Background="White" BorderBrush="#aaa" BorderThickness="1" CornerRadius="3" Padding="4,2" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5,5,0,0">
-                    <TextBlock x:Name="CompassAzimuthText" Text="AZ 0ֲ°" FontSize="14" FontWeight="Bold" Foreground="#18393c" FontFamily="Segoe UI"/>
+                    <TextBlock x:Name="CompassAzimuthText" Text="AZ 0ֲ°" FontSize="16" FontWeight="Bold" Foreground="#18393c" FontFamily="Segoe UI"/>
                 </Border>
             </Grid>
         </Border>
 
-        <TextBlock HorizontalAlignment="Left" Margin="11,48,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="15" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="11,48,0,0" VerticalAlignment="Top" Grid.Row="1" Width="70" Height="38" FontSize="16" ToolTip="Your Personal Callsign" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Operator" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Callsign" />

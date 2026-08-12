@@ -19,14 +19,46 @@ namespace HolyLogger
         private readonly string _backupsFolder;
 
         // One row in the backup picker.
-        private class BackupItem
+        private class BackupItem : System.ComponentModel.INotifyPropertyChanged
         {
+            // The second line of each entry: what this backup holds, filled in by the background read
+            // that runs when the window opens. "reading…" until then, so a slow disk looks like work in
+            // progress rather than like an empty list.
+            private string contents = "reading…";
+            public string Contents
+            {
+                get { return contents; }
+                set
+                {
+                    contents = value;
+                    if (PropertyChanged != null)
+                        PropertyChanged(this, new System.ComponentModel.PropertyChangedEventArgs("Contents"));
+                }
+            }
+            public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+
             public string Path;
             public string FileName;
             public DateTime? Date;
             public long SizeBytes;
-            public string DisplayLabel => (Date.HasValue ? Date.Value.ToString("dd-MM-yyyy") : FileName)
-                                         + "   (" + FormatSize(SizeBytes) + ")";
+
+            // What kind of copy this is. Empty for the ordinary daily backup; the safety copies taken
+            // before something rewrites the database say so, and carry a time as well as a date -
+            // several can be made in one afternoon and a date alone would not tell them apart.
+            public string Kind;
+
+            public string DisplayLabel
+            {
+                get
+                {
+                    string when = Date.HasValue
+                        ? Date.Value.ToString(string.IsNullOrEmpty(Kind) ? "dd-MM-yyyy" : "dd-MM-yyyy HH:mm")
+                        : FileName;
+                    return when
+                         + (string.IsNullOrEmpty(Kind) ? "" : "   " + Kind)
+                         + "   (" + FormatSize(SizeBytes) + ")";
+                }
+            }
         }
 
         // Set by the preview query after a successful read, so Restore uses the exact same numbers the
@@ -80,7 +112,181 @@ namespace HolyLogger
             }
             catch (Exception ex) { Log.Swallow(ex); }
 
-            LB_Backups.ItemsSource = items.OrderByDescending(b => b.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+            // THE SAFETY COPIES TOO. The Log Fixer copies the whole database before it writes, and so
+            // does a Restore - but those land BESIDE the database rather than in the Backups folder,
+            // under a different name, so this window never showed them. An operator told "a copy was
+            // saved first" came here to find it and found nothing, which made the promise look empty.
+            // They are full databases like any other backup, so Restore handles them unchanged.
+            try
+            {
+                // BOTH FOLDERS. New safety copies are written into the Backups folder with the daily
+                // ones; the ones taken before that change are still sitting beside the database, and
+                // an operator's old copies must not vanish from this list because the program moved
+                // where it puts new ones.
+                var dal = DataAccess.GetInstance();
+                string dbDir = dal == null || string.IsNullOrEmpty(dal.DbPath)
+                    ? null : Path.GetDirectoryName(dal.DbPath);
+
+                var folders = new List<string> { _backupsFolder };
+                if (!string.IsNullOrEmpty(dbDir) &&
+                    !string.Equals(dbDir, _backupsFolder, StringComparison.OrdinalIgnoreCase))
+                    folders.Add(dbDir);
+
+                foreach (string folder in folders)
+                if (!string.IsNullOrEmpty(folder) && Directory.Exists(folder))
+                    foreach (string path in Directory.GetFiles(folder, "logDB.db.*.bak"))
+                    {
+                        string name = Path.GetFileName(path);
+
+                        // logDB.db.pre-fix-yyyyMMdd-HHmmss.bak - the kind is whatever sits between the
+                        // "pre-" and the timestamp, so a new kind of safety copy needs nothing here.
+                        string kind = "safety copy";
+                        var m = System.Text.RegularExpressions.Regex.Match(
+                            name, @"\.pre-([a-z]+)-(\d{8})-(\d{6})\.bak$",
+                            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                        DateTime? when = null;
+                        if (m.Success)
+                        {
+                            kind = "before a " + m.Groups[1].Value.ToLowerInvariant();
+                            DateTime d2;
+                            if (DateTime.TryParseExact(m.Groups[2].Value + m.Groups[3].Value, "yyyyMMddHHmmss",
+                                    System.Globalization.CultureInfo.InvariantCulture,
+                                    System.Globalization.DateTimeStyles.None, out d2))
+                                when = d2;
+                        }
+                        if (when == null)
+                            try { when = new FileInfo(path).LastWriteTime; } catch (Exception ex) { Log.Swallow(ex); }
+
+                        long size = 0;
+                        try { size = new FileInfo(path).Length; } catch (Exception ex) { Log.Swallow(ex); }
+
+                        items.Add(new BackupItem
+                        {
+                            Path = path, FileName = name, Date = when, SizeBytes = size, Kind = kind
+                        });
+                    }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            // Newest first by the moment the copy was taken, so a safety copy made this afternoon sits
+            // above this morning's daily one rather than being sorted by a filename it does not share.
+            var ordered = items
+                .OrderByDescending(b => b.Date ?? DateTime.MinValue)
+                .ThenByDescending(b => b.FileName, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            LB_Backups.ItemsSource = ordered;
+
+            // The newest backup chosen for you. It is the one an operator wants nine times in ten, and
+            // an empty right-hand panel saying "pick a backup" is a step that need not exist. Selecting
+            // it also fires the read that fills that panel in.
+            if (ordered.Count > 0) LB_Backups.SelectedIndex = 0;
+
+            ReadAllContents(ordered);
+            ShowFolders();
+        }
+
+        // The two places backups live, named and clickable. They are two because they are made by two
+        // different things: the daily backup is written into the Backups folder, while a safety copy is
+        // taken beside the database itself at the moment something is about to rewrite it.
+        private void ShowFolders()
+        {
+            if (TB_Folders == null) return;
+            TB_Folders.Inlines.Clear();
+
+            string dbDir = null;
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal != null && !string.IsNullOrEmpty(dal.DbPath)) dbDir = Path.GetDirectoryName(dal.DbPath);
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            // ONE LINE, because there is one folder. Copies made by older versions beside the database
+            // are moved in here on startup (see BackupDatabaseDaily), so there is never a second place
+            // to mention - and no note about where the program used to put things.
+            AddFolderLine("All of these files are kept in this folder:  ", _backupsFolder);
+        }
+
+        private void AddFolderLine(string caption, string folder)
+        {
+            TB_Folders.Inlines.Add(new System.Windows.Documents.Run(caption));
+            if (string.IsNullOrEmpty(folder))
+            {
+                TB_Folders.Inlines.Add(new System.Windows.Documents.Run("(not known)"));
+                return;
+            }
+
+            var link = new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run(folder))
+            {
+                ToolTip = "Click to open this folder"
+            };
+            string target = folder;
+            link.Click += (s, e) =>
+            {
+                try
+                {
+                    if (Directory.Exists(target)) System.Diagnostics.Process.Start("explorer.exe", "\"" + target + "\"");
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            };
+            TB_Folders.Inlines.Add(link);
+        }
+
+        // WHAT EACH BACKUP HOLDS, WITHOUT BEING ASKED. Reading a 131 MB database is not instant and
+        // there may be a dozen of them, so they are read one after another off the UI thread and each
+        // line updates itself the moment its own answer arrives. The window is usable throughout; the
+        // second lines simply fill in from the top down.
+        //
+        // One at a time rather than all at once on purpose: these are large files on the same disk, and
+        // a dozen parallel reads would finish no sooner and would make the machine crawl meanwhile.
+        private async void ReadAllContents(List<BackupItem> items)
+        {
+            if (items == null) return;
+            foreach (BackupItem item in items)
+            {
+                string path = item.Path;
+                BackupSummary summary;
+                try { summary = await Task.Run(() => ReadBackupSummary(path)); }
+                catch (Exception ex) { Log.Swallow(ex); item.Contents = "could not be read"; continue; }
+
+                if (!summary.Ok) { item.Contents = "damaged — cannot be read"; continue; }
+
+                string logs = summary.Logs == null || summary.Logs.Count == 0
+                    ? ""
+                    : "  ·  " + summary.Logs.Count.ToString("N0")
+                      + (summary.Logs.Count == 1 ? " log" : " logs");
+
+                item.Contents = summary.TotalCount.ToString("N0") + " QSOs" + logs;
+            }
+        }
+
+        // THE WHEEL MOVES THE SELECTION, not just the view. Rolling the wheel used to slide the list
+        // under a selection that stayed where it was, so the panel on the right went on describing a
+        // backup that was no longer even visible - and the only way to see another one was to click it.
+        //
+        // Moving the selection instead means the description always belongs to the highlighted entry,
+        // and - just as important - to the entry Restore would act on. Following the mouse on HOVER
+        // would have done the same for the eye while leaving Restore pointed somewhere else, which is
+        // not a thing to risk on a button that overwrites the database.
+        private void LB_Backups_PreviewMouseWheel(object sender, System.Windows.Input.MouseWheelEventArgs e)
+        {
+            int count = LB_Backups.Items.Count;
+            if (count == 0) return;
+
+            int index = LB_Backups.SelectedIndex;
+            if (index < 0) index = e.Delta < 0 ? -1 : count;      // nothing chosen yet: start at the end we came from
+
+            index += e.Delta > 0 ? -1 : 1;
+            if (index < 0) index = 0;
+            if (index > count - 1) index = count - 1;
+
+            if (index != LB_Backups.SelectedIndex)
+            {
+                LB_Backups.SelectedIndex = index;
+                LB_Backups.ScrollIntoView(LB_Backups.SelectedItem);
+            }
+            e.Handled = true;      // the list must not also scroll away from what is now selected
         }
 
         // Opens the selected backup READ-ONLY (never the live connection, never a write) and reads its QSO
@@ -208,9 +414,11 @@ namespace HolyLogger
         {
             if (_selectedBackup == null || !_selectedBackupReadable) return;
 
-            string safetyName = "logDB.db.pre-restore-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak";
-            string dbFolder = DataAccess.GetInstance()?.DataFolder;
-            string safetyPath = string.IsNullOrEmpty(dbFolder) ? safetyName : Path.Combine(dbFolder, safetyName);
+            // Into the Backups folder with everything else, so there is one place to look. Falls back
+            // to a bare name beside the database only if there is no database to ask about.
+            string safetyPath = DataAccess.GetInstance()?.SafetyCopyPath("restore")
+                ?? ("logDB.db.pre-restore-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak");
+            string safetyName = safetyPath;
 
             bool confirmed = HolyMessageBox.ShowConfirm(
                 $"Replace your current log with the backup from {(_selectedBackup.Date?.ToString("dd-MM-yyyy") ?? _selectedBackup.FileName)}?\n\n" +

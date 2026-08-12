@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -44,14 +44,14 @@ namespace HolyLogger.OptionsUserControls
                 SP_Fields.Children.Add(new TextBlock
                 {
                     Text = field.Label,
-                    FontSize = 13,
+                    FontSize = 16,
                     FontWeight = FontWeights.SemiBold,
                     Margin = new Thickness(0, 8, 0, 2)
                 });
 
                 var tb = new TextBox
                 {
-                    FontSize = 13,
+                    FontSize = 16,
                     Text = val ?? string.Empty,
                     VerticalContentAlignment = VerticalAlignment.Center,
                     HorizontalAlignment = HorizontalAlignment.Left,
@@ -83,7 +83,7 @@ namespace HolyLogger.OptionsUserControls
                     SP_Fields.Children.Add(new TextBlock
                     {
                         Text = field.Hint,
-                        FontSize = 11,
+                        FontSize = 16,
                         Foreground = Brushes.Gray,
                         TextWrapping = TextWrapping.Wrap,
                         Margin = new Thickness(0, 1, 0, 0)

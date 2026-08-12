@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -31,7 +31,7 @@ namespace HolyLogger
             LogPanel.Children.Add(new TextBlock
             {
                 Text = $"{name}  ({count} QSO{(count != 1 ? "s" : "")})",
-                FontSize = 13,
+                FontSize = 16,
                 FontWeight = FontWeights.SemiBold,
                 Foreground = ThemeManager.Brush("AccentBrush"),
                 Margin = new Thickness(0, 0, 0, 3)
@@ -53,7 +53,7 @@ namespace HolyLogger
             LogPanel.Children.Add(new TextBlock
             {
                 Text = $"{name} — {reason}",
-                FontSize = 13,
+                FontSize = 16,
                 Foreground = new SolidColorBrush(Color.FromRgb(0xE6, 0x5C, 0x00)),
                 Margin = new Thickness(0, 0, 0, 3),
                 TextWrapping = TextWrapping.Wrap
@@ -72,7 +72,7 @@ namespace HolyLogger
                 Text = ok ? "✓" : "✗",
                 Width = 20,
                 FontWeight = FontWeights.Bold,
-                FontSize = 13,
+                FontSize = 16,
                 Foreground = new SolidColorBrush(okColor),
                 VerticalAlignment = VerticalAlignment.Center
             });
@@ -84,7 +84,7 @@ namespace HolyLogger
             row.Children.Add(new TextBlock
             {
                 Text = label,
-                FontSize = 13,
+                FontSize = 16,
                 Foreground = ok ? ThemeManager.Brush("TextBrush") : new SolidColorBrush(okColor),
                 VerticalAlignment = VerticalAlignment.Center
             });
@@ -110,14 +110,14 @@ namespace HolyLogger
                 Text = ok ? "✓" : "✗",
                 Width = 20,
                 FontWeight = FontWeights.Bold,
-                FontSize = 13,
+                FontSize = 16,
                 Foreground = new SolidColorBrush(okColor),
                 VerticalAlignment = VerticalAlignment.Top
             });
             row.Children.Add(new TextBlock
             {
                 Text = text,
-                FontSize = 13,
+                FontSize = 16,
                 Foreground = ok ? ThemeManager.Brush("TextBrush") : new SolidColorBrush(okColor),
                 TextWrapping = TextWrapping.Wrap,
                 VerticalAlignment = VerticalAlignment.Top
@@ -141,7 +141,7 @@ namespace HolyLogger
             LogPanel.Children.Add(new TextBlock
             {
                 Text = text,
-                FontSize = 12.5,
+                FontSize = 16,
                 Foreground = new SolidColorBrush(Color.FromRgb(0x88, 0x88, 0x88)),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(6, 4, 0, 2)

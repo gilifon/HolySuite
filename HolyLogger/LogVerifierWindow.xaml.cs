@@ -8,6 +8,9 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Markup;
+using System.Windows.Media;
 using DXCCManager;
 using HolyParser;
 
@@ -59,6 +62,32 @@ namespace HolyLogger
             public string Evidence { get; set; }
             public bool Fixable { get; set; }
 
+            // The QSO field a report-only finding is about. Findings that CAN be fixed name their field
+            // in Field, because that is what tells the fix where to go; these have nothing to write, so
+            // they carry the name for the reader alone.
+            public string Where;
+
+            // WHICH FIELD the pair of halves beside it is about. The table shows only what the problem
+            // touches, so this is the column that says what "Now / Would become" is naming - without it
+            // a row reading "20M" over "40M" could be about anything.
+            public string FieldLabel
+            {
+                get
+                {
+                    if (!string.IsNullOrEmpty(Where)) return Where;
+                    switch (Field)
+                    {
+                        case "DXCall": return "Callsign";
+                        case "Band": return "Band";
+                        case "Continent": return "Continent";
+                        case "Activity": return Program;
+                        case "CountryName": return "Country";
+                        case "Country": return "Country";
+                        default: return "—";
+                    }
+                }
+            }
+
             private bool apply;
             public bool Apply
             {
@@ -76,9 +105,239 @@ namespace HolyLogger
             public event PropertyChangedEventHandler PropertyChanged;
         }
 
+        // ONE KIND OF PROBLEM, and how many QSOs have it. The frame at the top of the window is a list
+        // of these, because the first decision an operator makes is not about a QSO, it is about a kind:
+        // put the wrong countries right, leave the spellings alone. Ticking one here ticks every QSO of
+        // that kind below, which can then be overruled row by row.
+        public class ProblemKind : INotifyPropertyChanged
+        {
+            public string Name { get; set; }
+            public int Count { get; set; }
+            public bool Fixable { get; set; }      // false = nothing to propose, so nothing to tick
+
+            public string CountText { get { return Count.ToString("N0"); } }
+
+            // WHY THE TICK BOX IS GREY, said in words. "(report only)" was a programmer's shorthand: it
+            // named what the window would do rather than what the operator has to do about it. These
+            // rows are the ones where no database can supply the answer - a grid that is not a locator,
+            // an operation Club Log says never counted - so the QSO has to be opened and judged.
+            public string HandNote
+            {
+                // Not "double-click the QSO" any more: the green half of every cell is a text box, so
+                // the answer the program could not supply is typed straight into the table, and the
+                // row's own tick box comes alive as soon as it is.
+                get
+                {
+                    return Fixable
+                        ? ""
+                        : "the program has no value to offer — each row below says why, and you can "
+                          + "type the answer there";
+                }
+            }
+
+            private bool @checked;
+            public bool Checked
+            {
+                get { return @checked; }
+                set
+                {
+                    if (@checked == value) return;
+                    @checked = value && Fixable;
+                    if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs("Checked"));
+                    if (CheckedChanged != null) CheckedChanged(this);
+                }
+            }
+
+            // Highlighted while this kind is the one the table is showing, so it is obvious that the
+            // table below is a slice and which slice it is.
+            private bool selected;
+            public bool Selected
+            {
+                get { return selected; }
+                set
+                {
+                    if (selected == value) return;
+                    selected = value;
+                    Raise("Selected");
+                }
+            }
+
+            private void Raise(string name)
+            {
+                if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs(name));
+            }
+
+            public Action<ProblemKind> CheckedChanged;
+            public event PropertyChangedEventHandler PropertyChanged;
+        }
+
+        // ── THE TABLE: ONE QSO, TWO ROWS, A COLUMN PER FIELD ─────────────────────────────────────
+        //
+        // The table is shaped like the log itself rather than like a list of complaints. Each QSO gets
+        // one entry drawn as two halves: the log as it stands on top, what it would become underneath.
+        // Only the cells actually in question carry colour, so the eye lands on the fault without a
+        // column having to spell it out in words - which is why there is no "what is wrong" column any
+        // more. The heading and the red cell say it between them.
+        //
+        // And only the columns that some finding TOUCHES are built at all: a scan that turned up no
+        // band trouble shows no Band column. That is what keeps a table this wide readable.
+        private sealed class Cell : INotifyPropertyChanged
+        {
+            // PROPERTIES, NOT FIELDS. WPF binds to properties only, and says nothing when it cannot
+            // find one - the whole table came up blank because these two were fields.
+            public string Current { get; set; }
+            public bool Wrong { get; set; }
+
+            public Cell() { Current = ""; }
+
+            // TYPEABLE. The lower half is a text box, so a fault the program cannot answer is still
+            // settled here rather than sending the operator off to another window: they read the red
+            // value, type the right one underneath, tick the row and press Fix.
+            //
+            // UserEdited separates what they typed from what the program suggested. Both are written,
+            // but a suggestion is written by the finding that made it - which knows to carry the entity
+            // number and the zones along with a country - while a typed value is written to that one
+            // field and nothing else. Confusing the two would let a hand-typed country quietly leave
+            // the QSO counting as the old one.
+            private string proposed = "";
+            public string Proposed
+            {
+                get { return proposed; }
+                set
+                {
+                    string v = value ?? "";
+                    if (proposed == v) return;
+                    proposed = v;
+                    UserEdited = true;
+                    Raise("Proposed"); Raise("ThenBg"); Raise("ThenWeight"); Raise("NoteVisible");
+                    if (Changed != null) Changed();
+                }
+            }
+
+            public bool UserEdited;
+            public Action Changed;
+
+            // WHAT IS WRONG, for a fault with no answer to offer. A red cell on its own says only that
+            // something is the matter - "Club Log lists this as never valid" is not something anyone
+            // can read out of a red callsign. It sits in the lower half as a grey note and vanishes the
+            // moment the operator types there, so the cell is still theirs to fill.
+            public string Note { get; set; }
+            public Visibility NoteVisible
+            {
+                get
+                {
+                    return !string.IsNullOrEmpty(Note) && proposed.Length == 0
+                        ? Visibility.Visible : Visibility.Collapsed;
+                }
+            }
+
+            // Filling a suggestion in from a finding is not the operator typing.
+            public void Suggest(string value)
+            {
+                proposed = value ?? "";
+                Raise("Proposed"); Raise("ThenBg"); Raise("ThenWeight");
+            }
+
+            private void Raise(string name)
+            {
+                if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs(name));
+            }
+            public event PropertyChangedEventHandler PropertyChanged;
+
+            // Filled only where there is something to say. Everywhere else the cell is transparent and
+            // the row reads as ordinary log data, which is exactly what it is.
+            public Brush NowBg { get { return Wrong ? WrongBg : Brushes.Transparent; } }
+            public Brush ThenBg { get { return Proposed.Length > 0 ? RightBg : Brushes.Transparent; } }
+            public Brush NowFg { get { return Wrong ? WrongFg : DimFg; } }
+            public FontWeight ThenWeight { get { return Proposed.Length > 0 ? FontWeights.Bold : FontWeights.Normal; } }
+
+            // A proper alarm red, not the pale wash it started as - a fault has to look like one.
+            private static readonly Brush WrongBg = Freeze(Color.FromRgb(0xFF, 0x8A, 0x8A));
+            private static readonly Brush RightBg = Freeze(Color.FromRgb(0xA5, 0xE8, 0xA8));
+            private static readonly Brush WrongFg = Freeze(Color.FromRgb(0x5D, 0x00, 0x00));
+            private static readonly Brush DimFg = Freeze(Color.FromRgb(0x33, 0x33, 0x33));
+            private static Brush Freeze(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
+        }
+
+        private sealed class FixRow : INotifyPropertyChanged
+        {
+            public QSO Qso;
+            public readonly List<Finding> Findings = new List<Finding>();
+            // A PROPERTY, for the same reason as Cell.Current: the cell templates bind Cells[Date] and
+            // so on, and a binding to a field finds nothing and reports nothing.
+            public Dictionary<string, Cell> Cells { get; private set; }
+
+            public FixRow() { Cells = new Dictionary<string, Cell>(); }
+
+            // A row can be put right either because the program proposed something or because the
+            // operator typed something. Recomputed as they type, so the tick box comes alive under
+            // their hands rather than staying grey until the window is reopened.
+            private bool fixable;
+            public bool Fixable
+            {
+                get { return fixable; }
+                set
+                {
+                    if (fixable == value) return;
+                    fixable = value;
+                    if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs("Fixable"));
+                }
+            }
+
+            public void Recompute()
+            {
+                bool any = false;
+                foreach (Finding f in Findings) if (f.Fixable) { any = true; break; }
+                if (!any)
+                    foreach (var kv in Cells)
+                        if (kv.Value.UserEdited && kv.Value.Proposed.Trim().Length > 0) { any = true; break; }
+                Fixable = any;
+            }
+
+            private bool apply;
+            public bool Apply
+            {
+                get { return apply; }
+                set
+                {
+                    if (apply == value) return;
+                    apply = value && Fixable;
+                    if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs("Apply"));
+                    if (ApplyChanged != null) ApplyChanged();
+                }
+            }
+
+            public Action ApplyChanged;
+            public event PropertyChangedEventHandler PropertyChanged;
+
+            public bool Has(string kind)
+            {
+                foreach (Finding f in Findings)
+                    if (string.Equals(f.Problem, kind, StringComparison.Ordinal)) return true;
+                return false;
+            }
+        }
+
+        // Every column the table can show, in the order the log table shows them. Date, Time and
+        // Callsign always appear - they are how an operator recognises the contact; the rest appear
+        // only when something is wrong with them.
+        private static readonly string[] AlwaysColumns = { "Date", "Time", "Callsign" };
+        private static readonly string[] IssueColumns =
+        {
+            "Band", "Mode", "Country", "Country Code", "Continent", "DX Locator", "Comment",
+            "IOTA", "SOTA", "POTA", "WWFF"
+        };
+
+        private readonly ObservableCollection<FixRow> _rows = new ObservableCollection<FixRow>();
+
         private readonly List<QSO> _qsos;
         private readonly string _logName;
         private readonly ObservableCollection<Finding> _findings = new ObservableCollection<Finding>();
+        private readonly ObservableCollection<ProblemKind> _kinds = new ObservableCollection<ProblemKind>();
+
+        // True while a kind's tick box is pushing its state down onto the rows, so the rows pushing
+        // their own count back up cannot turn into a loop.
+        private bool _syncingKind;
 
         // A callsign may legitimately hold letters, digits and strokes - anything else is damage, and the
         // log has at least one row that arrived from an import with rubbish bytes in front of the call.
@@ -132,7 +391,7 @@ namespace HolyLogger
             InitializeComponent();
             _qsos = (qsos ?? Enumerable.Empty<QSO>()).Where(q => q != null).ToList();
             _logName = string.IsNullOrWhiteSpace(logName) ? "" : logName.Trim();
-            Title = string.IsNullOrEmpty(_logName) ? "Verify Log" : "Verify Log — " + _logName;
+            Title = string.IsNullOrEmpty(_logName) ? "Log Fixer" : "Log Fixer — " + _logName;
 
             // The same header look as the QSO log, the cluster and the Logs window, from the one place
             // that defines it: the LogHeaderBg palette token with black text. Its background is a
@@ -159,21 +418,29 @@ namespace HolyLogger
             // runs off the UI thread - a 40,000-QSO log would otherwise freeze the window.
             List<Finding> found = await Task.Run(() => Scan(snapshot));
 
+            // Before anything is drawn: the locators this machine cannot answer are asked of QRZ, so
+            // the table appears with those suggestions already in it rather than with a button to go
+            // and fetch them.
+            await FillLocatorsFromQrz(found);
+
             foreach (Finding f in found) _findings.Add(f);
 
-            // The split is still worth stating, but as what it now is: how many findings this window
-            // could name a replacement for, against how many it can only point at. Neither number is a
-            // count of anything about to happen - nothing here happens to the log at all.
+            List<string> columns = BuildRows(found);
+            BuildColumns(columns);
+            FindingsGrid.ItemsSource = _rows;
+            BuildKinds(found);
+
             int suggested = found.Count(f => f.Fixable);
             TB_Header.Text = found.Count == 0
                 ? "No problems found in " + _qsos.Count.ToString("N0") + " QSOs."
                 : found.Count.ToString("N0") + " problem" + (found.Count == 1 ? "" : "s")
                   + " found in " + _qsos.Count.ToString("N0") + " QSOs";
             TB_Summary.Text = found.Count == 0
-                ? "Nothing to report."
-                : suggested.ToString("N0") + " with a suggested value, "
-                  + (found.Count - suggested).ToString("N0") + " to judge by hand. "
+                ? "Nothing to fix."
+                : suggested.ToString("N0") + " can be put right here, "
+                  + (found.Count - suggested).ToString("N0") + " are for you to judge. "
                   + "Double-click a row to open the QSO.";
+            UpdateFixButton();
         }
 
         private static List<Finding> Scan(List<QSO> qsos)
@@ -190,7 +457,7 @@ namespace HolyLogger
                 // --- the callsign itself -------------------------------------------------------------
                 if (call.Length == 0)
                 {
-                    findings.Add(Fyi(q, "No callsign", "(empty)", "cannot be guessed", "the log"));
+                    findings.Add(Fyi(q, "No callsign", "(empty)", "cannot be guessed", "the log", "Callsign"));
                     continue;   // nothing else can be judged without a callsign
                 }
 
@@ -216,7 +483,7 @@ namespace HolyLogger
                     else
                     {
                         findings.Add(Fyi(q, "Callsign holds odd characters", call,
-                                         "check what was really worked", "the log"));
+                                         "check what was really worked", "the log", "Callsign"));
                     }
                 }
 
@@ -226,13 +493,13 @@ namespace HolyLogger
                                   DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out when);
                 if (!dateOk)
                     findings.Add(Fyi(q, "Unreadable date", dateRaw.Length == 0 ? "(empty)" : dateRaw,
-                                     "a real date (YYYYMMDD)", "the log"));
+                                     "a real date (YYYYMMDD)", "the log", "Date"));
                 else if (when >= today)
                     findings.Add(Fyi(q, "Date in the future", when.ToString("dd-MM-yyyy"),
-                                     "a date that has happened", "the log"));
+                                     "a date that has happened", "the log", "Date"));
                 else if (when.Year < 1920)
                     findings.Add(Fyi(q, "Impossible date", when.ToString("dd-MM-yyyy"),
-                                     "amateur radio is not that old", "the log"));
+                                     "amateur radio is not that old", "the log", "Date"));
 
                 string timeRaw = (q.Time ?? string.Empty).Trim();
                 if (timeRaw.Length >= 4)
@@ -242,7 +509,7 @@ namespace HolyLogger
                                && int.TryParse(timeRaw.Substring(2, 2), out mm)
                                && hh <= 23 && mm <= 59;
                     if (!timeOk)
-                        findings.Add(Fyi(q, "Impossible time", timeRaw, "00:00 to 23:59", "the log"));
+                        findings.Add(Fyi(q, "Impossible time", timeRaw, "00:00 to 23:59", "the log", "Time"));
                 }
 
                 // --- band and frequency -------------------------------------------------------------
@@ -259,7 +526,7 @@ namespace HolyLogger
                     // and nothing can be derived from it. Only the operator knows what he was on.
                     findings.Add(Fyi(q, "Frequency is on no amateur band",
                                      freq + " MHz" + (band.Length == 0 ? "  (and no band)" : "  (band " + band + ")"),
-                                     "set the band by hand - the frequency cannot say", "the log"));
+                                     "set the band by hand - the frequency cannot say", "the log", "Band"));
                 }
                 else if (band.Length == 0 && fromFreq.Length > 0)
                 {
@@ -273,7 +540,7 @@ namespace HolyLogger
                 else if (band.Length == 0)
                 {
                     findings.Add(Fyi(q, "No band and no frequency", "(both empty)",
-                                     "set the band by hand", "the log"));
+                                     "set the band by hand", "the log", "Band"));
                 }
                 else if (fromFreq.Length > 0 && !string.Equals(fromFreq, band, StringComparison.OrdinalIgnoreCase))
                 {
@@ -285,12 +552,18 @@ namespace HolyLogger
                     findings.Add(f);
                 }
                 if (string.IsNullOrWhiteSpace(q.Mode))
-                    findings.Add(Fyi(q, "No mode", "(empty)", "a mode", "the log"));
+                    findings.Add(Fyi(q, "No mode", "(empty)", "a mode", "the log", "Mode"));
 
                 // --- the worked station's grid ------------------------------------------------------
                 string grid = (q.DXLocator ?? string.Empty).Trim();
                 if (grid.Length > 0 && !LegalLocator.IsMatch(grid) && !HolylandSquare.IsMatch(grid))
-                    findings.Add(Fyi(q, "Grid is not a locator", grid, "e.g. KM72OR", "the log"));
+                    // "Grid is not a locator" said nothing: to an operator those two words mean the same
+                    // thing, so the sentence read as a contradiction rather than a fault. What is
+                    // actually wrong is that the text in the box is not shaped like a grid square at
+                    // all - so say that, and show the shape it should have.
+                    findings.Add(Fyi(q, "DX Locator is wrong", grid,
+                                     "two letters, two digits, and usually two more letters — KM72OR",
+                                     "the log", "DX Locator"));
 
                 // --- an activity reference typed into the comment -----------------------------------
                 //
@@ -324,8 +597,9 @@ namespace HolyLogger
                             string p = ProgramInComment(word, comment);
                             if (p == null) continue;
                             findings.Add(Fyi(q, "Comment holds a " + p + " reference", comment,
-                                             "move " + word.ToUpperInvariant() + " into the " + p + " box",
-                                             "the " + p + " format"));
+                                             "comment has other text too — move " + word.ToUpperInvariant()
+                                             + " yourself",
+                                             "the " + p + " format", "Comment"));
                             break;
                         }
                     }
@@ -340,8 +614,13 @@ namespace HolyLogger
                 if (dated == null) continue;
 
                 if (dated.InvalidOperation)
-                    findings.Add(Fyi(q, "Club Log lists this as never valid", call,
-                                     "does not count for awards", "Club Log"));
+                    // NOT "never valid" - that said the callsign itself was bad, and it is not. Club Log
+                    // marks an OPERATION: XY2A is a perfectly good Myanmar callsign, and Club Log holds
+                    // one exception for it covering 19 to 25 January 2003. A QSO inside that week did
+                    // not count; the same callsign a day later did. The date is the whole point, so the
+                    // message has to name it.
+                    findings.Add(Fyi(q, "Club Log: operation did not count", call,
+                                     "no award credit", "Club Log", "Callsign"));
 
                 if (string.IsNullOrEmpty(dated.Name) || dated.Name == "Unknown") continue;
 
@@ -362,6 +641,24 @@ namespace HolyLogger
                 int storedCode = q.DxccCode;
                 int ourCode = EntityCodeOf(dated);
 
+                // THE OPERATOR'S OWN <DXCC> SETTLES A STROKE. When the callsign has a stroke there are
+                // two entities it could name, one per side, and which is meant is a convention rather
+                // than anything in the callsign - this program picks a side and is sometimes wrong.
+                // M/ON4CJK is England to one reading and Belgium to the other. If the number the log
+                // carries is ONE OF THOSE TWO it came from the person who was there, and it is not our
+                // place to argue with it.
+                //
+                // This is only ever a reason to say NOTHING. A stored entity that is neither side of
+                // the stroke is still reported, and a callsign with no stroke has no second candidate
+                // to defer to, so nothing is weakened by it.
+                if (ourCode > 0 && storedCode > 0 && storedCode != ourCode && call.IndexOf('/') >= 0)
+                {
+                    HashSet<int> sides;
+                    try { sides = lookup.CandidateEntityCodes(call, when); }
+                    catch { sides = null; }
+                    if (sides != null && sides.Contains(storedCode)) continue;
+                }
+
                 if (ourCode > 0 && storedCode > 0 && storedCode != ourCode)
                 {
                     Finding f = New(q, "Different country",
@@ -369,7 +666,7 @@ namespace HolyLogger
                                     Named(ourCode, dated.Name) + ZoneSuffix(
                                         dated.CqZone > 0 ? dated.CqZone.ToString() : q.CQZone,
                                         dated.ItuZone > 0 ? dated.ItuZone.ToString() : q.ITUZone),
-                                    dated.ResolvedBy);
+                                    EvidenceFor(dated, call));
                     FillCountryFix(f, dated, ourCode);
                     findings.Add(f);
                 }
@@ -377,7 +674,7 @@ namespace HolyLogger
                 {
                     Finding f = New(q, "No country code",
                                     storedCountry.Length == 0 ? "(empty)" : storedCountry + "  (no number)",
-                                    Named(ourCode, dated.Name), dated.ResolvedBy);
+                                    Named(ourCode, dated.Name), EvidenceFor(dated, call));
                     FillCountryFix(f, dated, ourCode);
                     findings.Add(f);
                 }
@@ -386,7 +683,7 @@ namespace HolyLogger
                 {
                     // Same entity, different wording. Nothing counts wrongly because of it.
                     Finding f = New(q, "Country spelled differently",
-                                    storedCountry, dated.Name, dated.ResolvedBy);
+                                    storedCountry, dated.Name, EvidenceFor(dated, call));
                     f.Field = "CountryName";
                     f.NewValue = dated.Name;
                     f.Fixable = true;
@@ -394,7 +691,7 @@ namespace HolyLogger
                 }
                 else if (storedCountry.Length == 0 && !string.IsNullOrEmpty(dated.Name))
                 {
-                    Finding f = New(q, "No country", "(empty)", Named(ourCode, dated.Name), dated.ResolvedBy);
+                    Finding f = New(q, "No country", "(empty)", Named(ourCode, dated.Name), EvidenceFor(dated, call));
                     FillCountryFix(f, dated, ourCode);
                     findings.Add(f);
                 }
@@ -405,7 +702,7 @@ namespace HolyLogger
                     // saved before the field was filled in reliably.
                     Finding f = New(q, "Wrong continent",
                                     storedCont.Length == 0 ? "(empty)" : storedCont,
-                                    dated.Continent, dated.ResolvedBy);
+                                    dated.Continent, EvidenceFor(dated, call));
                     f.Field = "Continent";
                     f.NewValue = dated.Continent;
                     f.Fixable = true;
@@ -434,6 +731,23 @@ namespace HolyLogger
             catch { return 0; }
         }
 
+        // WHAT THE ANSWER RESTS ON, not merely which database gave it. Two EA8 callsigns were pushed
+        // opposite ways on the same screen - EA8AAH out of Canary Islands into Spain, EA8SG the other
+        // way - and "cty.dat" against both explained nothing. The reason is that cty.dat carries a
+        // hand-curated entry for the exact callsign EA8AAH, placing that one station in Spain, while
+        // EA8SG simply follows the EA8 prefix. Both answers are right; only the evidence was mute.
+        private static string EvidenceFor(DXCC d, string call)
+        {
+            if (d == null) return "";
+            string src = string.IsNullOrEmpty(d.ResolvedBy) ? "the databases" : d.ResolvedBy;
+            string c = (call ?? "").Trim().ToUpperInvariant();
+            int n = d.MatchedLength;
+
+            if (n <= 0 || c.Length == 0) return src;
+            if (n >= c.Length) return src + ": this exact callsign";
+            return src + ": " + c.Substring(0, n) + " prefix";
+        }
+
         // "United States (291)" - the number is the part that counts, so it is never left off.
         private static string Named(int code, string name)
         {
@@ -459,7 +773,7 @@ namespace HolyLogger
 
         private static int Rank(string problem)
         {
-            if (problem.StartsWith("Club Log lists")) return 0;
+            if (problem.StartsWith("Club Log:")) return 0;
             if (problem == "Different country") return 1;
             if (problem == "No country code") return 2;
             if (problem == "No country") return 3;
@@ -495,10 +809,17 @@ namespace HolyLogger
 
         // A finding the program must not act on by itself. "Check by hand" rather than "FYI": the label
         // has to say what the operator should do, in words that need no explaining.
-        private static Finding Fyi(QSO q, string problem, string current, string note, string evidence)
+        // `where` names the QSO field the finding is about. These findings write nothing, so they have
+        // no Field to write - but the table still has a column saying WHICH field each row is talking
+        // about, and leaving it blank made a row read "Grid is not a locator — " with a dash that
+        // explained nothing. Named at each call site rather than guessed from the problem text, so
+        // rewording a message can never quietly empty the column.
+        private static Finding Fyi(QSO q, string problem, string current, string note, string evidence,
+                                   string where = null)
         {
             Finding f = New(q, problem, current, note, evidence);
             f.Fixable = false;
+            f.Where = where;
             f.Suggested = "Check by hand — " + note;
             return f;
         }
@@ -517,13 +838,711 @@ namespace HolyLogger
             return s.Substring(0, 2) + ":" + s.Substring(2, 2);
         }
 
-        // NOTHING HERE WRITES TO THE LOG. This window used to carry tick boxes, a "Tick all", and an
-        // "Apply the ticked corrections" button that saved a copy of the database and then updated
-        // every ticked QSO. All of it is gone on purpose: a QSO's content is changed in ONE place, the
-        // Log Corrections editor, so that when a log turns out to have been altered there is one place
-        // to look and one thing to have gone wrong. What survives is the suggestion itself - Finding
-        // still carries NewValue, NewCode, NewContinent and the zones - because that is the material
-        // the editor will work from. It is data about a QSO, not an action on one.
+        // Which COLUMN a finding belongs in. FieldLabel already names the field for the reader; this
+        // turns that into the column key, and adds the one case where a single finding fills two cells:
+        // a country correction changes the name AND the entity number, and both must be visible or the
+        // operator cannot see that the number is the part that matters.
+        private static string ColumnOf(Finding f)
+        {
+            switch (f.Field)
+            {
+                case "DXCall": return "Callsign";
+                case "Band": return "Band";
+                case "Continent": return "Continent";
+                case "DXLocator": return "DX Locator";
+                case "Country": return "Country";
+                case "CountryName": return "Country";
+                case "Activity": return f.Program;      // IOTA / SOTA / POTA / WWFF
+            }
+            // Report-only findings carry their field name in Where.
+            return string.IsNullOrEmpty(f.Where) ? "Callsign" : f.Where;
+        }
+
+        private static string Text(string s) { return (s ?? "").Trim(); }
+
+        // The one line that goes under a red cell nobody can answer for the operator. The Problem is
+        // what to say - "Club Log lists this as never valid" - and Suggested carries the advice that
+        // went with it, minus the "Check by hand" prefix, which the grey note already implies.
+        private static string NoteFor(Finding f)
+        {
+            string problem = Text(f.Problem);
+            string advice = Text(f.Suggested);
+            const string prefix = "Check by hand — ";
+            if (advice.StartsWith(prefix, StringComparison.Ordinal)) advice = advice.Substring(prefix.Length);
+            if (advice.Length == 0) return problem;
+            return problem + " — " + advice;
+        }
+
+        private static Cell CellFor(FixRow row, string key)
+        {
+            Cell c;
+            if (!row.Cells.TryGetValue(key, out c)) { c = new Cell(); row.Cells[key] = c; }
+            return c;
+        }
+
+        // One row per QSO, with its cells filled from the QSO as it stands and from whatever its
+        // findings propose. Cells nobody complained about carry the value and no colour.
+        private List<string> BuildRows(List<Finding> found)
+        {
+            _rows.Clear();
+            _rowByQso.Clear();
+            var used = new HashSet<string>();
+
+            foreach (var g in found.Where(f => f.Qso != null).GroupBy(f => f.Qso))
+            {
+                QSO q = g.Key;
+                var row = new FixRow { Qso = q };
+                row.Findings.AddRange(g);
+                row.ApplyChanged = UpdateFixButton;
+
+                CellFor(row, "Date").Current = FormatDate(q.Date);
+                CellFor(row, "Time").Current = FormatTime(q.Time);
+                CellFor(row, "Callsign").Current = Text(q.DXCall);
+
+                foreach (Finding f in g)
+                {
+                    string key = ColumnOf(f);
+                    used.Add(key);
+
+                    Cell cell = CellFor(row, key);
+                    cell.Wrong = true;
+                    if (cell.Current.Length == 0) cell.Current = CurrentOf(q, key);
+                    if (f.Fixable && !string.IsNullOrEmpty(f.NewValue)) cell.Suggest(f.NewValue);
+                    else if (!f.Fixable) cell.Note = NoteFor(f);
+
+                    // The entity number travels with the country name, and is the half that decides
+                    // what the QSO counts as.
+                    if (f.Field == "Country")
+                    {
+                        used.Add("Country Code");
+                        Cell code = CellFor(row, "Country Code");
+                        code.Wrong = true;
+                        if (code.Current.Length == 0) code.Current = q.DxccCodeText;
+                        if (f.NewCode > 0) code.Suggest(f.NewCode.ToString());
+
+                        if (!string.IsNullOrEmpty(f.NewContinent))
+                        {
+                            used.Add("Continent");
+                            Cell cont = CellFor(row, "Continent");
+                            if (cont.Current.Length == 0) cont.Current = Text(q.Continent);
+                            if (!string.Equals(cont.Current, f.NewContinent, StringComparison.OrdinalIgnoreCase))
+                            {
+                                cont.Wrong = true;
+                                cont.Suggest(f.NewContinent);
+                            }
+                        }
+                    }
+                }
+
+                // The columns this row does not own still show what the QSO holds, so the pair reads
+                // as a QSO rather than as three coloured boxes floating in space.
+                foreach (string key in IssueColumns)
+                    if (used.Contains(key) && !row.Cells.ContainsKey(key))
+                        CellFor(row, key).Current = CurrentOf(q, key);
+
+                // Every cell tells the row when it is typed into, so the tick box wakes up as soon as
+                // the operator supplies an answer the program could not.
+                FixRow captured = row;
+                foreach (var kv in row.Cells)
+                    kv.Value.Changed = () => { captured.Recompute(); UpdateFixButton(); };
+                row.Recompute();
+
+                _rowByQso[q] = row;
+                _rows.Add(row);
+            }
+
+            // Fill in any column that became used AFTER a row was built.
+            foreach (FixRow row in _rows)
+                foreach (string key in IssueColumns)
+                    if (used.Contains(key) && !row.Cells.ContainsKey(key))
+                        CellFor(row, key).Current = CurrentOf(row.Qso, key);
+
+            var columns = new List<string>(AlwaysColumns);
+            foreach (string key in IssueColumns) if (used.Contains(key)) columns.Add(key);
+            return columns;
+        }
+
+        // Which row belongs to which QSO, for the fix to find what was typed into it.
+        private readonly Dictionary<QSO, FixRow> _rowByQso = new Dictionary<QSO, FixRow>();
+
+        // A value the operator typed, written to the one field its column stands for. Date and time go
+        // back through the display format they were shown in; a country code that is not a number is
+        // ignored rather than stored as rubbish.
+        private static void WriteField(QSO q, string key, string v)
+        {
+            if (q == null) return;
+            switch (key)
+            {
+                case "Callsign": q.DXCall = v.ToUpperInvariant(); break;
+                case "Date": { string d = UnformatDate(v); if (d != null) q.Date = d; break; }
+                case "Time": { string t = UnformatTime(v); if (t != null) q.Time = t; break; }
+                case "Band": q.Band = v.ToUpperInvariant(); break;
+                case "Mode": q.Mode = v.ToUpperInvariant(); break;
+                case "Country": q.Country = v; break;
+                case "Country Code": { int c; if (int.TryParse(v, out c) && c > 0) q.DxccCode = c; break; }
+                case "Continent": q.Continent = v.ToUpperInvariant(); break;
+                case "DX Locator": q.DXLocator = v.ToUpperInvariant(); break;
+                case "Comment": q.Comment = v; break;
+                case "IOTA": q.Iota = v.ToUpperInvariant(); break;
+                case "SOTA": q.SotaRef = v.ToUpperInvariant(); break;
+                case "POTA": q.PotaRef = v.ToUpperInvariant(); break;
+                case "WWFF": q.WwffRef = v.ToUpperInvariant(); break;
+            }
+        }
+
+        // "21-01-2003" back to "20030121". Null when it is not a date, so a slip of the keyboard cannot
+        // replace a real date with nonsense.
+        private static string UnformatDate(string shown)
+        {
+            DateTime d;
+            if (DateTime.TryParseExact((shown ?? "").Trim(), "dd-MM-yyyy", CultureInfo.InvariantCulture,
+                                       DateTimeStyles.None, out d))
+                return d.ToString("yyyyMMdd");
+            string digits = new string((shown ?? "").Where(char.IsDigit).ToArray());
+            return digits.Length == 8 ? digits : null;
+        }
+
+        // "13:55" back to "1355".
+        private static string UnformatTime(string shown)
+        {
+            string digits = new string((shown ?? "").Where(char.IsDigit).ToArray());
+            if (digits.Length != 4 && digits.Length != 6) return null;
+            int hh, mm;
+            if (!int.TryParse(digits.Substring(0, 2), out hh) || hh > 23) return null;
+            if (!int.TryParse(digits.Substring(2, 2), out mm) || mm > 59) return null;
+            return digits;
+        }
+
+        private static string CurrentOf(QSO q, string key)
+        {
+            if (q == null) return "";
+            switch (key)
+            {
+                case "Callsign": return Text(q.DXCall);
+                case "Date": return FormatDate(q.Date);
+                case "Time": return FormatTime(q.Time);
+                case "Band": return Text(q.Band);
+                case "Mode": return Text(q.Mode);
+                case "Country": return Text(q.Country);
+                case "Country Code": return q.DxccCodeText;
+                case "Continent": return Text(q.Continent);
+                case "DX Locator": return Text(q.DXLocator);
+                case "Comment": return Text(q.Comment);
+                case "IOTA": return Text(q.Iota);
+                case "SOTA": return Text(q.SotaRef);
+                case "POTA": return Text(q.PotaRef);
+                case "WWFF": return Text(q.WwffRef);
+            }
+            return "";
+        }
+
+        // The columns are made here rather than in the XAML because WHICH of them exist depends on what
+        // the scan found. Each is the two-half cell; the tick column is built once at the front.
+        private void BuildColumns(List<string> columns)
+        {
+            FindingsGrid.Columns.Clear();
+
+            var tick = (DataGridTemplateColumn)XamlReader.Parse(
+                "<DataGridTemplateColumn xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
+                + "Header='Fix' Width='54' CanUserSort='False'><DataGridTemplateColumn.CellTemplate><DataTemplate>"
+                + "<CheckBox HorizontalAlignment='Center' VerticalAlignment='Center' IsEnabled='{Binding Fixable}' "
+                + "IsChecked='{Binding Apply, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}'/>"
+                + "</DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>");
+            FindingsGrid.Columns.Add(tick);
+
+            foreach (string key in columns)
+            {
+                string safe = key.Replace("&", "&amp;");
+                string xaml =
+                    "<DataGridTemplateColumn xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
+                    // MaxWidth, because Auto sizes to the WIDEST thing in the column and the widest
+                    // thing is the explanation under a red cell. One long note pushed the Callsign
+                    // column across half the window and shoved everything else off the edge. Capped,
+                    // the note wraps onto a second line and the table keeps its shape.
+                    + "Header='" + safe + "' Width='Auto' MinWidth='70' MaxWidth='230' CanUserSort='False'>"
+                    + "<DataGridTemplateColumn.CellTemplate><DataTemplate>"
+                    + "<Grid><Grid.RowDefinitions><RowDefinition Height='Auto'/><RowDefinition Height='Auto'/>"
+                    + "</Grid.RowDefinitions>"
+                    + "<Border Grid.Row='0' Background='{Binding Cells[" + safe + "].NowBg}' Padding='7,3,7,3' "
+                    + "MinHeight='24' BorderBrush='#C0C0C0' BorderThickness='0,0,0,1'>"
+                    + "<TextBlock Text='{Binding Cells[" + safe + "].Current}' TextWrapping='Wrap' "
+                    + "Foreground='{Binding Cells[" + safe + "].NowFg}'/></Border>"
+                    // THE LOWER HALF IS ALWAYS THERE, even when the program has nothing to propose.
+                    // An empty line under every contact is what makes the table read as pairs; letting
+                    // it collapse would leave the by-hand rows looking like a different kind of thing
+                    // when they are simply the ones the operator must answer.
+                    + "<Border Grid.Row='1' Background='{Binding Cells[" + safe + "].ThenBg}' Padding='4,1,4,1' "
+                    + "MinHeight='24'>"
+                    // A BORDERLESS, TRANSPARENT TEXT BOX, so the lower half looks like part of the
+                    // table until it is clicked. Typing into it is how a fault the program cannot
+                    // answer gets settled without leaving this window.
+                    // The note sits BEHIND the box, so it reads as a hint in an empty cell and is gone
+                    // as soon as anything is typed - the cell never stops being the operator's.
+                    + "<Grid><TextBlock Text='{Binding Cells[" + safe + "].Note}' TextWrapping='Wrap' "
+                    + "Visibility='{Binding Cells[" + safe + "].NoteVisible}' Margin='3,2,3,2' "
+                    + "FontStyle='Italic' FontSize='14' Foreground='#8A0000' IsHitTestVisible='False'/>"
+                    + "<TextBox Text='{Binding Cells[" + safe + "].Proposed, Mode=TwoWay, "
+                    + "UpdateSourceTrigger=PropertyChanged}' Background='Transparent' BorderThickness='0' "
+                    + "Padding='3,2,3,2' Foreground='#0B4A0E' "
+                    + "FontWeight='{Binding Cells[" + safe + "].ThenWeight}'/></Grid></Border>"
+                    + "</Grid></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>";
+                var col = (DataGridTemplateColumn)XamlReader.Parse(xaml);
+                // What Ctrl+C takes from this column: the value as it stands. A template column copies
+                // nothing at all unless told, and the top half is the log - which is what an operator
+                // pasting into a mail is asking for.
+                col.ClipboardContentBinding = new System.Windows.Data.Binding("Cells[" + key + "].Current");
+                FindingsGrid.Columns.Add(col);
+            }
+        }
+
+        // The kinds frame, built from the findings themselves rather than from a list of kinds kept
+        // somewhere - a check added to Scan appears here without anyone remembering to register it.
+        // Ordered the way the table is ordered, so the frame and the rows read in the same sequence.
+        private void BuildKinds(List<Finding> found)
+        {
+            _kinds.Clear();
+            foreach (var g in found.GroupBy(f => f.Problem)
+                                   .OrderBy(g => Rank(g.Key))
+                                   .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+            {
+                var kind = new ProblemKind
+                {
+                    Name = g.Key,
+                    Count = g.Count(),
+                    // A kind can be ticked only when every one of its findings has something to
+                    // propose. Half a kind being fixable would make the tick box a half-truth.
+                    Fixable = g.Any(f => f.Fixable)
+                };
+                kind.CheckedChanged = KindChecked;
+                _kinds.Add(kind);
+            }
+            IC_Kinds.ItemsSource = _kinds;
+
+            // A rebuilt list has no filter, and the summary line says what to do with it.
+            ApplyKindFilter(null);
+            if (_kinds.Count == 0) TB_KindsSummary.Text = "";
+        }
+
+        // A kind was ticked or unticked: push it down onto every row of that kind. Rows whose finding
+        // has nothing to propose stay untouched - Finding.Apply refuses a tick it cannot honour.
+        private void KindChecked(ProblemKind kind)
+        {
+            if (kind == null) return;
+            _syncingKind = true;
+            try
+            {
+                // A row is ticked when it HAS a problem of this kind. Ticking it puts every red cell on
+                // that row right, which is what the two coloured halves promise - so a QSO that also has
+                // a bad locator gets that mended too. Untick it and settle it by hand if that is wrong.
+                foreach (FixRow r in _rows)
+                    if (r.Has(kind.Name)) r.Apply = kind.Checked;
+            }
+            finally { _syncingKind = false; }
+            UpdateFixButton();
+        }
+
+        // CLICKING A KIND SHOWS ONLY THAT KIND. Fifteen bad locators among four thousand spellings are
+        // not findable by scrolling, and telling an operator to type the answer into a row they cannot
+        // reach is not an instruction. Clicking again shows everything.
+        private string _filterKind;
+
+        private void Kind_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var el = sender as FrameworkElement;
+            var kind = el == null ? null : el.DataContext as ProblemKind;
+            if (kind == null) return;
+
+            ApplyKindFilter(string.Equals(_filterKind, kind.Name, StringComparison.Ordinal) ? null : kind.Name);
+        }
+
+        private void Btn_ShowAll_Click(object sender, RoutedEventArgs e)
+        {
+            ApplyKindFilter(null);
+        }
+
+        private void ApplyKindFilter(string kindName)
+        {
+            _filterKind = kindName;
+
+            foreach (ProblemKind k in _kinds)
+                k.Selected = kindName != null && string.Equals(k.Name, kindName, StringComparison.Ordinal);
+
+            var view = System.Windows.Data.CollectionViewSource.GetDefaultView(_rows);
+            if (view != null)
+            {
+                view.Filter = kindName == null
+                    ? (Predicate<object>)null
+                    : o => { var r = o as FixRow; return r != null && r.Has(kindName); };
+                view.Refresh();
+            }
+
+            if (Btn_ShowAll != null)
+                Btn_ShowAll.Visibility = kindName == null ? Visibility.Collapsed : Visibility.Visible;
+
+            TB_KindsSummary.Text = kindName == null
+                ? "Click a kind to show only its QSOs. Checking a kind selects them all; you can then "
+                  + "uncheck any single one before pressing Fix."
+                : "Showing only: " + kindName + ".  Click it again, or Show all kinds, to see the rest.";
+        }
+
+        private void UpdateFixButton()
+        {
+            if (Btn_Fix == null) return;
+            if (_syncingKind) return;          // one update at the end of the sweep, not one per row
+            int n = _rows.Count(r => r.Apply);
+            Btn_Fix.IsEnabled = n > 0;
+            Btn_Fix.Content = n == 0
+                ? "Fix selected"
+                : "Fix " + n.ToString("N0") + " selected";
+        }
+
+        // The turning ring. Kept as a field so it can be stopped again - an animation left running on a
+        // hidden element goes on waking the render thread for as long as the window is open.
+        private System.Windows.Media.Animation.Storyboard _fixSpin;
+
+        private void ShowFixOverlay(int total, string title = "Fixing your log…", string unit = "QSOs")
+        {
+            TB_FixTitle.Text = title;
+            _overlayUnit = unit;
+            TB_FixProgress.Text = "0 of " + total.ToString("N0") + " " + unit;
+            PB_Fix.Value = 0;
+            FixOverlay.Visibility = Visibility.Visible;
+
+            if (_fixSpin == null)
+            {
+                var turn = new System.Windows.Media.Animation.DoubleAnimation(0, 360,
+                    new Duration(TimeSpan.FromSeconds(1.1)))
+                {
+                    RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+                };
+                System.Windows.Media.Animation.Storyboard.SetTarget(turn, FixSpin);
+                System.Windows.Media.Animation.Storyboard.SetTargetProperty(turn,
+                    new PropertyPath(System.Windows.Media.RotateTransform.AngleProperty));
+                _fixSpin = new System.Windows.Media.Animation.Storyboard();
+                _fixSpin.Children.Add(turn);
+            }
+            _fixSpin.Begin(this, true);
+        }
+
+        private string _overlayUnit = "QSOs";
+
+        private void UpdateFixOverlay(int done, int total)
+        {
+            TB_FixProgress.Text = done.ToString("N0") + " of " + total.ToString("N0") + " " + _overlayUnit;
+            PB_Fix.Value = total > 0 ? 100.0 * done / total : 0;
+        }
+
+        private void HideFixOverlay()
+        {
+            if (_fixSpin != null) _fixSpin.Stop(this);
+            FixOverlay.Visibility = Visibility.Collapsed;
+        }
+
+        // The one problem a database on this machine cannot answer: where the other station actually
+        // was. QRZ can, so it is asked - but only when the operator presses the button, and only for
+        // the rows that need it.
+        //
+        // QRZ answers with the grid the station has TODAY, which is not necessarily where it was during
+        // a QSO made twenty years ago. That is precisely why the answer becomes an ordinary suggestion
+        // with "QRZ" named as its evidence, to be ticked or ignored, rather than being written.
+        private const string LocatorProblem = "DX Locator is wrong";
+
+        // Run as part of the scan, not from a button. A wrong locator is the one fault this machine
+        // cannot answer on its own, and asking the operator to press something to find out what the
+        // answer might be is asking them to do the program's work. So the moment the scan knows which
+        // locators are wrong, it goes and looks - and whatever QRZ says arrives in the green half like
+        // any other suggestion, to be ticked or ignored.
+        //
+        // Quiet when there is nothing to ask about, no subscription, or no network: QrzGridFor returns
+        // null for all of those and the rows simply stay by-hand, which is what they were anyway.
+        // ASKED ONCE PER CALLSIGN, for as long as this window is open. The scan runs again after every
+        // Fix - that is how the list shrinks to what is still wrong - and the lookup sat inside it, so
+        // every fix sent the same callsigns back to QRZ. The ones QRZ has no grid for are exactly the
+        // ones that never leave the list, so those were re-asked every single time.
+        //
+        // A miss is remembered as well as a hit: "QRZ has nothing for this call" is an answer, and
+        // asking again in the same sitting will not change it.
+        private readonly Dictionary<string, string> _qrzGrid =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
+        private async Task FillLocatorsFromQrz(List<Finding> found)
+        {
+            List<Finding> rows = found
+                .Where(f => string.Equals(f.Problem, LocatorProblem, StringComparison.Ordinal)
+                            && !f.Fixable && f.Qso != null && !string.IsNullOrWhiteSpace(f.Qso.DXCall))
+                .ToList();
+            if (rows.Count == 0) return;
+
+            List<string> toAsk = rows.Select(f => f.Qso.DXCall.Trim())
+                                     .Where(c => !_qrzGrid.ContainsKey(c))
+                                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                                     .ToList();
+
+            if (toAsk.Count > 0)
+            {
+                ShowFixOverlay(toAsk.Count, "Asking QRZ about the locators…", "callsigns");
+                int done = 0;
+                foreach (string call in toAsk)
+                {
+                    string g = null;
+                    try { g = await MainWindow.QrzGridFor(call); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    _qrzGrid[call] = g;                 // null is remembered too
+                    UpdateFixOverlay(++done, toAsk.Count);
+                }
+                HideFixOverlay();
+            }
+
+            int asked = 0;
+            try
+            {
+                foreach (Finding f in rows)
+                {
+                    string grid;
+                    if (!_qrzGrid.TryGetValue(f.Qso.DXCall.Trim(), out grid)) grid = null;
+                    asked++;
+
+                    if (string.IsNullOrWhiteSpace(grid) || !LegalLocator.IsMatch(grid))
+                    {
+                        // WHY there is nothing to offer, said on the row itself. "No suggestion" alone
+                        // leaves an operator wondering whether the program failed or simply cannot
+                        // know - and here it is the second: we asked, and QRZ had nothing.
+                        f.Evidence = "QRZ has no grid";
+                        f.Suggested = "Check by hand — QRZ has no grid for this call";
+                        continue;
+                    }
+                    f.Field = "DXLocator";
+                    f.NewValue = grid;
+                    f.Suggested = grid;
+                    // Named, because QRZ knows where a station is TODAY and not necessarily where it
+                    // was during an old QSO. The operator seeing "QRZ" against a 2003 contact knows
+                    // exactly how much weight to give it.
+                    f.Evidence = "QRZ";
+                    f.Fixable = true;
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+            }
+        }
+
+        private async void Btn_Fix_Click(object sender, RoutedEventArgs e)
+        {
+            // THE ROWS DECIDE, NOT THE FINDINGS. A row can be worth writing for either of two reasons:
+            // the program proposed something, or the operator typed something. Gating on findings alone
+            // threw away every hand-typed answer - a checked row whose only finding was report-only
+            // (Club Log's "did not count", say) fell straight through this and Fix appeared to do
+            // nothing at all, which is exactly what it did.
+            List<FixRow> rows = _rows.Where(r => r.Apply && r.Fixable && r.Qso != null).ToList();
+            if (rows.Count == 0) return;
+
+            List<Finding> chosen = rows.SelectMany(r => r.Findings).Where(f => f.Fixable).ToList();
+            int typedCells = rows.Sum(r => r.Cells.Count(kv => kv.Value.UserEdited
+                                                               && kv.Value.Proposed.Trim().Length > 0));
+            if (chosen.Count == 0 && typedCells == 0) return;
+
+            var dal = DataAccess.GetInstance();
+            if (dal == null)
+            {
+                HolyMessageBox.ShowWarning("The log database is not open.", "Log Fixer", this);
+                return;
+            }
+
+            // The count of QSOs, not of findings: two problems on one contact are one row rewritten,
+            // and "83 corrections" against "80 QSOs" would look like a discrepancy. Hand-typed values
+            // are corrections too, and are counted with the rest.
+            int qsoCount = rows.Count;
+            int fixes = chosen.Count + typedCells;
+            if (!HolyMessageBox.ShowConfirm(
+                    fixes.ToString("N0") + " correction" + (fixes == 1 ? "" : "s")
+                    + " will be written to " + qsoCount.ToString("N0") + " QSO" + (qsoCount == 1 ? "" : "s")
+                    // NOT "restore it from Tools > Backups & Restore": that window lists only the dated
+                    // automatic backups (logDB-yyyy-MM-dd.db) and never these .bak safety copies, so
+                    // sending the operator there would send them somewhere the file is not.
+                    + ".\n\nYour WHOLE DATABASE — every log in it, not only this one — is copied first, "
+                    + "into\n" + (string.IsNullOrEmpty(dal.BackupsFolder) ? "your Backups folder"
+                                                                         : dal.BackupsFolder)
+                    + "\nas logDB.db.pre-fix-<date>.bak, where Tools > Backups & Restore lists it "
+                    + "alongside the daily backups and can put it back for you. Restoring it undoes "
+                    + "everything done since.\n\nFix them now?",
+                    "Log Fixer", HolyMsgType.Warning, this))
+                return;
+
+            string backup = SaveBackup(dal);
+            if (backup == null &&
+                !HolyMessageBox.ShowConfirm("The safety copy of the log could not be written.\n\nFix them "
+                    + "anyway?", "Log Fixer", HolyMsgType.Warning, this))
+                return;
+
+            Btn_Fix.IsEnabled = false;
+
+            // Driven by the CHECKED ROWS. Grouping the findings instead skipped any row that had no
+            // fixable finding on it - which is precisely the row somebody typed an answer into.
+            int total = rows.Count;
+            ShowFixOverlay(total);
+
+            int written = 0;
+            try
+            {
+
+                // ONE TRANSACTION, ONE TRIP TO THE BACKGROUND. This used to await a separate Task per
+                // QSO, each committing on its own: 4,376 spelling corrections meant 4,376 commits and
+                // 4,376 hops back to the UI thread, and the window sat on "fixing…" for minutes.
+                await Task.Run(() => dal.RunInTransaction(() =>
+                {
+                    foreach (FixRow r in rows)
+                    {
+                        QSO qso = r.Qso;
+                        foreach (Finding f in r.Findings) if (f.Fixable) ApplyTo(qso, f);
+
+                        // Anything the operator typed is written AFTER the suggestions, so their word
+                        // is the last one. A suggestion is applied by the finding that made it, which
+                        // knows to carry the entity number and the zones along with a country name; a
+                        // typed value goes to that one field alone.
+                        foreach (var kv in r.Cells)
+                            if (kv.Value.UserEdited && kv.Value.Proposed.Trim().Length > 0)
+                                WriteField(qso, kv.Key, kv.Value.Proposed.Trim());
+
+                        dal.Update(qso);
+                        written++;
+
+                        // A count that moves, so a long job is visibly a long job and not a dead one.
+                        if (written % 50 == 0 || written == total)
+                        {
+                            int done = written;
+                            Dispatcher.BeginInvoke(new Action(() => UpdateFixOverlay(done, total)));
+                        }
+                    }
+                }));
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HideFixOverlay();
+                HolyMessageBox.ShowError("Something went wrong while writing the corrections:\n\n" + ex.Message
+                    + "\n\nNothing was written — the whole job is one transaction, so the log is exactly "
+                    + "as it was."
+                    + (backup != null ? "\n\nThe copy taken before it started is in:\n" + backup : ""),
+                    "Log Fixer", this);
+                await RunCheck();
+                return;
+            }
+
+            // Down before the message box, so the operator is not reading "fixing" behind "fixed".
+            HideFixOverlay();
+
+            // THE PATH IS CLICKABLE, so "where is my safety copy" is answered by pressing it rather
+            // than by copying a line of text into Explorer. Clicking selects the file in its folder,
+            // which is what somebody who wants to keep it, move it or restore it needs to see.
+            string report = written.ToString("N0") + " QSO" + (written == 1 ? "" : "s") + " fixed."
+                + "\n\nClose and reopen the log window to see the new values.";
+
+            if (backup != null)
+            {
+                var links = new List<KeyValuePair<string, string>>
+                {
+                    new KeyValuePair<string, string>(
+                        "Your database as it was before this — click to open the folder:", backup)
+                };
+                HolyMessageBox.ShowWithLinks(report, "Log Fixer", HolyMsgType.Success, this,
+                                             links, ShowInFolder, 620);
+            }
+            else
+            {
+                HolyMessageBox.ShowSuccess(report, "Log Fixer", this);
+            }
+
+            // Re-check, so what is left on screen is what is still wrong.
+            await RunCheck();
+        }
+
+        private static void ApplyTo(QSO qso, Finding f)
+        {
+            switch (f.Field)
+            {
+                case "DXCall":
+                    qso.DXCall = f.NewValue;
+                    break;
+                case "Band":
+                    qso.Band = f.NewValue;
+                    break;
+                case "Continent":
+                    qso.Continent = f.NewValue;
+                    break;
+                case "DXLocator":
+                    qso.DXLocator = f.NewValue;
+                    break;
+                case "Activity":
+                    // Moved, not copied: the comment held the reference only because there was nowhere
+                    // else to put it, and leaving a copy behind would show it twice in every export.
+                    if (f.Program == "IOTA") qso.Iota = f.NewValue;
+                    else if (f.Program == "SOTA") qso.SotaRef = f.NewValue;
+                    else if (f.Program == "POTA") qso.PotaRef = f.NewValue;
+                    else if (f.Program == "WWFF") qso.WwffRef = f.NewValue;
+                    qso.Comment = string.Empty;
+                    break;
+                case "CountryName":
+                    // Spelling only. The entity number is already right, so nothing else moves - and
+                    // in particular the zones are left alone, because they belong to the entity and
+                    // the entity has not changed.
+                    qso.Country = f.NewValue;
+                    break;
+                case "Country":
+                    qso.Country = f.NewValue;
+                    // The entity travels with the name. Without this the log said one country and
+                    // counted as another, which is the harder error of the two to ever notice.
+                    if (f.NewCode > 0) qso.DxccCode = f.NewCode;
+                    if (!string.IsNullOrEmpty(f.NewDxcc)) qso.DXCC = f.NewDxcc;
+                    if (!string.IsNullOrEmpty(f.NewContinent)) qso.Continent = f.NewContinent;
+                    // The zones belong to the entity, so a country correction carries them along - a
+                    // Wake Island QSO cannot keep the CQ zone of the United States.
+                    if (f.NewCq > 0) qso.CQZone = f.NewCq.ToString();
+                    if (f.NewItu > 0) qso.ITUZone = f.NewItu.ToString();
+                    break;
+            }
+        }
+
+        // Opens Explorer with the file already selected, rather than merely opening the folder and
+        // leaving the operator to find it among the database's neighbours.
+        private static void ShowInFolder(string path)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(path)) return;
+                if (File.Exists(path))
+                    System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + path + "\"");
+                else
+                {
+                    string dir = Path.GetDirectoryName(path);
+                    if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                        System.Diagnostics.Process.Start("explorer.exe", "\"" + dir + "\"");
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // A plain file copy of the WHOLE DATABASE - every log in it, not only the one being fixed,
+        // because logDB.db is one file and there is no way to copy a single log out of it. Restoring
+        // it therefore undoes everything done since, which is why the confirmation says so.
+        //
+        // Named like the program's other safety copies, but note that Backups & Restore lists only the
+        // dated automatic backups (logDB-yyyy-MM-dd.db) and does NOT show these - the messages point at
+        // the file itself rather than at that window.
+        // Returns the path, or null when it could not be made.
+        private static string SaveBackup(DataAccess dal)
+        {
+            try
+            {
+                string path = dal.DbPath;
+                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
+                string backup = dal.SafetyCopyPath("fix");
+                if (backup == null) return null;
+                File.Copy(path, backup, false);
+                return backup;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
 
         // Double-clicking a row opens that QSO in the full editor, which is the only way to settle a
         // "Check by hand" finding - a missing band nobody can derive, a callsign with a note buried in
@@ -531,21 +1550,60 @@ namespace HolyLogger
         // the scan is then run again so the row disappears if the edit settled it.
         private async void FindingsGrid_MouseDoubleClick(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
-            Finding f = FindingsGrid.SelectedItem as Finding;
-            if (f == null || f.Qso == null) return;
+            // A FixRow, not a Finding. The table used to hold one row per problem and this cast said
+            // Finding; when it became one row per QSO the cast started failing on every double-click
+            // and the window simply did nothing - while the line at the foot went on inviting it.
+            FixRow row = FindingsGrid.SelectedItem as FixRow;
+
+            // Double-clicking usually lands on a cell rather than on an already-selected row, so fall
+            // back to whatever row was actually under the mouse.
+            if (row == null)
+            {
+                var cell = GridCopy.CellFrom(e.OriginalSource);
+                if (cell != null) row = cell.DataContext as FixRow;
+            }
+            if (row == null || row.Qso == null) return;
 
             try
             {
-                var editor = new QsoEditWindow(f.Qso) { Owner = this };
+                var editor = new QsoEditWindow(row.Qso) { Owner = this };
                 bool? saved = editor.ShowDialog();
                 if (saved == true) await RunCheck();
             }
             catch (Exception ex)
             {
                 Log.Swallow(ex);
-                MessageBox.Show(this, "This QSO could not be opened for editing:\n\n" + ex.Message,
-                                "Verify Log", MessageBoxButton.OK, MessageBoxImage.Warning);
+                HolyMessageBox.ShowWarning("This QSO could not be opened for editing:\n\n" + ex.Message,
+                                           "Log Fixer", this);
             }
+        }
+
+        // ESCAPE CLEARS THE HIGHLIGHT, and does nothing else. A selected row could not be deselected at
+        // all before - clicking elsewhere in a DataGrid only moves the selection - and Escape did the
+        // one thing it must not, which is close a window holding a page of ticks.
+        //
+        // Handled in Preview so it is caught before the grid or a cell's text box can act on it, and
+        // marked handled so it never reaches anything else. Escape now has exactly one meaning here.
+        private void Window_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != System.Windows.Input.Key.Escape) return;
+            if (FindingsGrid != null)
+            {
+                FindingsGrid.UnselectAll();
+                FindingsGrid.UnselectAllCells();
+            }
+            e.Handled = true;
+        }
+
+        // This table has no right-click menu of its own, so the two copy commands ARE its menu. Built
+        // fresh on every click because the cell under the mouse is part of what it offers.
+        private void FindingsGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        {
+            var menu = new ContextMenu { FontSize = 16 };
+            var cell = GridCopy.CellFrom(e.OriginalSource);
+            menu.Items.Add(GridCopy.CopyCellItem(GridCopy.TextOf(cell)));
+            menu.Items.Add(GridCopy.CopyRowsItem(FindingsGrid));
+            FindingsGrid.ContextMenu = menu;
         }
 
         private void Btn_Close_Click(object sender, RoutedEventArgs e)

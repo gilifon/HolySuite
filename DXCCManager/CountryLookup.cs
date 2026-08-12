@@ -203,7 +203,20 @@ namespace DXCCManager
             // Russia, while cty.dat matches "R1FJ" itself and reports Franz Josef Land. A full-callsign
             // exception is never overruled - that is Club Log's hand-curated core - and neither is
             // anything cty.dat could not match at all.
-            if (!cl.ExactCall && fromCty != null && fromCty.MatchedLength > cl.MatchedLength
+            //
+            // ...but only when Club Log's answer is a BARE FALLBACK. R1FJ in 2020 drops to "R" - one
+            // character, a whole call block - and that is not an answer about the station. EA8AAH is
+            // the case that showed the difference: Club Log matches "EA8", a real entity prefix and
+            // certainly the Canary Islands, while cty.dat carries a hand-written entry for that one
+            // callsign placing it in Spain. cty.dat has no dates, so such an entry stays true for ever
+            // once written; Club Log is kept with dates and knew better. Letting six matched characters
+            // beat three put two EA8 stations on one screen pointing opposite ways.
+            //
+            // Two characters is the line: a one or two letter match is a block ("R", "EA"), three is a
+            // prefix somebody assigned to a place ("EA8", "KP2", "R1F").
+            const int BlockFallback = 2;
+            if (!cl.ExactCall && cl.MatchedLength <= BlockFallback
+                && fromCty != null && fromCty.MatchedLength > cl.MatchedLength
                 && fromCty.Name != "Unknown")
                 return WithEntityNumber(fromCty);   // cty.dat's country, Club Log's number for it
 
@@ -370,6 +383,42 @@ namespace DXCCManager
 
         // The ARRL entity number for a country as it is WRITTEN in a logged QSO, or 0 when no database
         // knows that wording. Used by the ADIF export, so <dxcc> and <country> can never disagree.
+        // THE ENTITIES A STROKED CALLSIGN COULD NAME - one for each side of the stroke.
+        //
+        // M/ON4CJK could be England (the M) or Belgium (the ON4CJK), and which of the two is meant is
+        // decided by a convention, not by anything in the callsign itself. This program picks a side
+        // and is sometimes wrong. But the operator's own ADIF usually carries a <DXCC> for that
+        // contact, written by whoever was actually there - and when that number is ONE OF THESE TWO,
+        // the argument is over: the log is right and we were guessing.
+        //
+        // Empty for a callsign with no stroke: there is no second candidate, so there is nothing to
+        // defer to, and a log that disagrees with us there is a finding like any other.
+        public HashSet<int> CandidateEntityCodes(string callsign, DateTime whenUtc)
+        {
+            var codes = new HashSet<int>();
+            if (string.IsNullOrWhiteSpace(callsign)) return codes;
+            string call = callsign.Trim().ToUpperInvariant();
+            if (call.IndexOf('/') < 0) return codes;
+
+            foreach (string side in new[] { EntityResolver.OperatingPart(call), EntityResolver.OtherPart(call) })
+            {
+                if (string.IsNullOrEmpty(side)) continue;
+                DXCC d;
+                try { d = Resolve(side, whenUtc); }
+                catch { continue; }
+                if (d == null || !d.IsDxccEntity) continue;
+
+                int code = d.DxccCode;
+                if (code <= 0)
+                {
+                    try { code = EntityCodeForCountry(d.Name, whenUtc); }
+                    catch { code = 0; }
+                }
+                if (code > 0) codes.Add(code);
+            }
+            return codes;
+        }
+
         public int EntityCodeForCountry(string countryName)
         {
             string key = Flatten(countryName);

@@ -167,7 +167,7 @@ namespace HolyLogger
             {
                 Content = "Reset undo list",
                 Padding = new Thickness(14, 7, 14, 7),
-                FontSize = 13,
+                FontSize = 16,
                 Cursor = System.Windows.Input.Cursors.Hand,
                 Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x8B, 0x22, 0x22)),
                 Foreground = System.Windows.Media.Brushes.White,

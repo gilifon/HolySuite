@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -58,7 +58,7 @@ namespace HolyLogger
                     SP_Fields.Children.Add(new TextBlock
                     {
                         Text = field.Scope == CabrilloFieldScope.Personal ? "Station & operator" : "This contest",
-                        FontSize = 14,
+                        FontSize = 16,
                         FontWeight = FontWeights.Bold,
                         Foreground = ThemeManager.Brush("AccentBrush"),
                         Margin = new Thickness(0, 12, 0, 4)
@@ -71,7 +71,7 @@ namespace HolyLogger
 
                 var label = new TextBlock
                 {
-                    FontSize = 13,
+                    FontSize = 16,
                     Margin = new Thickness(0, 6, 0, 2),
                     Foreground = ThemeManager.Brush("TextBrush")
                 };
@@ -83,7 +83,7 @@ namespace HolyLogger
                 FrameworkElement input;
                 if (field.Input == CabrilloFieldInput.Choice)
                 {
-                    var combo = new ComboBox { FontSize = 13, Height = 26, IsEnabled = !field.ReadOnly };
+                    var combo = new ComboBox { FontSize = 16, Height = 26, IsEnabled = !field.ReadOnly };
                     combo.Items.Add(string.Empty);   // blank = not specified
                     foreach (var c in field.Choices) combo.Items.Add(c);
                     combo.SelectedItem = combo.Items.Contains(val) ? val : string.Empty;
@@ -94,7 +94,7 @@ namespace HolyLogger
                 {
                     var tb = new TextBox
                     {
-                        FontSize = 13,
+                        FontSize = 16,
                         Text = val,
                         VerticalContentAlignment = VerticalAlignment.Center,
                         IsReadOnly = field.ReadOnly,
@@ -125,7 +125,7 @@ namespace HolyLogger
                     SP_Fields.Children.Add(new TextBlock
                     {
                         Text = field.Hint,
-                        FontSize = 11,
+                        FontSize = 16,
                         TextWrapping = TextWrapping.Wrap,
                         Foreground = ThemeManager.Brush("MutedTextBrush"),
                         Margin = new Thickness(0, 1, 0, 0)

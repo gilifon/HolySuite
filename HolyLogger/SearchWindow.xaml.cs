@@ -147,11 +147,44 @@ namespace HolyLogger
             if (!many) HighlightRow(row);
 
             var menu = many ? BuildSelectionContextMenu(picked) : BuildRowContextMenu(qso, row);
+
+            // Copy the cell under the mouse, or the selected rows. Added here because only this
+            // handler knows which cell was right-clicked - see GridCopy.
+            AddCopyItems(menu, ResultsGrid, e.OriginalSource);
+
             menu.Closed += (s, _) => { if (!_hlKeep) ClearHighlight(); _hlKeep = false; };
             menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
             menu.PlacementTarget = ResultsGrid;
             menu.IsOpen = true;
             e.Handled = true;   // suppress any default context menu
+        }
+
+        // A separator and the two copy items, in the menu's own style. The twin of the main window's
+        // AddCopyItems; both tables get the same two commands so the habit carries between them.
+        private static void AddCopyItems(ContextMenu menu, DataGrid grid, object rightClickedOn)
+        {
+            if (menu == null || grid == null) return;
+            try
+            {
+                var cell = GridCopy.CellFrom(rightClickedOn);
+                string cellText = GridCopy.TextOf(cell);
+
+                // The FIRST REAL MenuItem, not Items[0]: this menu opens with a title block naming the
+                // QSO, so index 0 is not a MenuItem and the style came back null - which left the two
+                // copy lines in the default font. The separator is matched the same way.
+                Style itemStyle = null, sepStyle = null;
+                foreach (object o in menu.Items)
+                {
+                    if (itemStyle == null && o is MenuItem) itemStyle = ((MenuItem)o).Style;
+                    if (sepStyle == null && o is Separator) sepStyle = ((Separator)o).Style;
+                    if (itemStyle != null && sepStyle != null) break;
+                }
+
+                menu.Items.Add(sepStyle == null ? new Separator() : new Separator { Style = sepStyle });
+                menu.Items.Add(GridCopy.CopyCellItem(cellText, itemStyle));
+                menu.Items.Add(GridCopy.CopyRowsItem(grid, itemStyle));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // The same styled menu resources the main window's log right-click menu uses (rounded white card,
@@ -255,7 +288,7 @@ namespace HolyLogger
             {
                 Text = glyph,
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 15,
+                FontSize = 16,
                 Foreground = color,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center
@@ -321,7 +354,7 @@ namespace HolyLogger
             {
                 Content = "OK",
                 Width = 80,
-                FontSize = 15,
+                FontSize = 16,
                 Padding = new Thickness(10, 4, 10, 4),
                 Cursor = Cursors.Hand
             };
@@ -408,7 +441,7 @@ namespace HolyLogger
             {
                 Content = "OK",
                 Width = 80,
-                FontSize = 15,
+                FontSize = 16,
                 Padding = new Thickness(10, 4, 10, 4),
                 Cursor = Cursors.Hand
             };
@@ -1160,6 +1193,9 @@ namespace HolyLogger
         // a callsign immediately.
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            // Ctrl+C: tell every template column what it stands for, or the copy is headings only.
+            GridCopy.Enable(ResultsGrid);
+
             // Prefix holds 6 characters, suffix 10 - measured rather than guessed in pixels, so the
             // boxes stay right if the theme font or size ever changes.
             SizeToCharacters(TB_Prefix, 6);
@@ -2213,7 +2249,7 @@ namespace HolyLogger
             var list = shown == null ? new System.Collections.Generic.List<QSO>() : shown.ToList();
             if (list.Count == 0)
             {
-                HolyMessageBox.ShowWarning("There are no QSOs on screen to check.", "Verify", this);
+                HolyMessageBox.ShowWarning("There are no QSOs on screen to check.", "Log Verifier", this);
                 return;
             }
 
@@ -2230,7 +2266,7 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not check these QSOs.\n\n" + ex.Message, "Verify", this);
+                HolyMessageBox.ShowError("Could not check these QSOs.\n\n" + ex.Message, "Log Verifier", this);
             }
         }
 

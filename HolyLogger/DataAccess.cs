@@ -150,6 +150,70 @@ namespace HolyLogger
         // The live database file itself (logDB.db), for the in-app Restore feature.
         public string DbPath => dbPath;
 
+        // WHERE A SAFETY COPY GOES, decided in ONE place. A safety copy is the whole database, taken
+        // the moment before something rewrites it - the Log Fixer applying corrections, or a Restore
+        // replacing the file. They used to be written by appending to the database's own path, which
+        // landed them beside logDB.db while the daily backups went into Backups: two folders, for no
+        // reason beyond how the code happened to be written, and an operator told "a copy was saved"
+        // had to be told which of the two to look in.
+        //
+        // `kind` becomes part of the name - "fix", "restore" - so the Backups window can say what each
+        // copy was taken before without being taught about every caller.
+        //
+        // Returns null when there is no database to copy, which the callers already treat as "no copy
+        // was made" and ask the operator whether to go on regardless.
+        public string SafetyCopyPath(string kind)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath)) return null;
+                string dir = BackupsFolder;
+                Directory.CreateDirectory(dir);
+                // One fewer, to leave room for the copy about to be made.
+                PruneSafetyCopies(dir, SafetyCopiesToKeep - 1);
+                return Path.Combine(dir, "logDB.db.pre-" + kind + "-"
+                                         + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak");
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // How many safety copies to keep. Unlike the daily backups, these are made on DEMAND - every
+        // press of Fix in the Log Fixer makes another - and nothing was ever deleting them: eight
+        // copies of a 131 MB database had quietly taken a gigabyte of the operator's disk in one
+        // afternoon's testing. Four is enough to undo a run of corrections and think better of it a
+        // few steps later, which is what these exist for.
+        private const int SafetyCopiesToKeep = 4;
+
+        // Runs in two places, which is why `keep` is a parameter rather than the constant: BEFORE a new
+        // copy is written (keeping one fewer, so the count afterwards is exactly the limit), and at
+        // STARTUP (keeping the full number). Startup matters because copies are only ever made on
+        // demand - an operator who fixes a log once and never again would otherwise keep whatever was
+        // lying about for ever, including the ones just moved in from the old location.
+        //
+        // Both folders are swept, for the copies older versions left beside the database in case the
+        // move at startup could not shift one.
+        private void PruneSafetyCopies(string backupsDir, int keep)
+        {
+            try
+            {
+                var all = new List<string>();
+                foreach (string dir in new[] { backupsDir, DataFolder })
+                {
+                    if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir)) continue;
+                    if (all.Count > 0 && string.Equals(dir, backupsDir, StringComparison.OrdinalIgnoreCase)) continue;
+                    all.AddRange(Directory.GetFiles(dir, "logDB.db.pre-*.bak"));
+                }
+
+                // Newest first by the timestamp in the name, which sorts chronologically as text.
+                foreach (string f in all.OrderByDescending(p => Path.GetFileName(p), StringComparer.OrdinalIgnoreCase)
+                                        .Skip(Math.Max(0, keep)))
+                {
+                    try { File.Delete(f); } catch (Exception ex) { Log.Swallow(ex); }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Outcome of RestoreFromBackup: Ok + where the operator's pre-restore log was safely kept, or a
         // human-readable Error and nothing was changed (the original database is exactly as it was).
         public class RestoreResult
@@ -191,7 +255,15 @@ namespace HolyLogger
                     try { con?.Close(); con?.Dispose(); } catch (Exception ex) { Log.Swallow(ex); }
                     con = null;
 
-                    string safetyCopyPath = Path.Combine(Path.GetDirectoryName(dbPath), safetyCopyFileName);
+                    // A FULL PATH IS HONOURED. Safety copies now go to the Backups folder alongside the
+                    // daily ones (see SafetyCopyPath), so the caller passes where it wants this one to
+                    // land. A bare filename still means "beside the database", which is what every
+                    // older caller meant.
+                    string safetyCopyPath = Path.IsPathRooted(safetyCopyFileName)
+                        ? safetyCopyFileName
+                        : Path.Combine(Path.GetDirectoryName(dbPath), safetyCopyFileName);
+                    try { Directory.CreateDirectory(Path.GetDirectoryName(safetyCopyPath)); }
+                    catch (Exception ex) { Log.Swallow(ex); }
 
                     if (File.Exists(dbPath))
                         File.Move(dbPath, safetyCopyPath);   // the undo path - this file is never deleted
@@ -242,10 +314,31 @@ namespace HolyLogger
                 string backupDir = Path.Combine(Path.GetDirectoryName(dbPath), "Backups");
                 Directory.CreateDirectory(backupDir);
 
+                // Safety copies used to be written beside the database; they belong in here with
+                // everything else. Moved rather than explained: a line in the Backups window saying
+                // "some older copies are still over there" is a note about the program's own history,
+                // which is nothing an operator should have to read. Same volume, so this is a rename
+                // and costs nothing however large the files are.
+                foreach (string stray in Directory.GetFiles(Path.GetDirectoryName(dbPath), "logDB.db.pre-*.bak"))
+                {
+                    try
+                    {
+                        string moved = Path.Combine(backupDir, Path.GetFileName(stray));
+                        if (!File.Exists(moved)) File.Move(stray, moved);
+                        else File.Delete(stray);          // already there: the stray is the duplicate
+                    }
+                    catch (Exception ex) { Log.Swallow(ex); }
+                }
+
                 string todays = Path.Combine(backupDir,
                     "logDB-" + DateTime.Now.ToString("yyyy-MM-dd") + ".db");
                 if (!File.Exists(todays))
                     File.Copy(dbPath, todays);
+
+                // The safety copies get the same treatment as the daily ones, at the same moment. They
+                // are only ever created on demand, so without this a folder full of them would simply
+                // sit there until the operator happened to run the Log Fixer again.
+                PruneSafetyCopies(backupDir, SafetyCopiesToKeep);
 
                 // Prune: the date-stamped names sort chronologically, so ordering by name
                 // descending puts the newest first.
@@ -788,6 +881,30 @@ Environment.NewLine +
             return faultyQso;
             }
         }
+        // MANY WRITES AS ONE COMMIT. SQLite gives every statement its own transaction unless told
+        // otherwise, and a commit means waiting for the disk - which is invisible for one QSO and
+        // ruinous for thousands. The Log Fixer correcting 4,376 country spellings did 4,376 commits
+        // and appeared to hang; inside one transaction the same work is a single commit at the end.
+        //
+        // The lock is the same one every writer here takes, and Monitor is re-entrant, so the Update
+        // calls inside the action nest quietly. SQLite's transactions belong to the CONNECTION, so
+        // those calls join this one without having to be told about it.
+        //
+        // If the action throws, nothing is committed: the log is left exactly as it was.
+        public void RunInTransaction(Action work)
+        {
+            if (work == null) return;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) { work(); return; }
+                using (var tx = con.BeginTransaction())
+                {
+                    work();
+                    tx.Commit();
+                }
+            }
+        }
+
         public void Update(QSO qso)
         {
             lock (_dbLock)
@@ -2204,6 +2321,16 @@ Environment.NewLine +
             try
             {
                 using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_log_id ON qso(log_id)", con))
+                    cmd.ExecuteNonQuery();
+
+                // THE COPY-TO-LOG LINK, and the reason the Log Fixer appeared to hang. Update() asks
+                // "which rows are copies of this one?" for EVERY QSO it writes, and without an index
+                // that question is a full scan of the qso table. Measured on this operator's 37,837-QSO
+                // database: 100 of those lookups took 13 seconds, so fixing 3,292 QSOs spent about
+                // SEVEN MINUTES in that one query before a single row was written. With the index the
+                // same 3,292 lookups take 0.72 seconds, and building it costs 165 ms, once.
+                using (var cmd = new SQLiteCommand(
+                    "CREATE INDEX IF NOT EXISTS idx_qso_source_qso_id ON qso(source_qso_id)", con))
                     cmd.ExecuteNonQuery();
             }
             catch { /* an index is an optimization only; never block startup on it */ }

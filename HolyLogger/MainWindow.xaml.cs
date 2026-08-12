@@ -596,6 +596,9 @@ namespace HolyLogger
             // (Pinned My Favorite Channels is reopened in MainWindow_Loaded, not here: ChannelsWindow
             //  sets Owner = this, and WPF refuses to take an owner that has not been shown yet.)
 
+            // Ctrl+C: tell every template column what it stands for, or the copy is headings only.
+            GridCopy.Enable(QSODataGrid);
+
             ApplyLogColumnLayout();
             ToggleMatrixControl();
             ToggleAzimuthControl();
@@ -2433,7 +2436,7 @@ namespace HolyLogger
             TextBox tb = new TextBox
             {
                 Text = currentText,
-                FontSize = 14,
+                FontSize = 16,
                 Height = 28,
                 VerticalContentAlignment = VerticalAlignment.Center,
                 Padding = new Thickness(4, 0, 4, 0),
@@ -2845,6 +2848,12 @@ namespace HolyLogger
             // = Top puts the menu directly ABOVE the grid, its bottom edge at the grid's top (just
             // above the header row), so it never covers any QSO data.
             var menu = BuildQsoRowContextMenu(qso);
+
+            // The two copy items are added HERE rather than inside BuildQsoRowContextMenu, because
+            // only this handler knows which CELL the mouse was over - by the time the item is clicked
+            // the pointer has moved onto the menu.
+            AddCopyItems(menu, QSODataGrid, e.OriginalSource);
+
             menu.PlacementTarget = QSODataGrid;
             menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
             // Don't leave the row highlighted blue once the menu goes away (e.g. dismissed with
@@ -2856,6 +2865,35 @@ namespace HolyLogger
                 QSODataGrid.UnselectAll();
             };
             QSODataGrid.ContextMenu = menu;
+        }
+
+        // A separator and the two copy items, in the menu's own style so they do not look bolted on.
+        // Shared by the log table and the Log Workshop; see GridCopy for why copying is two commands.
+        private static void AddCopyItems(ContextMenu menu, DataGrid grid, object rightClickedOn)
+        {
+            if (menu == null || grid == null) return;
+            try
+            {
+                var cell = GridCopy.CellFrom(rightClickedOn);
+                string cellText = GridCopy.TextOf(cell);
+
+                // The FIRST REAL MenuItem, not Items[0]: both menus open with a title block naming the
+                // QSO, so index 0 is not a MenuItem at all and the style came back null - which is why
+                // the two copy lines were drawn in the default font while everything above them was
+                // not. The separator is matched the same way.
+                Style itemStyle = null, sepStyle = null;
+                foreach (object o in menu.Items)
+                {
+                    if (itemStyle == null && o is MenuItem) itemStyle = ((MenuItem)o).Style;
+                    if (sepStyle == null && o is Separator) sepStyle = ((Separator)o).Style;
+                    if (itemStyle != null && sepStyle != null) break;
+                }
+
+                menu.Items.Add(sepStyle == null ? new Separator() : new Separator { Style = sepStyle });
+                menu.Items.Add(GridCopy.CopyCellItem(cellText, itemStyle));
+                menu.Items.Add(GridCopy.CopyRowsItem(grid, itemStyle));
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Parsed-once styles for the log-row context menu (rounded card, hover highlights, icons).
@@ -2964,7 +3002,7 @@ namespace HolyLogger
             {
                 Text = glyph,
                 FontFamily = new FontFamily("Segoe MDL2 Assets"),
-                FontSize = 15,
+                FontSize = 16,
                 Foreground = color,
                 VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Center
@@ -7062,7 +7100,7 @@ namespace HolyLogger
             var modeText = new TextBlock
             {
                 Text = mode,
-                FontSize = 9,
+                FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 // Foreground inherited from the cluster window's themed TextElement.Foreground.
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -7137,7 +7175,7 @@ namespace HolyLogger
             var bandText = new TextBlock
             {
                 Text = band,
-                FontSize = 9,
+                FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 // Foreground inherited from the cluster window's themed TextElement.Foreground.
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -7258,7 +7296,7 @@ namespace HolyLogger
             var bandSpotCountText = new TextBlock
             {
                 Text = "0",
-                FontSize = 9,
+                FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 Foreground = Brushes.White,
                 HorizontalAlignment = HorizontalAlignment.Center,
@@ -8612,6 +8650,12 @@ namespace HolyLogger
         {
             if (string.IsNullOrWhiteSpace(call) || dal == null) return;
             call = call.Trim();
+
+            // NO LOG, NOTHING TO SAY. With no log open no QSO can be made, so how eQSL and LoTW would
+            // treat one is not a question yet. Deleting the last log used to be answered with this
+            // window - a report about uploading contacts that cannot be logged at all - which is
+            // noise at exactly the moment the operator is being told to go and open a log.
+            if (!dal.HasActiveLog) return;
 
             // NEVER INTERRUPT AN IMPORT, OR A DIALOG THAT IS ALREADY ASKING SOMETHING. This alert is
             // modal and owned by the main window, so it opens ON TOP of whatever else is up - first over
@@ -11264,6 +11308,30 @@ namespace HolyLogger
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             return true;
+        }
+
+        // QRZ's grid square for one callsign, for windows that are not this one - the Log Fixer offers
+        // it as a suggested DX Locator. The lookup needs this window's QRZ session key and its shared
+        // HTTP client, so it stays here and is reached through the running main window rather than
+        // being duplicated with a second session of its own.
+        //
+        // Returns null for anything that did not work: no main window, no subscription, no such call,
+        // network down. The caller treats null as "QRZ had no answer", which is the truth in every one
+        // of those cases and is never worth four different messages.
+        internal static async Task<string> QrzGridFor(string callsign)
+        {
+            if (string.IsNullOrWhiteSpace(callsign)) return null;
+            MainWindow mw = null;
+            if (Application.Current != null)
+                foreach (Window w in Application.Current.Windows)
+                    if (w is MainWindow) { mw = (MainWindow)w; break; }
+            if (mw == null) return null;
+            try
+            {
+                var r = await mw.GetQrzForCall(callsign);
+                return string.IsNullOrWhiteSpace(r.Grid) ? null : r.Grid.Trim().ToUpperInvariant();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
         }
 
         private async Task<(string Name, string Grid)> GetQrzForCall(string callsign)

@@ -1363,7 +1363,7 @@ namespace HolyLogger
                 TB_MissingHonor.Inlines.Add(new System.Windows.Documents.Run($"{missingForHonor} for Honor Roll "));
                 TB_MissingHonor.Inlines.Add(new System.Windows.Documents.Run($"({honorTarget})")
                 {
-                    FontSize = 12,
+                    FontSize = 16,
                     FontWeight = FontWeights.Normal,
                     Foreground = System.Windows.Media.Brushes.Black,
                 });
@@ -1375,7 +1375,7 @@ namespace HolyLogger
                 TB_MissingHonor.Inlines.Add(new System.Windows.Documents.Run("Honor Roll reached "));
                 TB_MissingHonor.Inlines.Add(new System.Windows.Documents.Run($"({honorTarget})")
                 {
-                    FontSize = 12,
+                    FontSize = 16,
                     FontWeight = FontWeights.Normal,
                     Foreground = System.Windows.Media.Brushes.Black,
                 });
@@ -2562,7 +2562,7 @@ namespace HolyLogger
                 HeadersVisibility = DataGridHeadersVisibility.All,   // row-number headers too, like a "Line" column
                 GridLinesVisibility = DataGridGridLinesVisibility.All,
                 SelectionMode = DataGridSelectionMode.Single,
-                FontSize = 13
+                FontSize = 16
             };
             grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
             ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
@@ -4362,7 +4362,7 @@ namespace HolyLogger
                 Child = new TextBlock
                 {
                     Text                = text ?? "",
-                    FontSize            = 14,
+                    FontSize = 16,
                     FontWeight          = bold ? FontWeights.Bold : FontWeights.Normal,
                     TextAlignment       = align,
                     HorizontalAlignment = HorizontalAlignment.Stretch,

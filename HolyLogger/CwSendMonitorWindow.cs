@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -122,7 +122,7 @@ namespace HolyLogger
             var caption = new TextBlock
             {
                 Text = title,
-                FontSize = 12,
+                FontSize = 16,
                 Foreground = Brushes.DimGray,
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -132,7 +132,7 @@ namespace HolyLogger
             _wpmLabel = new TextBlock
             {
                 Text = "~" + Math.Round(_wpm) + " WPM",
-                FontSize = 12,
+                FontSize = 16,
                 Foreground = Brushes.DimGray,
                 HorizontalAlignment = HorizontalAlignment.Right,
                 VerticalAlignment = VerticalAlignment.Center

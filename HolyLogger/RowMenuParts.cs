@@ -1,4 +1,4 @@
-using HolyParser;
+﻿using HolyParser;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
@@ -88,7 +88,7 @@ namespace HolyLogger
                 Content = configured ? name : name + "   (not configured)",
                 IsEnabled = configured,
                 Foreground = ItemTextBrush,
-                FontSize = 14,
+                FontSize = 16,
                 VerticalAlignment = VerticalAlignment.Center
             };
         }
@@ -130,7 +130,7 @@ namespace HolyLogger
             {
                 Content = "Close",
                 Width = 80,
-                FontSize = 15,
+                FontSize = 16,
                 Padding = new Thickness(10, 4, 10, 4),
                 Cursor = Cursors.Hand
             };

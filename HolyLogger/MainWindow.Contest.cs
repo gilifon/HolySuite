@@ -303,7 +303,7 @@ namespace HolyLogger
             col.Children.Add(new TextBlock
             {
                 Text = label,
-                FontSize = 11,
+                FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 Foreground = blue,
                 HorizontalAlignment = HorizontalAlignment.Center

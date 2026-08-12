@@ -94,23 +94,23 @@
                        a leading stroke stays with the prefix (4X/OK1 + DL) and a trailing one with the
                        suffix (4Z5 + SL/M). Either box alone is a valid search. -->
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
-                    <TextBlock Text="Prefix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                    <TextBlock Text="Prefix:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                ToolTip="How the callsign STARTS. Cut it wherever you like — 4Z, 4Z4 and 4Z4DX all find 4Z4DX."/>
                     <!-- Widths are recomputed in Window_Loaded to fit exactly 7 and 10 characters of
                          the actual font; these are only the fallback if that measurement is skipped. -->
-                    <TextBox x:Name="TB_Prefix" Width="72" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                    <TextBox x:Name="TB_Prefix" Width="72" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                              ToolTip="How the callsign STARTS. Cut it wherever you like — 4Z, 4Z4 and 4Z4DX all find 4Z4DX."
                              TextChanged="Prefix_TextChanged" KeyDown="SearchField_KeyDown"/>
-                    <TextBlock Text="Suffix:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,0,6,0"
+                    <TextBlock Text="Suffix:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="6,0,6,0"
                                ToolTip="How the callsign ENDS: DX, 4DX, SL/M — or the whole call. Either box on its own is enough."/>
-                    <TextBox x:Name="TB_Suffix" Width="98" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                    <TextBox x:Name="TB_Suffix" Width="98" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                              ToolTip="How the callsign ENDS: DX, 4DX, SL/M — or the whole call. Either box on its own is enough."
                              TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                   </StackPanel>
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
-                    <TextBlock Text="Country:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                    <TextBlock Text="Country:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                ToolTip="Type the country name or its ARRL entity number — 336 finds Israel"/>
-                    <ComboBox x:Name="CB_Country" Width="210" FontSize="14" VerticalAlignment="Center"
+                    <ComboBox x:Name="CB_Country" Width="210" FontSize="16" VerticalAlignment="Center"
                               IsEditable="True" StaysOpenOnEdit="True" IsTextSearchEnabled="False" MaxDropDownHeight="280"
                               IsSynchronizedWithCurrentItem="False"
                               ToolTip="Type the country name or its ARRL entity number — 336 finds Israel"
@@ -155,26 +155,26 @@
                   </StackPanel>
 
                   <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,8,0">
-                    <TextBlock Text="Frequency:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <TextBox x:Name="TB_Freq" Width="84" FontSize="14" VerticalAlignment="Bottom"
+                    <TextBlock Text="Frequency:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <TextBox x:Name="TB_Freq" Width="84" FontSize="16" VerticalAlignment="Bottom"
                              TextChanged="Freq_TextChanged" KeyDown="SearchField_KeyDown"/>
-                    <TextBlock Text="MHz" FontSize="11" FontWeight="Bold" VerticalAlignment="Bottom"
+                    <TextBlock Text="MHz" FontSize="16" FontWeight="Bold" VerticalAlignment="Bottom"
                                Margin="4,0,0,0" Foreground="{DynamicResource TextBrush}"/>
                   </StackPanel>
 
                   <!-- Band, Mode and Submode: same panel, so each sits immediately right of the last. -->
                   <StackPanel x:Name="BandGroup" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="Band:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <ComboBox x:Name="CB_Band" Width="90" FontSize="14" VerticalAlignment="Center"
+                    <TextBlock Text="Band:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox x:Name="CB_Band" Width="90" FontSize="16" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
-                    <TextBlock Text="Mode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,6,0"/>
-                    <ComboBox x:Name="CB_Mode" Width="90" FontSize="14" VerticalAlignment="Center"
+                    <TextBlock Text="Mode:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,6,0"/>
+                    <ComboBox x:Name="CB_Mode" Width="90" FontSize="16" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
-                    <TextBlock Text="Submode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,6,0"/>
+                    <TextBlock Text="Submode:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="8,0,6,0"/>
                     <!-- Filled from the log, like Band and Mode. It used to offer the full official ADIF
                          submode enumeration (~150 values), which meant scrolling past a hundred and forty
                          choices that could only ever return nothing. -->
-                    <ComboBox x:Name="CB_Submode" Width="110" FontSize="14" VerticalAlignment="Center"
+                    <ComboBox x:Name="CB_Submode" Width="110" FontSize="16" VerticalAlignment="Center"
                               SelectionChanged="Filter_Changed"/>
                   </StackPanel>
 
@@ -189,42 +189,42 @@
                        here are only the fallback, Window_Loaded measures the real contents. -->
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="0,6,0,0">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                      <TextBlock Text="Name:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_Name" Width="150" FontSize="14" VerticalAlignment="Center"
+                      <TextBlock Text="Name:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_Name" Width="150" FontSize="16" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                      <TextBlock Text="DX Locator:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="DX Locator:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="The worked station's grid square, e.g. KM72"/>
-                      <TextBox x:Name="TB_Locator" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                      <TextBox x:Name="TB_Locator" Width="90" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                                ToolTip="The worked station's grid square, e.g. KM72"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                      <TextBlock Text="CQ zone:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBlock Text="CQ zone:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                       <!-- Filled from the log, like Band / Mode: the zones offered are the zones worked.
                            Sorted as numbers, so 9 comes before 10 rather than after 1. -->
-                      <ComboBox x:Name="CB_CqZone" Width="62" FontSize="14" VerticalAlignment="Center"
+                      <ComboBox x:Name="CB_CqZone" Width="62" FontSize="16" VerticalAlignment="Center"
                                 ToolTip="CQ zones this log actually contains"
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                      <TextBlock Text="ITU zone:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <ComboBox x:Name="CB_ItuZone" Width="62" FontSize="14" VerticalAlignment="Center"
+                      <TextBlock Text="ITU zone:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_ItuZone" Width="62" FontSize="16" VerticalAlignment="Center"
                                 ToolTip="ITU zones this log actually contains"
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                      <TextBlock Text="Continent:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBlock Text="Continent:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
                       <!-- Two-letter codes, so the box only needs room for the text + the arrow. Filled from
                            the log; driven and locked by the callsign prefix, like Band is by Frequency. -->
-                      <ComboBox x:Name="CB_Continent" Width="72" FontSize="14" VerticalAlignment="Center"
+                      <ComboBox x:Name="CB_Continent" Width="72" FontSize="16" VerticalAlignment="Center"
                                 ToolTip="EU, NA, SA, AS, AF, OC, AN" SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,12,0">
-                      <TextBlock Text="State:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="State:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="The worked station's state / province, e.g. CA"/>
-                      <ComboBox x:Name="CB_State" Width="72" FontSize="14" VerticalAlignment="Center"
+                      <ComboBox x:Name="CB_State" Width="72" FontSize="16" VerticalAlignment="Center"
                                 ToolTip="The worked station's state / province — the ones this log contains"
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
@@ -234,9 +234,9 @@
                            Holyland contest. In every other contest it is a serial number, so the list read
                            as a column of squares called 1538, 155, 1573. Exchange is also what this field
                            is called in the log table, on the main form and in the QSO editor. -->
-                      <TextBlock Text="Exchange:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="Exchange:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="What the worked station SENT — their Holyland square in the Holyland contest, a serial number in others"/>
-                      <ComboBox x:Name="CB_Square" Width="90" FontSize="14" VerticalAlignment="Center"
+                      <ComboBox x:Name="CB_Square" Width="90" FontSize="16" VerticalAlignment="Center"
                                 ToolTip="What the worked station SENT — their Holyland square in the Holyland contest, a serial number in others. The list is what this log contains."
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
@@ -249,27 +249,27 @@
                   <Border Background="#DCEBFB" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                      <TextBlock Text="My callsign:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="My callsign:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"/>
-                      <ComboBox x:Name="CB_MyCall" Width="130" FontSize="14" VerticalAlignment="Center"
+                      <ComboBox x:Name="CB_MyCall" Width="130" FontSize="16" VerticalAlignment="Center"
                                 ToolTip="The station callsign the QSO was logged UNDER (yours), not the station worked"
                                 SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                      <TextBlock Text="Operator:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_Operator" Width="110" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                      <TextBlock Text="Operator:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_Operator" Width="110" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                      <TextBlock Text="My grid:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="My grid:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="Your own grid square"/>
-                      <TextBox x:Name="TB_MyGrid" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                      <TextBox x:Name="TB_MyGrid" Width="90" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                      <TextBlock Text="My square:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="My square:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="Your sent Holyland square"/>
-                      <TextBox x:Name="TB_MySquare" Width="90" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                      <TextBox x:Name="TB_MySquare" Width="90" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                   </StackPanel>
@@ -278,27 +278,27 @@
                   <!-- Row 4: the confirmation sources - light red background. -->
                   <Border Background="#FBE1E1" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-                    <TextBlock Text="Confirmed on:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                    <TextBlock Text="Confirmed on:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0"/>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                      <TextBlock Text="LoTW:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <ComboBox x:Name="CB_Lotw" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"
+                      <TextBlock Text="LoTW:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Lotw" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"
                                 ToolTip="Confirmed by the other station in Logbook of The World"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                      <TextBlock Text="QRZ:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <ComboBox x:Name="CB_Qrz" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                      <TextBlock Text="QRZ:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Qrz" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                      <TextBlock Text="eQSL:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <ComboBox x:Name="CB_Eqsl" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                      <TextBlock Text="eQSL:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Eqsl" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,16,0">
-                      <TextBlock Text="Club Log:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <ComboBox x:Name="CB_Clublog" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                      <TextBlock Text="Club Log:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Clublog" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                      <TextBlock Text="Paper:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <ComboBox x:Name="CB_Paper" Width="120" FontSize="14" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
+                      <TextBlock Text="Paper:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <ComboBox x:Name="CB_Paper" Width="120" FontSize="16" VerticalAlignment="Center" SelectionChanged="Filter_Changed"/>
                     </StackPanel>
                   </StackPanel>
                   </Border>
@@ -307,30 +307,30 @@
                   <Border Background="#E3E3E3" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                      <TextBlock Text="Prop mode:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_PropMode" Width="80" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                      <TextBlock Text="Prop mode:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_PropMode" Width="80" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                      <TextBlock Text="Sat name:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_SatName" Width="100" FontSize="14" VerticalAlignment="Center" CharacterCasing="Upper"
+                      <TextBlock Text="Sat name:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_SatName" Width="100" FontSize="16" VerticalAlignment="Center" CharacterCasing="Upper"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                      <TextBlock Text="Soapbox:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                      <TextBox x:Name="TB_Soapbox" Width="150" FontSize="14" VerticalAlignment="Center"
+                      <TextBlock Text="Soapbox:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                      <TextBox x:Name="TB_Soapbox" Width="150" FontSize="16" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                      <TextBlock Text="Time:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="Time:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="Any part of the QSO time (UTC), e.g. 20 or 2034"/>
-                      <TextBox x:Name="TB_Time" Width="80" FontSize="14" VerticalAlignment="Center"
+                      <TextBox x:Name="TB_Time" Width="80" FontSize="16" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
-                      <TextBlock Text="QTH:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="QTH:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="The worked station's town, e.g. Haifa"/>
-                      <TextBox x:Name="TB_Qth" Width="120" FontSize="14" VerticalAlignment="Center"
+                      <TextBox x:Name="TB_Qth" Width="120" FontSize="16" VerticalAlignment="Center"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
                     <!-- COMMENT LIVES HERE, not on the identity row above. It is the one box worth having
@@ -340,9 +340,9 @@
                          longest row is row 1, and the bars end just past the Submode box.
                          KEEP IT LAST on this row: AlignCommentBox measures from its left edge outwards. -->
                     <StackPanel x:Name="CommentGroup" Orientation="Horizontal" VerticalAlignment="Center">
-                      <TextBlock Text="Comment:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                      <TextBlock Text="Comment:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
                                  ToolTip="Any part of the QSO's comment text"/>
-                      <TextBox x:Name="TB_Comment" Width="288" FontSize="14" VerticalAlignment="Center"
+                      <TextBox x:Name="TB_Comment" Width="288" FontSize="16" VerticalAlignment="Center"
                                ToolTip="Any part of the QSO's comment text"
                                TextChanged="SearchField_TextChanged" KeyDown="SearchField_KeyDown"/>
                     </StackPanel>
@@ -356,11 +356,11 @@
                        gap happens to be left between the dates and the count pill. -->
                   <Grid Margin="0,6,0,0">
                   <StackPanel HorizontalAlignment="Left" Orientation="Horizontal" VerticalAlignment="Center">
-                    <TextBlock Text="From:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <DatePicker x:Name="DP_From" Width="125" FontSize="13" VerticalAlignment="Center" Margin="0,0,12,0"
+                    <TextBlock Text="From:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <DatePicker x:Name="DP_From" Width="125" FontSize="16" VerticalAlignment="Center" Margin="0,0,12,0"
                                 SelectedDateChanged="Filter_Changed"/>
-                    <TextBlock Text="To:" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                    <DatePicker x:Name="DP_To" Width="125" FontSize="13" VerticalAlignment="Center"
+                    <TextBlock Text="To:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <DatePicker x:Name="DP_To" Width="125" FontSize="16" VerticalAlignment="Center"
                                 SelectedDateChanged="Filter_Changed"/>
                   </StackPanel>
 
@@ -373,7 +373,7 @@
                          operator narrows a job down, and checking the 26 QSOs they just picked out is
                          the point of having them. Beside the count, so the number it will check is the
                          number right next to the button. -->
-                    <Button x:Name="Btn_Verify" Content="Verify" FontSize="16" Padding="14,3"
+                    <Button x:Name="Btn_Verify" Content="Log Verifier" FontSize="16" Padding="14,3"
                             Margin="0,0,10,0" Click="Btn_Verify_Click"
                             Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20" Cursor="Hand"
                             ToolTip="Check these QSOs against the callsign and date databases — nothing is changed until you approve it"/>
@@ -391,9 +391,9 @@
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <!-- Undo of a SAVED edit. Ctrl+Z does the same, but a disabled button is the only
                          thing that tells you an undo exists and what it would put back. -->
-                    <Button x:Name="Btn_Undo" Content="Undo" FontSize="14" Padding="12,4" Margin="0,0,14,0"
+                    <Button x:Name="Btn_Undo" Content="Undo" FontSize="16" Padding="12,4" Margin="0,0,14,0"
                             IsEnabled="False" Click="Btn_Undo_Click"/>
-                    <Button x:Name="Btn_Search" FontSize="14" Padding="16,4"
+                    <Button x:Name="Btn_Search" FontSize="16" Padding="16,4"
                             Click="Btn_Search_Click" Background="#1565C0" Foreground="White"
                             BorderBrush="#0D47A1" Cursor="Hand">
                         <StackPanel Orientation="Horizontal">
@@ -404,7 +404,7 @@
                             <TextBlock Text="Search" VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <Button x:Name="Btn_Clear" Content="Clear" FontSize="14" Padding="12,4"
+                    <Button x:Name="Btn_Clear" Content="Clear" FontSize="16" Padding="12,4"
                             Click="Btn_Clear_Click" Background="#757575" Foreground="White"
                             BorderBrush="#616161" Cursor="Hand" Margin="8,0,0,0"/>
                   </StackPanel>
@@ -430,6 +430,7 @@
                   FontSize="16"
                   ScrollViewer.HorizontalScrollBarVisibility="Auto"
                   ScrollViewer.CanContentScroll="True"
+                  ClipboardCopyMode="IncludeHeader"
                   BorderBrush="{DynamicResource AccentBrush}" BorderThickness="3"
                   BeginningEdit="ResultsGrid_BeginningEdit"
                   PreparingCellForEdit="ResultsGrid_PreparingCellForEdit"
@@ -956,7 +957,7 @@
              non-hit-testable so clicks still reach the header underneath (e.g. to sort). -->
         <Border x:Name="ConfirmationStripLabel" IsHitTestVisible="False" Panel.ZIndex="50"
                 HorizontalAlignment="Left" VerticalAlignment="Top" Background="Transparent"
-                TextElement.FontSize="11" TextElement.FontWeight="Bold" TextElement.Foreground="#1A1A1A">
+                TextElement.FontSize="16" TextElement.FontWeight="Bold" TextElement.Foreground="#1A1A1A">
             <!-- The letters are created by ConfirmationStripHelper (they are spread apart at runtime to
                  fill the strip's width), and inherit the font settings above. -->
         </Border>
@@ -969,12 +970,12 @@
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBlock x:Name="TB_Status" Grid.Column="0" FontSize="13" TextTrimming="CharacterEllipsis"
+                <TextBlock x:Name="TB_Status" Grid.Column="0" FontSize="16" TextTrimming="CharacterEllipsis"
                            Foreground="{DynamicResource MutedTextBrush}"
                            Text="Enter a Callsign or Country (or both) and press Search."/>
                 <!-- How many rows are ticked. Hidden entirely while nothing is selected, so the bar looks
                      exactly as it did before the moment there is nothing to report. -->
-                <TextBlock x:Name="TB_PickCount" Grid.Column="1" FontSize="13" FontWeight="Bold"
+                <TextBlock x:Name="TB_PickCount" Grid.Column="1" FontSize="16" FontWeight="Bold"
                            Margin="12,0,0,0" Visibility="Collapsed"
                            Foreground="{DynamicResource AccentBrush}"/>
             </Grid>

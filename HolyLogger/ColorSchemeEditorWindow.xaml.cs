@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Windows;
@@ -76,7 +76,7 @@ namespace HolyLogger
                 var header = new TextBlock
                 {
                     Text = group.Key,
-                    FontSize = 13,
+                    FontSize = 16,
                     FontWeight = FontWeights.Bold,
                     Margin = new Thickness(0, 12, 0, 4)
                 };
@@ -112,9 +112,9 @@ namespace HolyLogger
             grid.Children.Add(swatch);
 
             var texts = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 8, 0) };
-            var name = new TextBlock { Text = info.DisplayName, FontSize = 13, FontWeight = FontWeights.SemiBold };
+            var name = new TextBlock { Text = info.DisplayName, FontSize = 16, FontWeight = FontWeights.SemiBold };
             name.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-            var desc = new TextBlock { Text = info.Description, FontSize = 11.5, TextWrapping = TextWrapping.Wrap };
+            var desc = new TextBlock { Text = info.Description, FontSize = 16, TextWrapping = TextWrapping.Wrap };
             desc.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
             texts.Children.Add(name);
             texts.Children.Add(desc);
@@ -123,7 +123,7 @@ namespace HolyLogger
 
             var hexLabel = new TextBlock
             {
-                FontSize = 11.5,
+                FontSize = 16,
                 FontFamily = new FontFamily("Consolas"),
                 VerticalAlignment = VerticalAlignment.Center
             };
@@ -134,7 +134,7 @@ namespace HolyLogger
             var reset = new Button
             {
                 Content = "Reset",
-                FontSize = 11,
+                FontSize = 16,
                 Padding = new Thickness(6, 2, 6, 2),
                 VerticalAlignment = VerticalAlignment.Center,
                 ToolTip = "Return this color to the " + _scheme.DisplayName + " scheme's original value"

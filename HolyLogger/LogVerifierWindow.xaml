@@ -1,11 +1,17 @@
 <Window x:Class="HolyLogger.LogVerifierWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="Verify Log" Width="1240" Height="720" MinWidth="820" MinHeight="520"
+        Title="Log Fixer" Width="1240" Height="780" MinWidth="900" MinHeight="600"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
-        Background="{DynamicResource WindowBg}" Loaded="Window_Loaded">
+        Background="{DynamicResource WindowBg}" Loaded="Window_Loaded"
+        PreviewKeyDown="Window_PreviewKeyDown">
+    <!-- THE LOG FIXER. The class is still called LogVerifierWindow because the Verifier is what FINDS
+         the problems and this window has always held that scan; what changed is that the window is now
+         also where they are put right, and the operator's word for that is Fixer. Renaming the file
+         would touch the project, the XAML class and every caller for no behaviour at all. -->
     <Grid Margin="14,10,14,12">
         <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
             <RowDefinition Height="Auto"/>
@@ -14,61 +20,268 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock x:Name="TB_Header" FontSize="18" FontWeight="Bold"
                        Foreground="{DynamicResource AccentBrush}"/>
-            <!-- Split into Runs for one reason: the instruction that tells the operator HOW to settle a
-                 "Check by hand" row has to stand out from the paragraph explaining the window. Red comes
-                 from the scheme's Danger token, so it stays readable in the dark schemes too. -->
             <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
                        Foreground="{DynamicResource MutedTextBrush}">
-                <Run Text="Every QSO is checked against the country databases on ITS OWN DATE, and against itself for impossible values. "/><Run
-                    Text="This window only reports. It never changes your log."
-                    FontWeight="Bold" Foreground="{DynamicResource Danger}"/><Run
-                    Text=" To correct a QSO, open it "/><Run
-                    Text="(double-click the row)" FontWeight="Bold"/><Run
-                    Text=" and decide for yourself."/>
+                <Run Text="Every QSO was checked against the country databases on ITS OWN DATE, and against itself for impossible values. Check the kinds of problem you want put right, then "/><Run
+                    Text="Fix selected" FontWeight="Bold" Foreground="{DynamicResource Danger}"/><Run
+                    Text=". Your whole database — every log in it — is copied first, so nothing here is final."/><LineBreak/><Run
+                    Text="Where the program has no answer, "/><Run
+                    Text="type the right value into the green row" FontWeight="Bold" Foreground="{DynamicResource Danger}"/><Run
+                    Text=" and its check box comes alive. Double-clicking a row still opens the whole QSO for editing."/>
             </TextBlock>
         </StackPanel>
 
-        <DataGrid x:Name="FindingsGrid" Grid.Row="1" AutoGenerateColumns="False"
+        <!-- WHAT WAS FOUND, BY KIND. One row per kind of problem, because that is how an operator
+             decides: "yes, put the wrong countries right - no, leave my spellings alone". Ticking a
+             kind ticks every QSO of that kind in the table below, which can then be overruled one by
+             one. The kinds that cannot be put right automatically are listed too, greyed, so the
+             count on screen always adds up to what the scan actually found. -->
+        <Border Grid.Row="1" Margin="0,0,0,10" Padding="10,8,10,10"
+                Background="{DynamicResource PanelBg}"
+                BorderBrush="{DynamicResource AccentBrush}" BorderThickness="2" CornerRadius="4">
+            <DockPanel>
+                <DockPanel DockPanel.Dock="Bottom" Margin="0,10,0,0">
+                    <Button x:Name="Btn_Fix" DockPanel.Dock="Right" Height="38" MinWidth="240"
+                            FontSize="16" FontWeight="Bold" IsEnabled="False" Click="Btn_Fix_Click"
+                            Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20"
+                            BorderThickness="1.5" Content="Fix selected"/>
+                    <Button x:Name="Btn_ShowAll" DockPanel.Dock="Right" Height="38" MinWidth="150"
+                            Margin="0,0,10,0" FontSize="16" Visibility="Collapsed" Click="Btn_ShowAll_Click"
+                            Content="Show all kinds"/>
+                    <TextBlock x:Name="TB_KindsSummary" VerticalAlignment="Center" FontSize="16"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               TextTrimming="CharacterEllipsis"/>
+                </DockPanel>
+                <!-- Capped and scrollable: there are a dozen kinds today and nothing says there will
+                     not be twenty, and this frame must never grow until it squeezes out the table. -->
+                <!-- 190 cut the fifth button in half: each one is about 39px with its padding, border
+                     and margin, so five come to 195 and the cap sliced the last. 320 holds eight
+                     comfortably and still stops the frame growing into the table. -->
+                <ScrollViewer MaxHeight="320" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl x:Name="IC_Kinds">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <!-- LastChildFill off: the button is docked left and sizes to its own
+                                     text, so it looks like a button rather than like a stripe across
+                                     the frame. The count and the note sit outside it, on the right. -->
+                                <DockPanel Margin="0,3,0,3" LastChildFill="False">
+                                    <!-- The tick box stays outside the button: ticking a kind and
+                                         viewing a kind are two different acts, and one click must
+                                         never do both. -->
+                                    <CheckBox DockPanel.Dock="Left" Width="34" VerticalAlignment="Center"
+                                              IsEnabled="{Binding Fixable}"
+                                              IsChecked="{Binding Checked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+
+                                    <!-- SHAPED LIKE A BUTTON, because it behaves like one: it filters
+                                         the table to this kind. Plain text that happens to be clickable
+                                         is a thing nobody clicks. The colours live in the style rather
+                                         than on the element so that hover and "this is the one you are
+                                         looking at" can both be triggers - a Background set here would
+                                         outrank them and nothing would ever light up. -->
+                                    <Border DockPanel.Dock="Left" MouseLeftButtonUp="Kind_Click" Cursor="Hand"
+                                            CornerRadius="4" BorderThickness="1" Padding="12,5,12,5"
+                                            MinWidth="300" HorizontalAlignment="Left"
+                                            ToolTip="Click to show only these QSOs in the table below">
+                                        <Border.Style>
+                                            <Style TargetType="Border">
+                                                <Setter Property="Background" Value="#F0F0F0"/>
+                                                <Setter Property="BorderBrush" Value="#B0B0B0"/>
+                                                <Style.Triggers>
+                                                    <Trigger Property="IsMouseOver" Value="True">
+                                                        <Setter Property="Background" Value="#E3EEFF"/>
+                                                        <Setter Property="BorderBrush" Value="#1565C0"/>
+                                                    </Trigger>
+                                                    <!-- After the hover trigger, so the kind currently
+                                                         on show stays lit even as the mouse moves off. -->
+                                                    <DataTrigger Binding="{Binding Selected}" Value="True">
+                                                        <Setter Property="Background" Value="#CFE3FF"/>
+                                                        <Setter Property="BorderBrush" Value="#1565C0"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </Border.Style>
+                                        <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Foreground="#1A1A1A"/>
+                                    </Border>
+
+                                    <!-- The count sits immediately beside its button, where it reads as
+                                         "this kind, this many". Docked left AFTER the button, so the
+                                         numbers still line up in a column of their own. Neither this
+                                         nor the note is part of the button: they are facts about the
+                                         kind, not things to press. -->
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding CountText}"
+                                               FontSize="16" FontWeight="Bold" MinWidth="70"
+                                               Margin="14,0,0,0" TextAlignment="Right"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock DockPanel.Dock="Left" Text="{Binding HandNote}"
+                                               FontSize="16" FontStyle="Italic" Margin="18,0,16,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource Danger}"/>
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- ONE ROW PER PROBLEM, drawn as two halves: what the log says now, and what it would say
+             after the fix. A QSO with two problems appears twice, once for each, so a tick means
+             exactly one thing and "fix the band but not the country" is possible.
+             The halves are inside ONE grid row rather than being two grid rows - that is what lets the
+             tick box and the callsign stand beside the pair instead of beside one half of it, and it
+             keeps the row the unit the DataGrid virtualizes. -->
+        <DataGrid x:Name="FindingsGrid" Grid.Row="2" AutoGenerateColumns="False"
                   CanUserAddRows="False" SelectionMode="Extended" HeadersVisibility="Column"
-                  GridLinesVisibility="All" FontSize="16" RowHeaderWidth="0"
+                  GridLinesVisibility="Vertical" FontSize="16" RowHeaderWidth="0"
                   BorderBrush="#1565C0" BorderThickness="1"
+                  Background="{DynamicResource GridRowBg}"
                   Foreground="{DynamicResource TextBrush}"
-                  HorizontalGridLinesBrush="{DynamicResource GridLine}"
+                  EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling"
                   VerticalGridLinesBrush="{DynamicResource GridLine}"
+                  ClipboardCopyMode="IncludeHeader"
+                  ContextMenuOpening="FindingsGrid_ContextMenuOpening"
                   MouseDoubleClick="FindingsGrid_MouseDoubleClick">
+            <DataGrid.RowStyle>
+                <!-- The solid black line that separates one pair from the next. -->
+                <Style TargetType="DataGridRow">
+                    <Setter Property="BorderBrush" Value="#000000"/>
+                    <Setter Property="BorderThickness" Value="0,0,0,2"/>
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.ColumnHeaderStyle>
+                <Style TargetType="DataGridColumnHeader">
+                    <Setter Property="BorderBrush" Value="#1565C0"/>
+                    <Setter Property="BorderThickness" Value="0,0,1,3"/>
+                    <Setter Property="Padding" Value="5,3,5,3"/>
+                    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+                    <Setter Property="Background" Value="#DEB887"/>
+                    <Setter Property="Foreground" Value="#1A1A1A"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                </Style>
+            </DataGrid.ColumnHeaderStyle>
             <DataGrid.Columns>
-                <!-- NO TICK COLUMN. This window reports; it does not write. Everything in it is a
-                     statement of fact about a QSO, and the one place a QSO's content may be changed is
-                     the Log Corrections editor - one window that writes, so there is one place to look
-                     when a log turns out to have been altered. -->
+                <!-- The QSO tick, one per pair. Set from the frame above, then the operator's to
+                     overrule. A template column rather than a check-box column so one click ticks it -
+                     a check-box column spends the first click entering edit mode. -->
+                <DataGridTemplateColumn Header="Fix" Width="54" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
+                                      IsEnabled="{Binding Fixable}"
+                                      IsChecked="{Binding Apply, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
                 <DataGridTextColumn Header="Date" Binding="{Binding DateText}" Width="Auto" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="Auto" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Callsign" Binding="{Binding Call}" Width="Auto" IsReadOnly="True">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
                             <Setter Property="FontWeight" Value="Bold"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
-                <DataGridTextColumn Header="What is wrong" Binding="{Binding Problem}" Width="230" IsReadOnly="True"/>
-                <DataGridTextColumn Header="In the log" Binding="{Binding Current}" Width="*" IsReadOnly="True"/>
-                <DataGridTextColumn Header="Should be" Binding="{Binding Suggested}" Width="*" IsReadOnly="True">
+                <DataGridTextColumn Header="What is wrong" Binding="{Binding Problem}" Width="220" IsReadOnly="True">
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">
-                            <Setter Property="FontWeight" Value="Bold"/>
                             <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
                         </Style>
                     </DataGridTextColumn.ElementStyle>
                 </DataGridTextColumn>
-                <DataGridTextColumn Header="Evidence" Binding="{Binding Evidence}" Width="170" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Field" Binding="{Binding FieldLabel}" Width="Auto" IsReadOnly="True">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <!-- THE PAIR. Top half: the log as it stands, on red. Bottom half: what it would say,
+                     on green. A finding with nothing to propose shows the lower half empty and its
+                     tick box disabled - the program will not guess. -->
+                <DataGridTemplateColumn Header="Now  /  Would become" Width="*" CanUserSort="False">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0" Background="#FFCDD2" Padding="7,3,7,3"
+                                        BorderBrush="#B0B0B0" BorderThickness="0,0,0,1">
+                                    <TextBlock Text="{Binding Current}" TextWrapping="Wrap"
+                                               Foreground="#7F0000"/>
+                                </Border>
+                                <Border Grid.Row="1" Background="#C8E6C9" Padding="7,3,7,3">
+                                    <TextBlock Text="{Binding Suggested}" TextWrapping="Wrap"
+                                               FontWeight="Bold" Foreground="#1B5E20"/>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Evidence" Binding="{Binding Evidence}" Width="170" IsReadOnly="True">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
             </DataGrid.Columns>
         </DataGrid>
 
-        <DockPanel Grid.Row="2" Margin="0,12,0,0">
+        <DockPanel Grid.Row="3" Margin="0,12,0,0">
+            <!-- NOT IsCancel. Escape belongs to the table here - it clears the highlight - and a
+                 window that shuts on the same key would throw away a page of ticks the moment an
+                 operator tried to deselect a row. Closing is this button, or the title bar. -->
             <Button x:Name="Btn_Close" Content="Close" DockPanel.Dock="Right" Width="120" Height="38"
-                    FontSize="16" IsCancel="True" Click="Btn_Close_Click"/>
+                    FontSize="16" Click="Btn_Close_Click"/>
             <TextBlock x:Name="TB_Summary" VerticalAlignment="Center" FontSize="16"
                        Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
         </DockPanel>
+
+        <!-- WHILE IT IS WRITING. A line of small text at the foot of the window was not enough: an
+             operator who ticked 4,376 spellings watched "fixing…" in the corner and reasonably decided
+             the program had died. This sits over everything, says what is happening, counts, and turns
+             - and it also stops the table being clicked while its rows are being rewritten. -->
+        <Grid x:Name="FixOverlay" Grid.Row="0" Grid.RowSpan="4" Panel.ZIndex="100"
+              Visibility="Collapsed" Background="#A6000000">
+            <Border Background="{DynamicResource PanelBg}" BorderBrush="{DynamicResource AccentBrush}"
+                    BorderThickness="2" CornerRadius="6" Padding="30,22,30,22" MinWidth="420"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <!-- A gapped ring, turned by the storyboard in the code behind. -->
+                        <Ellipse Width="32" Height="32" Margin="0,0,14,0"
+                                 Stroke="#2E7D32" StrokeThickness="4"
+                                 StrokeDashArray="4 2.4" StrokeDashCap="Round"
+                                 RenderTransformOrigin="0.5,0.5">
+                            <Ellipse.RenderTransform>
+                                <RotateTransform x:Name="FixSpin" Angle="0"/>
+                            </Ellipse.RenderTransform>
+                        </Ellipse>
+                        <TextBlock x:Name="TB_FixTitle" Text="Fixing your log…" FontSize="20" FontWeight="Bold"
+                                   VerticalAlignment="Center" Foreground="{DynamicResource AccentBrush}"/>
+                    </StackPanel>
+
+                    <TextBlock x:Name="TB_FixProgress" FontSize="18" FontWeight="Bold" Margin="0,14,0,0"
+                               HorizontalAlignment="Center" Foreground="{DynamicResource TextBrush}"/>
+
+                    <ProgressBar x:Name="PB_Fix" Height="16" Margin="0,10,0,0" Minimum="0" Maximum="100"
+                                 Foreground="#2E7D32"/>
+
+                    <TextBlock FontSize="16" Margin="0,12,0,0" HorizontalAlignment="Center"
+                               TextAlignment="Center" TextWrapping="Wrap" MaxWidth="420"
+                               Foreground="{DynamicResource MutedTextBrush}"
+                               Text="Please wait. A copy of your log was saved before this started, so nothing here is final."/>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

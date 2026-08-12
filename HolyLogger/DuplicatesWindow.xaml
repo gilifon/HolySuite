@@ -1,4 +1,4 @@
-<Window x:Class="HolyLogger.DuplicatesWindow"
+﻿<Window x:Class="HolyLogger.DuplicatesWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Remove Duplicates" Width="760" Height="520" MinWidth="480"
@@ -14,14 +14,14 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock x:Name="TB_Header" FontSize="16" FontWeight="Bold"
                        Foreground="{DynamicResource AccentBrush}"/>
-            <TextBlock FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0"
+            <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
                        Foreground="{DynamicResource MutedTextBrush}"
                        Text="QSOs are duplicates when ALL of these match: DX callsign, station callsign, operator, frequency, band, mode, date and time (to the minute). Rows with the same background color belong to the same duplicate group. The first QSO of each group is KEPT; the others are deleted."/>
         </StackPanel>
 
         <DataGrid x:Name="DupsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
                   CanUserAddRows="False" SelectionMode="Single" HeadersVisibility="Column"
-                  GridLinesVisibility="All" FontSize="13" RowHeaderWidth="0"
+                  GridLinesVisibility="All" FontSize="16" RowHeaderWidth="0"
                   BorderBrush="#1565C0" BorderThickness="1"
                   Foreground="{DynamicResource TextBrush}"
                   HorizontalGridLinesBrush="{DynamicResource GridLine}"
@@ -57,11 +57,11 @@
 
         <DockPanel Grid.Row="2" Margin="0,12,0,0">
             <Button x:Name="Btn_Cancel" Content="Cancel" DockPanel.Dock="Right" Width="110" Height="34"
-                    FontSize="13" IsCancel="True" Click="Btn_Cancel_Click"/>
+                    FontSize="16" IsCancel="True" Click="Btn_Cancel_Click"/>
             <Button x:Name="Btn_Delete" DockPanel.Dock="Right" Width="230" Height="34" Margin="0,0,10,0"
-                    FontSize="13" FontWeight="Bold" Click="Btn_Delete_Click"
+                    FontSize="16" FontWeight="Bold" Click="Btn_Delete_Click"
                     Background="#C62828" Foreground="White" BorderBrush="#8E1B1B" BorderThickness="1.5"/>
-            <TextBlock x:Name="TB_Summary" VerticalAlignment="Center" FontSize="12.5"
+            <TextBlock x:Name="TB_Summary" VerticalAlignment="Center" FontSize="16"
                        Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
         </DockPanel>
     </Grid>

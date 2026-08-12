@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Controls;
@@ -134,14 +134,14 @@ namespace HolyLogger
             textPanel.Children.Add(new TextBlock
             {
                 Text = name,
-                FontSize = 13,
+                FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 Foreground = ThemeManager.Brush("AccentBrush")
             });
             textPanel.Children.Add(new TextBlock
             {
                 Text = message,
-                FontSize = 12,
+                FontSize = 16,
                 Foreground = ThemeManager.Brush("MutedTextBrush"),
                 TextWrapping = TextWrapping.Wrap,
                 Margin = new Thickness(0, 2, 0, 0)

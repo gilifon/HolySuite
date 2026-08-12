@@ -1,4 +1,4 @@
-<Window x:Class="HolyLogger.ContestPickerWindow"
+﻿<Window x:Class="HolyLogger.ContestPickerWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Select contest" Height="560" Width="520"
@@ -14,7 +14,7 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,10">
             <TextBlock Text="Choose a contest to enter contest mode" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
             <TextBlock Text="Only contests ready for logging are selectable. Others appear greyed until they're added."
-                       FontSize="12" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
+                       FontSize="16" Foreground="{DynamicResource MutedTextBrush}" TextWrapping="Wrap" Margin="0,4,0,0"/>
         </StackPanel>
 
         <Border Grid.Row="1" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1" Background="{DynamicResource PanelBg}">
@@ -26,11 +26,11 @@
                         <Border Padding="6,5" Opacity="{Binding RowOpacity}">
                             <StackPanel>
                                 <StackPanel Orientation="Horizontal">
-                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
-                                    <TextBlock Text="{Binding StatusTag}" FontSize="11" Foreground="{DynamicResource Danger}"
+                                    <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="Bold" Foreground="{DynamicResource AccentBrush}"/>
+                                    <TextBlock Text="{Binding StatusTag}" FontSize="16" Foreground="{DynamicResource Danger}"
                                                Margin="8,2,0,0" VerticalAlignment="Center"/>
                                 </StackPanel>
-                                <TextBlock Text="{Binding Sub}" FontSize="11.5" Foreground="{DynamicResource MutedTextBrush}"/>
+                                <TextBlock Text="{Binding Sub}" FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
                             </StackPanel>
                         </Border>
                     </DataTemplate>

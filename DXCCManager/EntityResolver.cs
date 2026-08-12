@@ -297,7 +297,20 @@ namespace DXCCManager
                 }
                 CtyMatch fromPart = LongestPrefix(operating, out matchedLength);
                 if (fromPart != null) return fromPart;
-                matchedLength = 0;      // that part means nothing to cty.dat; fall back to the whole call
+
+                // That side means nothing to cty.dat, so try the other one before giving up.
+                string other = OtherPart(call);
+                if (!string.IsNullOrEmpty(other))
+                {
+                    if (exactCalls.TryGetValue(other, out CtyMatch exactOther))
+                    {
+                        matchedLength = other.Length;
+                        return exactOther;
+                    }
+                    CtyMatch fromOther = LongestPrefix(other, out matchedLength);
+                    if (fromOther != null) return fromOther;
+                }
+                matchedLength = 0;      // neither side is known; fall back to the whole call
             }
 
             // 3) Otherwise the longest matching prefix of the callsign as written.
@@ -339,15 +352,53 @@ namespace DXCCManager
         {
             if (string.IsNullOrEmpty(call) || call.IndexOf('/') < 0) return call;
 
+            // A PLACELESS ENDING IS AN ENDING, and only an ending. The list below holds single letters
+            // that mean something about the station - M for mobile, P for portable - and several of
+            // them are also perfectly good country prefixes at the FRONT of a callsign. M is the plainest
+            // case: ON4CJK/M is a Belgian station, mobile, in Belgium, while M/ON4CJK is that same
+            // operator transmitting from ENGLAND, whose prefix is M. Testing every part against the list
+            // threw the England away and answered Belgium - the operator's home country, which is the
+            // one thing the stroke exists to say they are not in.
             var parts = new List<string>();
-            foreach (string p in call.Split('/'))
-                if (p.Length > 0 && !IsPlacelessSuffix(p)) parts.Add(p);
+            string[] raw = call.Split('/');
+            for (int i = 0; i < raw.Length; i++)
+            {
+                string p = raw[i];
+                if (p.Length == 0) continue;
+                if (i > 0 && IsPlacelessSuffix(p)) continue;
+                parts.Add(p);
+            }
 
             if (parts.Count == 0) return call;
             if (parts.Count == 1) return parts[0];
 
             string first = parts[0], last = parts[parts.Count - 1];
             return last.Length < first.Length ? last : first;
+        }
+
+        // The side of the stroke that OperatingPart did NOT choose, for a caller whose first choice
+        // meant nothing to either database. "P/ON4CJK" is the case: P is not a country prefix, and
+        // being the shorter part it is chosen, so the callsign would resolve to nothing at all -
+        // where before the placeless-suffix fix it at least came back Belgium. Trying the other side
+        // when the first says nothing keeps that answer without weakening the rule.
+        internal static string OtherPart(string call)
+        {
+            if (string.IsNullOrEmpty(call) || call.IndexOf('/') < 0) return null;
+
+            var parts = new List<string>();
+            string[] raw = call.Split('/');
+            for (int i = 0; i < raw.Length; i++)
+            {
+                string p = raw[i];
+                if (p.Length == 0) continue;
+                if (i > 0 && IsPlacelessSuffix(p)) continue;
+                parts.Add(p);
+            }
+            if (parts.Count < 2) return null;
+
+            string chosen = OperatingPart(call);
+            string first = parts[0], last = parts[parts.Count - 1];
+            return string.Equals(chosen, first, StringComparison.Ordinal) ? last : first;
         }
 
         // The everyday endings that say something about the STATION, never about the country: mobile,
