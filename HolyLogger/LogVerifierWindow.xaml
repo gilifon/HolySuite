@@ -19,9 +19,12 @@
                  from the scheme's Danger token, so it stays readable in the dark schemes too. -->
             <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
                        Foreground="{DynamicResource MutedTextBrush}">
-                <Run Text="Every QSO is checked against the country databases on ITS OWN DATE, and against itself for impossible values. Nothing is changed until you tick a row and press Apply. A row that says &quot;Check by hand&quot; has no tick box: the program will not guess at it, so open the QSO "/><Run
-                    Text="(double-click the row)" FontWeight="Bold" Foreground="{DynamicResource Danger}"/><Run
-                    Text=" and decide yourself."/>
+                <Run Text="Every QSO is checked against the country databases on ITS OWN DATE, and against itself for impossible values. "/><Run
+                    Text="This window only reports. It never changes your log."
+                    FontWeight="Bold" Foreground="{DynamicResource Danger}"/><Run
+                    Text=" To correct a QSO, open it "/><Run
+                    Text="(double-click the row)" FontWeight="Bold"/><Run
+                    Text=" and decide for yourself."/>
             </TextBlock>
         </StackPanel>
 
@@ -34,18 +37,10 @@
                   VerticalGridLinesBrush="{DynamicResource GridLine}"
                   MouseDoubleClick="FindingsGrid_MouseDoubleClick">
             <DataGrid.Columns>
-                <!-- The only thing the operator can change: everything else is a statement of fact. A
-                     template column rather than a DataGridCheckBoxColumn so one click ticks the box -
-                     a check box column would need the first click just to enter edit mode. -->
-                <DataGridTemplateColumn Header="Fix" Width="52" CanUserSort="False">
-                    <DataGridTemplateColumn.CellTemplate>
-                        <DataTemplate>
-                            <CheckBox HorizontalAlignment="Center" VerticalAlignment="Center"
-                                      IsEnabled="{Binding Fixable}"
-                                      IsChecked="{Binding Apply, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
-                        </DataTemplate>
-                    </DataGridTemplateColumn.CellTemplate>
-                </DataGridTemplateColumn>
+                <!-- NO TICK COLUMN. This window reports; it does not write. Everything in it is a
+                     statement of fact about a QSO, and the one place a QSO's content may be changed is
+                     the Log Corrections editor - one window that writes, so there is one place to look
+                     when a log turns out to have been altered. -->
                 <DataGridTextColumn Header="Date" Binding="{Binding DateText}" Width="Auto" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="Auto" IsReadOnly="True"/>
                 <DataGridTextColumn Header="Callsign" Binding="{Binding Call}" Width="Auto" IsReadOnly="True">
@@ -72,14 +67,6 @@
         <DockPanel Grid.Row="2" Margin="0,12,0,0">
             <Button x:Name="Btn_Close" Content="Close" DockPanel.Dock="Right" Width="120" Height="38"
                     FontSize="16" IsCancel="True" Click="Btn_Close_Click"/>
-            <Button x:Name="Btn_Apply" DockPanel.Dock="Right" Width="345" Height="38" Margin="0,0,10,0"
-                    FontSize="16" FontWeight="Bold" IsEnabled="False" Click="Btn_Apply_Click"
-                    Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20" BorderThickness="1.5"
-                    Content="Apply the ticked corrections"/>
-            <Button x:Name="Btn_None" Content="Tick none" DockPanel.Dock="Right" Width="145" Height="38"
-                    Margin="0,0,10,0" FontSize="16" Click="Btn_None_Click"/>
-            <Button x:Name="Btn_All" Content="Tick all" DockPanel.Dock="Right" Width="145" Height="38"
-                    Margin="0,0,10,0" FontSize="16" Click="Btn_All_Click"/>
             <TextBlock x:Name="TB_Summary" VerticalAlignment="Center" FontSize="16"
                        Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
         </DockPanel>

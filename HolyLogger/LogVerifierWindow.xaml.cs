@@ -44,6 +44,12 @@ namespace HolyLogger
             // actually made of - so a log could read "Puerto Rico" while still counting as the USA.
             public string NewDxcc;
 
+            // THE ENTITY NUMBER, which is what every count of countries is actually made of. NewDxcc
+            // above writes the legacy DXCC string; this writes the dxcc column the statistics read.
+            // Correcting the name and the string but not this left the log reading one country and
+            // counting as another - which is exactly the fault Verify exists to find.
+            public int NewCode;
+
             public string Call { get; set; }
             public string Time { get; set; }
             public string DateText { get; set; }
@@ -147,29 +153,27 @@ namespace HolyLogger
         private async Task RunCheck()
         {
             _findings.Clear();
-            Btn_Apply.IsEnabled = false;
 
             List<QSO> snapshot = _qsos;
             // The country lookup parses two databases and every QSO is resolved twice, so the whole scan
             // runs off the UI thread - a 40,000-QSO log would otherwise freeze the window.
             List<Finding> found = await Task.Run(() => Scan(snapshot));
 
-            foreach (Finding f in found)
-            {
-                f.ApplyChanged = UpdateApplyButton;
-                _findings.Add(f);
-            }
+            foreach (Finding f in found) _findings.Add(f);
 
-            int fixable = found.Count(f => f.Fixable);
+            // The split is still worth stating, but as what it now is: how many findings this window
+            // could name a replacement for, against how many it can only point at. Neither number is a
+            // count of anything about to happen - nothing here happens to the log at all.
+            int suggested = found.Count(f => f.Fixable);
             TB_Header.Text = found.Count == 0
                 ? "No problems found in " + _qsos.Count.ToString("N0") + " QSOs."
                 : found.Count.ToString("N0") + " problem" + (found.Count == 1 ? "" : "s")
                   + " found in " + _qsos.Count.ToString("N0") + " QSOs";
             TB_Summary.Text = found.Count == 0
-                ? "Nothing to correct."
-                : fixable.ToString("N0") + " can be corrected automatically, "
-                  + (found.Count - fixable).ToString("N0") + " are for information only.";
-            UpdateApplyButton();
+                ? "Nothing to report."
+                : suggested.ToString("N0") + " with a suggested value, "
+                  + (found.Count - suggested).ToString("N0") + " to judge by hand. "
+                  + "Double-click a row to open the QSO.";
         }
 
         private static List<Finding> Scan(List<QSO> qsos)
@@ -344,34 +348,54 @@ namespace HolyLogger
                 string storedCountry = (q.Country ?? string.Empty).Trim();
                 string storedCont = (q.Continent ?? string.Empty).Trim();
 
-                if (storedCountry.Length > 0 &&
-                    !string.Equals(storedCountry, dated.Name, StringComparison.OrdinalIgnoreCase))
+                // THE COUNTRY IS ITS NUMBER, NOT ITS NAME. Every count of countries this program makes
+                // is made of entity codes, so that is what is checked here - and the three things that
+                // can be wrong with one are three different findings, because they are three different
+                // sizes of problem and the operator must be able to tell them apart:
+                //
+                //   the code disagrees   the QSO counts for the wrong country. The serious one.
+                //   the code is missing  the QSO counts for nobody. Old rows, and files with no <DXCC>.
+                //   only the name differs  the count is already right; the log simply spells it its
+                //                          own way. Offered, never urgent - and never ticked by
+                //                          default, because 3,846 of them is not a correction, it is
+                //                          rewriting somebody's log for them.
+                int storedCode = q.DxccCode;
+                int ourCode = EntityCodeOf(dated);
+
+                if (ourCode > 0 && storedCode > 0 && storedCode != ourCode)
                 {
-                    Finding f = New(q, "Wrong country",
-                                    storedCountry + ZoneSuffix(q.CQZone, q.ITUZone),
-                                    dated.Name + ZoneSuffix(
+                    Finding f = New(q, "Different country",
+                                    Named(storedCode, storedCountry) + ZoneSuffix(q.CQZone, q.ITUZone),
+                                    Named(ourCode, dated.Name) + ZoneSuffix(
                                         dated.CqZone > 0 ? dated.CqZone.ToString() : q.CQZone,
                                         dated.ItuZone > 0 ? dated.ItuZone.ToString() : q.ITUZone),
                                     dated.ResolvedBy);
-                    f.Field = "Country";
+                    FillCountryFix(f, dated, ourCode);
+                    findings.Add(f);
+                }
+                else if (ourCode > 0 && storedCode <= 0)
+                {
+                    Finding f = New(q, "No country code",
+                                    storedCountry.Length == 0 ? "(empty)" : storedCountry + "  (no number)",
+                                    Named(ourCode, dated.Name), dated.ResolvedBy);
+                    FillCountryFix(f, dated, ourCode);
+                    findings.Add(f);
+                }
+                else if (storedCountry.Length > 0 && ourCode > 0 && storedCode == ourCode
+                         && !string.Equals(storedCountry, dated.Name, StringComparison.OrdinalIgnoreCase))
+                {
+                    // Same entity, different wording. Nothing counts wrongly because of it.
+                    Finding f = New(q, "Country spelled differently",
+                                    storedCountry, dated.Name, dated.ResolvedBy);
+                    f.Field = "CountryName";
                     f.NewValue = dated.Name;
-                    f.NewDxcc = dated.Entity;
-                    f.NewContinent = dated.Continent != null && dated.Continent != "XX" ? dated.Continent : null;
-                    f.NewCq = dated.CqZone;
-                    f.NewItu = dated.ItuZone;
                     f.Fixable = true;
                     findings.Add(f);
                 }
-                else if (storedCountry.Length == 0)
+                else if (storedCountry.Length == 0 && !string.IsNullOrEmpty(dated.Name))
                 {
-                    Finding f = New(q, "No country", "(empty)", dated.Name, dated.ResolvedBy);
-                    f.Field = "Country";
-                    f.NewValue = dated.Name;
-                    f.NewDxcc = dated.Entity;
-                    f.NewContinent = dated.Continent != null && dated.Continent != "XX" ? dated.Continent : null;
-                    f.NewCq = dated.CqZone;
-                    f.NewItu = dated.ItuZone;
-                    f.Fixable = true;
+                    Finding f = New(q, "No country", "(empty)", Named(ourCode, dated.Name), dated.ResolvedBy);
+                    FillCountryFix(f, dated, ourCode);
                     findings.Add(f);
                 }
                 else if (!string.IsNullOrEmpty(dated.Continent) && dated.Continent != "XX"
@@ -398,15 +422,52 @@ namespace HolyLogger
                 .ToList();
         }
 
+        // The entity number behind an answer. DXCC.DxccCode is filled by Club Log; cty.dat's side names
+        // the country and leaves the number to be looked up, so both are tried before giving up. Zero
+        // means the answer is not a DXCC entity at all - a maritime-mobile station, an invalid
+        // operation - and nothing is ever suggested from one of those.
+        private static int EntityCodeOf(DXCC d)
+        {
+            if (d == null || !d.IsDxccEntity) return 0;
+            if (d.DxccCode > 0) return d.DxccCode;
+            try { return CountryLookup.Shared.EntityCodeForCountry(d.Name); }
+            catch { return 0; }
+        }
+
+        // "United States (291)" - the number is the part that counts, so it is never left off.
+        private static string Named(int code, string name)
+        {
+            string n = string.IsNullOrWhiteSpace(name) ? "(no name)" : name.Trim();
+            return code > 0 ? n + " (" + code + ")" : n;
+        }
+
+        // Everything a country correction writes, in one place: the name, the entity NUMBER, the
+        // continent and the zones. They are one fact about the QSO and must never be written apart -
+        // a log that says "Puerto Rico" while still counting as the United States is the harder error
+        // of the two to ever notice.
+        private static void FillCountryFix(Finding f, DXCC dated, int code)
+        {
+            f.Field = "Country";
+            f.NewValue = dated.Name;
+            f.NewCode = code;
+            f.NewDxcc = dated.Entity;
+            f.NewContinent = dated.Continent != null && dated.Continent != "XX" ? dated.Continent : null;
+            f.NewCq = dated.CqZone;
+            f.NewItu = dated.ItuZone;
+            f.Fixable = true;
+        }
+
         private static int Rank(string problem)
         {
             if (problem.StartsWith("Club Log lists")) return 0;
-            if (problem == "Wrong country") return 1;
-            if (problem == "No country") return 2;
-            if (problem == "Damaged callsign") return 3;
-            if (problem.StartsWith("Band") || problem.StartsWith("Frequency")) return 4;
-            if (problem == "Wrong continent") return 5;
-            return 6;
+            if (problem == "Different country") return 1;
+            if (problem == "No country code") return 2;
+            if (problem == "No country") return 3;
+            if (problem == "Damaged callsign") return 4;
+            if (problem.StartsWith("Band") || problem.StartsWith("Frequency")) return 5;
+            if (problem == "Wrong continent") return 6;
+            if (problem == "Country spelled differently") return 8;   // last: nothing counts wrongly
+            return 7;
         }
 
         private static string ZoneSuffix(string cq, string itu)
@@ -456,139 +517,13 @@ namespace HolyLogger
             return s.Substring(0, 2) + ":" + s.Substring(2, 2);
         }
 
-        private void UpdateApplyButton()
-        {
-            int n = _findings.Count(f => f.Apply);
-            Btn_Apply.IsEnabled = n > 0;
-            Btn_Apply.Content = n == 0
-                ? "Apply the ticked corrections"
-                : "Apply " + n.ToString("N0") + " correction" + (n == 1 ? "" : "s");
-        }
-
-        // Each Finding raises PropertyChanged, so the boxes follow without refreshing the grid - which
-        // would rebuild every row and throw the operator's scroll position away.
-        private void Btn_All_Click(object sender, RoutedEventArgs e)
-        {
-            foreach (Finding f in _findings) f.Apply = f.Fixable;
-            UpdateApplyButton();
-        }
-
-        private void Btn_None_Click(object sender, RoutedEventArgs e)
-        {
-            foreach (Finding f in _findings) f.Apply = false;
-            UpdateApplyButton();
-        }
-
-        private async void Btn_Apply_Click(object sender, RoutedEventArgs e)
-        {
-            List<Finding> chosen = _findings.Where(f => f.Apply && f.Fixable && f.Qso != null).ToList();
-            if (chosen.Count == 0) return;
-
-            var dal = DataAccess.GetInstance();
-            if (dal == null)
-            {
-                MessageBox.Show(this, "The log database is not open.", "Verify Log",
-                                MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            if (MessageBox.Show(this,
-                    chosen.Count.ToString("N0") + " QSO correction" + (chosen.Count == 1 ? "" : "s")
-                    + " will be written to the log.\n\nA copy of the log is saved first, so this can be undone "
-                    + "by restoring that copy (Tools > Backups & Restore).\n\nApply now?",
-                    "Verify Log", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
-                return;
-
-            string backup = SaveBackup(dal);
-            if (backup == null &&
-                MessageBox.Show(this, "The safety copy of the log could not be written.\n\nApply the "
-                    + "corrections anyway?", "Verify Log",
-                    MessageBoxButton.OKCancel, MessageBoxImage.Warning) != MessageBoxResult.OK)
-                return;
-
-            Btn_Apply.IsEnabled = false;
-            TB_Summary.Text = "applying…";
-
-            int written = 0;
-            try
-            {
-                // Several findings can belong to one QSO (a wrong country and a wrong band), so the
-                // changes are gathered per QSO and the row is written once.
-                foreach (var group in chosen.GroupBy(f => f.Qso))
-                {
-                    QSO qso = group.Key;
-                    foreach (Finding f in group) ApplyTo(qso, f);
-                    await Task.Run(() => dal.Update(qso));
-                    written++;
-                }
-            }
-            catch (Exception ex)
-            {
-                Log.Swallow(ex);
-                MessageBox.Show(this, "Something went wrong while writing the corrections:\n\n" + ex.Message
-                    + (backup != null ? "\n\nThe log as it was before is in:\n" + backup : ""),
-                    "Verify Log", MessageBoxButton.OK, MessageBoxImage.Error);
-            }
-
-            MessageBox.Show(this, written.ToString("N0") + " QSO" + (written == 1 ? "" : "s") + " corrected."
-                + (backup != null ? "\n\nThe log as it was before is in:\n" + Path.GetFileName(backup) : "")
-                + "\n\nClose and reopen the log window to see the new values.",
-                "Verify Log", MessageBoxButton.OK, MessageBoxImage.Information);
-
-            // Re-check, so what is left on screen is what is still wrong.
-            await RunCheck();
-        }
-
-        private static void ApplyTo(QSO qso, Finding f)
-        {
-            switch (f.Field)
-            {
-                case "DXCall":
-                    qso.DXCall = f.NewValue;
-                    break;
-                case "Band":
-                    qso.Band = f.NewValue;
-                    break;
-                case "Continent":
-                    qso.Continent = f.NewValue;
-                    break;
-                case "Activity":
-                    // Moved, not copied: the comment held the reference only because there was nowhere
-                    // else to put it, and leaving a copy behind would show it twice in every export.
-                    if (f.Program == "IOTA") qso.Iota = f.NewValue;
-                    else if (f.Program == "SOTA") qso.SotaRef = f.NewValue;
-                    else if (f.Program == "POTA") qso.PotaRef = f.NewValue;
-                    else if (f.Program == "WWFF") qso.WwffRef = f.NewValue;
-                    qso.Comment = string.Empty;
-                    break;
-                case "Country":
-                    qso.Country = f.NewValue;
-                    // The entity travels with the name. Without this the log said one country and
-                    // counted as another, which is the harder error of the two to ever notice.
-                    if (!string.IsNullOrEmpty(f.NewDxcc)) qso.DXCC = f.NewDxcc;
-                    if (!string.IsNullOrEmpty(f.NewContinent)) qso.Continent = f.NewContinent;
-                    // The zones belong to the entity, so a country correction carries them along - a
-                    // Wake Island QSO cannot keep the CQ zone of the United States.
-                    if (f.NewCq > 0) qso.CQZone = f.NewCq.ToString();
-                    if (f.NewItu > 0) qso.ITUZone = f.NewItu.ToString();
-                    break;
-            }
-        }
-
-        // A plain file copy of the log, named like the program's other safety copies so it shows up in
-        // Backups & Restore. Returns the path, or null when it could not be made.
-        private static string SaveBackup(DataAccess dal)
-        {
-            try
-            {
-                string path = dal.DbPath;
-                if (string.IsNullOrEmpty(path) || !File.Exists(path)) return null;
-                string backup = path + ".pre-verify-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak";
-                File.Copy(path, backup, false);
-                return backup;
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
-        }
+        // NOTHING HERE WRITES TO THE LOG. This window used to carry tick boxes, a "Tick all", and an
+        // "Apply the ticked corrections" button that saved a copy of the database and then updated
+        // every ticked QSO. All of it is gone on purpose: a QSO's content is changed in ONE place, the
+        // Log Corrections editor, so that when a log turns out to have been altered there is one place
+        // to look and one thing to have gone wrong. What survives is the suggestion itself - Finding
+        // still carries NewValue, NewCode, NewContinent and the zones - because that is the material
+        // the editor will work from. It is data about a QSO, not an action on one.
 
         // Double-clicking a row opens that QSO in the full editor, which is the only way to settle a
         // "Check by hand" finding - a missing band nobody can derive, a callsign with a note buried in

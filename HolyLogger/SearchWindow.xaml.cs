@@ -2200,6 +2200,40 @@ namespace HolyLogger
         // What the caption calls the set of QSOs on show. Normally the log's name; a window opened on a
         // SLICE of a log (the Statistics window's deleted entities, say) says which slice, so a count far
         // smaller than the log's does not read as data gone missing.
+        // VERIFY, over exactly the rows on screen. The import report ends by saying Verify is where the
+        // findings can be acted on, and this is that button: it checks what the filters above have
+        // narrowed the log down to, so an operator can work through one country, one year or one band
+        // at a time instead of the whole logbook at once.
+        //
+        // Nothing is written by opening it. The verifier lists what it finds, ticks nothing, copies the
+        // database before it writes, and only touches the QSOs whose rows were ticked.
+        private void Btn_Verify_Click(object sender, RoutedEventArgs e)
+        {
+            var shown = ResultsGrid.DataContext as System.Collections.Generic.IEnumerable<QSO>;
+            var list = shown == null ? new System.Collections.Generic.List<QSO>() : shown.ToList();
+            if (list.Count == 0)
+            {
+                HolyMessageBox.ShowWarning("There are no QSOs on screen to check.", "Verify", this);
+                return;
+            }
+
+            try
+            {
+                // Named with the count, because this is usually NOT the whole log and the window must
+                // not look as though it has checked one when it has checked twenty-six.
+                string what = TB_TitleLog != null && !string.IsNullOrWhiteSpace(TB_TitleLog.Text)
+                    ? TB_TitleLog.Text.Trim()
+                    : "this log";
+                var verifier = new LogVerifierWindow(list, $"{what}  ({list.Count:N0} QSOs)") { Owner = this };
+                verifier.ShowDialog();
+                ResultsGrid.Items.Refresh();   // corrections are written into the very objects shown here
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError("Could not check these QSOs.\n\n" + ex.Message, "Verify", this);
+            }
+        }
+
         public void SetTitleLog(string label)
         {
             string text = string.IsNullOrWhiteSpace(label) ? "(unnamed log)" : label.Trim();

@@ -368,14 +368,24 @@
                        from theme tokens, not fixed colours, so the pill still looks like a control in the
                        dark schemes instead of a white patch. Always visible: it starts at "0 QSOs" rather
                        than appearing only once a search has been run. -->
-                  <Border HorizontalAlignment="Right" VerticalAlignment="Center" MinWidth="120" Margin="0,0,4,0"
-                          Background="{DynamicResource GridHeaderBg}"
-                          BorderBrush="{DynamicResource GridLine}" BorderThickness="1"
-                          CornerRadius="10" Padding="14,4,14,4">
-                      <TextBlock x:Name="TB_Count" Text="0 QSOs" FontSize="16" FontWeight="Bold"
-                                 HorizontalAlignment="Center" TextAlignment="Center"
-                                 Foreground="{DynamicResource AccentBrush}"/>
-                  </Border>
+                  <StackPanel HorizontalAlignment="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- VERIFY WHAT IS ON SCREEN, not always the whole log: the filters above are how an
+                         operator narrows a job down, and checking the 26 QSOs they just picked out is
+                         the point of having them. Beside the count, so the number it will check is the
+                         number right next to the button. -->
+                    <Button x:Name="Btn_Verify" Content="Verify" FontSize="16" Padding="14,3"
+                            Margin="0,0,10,0" Click="Btn_Verify_Click"
+                            Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20" Cursor="Hand"
+                            ToolTip="Check these QSOs against the callsign and date databases — nothing is changed until you approve it"/>
+                    <Border VerticalAlignment="Center" MinWidth="120" Margin="0,0,4,0"
+                            Background="{DynamicResource GridHeaderBg}"
+                            BorderBrush="{DynamicResource GridLine}" BorderThickness="1"
+                            CornerRadius="10" Padding="14,4,14,4">
+                        <TextBlock x:Name="TB_Count" Text="0 QSOs" FontSize="16" FontWeight="Bold"
+                                   HorizontalAlignment="Center" TextAlignment="Center"
+                                   Foreground="{DynamicResource AccentBrush}"/>
+                    </Border>
+                  </StackPanel>
 
                   <!-- Search sits on the row's true centre, with Undo/Clear at its sides. -->
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
