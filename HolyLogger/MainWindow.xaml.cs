@@ -529,16 +529,7 @@ namespace HolyLogger
             CB_Mode.Text = Properties.Settings.Default.Mode;
 
             // Initialize RST fields based on the selected mode
-            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM" || CB_Mode.Text == "AM")
-            {
-                TB_RSTSent.Text = "59";
-                TB_RSTRcvd.Text = "59";
-            }
-            else
-            {
-                TB_RSTSent.Text = "599";
-                TB_RSTRcvd.Text = "599";
-            }
+            ResetRstForMode();
 
             TB_MyCallsign.Focus();
 
@@ -1180,16 +1171,7 @@ namespace HolyLogger
             _ = PumpClublogQueue();
 
             // Initialize RST fields based on the selected mode after window is fully loaded
-            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM" || CB_Mode.Text == "AM")
-            {
-                TB_RSTSent.Text = "59";
-                TB_RSTRcvd.Text = "59";
-            }
-            else
-            {
-                TB_RSTSent.Text = "599";
-                TB_RSTRcvd.Text = "599";
-            }
+            ResetRstForMode();
 
             // One-time, skippable offer to set an off-machine backup folder. Deferred to ApplicationIdle
             // so it appears only after the startup splash has closed (the splash is Topmost and would
@@ -1867,16 +1849,7 @@ namespace HolyLogger
             TB_ITUZone.Text = "";
             TB_CQZone.Text = "";
 
-            if (CB_Mode.Text == "SSB" || CB_Mode.Text == "FM" || CB_Mode.Text == "AM")
-            {
-                TB_RSTSent.Text = "59";
-                TB_RSTRcvd.Text = "59";
-            }
-            else
-            {
-                TB_RSTSent.Text = "599";
-                TB_RSTRcvd.Text = "599";
-            }
+            ResetRstForMode();
             if (TB_Comment.IsEnabled) TB_Comment.Clear();
             ClearActivityRow();
             TB_State.Text = string.Empty;
@@ -4269,13 +4242,89 @@ namespace HolyLogger
             button.Background = isActive ? VoiceMessageActiveBrush : VoiceMessageDefaultBrush;
         }
 
+        // How many digits an RST report has in the current mode: 2 on voice, 3 on CW and the data modes,
+        // where the report carries a tone digit as well. The contest RST cells read it too, since what is
+        // typed in those is copied straight into these boxes.
+        private int _rstDigits = 2;
+
+        // The two RST boxes, set to the report the current mode uses - 59 on voice, 599 everywhere else -
+        // and, on voice only, offering 59 down to 51 on a chevron. Rebuilt on every mode change rather
+        // than written out in the XAML, so the two boxes can never disagree about the current mode.
+        //
+        // The digit limit moves with the mode as well, so the box will not ACCEPT a third digit on SSB or
+        // a fourth on CW. It only limits typing - WPF leaves text assigned in code alone (measured) - so
+        // opening an old QSO for editing still shows whatever was logged, however long it is, rather than
+        // quietly dropping its last digit.
+        //
+        // The mode is passed in from CB_Mode's SelectionChanged, where CB_Mode.Text still holds the
+        // PREVIOUS mode; everywhere else the dropdown itself is the truth.
+        private void ResetRstForMode(string modeOverride = null)
+        {
+            if (TB_RSTSent == null || TB_RSTRcvd == null) return;
+
+            string mode = (modeOverride ?? (CB_Mode == null ? "" : CB_Mode.Text) ?? "").Trim().ToUpperInvariant();
+            bool voice = mode == "SSB" || mode == "FM" || mode == "AM";
+
+            _rstDigits = voice ? 2 : 3;
+            string best = voice ? "59" : "599";
+
+            // The list is offered on voice only. On CW and the data modes the report is 599 almost
+            // without exception, so those boxes lose the chevron and go back to being plain typing boxes.
+            ControlTemplate look = TryFindResource(voice ? "FlatEditableComboTemplate" : "FlatTypeOnlyComboTemplate") as ControlTemplate;
+
+            foreach (ComboBox box in new[] { TB_RSTSent, TB_RSTRcvd })
+            {
+                if (look != null && !ReferenceEquals(box.Template, look)) box.Template = look;
+
+                box.Items.Clear();
+                // Best at the top, worst at the bottom: the strength digit counts down from 9 to 1 while
+                // readability stays 5 - below R5 you are not completing the contact.
+                if (voice) for (int s = 9; s >= 1; s--) box.Items.Add("5" + s);
+                box.Text = best;
+
+                TextBox editor = RstEditor(box);
+                if (editor != null) editor.MaxLength = _rstDigits;
+            }
+        }
+
+        // The TextBox inside an editable ComboBox. WPF builds it from the control template and insists on
+        // the name PART_EditableTextBox; it is where MaxLength and the caret actually live, neither of
+        // which the ComboBox itself exposes. ApplyTemplate is called first because this can run before
+        // the window has ever been laid out.
+        private static TextBox RstEditor(ComboBox box)
+        {
+            if (box == null) return null;
+            try
+            {
+                box.ApplyTemplate();
+                return box.Template == null ? null : box.Template.FindName("PART_EditableTextBox", box) as TextBox;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // Landing in an RST box selects the STRENGTH digit - the one that actually varies - so typing a
+        // single number changes 59 to 57 without touching the rest.
         private void RST_GotFocus(object sender, RoutedEventArgs e)
         {
-            if (((TextBox)sender).Text.Length > 0)
+            TextBox box = sender as TextBox ?? RstEditor(sender as ComboBox);
+            if (box == null || box.Text.Length < 2) return;
+            box.CaretIndex = 1;
+            box.SelectionLength = 1;
+        }
+
+        // Picking a report off the list leaves WPF's own selection over the value, which reads as a grey
+        // wash across the digits. Nothing is being typed at that moment, so the highlight is dropped and
+        // the caret parked at the end. Queued at Input priority because the ComboBox re-selects the text
+        // itself as focus comes back to the box, after this event has been raised.
+        private void RST_DropDownClosed(object sender, EventArgs e)
+        {
+            TextBox editor = RstEditor(sender as ComboBox);
+            if (editor == null) return;
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-                ((TextBox)sender).CaretIndex = 1;
-                ((TextBox)sender).SelectionLength = 1;
-            }
+                editor.SelectionLength = 0;
+                editor.CaretIndex = editor.Text.Length;
+            }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
         private void TB_RSTSent_TextChanged(object sender, TextChangedEventArgs e)
@@ -9429,16 +9478,7 @@ namespace HolyLogger
 
                 val = (val ?? string.Empty).Trim().ToUpperInvariant();
 
-                if (val == "SSB" || val == "FM" || val == "AM")
-                {
-                    TB_RSTSent.Text = "59";
-                    TB_RSTRcvd.Text = "59";
-                }
-                else
-                {
-                    TB_RSTSent.Text = "599";
-                    TB_RSTRcvd.Text = "599";
-                }
+                ResetRstForMode(val);
                 UpdateDup();
                 // Refresh the Msg buttons so they switch to/from the CW look immediately on a mode
                 // change (matters when the radio is off, where the mode comes from this dropdown).

@@ -105,7 +105,7 @@
                 <DataGridTextColumn x:Name="FreqColumn" Binding="{Binding FreqKhz, UpdateSourceTrigger=PropertyChanged}" Width="*">
                     <DataGridTextColumn.Header>
                         <!-- Unit on its own line, smaller and bold, so the column name reads cleanly. -->
-                        <TextBlock TextAlignment="Center" LineStackingStrategy="BlockLineHeight" LineHeight="15"><Run Text="Frequency"/><LineBreak/><Run Text="(kHz)" FontSize="16" FontWeight="Bold"/></TextBlock>
+                        <TextBlock TextAlignment="Center" LineStackingStrategy="BlockLineHeight" LineHeight="15"><Run Text="Frequency"/><LineBreak/><Run Text="(kHz)" FontSize="10" FontWeight="Bold"/></TextBlock>
                     </DataGridTextColumn.Header>
                     <DataGridTextColumn.ElementStyle>
                         <Style TargetType="TextBlock">

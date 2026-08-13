@@ -1,4 +1,4 @@
-﻿<!--
+<!--
     The look of the five confirmation columns (LoTW / QRZ / eQSL / Club Log / Paper QSL), defined ONCE
     and used by both log tables: the main window's QSODataGrid and the Log Workshop's ResultsGrid.
 
@@ -51,7 +51,7 @@
             </Grid.RowDefinitions>
             <Border Grid.Row="0" Background="{DynamicResource RowOnFreqBg}"/>
             <Border Grid.Row="1" BorderBrush="#1565C0" BorderThickness="0,0,1,0">
-                <TextBlock Text="{Binding}" FontSize="16" FontWeight="Bold" Margin="3,0,3,0"
+                <TextBlock Text="{Binding}" FontSize="11" FontWeight="Bold" Margin="3,0,3,0"
                            Foreground="#1A1A1A" HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
         </Grid>

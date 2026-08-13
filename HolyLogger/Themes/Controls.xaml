@@ -256,8 +256,11 @@
                         <Border x:Name="Track" CornerRadius="12"
                                 Background="{DynamicResource ButtonHoverBg}"
                                 BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"/>
-                        <!-- OFF/ON caption inside the track, on the opposite side to the knob. -->
-                        <TextBlock x:Name="Caption" Text="OFF" FontSize="16" FontWeight="Bold"
+                        <!-- OFF/ON caption inside the track, on the opposite side to the knob. FONT 10 ON
+                             PURPOSE: the track is 52 wide and the knob takes 18 of it, so the word has
+                             about 24px. At 16 "OFF" is 29 wide and ran over the knob and out of the
+                             pill - which is what the no-font-below-16 sweep did here. -->
+                        <TextBlock x:Name="Caption" Text="OFF" FontSize="10" FontWeight="Bold"
                                    VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,7,0"
                                    Foreground="{DynamicResource MutedTextBrush}"/>
                         <Border x:Name="Knob" Width="18" Height="18" CornerRadius="9"

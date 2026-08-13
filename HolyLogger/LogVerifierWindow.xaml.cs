@@ -400,6 +400,40 @@ namespace HolyLogger
             FindingsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
 
             FindingsGrid.ItemsSource = _findings;
+
+            // Where the operator put this window, and how big they made it, is remembered - the table
+            // below is the whole point of the window and how much of it you can see is a personal choice.
+            // The XAML height is only the FIRST-EVER size; it is deliberately tall enough for six QSOs,
+            // because each one is drawn as two half rows and at the old height only three fitted.
+            double firstTime = Height;
+            WindowBounds.Attach(this, "LogFixer");
+            if (Math.Abs(Height - firstTime) < 0.5) ShrinkToFitScreen();
+        }
+
+        // A first-open height of 1010 is taller than some screens. Nothing else in the window can be
+        // trusted to notice - WPF will happily place a window whose bottom is off the desktop - so on the
+        // first open only, the height is cut to the work area of the monitor this window landed on.
+        // Screen.FromHandle, not SystemParameters.WorkArea: that one answers for the PRIMARY monitor only
+        // and would give the wrong figure whenever HolyLogger is being run on the second screen.
+        private void ShrinkToFitScreen()
+        {
+            SourceInitialized += (s, e) =>
+            {
+                try
+                {
+                    IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                    if (hwnd == IntPtr.Zero) return;
+
+                    var src = System.Windows.PresentationSource.FromVisual(this);
+                    double sy = src != null && src.CompositionTarget != null
+                        ? src.CompositionTarget.TransformToDevice.M22 : 1.0;
+                    if (sy <= 0) sy = 1.0;
+
+                    double usable = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea.Height / sy;
+                    if (Height > usable - 20) Height = Math.Max(MinHeight, usable - 20);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            };
         }
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)

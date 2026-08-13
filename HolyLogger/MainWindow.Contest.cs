@@ -200,6 +200,9 @@ namespace HolyLogger
             TextBox rstr = AddContestCell("RST R", 52, tab++, ContestRxPanel);
             _contestRstRcvdBox = rstr;
             rstr.Text = TB_RSTRcvd != null ? TB_RSTRcvd.Text : "59";
+            // The same digit limit the hidden box behind it has - 2 on voice, 3 on CW - since whatever
+            // is typed here is copied straight into it.
+            rstr.MaxLength = _rstDigits;
             rstr.TextChanged += (s, e2) => { if (TB_RSTRcvd != null) TB_RSTRcvd.Text = rstr.Text; };
 
             foreach (string field in fields)
@@ -220,6 +223,7 @@ namespace HolyLogger
             {
                 TextBox rsts = AddContestCell("RST S", 52, null, ContestTxPanel);
                 rsts.Text = TB_RSTSent != null ? TB_RSTSent.Text : "59";
+                rsts.MaxLength = _rstDigits;
                 rsts.TextChanged += (s, e2) => { if (TB_RSTSent != null) TB_RSTSent.Text = rsts.Text; };
 
                 var sentFields = Contests.ContestService.GetSentFields(contest, myCall, myCont)

@@ -1,4 +1,4 @@
-﻿<Window
+<Window
 
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -83,6 +83,69 @@
                     </Border>
                 </Popup>
             </Grid>
+        </ControlTemplate>
+        <!-- The same compact box, but you can TYPE in it: used by RST S and RST R, which offer the
+             usual reports on the chevron and still take anything typed over them. The only change from
+             FlatComboTemplate is that the ContentPresenter is replaced by the TextBox WPF requires,
+             which MUST be called PART_EditableTextBox for the ComboBox to find it.
+             Transparent, with no border of its own: the box's own Background and BorderBrush then show
+             through exactly as they do on a plain TextBox, which is what lets the edit-mode tint and the
+             red "this field is empty" frame keep working. Both are set here as local values because the
+             app-wide TextBox style would otherwise paint it opaque and draw a second frame inside. -->
+        <ControlTemplate x:Key="FlatEditableComboTemplate" TargetType="ComboBox">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="10"/>
+                </Grid.ColumnDefinitions>
+                <ToggleButton Grid.ColumnSpan="2"
+                              IsChecked="{Binding IsDropDownOpen, Mode=TwoWay, RelativeSource={RelativeSource TemplatedParent}}"
+                              BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" Background="{TemplateBinding Background}"
+                              Cursor="Hand">
+                    <ToggleButton.Template>
+                        <ControlTemplate TargetType="ToggleButton">
+                            <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}"/>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </ToggleButton.Template>
+                </ToggleButton>
+                <TextBox x:Name="PART_EditableTextBox" Grid.Column="0"
+                         Background="Transparent" BorderThickness="0" Padding="3,0,0,0"
+                         Foreground="{TemplateBinding Foreground}"
+                         CaretBrush="{TemplateBinding Foreground}"
+                         HorizontalContentAlignment="Left" VerticalContentAlignment="Center"
+                         VerticalAlignment="Center"/>
+                <Path Grid.Column="1" Data="M 0,0 L 8,0 L 4,4.5 Z" Fill="{TemplateBinding Foreground}"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,1,2,0"
+                      IsHitTestVisible="False" SnapsToDevicePixels="True"/>
+                <Popup x:Name="PART_Popup" AllowsTransparency="True" IsOpen="{Binding IsDropDownOpen, RelativeSource={RelativeSource TemplatedParent}}" Placement="Bottom">
+                    <Border BorderBrush="#0078D7" BorderThickness="1" Background="{DynamicResource MenuBg}" MaxHeight="{TemplateBinding MaxDropDownHeight}" MinWidth="{TemplateBinding ActualWidth}">
+                        <ScrollViewer>
+                            <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                        </ScrollViewer>
+                    </Border>
+                </Popup>
+            </Grid>
+        </ControlTemplate>
+        <!-- The same box with nothing to open: what RST S and RST R wear on CW and the data modes, where
+             the report is always 599 and a list of nine would only be in the way. Kept as a template of
+             its own rather than by hiding the chevron, so the text gets the full width of the box back. -->
+        <ControlTemplate x:Key="FlatTypeOnlyComboTemplate" TargetType="ComboBox">
+            <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}">
+                <TextBox x:Name="PART_EditableTextBox"
+                         Background="Transparent" BorderThickness="0" Padding="3,0,0,0"
+                         Foreground="{TemplateBinding Foreground}"
+                         CaretBrush="{TemplateBinding Foreground}"
+                         HorizontalContentAlignment="Left" VerticalContentAlignment="Center"
+                         VerticalAlignment="Center"/>
+            </Border>
         </ControlTemplate>
         <Style x:Key="RaisedActionButtonStyle" TargetType="Button">
             <Setter Property="Foreground" Value="#1E2A34"/>
@@ -866,7 +929,9 @@
                          footprint as the old "Grids: " (40.1px + 20px), so the number does not move.
                          Left-aligned (both lines share the same left edge) + vertically centered so it
                          is symmetric with the number, leaving room for up to a 3-digit count. -->
-                    <TextBlock Margin="4,0,0,0" FontSize="16" Width="56" TextAlignment="Left"
+                    <!-- Font 14, not 16: "Holyland" needs 64px at 16 and this block is 56 wide, so 16
+                         cut the word off. The three two-line status-bar labels below share the reason. -->
+                    <TextBlock Margin="4,0,0,0" FontSize="14" Width="56" TextAlignment="Left"
                                VerticalAlignment="Center" LineHeight="15" LineStackingStrategy="BlockLineHeight"><Run Text="Holyland"/><LineBreak/><Run Text="Squares"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
@@ -879,7 +944,7 @@
                          "(active)" rather than "(worked)": the count has always excluded deleted
                          entities - it is filtered to the official current list, the same 340 the
                          Statistics window measures against - and the old word did not say so. -->
-                    <TextBlock Margin="10,0,0,0" FontSize="16" TextAlignment="Left"
+                    <TextBlock Margin="10,0,0,0" FontSize="14" TextAlignment="Left"
                                VerticalAlignment="Center" LineHeight="15" LineStackingStrategy="BlockLineHeight"><Run Text="DXCCs"/><LineBreak/><Run Text="(active)"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
@@ -895,7 +960,7 @@
                             </MenuItem>
                         </ContextMenu>
                     </StatusBarItem.ContextMenu>
-                    <TextBlock Margin="10,0,2,0" FontSize="16" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Recent"/><LineBreak/><Run Text="QSOs:"/></TextBlock>
+                    <TextBlock Margin="10,0,2,0" FontSize="14" LineHeight="15" LineStackingStrategy="BlockLineHeight" VerticalAlignment="Center" TextAlignment="Left"><Run Text="Recent"/><LineBreak/><Run Text="QSOs:"/></TextBlock>
                 </StatusBarItem>
                 <StatusBarItem>
                     <StatusBarItem.ContextMenu>
@@ -1094,15 +1159,15 @@
                              GotFocus="TB_FreqNoCat_GotFocus" TextChanged="TB_FreqNoCat_TextChanged"/>
                 </Border>
             </Grid>
-            <TextBlock Text="kHz" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource KHzText}"
-                       VerticalAlignment="Bottom" Margin="2,0,0,-2"/>
+            <TextBlock Text="kHz" FontWeight="Bold" FontSize="13" Foreground="{DynamicResource KHzText}"
+                       VerticalAlignment="Bottom" Margin="0,0,0,-2"/>
         </StackPanel>
         <Button x:Name="Btn_Spot" HorizontalAlignment="Left" VerticalAlignment="Top" Grid.Row="1" Margin="580,47,0,0" Width="95" Height="32" Style="{StaticResource SpotButtonStyle}" Click="SpotButton_Click" ToolTip="Spot to DX Cluster (F3)" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch" Padding="0">
             <Grid Width="95">
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M7,3 C1,8 1,24 7,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M11,3 C5,8 5,24 11,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
                 <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-2,0,0">
-                    <TextBlock Text="Spot (F3)" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
+                    <TextBlock Text="Spot (F3)" FontSize="15" FontWeight="Bold" HorizontalAlignment="Center" Margin="0,1,0,0"/>
                 </StackPanel>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M86,3 C92,8 92,24 86,29"/>
                 <Path Stroke="#E53935" StrokeThickness="1.6" Data="M81,3 C88,8 88,24 81,29" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
@@ -1134,28 +1199,32 @@
                     <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
+                <!-- FONT 11 HERE ON PURPOSE - do not raise it to 16 with the rest of the program. These
+                     four buttons are 44x32 and carry two lines each, the name and the function key; at 16
+                     the words are cut off, which is what happened when the no-font-below-16 rule was
+                     applied everywhere and is why it was undone here. Same for Spot (F3) at 15. -->
                 <Button x:Name="Btn_Msg1" Grid.Column="1" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="1" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg1" FontSize="16" HorizontalAlignment="Center" />
-                        <TextBlock Text="F5" FontSize="16" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Msg1" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F5" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="Btn_Msg2" Grid.Column="3" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="2" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg2" FontSize="16" HorizontalAlignment="Center" />
-                        <TextBlock Text="F6" FontSize="16" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Msg2" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F6" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="Btn_Msg3" Grid.Column="5" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="3" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg3" FontSize="16" HorizontalAlignment="Center" />
-                        <TextBlock Text="F7" FontSize="16" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Msg3" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F7" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
                 <Button x:Name="Btn_Msg4" Grid.Column="7" Style="{StaticResource MsgButtonStyle}" Width="44" Height="32" HorizontalAlignment="Center" VerticalAlignment="Center" Padding="0" Tag="4" Click="MessageButton_Click" MouseRightButtonUp="MessageButton_RightClick" PreviewMouseLeftButtonDown="MessageButton_PreviewLeftDown">
                     <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
-                        <TextBlock Text="Msg4" FontSize="16" HorizontalAlignment="Center" />
-                        <TextBlock Text="F8" FontSize="16" Foreground="#444444" HorizontalAlignment="Center"/>
+                        <TextBlock Text="Msg4" FontSize="11" HorizontalAlignment="Center" />
+                        <TextBlock Text="F8" FontSize="11" Foreground="#444444" HorizontalAlignment="Center"/>
                     </StackPanel>
                 </Button>
             </Grid>
@@ -1166,7 +1235,7 @@
             <Run Text="Locator" />
         </TextBlock>
         <TextBox x:Name="TB_MyLocator" HorizontalAlignment="Left" Margin="252,11,0,0" Grid.Row="1" TextWrapping="NoWrap" VerticalAlignment="Top" CharacterCasing="Upper" Text="{Binding Default.my_locator, Source={StaticResource Settings}}" Width="72" Height="28" TextChanged="TB_MyHolyland_TextChanged" PreviewLostKeyboardFocus="TB_MyLocator_PreviewLostKeyboardFocus" FontSize="16" TextAlignment="Left" HorizontalContentAlignment="Left" VerticalContentAlignment="Center" MaxLength="6" TabIndex="3"/>
-        <TextBlock HorizontalAlignment="Left" Margin="332,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="16" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
+        <TextBlock HorizontalAlignment="Left" Margin="332,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="65" Height="38" FontSize="15" ToolTip="Your Holyland square" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Holyland" FontWeight="Bold" />
             <LineBreak />
             <Run Text="Square" />
@@ -1245,7 +1314,7 @@
              Looks pressed INTO the screen when ON (IsChecked), raised OUT when OFF. -->
         <ToggleButton x:Name="BtnSuggestToggle" Content="Suggest (F4)" Grid.Row="1"
                       HorizontalAlignment="Left" VerticalAlignment="Top" Margin="12,101,0,0"
-                      Width="78" Height="20" FontSize="16" FontWeight="Bold" Foreground="#1E2A36"
+                      Width="78" Height="20" FontSize="12" FontWeight="Bold" Foreground="#1E2A36"
                       Focusable="False" Click="BtnSuggestToggle_Click"
                       ToolTip="Show/hide the callsign suggestions dropdown (toggle with F4)">
             <ToggleButton.Template>
@@ -1381,7 +1450,7 @@
                     </StackPanel>
                 </ToolTip>
             </Border.ToolTip>
-            <TextBlock Text="i" Foreground="White" FontWeight="Bold" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center" FontStyle="Italic"/>
+            <TextBlock Text="i" Foreground="White" FontWeight="Bold" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center" FontStyle="Italic"/>
         </Border>
         <Image x:Name="QRZBtn" ToolTip="Get Data from QRZ.com and open the callsign's QRZ.com page" HorizontalAlignment="Left" Height="24" Margin="261,89,0,0" VerticalAlignment="Top" Width="24" Source="Images/qrz.png" MouseUp="QRZBtn_Click" Grid.Row="1" Stretch="UniformToFill" Cursor="Hand" RenderTransformOrigin="0.5,0.5" />
         <!-- "No QRZ.com connection" alert: a red "!" badge on the QRZ icon's top-right corner, shown
@@ -1391,7 +1460,7 @@
                 Margin="275,85,0,0" Width="14" Height="14" CornerRadius="7" Background="#D32F2F"
                 BorderBrush="White" BorderThickness="1.5" Panel.ZIndex="40" IsHitTestVisible="False"
                 Visibility="Collapsed" ToolTip="No connection to QRZ.com">
-            <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="16"
+            <TextBlock Text="!" Foreground="White" FontWeight="Bold" FontSize="10"
                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,-1,0,0"/>
         </Border>
 
@@ -1414,21 +1483,38 @@
         <StackPanel x:Name="ContestRxPanel" Orientation="Horizontal" HorizontalAlignment="Left"
                     VerticalAlignment="Top" Margin="101,122,0,0" Grid.Row="1" Visibility="Collapsed"/>
         <TextBlock x:Name="L_RstSLabel" HorizontalAlignment="Left" Margin="228,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="16" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="S" FontWeight="Bold"/></TextBlock>
-        <TextBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="10" TextChanged="TB_RSTSent_TextChanged"/>
+        <!-- RST S / RST R. On voice these are drop-downs you can also type in, offering 59 down to 51;
+             on CW and the data modes the report is always 599, so ResetRstForMode swaps in the plain
+             typing template instead. The names still start with TB_ because every reference in the code
+             does. -->
+        <ComboBox x:Name="TB_RSTSent" HorizontalAlignment="Left" Height="24" Margin="262,125,0,0" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1"
+                  IsEditable="True" IsTextSearchEnabled="False" StaysOpenOnEdit="True"
+                  Template="{StaticResource FlatEditableComboTemplate}"
+                  Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
+                  GotFocus="RST_GotFocus" DropDownClosed="RST_DropDownClosed" FontSize="16" TabIndex="10" TextBoxBase.TextChanged="TB_RSTSent_TextChanged"/>
         <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,123,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
         <!-- RST R + QTH were pulled left off the x=349 RST R used to have, and the whole group is
              anchored on its RIGHT edge: TB_QTH ends at x=560, exactly under the Time box (496 + 64), so
              this row lines up with the Date/Time row above it. Move any of the four and the group has to
              stay 6px clear of Add (F1) at x=572 and end on 560. The RST R label overlapping the RST S
              box by a couple of pixels is the same idiom as RST S over the Exchange box - the label text
-             is centred in a 40px block, so ~8px of white actually shows. -->
-        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="314,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="16" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
-        <TextBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="348,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="52" Text="59" Grid.Row="1" GotFocus="RST_GotFocus" FontSize="16" MaxLength="5" TabIndex="11"/>
+             is centred in a 40px block, so ~8px of white actually shows.
+             The two RST boxes were 52 wide and are now 36 - enough for "599" with the chevron, measured -
+             so the RST R label, the RST R box and the whole QTH group each moved left by what was freed,
+             and all of it went into TB_QTH: 108 wide before, 149 now. It starts on x=411, the left edge
+             of the Country box on the row below, and still ends on 560 - so the QTH row is now squared
+             off against the row above it AND the row beneath it. -->
+        <TextBlock x:Name="L_RstRLabel" HorizontalAlignment="Left" Margin="298,124,0,0" VerticalAlignment="Top" Grid.Row="1" Width="40" TextAlignment="Center" FontSize="16" LineHeight="13" LineStackingStrategy="BlockLineHeight"><Run Text="RST"/><LineBreak/><Run Text="R" FontWeight="Bold"/></TextBlock>
+        <ComboBox x:Name="TB_RSTRcvd" HorizontalAlignment="Left" Height="24" Margin="332,125,0,0" VerticalAlignment="Top" Width="36" Text="59" Grid.Row="1"
+                  IsEditable="True" IsTextSearchEnabled="False" StaysOpenOnEdit="True"
+                  Template="{StaticResource FlatEditableComboTemplate}"
+                  Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
+                  GotFocus="RST_GotFocus" DropDownClosed="RST_DropDownClosed" FontSize="16" TabIndex="11"/>
         <!-- The DX station's town. Filled from the QRZ.com lookup (its addr2 line is the city) and
              editable, like Name and Country. Hidden in contest mode, where the contest exchange frame
              owns this strip - see ApplyContestExchangeUI. -->
-        <Label x:Name="L_QTHLabel" Content="QTH" HorizontalAlignment="Left" Margin="408,121,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The DX station's town (from QRZ.com)"/>
-        <TextBox x:Name="TB_QTH" HorizontalAlignment="Left" Height="28" Margin="452,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="108" Grid.Row="1" FontSize="16" MaxLength="40" TabIndex="12" ToolTip="The DX station's town (from QRZ.com)"/>
+        <Label x:Name="L_QTHLabel" Content="QTH" HorizontalAlignment="Left" Margin="369,121,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The DX station's town (from QRZ.com)"/>
+        <TextBox x:Name="TB_QTH" HorizontalAlignment="Left" Height="28" Margin="411,125,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="149" Grid.Row="1" FontSize="16" MaxLength="40" TabIndex="12" ToolTip="The DX station's town (from QRZ.com)"/>
         <Label x:Name="L_Date" Content="Date" HorizontalAlignment="Left" Margin="288,83,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's date"/>
         <xctk:DateTimeUpDown x:Name="TP_Date" Format="Custom" FormatString="dd-MM-yyyy" HorizontalAlignment="Left" TextAlignment="Left" Margin="333,86,0,0" Grid.Row="1" VerticalAlignment="Top" Width="112" FontSize="16" Height="28" IsTabStop="False" Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="#ABADB3" BorderThickness="1" />
         <Label Content="Time" HorizontalAlignment="Left" Margin="451,83,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" ToolTip="The QSO's time"/>
@@ -1466,13 +1552,13 @@
             <Button x:Name="MainUndoButton" Width="26" Height="26" Background="Transparent" BorderThickness="0" Cursor="Hand" Padding="0" Click="LogRadioUndoButton_Click" PreviewMouseLeftButtonDown="MainUndoButton_PreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MainUndoButton_PreviewMouseLeftButtonUp" MouseLeave="MainUndoButton_MouseLeave" PreviewMouseRightButtonUp="MainUndoButton_RightClick" ToolTip="Click to undo radio frequency/mode change • Hold to clear all">
                 <Grid>
                     <Image Source="Images/UNDO_Icon.png" Width="22" Height="22" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-                    <TextBlock x:Name="MainUndoCountText" FontSize="16" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
+                    <TextBlock x:Name="MainUndoCountText" FontSize="10" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center" VerticalAlignment="Center" IsHitTestVisible="False"/>
                 </Grid>
             </Button>
         </Grid>
         <Label Content="Name" HorizontalAlignment="Left" Margin="6,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" />
         <TextBox x:Name="TB_DX_Name" HorizontalAlignment="Left" Height="28" Margin="69,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="264" MaxLength="30" Grid.Row="1" Text="{Binding FName, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="15" TextChanged="TB_DX_Name_TextChanged" />
-        <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="340,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
+        <Label x:Name="L_CountryLabel" Content="Country" HorizontalAlignment="Left" Margin="342,159,0,0" VerticalAlignment="Top" Grid.Row="1" FontSize="16" Visibility="Visible" />
         <Image x:Name="Img_CountryFlag" HorizontalAlignment="Left" Margin="376,167,0,0" VerticalAlignment="Top" Grid.Row="1" Width="30" Height="20" Stretch="Uniform" Visibility="Collapsed" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
         <TextBox x:Name="TB_DXCC" HorizontalAlignment="Left" Height="28" Margin="411,163,0,0" TextWrapping="NoWrap" VerticalAlignment="Top" Width="124" MaxLength="25" Grid.Row="1" Text="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" IsEnabled="True" FontSize="16" TabIndex="16" ToolTip="{Binding Country, RelativeSource={RelativeSource AncestorType={x:Type Window}, Mode=FindAncestor}}" />
         <!-- THE COUNTRY'S NUMBER, in a box of its own and NOT inside the one beside it. That box is
@@ -1609,7 +1695,7 @@
                         <DataTemplate>
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Text="{Binding}" VerticalAlignment="Bottom"/>
-                                <TextBlock Text="MHz" FontSize="16" FontWeight="Bold" VerticalAlignment="Bottom" Margin="2,0,0,0"/>
+                                <TextBlock Text="MHz" FontSize="10" FontWeight="Bold" VerticalAlignment="Bottom" Margin="2,0,0,0"/>
                             </StackPanel>
                         </DataTemplate>
                     </DataGridTemplateColumn.HeaderTemplate>
@@ -1857,10 +1943,10 @@
                         </Ellipse>
 
                         <!-- Cardinal direction markers (N, E, S, W) -->
-                        <TextBlock Text="N" FontSize="16" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="6" FontFamily="Segoe UI"/>
-                        <TextBlock Text="E" FontSize="16" FontWeight="Bold" Foreground="#134346" Canvas.Left="82" Canvas.Top="46" FontFamily="Segoe UI"/>
-                        <TextBlock Text="S" FontSize="16" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="82" FontFamily="Segoe UI"/>
-                        <TextBlock Text="W" FontSize="16" FontWeight="Bold" Foreground="#134346" Canvas.Left="8" Canvas.Top="46" FontFamily="Segoe UI"/>
+                        <TextBlock Text="N" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="6" FontFamily="Segoe UI"/>
+                        <TextBlock Text="E" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="82" Canvas.Top="46" FontFamily="Segoe UI"/>
+                        <TextBlock Text="S" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="46" Canvas.Top="82" FontFamily="Segoe UI"/>
+                        <TextBlock Text="W" FontSize="11" FontWeight="Bold" Foreground="#134346" Canvas.Left="8" Canvas.Top="46" FontFamily="Segoe UI"/>
 
                         <!-- Compass needle (rotates based on azimuth) -->
                         <Canvas x:Name="CompassNeedle" Width="100" Height="100" RenderTransformOrigin="0.5,0.5">
