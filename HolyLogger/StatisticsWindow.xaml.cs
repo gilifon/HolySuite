@@ -2631,7 +2631,7 @@ namespace HolyLogger
             {
                 if (missing == null || missing.Count == 0) return;
 
-                string n = missing.Count.ToString("N0");
+                string n = "**" + missing.Count.ToString("N0") + "**";
                 bool review = HolyMessageBox.ShowConfirm(
                     "LoTW has " + n + (missing.Count == 1 ? " confirmed contact" : " confirmed contacts")
                     + " whose callsign is not in this log at all.\n\n"
@@ -2672,7 +2672,9 @@ namespace HolyLogger
             {
                 if (nearMisses == null || nearMisses.Count == 0) return;
 
-                string n = nearMisses.Count.ToString("N0");
+                // **…** is bold in HolyMessageBox: the count is the fact the operator is deciding on,
+                // and it should not have to be picked out of a paragraph.
+                string n = "**" + nearMisses.Count.ToString("N0") + "**";
                 bool review = HolyMessageBox.ShowConfirm(
                     "LoTW has " + n + (nearMisses.Count == 1 ? " confirmation" : " confirmations")
                     + " for stations that ARE in this log, but the band, the mode or the date does not "
