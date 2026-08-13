@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
   <PropertyGroup>
@@ -327,6 +327,10 @@
       <DependentUpon>LogVerifierWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="LotwRestoreWindow.xaml.cs">
+      <DependentUpon>LotwRestoreWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="OtherActivityWindow.xaml.cs">
       <DependentUpon>OtherActivityWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
@@ -337,9 +341,6 @@
     </Compile>
     <Compile Include="QsoEditWindow.xaml.cs">
       <DependentUpon>QsoEditWindow.xaml</DependentUpon>
-    </Compile>
-    <Compile Include="BadQsoEditorWindow.xaml.cs">
-      <DependentUpon>BadQsoEditorWindow.xaml</DependentUpon>
     </Compile>
     <Compile Include="HolyMessageBox.xaml.cs">
       <DependentUpon>HolyMessageBox.xaml</DependentUpon>
@@ -440,6 +441,10 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="LogVerifierWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>
+    <Page Include="LotwRestoreWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -576,10 +581,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="SearchWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="BadQsoEditorWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

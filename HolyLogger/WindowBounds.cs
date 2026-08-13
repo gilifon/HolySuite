@@ -58,9 +58,16 @@ namespace HolyLogger
                 var all = Load();
                 if (!all.TryGetValue(key, out Box b) || b == null) return;
 
-                // Size first, so the visibility net below measures the real window. Anything below the
-                // window's own minimum is ignored, which self-heals a stale too-small saved value.
-                if (b.W > 0 && b.W >= window.MinWidth) window.Width = b.W;
+                // Size first, so the visibility net below measures the real window.
+                //
+                // A saved size SMALLER than the window's own minimum is raised to that minimum, not
+                // thrown away. Discarding it was the old rule, and it turned a 20px correction into a
+                // window that jumped to a completely different size: My Favorite Channels had 300 saved,
+                // its MinWidth went to 380 so the OK button would stop being cut off, and the whole 300
+                // was ignored - so the window opened at its XAML default of 540 and looked as though it
+                // had forgotten everything. Clamping keeps the operator's own size wherever it is still
+                // usable, which is what a remembered size is for.
+                if (b.W > 0) window.Width = Math.Max(b.W, window.MinWidth);
 
                 // A window whose height is content-driven (SizeToContent="Height" / "WidthAndHeight") must
                 // never have Height set explicitly - WPF throws if you try, and the whole point of that
@@ -69,7 +76,7 @@ namespace HolyLogger
                 // area under a window's content after that content was trimmed down).
                 bool heightIsAuto = window.SizeToContent == SizeToContent.Height
                                  || window.SizeToContent == SizeToContent.WidthAndHeight;
-                if (!heightIsAuto && b.H > 0 && b.H >= window.MinHeight) window.Height = b.H;
+                if (!heightIsAuto && b.H > 0) window.Height = Math.Max(b.H, window.MinHeight);
 
                 // Apply the saved corner whenever it is a real number - including on a second monitor.
                 // This used to be gated on a test against SystemParameters.VirtualScreen*, which WPF

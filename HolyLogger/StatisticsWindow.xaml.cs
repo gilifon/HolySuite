@@ -1,4 +1,4 @@
-﻿using DXCCManager;
+using DXCCManager;
 using HolyParser;
 using Newtonsoft.Json;
 using System;
@@ -511,17 +511,10 @@ namespace HolyLogger
             BuildCountryPivot();
             BuildCountryTables();
 
-            int needsEdit = _allQsos.Count(q => string.IsNullOrEmpty(q.Band) || string.IsNullOrEmpty(q.Mode));
-            if (needsEdit > 0)
-            {
-                TB_DataQuality.Text = $"⚠  {needsEdit} QSO{(needsEdit == 1 ? "" : "s")} have missing band or mode.";
-                BTN_EditProblems.Visibility = Visibility.Visible;
-            }
-            else
-            {
-                TB_DataQuality.Text = "";
-                BTN_EditProblems.Visibility = Visibility.Collapsed;
-            }
+            // The band/mode warning and its editor are gone: the Log Fixer reports a missing band with
+            // everything else that is wrong with a QSO, and can fill it in from the frequency, which the
+            // old editor could not. One place to look, one place to put things right.
+            TB_DataQuality.Text = "";
 
             PopulateMissingZones();
             // The status line is set by ApplySourceCounts (called above), which knows which folder is
@@ -2628,6 +2621,79 @@ namespace HolyLogger
         // has arrived since last time. One-shot: cleared as soon as the check reads it.
         private bool _forceFullDownload;
 
+        // LoTW HAS THEM, THIS LOG DOES NOT. A confirmation whose callsign appears nowhere in the log is
+        // a contact the log has lost, and LoTW kept enough of it to put it back. Asked as a question,
+        // because adding QSOs to somebody's log is not a thing to do quietly, and skipped entirely when
+        // there is nothing to add.
+        private async System.Threading.Tasks.Task OfferLotwRestore(List<DataAccess.LotwConfirmation> missing)
+        {
+            try
+            {
+                if (missing == null || missing.Count == 0) return;
+
+                string n = missing.Count.ToString("N0");
+                bool review = HolyMessageBox.ShowConfirm(
+                    "LoTW has " + n + (missing.Count == 1 ? " confirmed contact" : " confirmed contacts")
+                    + " whose callsign is not in this log at all.\n\n"
+                    + "These are contacts the log does not hold — LoTW can put them back, with the date, "
+                    + "time, band, mode, entity and square it keeps.\n\n"
+                    + "Look at them now?",
+                    "Contacts missing from this log", HolyMsgType.Info, this);
+                if (!review) return;
+
+                var win = new LotwRestoreWindow(missing) { Owner = this };
+                win.ShowDialog();
+
+                if (win.Added > 0)
+                {
+                    // THE LOG IS NOW BIGGER THAN EVERY COUNT ON SCREEN. Adding QSOs changes more than the
+                    // grid: the figures along the foot of the main window, this window's own list of the
+                    // log, its per-folder counts, its countries and its zones are all made FROM the QSOs.
+                    // Restoring 147 contacts and leaving those reading the old numbers is the program
+                    // disagreeing with itself, so everything that counts is made to count again.
+                    try { (Application.Current.Windows.OfType<MainWindow>().FirstOrDefault())?.ReloadActiveLogQsos(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                    await ReloadQsosAfterCheck(true);
+                    try { RefreshForSource(); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE OTHER PILE: the station IS in the log, but LoTW's band, mode or date does not agree with
+        // what the log holds. Nothing here is missing, so nothing is added; it is a question about
+        // contacts that already exist, and it is asked in the Log Fixer - the table that exists for
+        // exactly this shape of answer, the log in red on top and what is proposed in green underneath.
+        private void OfferLotwDifferences(List<DataAccess.LotwConfirmation> nearMisses)
+        {
+            try
+            {
+                if (nearMisses == null || nearMisses.Count == 0) return;
+
+                string n = nearMisses.Count.ToString("N0");
+                bool review = HolyMessageBox.ShowConfirm(
+                    "LoTW has " + n + (nearMisses.Count == 1 ? " confirmation" : " confirmations")
+                    + " for stations that ARE in this log, but the band, the mode or the date does not "
+                    + "match what LoTW was sent.\n\n"
+                    + "Nothing is missing here — these are contacts you already have, with one detail "
+                    + "that the two of you recorded differently.\n\n"
+                    + "Look at them in the Log Fixer?",
+                    "Where LoTW disagrees with this log", HolyMsgType.Info, this);
+                if (!review) return;
+
+                int rows = LogVerifierWindow.ShowLotwDifferences(this, _allQsos, nearMisses);
+                if (rows == 0)
+                    HolyMessageBox.Show(
+                        "Nothing to show: every one of them agrees with the log on band, mode and date. "
+                        + "They differ only in which of your callsigns was used, which is not something "
+                        + "to change from here.",
+                        "Where LoTW disagrees with this log", HolyMsgType.Info, this);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         // Writes the confirmations that matched no QSO, each followed by what the log holds for that
         // same callsign. Desktop file, same place as the other diagnostics.
         private static void WriteUnmatchedReport(int total, int matched, List<DataAccess.LotwConfirmation> unmatched,
@@ -3083,6 +3149,13 @@ namespace HolyLogger
                 // re-reading when a flag actually changed.
                 await ReloadQsosAfterCheck(markedConfirmed > 0);
 
+                // THE PROGRESS PANEL COMES DOWN BEFORE ANYTHING IS SAID. The work is over by this line;
+                // leaving it to the finally at the foot of the method meant the summary opened ON TOP of
+                // a frozen last frame - "Matching to your log 2,800 of 2,929", a clock still reading 4:08
+                // and a Stop button - so a finished check looked like one still running behind a dialog
+                // that claimed it had finished. The finally still calls this; it does no harm twice.
+                ShowLotwSpinner(false);
+
                 // EVERY check ends with a summary, incremental included. It used to be left off the
                 // quick check to avoid nagging, which meant pressing the button and getting no answer
                 // at all - and it read as a fault beside eQSL and QRZ, which do report. Consistency
@@ -3094,6 +3167,12 @@ namespace HolyLogger
                 // arrived each time. What matters is how many were new, which is 0.
                 ShowCheckSummary(ConfSource.Lotw, incremental ? newCount : qslCount, incremental,
                                  anythingChanged: !incremental || newCount > 0);
+
+                // AND THEN: LoTW may be holding contacts this log does not have at all. Offered after the
+                // summary, never instead of it, and only when there is something to offer - the operator
+                // is told what the check did before being asked anything.
+                await OfferLotwRestore(result.MissingFromLog);
+                OfferLotwDifferences(result.NearMisses);
             }
             catch (OperationCanceledException)
             {
@@ -3773,6 +3852,19 @@ namespace HolyLogger
             // even though our cty.dat resolver would map its callsign to the modern parent.
             public HashSet<int> ConfirmedActiveCodes = new HashSet<int>();
             public HashSet<int> ConfirmedDeletedCodes = new HashSet<int>();
+
+            // THE CONFIRMATIONS THAT MATCHED NOTHING, sorted into the two piles that want different
+            // things done to them.
+            //
+            // MissingFromLog: this log has never worked that callsign at all. LoTW is holding a contact
+            // the log has lost - which is how a log destroyed with its computer can be got back, if it
+            // was uploaded before the machine died - and every field LoTW keeps of it is here.
+            //
+            // NearMisses: the station IS in the log, but band, mode or date do not agree with what LoTW
+            // was sent. Adding these would not restore anything; it would double-log contacts that are
+            // already there. They are a question - which of the two is right - not an import.
+            public List<DataAccess.LotwConfirmation> MissingFromLog = new List<DataAccess.LotwConfirmation>();
+            public List<DataAccess.LotwConfirmation> NearMisses = new List<DataAccess.LotwConfirmation>();
         }
 
         // The heavy half of the LoTW check, run on a background thread (see the caller). Splits the
@@ -3864,7 +3956,17 @@ namespace HolyLogger
                     QsoDate = qsoDate,
                     StationCallsign = (ExtractAdifField(rec, "station_callsign") ?? string.Empty).Trim(),
                     QslRDate = (ExtractAdifField(rec, "qslrdate") ?? string.Empty).Trim(),
-                    DxccCode = dxccCode
+                    DxccCode = dxccCode,
+
+                    // Everything else the record holds about the contact itself, so a confirmation for a
+                    // QSO the log has lost can be turned back into one. Costs nothing here - the record
+                    // is already parsed - and is ignored by the matching, which reads none of it.
+                    TimeOn = (ExtractAdifField(rec, "time_on") ?? string.Empty).Trim(),
+                    Grid = (ExtractAdifField(rec, "gridsquare") ?? string.Empty).Trim(),
+                    Country = (ExtractAdifField(rec, "country") ?? string.Empty).Trim(),
+                    Continent = (ExtractAdifField(rec, "cont") ?? string.Empty).Trim(),
+                    CqZone = (ExtractAdifField(rec, "cqz") ?? string.Empty).Trim(),
+                    ItuZone = (ExtractAdifField(rec, "ituz") ?? string.Empty).Trim()
                 });
 
                 // Report every so often, not every record: marshaling to the UI thread on all ~6,000
@@ -3917,6 +4019,26 @@ namespace HolyLogger
                     else result.ConfirmedActiveCodes.Add(c.DxccCode);
                 }
             }
+
+            // Sort what matched nothing into "the log has never worked this station" and "it has, but
+            // the details disagree". One query for the whole log's callsigns, then a set lookup each -
+            // asking the database per confirmation would be thousands of queries.
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal != null && unmatched != null && unmatched.Count > 0)
+                {
+                    HashSet<string> worked = dal.WorkedCallsignsInLog(dal.ActiveLogId);
+                    foreach (var c in unmatched)
+                    {
+                        if (worked.Contains(CallsignIdentity.Base(c.Call ?? string.Empty)))
+                            result.NearMisses.Add(c);
+                        else
+                            result.MissingFromLog.Add(c);
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             try { WriteUnmatchedReport(confirmations.Count, result.MarkedConfirmed, unmatched, result.OtherStationConfirmations); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -4076,6 +4198,11 @@ namespace HolyLogger
             }
             else
             {
+                // Taking it down twice is expected - once the moment the work ends, once from the finally
+                // that guarantees it happens at all - and the second time must do nothing, or the freeze
+                // report would be written again over the figures of the run that has just been reported.
+                if (LotwLoadingOverlay.Visibility != Visibility.Visible) return;
+
                 MeasureFreeze();          // a stall that ran right up to the end still counts
                 _uiWatchdogRun = false;   // the thread exits on its own; never joined from the UI thread
                 WriteFreezeReport();
@@ -4427,25 +4554,6 @@ namespace HolyLogger
         {
             if (string.IsNullOrEmpty(adif) || adif.Length < 8) return adif;
             return $"{adif.Substring(0, 4)}-{adif.Substring(4, 2)}-{adif.Substring(6, 2)}";
-        }
-
-        // ── problem QSO editor ────────────────────────────────────────────
-
-        private void BTN_EditProblems_Click(object sender, RoutedEventArgs e)
-        {
-            var badQsos = _allQsos
-                .Where(q => string.IsNullOrEmpty(q.Band) || string.IsNullOrEmpty(q.Mode))
-                .ToList();
-
-            var editor = new BadQsoEditorWindow(badQsos, Dal)
-            {
-                Owner = this
-            };
-            editor.ShowDialog();
-
-            // Refresh stats if any QSOs were saved.
-            if (editor.AnySaved)
-                ComputeStats();
         }
 
         // ── window position / size persistence ───────────────────────────

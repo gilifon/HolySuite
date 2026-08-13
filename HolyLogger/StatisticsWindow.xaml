@@ -293,13 +293,14 @@
                                             BorderBrush="Transparent"
                                             BorderThickness="0"/>
                                 </Border>
+                                <!-- "N QSOs have missing band or mode" and its Edit Problem QSOs button
+                                     were removed with the window behind them. The Log Fixer finds a
+                                     missing band - and fills it in from the frequency, which that editor
+                                     never did - along with every other fault, in one place. -->
                                 <TextBlock x:Name="TB_DataQuality"
                                            Margin="0,8,0,0" FontSize="16" Foreground="{DynamicResource Danger}"
                                            FontStyle="Italic" TextWrapping="Wrap" MaxWidth="390"
                                            HorizontalAlignment="Left"/>
-                                <Button x:Name="BTN_EditProblems" Content="Edit Problem QSOs…"
-                                        Margin="0,6,0,0" Padding="10,4" FontSize="16"
-                                        Visibility="Collapsed" Click="BTN_EditProblems_Click"/>
                             </StackPanel>
 
                             <!-- THE DXCC FOLDER. The same table, counting COUNTRIES instead of contacts,

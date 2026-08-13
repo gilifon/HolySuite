@@ -1100,14 +1100,19 @@ namespace HolyLogger
             // after the window is on screen rather than in the middle of the startup sequence.
             Dispatcher.BeginInvoke(new Action(OfferFrequencyRepair), DispatcherPriority.ApplicationIdle);
 
-            // My Favorite Channels comes back if it was ON SCREEN when the program last closed, or if it
-            // is pinned - pinned meaning "always bring it back, even if I closed it myself last time".
-            // Reopened at its saved position and size (the window restores those itself). Done HERE
-            // rather than in the constructor because ChannelsWindow sets Owner = this, and WPF throws
-            // "Cannot set Owner property to a Window that has not been shown previously" while the main
-            // window is still being built.
-            if (Properties.Settings.Default.ChannelsWindowPinned
-                || Properties.Settings.Default.ChannelsWindowWasOpen)
+            // MY FAVORITE CHANNELS COMES BACK ONLY IF IT IS PINNED. Nothing else opens it - not "it was
+            // open last time", which was tried and taken out again: it kept putting the window on screen
+            // when it was not wanted, and a window that reappears after being closed is worse than one
+            // that has to be fetched from the menu. The pin is the operator's own explicit "always bring
+            // this back", and it is the whole rule.
+            //
+            // Done HERE rather than in the constructor because ChannelsWindow sets Owner = this, and WPF
+            // throws "Cannot set Owner property to a Window that has not been shown previously" while the
+            // main window is still being built.
+            Log.Warn("My Favorite Channels at startup: pinned="
+                     + Properties.Settings.Default.ChannelsWindowPinned);
+
+            if (Properties.Settings.Default.ChannelsWindowPinned)
             {
                 // ShowChannelsWindow, NOT the menu handler: the menu handler deliberately unpins, and
                 // nothing about reopening it here is a request to change the pin.
@@ -5801,16 +5806,8 @@ namespace HolyLogger
             try { _channelsWindow?.PersistNow(); }   // same exposure for the channel list itself
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
-            // WAS MY FAVORITE CHANNELS ON SCREEN WHEN THE PROGRAM CLOSED? Then it belongs on screen when
-            // the program opens again - that is what the operator left set up, and having to fetch it
-            // from the menu every morning is not a setting anybody chose. Recorded here rather than in
-            // the window's own Closing, because a window still open at shutdown never runs that.
-            try
-            {
-                Properties.Settings.Default.ChannelsWindowWasOpen = _channelsWindow != null;
-                Properties.Settings.Default.Save();
-            }
-            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            // (Nothing is recorded here about My Favorite Channels being open. It reopens only when it is
+            // pinned, which is a setting the operator turns on himself and nothing else may write.)
 
             // Land any debounced settings write still waiting on its timer (window bounds saved
             // moments before exit would otherwise be lost with the timer).
@@ -6584,6 +6581,12 @@ namespace HolyLogger
                 // it at the freshly-loaded collection so it updates without being reopened.
                 if (searchWindow != null && searchWindow.IsLoaded)
                     searchWindow.ReplaceSource(Qsos);
+
+                // AND THE FIGURES ALONG THE FOOT OF THE WINDOW. This method is called when the log has
+                // CHANGED underneath the grid, and the QSO / squares / countries counts are made from
+                // exactly that. Without this, restoring 147 contacts from LoTW filled the table and left
+                // the status bar still reporting the count from before them.
+                UpdateNumOfQSOs();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -6638,6 +6641,12 @@ namespace HolyLogger
         }
 
         // Opens (or focuses) the window WITHOUT touching the pinned state.
+        //
+        // "Was it open?" is written the moment it opens and the moment it closes, NOT only at shutdown.
+        // Recording it at shutdown alone was wrong in one direction that matters: any exit that does not
+        // reach DoShutdownCleanup - a crash, an end-of-session teardown - leaves the last "yes" standing
+        // for ever, and the window then opens on every start whatever the operator does with it. Written
+        // here it is always the truth about the last thing that actually happened to the window.
         private void ShowChannelsWindow()
         {
             if (_channelsWindow != null)

@@ -2934,6 +2934,17 @@ Environment.NewLine +
             public string StationCallsign { get; set; } // ours, when the report carries it
             public string QslRDate { get; set; }        // yyyyMMdd, when the report carries it
             public int DxccCode { get; set; }           // LoTW's worked-entity code (date-correct)
+
+            // KEPT FOR THE QSOS THAT ARE NOT IN THE LOG AT ALL. Matching never needed these - LoTW is
+            // matched on call, band, mode and date - but a confirmation for a contact the log has lost
+            // can be turned back INTO that contact, and then the time and the grid are worth having.
+            // LoTW holds nothing else of a QSO: no RST, no name, no QTH, no comment.
+            public string TimeOn { get; set; }          // HHMM or HHMMSS, as the report writes it
+            public string Grid { get; set; }            // the worked station's square
+            public string Country { get; set; }         // LoTW's own name for the entity
+            public string Continent { get; set; }
+            public string CqZone { get; set; }
+            public string ItuZone { get; set; }
         }
 
         // Marks the QSOs that LoTW says are confirmed. Returns how many rows changed.
@@ -3202,6 +3213,39 @@ Environment.NewLine +
                 }
             }
             return found;
+        }
+
+        // EVERY CALLSIGN THIS LOG HAS WORKED, as identity base forms, in one query.
+        //
+        // Answers "is this station in the log at all?" for a whole download at once. The unmatched
+        // confirmations are sorted into two piles with it: a callsign the log has never worked is a QSO
+        // that is genuinely MISSING - the lost-log case - while a callsign that IS there means the
+        // contact is logged and something about it (band, mode, date) simply does not agree with LoTW.
+        // Those two want completely different things done to them, and telling them apart one row at a
+        // time would be one query per confirmation: measured elsewhere in this window at 13 seconds per
+        // hundred, and a full download runs to thousands.
+        //
+        // Identity base forms, so a QSO logged as DL1ABC/P answers for LoTW's DL1ABC.
+        public HashSet<string> WorkedCallsignsInLog(long logId)
+        {
+            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return set;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT DISTINCT dx_callsign FROM qso WHERE log_id = @lid AND dx_callsign IS NOT NULL", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@lid", logId));
+                    using (var rdr = cmd.ExecuteReader())
+                        while (rdr.Read())
+                        {
+                            string call = rdr[0] as string;
+                            if (string.IsNullOrWhiteSpace(call)) continue;
+                            set.Add(CallsignIdentity.Base(call.Trim()));
+                        }
+                }
+            }
+            return set;
         }
 
         // How many QSOs are currently marked confirmed by LoTW.

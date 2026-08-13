@@ -9,6 +9,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Markup;
 using System.Windows.Media;
 using DXCCManager;
@@ -495,6 +496,135 @@ namespace HolyLogger
             if (Math.Abs(Height - firstTime) < 0.5) ShrinkToFitScreen();
         }
 
+        // ── OPENED ON DIFFERENCES SOMEBODY ELSE FOUND ────────────────────────────────────────────
+        //
+        // Same window, same table, same Fix - but the rows come from a comparison this window did not
+        // make. The first user of it is LoTW: a confirmation whose station IS in the log but whose band,
+        // mode or date does not agree with what was uploaded. The log is on top in red, LoTW's version
+        // underneath in green, and the operator ticks the ones where LoTW is right.
+        private LogVerifierWindow(List<Finding> prepared, string title, string headline, string summary)
+        {
+            InitializeComponent();
+            _qsos = new List<QSO>();
+            _logName = "";
+            Title = title;
+
+            FindingsGrid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+            FindingsGrid.ItemsSource = _findings;
+
+            _prepared = prepared ?? new List<Finding>();
+            _preparedHeadline = headline;
+            _preparedSummary = summary;
+
+            // Its own remembered placement: this is a different job from the scan, opened at a different
+            // moment, and the size that suits one need not suit the other.
+            double firstTime = Height;
+            WindowBounds.Attach(this, "LogFixerLotw");
+            if (Math.Abs(Height - firstTime) < 0.5) ShrinkToFitScreen();
+        }
+
+        // WHERE THE LOG AND LoTW DISAGREE ABOUT A CONTACT BOTH OF THEM HAVE.
+        //
+        // Each of these confirmations was matched to nothing, but its callsign IS in the log - so the
+        // contact exists and one of the two records has a detail wrong. Adding it as a new QSO would
+        // double-log it; that is why the missing ones were separated out before either was shown.
+        //
+        // The TIME is deliberately never proposed. LoTW carries the OTHER station's logged time, which
+        // routinely differs from ours by a minute or two - the matcher ignores it for that very reason,
+        // and offering to overwrite our own clock with theirs would be a correction in the wrong
+        // direction. Only band, mode and date are offered.
+        public static int ShowLotwDifferences(Window owner, IEnumerable<QSO> logQsos,
+                                              IEnumerable<DataAccess.LotwConfirmation> nearMisses)
+        {
+            var qsos = (logQsos ?? Enumerable.Empty<QSO>()).Where(q => q != null && !string.IsNullOrWhiteSpace(q.DXCall)).ToList();
+            var misses = (nearMisses ?? Enumerable.Empty<DataAccess.LotwConfirmation>())
+                         .Where(c => c != null && !string.IsNullOrWhiteSpace(c.Call)).ToList();
+            if (qsos.Count == 0 || misses.Count == 0) return 0;
+
+            var byCall = new Dictionary<string, List<QSO>>(StringComparer.OrdinalIgnoreCase);
+            foreach (QSO q in qsos)
+            {
+                string key = CallsignIdentity.Base(q.DXCall.Trim());
+                List<QSO> list;
+                if (!byCall.TryGetValue(key, out list)) { list = new List<QSO>(); byCall[key] = list; }
+                list.Add(q);
+            }
+
+            var findings = new List<Finding>();
+            var taken = new HashSet<QSO>();
+            int sameOnEveryField = 0;
+
+            foreach (var c in misses)
+            {
+                List<QSO> candidates;
+                if (!byCall.TryGetValue(CallsignIdentity.Base(c.Call.Trim()), out candidates)) continue;
+
+                QSO q = BestMatch(candidates, c, taken);
+                if (q == null) continue;
+
+                string band = (c.Band ?? "").Trim().ToUpperInvariant();
+                string mode = (c.Mode ?? "").Trim().ToUpperInvariant();
+                string date = (c.QsoDate ?? "").Trim();
+
+                bool any = false;
+                if (band.Length > 0 && !string.Equals(Text(q.Band), band, StringComparison.OrdinalIgnoreCase))
+                { findings.Add(Difference(q, "LoTW logged another band", "Band", Text(q.Band), band)); any = true; }
+
+                if (mode.Length > 0 && !string.Equals(Text(q.Mode), mode, StringComparison.OrdinalIgnoreCase))
+                { findings.Add(Difference(q, "LoTW logged another mode", "Mode", Text(q.Mode), mode)); any = true; }
+
+                if (date.Length == 8 && !string.Equals(Text(q.Date), date, StringComparison.Ordinal))
+                { findings.Add(Difference(q, "LoTW logged another date", "Date", FormatDate(q.Date), FormatDate(date))); any = true; }
+
+                if (any) taken.Add(q);
+                else sameOnEveryField++;
+            }
+
+            if (findings.Count == 0) return 0;
+
+            int rows = findings.Select(f => f.Qso).Distinct().Count();
+            string headline = rows.ToString("N0") + (rows == 1 ? " QSO does not agree with LoTW" : " QSOs do not agree with LoTW");
+            string summary = "Green is what LoTW holds. Tick the ones where LoTW is right and press Fix; "
+                           + "leave the others and the log keeps what it has."
+                           + (sameOnEveryField > 0
+                                ? "  (" + sameOnEveryField.ToString("N0") + " more differ only in which of your "
+                                  + "callsigns was used, which is not something to change from here.)"
+                                : "");
+
+            var win = new LogVerifierWindow(findings, "Log Fixer — where LoTW disagrees", headline, summary);
+            if (owner != null) win.Owner = owner;
+            win.ShowDialog();
+            return rows;
+        }
+
+        // The QSO a confirmation is most likely to BE. Same date is the strongest sign, then the band,
+        // then the mode; a QSO already claimed by another confirmation is passed over, so two
+        // confirmations for the same station on the same day cannot both land on one QSO.
+        private static QSO BestMatch(List<QSO> candidates, DataAccess.LotwConfirmation c, HashSet<QSO> taken)
+        {
+            QSO best = null;
+            int bestScore = -1;
+            foreach (QSO q in candidates)
+            {
+                if (taken.Contains(q)) continue;
+                int score = 0;
+                if (string.Equals(Text(q.Date), (c.QsoDate ?? "").Trim(), StringComparison.Ordinal)) score += 4;
+                if (string.Equals(Text(q.Band), (c.Band ?? "").Trim(), StringComparison.OrdinalIgnoreCase)) score += 2;
+                if (string.Equals(Text(q.Mode), (c.Mode ?? "").Trim(), StringComparison.OrdinalIgnoreCase)) score += 1;
+                if (score > bestScore) { bestScore = score; best = q; }
+            }
+            return best;
+        }
+
+        private static Finding Difference(QSO q, string problem, string field, string current, string proposed)
+        {
+            Finding f = New(q, problem, current.Length == 0 ? "(empty)" : current, proposed, "LoTW");
+            f.Field = field;
+            f.NewValue = proposed;
+            f.Fixable = true;
+            return f;
+        }
+
         // A first-open height of 1010 is taller than some screens. Nothing else in the window can be
         // trusted to notice - WPF will happily place a window whose bottom is off the desktop - so on the
         // first open only, the height is cut to the work area of the monitor this window landed on.
@@ -523,9 +653,59 @@ namespace HolyLogger
 
         private async void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            // A window opened with findings already made does not scan anything: there is nothing to
+            // look for, the differences were handed to it. Everything after the scan is the same code.
+            if (_prepared != null) { ShowPrepared(); return; }
+
             TB_Header.Text = "Checking " + _qsos.Count.ToString("N0") + " QSOs…";
             TB_Summary.Text = "working…";
             await RunCheck();
+        }
+
+        // ── THE SAME TABLE, FILLED FROM SOMEWHERE ELSE ───────────────────────────────────────────
+        //
+        // The Fixer's SCAN has nothing to say about LoTW - it checks a QSO against the country
+        // databases and against itself. Its TABLE has everything to say about it: the log on top, what
+        // is proposed underneath, only the columns in question, a tick per row, one Fix that copies the
+        // database first. So the LoTW differences are handed in as findings and the window skips
+        // straight to drawing them, rather than a second window being written that looks like this one.
+        private List<Finding> _prepared;
+        private string _preparedHeadline;
+        private string _preparedSummary;
+
+        private void ShowPrepared()
+        {
+            // The paragraph under the heading belongs to the SCAN - "every QSO was checked against the
+            // country databases", "where the program has no answer, type into the green row". None of it
+            // is true here: nothing was scanned and every green cell already holds LoTW's own value.
+            if (TB_Intro != null)
+            {
+                TB_Intro.Inlines.Clear();
+                TB_Intro.Inlines.Add(new Run("These contacts are in your log AND in LoTW, but a detail does "
+                    + "not agree. Red is what the log holds, green is what LoTW was sent. Tick the ones "
+                    + "where LoTW is right and press "));
+                TB_Intro.Inlines.Add(new Run("Fix selected")
+                {
+                    FontWeight = FontWeights.Bold,
+                    Foreground = ThemeManager.Brush("Danger")
+                });
+                TB_Intro.Inlines.Add(new Run(". Your whole database — every log in it — is copied first, "
+                    + "so nothing here is final; you can view it in "));
+                TB_Intro.Inlines.Add(new Run("File → Backups & Restore") { FontWeight = FontWeights.Bold });
+                TB_Intro.Inlines.Add(new Run(". Anything you leave unticked stays exactly as it is."));
+            }
+
+            List<Finding> found = _prepared;
+            foreach (Finding f in found) _findings.Add(f);
+
+            List<string> columns = BuildRows(found);
+            BuildColumns(columns);
+            FindingsGrid.ItemsSource = _rows;
+            BuildKinds(found);
+
+            TB_Header.Text = _preparedHeadline ?? "";
+            TB_Summary.Text = _preparedSummary ?? "";
+            UpdateFixButton();
         }
 
         private async Task RunCheck()
@@ -990,6 +1170,9 @@ namespace HolyLogger
             {
                 case "DXCall": return "Callsign";
                 case "Band": return "Band";
+                case "Mode": return "Mode";
+                case "Date": return "Date";
+                case "Time": return "Time";
                 case "Continent": return "Continent";
                 case "DXLocator": return "DX Locator";
                 case "Country": return "Country";
@@ -1631,6 +1814,19 @@ namespace HolyLogger
                     break;
                 case "Band":
                     qso.Band = f.NewValue;
+                    break;
+                // The date and the time are held as the operator READS them - "18-03-2012", "21:42" -
+                // because that same string is what the green cell shows and what a typed answer arrives
+                // as. Converted here, by the same pair of functions the typed path uses, so a suggestion
+                // and a hand-typed value can never be stored in different formats.
+                case "Mode":
+                    qso.Mode = f.NewValue;
+                    break;
+                case "Date":
+                    { string d = UnformatDate(f.NewValue); if (d != null) qso.Date = d; }
+                    break;
+                case "Time":
+                    { string t = UnformatTime(f.NewValue); if (t != null) qso.Time = t; }
                     break;
                 case "Continent":
                     qso.Continent = f.NewValue;

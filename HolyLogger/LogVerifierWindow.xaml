@@ -20,7 +20,10 @@
         <StackPanel Grid.Row="0" Margin="0,0,0,8">
             <TextBlock x:Name="TB_Header" FontSize="18" FontWeight="Bold"
                        Foreground="{DynamicResource AccentBrush}"/>
-            <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
+            <!-- Named because it is REPLACED when the window is opened on differences somebody else
+                 found: the words below are about the scan, and a window that did not scan anything must
+                 not claim to have. -->
+            <TextBlock x:Name="TB_Intro" FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
                        Foreground="{DynamicResource MutedTextBrush}">
                 <Run Text="Every QSO was checked against the country databases on ITS OWN DATE, and against itself for impossible values. Check the kinds of problem you want put right, then "/><Run
                     Text="Fix selected" FontWeight="Bold" Foreground="{DynamicResource Danger}"/><Run
