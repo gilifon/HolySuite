@@ -683,11 +683,30 @@
                                      different heights. The frame inside is trimmed to fit this height. -->
                                 <Border x:Name="LotwSlot" Height="{Binding ActualHeight, ElementName=TilesRow}">
                                 <!-- No title: this frame only ever shows on the LoTW folder. Tight rows. -->
-                                <Border x:Name="ConfirmSummaryPanel" Padding="10,3"
-                                        VerticalAlignment="Top" CornerRadius="3"
+                                <!-- Stretch, not Top: the slot is already exactly the tiles' height, so
+                                     filling it makes this frame and the tile beside it the same height
+                                     and the row reads as one. Top-aligned it shrank to its text and sat
+                                     short against a taller neighbour. The rows inside are Auto, so the
+                                     content still starts at the top - only the frame grows. -->
+                                <Border x:Name="ConfirmSummaryPanel" Padding="10,4"
+                                        VerticalAlignment="Stretch" CornerRadius="3"
                                         BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1"
                                         Background="{DynamicResource GridAltRowBg}" Visibility="Collapsed">
                                     <Grid>
+                                        <!-- THE ROWS ARE PACKED TIGHTER THAN THE FONT WOULD PACK THEM.
+                                             This frame lives in a slot of FIXED height - pinned to the
+                                             tiles above so the zone lists line up with the country
+                                             lists - so it cannot grow, it can only spill. Four lines at
+                                             16pt need 21.3px each by default; that plus the button came
+                                             to more than the slot and the button was cut in half.
+                                             18px a line still clears every descender at this size and
+                                             gives the button its room back. -->
+                                        <Grid.Resources>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="LineHeight" Value="18"/>
+                                                <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
+                                            </Style>
+                                        </Grid.Resources>
                                         <Grid.ColumnDefinitions>
                                             <ColumnDefinition Width="Auto"/>
                                             <ColumnDefinition Width="*"/>
@@ -732,8 +751,8 @@
                                         <!-- The source's full-download button lives in the frame; only the one for the
                                              current folder is shown. (LoTW also keeps "Check LoTW Updates" in the header.) -->
                                         <Button x:Name="BTN_GetAllConfirmations" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All LoTW Confirmations" FontSize="16" Padding="8,1"
-                                                HorizontalAlignment="Left" Margin="0,3,0,0"
+                                                Content="Get All LoTW Confirmations" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0"
                                                 Click="BTN_GetAllConfirmations_Click">
                                             <Button.ToolTip>
                                                 <ToolTip>
@@ -743,8 +762,8 @@
                                             </Button.ToolTip>
                                         </Button>
                                         <Button x:Name="BTN_CheckQrz" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All QRZ Confirmations" FontSize="16" Padding="8,1"
-                                                HorizontalAlignment="Left" Margin="0,3,0,0" Visibility="Collapsed"
+                                                Content="Get All QRZ Confirmations" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
                                                 Click="BTN_CheckQrz_Click">
                                             <Button.ToolTip>
                                                 <ToolTip>
@@ -754,8 +773,8 @@
                                             </Button.ToolTip>
                                         </Button>
                                         <Button x:Name="BTN_CheckEqsl" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All eQSL Confirmations" FontSize="16" Padding="8,1"
-                                                HorizontalAlignment="Left" Margin="0,3,0,0" Visibility="Collapsed"
+                                                Content="Get All eQSL Confirmations" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
                                                 Click="BTN_CheckEqsl_Click">
                                             <Button.ToolTip>
                                                 <ToolTip>
@@ -765,8 +784,8 @@
                                             </Button.ToolTip>
                                         </Button>
                                         <Button x:Name="BTN_CheckClublog" Grid.Row="4" Grid.ColumnSpan="2"
-                                                Content="Get All Club Log Confirmations" FontSize="16" Padding="8,1"
-                                                HorizontalAlignment="Left" Margin="0,3,0,0" Visibility="Collapsed"
+                                                Content="Get All Club Log Confirmations" FontSize="16" Padding="8,0"
+                                                HorizontalAlignment="Left" Margin="0,1,0,0" Visibility="Collapsed"
                                                 Click="BTN_CheckClublog_Click">
                                             <Button.ToolTip>
                                                 <ToolTip>

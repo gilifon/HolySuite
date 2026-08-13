@@ -2124,6 +2124,15 @@ namespace HolyLogger
             if (BTN_CheckEqsl != null)          BTN_CheckEqsl.Visibility          = _source == ConfSource.Eqsl    ? Visibility.Visible : Visibility.Collapsed;
             if (BTN_CheckClublog != null)       BTN_CheckClublog.Visibility       = _source == ConfSource.Clublog ? Visibility.Visible : Visibility.Collapsed;
 
+            // THE BUTTON WEARS ITS FOLDER'S COLOUR. Four buttons sit on top of each other in this one
+            // slot and only the open folder's is shown, so a button that looks the same on every folder
+            // gives no clue which service it is about to go and ask. The tint is the folder's own -
+            // SourceBackground, the same brush the tab and the page behind it use - so the button reads
+            // as part of the folder rather than as a grey control that happens to be there.
+            Brush folderTint = SourceBackground(_source);
+            foreach (var b in new[] { BTN_GetAllConfirmations, BTN_CheckQrz, BTN_CheckEqsl, BTN_CheckClublog })
+                if (b != null && b.Visibility == Visibility.Visible) b.Background = folderTint;
+
             // Worked and Paper QSL have no downloaded summary (Paper is manual). Keep the frame's SPACE
             // (Hidden) so the zone lists still line up with the download folders.
             // Worked, Paper QSL and DXCC Award have no download of their own (Paper is manual, and Award is
