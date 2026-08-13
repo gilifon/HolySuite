@@ -41,6 +41,14 @@ namespace HolyLogger
 
             MessageText.Text = string.Empty;
             MessageText.Inlines.Clear();
+            AddMarkup(text);
+        }
+
+        // Appends text to whatever is already in the message, turning **...** into bold. Separate from
+        // SetMessage so a caller can add a line AFTER the links it put below the message.
+        private void AddMarkup(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return;
 
             int at = 0;
             bool bold = false;
@@ -285,7 +293,7 @@ namespace HolyLogger
         // how a file gets opened rather than this dialog deciding for it.
         public static void ShowWithLinks(string message, string title, HolyMsgType type, Window owner,
                                          System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>> links,
-                                         Action<string> onLink, double width = 0)
+                                         Action<string> onLink, double width = 0, string footer = null)
         {
             var dlg = new HolyMessageBox(message, title, type, owner, confirm: false, width);
 
@@ -317,6 +325,16 @@ namespace HolyLogger
                     };
                     dlg.MessageText.Inlines.Add(link);
                 }
+
+            // A closing line AFTER the links. The links are added here rather than being part of the
+            // message, so anything meant to come below them cannot be written into the message string -
+            // it would land above. Understands **bold** like the message does.
+            if (!string.IsNullOrWhiteSpace(footer))
+            {
+                dlg.MessageText.Inlines.Add(new System.Windows.Documents.LineBreak());
+                dlg.MessageText.Inlines.Add(new System.Windows.Documents.LineBreak());
+                dlg.AddMarkup(footer);
+            }
 
             // OK in the middle for this kind of message only. The rest of the program keeps it on the
             // right, where every dialog has always had it.

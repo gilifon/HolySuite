@@ -599,6 +599,9 @@ namespace HolyLogger
             // Ctrl+C: tell every template column what it stands for, or the copy is headings only.
             GridCopy.Enable(QSODataGrid);
 
+            // Say so whenever the program writes a report, wherever in the program it happens.
+            Reports.Written += OnReportWritten;
+
             ApplyLogColumnLayout();
             ToggleMatrixControl();
             ToggleAzimuthControl();
@@ -1026,6 +1029,7 @@ namespace HolyLogger
                 sb.AppendLine("QSOs with no band, and any value that would not land back inside the band");
                 sb.AppendLine("it is logged on, are never touched — they are not in this list.");
                 System.IO.File.WriteAllText(reportPath, sb.ToString(), System.Text.Encoding.UTF8);
+                Reports.Note(reportPath);
 
                 bool confirmed = HolyMessageBox.ShowConfirm(
                     $"{fixes.Count} QSO(s) in your log have the frequency stored in kHz (for example " +
@@ -2865,6 +2869,32 @@ namespace HolyLogger
                 QSODataGrid.UnselectAll();
             };
             QSODataGrid.ContextMenu = menu;
+        }
+
+        // The report the notice in the status bar is about, so clicking it opens that file.
+        private string _lastReportPath;
+
+        // A report was written, somewhere in the program. Raised on whatever thread wrote it - an
+        // upload runs on a worker - so the hop to the UI happens here.
+        private void OnReportWritten(string path)
+        {
+            if (!Dispatcher.CheckAccess())
+            {
+                Dispatcher.BeginInvoke(new Action<string>(OnReportWritten), path);
+                return;
+            }
+
+            // NOT IN THE STATUS BAR. That strip already carries the QSO count, the Holyland squares,
+            // the DXCC total, the rig, the clock and the frequency mode - it is a dashboard, not a
+            // place for passing announcements, and one more thing appearing and vanishing in it makes
+            // the rest harder to read. Remembered here for File > Open Reports Folder and for whatever
+            // is chosen to show it.
+            _lastReportPath = path;
+        }
+
+        private void ReportsFolderMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            Reports.OpenFolder();
         }
 
         // A separator and the two copy items, in the menu's own style so they do not look bolted on.

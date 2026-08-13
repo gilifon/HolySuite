@@ -1435,15 +1435,23 @@ namespace HolyLogger
             // THE PATH IS CLICKABLE, so "where is my safety copy" is answered by pressing it rather
             // than by copying a line of text into Explorer. Clicking selects the file in its folder,
             // which is what somebody who wants to keep it, move it or restore it needs to see.
+            // SAY WHAT IT IS FOR. "Your database as it was before this" over a long path told the
+            // operator a fact about a file and left them to work out what to do with it. What they
+            // want to know is how to change their mind - so the sentence is about undoing, and the
+            // path underneath is the evidence that it exists.
             string report = written.ToString("N0") + " QSO" + (written == 1 ? "" : "s") + " fixed."
-                + "\n\nClose and reopen the log window to see the new values.";
+                + "\n\nClose and reopen the log window to see the new values."
+                + (backup == null ? "" :
+                    "\n\nChanged your mind? A copy of your database from just before this was saved. "
+                    + "Open **Tools → Backups & Restore**, pick the newest one — it says "
+                    + "**before a fix** — and restore it.");
 
             if (backup != null)
             {
                 var links = new List<KeyValuePair<string, string>>
                 {
                     new KeyValuePair<string, string>(
-                        "Your database as it was before this — click to open the folder:", backup)
+                        "That copy is this file, if you want to see it:", backup)
                 };
                 HolyMessageBox.ShowWithLinks(report, "Log Fixer", HolyMsgType.Success, this,
                                              links, ShowInFolder, 620);

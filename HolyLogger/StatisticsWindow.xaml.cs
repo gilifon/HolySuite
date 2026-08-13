@@ -2672,6 +2672,7 @@ namespace HolyLogger
             }
 
             System.IO.File.WriteAllText(path, text.ToString(), System.Text.Encoding.UTF8);
+                Reports.Note(path);
         }
 
         // Downloads the complete confirmation history and marks every confirmed QSO.
@@ -4003,6 +4004,7 @@ namespace HolyLogger
                 else
                     foreach (string s in stalls) t.AppendLine(s);
                 System.IO.File.WriteAllText(path, t.ToString(), System.Text.Encoding.UTF8);
+                Reports.Note(path);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }

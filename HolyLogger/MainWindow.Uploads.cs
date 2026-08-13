@@ -682,6 +682,7 @@ namespace HolyLogger
                     file.AppendLine();
                     file.Append(detail);
                     System.IO.File.WriteAllText(reportPath, file.ToString(), System.Text.Encoding.UTF8);
+                    Reports.Note(reportPath);
                 }
                 catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 

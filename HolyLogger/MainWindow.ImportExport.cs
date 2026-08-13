@@ -630,7 +630,7 @@ namespace HolyLogger
                     if (!string.IsNullOrEmpty(result.ReportPath))
                     {
                         HolyMessageBox.ShowWithLinks(msg, "Import Complete", HolyMsgType.Warning, this,
-                            FileLinks(result), OpenPath, 620);
+                            FileLinks(result), OpenPath, 620, ReportsFooter);
                     }
                     else
                     {
@@ -642,7 +642,7 @@ namespace HolyLogger
                     // Nothing rejected, but there IS a report - fields were filled in. Still success,
                     // and still reachable in one click.
                     HolyMessageBox.ShowWithLinks(msg, "Import Complete", HolyMsgType.Success, this,
-                        FileLinks(result), OpenPath, 620);
+                        FileLinks(result), OpenPath, 620, ReportsFooter);
                 }
                 else
                 {
@@ -1222,6 +1222,12 @@ namespace HolyLogger
             return new string(' ', left) + s + new string(' ', width - s.Length - left);
         }
 
+        // The last line of any message that hands the operator a report: where to find it again. The
+        // path above it is one click today and gone tomorrow - this says how to come back to it in a
+        // week, when the message is long closed.
+        private const string ReportsFooter =
+            "Reports can be viewed at any time:\n**File → Open Reports Folder**";
+
         // How many individual rows a report section prints before it stops naming them one by one.
         //
         // A 77 MB ADIF holds a few hundred thousand contacts. A finding on even a tenth of them is tens
@@ -1458,6 +1464,7 @@ namespace HolyLogger
 
                 System.IO.File.WriteAllText(txt, sb.ToString(), Encoding.UTF8);
                 reportPath = txt;
+                Reports.Note(txt);
 
                 if (rejects.Count > 0)
                 {
