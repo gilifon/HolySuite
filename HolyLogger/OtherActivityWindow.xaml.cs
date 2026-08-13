@@ -57,7 +57,10 @@ namespace HolyLogger
         {
             InitializeComponent();
 
-            foreach (var p in KnownPrograms) CB_Program.Items.Add(p.Key);
+            // The pairs themselves, not just their names: the drop-down's template shows the name in
+            // bold and what the program collects beside it, and TextSearch.TextPath (set in the XAML)
+            // keeps the box holding the short name alone.
+            CB_Program.ItemsSource = KnownPrograms;
             CB_Program.Text = (program ?? "").Trim();
             TB_Reference.Text = (reference ?? "").Trim();
 

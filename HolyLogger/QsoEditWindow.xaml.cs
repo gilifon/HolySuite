@@ -133,8 +133,7 @@ namespace HolyLogger
             TB_WwffRef.Text   = S(_qso.WwffRef);
             // The program drop-down carries the same eight names the main form's Other window offers,
             // and its tooltip spells out whichever one is in the box - "ARLHS" means nothing on its own.
-            TB_Sig.Items.Clear();
-            foreach (var p in OtherActivityWindow.Known) TB_Sig.Items.Add(p.Key);
+            TB_Sig.ItemsSource = OtherActivityWindow.Known;
             TB_Sig.Text       = S(_qso.Sig);
             ShowProgramMeaning();
             TB_Sig.LostFocus += (s, e) => ShowProgramMeaning();

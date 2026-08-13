@@ -260,9 +260,24 @@
                      list earns its space. Editable, because a program founded next year must still be
                      typeable. The Cell style cannot be used here - it targets TextBox - so the look is
                      set by hand to match the boxes beside it. -->
+                <!-- Each line of the list says what the program collects, exactly as the Other-activity
+                     window shows it: the short name in bold, its subject in blue beside it. The BOX
+                     still holds the short name alone (TextSearch.TextPath), which is what is logged. -->
                 <ComboBox Grid.Row="1" Grid.Column="4" x:Name="TB_Sig" IsEditable="True" FontSize="16"
                           Margin="1,0,1,1" Padding="2,3" VerticalContentAlignment="Center"
-                          ToolTip="Any other program, by its short name — WCA for castles, MOTA for mills, ARLHS for lighthouses"/>
+                          TextSearch.TextPath="Key"
+                          ToolTip="Any other program, by its short name — WCA for castles, MOTA for mills, ARLHS for lighthouses">
+                    <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Text="{Binding Key}" FontSize="16" FontWeight="Bold" MinWidth="72"
+                                           Foreground="{DynamicResource TextBrush}"/>
+                                <TextBlock Text="{Binding Value}" FontSize="16" Margin="8,0,0,0"
+                                           Foreground="{DynamicResource AccentBrush}"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                </ComboBox>
                 <TextBox Grid.Row="1" Grid.Column="5" x:Name="TB_SigInfo" Style="{StaticResource Cell}" FontSize="16" CharacterCasing="Upper" MaxLength="60"
                          ToolTip="The reference within that program, e.g. OK-00234"/>
             </Grid>

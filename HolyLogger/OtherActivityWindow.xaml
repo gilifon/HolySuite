@@ -24,9 +24,26 @@
         <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
             <TextBlock Text="Program" FontSize="16" Width="110" VerticalAlignment="Center"
                        Foreground="{DynamicResource TextBrush}"/>
+            <!-- EACH LINE OF THE LIST SAYS WHAT THE PROGRAM IS. "ARLHS" means nothing to anyone who has
+                 not activated a lighthouse, and three of these eight ARE lighthouses - a list of bare
+                 short names made the operator pick one and then find out. The name stays on the left in
+                 bold and its subject follows in blue, so the column of names still reads as a column.
+                 TextSearch.TextPath="Key" keeps the BOX itself showing the short name alone, which is
+                 what gets logged; only the drop-down carries the explanation. -->
             <ComboBox x:Name="CB_Program" IsEditable="True" Width="180" Height="30" FontSize="16"
-                      VerticalContentAlignment="Center"
-                      ToolTip="Pick one, or type the short name of any other program"/>
+                      VerticalContentAlignment="Center" TextSearch.TextPath="Key"
+                      ToolTip="Pick one, or type the short name of any other program">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Key}" FontSize="16" FontWeight="Bold" MinWidth="72"
+                                       Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="{Binding Value}" FontSize="16" Margin="8,0,0,0"
+                                       Foreground="{DynamicResource AccentBrush}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
             <TextBlock x:Name="TB_ProgramHint" FontSize="16" Margin="12,0,0,0" VerticalAlignment="Center"
                        Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
         </StackPanel>
