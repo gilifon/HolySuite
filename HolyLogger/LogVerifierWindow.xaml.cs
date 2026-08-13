@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
@@ -117,22 +117,90 @@ namespace HolyLogger
 
             public string CountText { get { return Count.ToString("N0"); } }
 
-            // WHY THE TICK BOX IS GREY, said in words. "(report only)" was a programmer's shorthand: it
-            // named what the window would do rather than what the operator has to do about it. These
-            // rows are the ones where no database can supply the answer - a grid that is not a locator,
-            // an operation Club Log says never counted - so the QSO has to be opened and judged.
+            // WHAT THIS KIND ACTUALLY MEANS, beside its own count, so nobody has to guess it from the
+            // rows. Every kind has a sentence - the ones the program can put right and the ones only the
+            // operator can judge - and for the second sort the sentence says so in as many words ("only
+            // you can fix it", "only you know which band it was"), which is also the answer to why that
+            // tick box is grey. It replaced one sentence that appeared on every hand-judged kind alike
+            // and merely repeated the window's own heading.
             public string HandNote
             {
-                // Not "double-click the QSO" any more: the green half of every cell is a text box, so
-                // the answer the program could not supply is typed straight into the table, and the
-                // row's own tick box comes alive as soon as it is.
-                get
+                get { return Explain(Name); }
+            }
+
+            // THE COUNTRY KINDS READ ALIKE UNTIL YOU KNOW WHICH HALF IS WRONG. Each of them shows a
+            // country name in red and another in green, so on the screen they look like the same
+            // complaint three times; what actually differs is whether the COUNTRY CODE - the thing an
+            // award is counted from - is wrong, right, or right with the wrong words beside it.
+            //
+            // "Country code", never "entity number", because Country Code is what the column at the top
+            // of the table below is called and what the operator therefore calls it.
+            private static string Explain(string kind)
+            {
+                // "Comment holds a WWFF reference" - the program's name is part of the kind, so this one
+                // is matched on its opening words rather than whole.
+                if (kind != null && kind.StartsWith("Comment holds a", StringComparison.Ordinal))
+                    return "The comment holds a reference AND other text, so only you can separate them";
+
+                switch (kind)
                 {
-                    return Fixable
-                        ? ""
-                        : "the program has no value to offer — each row below says why, and you can "
-                          + "type the answer there";
+                    // the callsign
+                    case "No callsign":
+                        return "The QSO has no callsign at all, so nothing else about it can be checked";
+                    case "Damaged callsign":
+                        return "Stray characters are stuck to the front or back of the callsign; the fix will take them off";
+                    case "Callsign holds odd characters":
+                        return "Odd characters inside the callsign — only you can fix it";
+
+                    // date and time
+                    case "Unreadable date":
+                        return "What stands in the date field is not a date";
+                    case "Date in the future":
+                        return "The QSO is dated later than today";
+                    case "Impossible date":
+                        return "The QSO is dated before amateur radio existed";
+                    case "Impossible time":
+                        return "What stands in the time field is not a time of day";
+
+                    // band, frequency, mode
+                    case "Frequency is on no amateur band":
+                        return "That frequency belongs to no amateur band, so the band cannot be worked out from it";
+                    case "No band":
+                        return "The band is empty, and the frequency logged says which one it was";
+                    case "No band and no frequency":
+                        return "Neither was logged, so only you know which band it was";
+                    case "Band does not match the frequency":
+                        return "The two disagree, and the frequency is the one the radio measured";
+                    case "No mode":
+                        return "No mode was logged";
+
+                    // the worked station's grid
+                    case "DX Locator is wrong":
+                        return "The grid is not a grid: two letters, two digits, and usually two more letters";
+
+                    // the comment
+                    case "Reference sitting in the comment":
+                        return "A park or summit reference is sitting in the comment; it belongs in its own field";
+
+                    // Club Log
+                    case "Club Log: operation did not count":
+                        return "Club Log says this operation earned no award credit on that date";
+
+                    // the country
+                    case "Different country":
+                        return "The country code in the log is wrong, so the QSO counts as the wrong country";
+                    case "No country code":
+                        return "The fix will add the missing country code";
+                    case "No country":
+                        return "The fix will add the country and its code";
+                    case "Wrong country name":
+                        return "The country code is right — only the name belongs to another country";
+                    case "Country spelled differently":
+                        return "The same country in other words — nothing counts wrongly";
+                    case "Wrong continent":
+                        return "The continent does not match the country the QSO counts for";
                 }
+                return "";
             }
 
             private bool @checked;
@@ -209,7 +277,7 @@ namespace HolyLogger
                     if (proposed == v) return;
                     proposed = v;
                     UserEdited = true;
-                    Raise("Proposed"); Raise("ThenBg"); Raise("ThenWeight"); Raise("NoteVisible");
+                    Raise("Proposed"); Raise("ThenBg"); Raise("ThenWeight"); Raise("NoteVisible"); Raise("EchoVisible");
                     if (Changed != null) Changed();
                 }
             }
@@ -231,11 +299,28 @@ namespace HolyLogger
                 }
             }
 
+            // THE LOWER HALF REPEATS WHAT IS NOT CHANGING. With only the mended cells filled in, the
+            // second line was a row of blanks with one green word in it, and the operator had to look up
+            // to the line above to see WHICH QSO it belonged to. Now every other cell shows its own value
+            // again, in grey: the lower half reads as the whole contact as it would stand after the fix.
+            //
+            // Grey and behind the text box, exactly like the note - so it is plainly not a proposal (no
+            // green), it is not something that gets written, and it disappears the moment anything is
+            // typed there, leaving the cell the operator's.
+            public Visibility EchoVisible
+            {
+                get
+                {
+                    return proposed.Length == 0 && string.IsNullOrEmpty(Note) && !string.IsNullOrEmpty(Current)
+                        ? Visibility.Visible : Visibility.Collapsed;
+                }
+            }
+
             // Filling a suggestion in from a finding is not the operator typing.
             public void Suggest(string value)
             {
                 proposed = value ?? "";
-                Raise("Proposed"); Raise("ThenBg"); Raise("ThenWeight");
+                Raise("Proposed"); Raise("ThenBg"); Raise("ThenWeight"); Raise("EchoVisible");
             }
 
             private void Raise(string name)
@@ -715,9 +800,29 @@ namespace HolyLogger
                 else if (storedCountry.Length > 0 && ourCode > 0 && storedCode == ourCode
                          && !string.Equals(storedCountry, dated.Name, StringComparison.OrdinalIgnoreCase))
                 {
-                    // Same entity, different wording. Nothing counts wrongly because of it.
-                    Finding f = New(q, "Country spelled differently",
-                                    storedCountry, dated.Name, EvidenceFor(dated, call));
+                    // The entity NUMBER is right and only the words differ - but there are two very
+                    // different reasons for that, and calling both of them a spelling was wrong.
+                    //
+                    //   "Fed. Rep. of Germany" against "Germany" is a spelling. Two databases, two
+                    //   wordings, one country; nothing counts wrongly and it can be left alone for ever.
+                    //
+                    //   "United States" against entity 71 is not. That name belongs to a different
+                    //   country altogether - the QSO is Galapagos by its own number - so the log READS
+                    //   as a country it does not count as. K7ST/HC8, KU9C/VP9 (Bermuda logged as United
+                    //   States) and I1GDH/IS0 (Sardinia logged as Italy) are all of this kind.
+                    //
+                    // The two are told apart by asking what entity the stored WORDING itself names: if
+                    // it names another entity, the name is simply wrong.
+                    int nameCode = 0;
+                    try { nameCode = lookup.EntityCodeForCountry(storedCountry, when); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    bool namesAnother = nameCode > 0 && nameCode != storedCode;
+
+                    Finding f = New(q, namesAnother ? "Wrong country name"
+                                                    : "Country spelled differently",
+                                    namesAnother ? Named(nameCode, storedCountry) : storedCountry,
+                                    namesAnother ? Named(storedCode, dated.Name) : dated.Name,
+                                    EvidenceFor(dated, call));
                     f.Field = "CountryName";
                     f.NewValue = dated.Name;
                     f.Fixable = true;
@@ -814,8 +919,11 @@ namespace HolyLogger
             if (problem == "Damaged callsign") return 4;
             if (problem.StartsWith("Band") || problem.StartsWith("Frequency")) return 5;
             if (problem == "Wrong continent") return 6;
-            if (problem == "Country spelled differently") return 8;   // last: nothing counts wrongly
-            return 7;
+            // A name that belongs to another country is worth reading before a mere wording, because a
+            // log that SAYS United States while counting as Galapagos misleads whoever reads it.
+            if (problem == "Wrong country name") return 7;
+            if (problem == "Country spelled differently") return 9;   // last: nothing counts wrongly
+            return 8;
         }
 
         private static string ZoneSuffix(string cq, string itu)
@@ -1115,6 +1223,12 @@ namespace HolyLogger
                     + "<Grid><TextBlock Text='{Binding Cells[" + safe + "].Note}' TextWrapping='Wrap' "
                     + "Visibility='{Binding Cells[" + safe + "].NoteVisible}' Margin='3,2,3,2' "
                     + "FontStyle='Italic' FontSize='14' Foreground='#8A0000' IsHitTestVisible='False'/>"
+                    // AND THE REST OF THE QSO, repeated in grey behind the box wherever nothing is being
+                    // proposed, so the lower half reads as the whole contact rather than as one green
+                    // word among blanks. Not hit-testable, so a click still lands in the text box.
+                    + "<TextBlock Text='{Binding Cells[" + safe + "].Current}' TextWrapping='Wrap' "
+                    + "Visibility='{Binding Cells[" + safe + "].EchoVisible}' Margin='3,2,3,2' "
+                    + "Foreground='#8C8C8C' IsHitTestVisible='False'/>"
                     + "<TextBox Text='{Binding Cells[" + safe + "].Proposed, Mode=TwoWay, "
                     + "UpdateSourceTrigger=PropertyChanged}' Background='Transparent' BorderThickness='0' "
                     + "Padding='3,2,3,2' Foreground='#0B4A0E' "
@@ -1135,16 +1249,25 @@ namespace HolyLogger
         private void BuildKinds(List<Finding> found)
         {
             _kinds.Clear();
+            // EVERYTHING THE PROGRAM CAN PUT RIGHT COMES FIRST, and only then the kinds that are the
+            // operator's own to judge. Those two halves are what he does different things with - tick the
+            // first, read and answer the second - so they are not left interleaved. Inside each half the
+            // old order stands: worst first, by Rank.
             foreach (var g in found.GroupBy(f => f.Problem)
-                                   .OrderBy(g => Rank(g.Key))
+                                   .OrderBy(g => g.Any(f => f.Fixable) ? 0 : 1)
+                                   .ThenBy(g => Rank(g.Key))
                                    .ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
             {
                 var kind = new ProblemKind
                 {
                     Name = g.Key,
                     Count = g.Count(),
-                    // A kind can be ticked only when every one of its findings has something to
-                    // propose. Half a kind being fixable would make the tick box a half-truth.
+                    // The tick box is alive when the program has an answer for AT LEAST ONE QSO of this
+                    // kind - not for all of them. Requiring all would grey out a whole kind because a
+                    // single QSO in it cannot be answered, and the rest would then have to be ticked one
+                    // by one for no reason. Ticking a mixed kind is still honest: the rows with nothing
+                    // to propose are left alone (KindChecked, and Finding.Apply refuses a tick it cannot
+                    // honour), and each of them can still be answered by typing into its green row.
                     Fixable = g.Any(f => f.Fixable)
                 };
                 kind.CheckedChanged = KindChecked;

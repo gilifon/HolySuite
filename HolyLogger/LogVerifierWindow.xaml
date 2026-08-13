@@ -24,7 +24,9 @@
                        Foreground="{DynamicResource MutedTextBrush}">
                 <Run Text="Every QSO was checked against the country databases on ITS OWN DATE, and against itself for impossible values. Check the kinds of problem you want put right, then "/><Run
                     Text="Fix selected" FontWeight="Bold" Foreground="{DynamicResource Danger}"/><Run
-                    Text=". Your whole database — every log in it — is copied first, so nothing here is final."/><LineBreak/><Run
+                    Text=". Your whole database — every log in it — is copied first, so nothing here is final. You can view the database in "/><Run
+                    Text="File → Backups &amp; Restore" FontWeight="Bold"/><Run
+                    Text="."/><LineBreak/><Run
                     Text="Where the program has no answer, "/><Run
                     Text="type the right value into the green row" FontWeight="Bold" Foreground="{DynamicResource Danger}"/><Run
                     Text=" and its check box comes alive. Double-clicking a row still opens the whole QSO for editing."/>
@@ -67,10 +69,25 @@
                                 <DockPanel Margin="0,3,0,3" LastChildFill="False">
                                     <!-- The tick box stays outside the button: ticking a kind and
                                          viewing a kind are two different acts, and one click must
-                                         never do both. -->
-                                    <CheckBox DockPanel.Dock="Left" Width="34" VerticalAlignment="Center"
-                                              IsEnabled="{Binding Fixable}"
-                                              IsChecked="{Binding Checked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"/>
+                                         never do both.
+                                         A kind the program cannot answer shows NO box at all, rather
+                                         than a grey one: a box that can never be ticked is an invitation
+                                         the window then refuses. Its 34px are still held by the Grid, so
+                                         every button below it stays in the same column. -->
+                                    <Grid DockPanel.Dock="Left" Width="34">
+                                        <CheckBox VerticalAlignment="Center" HorizontalAlignment="Center"
+                                                  IsChecked="{Binding Checked, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                                            <CheckBox.Style>
+                                                <Style TargetType="CheckBox">
+                                                    <Style.Triggers>
+                                                        <DataTrigger Binding="{Binding Fixable}" Value="False">
+                                                            <Setter Property="Visibility" Value="Hidden"/>
+                                                        </DataTrigger>
+                                                    </Style.Triggers>
+                                                </Style>
+                                            </CheckBox.Style>
+                                        </CheckBox>
+                                    </Grid>
 
                                     <!-- SHAPED LIKE A BUTTON, because it behaves like one: it filters
                                          the table to this kind. Plain text that happens to be clickable
@@ -82,21 +99,49 @@
                                             CornerRadius="4" BorderThickness="1" Padding="12,5,12,5"
                                             MinWidth="300" HorizontalAlignment="Left"
                                             ToolTip="Click to show only these QSOs in the table below">
+                                        <!-- THE BUTTON WEARS THE SAME COLOUR AS ITS SENTENCE: blue for a
+                                             kind the program can put right, red for one only the operator
+                                             can settle. Written as two families rather than one, because
+                                             hovering and "this is the kind on show" must still light up
+                                             inside each - a red button that turned blue under the mouse
+                                             would say the wrong thing about itself. The red conditions
+                                             come last so they win over the blue ones they repeat. -->
                                         <Border.Style>
                                             <Style TargetType="Border">
-                                                <Setter Property="Background" Value="#F0F0F0"/>
-                                                <Setter Property="BorderBrush" Value="#B0B0B0"/>
+                                                <Setter Property="Background" Value="#D6E6FA"/>
+                                                <Setter Property="BorderBrush" Value="#7FA9DC"/>
                                                 <Style.Triggers>
                                                     <Trigger Property="IsMouseOver" Value="True">
-                                                        <Setter Property="Background" Value="#E3EEFF"/>
+                                                        <Setter Property="Background" Value="#C0DAF8"/>
                                                         <Setter Property="BorderBrush" Value="#1565C0"/>
                                                     </Trigger>
                                                     <!-- After the hover trigger, so the kind currently
                                                          on show stays lit even as the mouse moves off. -->
                                                     <DataTrigger Binding="{Binding Selected}" Value="True">
-                                                        <Setter Property="Background" Value="#CFE3FF"/>
+                                                        <Setter Property="Background" Value="#A6C9F2"/>
                                                         <Setter Property="BorderBrush" Value="#1565C0"/>
                                                     </DataTrigger>
+
+                                                    <DataTrigger Binding="{Binding Fixable}" Value="False">
+                                                        <Setter Property="Background" Value="#F7D4D4"/>
+                                                        <Setter Property="BorderBrush" Value="#D48787"/>
+                                                    </DataTrigger>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding Fixable}" Value="False"/>
+                                                            <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource Self}}" Value="True"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Background" Value="#F0BDBD"/>
+                                                        <Setter Property="BorderBrush" Value="#C62828"/>
+                                                    </MultiDataTrigger>
+                                                    <MultiDataTrigger>
+                                                        <MultiDataTrigger.Conditions>
+                                                            <Condition Binding="{Binding Fixable}" Value="False"/>
+                                                            <Condition Binding="{Binding Selected}" Value="True"/>
+                                                        </MultiDataTrigger.Conditions>
+                                                        <Setter Property="Background" Value="#E9A9A9"/>
+                                                        <Setter Property="BorderBrush" Value="#C62828"/>
+                                                    </MultiDataTrigger>
                                                 </Style.Triggers>
                                             </Style>
                                         </Border.Style>
@@ -116,10 +161,30 @@
                                                Margin="14,0,0,0" TextAlignment="Right"
                                                VerticalAlignment="Center"
                                                Foreground="{DynamicResource AccentBrush}"/>
+                                    <!-- What the kind means, in the window's own blue. Measured: at the
+                                         width this window opens with, the longest of them is 593px in
+                                         the 703px this leaves, so none of them wraps. Wrapping is on all
+                                         the same, because the window can be dragged narrower and a
+                                         sentence that quietly loses its end is worse than one on two
+                                         lines. -->
+                                    <!-- Blue for a kind the program can put right, red for one only the
+                                         operator can settle. The colour says at a glance which half of
+                                         the list is his work, and it is the same red the heading uses
+                                         for the words about typing into the green row. -->
                                     <TextBlock DockPanel.Dock="Left" Text="{Binding HandNote}"
                                                FontSize="16" FontStyle="Italic" Margin="18,0,16,0"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource Danger}"/>
+                                               VerticalAlignment="Center" TextWrapping="Wrap">
+                                        <TextBlock.Style>
+                                            <Style TargetType="TextBlock">
+                                                <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+                                                <Style.Triggers>
+                                                    <DataTrigger Binding="{Binding Fixable}" Value="False">
+                                                        <Setter Property="Foreground" Value="{DynamicResource Danger}"/>
+                                                    </DataTrigger>
+                                                </Style.Triggers>
+                                            </Style>
+                                        </TextBlock.Style>
+                                    </TextBlock>
                                 </DockPanel>
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>

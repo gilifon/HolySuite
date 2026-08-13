@@ -1827,6 +1827,18 @@ namespace HolyLogger.Properties {
 
         [global::System.Configuration.UserScopedSettingAttribute()]
         [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("False")]
+        public bool ChannelsWindowWasOpen {
+            get {
+                return ((bool)(this["ChannelsWindowWasOpen"]));
+            }
+            set {
+                this["ChannelsWindowWasOpen"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
         [global::System.Configuration.DefaultSettingValueAttribute("0")]
         public int FreqRepairDeclinedCount {
             get {

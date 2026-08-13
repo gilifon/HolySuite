@@ -1491,7 +1491,7 @@
                   IsEditable="True" IsTextSearchEnabled="False" StaysOpenOnEdit="True"
                   Template="{StaticResource FlatEditableComboTemplate}"
                   Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
-                  GotFocus="RST_GotFocus" DropDownClosed="RST_DropDownClosed" FontSize="16" TabIndex="10" TextBoxBase.TextChanged="TB_RSTSent_TextChanged"/>
+                  GotFocus="RST_GotFocus" DropDownClosed="RST_DropDownClosed" DropDownOpened="RST_DropDownOpened" PreviewTextInput="RST_PreviewTextInput" PreviewMouseLeftButtonUp="RST_PreviewMouseLeftButtonUp" FontSize="16" TabIndex="10" TextBoxBase.TextChanged="TB_RSTSent_TextChanged"/>
         <local:SMeterControl x:Name="SMeter" HorizontalAlignment="Left" Margin="340,123,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Collapsed"/>
         <!-- RST R + QTH were pulled left off the x=349 RST R used to have, and the whole group is
              anchored on its RIGHT edge: TB_QTH ends at x=560, exactly under the Time box (496 + 64), so
@@ -1509,7 +1509,7 @@
                   IsEditable="True" IsTextSearchEnabled="False" StaysOpenOnEdit="True"
                   Template="{StaticResource FlatEditableComboTemplate}"
                   Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}" BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
-                  GotFocus="RST_GotFocus" DropDownClosed="RST_DropDownClosed" FontSize="16" TabIndex="11"/>
+                  GotFocus="RST_GotFocus" DropDownClosed="RST_DropDownClosed" DropDownOpened="RST_DropDownOpened" PreviewTextInput="RST_PreviewTextInput" PreviewMouseLeftButtonUp="RST_PreviewMouseLeftButtonUp" FontSize="16" TabIndex="11"/>
         <!-- The DX station's town. Filled from the QRZ.com lookup (its addr2 line is the city) and
              editable, like Name and Country. Hidden in contest mode, where the contest exchange frame
              owns this strip - see ApplyContestExchangeUI. -->

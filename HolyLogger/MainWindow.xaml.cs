@@ -1100,14 +1100,17 @@ namespace HolyLogger
             // after the window is on screen rather than in the middle of the startup sequence.
             Dispatcher.BeginInvoke(new Action(OfferFrequencyRepair), DispatcherPriority.ApplicationIdle);
 
-            // Pinned My Favorite Channels: reopen it as part of the setup, at its saved position and size
-            // (the window restores those itself). Done HERE rather than in the constructor because
-            // ChannelsWindow sets Owner = this, and WPF throws "Cannot set Owner property to a Window
-            // that has not been shown previously" while the main window is still being built.
-            if (Properties.Settings.Default.ChannelsWindowPinned)
+            // My Favorite Channels comes back if it was ON SCREEN when the program last closed, or if it
+            // is pinned - pinned meaning "always bring it back, even if I closed it myself last time".
+            // Reopened at its saved position and size (the window restores those itself). Done HERE
+            // rather than in the constructor because ChannelsWindow sets Owner = this, and WPF throws
+            // "Cannot set Owner property to a Window that has not been shown previously" while the main
+            // window is still being built.
+            if (Properties.Settings.Default.ChannelsWindowPinned
+                || Properties.Settings.Default.ChannelsWindowWasOpen)
             {
                 // ShowChannelsWindow, NOT the menu handler: the menu handler deliberately unpins, and
-                // this window is opening precisely BECAUSE it is pinned.
+                // nothing about reopening it here is a request to change the pin.
                 try { ShowChannelsWindow(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
@@ -4302,23 +4305,82 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
         }
 
-        // Landing in an RST box selects the STRENGTH digit - the one that actually varies - so typing a
-        // single number changes 59 to 57 without touching the rest.
-        private void RST_GotFocus(object sender, RoutedEventArgs e)
+        // THE WHOLE BOX OPENS THE LIST, not just the chevron. The chevron is 10px wide in a 36px box and
+        // hitting it with a mouse mid-QSO is a nuisance, so a click anywhere on the box does what a click
+        // on the chevron does. Typing is untouched: the box keeps the keyboard focus while the list is
+        // open (StaysOpenOnEdit), so a report can still simply be typed over.
+        //
+        // ON THE BUTTON COMING UP, NOT GOING DOWN. Opening it on the way down looks like doing nothing at
+        // all: the list appears and the ComboBox's own handling of the release closes it again before
+        // anything is drawn. Measured all four ways in a test harness - open on down, open on down and
+        // swallow the release, defer the opening, open on up - and only opening on the way up survives.
+        //
+        // Two things this must not break. On CW there IS no list - the box has no items and wears the
+        // plain template - so it returns at once and stays an ordinary typing box. And a click on a value
+        // in the open list must select that value: those clicks tunnel through this handler on their way
+        // down, and are told apart by being outside the box's own rectangle, the popup hanging below it.
+        private void RST_PreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
-            TextBox box = sender as TextBox ?? RstEditor(sender as ComboBox);
-            if (box == null || box.Text.Length < 2) return;
-            box.CaretIndex = 1;
-            box.SelectionLength = 1;
+            ComboBox box = sender as ComboBox;
+            if (box == null || box.Items.Count == 0) return;
+
+            Point p = e.GetPosition(box);
+            if (p.X < 0 || p.Y < 0 || p.X > box.ActualWidth || p.Y > box.ActualHeight) return;
+
+            TextBox editor = RstEditor(box);
+            if (editor != null && !editor.IsKeyboardFocusWithin) editor.Focus();
+
+            box.IsDropDownOpen = !box.IsDropDownOpen;
+            e.Handled = true;
         }
 
-        // Picking a report off the list leaves WPF's own selection over the value, which reads as a grey
-        // wash across the digits. Nothing is being typed at that moment, so the highlight is dropped and
-        // the caret parked at the end. Queued at Input priority because the ComboBox re-selects the text
-        // itself as focus comes back to the box, after this event has been raised.
+        // NO DIGIT IS EVER LEFT HIGHLIGHTED. Landing in the box used to select the strength digit so that
+        // typing one number changed 59 to 57, and picking a report off the list leaves WPF's own
+        // selection over the value; both painted a block of colour across a two-digit box and read as if
+        // something was wrong with it. The selection is dropped and the caret parked at the end instead.
+        //
+        // Typing still replaces rather than being refused by a full box: the box is marked FRESH while it
+        // is newly focused, and the first character typed empties it first (RST_PreviewTextInput). So
+        // "5", "7" gives 57, exactly as before, and nothing is tinted on the way.
+        private ComboBox _rstFresh;
+
+        private void RST_GotFocus(object sender, RoutedEventArgs e)
+        {
+            _rstFresh = sender as ComboBox;
+            ClearRstSelection(sender as ComboBox);
+        }
+
+        private void RST_PreviewTextInput(object sender, TextCompositionEventArgs e)
+        {
+            ComboBox box = sender as ComboBox;
+            if (box == null || !ReferenceEquals(box, _rstFresh)) return;
+            _rstFresh = null;
+
+            TextBox editor = RstEditor(box);
+            if (editor != null) editor.Text = "";   // the character being typed then lands in an empty box
+        }
+
         private void RST_DropDownClosed(object sender, EventArgs e)
         {
-            TextBox editor = RstEditor(sender as ComboBox);
+            ComboBox box = sender as ComboBox;
+            _rstFresh = box;                        // typing after a pick starts a new report
+            ClearRstSelection(box);
+        }
+
+        // AND AGAIN WHEN THE LIST OPENS. Opening the drop-down makes the ComboBox select the whole value
+        // in its text box, and it does that AFTER the click that opened it - so clearing the selection on
+        // focus alone left both digits highlighted, which is what a click looked like. Measured: with
+        // this handler a click leaves 0 characters selected, without it 2.
+        private void RST_DropDownOpened(object sender, EventArgs e)
+        {
+            ClearRstSelection(sender as ComboBox);
+        }
+
+        // Queued at Input priority because the ComboBox selects the text itself as focus comes back to
+        // the box, after these events have been raised - clearing it any sooner would be undone.
+        private void ClearRstSelection(ComboBox box)
+        {
+            TextBox editor = RstEditor(box);
             if (editor == null) return;
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -5737,6 +5799,17 @@ namespace HolyLogger
             try { WindowBounds.SaveAllOpen(); }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             try { _channelsWindow?.PersistNow(); }   // same exposure for the channel list itself
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+            // WAS MY FAVORITE CHANNELS ON SCREEN WHEN THE PROGRAM CLOSED? Then it belongs on screen when
+            // the program opens again - that is what the operator left set up, and having to fetch it
+            // from the menu every morning is not a setting anybody chose. Recorded here rather than in
+            // the window's own Closing, because a window still open at shutdown never runs that.
+            try
+            {
+                Properties.Settings.Default.ChannelsWindowWasOpen = _channelsWindow != null;
+                Properties.Settings.Default.Save();
+            }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             // Land any debounced settings write still waiting on its timer (window bounds saved

@@ -412,6 +412,17 @@ namespace DXCCManager
                 case "A": case "B": case "J": case "N": case "R": case "LH":
                     return true;
             }
+
+            // "/P" with a call-area digit stuck to it - IZ5TJD/P7 - is still portable. It has to be said
+            // out loud because P5-P9 is North Korea's ITU block, so both databases read P7 as a country:
+            // cty.dat lists "P5,P6,P7,P8,P9" and Club Log carries a prefix record for each, dated from
+            // 1978. Neither is evidence of a station. Every DPRK operation Club Log knows is a P5 and is
+            // written prefix-FIRST - P5/OH2AM, P5/4L4FN, P5/3Z9DX, P51BH - and P6 to P9 have never
+            // appeared at all, so nothing that ends in one of them was ever on the air from Korea.
+            // P0-P4 are deliberately NOT included: P2 (Papua New Guinea), P3 (Cyprus) and P4 (Aruba) are
+            // prefixes people really do operate under.
+            if (part.Length == 2 && part[0] == 'P' && part[1] >= '5' && part[1] <= '9') return true;
+
             foreach (char c in part) if (c < '0' || c > '9') return false;
             return true;      // all digits - a call-area change, not a country
         }
