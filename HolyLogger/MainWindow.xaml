@@ -507,7 +507,7 @@
           SizeChanged="AddLogGrid_SizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="70" />
-            <RowDefinition x:Name="MainForm" Height="332" />
+            <RowDefinition x:Name="MainForm" Height="344" />
             <RowDefinition Height="*" />
             <RowDefinition Height="40" />
         </Grid.RowDefinitions>
@@ -1090,7 +1090,10 @@
         </DockPanel>
 
 
-        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="284" />
+        <!-- Runs all the way down to the X-array's own fill, which starts at 295 and overlaps it by 2px.
+             At 284 it stopped short and a band of window background showed straight across the form,
+             which read as a grey line under the activity row. -->
+        <Rectangle x:Name="MainFormBackgroundRect" Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="297" />
         <!-- Blue frame around the entry form INCLUDING the X-array, matching the log-table frame
              (#1565C0, thickness 3). Fixed blue so it shows in light and dark mode. It spans the full form
              row and has NO bottom border: the left/right sides run down to the log table, whose own top
@@ -1098,7 +1101,7 @@
              right side exactly on the map's left frame so the two read as a single vertical line. High
              ZIndex so the sides draw over the X-array strip. Excluded from the contest shift (RowShift). -->
         <Border x:Name="FormFrame" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Width="680" Height="332" BorderBrush="#1565C0" BorderThickness="3,3,3,0"
+                Width="680" Height="344" BorderBrush="#1565C0" BorderThickness="3,3,3,0"
                 Background="Transparent" IsHitTestVisible="False" Panel.ZIndex="30"/>
         <TextBlock HorizontalAlignment="Left" Margin="11,12,0,0" VerticalAlignment="Top" Grid.Row="1" Width="56" Height="38" FontSize="16" ToolTip="Callsign used on the air" TextAlignment="Left" LineHeight="14" LineStackingStrategy="BlockLineHeight">
             <Run Text="Station" FontWeight="Bold" />
@@ -1608,44 +1611,95 @@
              Padding="0" because a Label's default 5px padding would push each box out of the measured
              positions this row was laid out to. -->
         <Canvas x:Name="ActivityRow" Grid.Row="1" HorizontalAlignment="Left" VerticalAlignment="Top"
-                Margin="0,239,0,0" Width="677" Height="28">
-            <Label Content="IOTA" Canvas.Left="11" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+                Margin="0,233,0,0" Width="677" Height="58">
+            <Label Content="IOTA" Canvas.Left="29" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
                    VerticalContentAlignment="Center" ToolTip="Islands on the Air, e.g. EU-005"/>
             <!-- MaxLength is deliberately looser than the format: an island reference is exactly 6
                  characters and a nature one 8 to 11, but a box that simply stops accepting keystrokes
                  makes a typo impossible to correct by typing past it, and impossible to paste into.
                  The red tint does the complaining instead, and Add asks once before logging. -->
-            <TextBox x:Name="TB_Iota" Canvas.Left="51" Canvas.Top="0" Width="62" Height="28" FontSize="16"
+            <TextBox x:Name="TB_Iota" Canvas.Left="69" Canvas.Top="0" Width="62" Height="28" FontSize="16"
                      CharacterCasing="Upper" MaxLength="20" TabIndex="20" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="Islands on the Air: two letters for the continent, then three digits - EU-005"/>
-            <Label Content="SOTA" Canvas.Left="125" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+            <Label Content="SOTA" Canvas.Left="133" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
                    VerticalContentAlignment="Center" ToolTip="Summits on the Air, e.g. W2/WE-003"/>
-            <TextBox x:Name="TB_SotaRef" Canvas.Left="169" Canvas.Top="0" Width="90" Height="28" FontSize="16"
+            <TextBox x:Name="TB_SotaRef" Canvas.Left="177" Canvas.Top="0" Width="90" Height="28" FontSize="16"
                      CharacterCasing="Upper" MaxLength="20" TabIndex="21" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="Summits on the Air: the summit reference - W2/WE-003, G/LD-003"/>
-            <Label Content="POTA" Canvas.Left="271" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+            <Label Content="POTA" Canvas.Left="320" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
                    VerticalContentAlignment="Center" ToolTip="Parks on the Air, e.g. K-0001"/>
-            <TextBox x:Name="TB_PotaRef" Canvas.Left="315" Canvas.Top="0" Width="125" Height="28" FontSize="16"
+            <TextBox x:Name="TB_PotaRef" Canvas.Left="364" Canvas.Top="0" Width="125" Height="28" FontSize="16"
                      CharacterCasing="Upper" MaxLength="90" TabIndex="22" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="Parks on the Air: the park reference - K-0001. Two parks at once are written K-0001,US-4578"/>
-            <Label Content="WWFF" Canvas.Left="452" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
+            <Label Content="WWFF" Canvas.Left="501" Canvas.Top="0" Height="28" Padding="0" FontSize="16"
                    VerticalContentAlignment="Center" ToolTip="World Wide Flora and Fauna, e.g. 4XFF-0016"/>
-            <TextBox x:Name="TB_WwffRef" Canvas.Left="504" Canvas.Top="0" Width="85" Height="28" FontSize="16"
+            <TextBox x:Name="TB_WwffRef" Canvas.Left="553" Canvas.Top="0" Width="85" Height="28" FontSize="16"
                      CharacterCasing="Upper" MaxLength="20" TabIndex="23" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center" TextChanged="ActivityBox_TextChanged"
                      ToolTip="World Wide Flora and Fauna: the nature-reserve reference - 4XFF-0016"/>
-            <Button x:Name="Btn_OtherActivity" Content="Other…" Canvas.Left="601" Canvas.Top="0"
-                    Width="66" Height="28" FontSize="16" TabIndex="24" Padding="0"
-                    Click="Btn_OtherActivity_Click"
-                    ToolTip="Any other program - castles, mills, lighthouses. Shows what is set once you choose one."/>
+            <!-- EVERY OTHER PROGRAM, ON THE FORM ITSELF. The four boxes above exist because ADIF gives
+                 those four a field each; castles, mills, lighthouses and whatever is founded next year
+                 share the standard's SIG / SIG_INFO pair, and that pair is these two controls.
+                 It used to be a button that opened a window. A drop-down says what it is without being
+                 pressed: the chevron shows it opens, the list spells out what each short name collects,
+                 and the box keeps the short name alone - which is what is logged. Editable, because the
+                 list of programs has no end and a new one must be typeable.
+                 The window behind the old button still exists; the QSO editor opens it. -->
+            <ComboBox x:Name="CB_ActivitySig" Canvas.Left="69" Canvas.Top="34" Width="104" Height="28" FontSize="16"
+                      IsEditable="True" IsTextSearchEnabled="False" StaysOpenOnEdit="True"
+                      TextSearch.TextPath="Key" TabIndex="24"
+                      Template="{StaticResource FlatEditableComboTemplate}"
+                      Background="{DynamicResource ControlBg}" Foreground="{DynamicResource TextBrush}"
+                      BorderBrush="{DynamicResource InputBorder}" BorderThickness="1"
+                      PreviewMouseLeftButtonUp="ActivitySig_PreviewMouseLeftButtonUp"
+                      PreviewKeyDown="ActivitySig_PreviewKeyDown"
+                      TextBoxBase.TextChanged="ActivitySig_TextChanged"
+                      ToolTip="Any other program - castles, mills, lighthouses. Pick one or type its short name.">
+                <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding Key}" FontSize="16" FontWeight="Bold" MinWidth="72"
+                                       Foreground="{DynamicResource TextBrush}"/>
+                            <TextBlock Text="{Binding Value}" FontSize="16" Margin="8,0,0,0"
+                                       Foreground="{DynamicResource AccentBrush}"/>
+                        </StackPanel>
+                    </DataTemplate>
+                </ComboBox.ItemTemplate>
+            </ComboBox>
+            <TextBox x:Name="TB_ActivitySigInfo" Canvas.Left="177" Canvas.Top="34" Width="150" Height="28" FontSize="16"
+                     CharacterCasing="Upper" MaxLength="60" TabIndex="25" TextWrapping="NoWrap"
+                     VerticalContentAlignment="Center"
+                     ToolTip="The reference within that program, e.g. OK-00234"/>
+            <!-- "Program" written INSIDE the empty box, the way a placeholder is. The row's other boxes
+                 have a label to their left saying what they are; this one has no room for one, and an
+                 empty box with a chevron says only "something goes here". Grey, so it cannot be mistaken
+                 for a value, and not hit-testable, so a click goes through it to the box underneath.
+                 Hidden the moment anything is chosen or typed (ShowActivitySigMeaning). -->
+            <!-- Centred by the LAYOUT, not by a top coordinate: the border is exactly the box it sits on
+                 and the text centres itself inside it, so it stays centred whatever the font metrics
+                 turn out to be. Two attempts at guessing the right Canvas.Top were two attempts too
+                 many. -->
+            <Border x:Name="TB_ActivitySigPlaceholder" Canvas.Left="69" Canvas.Top="34" Width="104" Height="28"
+                    Background="Transparent" IsHitTestVisible="False">
+                <!-- The 4px under it are what MAKES it look centred. Centring the line box is not the
+                     same as centring the letters: "Program" has a descender, so its ink hung 3px below
+                     the middle while a typed value like ARLHS sits 1px below. Measured off the rendered
+                     pixels, 4px of bottom margin lands the placeholder exactly where a real value sits,
+                     which is the alignment the eye is actually comparing it against. -->
+                <TextBlock Text="Program" FontSize="16" VerticalAlignment="Center" Margin="5,0,0,4"
+                           Foreground="{DynamicResource MutedTextBrush}"/>
+            </Border>
+            <TextBlock x:Name="TB_ActivitySigHint" Canvas.Left="335" Canvas.Top="37" FontSize="16"
+                       Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis"
+                       IsHitTestVisible="False"/>
         </Canvas>
         <!--<ListBox ItemsSource="{Binding}" ItemTemplate="{StaticResource MyDataTemplate}"
              HorizontalContentAlignment="Stretch" Grid.Row="3"/>-->
-        <Rectangle Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="53" Margin="0,279,0,0" />
-        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,281,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
+        <Rectangle Grid.Row="1" Fill="{DynamicResource FormBg}" HorizontalAlignment="Left" VerticalAlignment="Top" Width="677" Height="49" Margin="0,295,0,0" />
+        <local:MatrixControl x:Name="MatrixC" HorizontalAlignment="Left" Margin="4,297,0,0" Grid.Row="1" VerticalAlignment="Top" Visibility="Visible"/>
         <!-- The grid and its "Received Confirmation" overlay share this single-cell wrapper on purpose:
              the overlay is positioned by a Margin measured from its parent's origin, so its parent must be
              the same element the header bounds are measured against (see ConfirmationStripHelper.cs).
@@ -1906,15 +1960,15 @@
         </Border>
         </Grid>
 
-        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
+        <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
         <Border x:Name="MapDisabledPanel" HorizontalAlignment="Stretch" Height="{Binding Height, ElementName=MapControl}" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="21" Visibility="Collapsed"/>
-        <Border HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
+        <Border HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CustomGraphicsBorder">
             <Image x:Name="Img_CustomGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
         </Border>
-        <Border HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="QRZGraphicsBorder">
+        <Border HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="{Binding Fill, ElementName=MainFormBackgroundRect}" Panel.ZIndex="20" Visibility="Collapsed" x:Name="QRZGraphicsBorder">
             <Image x:Name="Img_QRZGraphics" HorizontalAlignment="Center" VerticalAlignment="Center" Stretch="Uniform"/>
         </Border>
-        <Border HorizontalAlignment="Stretch" Height="332" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="#4A90E2" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CompassBorder">
+        <Border HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top" Background="#4A90E2" Panel.ZIndex="20" Visibility="Collapsed" x:Name="CompassBorder">
             <Grid>
                 <Viewbox Width="280" Height="280" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <Canvas Width="100" Height="100">

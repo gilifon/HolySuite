@@ -531,6 +531,10 @@ namespace HolyLogger
             // Initialize RST fields based on the selected mode
             ResetRstForMode();
 
+            // The activity row's program list - the same eight names the Other window and the QSO
+            // editor offer, from the one place that holds them.
+            FillActivitySigList();
+
             TB_MyCallsign.Focus();
 
             // POSITION IS NOT SET HERE. It used to be, with a "< 0 ? 0" clamp - and that clamp is wrong
@@ -843,8 +847,12 @@ namespace HolyLogger
             MatrixC.Visibility = Properties.Settings.Default.IsShowMatrixControl
                 ? Visibility.Visible
                 : Visibility.Hidden;
-            MainForm.Height = new GridLength(325);
-            MapControl.Height = 325;
+
+            // THE HEIGHT IS THE XAML'S TO DECIDE, NOT THIS METHOD'S. These two lines used to re-assert
+            // 325 every time the matrix was shown or hidden, which silently overruled the form row and
+            // the map set in MainWindow.xaml - so growing the form there changed nothing on screen and
+            // the X-array was cut off at the bottom. Only the matrix's own visibility belongs here; the
+            // comment above says as much, and now the code does too.
         }
 
         private void UpdateGraphicsBoxDisplay()
@@ -5018,6 +5026,10 @@ namespace HolyLogger
             TB_DXLocator.Background = backgroundColor;
             TB_Comment.Background = backgroundColor;
             TB_DXCC.Background = backgroundColor;
+            // The activity row's "other program" pair belongs to the QSO like every box above it, so it
+            // wears the edit-mode colour too - and is as editable in edit mode as it is when logging.
+            CB_ActivitySig.Background = backgroundColor;
+            TB_ActivitySigInfo.Background = backgroundColor;
             CB_Mode.Background = backgroundColor;
             TB_ITUZone.Background = backgroundColor;
             TB_CQZone.Background = backgroundColor;

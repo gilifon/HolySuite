@@ -27,9 +27,6 @@ namespace HolyLogger
         // brush: that one is for text, and behind 16pt characters it is far too dark to read through.
         private static readonly Brush BadReferenceBrush = new SolidColorBrush(Color.FromRgb(0xFF, 0xE1, 0xE1));
 
-        // Whatever the Other button last collected, held here until the QSO is logged.
-        private string activitySig;
-        private string activitySigInfo;
 
         // What an activity box should look like when it has nothing to complain about: the form's
         // ordinary input colour, or the edit-mode yellow while a logged QSO is open for editing.
@@ -147,8 +144,10 @@ namespace HolyLogger
             qso.SotaRef = TB_SotaRef.Text.Trim();
             qso.PotaRef = TB_PotaRef.Text.Trim();
             qso.WwffRef = TB_WwffRef.Text.Trim();
-            qso.Sig = (activitySig ?? "").Trim();
-            qso.SigInfo = (activitySigInfo ?? "").Trim();
+            // Straight off the form now, like the four above. They used to be held in two variables that
+            // only the Other window ever wrote.
+            qso.Sig = (CB_ActivitySig.Text ?? "").Trim();
+            qso.SigInfo = (TB_ActivitySigInfo.Text ?? "").Trim();
         }
 
         private void ActivityFromQso(QSO qso)
@@ -158,49 +157,105 @@ namespace HolyLogger
             TB_SotaRef.Text = qso.SotaRef ?? "";
             TB_PotaRef.Text = qso.PotaRef ?? "";
             TB_WwffRef.Text = qso.WwffRef ?? "";
-            activitySig = qso.Sig ?? "";
-            activitySigInfo = qso.SigInfo ?? "";
-            UpdateOtherActivityButton();
+            CB_ActivitySig.Text = qso.Sig ?? "";
+            TB_ActivitySigInfo.Text = qso.SigInfo ?? "";
+            ShowActivitySigMeaning();
         }
 
+        // THE PROGRAM SURVIVES A CLEAR. Everything else on this row belongs to the contact just logged
+        // and goes; the program is what the OPERATOR is doing - working a castle, a lighthouse - and it
+        // stays true until they say otherwise. Clearing it after every QSO would mean choosing it again
+        // for every QSO of the same activation. Clear it by picking the blank at the top of the list, or
+        // by selecting a different program.
         private void ClearActivityRow()
         {
             TB_Iota.Clear();
             TB_SotaRef.Clear();
             TB_PotaRef.Clear();
             TB_WwffRef.Clear();
-            activitySig = null;
-            activitySigInfo = null;
-            UpdateOtherActivityButton();
+            TB_ActivitySigInfo.Clear();
+            ShowActivitySigMeaning();
         }
 
-        // The button carries what it holds, so an "other" program is visible on the form without
-        // opening anything. It goes back to reading "Other..." when there is nothing set.
-        private void UpdateOtherActivityButton()
+        // The program list, filled once, from the same place the Other window and the QSO editor use,
+        // with the last program used put back into the box - the same activation usually goes on across
+        // sessions, so the answer given yesterday is still the right one this morning.
+        private void FillActivitySigList()
         {
-            if (Btn_OtherActivity == null) return;
-            string sig = (activitySig ?? "").Trim();
-            string info = (activitySigInfo ?? "").Trim();
-            if (sig.Length == 0 && info.Length == 0)
+            if (CB_ActivitySig == null) return;
+
+            // A blank line at the top, because the box now keeps what it holds: without a way to choose
+            // NOTHING, the only way back out of a program would be to select all of it and delete it.
+            var list = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>("", "no program") };
+            list.AddRange(OtherActivityWindow.Known);
+            CB_ActivitySig.ItemsSource = list;
+            CB_ActivitySig.Text = (Properties.Settings.Default.LastActivityProgram ?? "").Trim();
+            ShowActivitySigMeaning();
+        }
+
+        // Remembered as it changes, so the box comes back filled next time the program starts.
+        private void RememberActivityProgram()
+        {
+            try
             {
-                Btn_OtherActivity.Content = "Other…";
-                Btn_OtherActivity.FontWeight = FontWeights.Normal;
-                Btn_OtherActivity.ToolTip = "Any other program - castles, mills, lighthouses. Shows what is set once you choose one.";
-                return;
+                string now = (CB_ActivitySig.Text ?? "").Trim();
+                if (string.Equals(Properties.Settings.Default.LastActivityProgram, now, StringComparison.Ordinal)) return;
+                Properties.Settings.Default.LastActivityProgram = now;
+                SettingsFlush.RequestSave();
             }
-            string shown = (sig + " " + info).Trim();
-            Btn_OtherActivity.Content = shown;
-            Btn_OtherActivity.FontWeight = FontWeights.Bold;
-            Btn_OtherActivity.ToolTip = "This QSO carries " + shown + ". Click to change or clear it.";
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        private void Btn_OtherActivity_Click(object sender, RoutedEventArgs e)
+        // WHAT THE SHORT NAME MEANS, beside the box. "ARLHS" is not something to have to remember, and
+        // three of the eight names on the list are lighthouses. The drop-down spells each one out while
+        // it is open; this keeps the answer on screen after it has closed. Silent for a name nothing
+        // recognises - a program founded next year is perfectly allowed here, and saying nothing is the
+        // truthful response to one we have never heard of.
+        private void ShowActivitySigMeaning()
         {
-            var w = new OtherActivityWindow(activitySig, activitySigInfo) { Owner = this };
-            if (w.ShowDialog() != true) return;
-            activitySig = w.Program;
-            activitySigInfo = w.Reference;
-            UpdateOtherActivityButton();
+            string typed = (CB_ActivitySig == null ? "" : CB_ActivitySig.Text ?? "").Trim();
+
+            if (TB_ActivitySigHint != null)
+                TB_ActivitySigHint.Text = OtherActivityWindow.DescriptionOf(typed);
+
+            // The word "Program" shows only while the box is empty - it is a label, not a value.
+            if (TB_ActivitySigPlaceholder != null)
+                TB_ActivitySigPlaceholder.Visibility = typed.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void ActivitySig_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            ShowActivitySigMeaning();
+            RememberActivityProgram();
+        }
+
+        // ESC MUST NOT THROW THE PROGRAM AWAY. A WPF ComboBox treats Escape as "undo what I typed" and
+        // puts back whatever was selected before - and the main window treats it as "clear the entry" -
+        // so a chosen programme could vanish from a key pressed for something else entirely. Here Escape
+        // does one thing only: close the list if it is open. The value stays either way, and the box is
+        // cleared the way everything else on the form is cleared, by Clear (F9).
+        private void ActivitySig_PreviewKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key != System.Windows.Input.Key.Escape) return;
+
+            ComboBox box = sender as ComboBox;
+            if (box != null && box.IsDropDownOpen) box.IsDropDownOpen = false;
+            e.Handled = true;
+        }
+
+        // A click anywhere on the box opens the list, not only on the 10px chevron - the same rule the
+        // RST boxes follow, and for the same reason. On the way UP, because opening it on the way down
+        // is undone by the ComboBox's own handling of the release (measured; see RST_PreviewMouseLeftButtonUp).
+        private void ActivitySig_PreviewMouseLeftButtonUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            ComboBox box = sender as ComboBox;
+            if (box == null || box.Items.Count == 0) return;
+
+            Point p = e.GetPosition(box);
+            if (p.X < 0 || p.Y < 0 || p.X > box.ActualWidth || p.Y > box.ActualHeight) return;
+
+            box.IsDropDownOpen = !box.IsDropDownOpen;
+            e.Handled = true;
         }
 
         // Contest mode has no room for this row - the contest layout already reaches the bottom of the
