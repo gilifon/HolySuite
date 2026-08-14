@@ -1534,10 +1534,14 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             if (s.UseEqslService || hasEqsl || !string.IsNullOrWhiteSpace(EqslConfirmedEntities))
                 AddSourceFolder(ConfSource.Eqsl, "eQSL");
-            // Club Log is a single account (e-mail + password), so show the folder when the service is on
-            // or a past download left a cached confirmed set.
-            if (s.UseClublogService || !string.IsNullOrWhiteSpace(ClublogConfirmedEntities))
-                AddSourceFolder(ConfSource.Clublog, "Club Log");
+            // NO CLUB LOG FOLDER. Club Log is still used by the program - QSOs are uploaded to it, and
+            // its country database is one of the two the DXCC resolver reads - but its CONFIRMATIONS are
+            // not shown as a folder here any more. Only this window's folder strip is affected; the
+            // upload service, the Options page and the country data are untouched, and the code behind
+            // the folder (ConfSource.Clublog, the check, the marking) is left in place so it can be put
+            // back by restoring this one call.
+            //   if (s.UseClublogService || !string.IsNullOrWhiteSpace(ClublogConfirmedEntities))
+            //       AddSourceFolder(ConfSource.Clublog, "Club Log");
             // Paper QSL is manual (no service to configure), so it is ALWAYS available.
             AddSourceFolder(ConfSource.Paper, "Paper QSL");
             // ...and last, the one that answers the question every DXer actually asks. Always shown: it
