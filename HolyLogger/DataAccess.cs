@@ -2361,6 +2361,45 @@ Environment.NewLine +
                 using (var cmd = new SQLiteCommand(
                     "CREATE INDEX IF NOT EXISTS idx_qso_source_qso_id ON qso(source_qso_id)", con))
                     cmd.ExecuteNonQuery();
+
+                // ── THE THREE QUESTIONS THIS PROGRAM ASKS MOST ────────────────────────────────
+                //
+                // Measured on this operator's 37,984-QSO database, before and after, with
+                // EXPLAIN QUERY PLAN read for each:
+                //
+                //   open the log (28,454 QSOs)   1043 ms -> 444 ms   the sort disappears
+                //   every QSO with one callsign    96 ms ->   0 ms   was a full table scan
+                //   count confirmed by a service   95 ms ->   2 ms   was a full table scan
+                //
+                // Building all of them costs 925 ms, once. A thousand inserts inside a transaction
+                // still take 17 ms with them in place, so the write side is not measurably worse.
+                //
+                // 1. The log is ALWAYS read as "this log, newest first". log_id alone finds the rows
+                //    but leaves SQLite to sort them - "USE TEMP B-TREE FOR ORDER BY", the whole sort
+                //    built in memory on every log open. With the date and time in the index the rows
+                //    come out already in order.
+                using (var cmd = new SQLiteCommand(
+                    "CREATE INDEX IF NOT EXISTS idx_qso_log_date ON qso(log_id, date DESC, time DESC)", con))
+                    cmd.ExecuteNonQuery();
+
+                // 2. "What else have I worked this station on?" - the dup check, the unmatched-
+                //    confirmations report, the callsign history. COLLATE NOCASE must be on the INDEX
+                //    too: the queries compare that way, and an index with a different collation is
+                //    simply not used.
+                using (var cmd = new SQLiteCommand(
+                    "CREATE INDEX IF NOT EXISTS idx_qso_dx_callsign ON qso(dx_callsign COLLATE NOCASE)", con))
+                    cmd.ExecuteNonQuery();
+
+                // 3. "How many are confirmed?" - asked once per service every time Statistics opens or
+                //    a check finishes. PARTIAL indexes (WHERE ... = 1): they hold only the confirmed
+                //    rows, so five of them together are far smaller than one ordinary index, and each
+                //    is used only by the query whose WHERE clause matches its own - which is exactly
+                //    the query it exists for.
+                foreach (string service in new[] { "lotw", "qrz", "eqsl", "clublog", "paper" })
+                    using (var cmd = new SQLiteCommand(
+                        "CREATE INDEX IF NOT EXISTS idx_qso_" + service + "_rcvd ON qso(log_id) "
+                        + "WHERE " + service + "_qsl_rcvd = 1", con))
+                        cmd.ExecuteNonQuery();
             }
             catch { /* an index is an optimization only; never block startup on it */ }
         }

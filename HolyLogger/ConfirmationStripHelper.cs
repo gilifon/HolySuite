@@ -28,10 +28,32 @@ namespace HolyLogger
         private const double Spread = 0.5;     // fraction of the leftover width used as letter spacing;
                                                // 1.0 fills the strip edge to edge, which reads too airy
 
+        // THE TWO HEADERS ARE FOUND ONCE, NOT ON EVERY LAYOUT PASS.
+        //
+        // This is called from LayoutUpdated, which fires on every layout pass anywhere in the window - a
+        // keystroke, a clock tick, a mouse-over, a scroll - so on a large log it runs many times a
+        // second for the whole life of the program. The result was already guarded (nothing is touched
+        // when the rectangle has not moved), but the SEARCH ran every single time: a walk down the
+        // visual tree for the headers presenter, then a walk across its headers, twice.
+        //
+        // The headers are the same objects from the moment the grid is loaded until the columns change,
+        // so they are remembered per grid and re-found only when the remembered ones stop being usable -
+        // disconnected from the tree, or a column added, removed or re-ordered. What is left to do on a
+        // quiet layout pass is two transforms and a comparison.
+        private sealed class Headers
+        {
+            public DataGridColumnHeader First, Last;
+            public int ColumnCount;
+            public int FirstIndex, LastIndex;   // display index: re-ordering columns must re-find them
+        }
+
+        private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<DataGrid, Headers> Cache =
+            new System.Runtime.CompilerServices.ConditionalWeakTable<DataGrid, Headers>();
+
         // Recomputes the overlay's position/size from the ACTUAL rendered bounds of the first and last
         // confirmation columns' headers, and only touches the overlay's layout properties if something
-        // really changed - calling this from LayoutUpdated (which fires very often) must not itself cause
-        // another layout pass every single time, or it would loop.
+        // really changed - calling this from LayoutUpdated must not itself cause another layout pass
+        // every single time, or it would loop.
         public static void UpdatePosition(DataGrid grid, FrameworkElement overlay, ref Rect lastRect,
                                           string firstColumnSortPath, string lastColumnSortPath)
         {
@@ -44,12 +66,8 @@ namespace HolyLogger
                 var lastColumn = grid.Columns.FirstOrDefault(c => c.SortMemberPath == lastColumnSortPath);
                 if (firstColumn == null || lastColumn == null) return;
 
-                var presenter = FindVisualChild<DataGridColumnHeadersPresenter>(grid);
-                if (presenter == null) return;
-
-                var firstHeader = FindHeaderFor(presenter, firstColumn);
-                var lastHeader = FindHeaderFor(presenter, lastColumn);
-                if (firstHeader == null || lastHeader == null) return;
+                DataGridColumnHeader firstHeader, lastHeader;
+                if (!TryGetHeaders(grid, firstColumn, lastColumn, out firstHeader, out lastHeader)) return;
                 if (!firstHeader.IsVisible || !lastHeader.IsVisible) return;
                 if (firstHeader.ActualWidth <= 0 || lastHeader.ActualWidth <= 0) return;
 
@@ -75,6 +93,51 @@ namespace HolyLogger
                 SpreadLetters(overlay as Border, rect.Width - EdgeInset * 2);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // The remembered headers when they are still the right ones, otherwise a fresh search.
+        //
+        // "Still the right ones" is three cheap tests: both objects still hang off a parent in the visual
+        // tree, the grid still has the same number of columns, and the two columns still sit where they
+        // did. Anything that invalidates them - a column added, hidden, dragged to a new place, the grid
+        // re-templated - fails one of those and the search runs once more.
+        private static bool TryGetHeaders(DataGrid grid, DataGridColumn firstColumn, DataGridColumn lastColumn,
+                                          out DataGridColumnHeader first, out DataGridColumnHeader last)
+        {
+            Headers cached;
+            if (Cache.TryGetValue(grid, out cached)
+                && cached.First != null && cached.Last != null
+                && VisualTreeHelper.GetParent(cached.First) != null
+                && VisualTreeHelper.GetParent(cached.Last) != null
+                && cached.ColumnCount == grid.Columns.Count
+                && cached.FirstIndex == firstColumn.DisplayIndex
+                && cached.LastIndex == lastColumn.DisplayIndex)
+            {
+                first = cached.First;
+                last = cached.Last;
+                return true;
+            }
+
+            first = null;
+            last = null;
+
+            var presenter = FindVisualChild<DataGridColumnHeadersPresenter>(grid);
+            if (presenter == null) return false;
+
+            first = FindHeaderFor(presenter, firstColumn);
+            last = FindHeaderFor(presenter, lastColumn);
+            if (first == null || last == null) return false;
+
+            Cache.Remove(grid);
+            Cache.Add(grid, new Headers
+            {
+                First = first,
+                Last = last,
+                ColumnCount = grid.Columns.Count,
+                FirstIndex = firstColumn.DisplayIndex,
+                LastIndex = lastColumn.DisplayIndex
+            });
+            return true;
         }
 
         // Lays the label out as one TextBlock per character with an even gap between them, sized so the

@@ -1705,7 +1705,16 @@
              the same element the header bounds are measured against (see ConfirmationStripHelper.cs).
              ClipToBounds keeps the overlay from spilling outside the grid when columns scroll sideways. -->
         <Grid Grid.Row="2" ClipToBounds="True">
-        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" BeginningEdit="QSODataGrid_BeginningEdit" CheckBox.Checked="PaperQsl_Changed" CheckBox.Unchecked="PaperQsl_Changed" ClipboardCopyMode="IncludeHeader" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
+        <!-- RECYCLING, not the default. WPF virtualizes the rows either way, but by default it THROWS
+             AWAY each row container as it scrolls out of view and builds a new one for the row coming in
+             - on a log of tens of thousands that is a fresh visual tree per row, all the way down. In
+             recycling mode the same containers are re-used with new data, which is what makes a long log
+             scroll smoothly rather than in steps on a slow machine. Rows only: column virtualization is
+             deliberately left off, because the confirmation strip measures real column headers and a
+             virtualized header may not exist when it looks. -->
+        <DataGrid x:Name="QSODataGrid" ItemsSource="{Binding}" AutoGenerateColumns="False" AlternationCount="2"
+                  EnableRowVirtualization="True" VirtualizingPanel.IsVirtualizing="True"
+                  VirtualizingPanel.VirtualizationMode="Recycling" Background="{DynamicResource GridRowBg}" Foreground="{DynamicResource TextBrush}" RowBackground="{DynamicResource GridRowBg}" AlternatingRowBackground="{DynamicResource GridAltRowBg}" CanUserAddRows="False" PreviewKeyDown="QSODataGrid_PreviewKeyDown" PreviewMouseRightButtonDown="QSODataGrid_PreviewMouseRightButtonDown" PreviewMouseLeftButtonDown="QSODataGrid_PreviewMouseLeftButtonDown" FontSize="16" Sorting="QSODataGrid_Sorting" ColumnDisplayIndexChanged="QSODataGrid_ColumnDisplayIndexChanged" Drop="QSODataGrid_Drop" AllowDrop="True" LoadingRow="QSODataGrid_LoadingRow" BeginningEdit="QSODataGrid_BeginningEdit" CheckBox.Checked="PaperQsl_Changed" CheckBox.Unchecked="PaperQsl_Changed" ClipboardCopyMode="IncludeHeader" Margin="0,0,6,0" BorderBrush="#1565C0" BorderThickness="3" VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}" Padding="0,0,0,0">
             <DataGrid.Resources>
                 <!-- Keep the selected row blue even when the grid loses focus (e.g. while the right-click
                      context menu is open), so the user clearly sees which row the menu refers to. -->
