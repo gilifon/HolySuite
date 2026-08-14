@@ -1583,8 +1583,13 @@ namespace HolyLogger
         // the rows that need it.
         //
         // QRZ answers with the grid the station has TODAY, which is not necessarily where it was during
-        // a QSO made twenty years ago. That is precisely why the answer becomes an ordinary suggestion
-        // with "QRZ" named as its evidence, to be ticked or ignored, rather than being written.
+        // a QSO made twenty years ago. That is precisely why the answer becomes an ordinary suggestion,
+        // to be ticked or ignored, rather than being written.
+        //
+        // NOTHING ON SCREEN NAMES QRZ. The evidence column says "callsign lookup" and the overlay says
+        // "Looking up the locators" - the operator still learns that the grid was fetched rather than
+        // worked out, and still sees which rows rest on it, without the window advertising which service
+        // this station has an account with. Asked for by the operator.
         private const string LocatorProblem = "DX Locator is wrong";
 
         // Run as part of the scan, not from a button. A wrong locator is the one fault this machine
@@ -1620,7 +1625,7 @@ namespace HolyLogger
 
             if (toAsk.Count > 0)
             {
-                ShowFixOverlay(toAsk.Count, "Asking QRZ about the locators…", "callsigns");
+                ShowFixOverlay(toAsk.Count, "Looking up the locators…", "callsigns");
                 int done = 0;
                 foreach (string call in toAsk)
                 {
@@ -1647,8 +1652,8 @@ namespace HolyLogger
                         // WHY there is nothing to offer, said on the row itself. "No suggestion" alone
                         // leaves an operator wondering whether the program failed or simply cannot
                         // know - and here it is the second: we asked, and QRZ had nothing.
-                        f.Evidence = "QRZ has no grid";
-                        f.Suggested = "Check by hand — QRZ has no grid for this call";
+                        f.Evidence = "no grid found";
+                        f.Suggested = "Check by hand — no grid found for this call";
                         continue;
                     }
                     f.Field = "DXLocator";
@@ -1657,7 +1662,7 @@ namespace HolyLogger
                     // Named, because QRZ knows where a station is TODAY and not necessarily where it
                     // was during an old QSO. The operator seeing "QRZ" against a 2003 contact knows
                     // exactly how much weight to give it.
-                    f.Evidence = "QRZ";
+                    f.Evidence = "callsign lookup";
                     f.Fixable = true;
                 }
             }
@@ -1674,13 +1679,29 @@ namespace HolyLogger
             // threw away every hand-typed answer - a checked row whose only finding was report-only
             // (Club Log's "did not count", say) fell straight through this and Fix appeared to do
             // nothing at all, which is exactly what it did.
+            // AND WHEN THERE IS NOTHING TO WRITE, SAY SO. Both of these used to return in silence, so
+            // pressing Fix with nothing ticked - or with rows ticked that carry no answer yet - looked
+            // exactly like a Fix that had run and reported nothing.
             List<FixRow> rows = _rows.Where(r => r.Apply && r.Fixable && r.Qso != null).ToList();
-            if (rows.Count == 0) return;
+            if (rows.Count == 0)
+            {
+                HolyMessageBox.Show("Nothing was written, because nothing is ticked.\n\n"
+                    + "Tick a kind of problem to take all of its QSOs, or tick single rows in the table.",
+                    "Log Fixer", HolyMsgType.Info, this);
+                return;
+            }
 
             List<Finding> chosen = rows.SelectMany(r => r.Findings).Where(f => f.Fixable).ToList();
             int typedCells = rows.Sum(r => r.Cells.Count(kv => kv.Value.UserEdited
                                                                && kv.Value.Proposed.Trim().Length > 0));
-            if (chosen.Count == 0 && typedCells == 0) return;
+            if (chosen.Count == 0 && typedCells == 0)
+            {
+                HolyMessageBox.Show("Nothing was written: the ticked rows have no value to write.\n\n"
+                    + "These are the ones the program cannot answer for you - type the right value into "
+                    + "the green row and the row will then be written with the rest.",
+                    "Log Fixer", HolyMsgType.Info, this);
+                return;
+            }
 
             var dal = DataAccess.GetInstance();
             if (dal == null)
