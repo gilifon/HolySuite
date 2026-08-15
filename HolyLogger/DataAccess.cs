@@ -1241,11 +1241,33 @@ Environment.NewLine +
             return string.IsNullOrWhiteSpace(s) ? (object)DBNull.Value : s.Trim();
         }
 
+        // "Does this reader have that column?" - asked 18 times for EVERY QSO read (see
+        // ReadActivityFields), because an old database that has not been through the migration has no
+        // such column and rdr["iota"] would throw rather than return null.
+        //
+        // It used to answer by scanning all ~60 column names with a case-insensitive compare, every
+        // time. That is 18 x 60 string comparisons per row: about 30 MILLION of them for a 28,454-QSO
+        // log, and it is where opening that log spent its ELEVEN SECONDS - measured with the timing this
+        // path now writes to the log, 10.9 s of an 11.2 s switch, while the same query in raw SQL takes
+        // under a second.
+        //
+        // The names are the same for the whole reader, so they are collected once per reader and then
+        // answered from a set. Held in a [ThreadStatic] pair rather than a dictionary keyed by reader:
+        // readers are used and disposed one at a time on the thread doing the reading, so this both
+        // holds nothing after the read and needs no locking.
+        [ThreadStatic] private static SQLiteDataReader _columnsFor;
+        [ThreadStatic] private static HashSet<string> _columnNames;
+
         private static bool HasColumn(SQLiteDataReader rdr, string name)
         {
-            for (int i = 0; i < rdr.FieldCount; i++)
-                if (string.Equals(rdr.GetName(i), name, StringComparison.OrdinalIgnoreCase)) return true;
-            return false;
+            if (!ReferenceEquals(_columnsFor, rdr))
+            {
+                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                for (int i = 0; i < rdr.FieldCount; i++) names.Add(rdr.GetName(i));
+                _columnNames = names;
+                _columnsFor = rdr;
+            }
+            return _columnNames.Contains(name);
         }
 
         // Loads only the QSOs stored under one log (what the log table shows for the active log).

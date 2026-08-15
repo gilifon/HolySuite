@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -2106,6 +2106,12 @@ namespace HolyLogger
             // overlay + wait cursor so the user knows it is working, not hung.
             Mouse.OverrideCursor = Cursors.Wait;
             ShowLogLoadingOverlay(true);
+
+            // TIMED, and written to the log. "Opening a log feels slower" is not something to settle by
+            // argument: this records how long the database read took, how long everything after it took,
+            // and how many QSOs were involved, so the answer comes from the operator's own machine.
+            var swTotal = System.Diagnostics.Stopwatch.StartNew();
+            long msRead = 0, msCounts = 0, msCluster = 0;
             try
             {
                 dal.ActiveLogId = logId;
@@ -2113,7 +2119,10 @@ namespace HolyLogger
                 Properties.Settings.Default.Save();
 
                 if (Qsos != null) Qsos.CollectionChanged -= Qsos_CollectionChanged;
+                var swRead = System.Diagnostics.Stopwatch.StartNew();
                 Qsos = dal.GetQSOsForLog(logId);
+                swRead.Stop();
+                msRead = swRead.ElapsedMilliseconds;
                 Qsos.CollectionChanged += Qsos_CollectionChanged;
                 DataContext = Qsos;
                 RestoreDataContext();
@@ -2122,7 +2131,13 @@ namespace HolyLogger
                 ClearBtn_Click(null, null);       // reset the entry form for the newly active log
                 ApplyContestModeForActiveLog();
                 UpdateActiveLogTitle();
+
+                // Timed separately: this one walks every QSO in the log and resolves its country, so on
+                // a big log it is a second pass over everything the read above just fetched.
+                var swCounts = System.Diagnostics.Stopwatch.StartNew();
                 UpdateNumOfQSOs();
+                swCounts.Stop();
+                msCounts = swCounts.ElapsedMilliseconds;
                 UpdateEqslQueueIndicator();
                 UpdateQrzMenuCount();
                 RefreshCopyIndicator();           // show/hide the red "copying is live" dot for this log
@@ -2133,7 +2148,12 @@ namespace HolyLogger
                 // Recompute worked countries from the newly active log so the cluster's "new
                 // country" (red) flags reflect THIS log immediately -- e.g. a brand-new empty log
                 // makes every spotted entity needed. Without this they stayed stale until restart.
+                // Timed: a THIRD pass over the log (worked countries) plus a cluster refresh, which
+                // itself rebuilds the set of every callsign in the log.
+                var swCluster = System.Diagnostics.Stopwatch.StartNew();
                 RebuildWorkedCountriesAndRefreshCluster();
+                swCluster.Stop();
+                msCluster = swCluster.ElapsedMilliseconds;
 
                 // Search and Statistics capture the Qsos collection at construction (readonly field)
                 // and compute everything from it. We just REPLACED Qsos with the new log's collection,
@@ -2144,9 +2164,21 @@ namespace HolyLogger
             }
             finally
             {
+                swTotal.Stop();
+                long msBeforePaint = swTotal.ElapsedMilliseconds;
+
                 // Clear the busy indicator only after the grid has finished its layout/render pass.
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
+                    // Now the grid has laid out and painted, so this is the whole wait as the operator
+                    // experiences it - not just the part that happens in this method.
+                    swTotal.Stop();
+                    Log.Warn("Open log " + logId + ": " + (Qsos == null ? 0 : Qsos.Count).ToString("N0")
+                             + " QSOs | database read " + msRead + " ms | counts " + msCounts
+                             + " ms | worked-countries+cluster " + msCluster
+                             + " ms | ready in " + msBeforePaint
+                             + " ms | painted after " + swTotal.ElapsedMilliseconds + " ms");
+
                     ShowLogLoadingOverlay(false);
                     Mouse.OverrideCursor = null;
 
