@@ -275,6 +275,11 @@ namespace HolyLogger
         private const int SpotClusterReadTimeoutMs = 10000;
         private const string HolyClusterWebSocketUrl = "wss://holycluster.iarc.org/spots_ws";
 
+        // How long one attempt to open the cluster connection may take before it is given up and
+        // retried. Generous on purpose: a slow link that is going to succeed should be allowed to,
+        // and failing early costs a full ten-second wait before the next try.
+        private const int ClusterConnectTimeoutMs = 20000;
+
         private sealed class RadioVoiceCommandProfile
         {
             public RadioVoiceCommandProfile(string message1, string message2, string message3, string message4, string stop)
@@ -2938,7 +2943,28 @@ namespace HolyLogger
                     clusterWebSocket = new ClientWebSocket();
 
                     AppendClusterLog(string.Format("Connecting to cluster (attempt {0})...", attempt));
-                    await clusterWebSocket.ConnectAsync(new Uri(HolyClusterWebSocketUrl), token);
+
+                    // The attempt is given a deadline, because ConnectAsync has none of its own. A
+                    // network that REFUSES is not the problem - Windows gives up on that in about
+                    // twenty seconds and the loop below comes round again. The problem is a network
+                    // that accepts the connection and then never answers: a captive portal, the hotel
+                    // wifi still waiting for someone to click "I agree". There the wait never ends,
+                    // the loop never comes round, and the cluster stays silently dead until the
+                    // window is closed and reopened. Cancelling the attempt puts it back in the loop.
+                    using (var attemptCts = CancellationTokenSource.CreateLinkedTokenSource(token))
+                    {
+                        attemptCts.CancelAfter(ClusterConnectTimeoutMs);
+                        try
+                        {
+                            await clusterWebSocket.ConnectAsync(new Uri(HolyClusterWebSocketUrl), attemptCts.Token);
+                        }
+                        catch (OperationCanceledException) when (!token.IsCancellationRequested)
+                        {
+                            // The deadline, not the window closing. Say which, and let the loop retry.
+                            throw new TimeoutException("The cluster did not answer within "
+                                + (ClusterConnectTimeoutMs / 1000) + " seconds.");
+                        }
+                    }
                     AppendClusterLog("Connected successfully.");
                     attempt = 0;
 
