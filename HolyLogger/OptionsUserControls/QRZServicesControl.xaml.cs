@@ -81,11 +81,21 @@ namespace HolyLogger.OptionsUserControls
         private string CurrentPassword =>
             BTN_ShowPassword.IsChecked == true ? TB_PasswordVisible.Text : TB_Password.Password;
 
-        private void TestConnectionBtn_Click(object sender, RoutedEventArgs e)
+        // Awaited, not blocking. The synchronous QRZ login waits on a request whose default timeout is
+        // 100 seconds, and it did that on the UI thread - so on a network that hangs rather than refuses,
+        // pressing Test Connection froze the whole Options window with no sign of why. The button greys
+        // itself while the round trip is in flight, the same as the eQSL and Logbook tests beside it.
+        private async void TestConnectionBtn_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.qrz_password = CurrentPassword;
             Properties.Settings.Default.qrz_username = TB_UserName.Text;
-            bool ok = Helper.LoginToQRZ(out string sessionKey);
+
+            string sessionKey;
+            TestConnectionBtn.IsEnabled = false;
+            try { sessionKey = await Helper.LoginToQRZAsync(); }
+            finally { TestConnectionBtn.IsEnabled = true; }
+
+            bool ok = !string.IsNullOrWhiteSpace(sessionKey);
             if (ok)
                 HolyMessageBox.ShowSuccess("Connected to QRZ.com successfully!", "QRZ Connection", Window.GetWindow(this));
             else

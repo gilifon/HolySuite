@@ -41,12 +41,19 @@ namespace HolyLogger.OptionsUserControls
             HasChanged = false;
         }
         
-        private void TestConnectionBtn_Click(object sender, RoutedEventArgs e)
+        // Awaited rather than blocking, for the reason given on the same button in QRZServicesControl:
+        // the synchronous login can hold the UI thread for 100 seconds on a network that hangs.
+        private async void TestConnectionBtn_Click(object sender, RoutedEventArgs e)
         {
             Properties.Settings.Default.qrz_password = TB_Password.Password;
             Properties.Settings.Default.qrz_username = TB_UserName.Text;
+
             string x;
-            bool ok = Helper.LoginToQRZ(out x);
+            TestConnectionBtn.IsEnabled = false;
+            try { x = await Helper.LoginToQRZAsync(); }
+            finally { TestConnectionBtn.IsEnabled = true; }
+
+            bool ok = !string.IsNullOrWhiteSpace(x);
             if (ok)
                 HolyMessageBox.ShowSuccess("Connected to QRZ.com successfully!", "QRZ Connection", Window.GetWindow(this));
             else

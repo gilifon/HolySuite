@@ -45,48 +45,13 @@ namespace HolyLogger
         [DllImport("Kernel32.dll")]
         private static extern uint GetLastError();
 
-        public static bool LoginToQRZ(out string SessionKey)
-        {
-            if (string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_username) || string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_password))
-            {
-                SessionKey = "";
-                return false;
-            }
-            try
-            {
-                ServicePointManager.Expect100Continue = true;
-                ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
-                WebRequest request = WebRequest.Create("https://xmldata.qrz.com/xml/current/?username=" + Properties.Settings.Default.qrz_username + ";password=" + Properties.Settings.Default.qrz_password);
-                using (WebResponse response = request.GetResponse())
-                using (Stream dataStream = response.GetResponseStream())
-                using (StreamReader reader = new StreamReader(dataStream))
-                {
-                    string responseFromServer = reader.ReadToEnd();
-
-                    XElement xml = XElement.Parse(responseFromServer);
-                    XElement element = xml.Elements().FirstOrDefault();
-                    SessionKey = element.Elements().FirstOrDefault().Value;
-
-                    if (SessionKey.Contains("incorrect"))
-                    {
-                        SessionKey = "";
-                        return false;
-                    }
-                    return true;
-                }
-            }
-            catch (Exception ex)
-            {
-                //System.Windows.Forms.MessageBox.Show("Login to QRZ service failed: " + ex.Message);
-                SessionKey = "";
-                return false;
-            }
-        }
-
-        // Async variant of LoginToQRZ. The synchronous version blocks the calling thread on
-        // request.GetResponse()/ReadToEnd() (default WebRequest timeout is 100 s), which freezes
-        // the UI when called from the keystroke/QRZ-lookup path. Awaiting this keeps the UI thread
-        // free while the QRZ login round-trip is in flight. Returns the session key, or "" on failure.
+        // Logs in to QRZ.com and returns the session key, or "" on failure.
+        //
+        // There is no synchronous version any more, deliberately. It blocked the calling thread on
+        // GetResponse()/ReadToEnd(), whose default timeout is 100 seconds, and the last two callers were
+        // the Test Connection buttons in Options - so a network that hangs rather than refuses froze the
+        // Options window outright. Awaiting this leaves the UI thread free while the round trip is in
+        // flight, and there is no blocking overload left for anyone to reach for by mistake.
         public static async Task<string> LoginToQRZAsync()
         {
             if (string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_username) || string.IsNullOrWhiteSpace(Properties.Settings.Default.qrz_password))
