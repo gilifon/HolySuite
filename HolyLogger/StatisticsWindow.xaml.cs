@@ -231,6 +231,20 @@ namespace HolyLogger
             if (fresh != null) fresh.CollectionChanged += QsoCollectionChanged;
         }
 
+        // Closing the window is not the end of it. The collection above belongs to the MAIN window and
+        // outlives every Statistics window ever opened, so a handler left attached to it holds this whole
+        // page - tables, caches, the images - in memory with nothing left to show them on. Worse than the
+        // memory: the handler still RUNS. Every QSO logged afterwards would start the timer below and
+        // recount a page nobody can see, on the same UI thread the operator is typing into, once for each
+        // time the window had been opened and closed.
+        protected override void OnClosed(EventArgs e)
+        {
+            HookQsoCollection(_allQsos, null);
+            _liveRefreshTimer?.Stop();   // a quiet period still running has this window in the dispatcher queue
+            _spinnerClock?.Stop();
+            base.OnClosed(e);
+        }
+
         private void QsoCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
             InvalidateSourceStats();     // at once, so nothing can read a stale count in the meantime
