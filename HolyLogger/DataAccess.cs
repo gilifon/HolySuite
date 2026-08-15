@@ -1,4 +1,4 @@
-﻿using HolyParser;
+using HolyParser;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -81,6 +81,32 @@ namespace HolyLogger
                 throw new Exception("Failed to connect to DB: " + e.Message);
             }
             
+        }
+
+        // "HAS ANYTHING THAT MOVES A CALLSIGN BEEN WRITTEN?"
+        //
+        // Counted so that a screen holding a lookup built from the log - the cluster's set of worked
+        // callsigns, the duplicate check's per-station index - can tell in one comparison whether its
+        // answer is still good, without walking 28,454 QSOs to find out.
+        //
+        // Bumped by the writes that can add a QSO, remove one, move one between logs, or change the
+        // callsigns on one. Deliberately NOT by the confirmation marks, the upload-queue flags or the
+        // entity-code backfill: none of those can change who was worked, so making the caches rebuild
+        // after a LoTW check would be work for nothing.
+        //
+        // Every edit in the program funnels through Update() - the main form, the Log Workshop grid, the
+        // QSO editor, the Log Fixer - which is what makes this a reliable signal rather than a hopeful
+        // one. It is the reason the caches those callers refused to keep are safe to keep now.
+        private static long _contentVersion;
+
+        public static long ContentVersion
+        {
+            get { return System.Threading.Interlocked.Read(ref _contentVersion); }
+        }
+
+        private static void BumpContentVersion()
+        {
+            System.Threading.Interlocked.Increment(ref _contentVersion);
         }
 
         // PER-LOG STATE. Everything a confirmation service remembers about a log - what it last reported,
@@ -626,6 +652,7 @@ Environment.NewLine +
         // was copied. Best-effort: never throws, so copying can't break logging.
         public long CopyQsoToTargetIfConfigured(QSO qso, long sourceLogId)
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             try
             {
                 lock (_dbLock)
@@ -687,6 +714,7 @@ Environment.NewLine +
 
         public bool Insert(IEnumerable<QSO> qsos)
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             lock (_dbLock)
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
@@ -743,6 +771,7 @@ Environment.NewLine +
         public int InsertBatch(IEnumerable<QSO> qsos, Action<int> progressCallback = null,
                                List<KeyValuePair<QSO, string>> failed = null)
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             lock (_dbLock)
             {
             if (con == null || con.State != System.Data.ConnectionState.Open)
@@ -936,6 +965,7 @@ Environment.NewLine +
 
         public void Update(QSO qso)
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             lock (_dbLock)
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
@@ -1010,6 +1040,7 @@ Environment.NewLine +
         }
         public void Delete(int Id)
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             lock (_dbLock)
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
@@ -1063,6 +1094,7 @@ Environment.NewLine +
         }
         public void DeleteAll()
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             lock (_dbLock)
             {
             if (con != null && con.State == System.Data.ConnectionState.Open)
@@ -1084,6 +1116,7 @@ Environment.NewLine +
         // active log, not every log in the database).
         public void DeleteQSOsForLog(long logId)
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             lock (_dbLock)
                 using (var cmd = new SQLiteCommand("DELETE FROM qso WHERE log_id = ?", con))
                 {
@@ -2086,6 +2119,7 @@ Environment.NewLine +
         // Assigns every QSO that has no log yet to the given log (used once during first-run migration).
         public int AssignUnassignedToLog(long logId)
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             lock (_dbLock)
                 using (var cmd = new SQLiteCommand("UPDATE qso SET log_id = ? WHERE log_id IS NULL", con))
                 {
@@ -3022,6 +3056,7 @@ Environment.NewLine +
         // the Search window's Undo-delete.
         public int RestoreQso(QSO qso, long logId)
         {
+            BumpContentVersion();   // this write can change who is in the log or what they are called
             if (qso == null) return 0;
             lock (_dbLock)
             {

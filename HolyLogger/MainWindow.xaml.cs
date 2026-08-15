@@ -7970,23 +7970,94 @@ namespace HolyLogger
             public event PropertyChangedEventHandler PropertyChanged;
         }
 
-        // Builds a case-insensitive set of all DX callsigns currently in the log, so cluster spot
-        // processing can test "is this call already logged?" in O(1) instead of scanning the whole
-        // log per spot. Built once per cluster payload on the UI thread (a single ~11k pass is cheap).
-        private HashSet<string> BuildLoggedDxCallSet()
+        // TWO LOOKUPS OVER THE WHOLE LOG, BUILT ONCE INSTEAD OF OVER AND OVER
+        //
+        // The cluster asks "is this callsign already in my log?" for every spot on screen, and the
+        // duplicate check asks "which QSOs are with this station?" for every character typed into the
+        // callsign box. Both used to walk all 28,454 QSOs each time they were asked: measured here at
+        // 3.96 ms per cluster refresh and 0.97 ms per keystroke, on a fast machine. Three to five times
+        // that on the weak laptop this work is for, and the cluster refreshes on every payload, every
+        // band button, every mode button and every move of the VFO.
+        //
+        // Caching was refused before, and the reason recorded in UpdateDup was a good one: a QSO edit
+        // changes the object in place and raises no collection event, so a stale cache could call a
+        // contact a duplicate when it is not - worse than slow, mid-contest.
+        //
+        // What makes it safe now is that every edit in the program funnels through DataAccess, which
+        // counts the writes that can add a QSO, remove one, or change its callsigns. THREE things are
+        // checked before a cached answer is used: the collection is the same object, its count is
+        // unchanged, and nothing has been written since. Any one of them differing rebuilds both.
+        private HashSet<string> _loggedDxCalls;
+        private Dictionary<string, List<QSO>> _qsosByStation;
+        private ObservableCollection<QSO> _lookupsBuiltFrom;
+        private int _lookupsBuiltAtCount = -1;
+        private long _lookupsBuiltAtVersion = -1;
+
+        // Handed out when a station has never been worked. Shared and never added to - UpdateDupCore
+        // only reads it.
+        private static readonly List<QSO> _noQsosWithStation = new List<QSO>();
+
+        // Joins the two callsigns into one key. A control character, so it cannot occur inside either
+        // one and no pair of callsigns can be mistaken for a different pair.
+        private const string StationKeySeparator = "\u0001";
+
+        private void EnsureLogLookups()
         {
-            var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var qsos = Qsos;
+            int count = qsos == null ? 0 : qsos.Count;
+            long version = DataAccess.ContentVersion;
+
+            if (_loggedDxCalls != null
+                && ReferenceEquals(_lookupsBuiltFrom, qsos)
+                && _lookupsBuiltAtCount == count
+                && _lookupsBuiltAtVersion == version)
+                return;
+
+            var calls = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // Ordinal and case-sensitive, because that is what the walk it replaces used: string ==
+            // in C# is an ordinal compare, and answering a different set of QSOs than the old code did
+            // is exactly the kind of change nobody would notice until a contest.
+            var byStation = new Dictionary<string, List<QSO>>(StringComparer.Ordinal);
+
             if (qsos != null)
             {
                 foreach (var q in qsos)
                 {
                     string c = (q.DXCall ?? string.Empty).Trim();
                     if (c.Length > 0)
-                        set.Add(c);
+                        calls.Add(c);
+
+                    // A QSO with no callsign at all is left out of the station index on purpose: the
+                    // old comparison was against the text of a box, which is never null, so null could
+                    // never match. Keying it would have made an empty callsign box find these.
+                    if (q.MyCall == null || q.DXCall == null)
+                        continue;
+
+                    string key = q.MyCall + StationKeySeparator + q.DXCall;
+                    List<QSO> withStation;
+                    if (!byStation.TryGetValue(key, out withStation))
+                    {
+                        withStation = new List<QSO>();
+                        byStation[key] = withStation;
+                    }
+                    withStation.Add(q);
                 }
             }
-            return set;
+
+            _loggedDxCalls = calls;
+            _qsosByStation = byStation;
+            _lookupsBuiltFrom = qsos;
+            _lookupsBuiltAtCount = count;
+            _lookupsBuiltAtVersion = version;
+        }
+
+        // A case-insensitive set of all DX callsigns currently in the log, so cluster spot processing
+        // can test "is this call already logged?" in O(1) instead of scanning the whole log per spot.
+        // The callers only ask it questions; nothing adds to it.
+        private HashSet<string> BuildLoggedDxCallSet()
+        {
+            EnsureLogLookups();
+            return _loggedDxCalls;
         }
 
         private bool IsMyStationCallsign(string dxCallsign)
@@ -10981,20 +11052,25 @@ namespace HolyLogger
 
         private void UpdateDup()
         {
-            // Single pass over the log (this runs on the typing hot path): collect the QSOs with
-            // this station once, then evaluate dup + worked-before from that small list. The old
-            // code enumerated the full collection up to three times per keystroke (here twice,
-            // plus UpdateMatrix's own scan). No caching on purpose: QSO edits mutate objects
-            // in place without collection events, so any cross-call cache could go stale and
-            // report a wrong Duplicate verdict mid-contest.
+            // The QSOs with this station, found in one lookup rather than by walking the log.
+            //
+            // This runs on every character typed into the callsign box. The walk it replaces measured
+            // 0.97 ms per keystroke on a 28,454-QSO log here, and several times that on a slow machine
+            // - paid again for every letter, in the middle of a contest.
+            //
+            // The comment that used to stand here refused a cache because a QSO edit changes the object
+            // in place and raises no collection event, so the cache could report a wrong Duplicate
+            // verdict. That danger is answered in EnsureLogLookups, not ignored: the index is thrown
+            // away the moment anything is written that could move a callsign, and every edit in the
+            // program goes through that one door.
             if (Qsos == null) return;
             string myCall = TB_MyCallsign.Text;
             string dxCall = TB_DXCallsign.Text;
 
-            var perStation = new List<QSO>();
-            foreach (var qso in Qsos)
-                if (qso.MyCall == myCall && qso.DXCall == dxCall)
-                    perStation.Add(qso);
+            EnsureLogLookups();
+            List<QSO> perStation;
+            if (!_qsosByStation.TryGetValue(myCall + StationKeySeparator + dxCall, out perStation))
+                perStation = _noQsosWithStation;
 
             UpdateDupCore(perStation);
         }
