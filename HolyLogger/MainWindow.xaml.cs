@@ -930,6 +930,10 @@ namespace HolyLogger
             }
         }
 
+        // Twice the 344-pixel height of QRZGraphicsBorder in the XAML, so the photo is still sharp at
+        // 150% and 200% display scaling. Change it if that border's height changes.
+        private const int QrzPhotoBoxDecodeHeight = 688;
+
         private async void LoadCurrentQRZPhotoToGraphicsBox()
         {
             string urlAtCall = currentQrzImageUrl;
@@ -965,6 +969,16 @@ namespace HolyLogger
                 bitmap.BeginInit();
                 bitmap.CacheOption = BitmapCacheOption.OnLoad;
                 bitmap.StreamSource = new MemoryStream(data);
+                // Decoded at the size of the box it goes into, not the size it arrives at. QRZ photos
+                // come as the operator uploaded them - some are 3000 pixels across, which is 24 MB of
+                // memory once decoded, all of it to fill a box 344 pixels tall, and the CPU shrinks it
+                // on every repaint. This costs nothing on a strong machine and a good deal on a weak
+                // one, and it happens for every callsign looked up.
+                //
+                // Height only, so the proportions are WPF's to keep, and doubled so the picture is
+                // still sharp on a 150% or 200% display. The pop-out photo window has its own download
+                // and is deliberately left at full size - that is the one meant to be looked at.
+                bitmap.DecodePixelHeight = QrzPhotoBoxDecodeHeight;
                 bitmap.EndInit();
                 bitmap.Freeze();
                 Img_QRZGraphics.Source = bitmap;
