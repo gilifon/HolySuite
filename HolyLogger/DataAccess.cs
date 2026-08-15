@@ -1100,33 +1100,42 @@ Environment.NewLine +
         // would throw rather than return null.
         private static void ReadActivityFields(SQLiteDataReader rdr, QSO q)
         {
-            if (HasColumn(rdr, "iota")) q.Iota = rdr["iota"] as string;
-            if (HasColumn(rdr, "sota_ref")) q.SotaRef = rdr["sota_ref"] as string;
-            if (HasColumn(rdr, "pota_ref")) q.PotaRef = rdr["pota_ref"] as string;
-            if (HasColumn(rdr, "wwff_ref")) q.WwffRef = rdr["wwff_ref"] as string;
-            if (HasColumn(rdr, "sig")) q.Sig = rdr["sig"] as string;
-            if (HasColumn(rdr, "sig_info")) q.SigInfo = rdr["sig_info"] as string;
+            // Each field is found by its column NUMBER, looked up once here instead of the reader
+            // finding the name's position again for every call. Nineteen fields, on every QSO of every
+            // query in this file, so the saving is nineteen name searches per row.
+            //
+            // "as string" is kept exactly as it was: it yields null for a NULL column (DBNull is not a
+            // string), and null is what "this QSO has no reference" means everywhere downstream. That
+            // is NOT the same as the empty string TextAt gives the plain columns, and the difference
+            // matters - an empty SIG would be exported as a field with no value.
+            int o;
+            if ((o = Ordinal(rdr, "iota")) >= 0) q.Iota = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "sota_ref")) >= 0) q.SotaRef = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "pota_ref")) >= 0) q.PotaRef = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "wwff_ref")) >= 0) q.WwffRef = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "sig")) >= 0) q.Sig = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "sig_info")) >= 0) q.SigInfo = rdr.GetValue(o) as string;
             // The award / QSL record and the carried remainder. Read alongside the activity references for
             // the same reason: this is the ONE place every reader goes through, and a field that is
             // written but not read back is a field silently lost on the next export.
-            if (HasColumn(rdr, "credit_granted")) q.CreditGranted = rdr["credit_granted"] as string;
-            if (HasColumn(rdr, "cnty")) q.Cnty = rdr["cnty"] as string;
-            if (HasColumn(rdr, "qsl_via")) q.QslVia = rdr["qsl_via"] as string;
-            if (HasColumn(rdr, "qsl_rdate")) q.QslRDate = rdr["qsl_rdate"] as string;
-            if (HasColumn(rdr, "qsl_sent")) q.QslSent = rdr["qsl_sent"] as string;
-            if (HasColumn(rdr, "contest_id")) q.ContestId = rdr["contest_id"] as string;
-            if (HasColumn(rdr, "time_off")) q.TimeOff = rdr["time_off"] as string;
-            if (HasColumn(rdr, "date_off")) q.DateOff = rdr["date_off"] as string;
-            if (HasColumn(rdr, "extra_adif")) q.ExtraAdif = rdr["extra_adif"] as string;
+            if ((o = Ordinal(rdr, "credit_granted")) >= 0) q.CreditGranted = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "cnty")) >= 0) q.Cnty = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "qsl_via")) >= 0) q.QslVia = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "qsl_rdate")) >= 0) q.QslRDate = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "qsl_sent")) >= 0) q.QslSent = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "contest_id")) >= 0) q.ContestId = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "time_off")) >= 0) q.TimeOff = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "date_off")) >= 0) q.DateOff = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "extra_adif")) >= 0) q.ExtraAdif = rdr.GetValue(o) as string;
             // ADIF QTH (the worked station's town). Read here, in the one place every reader in this file
             // goes through, rather than repeated per query the way state is - a field that is written but
             // read back by only some of the readers is a field that vanishes from whichever screen uses
             // the other query.
-            if (HasColumn(rdr, "qth")) q.Qth = rdr["qth"] as string;
-            if (HasColumn(rdr, "dxcc") && rdr["dxcc"] != DBNull.Value)
+            if ((o = Ordinal(rdr, "qth")) >= 0) q.Qth = rdr.GetValue(o) as string;
+            if ((o = Ordinal(rdr, "dxcc")) >= 0 && !rdr.IsDBNull(o))
             {
                 int code;
-                if (int.TryParse(Convert.ToString(rdr["dxcc"]), out code)) q.DxccCode = code;
+                if (int.TryParse(Convert.ToString(rdr.GetValue(o)), out code)) q.DxccCode = code;
             }
         }
 
@@ -1252,22 +1261,49 @@ Environment.NewLine +
         // under a second.
         //
         // The names are the same for the whole reader, so they are collected once per reader and then
-        // answered from a set. Held in a [ThreadStatic] pair rather than a dictionary keyed by reader:
+        // answered from a table. Held in a [ThreadStatic] pair rather than a dictionary keyed by reader:
         // readers are used and disposed one at a time on the thread doing the reading, so this both
         // holds nothing after the read and needs no locking.
+        //
+        // What is collected is the column's NUMBER, not merely its name, because reading a field by
+        // name - rdr["dx_callsign"] - makes the reader find that name's position again on every single
+        // call, the same linear scan this was built to end. With the number in hand the field is taken
+        // straight out of the row.
         [ThreadStatic] private static SQLiteDataReader _columnsFor;
-        [ThreadStatic] private static HashSet<string> _columnNames;
+        [ThreadStatic] private static Dictionary<string, int> _columnOrdinals;
+
+        private static void EnsureColumnMap(SQLiteDataReader rdr)
+        {
+            if (ReferenceEquals(_columnsFor, rdr)) return;
+            var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            for (int i = 0; i < rdr.FieldCount; i++) map[rdr.GetName(i)] = i;
+            _columnOrdinals = map;
+            _columnsFor = rdr;
+        }
 
         private static bool HasColumn(SQLiteDataReader rdr, string name)
         {
-            if (!ReferenceEquals(_columnsFor, rdr))
-            {
-                var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                for (int i = 0; i < rdr.FieldCount; i++) names.Add(rdr.GetName(i));
-                _columnNames = names;
-                _columnsFor = rdr;
-            }
-            return _columnNames.Contains(name);
+            EnsureColumnMap(rdr);
+            return _columnOrdinals.ContainsKey(name);
+        }
+
+        // The column's position in this reader, or -1 if the database has no such column (an old file
+        // that predates it - the Restore button can open one). Callers must check for -1 exactly as
+        // they used to check HasColumn.
+        private static int Ordinal(SQLiteDataReader rdr, string name)
+        {
+            EnsureColumnMap(rdr);
+            int i;
+            return _columnOrdinals.TryGetValue(name, out i) ? i : -1;
+        }
+
+        // The text of a column that may be absent or NULL. Empty string for NULL, which is what
+        // rdr[name].ToString() gave before - DBNull's own ToString() is "" - so nothing downstream
+        // sees a value it did not see before.
+        private static string TextAt(SQLiteDataReader rdr, int ordinal)
+        {
+            if (ordinal < 0 || rdr.IsDBNull(ordinal)) return string.Empty;
+            return rdr.GetValue(ordinal).ToString();
         }
 
         // EVERY COLUMN EXCEPT THE CARRIED ADIF TEXT.
@@ -1345,55 +1381,89 @@ Environment.NewLine +
                     cmd.Parameters.Add(new SQLiteParameter(null, logId));
                     using (SQLiteDataReader rdr = cmd.ExecuteReader())
                     {
+                        // THE COLUMN NUMBERS, FOUND ONCE FOR THE WHOLE QUERY.
+                        //
+                        // Every field used to be fetched by name - rdr["dx_callsign"] - and each of those
+                        // makes the reader search its ~60 column names for that one. Forty-odd fields per
+                        // QSO, 28,454 QSOs in this operator's log: over a million searches to hand over
+                        // the same columns in the same order every time. A reader's columns cannot change
+                        // while it is open, so their positions are taken here and used for every row.
+                        //
+                        // Ordinal() answers -1 for a column the database does not have, so an old file
+                        // opened by Restore reads what it has and leaves the rest alone, instead of
+                        // throwing the way rdr["state"] would.
+                        int cId = Ordinal(rdr, "Id"), cComment = Ordinal(rdr, "comment"),
+                            cDxCall = Ordinal(rdr, "dx_callsign"), cMode = Ordinal(rdr, "mode"),
+                            cSubmode = Ordinal(rdr, "submode"), cExchange = Ordinal(rdr, "exchange"),
+                            cFreq = Ordinal(rdr, "frequency"), cBand = Ordinal(rdr, "band"),
+                            cMyCall = Ordinal(rdr, "my_callsign"), cOperator = Ordinal(rdr, "operator"),
+                            cMySquare = Ordinal(rdr, "my_square"), cMyLocator = Ordinal(rdr, "my_locator"),
+                            cDxLocator = Ordinal(rdr, "dx_locator"), cRstRcvd = Ordinal(rdr, "rst_rcvd"),
+                            cRstSent = Ordinal(rdr, "rst_sent"), cName = Ordinal(rdr, "name"),
+                            cCountry = Ordinal(rdr, "country"), cContinent = Ordinal(rdr, "continent"),
+                            cCqZone = Ordinal(rdr, "cq_zone"), cItuZone = Ordinal(rdr, "itu_zone"),
+                            cState = Ordinal(rdr, "state"), cTime = Ordinal(rdr, "time"),
+                            cDate = Ordinal(rdr, "date"), cPropMode = Ordinal(rdr, "prop_mode"),
+                            cSatName = Ordinal(rdr, "sat_name"), cSoapbox = Ordinal(rdr, "soapbox"),
+                            cEqslStatus = Ordinal(rdr, "eqsl_status"), cLotwStatus = Ordinal(rdr, "lotw_status"),
+                            cQrzStatus = Ordinal(rdr, "qrz_status"), cClublogStatus = Ordinal(rdr, "clublog_status"),
+                            cLotwRcvd = Ordinal(rdr, "lotw_qsl_rcvd"), cLotwRDate = Ordinal(rdr, "lotw_qsl_rdate"),
+                            cLotwDeleted = Ordinal(rdr, "lotw_deleted_entity"),
+                            cQrzRcvd = Ordinal(rdr, "qrz_qsl_rcvd"), cQrzRDate = Ordinal(rdr, "qrz_qsl_rdate"),
+                            cQrzDeleted = Ordinal(rdr, "qrz_deleted_entity"),
+                            cEqslRcvd = Ordinal(rdr, "eqsl_qsl_rcvd"), cEqslRDate = Ordinal(rdr, "eqsl_qsl_rdate"),
+                            cEqslDeleted = Ordinal(rdr, "eqsl_deleted_entity"),
+                            cClublogRcvd = Ordinal(rdr, "clublog_qsl_rcvd"), cClublogRDate = Ordinal(rdr, "clublog_qsl_rdate"),
+                            cClublogDeleted = Ordinal(rdr, "clublog_deleted_entity"),
+                            cPaperRcvd = Ordinal(rdr, "paper_qsl_rcvd");
+
                         while (rdr.Read())
                         {
                             QSO q = new QSO();
-                            if (rdr["Id"] != null) q.id = int.Parse(rdr["Id"].ToString());
-                            if (rdr["comment"] != null) q.Comment = rdr["comment"].ToString();
-                            if (rdr["dx_callsign"] != null) q.DXCall = rdr["dx_callsign"].ToString();
-                            if (rdr["mode"] != null) q.Mode = rdr["mode"].ToString();
-                            if (rdr["submode"] != null) q.SUBMode = rdr["submode"].ToString();
-                            if (rdr["exchange"] != null) q.SRX = rdr["exchange"].ToString();
-                            if (rdr["frequency"] != null) q.Freq = rdr["frequency"].ToString();
-                            if (rdr["band"] != null) q.Band = rdr["band"].ToString();
-                            if (rdr["my_callsign"] != null) q.MyCall = rdr["my_callsign"].ToString();
-                            if (rdr["operator"] != null) q.Operator = rdr["operator"].ToString();
-                            if (rdr["my_square"] != null) q.STX = rdr["my_square"].ToString();
-                            if (rdr["my_locator"] != null) q.MyLocator = rdr["my_locator"].ToString();
-                            if (rdr["dx_locator"] != null) q.DXLocator = rdr["dx_locator"].ToString();
-                            if (rdr["rst_rcvd"] != null) q.RST_RCVD = rdr["rst_rcvd"].ToString();
-                            if (rdr["rst_sent"] != null) q.RST_SENT = rdr["rst_sent"].ToString();
-                            if (rdr["name"] != null) q.Name = rdr["name"].ToString();
-                            if (rdr["country"] != null) q.Country = rdr["country"].ToString();
-                            if (rdr["continent"] != null) q.Continent = rdr["continent"].ToString();
-                            if (rdr["cq_zone"] != null) q.CQZone = rdr["cq_zone"].ToString();
-                            if (rdr["itu_zone"] != null) q.ITUZone = rdr["itu_zone"].ToString();
-                        if (rdr["state"] != null) q.State = rdr["state"].ToString();
-                    if (rdr["state"] != null) q.State = rdr["state"].ToString();
-                            if (rdr["time"] != null) q.Time = rdr["time"].ToString();
-                            if (rdr["date"] != null) q.Date = rdr["date"].ToString();
-                            if (rdr["prop_mode"] != null) q.PROP_MODE = rdr["prop_mode"].ToString();
-                            if (rdr["sat_name"] != null) q.SAT_NAME = rdr["sat_name"].ToString();
-                            if (rdr["soapbox"] != null) q.SOAPBOX = rdr["soapbox"].ToString();
+                            if (cId >= 0) q.id = Convert.ToInt32(rdr.GetValue(cId));
+                            q.Comment = TextAt(rdr, cComment);
+                            q.DXCall = TextAt(rdr, cDxCall);
+                            q.Mode = TextAt(rdr, cMode);
+                            q.SUBMode = TextAt(rdr, cSubmode);
+                            q.SRX = TextAt(rdr, cExchange);
+                            q.Freq = TextAt(rdr, cFreq);
+                            q.Band = TextAt(rdr, cBand);
+                            q.MyCall = TextAt(rdr, cMyCall);
+                            q.Operator = TextAt(rdr, cOperator);
+                            q.STX = TextAt(rdr, cMySquare);
+                            q.MyLocator = TextAt(rdr, cMyLocator);
+                            q.DXLocator = TextAt(rdr, cDxLocator);
+                            q.RST_RCVD = TextAt(rdr, cRstRcvd);
+                            q.RST_SENT = TextAt(rdr, cRstSent);
+                            q.Name = TextAt(rdr, cName);
+                            q.Country = TextAt(rdr, cCountry);
+                            q.Continent = TextAt(rdr, cContinent);
+                            q.CQZone = TextAt(rdr, cCqZone);
+                            q.ITUZone = TextAt(rdr, cItuZone);
+                            q.State = TextAt(rdr, cState);
+                            q.Time = TextAt(rdr, cTime);
+                            q.Date = TextAt(rdr, cDate);
+                            q.PROP_MODE = TextAt(rdr, cPropMode);
+                            q.SAT_NAME = TextAt(rdr, cSatName);
+                            q.SOAPBOX = TextAt(rdr, cSoapbox);
                             ReadActivityFields(rdr, q);
-                            if (rdr["eqsl_status"] != null && rdr["eqsl_status"] != DBNull.Value) q.EqslStatus = Convert.ToInt32(rdr["eqsl_status"]);
-                            if (rdr["lotw_status"] != null && rdr["lotw_status"] != DBNull.Value) q.LotwStatus = Convert.ToInt32(rdr["lotw_status"]);
-                            if (rdr["qrz_status"] != null && rdr["qrz_status"] != DBNull.Value) q.QrzStatus = Convert.ToInt32(rdr["qrz_status"]);
-                        if (rdr["lotw_qsl_rcvd"] != null && rdr["lotw_qsl_rcvd"] != DBNull.Value) q.LotwQslRcvd = Convert.ToInt32(rdr["lotw_qsl_rcvd"]);
-                        if (rdr["lotw_qsl_rdate"] != null && rdr["lotw_qsl_rdate"] != DBNull.Value) q.LotwQslRDate = rdr["lotw_qsl_rdate"].ToString();
-                        if (rdr["lotw_deleted_entity"] != null && rdr["lotw_deleted_entity"] != DBNull.Value) q.LotwDeletedEntity = Convert.ToInt32(rdr["lotw_deleted_entity"]);
-                        if (rdr["qrz_qsl_rcvd"] != null && rdr["qrz_qsl_rcvd"] != DBNull.Value) q.QrzQslRcvd = Convert.ToInt32(rdr["qrz_qsl_rcvd"]);
-                        if (rdr["qrz_qsl_rdate"] != null && rdr["qrz_qsl_rdate"] != DBNull.Value) q.QrzQslRDate = rdr["qrz_qsl_rdate"].ToString();
-                        if (rdr["qrz_deleted_entity"] != null && rdr["qrz_deleted_entity"] != DBNull.Value) q.QrzDeletedEntity = Convert.ToInt32(rdr["qrz_deleted_entity"]);
-                        if (rdr["eqsl_qsl_rcvd"] != null && rdr["eqsl_qsl_rcvd"] != DBNull.Value) q.EqslQslRcvd = Convert.ToInt32(rdr["eqsl_qsl_rcvd"]);
-                        if (rdr["eqsl_qsl_rdate"] != null && rdr["eqsl_qsl_rdate"] != DBNull.Value) q.EqslQslRDate = rdr["eqsl_qsl_rdate"].ToString();
-                        if (rdr["eqsl_deleted_entity"] != null && rdr["eqsl_deleted_entity"] != DBNull.Value) q.EqslDeletedEntity = Convert.ToInt32(rdr["eqsl_deleted_entity"]);
-                        if (rdr["clublog_qsl_rcvd"] != null && rdr["clublog_qsl_rcvd"] != DBNull.Value) q.ClublogQslRcvd = Convert.ToInt32(rdr["clublog_qsl_rcvd"]);
-                        if (rdr["clublog_qsl_rdate"] != null && rdr["clublog_qsl_rdate"] != DBNull.Value) q.ClublogQslRDate = rdr["clublog_qsl_rdate"].ToString();
-                        if (rdr["clublog_deleted_entity"] != null && rdr["clublog_deleted_entity"] != DBNull.Value) q.ClublogDeletedEntity = Convert.ToInt32(rdr["clublog_deleted_entity"]);
-                        if (rdr["paper_qsl_rcvd"] != null && rdr["paper_qsl_rcvd"] != DBNull.Value) q.PaperQslRcvd = Convert.ToInt32(rdr["paper_qsl_rcvd"]);
-                            if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
-                        if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
+                            if (cEqslStatus >= 0 && !rdr.IsDBNull(cEqslStatus)) q.EqslStatus = Convert.ToInt32(rdr.GetValue(cEqslStatus));
+                            if (cLotwStatus >= 0 && !rdr.IsDBNull(cLotwStatus)) q.LotwStatus = Convert.ToInt32(rdr.GetValue(cLotwStatus));
+                            if (cQrzStatus >= 0 && !rdr.IsDBNull(cQrzStatus)) q.QrzStatus = Convert.ToInt32(rdr.GetValue(cQrzStatus));
+                            if (cLotwRcvd >= 0 && !rdr.IsDBNull(cLotwRcvd)) q.LotwQslRcvd = Convert.ToInt32(rdr.GetValue(cLotwRcvd));
+                            if (cLotwRDate >= 0 && !rdr.IsDBNull(cLotwRDate)) q.LotwQslRDate = rdr.GetValue(cLotwRDate).ToString();
+                            if (cLotwDeleted >= 0 && !rdr.IsDBNull(cLotwDeleted)) q.LotwDeletedEntity = Convert.ToInt32(rdr.GetValue(cLotwDeleted));
+                            if (cQrzRcvd >= 0 && !rdr.IsDBNull(cQrzRcvd)) q.QrzQslRcvd = Convert.ToInt32(rdr.GetValue(cQrzRcvd));
+                            if (cQrzRDate >= 0 && !rdr.IsDBNull(cQrzRDate)) q.QrzQslRDate = rdr.GetValue(cQrzRDate).ToString();
+                            if (cQrzDeleted >= 0 && !rdr.IsDBNull(cQrzDeleted)) q.QrzDeletedEntity = Convert.ToInt32(rdr.GetValue(cQrzDeleted));
+                            if (cEqslRcvd >= 0 && !rdr.IsDBNull(cEqslRcvd)) q.EqslQslRcvd = Convert.ToInt32(rdr.GetValue(cEqslRcvd));
+                            if (cEqslRDate >= 0 && !rdr.IsDBNull(cEqslRDate)) q.EqslQslRDate = rdr.GetValue(cEqslRDate).ToString();
+                            if (cEqslDeleted >= 0 && !rdr.IsDBNull(cEqslDeleted)) q.EqslDeletedEntity = Convert.ToInt32(rdr.GetValue(cEqslDeleted));
+                            if (cClublogRcvd >= 0 && !rdr.IsDBNull(cClublogRcvd)) q.ClublogQslRcvd = Convert.ToInt32(rdr.GetValue(cClublogRcvd));
+                            if (cClublogRDate >= 0 && !rdr.IsDBNull(cClublogRDate)) q.ClublogQslRDate = rdr.GetValue(cClublogRDate).ToString();
+                            if (cClublogDeleted >= 0 && !rdr.IsDBNull(cClublogDeleted)) q.ClublogDeletedEntity = Convert.ToInt32(rdr.GetValue(cClublogDeleted));
+                            if (cPaperRcvd >= 0 && !rdr.IsDBNull(cPaperRcvd)) q.PaperQslRcvd = Convert.ToInt32(rdr.GetValue(cPaperRcvd));
+                            if (cClublogStatus >= 0 && !rdr.IsDBNull(cClublogStatus)) q.ClublogStatus = Convert.ToInt32(rdr.GetValue(cClublogStatus));
                             q.StandartizeQSO();
                             qso_list.Add(q);
 
