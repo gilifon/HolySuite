@@ -135,14 +135,27 @@ namespace HolyLogger
             });
         }
 
-        public static bool CheckForInternetConnection()
+        // "Is there really internet out there", answered in three seconds or not at all.
+        //
+        // This used to be a WebClient with no timeout, which means the .NET default of ONE HUNDRED
+        // SECONDS. With no network at all that is harmless - the name lookup fails at once - but a
+        // network that swallows packets instead of refusing them (hotel wifi, a captive portal, a
+        // firewalled club station) left whoever asked waiting a minute and a half. Nothing this answer
+        // is used for is worth that wait, so the probe is bounded, and it is async: no caller has to
+        // give up a thread, least of all the UI thread.
+        private static readonly HttpClient _probeHttpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(3) };
+
+        public static async Task<bool> CheckForInternetConnectionAsync()
         {
             try
             {
-                using (var client = new WebClient())
-                using (client.OpenRead("http://clients3.google.com/generate_204"))
+                // generate_204 answers with an empty 204 - the cheapest honest "yes" on the web, and
+                // no body to read. Headers are enough, so the response is not waited out in full.
+                using (var response = await _probeHttpClient
+                           .GetAsync("http://clients3.google.com/generate_204", HttpCompletionOption.ResponseHeadersRead)
+                           .ConfigureAwait(false))
                 {
-                    return true;
+                    return response.IsSuccessStatusCode;
                 }
             }
             catch

@@ -991,7 +991,7 @@ namespace HolyLogger
             // Check connectivity before showing the window so the window never appears blank
             // while waiting for the network check to complete.
             bool online = false;
-            try { online = Helper.CheckForInternetConnection(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { online = await Helper.CheckForInternetConnectionAsync(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
 
             var progressWindow = new UploadProgressWindow { Owner = this };
             progressWindow.Show();

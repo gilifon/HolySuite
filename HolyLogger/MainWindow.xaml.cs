@@ -414,7 +414,25 @@ namespace HolyLogger
 
             ApplyHolyClusterListener();
 
-            isNetworkAvailable = Helper.CheckForInternetConnection();
+            // The program must not wait on the internet in order to appear. Windows' own answer - is any
+            // adapter up - costs nothing and sends nothing, so it is what the program believes for the
+            // first moment. The real probe then runs in the background and corrects the flag, the network
+            // light and the QRZ icon when it replies. Being optimistic for that moment is the safe way
+            // round: everything gated on this flag makes a network call that has its own timeout, whereas
+            // starting out "offline" would have those features refuse to try on a machine that is online.
+            isNetworkAvailable = NetworkInterface.GetIsNetworkAvailable();
+            _ = Task.Run(async () =>
+            {
+                bool online = await Helper.CheckForInternetConnectionAsync().ConfigureAwait(false);
+                await Dispatcher.InvokeAsync(() =>
+                {
+                    isNetworkAvailable = online;
+                    if (NetworkFlag != null)
+                        NetworkFlag.Fill = online ? new SolidColorBrush(Color.FromRgb(0x00, 0xFF, 0x00))
+                                                  : new SolidColorBrush(Color.FromRgb(0xFF, 0x00, 0x00));
+                    if (!online) SetQrzConnected(false);
+                });
+            });
             HeartbeatTimer.Tick += HeartbeatTimer_Tick;
             CallsignLookupDebounceTimer.Interval = TimeSpan.FromMilliseconds(CallsignLookupDebounceMs);
             CallsignLookupDebounceTimer.Tick += CallsignLookupDebounceTimer_Tick;
