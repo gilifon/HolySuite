@@ -11197,7 +11197,13 @@ namespace HolyLogger
                 try
                 {
                     string baseRequest = "https://xmldata.qrz.com/xml/current/?s=";
-                    var response = await _sharedHttpClient.GetAsync(baseRequest + SessionKey + ";callsign=" + bare_dxcall);
+                    // Started on a background thread, not here. Awaiting is not enough on .NET Framework:
+                    // the proxy for a request is resolved on whichever thread STARTS it, before the call
+                    // goes off on its own. With "automatically detect proxy settings" on - the Windows
+                    // default, and what hotel and club networks run - that resolution can take a moment,
+                    // and this method runs on every callsign the operator types. The startup code dodges
+                    // the same trap for the QRZ login; this is the typing path, where it matters more.
+                    var response = await Task.Run(() => _sharedHttpClient.GetAsync(baseRequest + SessionKey + ";callsign=" + bare_dxcall));
                     var responseFromServer = await response.Content.ReadAsStringAsync();
                     XDocument xDoc = XDocument.Parse(responseFromServer);
                     XNamespace ns = xDoc.Root.GetDefaultNamespace();
@@ -11356,14 +11362,16 @@ namespace HolyLogger
                     var client = _qrzPhotoHttpClient;
                     string html = string.Empty;
 
+                    // Off the UI thread for the same reason as the lookup above: the proxy is resolved
+                    // where the request is started, and this is two requests, on the typing path.
                     if (!string.IsNullOrWhiteSpace(SessionKey))
                     {
-                        html = await client.GetStringAsync("https://xmldata.qrz.com/xml/current/?s=" + SessionKey + ";html=" + bareCallsign);
+                        html = await Task.Run(() => client.GetStringAsync("https://xmldata.qrz.com/xml/current/?s=" + SessionKey + ";html=" + bareCallsign));
                     }
 
                     if (string.IsNullOrWhiteSpace(html))
                     {
-                        html = await client.GetStringAsync("https://www.qrz.com/db/" + bareCallsign);
+                        html = await Task.Run(() => client.GetStringAsync("https://www.qrz.com/db/" + bareCallsign));
                     }
 
                     Match match = Regex.Match(html, @"https://cdn-bio\.qrz\.com/[^""'<>\x00--]+", RegexOptions.IgnoreCase);

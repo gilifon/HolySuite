@@ -32,7 +32,10 @@ namespace HolyLogger
             if (string.IsNullOrWhiteSpace(url)) return null;
             try
             {
-                return await _imageHttpClient.GetByteArrayAsync(url).ConfigureAwait(false);
+                // Task.Run, not just await: on .NET Framework the request's proxy is resolved on the
+                // thread that STARTS it, so awaiting alone still leaves that part on the caller - which
+                // for the operator photo is the UI thread, on the typing path.
+                return await Task.Run(() => _imageHttpClient.GetByteArrayAsync(url)).ConfigureAwait(false);
             }
             catch
             {
