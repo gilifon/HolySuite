@@ -1270,6 +1270,61 @@ Environment.NewLine +
             return _columnNames.Contains(name);
         }
 
+        // EVERY COLUMN EXCEPT THE CARRIED ADIF TEXT.
+        //
+        // extra_adif holds, for each imported QSO, the ADIF fields HolyLogger has no column of its own
+        // for - kept word for word so an export gives them back. Measured on this operator's database it
+        // is 58 MB of the 62 MB in one log: 93% of everything a log read fetches, for something no screen
+        // ever shows. Only the ADIF export reads it, and it fetches it for itself (FillCarriedAdif).
+        //
+        // Left out by NAME rather than by listing the wanted columns, so a column added to the table in
+        // future is read without anyone having to remember this list. ReadActivityFields asks HasColumn
+        // before touching it, so a reader without the column simply leaves QSO.ExtraAdif null - and
+        // Update never writes that column, so a QSO saved without it in hand keeps its text.
+        private string ColumnsExceptCarriedAdif()
+        {
+            if (_columnsNoAdif != null) return _columnsNoAdif;
+
+            var names = new List<string>();
+            using (var cmd = new SQLiteCommand("PRAGMA table_info(qso)", con))
+            using (var r = cmd.ExecuteReader())
+                while (r.Read())
+                {
+                    string name = r["name"].ToString();
+                    if (!string.Equals(name, "extra_adif", StringComparison.OrdinalIgnoreCase))
+                        names.Add("\"" + name + "\"");
+                }
+
+            _columnsNoAdif = names.Count == 0 ? "*" : string.Join(",", names.ToArray());
+            return _columnsNoAdif;
+        }
+        private string _columnsNoAdif;
+
+        // Fills in the carried ADIF text for QSOs that are about to be exported - the one place that
+        // needs it. One query for the lot, matched back by Id.
+        public void FillCarriedAdif(IEnumerable<QSO> qsos)
+        {
+            if (qsos == null) return;
+            var byId = new Dictionary<long, QSO>();
+            foreach (QSO q in qsos)
+                if (q != null && q.id > 0 && string.IsNullOrEmpty(q.ExtraAdif)) byId[q.id] = q;
+            if (byId.Count == 0) return;
+
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return;
+                using (var cmd = new SQLiteCommand(
+                    "SELECT Id, extra_adif FROM qso WHERE extra_adif IS NOT NULL AND extra_adif <> ''", con))
+                using (var rdr = cmd.ExecuteReader())
+                    while (rdr.Read())
+                    {
+                        long id = Convert.ToInt64(rdr[0]);
+                        QSO q;
+                        if (byId.TryGetValue(id, out q)) q.ExtraAdif = rdr[1] as string;
+                    }
+            }
+        }
+
         // Loads only the QSOs stored under one log (what the log table shows for the active log).
         public ObservableCollection<QSO> GetQSOsForLog(long logId, Action<int> progressCallback = null)
         {
@@ -1284,7 +1339,8 @@ Environment.NewLine +
                 }
                 int processedCount = 0;
                 int lastReportedProgress = -1;
-                using (SQLiteCommand cmd = new SQLiteCommand("SELECT * FROM qso WHERE log_id = ? ORDER BY date DESC, time DESC", con))
+                using (SQLiteCommand cmd = new SQLiteCommand(
+                    "SELECT " + ColumnsExceptCarriedAdif() + " FROM qso WHERE log_id = ? ORDER BY date DESC, time DESC", con))
                 {
                     cmd.Parameters.Add(new SQLiteParameter(null, logId));
                     using (SQLiteDataReader rdr = cmd.ExecuteReader())

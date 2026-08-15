@@ -109,6 +109,12 @@ namespace HolyLogger
             // A file written FOR THE OPERATOR carries everything their QSOs arrived with, including the
             // fields HolyLogger has no column for - an export they can re-import anywhere and still have
             // the log they started with. (Service uploads deliberately do not; see GenerateAdif.)
+            //
+            // Those carried fields are NOT loaded with the log - they are 93% of its weight and nothing
+            // on screen uses them - so they are fetched here, for these QSOs, just before writing.
+            try { dal?.FillCarriedAdif(qsos); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
             string adif = Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName,
                                                 includeImportedFields: true);
             var save = new SaveFileDialog { Filter = "ADIF File|*.adi", Title = "Export ADIF" };

@@ -4527,8 +4527,11 @@ namespace HolyLogger
             try
             {
                 // Back up ONLY the active log (Replace replaces just this log, not every log).
-                // A backup that drops fields is not a backup: carried imported fields go in too.
-                string adif = Services.GenerateAdif(dal.GetQSOsForLog(dal.ActiveLogId), Contests.ContestService.Active?.CabrilloName,
+                // A backup that drops fields is not a backup: carried imported fields go in too - and
+                // since the log read no longer carries them, they are fetched for this backup.
+                var backupQsos = dal.GetQSOsForLog(dal.ActiveLogId);
+                dal.FillCarriedAdif(backupQsos);
+                string adif = Services.GenerateAdif(backupQsos, Contests.ContestService.Active?.CabrilloName,
                                                     includeImportedFields: true);
                 System.IO.File.WriteAllText(saveDialog.FileName, adif);
             }

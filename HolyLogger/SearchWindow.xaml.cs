@@ -579,6 +579,11 @@ namespace HolyLogger
             if (qsos == null || qsos.Count == 0) return;
             try
             {
+                // The carried ADIF fields are not loaded with the log - they are most of its weight and
+                // no screen shows them - so they are fetched here for the QSOs being written out.
+                try { DataAccess.GetInstance()?.FillCarriedAdif(qsos); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
                 string adif = HolyParser.Services.GenerateAdif(qsos, Contests.ContestService.Active?.CabrilloName,
                                                                includeImportedFields: true);
                 var save = new Microsoft.Win32.SaveFileDialog
