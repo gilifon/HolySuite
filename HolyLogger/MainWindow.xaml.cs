@@ -4694,7 +4694,9 @@ namespace HolyLogger
             var content = new FormUrlEncodedContent(values);
             try
             {
-                var response = await _sharedHttpClient.PostAsync("https://tools.iarc.org/Holyland/Server/AddParticipant.php", content);
+                // Started off the UI thread: on .NET Framework the proxy for a request is resolved on
+                // whichever thread starts it, and this is called from the form.
+                var response = await Task.Run(() => _sharedHttpClient.PostAsync("https://tools.iarc.org/Holyland/Server/AddParticipant.php", content));
                 var responseString = await response.Content.ReadAsStringAsync();
                 return responseString;
             }
@@ -4722,7 +4724,7 @@ namespace HolyLogger
                 var content = new FormUrlEncodedContent(values);
                 try
                 {
-                    var response = await _sharedHttpClient.PostAsync("https://tools.iarc.org/Holyland/Server/AddQSO.php", content);
+                    var response = await Task.Run(() => _sharedHttpClient.PostAsync("https://tools.iarc.org/Holyland/Server/AddQSO.php", content));
                     //var response = await _sharedHttpClient.PostAsync(Properties.Settings.Default.baseURL + "/Holyland/Server/AddLog.php", content);
                     var responseString = await response.Content.ReadAsStringAsync();
                     errorLog.AppendLine("Chunk #" + c + ":");
@@ -8454,7 +8456,9 @@ namespace HolyLogger
                 try
                 {
                     string baseRequest = "http://raw.githubusercontent.com/4Z1KD/HolyLogger/master/Version?v=" + DateTime.Now.Ticks;
-                    var response = await client.GetAsync(baseRequest);
+                    // Off the UI thread. This is a menu item, but it also fires by itself at startup
+                    // when "check for updates automatically" is on.
+                    var response = await Task.Run(() => client.GetAsync(baseRequest));
                     var responseFromServer = await response.Content.ReadAsStringAsync();
 
                     if (CompareVersions(CurrentVersion, responseFromServer))
@@ -11654,7 +11658,9 @@ namespace HolyLogger
             try
             {
                 string baseRequest = "http://xmldata.qrz.com/xml/current/?s=";
-                var response = await _sharedHttpClient.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(callsign));
+                // Off the UI thread, like the lookup on the typing path: the proxy is resolved where
+                // the request is started. This one runs once per QSO of a whole-log lookup.
+                var response = await Task.Run(() => _sharedHttpClient.GetAsync(baseRequest + SessionKey + ";callsign=" + Services.getBareCallsign(callsign)));
                 var responseFromServer = await response.Content.ReadAsStringAsync();
                 XDocument xDoc = XDocument.Parse(responseFromServer);
 
@@ -11818,7 +11824,10 @@ namespace HolyLogger
                     ServicePointManager.Expect100Continue = true;
                     ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
                     string baseRequest = "https://raw.githubusercontent.com/4Z1KD/HolyLogger/master/LiveLog?v=" + DateTime.Now.Ticks;
-                    var response = await client.GetAsync(baseRequest);
+                    // Off the UI thread: this runs from the constructor, so the proxy resolution it
+                    // would otherwise do there lands squarely in the startup the program just stopped
+                    // making people wait through.
+                    var response = await Task.Run(() => client.GetAsync(baseRequest));
                     var responseFromServer = await response.Content.ReadAsStringAsync();
                     isRemoteServerLiveLog = responseFromServer.ToLower().Trim() == "true";
                 }

@@ -66,7 +66,9 @@ namespace HolyLogger
                     + "?UserName=" + Uri.EscapeDataString(username.Trim())
                     + "&Password=" + Uri.EscapeDataString(password)
                     + (string.IsNullOrWhiteSpace(rcvdSince) ? "" : "&RcvdSince=" + Uri.EscapeDataString(rcvdSince.Trim()));
-                using (var resp = await _http.GetAsync(url, ct))
+                // Started on a background thread: on .NET Framework the proxy for a request is resolved
+                // on whichever thread starts it, and the In Box fetch is asked for from the UI thread.
+                using (var resp = await Task.Run(() => _http.GetAsync(url, ct), ct))
                     html = await resp.Content.ReadAsStringAsync();
             }
             catch (OperationCanceledException) { throw; }
@@ -106,7 +108,7 @@ namespace HolyLogger
             string adif;
             try
             {
-                using (var resp = await _http.GetAsync(FilesBase + m.Groups[1].Value, ct))
+                using (var resp = await Task.Run(() => _http.GetAsync(FilesBase + m.Groups[1].Value, ct), ct))
                     adif = await resp.Content.ReadAsStringAsync();
             }
             catch (OperationCanceledException) { throw; }
@@ -187,7 +189,20 @@ namespace HolyLogger
                 QsoDate = F(f, "qso_date"),
                 QslRDate = F(f, "eqsl_qslrdate"),
                 StationCallsign = stationCallsign,   // the In Box belongs to this account's callsign
-                DxccCode = 0                          // eQSL sends no <DXCC>; entity resolved by the caller
+                DxccCode = 0,                         // eQSL sends no <DXCC>; entity resolved by the caller
+
+                // KEPT FOR THE CONTACTS THIS LOG NO LONGER HAS. Matching needs none of these - a card is
+                // matched on callsign, band, mode and date - but a confirmation for a contact the log has
+                // lost can be turned back into that contact, and then everything eQSL kept is worth
+                // having. Per eQSL's own description of the In Box download, TIME_ON, RST_SENT and
+                // RST_RCVD are always sent; SUBMODE, PROP_MODE and GRIDSQUARE appear when they are not
+                // blank (the square only when it is four characters or longer).
+                TimeOn = F(f, "time_on"),
+                RstSent = F(f, "rst_sent"),
+                RstRcvd = F(f, "rst_rcvd"),
+                SubMode = F(f, "submode"),
+                PropMode = F(f, "prop_mode"),
+                Grid = F(f, "gridsquare")
             });
         }
     }

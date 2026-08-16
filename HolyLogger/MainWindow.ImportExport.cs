@@ -1558,7 +1558,9 @@ namespace HolyLogger
                 c.timestamp = DateTime.UtcNow.Ticks.ToString();
 
                 //post file
-                var response = await _sharedHttpClient.PostAsync("https://tools.iarc.org/iarc/Server/ftp.php", formData);
+                // Started off the UI thread - on .NET Framework the proxy is resolved on the thread
+                // that starts a request, and this runs from the contest-upload button.
+                var response = await Task.Run(() => _sharedHttpClient.PostAsync("https://tools.iarc.org/iarc/Server/ftp.php", formData));
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -1571,7 +1573,7 @@ namespace HolyLogger
                     {
                         // Send a POST request to the URL with the JSON data
                         //upload_log.php
-                        response = await _sharedHttpClient.PostAsync("https://tools.iarc.org/iarc/Server/upload_log.php", formData);
+                        response = await Task.Run(() => _sharedHttpClient.PostAsync("https://tools.iarc.org/iarc/Server/upload_log.php", formData));
 
                         // Check if the request was successful
                         if (response.IsSuccessStatusCode)

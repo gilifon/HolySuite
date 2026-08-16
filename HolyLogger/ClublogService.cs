@@ -78,8 +78,13 @@ namespace HolyLogger
 
             try
             {
+                // Task.Run, not a bare await. On .NET Framework the proxy for a request is resolved on
+                // whichever thread STARTS it, before the call goes off on its own - and this one is
+                // started from the UI thread every time a QSO is saved with Club Log auto-upload on.
+                // With "automatically detect proxy settings" enabled, which is the Windows default,
+                // that resolution is a real pause in the middle of logging a contact.
                 using (var content = new FormUrlEncodedContent(fields))
-                using (HttpResponseMessage resp = await _http.PostAsync(Endpoint, content))
+                using (HttpResponseMessage resp = await Task.Run(() => _http.PostAsync(Endpoint, content)))
                 {
                     result.StatusCode = (int)resp.StatusCode;
                     try { result.Message = await resp.Content.ReadAsStringAsync(); }
@@ -148,7 +153,8 @@ namespace HolyLogger
                     file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("application/octet-stream");
                     form.Add(file, "file", "holylogger.adi");
 
-                    using (HttpResponseMessage resp = await _http.PostAsync(PutLogsEndpoint, form))
+                    // Off the calling thread - see the note on the upload above.
+                    using (HttpResponseMessage resp = await Task.Run(() => _http.PostAsync(PutLogsEndpoint, form)))
                     {
                         result.StatusCode = (int)resp.StatusCode;
                         try { result.Message = await resp.Content.ReadAsStringAsync(); }
@@ -198,7 +204,7 @@ namespace HolyLogger
             try
             {
                 using (var content = new FormUrlEncodedContent(fields))
-                using (HttpResponseMessage resp = await _http.PostAsync(GetAdifEndpoint, content))
+                using (HttpResponseMessage resp = await Task.Run(() => _http.PostAsync(GetAdifEndpoint, content)))
                 {
                     result.StatusCode = (int)resp.StatusCode;
                     try { result.Message = await resp.Content.ReadAsStringAsync(); }
@@ -253,7 +259,7 @@ namespace HolyLogger
                     new KeyValuePair<string, string>("api", ApiKey.Trim())
                 };
                 using (var content = new FormUrlEncodedContent(fields))
-                using (var resp = await _http.PostAsync(GetAdifEndpoint, content, ct))
+                using (var resp = await Task.Run(() => _http.PostAsync(GetAdifEndpoint, content, ct), ct))
                     adif = await resp.Content.ReadAsStringAsync();
             }
             catch (OperationCanceledException) { throw; }

@@ -85,7 +85,10 @@ namespace HolyLogger
 
                     try
                     {
-                        HttpResponseMessage response = await _http.PostAsync(EndpointUrl, content).ConfigureAwait(false);
+                        // Task.Run as well as ConfigureAwait: the latter decides where the code AFTER the
+                        // call resumes, but on .NET Framework the proxy is resolved on the thread that
+                        // STARTS the request. Only starting it elsewhere keeps that off the caller.
+                        HttpResponseMessage response = await Task.Run(() => _http.PostAsync(EndpointUrl, content)).ConfigureAwait(false);
                         string body = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
                         LogAndNotify(
                             string.Format(

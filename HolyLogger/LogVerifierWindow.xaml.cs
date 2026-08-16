@@ -600,13 +600,24 @@ namespace HolyLogger
         // The QSO a confirmation is most likely to BE. Same date is the strongest sign, then the band,
         // then the mode; a QSO already claimed by another confirmation is passed over, so two
         // confirmations for the same station on the same day cannot both land on one QSO.
+        // Which logged QSO a card is talking about. Only ever one on the SAME DAY.
+        //
+        // The cards that reach this window are now the ones whose station the log holds on that very
+        // date, so a same-day QSO always exists. Without the restriction below, a card whose same-day
+        // QSO had already been claimed by an earlier card would fall back to that station's QSO from
+        // some other year and be reported as "logged another date" - years apart, about two contacts
+        // that have nothing to do with each other. That is precisely the noise this pairing is meant to
+        // avoid, so a candidate on another day is not considered at all.
         private static QSO BestMatch(List<QSO> candidates, DataAccess.LotwConfirmation c, HashSet<QSO> taken)
         {
             QSO best = null;
             int bestScore = -1;
+            string cardDate = (c.QsoDate ?? "").Trim();
             foreach (QSO q in candidates)
             {
                 if (taken.Contains(q)) continue;
+                if (cardDate.Length == 8 && !string.Equals(Text(q.Date), cardDate, StringComparison.Ordinal))
+                    continue;
                 int score = 0;
                 if (string.Equals(Text(q.Date), (c.QsoDate ?? "").Trim(), StringComparison.Ordinal)) score += 4;
                 if (string.Equals(Text(q.Band), (c.Band ?? "").Trim(), StringComparison.OrdinalIgnoreCase)) score += 2;

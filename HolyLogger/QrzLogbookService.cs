@@ -90,8 +90,13 @@ namespace HolyLogger
             string body;
             try
             {
+                // Task.Run, not a bare await. On .NET Framework the proxy for a request is resolved on
+                // whichever thread STARTS it, before the call goes off on its own - and this one is
+                // started from the UI thread every time a QSO is saved with Logbook auto-push on. With
+                // "automatically detect proxy settings" enabled, the Windows default, that resolution
+                // is a real pause in the middle of logging a contact.
                 using (var content = new FormUrlEncodedContent(fields))
-                using (HttpResponseMessage resp = await _http.PostAsync(Endpoint, content))
+                using (HttpResponseMessage resp = await Task.Run(() => _http.PostAsync(Endpoint, content)))
                 {
                     body = await resp.Content.ReadAsStringAsync();
                 }
@@ -207,7 +212,7 @@ namespace HolyLogger
             try
             {
                 using (var content = new FormUrlEncodedContent(fields))
-                using (HttpResponseMessage resp = await _http.PostAsync(Endpoint, content, ct))
+                using (HttpResponseMessage resp = await Task.Run(() => _http.PostAsync(Endpoint, content, ct), ct))
                 {
                     body = await resp.Content.ReadAsStringAsync();
                 }

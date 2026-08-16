@@ -2639,27 +2639,63 @@ namespace HolyLogger
         // has arrived since last time. One-shot: cleared as soon as the check reads it.
         private bool _forceFullDownload;
 
+        // THE eQSL CARDS THAT MATCHED NOTHING, sorted by the same rule the LoTW check uses.
+        //
+        // A card is a second account of a contact the log already holds only if the log has that station
+        // on that DAY. Then band, mode or time disagree, and adding it would double-log what is already
+        // there, so it is left alone. Otherwise the log holds no contact with that station that day: it
+        // is one the log has lost, and eQSL kept enough of it to put it back.
+        //
+        // One query for the whole log's callsigns and dates and then a set lookup each; asking the
+        // database per card would be thousands of queries.
+        private async System.Threading.Tasks.Task OfferEqslRestore(List<DataAccess.LotwConfirmation> unmatched)
+        {
+            if (unmatched == null || unmatched.Count == 0) return;
+
+            var missing = new List<DataAccess.LotwConfirmation>();
+            try
+            {
+                var dal = DataAccess.GetInstance();
+                if (dal == null) return;
+                HashSet<string> workedThatDay = dal.WorkedCallsignDatesInLog(dal.ActiveLogId);
+                foreach (var c in unmatched)
+                    if (!workedThatDay.Contains(DataAccess.CallDateKey(c.Call, c.QsoDate)))
+                        missing.Add(c);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return; }
+
+            await OfferLotwRestore(missing, LotwRestoreWindow.Source.Eqsl);
+        }
+
         // LoTW HAS THEM, THIS LOG DOES NOT. A confirmation whose callsign appears nowhere in the log is
         // a contact the log has lost, and LoTW kept enough of it to put it back. Asked as a question,
         // because adding QSOs to somebody's log is not a thing to do quietly, and skipped entirely when
         // there is nothing to add.
-        private async System.Threading.Tasks.Task OfferLotwRestore(List<DataAccess.LotwConfirmation> missing)
+        private async System.Threading.Tasks.Task OfferLotwRestore(List<DataAccess.LotwConfirmation> missing,
+                                                                  LotwRestoreWindow.Source source = LotwRestoreWindow.Source.Lotw)
         {
             try
             {
                 if (missing == null || missing.Count == 0) return;
 
+                string service = source == LotwRestoreWindow.Source.Eqsl ? "eQSL" : "LoTW";
+                // What that service can put back differs, and the question should not promise more than
+                // it will deliver: eQSL sends the two signal reports as well, LoTW never has.
+                string keeps = source == LotwRestoreWindow.Source.Eqsl
+                    ? "date, time, band, mode, both signal reports and the square it keeps"
+                    : "date, time, band, mode, entity and square it keeps";
+
                 string n = "**" + missing.Count.ToString("N0") + "**";
                 bool review = HolyMessageBox.ShowConfirm(
-                    "LoTW has " + n + (missing.Count == 1 ? " confirmed contact" : " confirmed contacts")
+                    service + " has " + n + (missing.Count == 1 ? " confirmed contact" : " confirmed contacts")
                     + " whose callsign is not in this log at all.\n\n"
-                    + "These are contacts the log does not hold — LoTW can put them back, with the date, "
-                    + "time, band, mode, entity and square it keeps.\n\n"
+                    + "These are contacts the log does not hold — " + service + " can put them back, with the "
+                    + keeps + ".\n\n"
                     + "Look at them now?",
                     "Contacts missing from this log", HolyMsgType.Info, this);
                 if (!review) return;
 
-                var win = new LotwRestoreWindow(missing) { Owner = this };
+                var win = new LotwRestoreWindow(missing, source) { Owner = this };
                 win.ShowDialog();
 
                 if (win.Added > 0)
@@ -3663,6 +3699,15 @@ namespace HolyLogger
                 await ReloadQsosAfterCheck(marked > 0);
                 ShowCheckSummary(ConfSource.Eqsl, all.Count, incremental,
                                  !incremental || ConfirmedInLog(ConfSource.Eqsl) > confirmedBefore, failed);
+
+                // AND THEN: eQSL may be holding contacts this log does not have at all - the same
+                // offer LoTW makes, for the same reason. Only the cards whose callsign appears NOWHERE
+                // in the log: a card that disagrees with a QSO that IS logged would double-log it, so
+                // those are left alone here exactly as they are on the LoTW side.
+                //
+                // After the summary, never instead of it: the operator is told what the check did
+                // before being asked anything.
+                await OfferEqslRestore(unmatched);
             }
             catch (OperationCanceledException)
             {
@@ -4040,18 +4085,25 @@ namespace HolyLogger
                 }
             }
 
-            // Sort what matched nothing into "the log has never worked this station" and "it has, but
-            // the details disagree". One query for the whole log's callsigns, then a set lookup each -
-            // asking the database per confirmation would be thousands of queries.
+            // Sort what matched nothing into "the log does not hold this contact" and "it does, but the
+            // details disagree". One query for the whole log's callsigns and dates, then a set lookup
+            // each - asking the database per confirmation would be thousands of queries.
+            //
+            // BY CALLSIGN AND DATE, not by callsign alone. Alone, a card from 2014 for a station also
+            // worked in 2021 was called an almost-match and sent to the Log Fixer as a disagreement
+            // about a QSO - when no contact with that station exists on that day at all. Checked
+            // against the real list, every one of them was years apart. Same station, same DAY is what
+            // makes a card and a QSO two accounts of one contact; anything else is a contact the log
+            // has lost, and belongs where it can be put back.
             try
             {
                 var dal = DataAccess.GetInstance();
                 if (dal != null && unmatched != null && unmatched.Count > 0)
                 {
-                    HashSet<string> worked = dal.WorkedCallsignsInLog(dal.ActiveLogId);
+                    HashSet<string> workedThatDay = dal.WorkedCallsignDatesInLog(dal.ActiveLogId);
                     foreach (var c in unmatched)
                     {
-                        if (worked.Contains(CallsignIdentity.Base(c.Call ?? string.Empty)))
+                        if (workedThatDay.Contains(DataAccess.CallDateKey(c.Call, c.QsoDate)))
                             result.NearMisses.Add(c);
                         else
                             result.MissingFromLog.Add(c);

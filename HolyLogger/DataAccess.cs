@@ -3167,6 +3167,15 @@ Environment.NewLine +
             public string Continent { get; set; }
             public string CqZone { get; set; }
             public string ItuZone { get; set; }
+
+            // eQSL SENDS THESE AND LOTW DOES NOT. An eQSL card carries the two signal reports, and the
+            // submode and propagation mode when they are not blank - so a contact restored from eQSL
+            // comes back with more of itself than one restored from LoTW. Empty for LoTW, which has
+            // never held them, and empty is the honest answer: see ToQso, where nothing is invented.
+            public string RstSent { get; set; }
+            public string RstRcvd { get; set; }
+            public string SubMode { get; set; }
+            public string PropMode { get; set; }
         }
 
         // Marks the QSOs that LoTW says are confirmed. Returns how many rows changed.
@@ -3437,25 +3446,31 @@ Environment.NewLine +
             return found;
         }
 
-        // EVERY CALLSIGN THIS LOG HAS WORKED, as identity base forms, in one query.
+
+        // EVERY CALLSIGN THIS LOG HAS WORKED **AND THE DAY IT WORKED IT**, in one query.
         //
-        // Answers "is this station in the log at all?" for a whole download at once. The unmatched
-        // confirmations are sorted into two piles with it: a callsign the log has never worked is a QSO
-        // that is genuinely MISSING - the lost-log case - while a callsign that IS there means the
-        // contact is logged and something about it (band, mode, date) simply does not agree with LoTW.
-        // Those two want completely different things done to them, and telling them apart one row at a
-        // time would be one query per confirmation: measured elsewhere in this window at 13 seconds per
-        // hundred, and a full download runs to thousands.
+        // The callsign alone was too blunt a test. Sorting the unmatched confirmations by callsign only,
+        // a card from 2014 for a station also worked in 2021 was called an "almost match" and sent to
+        // the Log Fixer as a disagreement about a QSO - when the log holds no contact with that station
+        // on that day at all. The operator checked the list and found every one of them years apart.
         //
-        // Identity base forms, so a QSO logged as DL1ABC/P answers for LoTW's DL1ABC.
-        public HashSet<string> WorkedCallsignsInLog(long logId)
+        // So the pile a card falls into is decided by callsign AND date:
+        //   the log HAS that station that day - band, mode or time disagree, a question for the Fixer;
+        //   it does NOT                      - the contact is absent, and can be put back.
+        //
+        // The date is the one field both services agree on to the day. Time is deliberately left out:
+        // each side records its own operator's clock, and they routinely differ by a minute or two.
+        //
+        // Keyed "BASECALL|yyyyMMdd" with the identity base form, so a QSO logged as DL1ABC/P answers for
+        // a card from DL1ABC - the same rule the callsign-only set used.
+        public HashSet<string> WorkedCallsignDatesInLog(long logId)
         {
             var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             lock (_dbLock)
             {
                 if (con == null || con.State != System.Data.ConnectionState.Open) return set;
                 using (var cmd = new SQLiteCommand(
-                    "SELECT DISTINCT dx_callsign FROM qso WHERE log_id = @lid AND dx_callsign IS NOT NULL", con))
+                    "SELECT DISTINCT dx_callsign, date FROM qso WHERE log_id = @lid AND dx_callsign IS NOT NULL", con))
                 {
                     cmd.Parameters.Add(new SQLiteParameter("@lid", logId));
                     using (var rdr = cmd.ExecuteReader())
@@ -3463,11 +3478,20 @@ Environment.NewLine +
                         {
                             string call = rdr[0] as string;
                             if (string.IsNullOrWhiteSpace(call)) continue;
-                            set.Add(CallsignIdentity.Base(call.Trim()));
+                            string date = rdr.IsDBNull(1) ? string.Empty : (rdr.GetValue(1) ?? string.Empty).ToString().Trim();
+                            set.Add(CallsignIdentity.Base(call.Trim()) + "|" + date);
                         }
                 }
             }
             return set;
+        }
+
+        // The key WorkedCallsignDatesInLog stores, built from a confirmation. One place, so the two
+        // sides of the comparison can never drift apart.
+        public static string CallDateKey(string callsign, string qsoDate)
+        {
+            return CallsignIdentity.Base((callsign ?? string.Empty).Trim())
+                 + "|" + (qsoDate ?? string.Empty).Trim();
         }
 
         // How many QSOs are currently marked confirmed by LoTW.
