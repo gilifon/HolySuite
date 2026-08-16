@@ -12341,9 +12341,19 @@ namespace HolyLogger
 
         private async void RemoveDuplicatesMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            // Identify duplicates up front WITHOUT touching the DB, in the ACTIVE log only. Two
-            // QSOs are duplicates when ALL of these match: DX callsign, station callsign, operator,
-            // frequency, band, mode, date and time. The first of each group is kept; the extras are
+            // Identify duplicates up front WITHOUT touching the DB, in the ACTIVE log only. Two QSOs are
+            // duplicates when they are THE SAME CONTACT by the program's one definition of that -
+            // DataAccess.MatchKey: callsign, date, band, mode and the minute. The import's merge asks
+            // the same question of the same method, so a pair this window would call duplicates is
+            // exactly a pair the import would not add twice.
+            //
+            // It used to compare the frequency, the station callsign and the operator as well. Those
+            // came out because they are what a file exported by another program gets WRONG - a rounded
+            // frequency, a missing operator - and a rule that only one half of the program can honour is
+            // not one rule. On the file this was measured against it made a difference of three records
+            // in 17,430, every one of them shown for review before anything is deleted.
+            //
+            // The first of each group is kept; the extras are
             // shown for review in DuplicatesWindow (same background color per group) and deleted
             // only after the operator confirms there. Deleting only those rows -- instead of the
             // old "delete everything then re-insert the unique ones" -- means the log is never left
@@ -12353,15 +12363,10 @@ namespace HolyLogger
             var groupOrder = new List<List<QSO>>();
             foreach (var q in all)
             {
-                // Time is matched to the MINUTE (HHmm), not the second: the log shows time to the
-                // minute, and two QSOs with the same station/band/mode/frequency in the same minute
-                // are the same contact even if their stored seconds differ.
-                string timeMin = (q.Time ?? "").Trim();
-                if (timeMin.Length > 4) timeMin = timeMin.Substring(0, 4);
-                string key = ((q.DXCall ?? "").Trim() + "|" + (q.MyCall ?? "").Trim() + "|" +
-                              (q.Operator ?? "").Trim() + "|" + (q.Freq ?? "").Trim() + "|" +
-                              (q.Band ?? "").Trim() + "|" + (q.Mode ?? "").Trim() + "|" +
-                              (q.Date ?? "").Trim() + "|" + timeMin).ToUpperInvariant();
+                // The program's one definition of "the same contact". A record too incomplete to
+                // identify - no callsign, or no date - is left alone rather than grouped with anything.
+                string key = DataAccess.MatchKey(q);
+                if (key == null) continue;
                 if (!groupsByKey.TryGetValue(key, out var group))
                 {
                     group = new List<QSO>();

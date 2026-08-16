@@ -2936,17 +2936,27 @@ Environment.NewLine +
                             continue;
                         }
 
+                        // ONE FOR ONE. The matched QSO is taken OUT of the bucket, so a second record
+                        // that looks the same cannot pair with it as well - it finds the bucket empty and
+                        // is added, as a second contact should be. Without this, one QSO in the log
+                        // absorbed any number of records from the file and the extras vanished: the whole
+                        // reason a 17,430-record file merged into a log and added nothing at all.
+                        //
+                        // With the minute now in the key a bucket rarely holds more than one, but it
+                        // still can - the same station, same minute, twice - and the rule has to hold
+                        // there too.
                         QSO target = bucket[0];
                         if (bucket.Count > 1)
                         {
-                            // Several contacts with that station on the same band and mode that day: the one
-                            // logged nearest the same minute is the one this record belongs to. If two are
-                            // equally close there is no honest way to choose - and since the log clearly
-                            // HAS this contact, the record is skipped rather than added as a duplicate.
+                            // Several records for that minute: the one logged nearest the same second is
+                            // the one this record belongs to. If two are equally close there is no honest
+                            // way to choose - and since the log clearly HAS this contact, the record is
+                            // skipped rather than added as a duplicate.
                             bool tie;
                             target = ClosestByTime(bucket, p.Time, out tie);
                             if (tie || target == null) { ambiguous++; continue; }
                         }
+                        bucket.Remove(target);
 
                         // A record that has nothing to give still counts as "already in this log" - it
                         // simply needs no write. Skipping those keeps a re-import of a plain file (a
@@ -2998,19 +3008,46 @@ Environment.NewLine +
                 || !string.IsNullOrWhiteSpace(p.DateOff) || !string.IsNullOrWhiteSpace(p.Qth);
         }
 
-        // callsign | date | band | mode - what makes two records the same contact. Null when the record is
-        // too incomplete to identify, which is safer than matching it to the wrong QSO.
-        private static string MatchKey(QSO q)
+        // WHAT MAKES TWO RECORDS THE SAME CONTACT, for the whole program: callsign, date, band, mode and
+        // the MINUTE. Null when the record is too incomplete to identify, which is safer than matching it
+        // to the wrong QSO.
+        //
+        // The minute used to be missing here, and that cost QSOs. A station worked twice on the same day,
+        // same band and same mode - an hour apart, or five - was one key, so on an import every record
+        // after the first was counted as "already in this log" and thrown away. Measured on one
+        // operator's file: 17,430 records, 16,192 keys without the minute; 984 of the collapsed records
+        // were contacts at genuinely different times, 88 of them more than an hour apart.
+        //
+        // To the minute rather than the second, and rather than a tolerance in either direction, because
+        // Tools > Remove Duplicates has always judged it that way and one definition serving both is
+        // worth more than a cleverer one used in only half the program. Where the minute errs it errs
+        // by KEEPING data: two records at 17:24:59 and 17:25:16 are different keys, so the second is
+        // added rather than silently dropped, and losing a contact is the failure that matters.
+        //
+        // NOT the frequency, the station callsign or the operator - deliberately. A file exported by
+        // another program rounds the frequency and often carries no operator at all, so demanding those
+        // would make every re-import look new and DOUBLE the log, which is a worse fault than the one
+        // this fixes.
+        internal static string MatchKey(QSO q)
         {
+            if (q == null) return null;
             string call = (q.DXCall ?? string.Empty).Trim();
             string date = (q.Date ?? string.Empty).Trim();
             string band = (q.Band ?? string.Empty).Trim();
             string mode = (q.Mode ?? string.Empty).Trim();
             if (call.Length == 0 || date.Length == 0) return null;
+
             // The date sometimes arrives as "yyyyMMdd HHmmss"; only the day identifies the contact.
             int space = date.IndexOf(' ');
             if (space > 0) date = date.Substring(0, space);
-            return call.ToUpperInvariant() + "|" + date + "|" + band.ToUpperInvariant() + "|" + mode.ToUpperInvariant();
+
+            // "HHmmss" or "HHmm" -> "HHmm". A record with no readable time keeps an empty slot, so it can
+            // still only ever match another record that has none either.
+            string time = (q.Time ?? string.Empty).Trim();
+            if (time.Length > 4) time = time.Substring(0, 4);
+
+            return call.ToUpperInvariant() + "|" + date + "|" + band.ToUpperInvariant() + "|"
+                   + mode.ToUpperInvariant() + "|" + time;
         }
 
         // The QSO in the bucket logged closest to that time. tie = two are equally close, so the caller
