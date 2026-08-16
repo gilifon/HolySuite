@@ -3112,6 +3112,28 @@ namespace HolyLogger
             var spotItem = new MenuItem { Header = "Spot", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
             spotItem.Click += (s, e) =>
             {
+                // A SPOT IS ABOUT NOW. Telling the world a station is on a frequency is only true while
+                // it still is; an hour later it is noise on everybody's screen, and the operator who
+                // sent it looks careless. So an old contact cannot be spotted from the log at all.
+                if (!IsFreshEnoughToSpot(qso))
+                {
+                    double? age = MinutesSinceQso(qso);
+                    string howOld = age.HasValue
+                        ? (age.Value < 120
+                            ? Math.Round(age.Value) + " minutes ago"
+                            : (age.Value < 2880 ? Math.Round(age.Value / 60) + " hours ago"
+                                                : Math.Round(age.Value / 1440) + " days ago"))
+                        : "some time ago";
+
+                    HolyMessageBox.ShowError(
+                        (qso.DXCall ?? "This station") + " was worked " + howOld + ".\n\n" +
+                        "A spot says a station is on frequency NOW, so only a contact from the last " +
+                        SpotFreshnessMinutes + " minutes can be spotted from the log.\n\n" +
+                        "If you can hear it now, use Spot (F3) and give the frequency you hear it on.",
+                        "Too old to spot", this);
+                    return;
+                }
+
                 Window dialog = BuildSpotDialog(qso.DXCall, qso.Freq);
                 dialog.Owner = this;
                 dialog.ShowDialog();
@@ -3692,6 +3714,40 @@ namespace HolyLogger
             _undoResetTimer?.Stop();
         }
 
+        // HOW RECENT A CONTACT HAS TO BE BEFORE IT CAN BE SPOTTED. A spot is a claim about the present
+        // tense - "this station is on this frequency" - so a contact from an hour ago is not evidence of
+        // anything. One number, used by both ways in: the log row's Spot menu and the F3 window.
+        internal const int SpotFreshnessMinutes = 5;
+
+        // Minutes since the contact was logged, or null when the stored date/time cannot be read.
+        // The log keeps them as yyyyMMdd and HHmmss in UTC, which is what the clock at the top shows.
+        private static double? MinutesSinceQso(QSO qso)
+        {
+            if (qso == null) return null;
+
+            string d = (qso.Date ?? string.Empty).Trim();
+            string t = (qso.Time ?? string.Empty).Trim();
+            if (d.Length != 8) return null;
+            if (t.Length == 4) t += "00";        // some records carry only HHmm
+            if (t.Length != 6) return null;
+
+            DateTime when;
+            if (!DateTime.TryParseExact(d + t, "yyyyMMddHHmmss",
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    System.Globalization.DateTimeStyles.AssumeUniversal |
+                    System.Globalization.DateTimeStyles.AdjustToUniversal, out when))
+                return null;
+
+            double minutes = (DateTime.UtcNow - when).TotalMinutes;
+            return minutes < 0 ? 0 : minutes;    // a contact logged this second may round into the future
+        }
+
+        private static bool IsFreshEnoughToSpot(QSO qso)
+        {
+            double? age = MinutesSinceQso(qso);
+            return age.HasValue && age.Value <= SpotFreshnessMinutes;
+        }
+
         private Window BuildSpotDialog(string presetCallsign = null, string presetFrequency = null)
         {
             bool hasPreset = !string.IsNullOrWhiteSpace(presetCallsign);
@@ -3727,48 +3783,176 @@ namespace HolyLogger
             myCallsignTextBox.IsTabStop = false;
             myCallsignTextBox.Focusable = false;
 
-            string defaultSpottedCallsign = hasPreset
-                ? presetCallsign
-                : (string.IsNullOrWhiteSpace(TB_DXCallsign.Text)
-                    ? (LastQSO != null ? LastQSO.DXCall : string.Empty)
-                    : TB_DXCallsign.Text);
+            // WHAT IS THIS WINDOW ABOUT? Three situations, and the window has to be right about which:
+            //   * the last contact is stale (older than SpotFreshnessMinutes) - it is no longer evidence
+            //     that anybody is on any frequency, so it is not offered at all. Whatever is in the DX
+            //     box, on the radio's frequency.
+            //   * the last contact is recent and the DX box is empty or holds that same station - one
+            //     obvious answer, filled in with that contact's own frequency.
+            //   * the last contact is recent AND the DX box holds someone ELSE - two honest answers and
+            //     no way to tell which the operator means. The window asks, and sends nothing until it
+            //     is told (see the two buttons below).
+            QSO lastQso = LastQSO;
+            bool lastIsFresh = !hasPreset && IsFreshEnoughToSpot(lastQso);
+            string dxBoxCall = (TB_DXCallsign != null ? (TB_DXCallsign.Text ?? string.Empty) : string.Empty).Trim();
+            bool mustChoose = lastIsFresh
+                              && dxBoxCall.Length > 0
+                              && !CallsignIdentity.Same(dxBoxCall, lastQso.DXCall);
+
+            string defaultSpottedCallsign;
+            string defaultFrequencyValue;
+            if (hasPreset)
+            {
+                defaultSpottedCallsign = presetCallsign;
+                defaultFrequencyValue = presetFrequency ?? string.Empty;
+            }
+            else if (mustChoose)
+            {
+                defaultSpottedCallsign = string.Empty;   // filled by whichever button is pressed
+                defaultFrequencyValue = string.Empty;
+            }
+            else if (lastIsFresh)
+            {
+                // The station just worked, at the frequency it was worked on.
+                defaultSpottedCallsign = lastQso.DXCall ?? string.Empty;
+                defaultFrequencyValue = lastQso.Freq ?? string.Empty;
+            }
+            else
+            {
+                // Nothing recent to offer: whatever is being typed, where the radio actually is.
+                defaultSpottedCallsign = dxBoxCall;
+                defaultFrequencyValue = TB_Frequency.Text;
+            }
 
             AddSpotDialogLabel(grid, "Spotted Callsign", 1, new Thickness(0, 8, 0, 0));
             TextBox spottedCallsignTextBox = AddSpotDialogTextBox(grid, defaultSpottedCallsign, 1, false, new Thickness(0, 8, 0, 0));
 
-            string defaultFrequency = hasPreset
-                ? (presetFrequency ?? string.Empty)
-                : (string.IsNullOrWhiteSpace(TB_DXCallsign.Text)
-                    ? (LastQSO != null ? LastQSO.Freq : string.Empty)
-                    : TB_Frequency.Text);
-
             AddSpotDialogLabel(grid, "Frequency MHz", 2, new Thickness(0, 8, 0, 0));
-            TextBox frequencyTextBox = AddSpotDialogTextBox(grid, defaultFrequency, 2, false, new Thickness(0, 8, 0, 0));
+            TextBox frequencyTextBox = AddSpotDialogTextBox(grid, defaultFrequencyValue, 2, false, new Thickness(0, 8, 0, 0));
 
             AddSpotDialogLabel(grid, "Comment", 3, new Thickness(0, 8, 0, 0), VerticalAlignment.Top);
             TextBox commentTextBox = AddSpotDialogTextBox(grid, string.Empty, 3, false, new Thickness(0, 8, 0, 0));
             commentTextBox.MaxLength = 60;
 
+            // WHICH STATION? Only when there are genuinely two answers. Each button says the callsign it
+            // will spot rather than "Last Saved" / "New", because the operator is choosing between two
+            // stations, not between two words. Until one is pressed the boxes stay empty and Send is
+            // dead - there is no default here that would not sometimes be the wrong station.
+            Button chooseLastButton = null;
+            Button chooseDxBoxButton = null;
+            if (mustChoose)
+            {
+                dialog.Height = 335;
+                dialog.MinHeight = 335;
+                dialog.MaxHeight = 335;
+
+                var choosePanel = new StackPanel
+                {
+                    Orientation = Orientation.Horizontal,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                    Margin = new Thickness(0, 10, 0, 0)
+                };
+
+                chooseLastButton = new Button
+                {
+                    Content = (lastQso.DXCall ?? string.Empty) + "  —  just worked",
+                    Height = 32,
+                    Padding = new Thickness(10, 0, 10, 0),
+                    FontSize = 16,
+                    Margin = new Thickness(0, 0, 10, 0)
+                };
+                chooseDxBoxButton = new Button
+                {
+                    Content = dxBoxCall + "  —  in the DX box",
+                    Height = 32,
+                    Padding = new Thickness(10, 0, 10, 0),
+                    FontSize = 16
+                };
+
+                choosePanel.Children.Add(chooseLastButton);
+                choosePanel.Children.Add(chooseDxBoxButton);
+                Grid.SetRow(choosePanel, 4);
+                Grid.SetColumn(choosePanel, 0);
+                Grid.SetColumnSpan(choosePanel, 2);
+                grid.Children.Add(choosePanel);
+            }
+
+            // Centred, and green once it will actually do something - the same green as Add (F1), so a
+            // live Send looks the same everywhere in the program.
             Button sendButton = new Button
             {
                 Content = "Send",
-                Width = 78,
+                Width = 110,
                 Height = 32,
-                HorizontalAlignment = HorizontalAlignment.Right,
+                HorizontalAlignment = HorizontalAlignment.Center,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 12, 0, 0),
                 FontSize = 16,
+                FontWeight = FontWeights.Bold,
                 IsDefault = true,
                 IsEnabled = false
             };
 
             bool isSendingSpot = false;
+            bool choiceMade = !mustChoose;      // nothing to choose = already chosen
             Action updateSendButtonState = () =>
             {
-                sendButton.IsEnabled = !isSendingSpot
-                    && !string.IsNullOrWhiteSpace(spottedCallsignTextBox.Text)
-                    && !string.IsNullOrWhiteSpace(frequencyTextBox.Text);
+                // A HALF-TYPED CALLSIGN IS NOT A CALLSIGN. "Not empty" was the only test, so a spot for
+                // "4" - the first keystroke of 4Z5SL, caught while the operator was still typing - was
+                // ready to be broadcast to every cluster in the world. It has to LOOK like a callsign,
+                // by the same rule the rest of the program uses; and the frequency has to be a number,
+                // for the same reason.
+                string spotted = (spottedCallsignTextBox.Text ?? string.Empty).Trim();
+                string freqText = (frequencyTextBox.Text ?? string.Empty).Trim();
+
+                bool callIsReal = CallsignIdentity.LooksLikeCallsign(spotted);
+                double freqMhz;
+                bool freqIsReal = double.TryParse(freqText,
+                                      System.Globalization.NumberStyles.Float,
+                                      System.Globalization.CultureInfo.InvariantCulture, out freqMhz)
+                                  && freqMhz > 0;
+
+                sendButton.IsEnabled = !isSendingSpot && choiceMade && callIsReal && freqIsReal;
+
+                sendButton.ToolTip =
+                      !choiceMade ? "Choose which station you are spotting"
+                    : !callIsReal ? (spotted.Length == 0 ? "Type the callsign you are spotting"
+                                                         : "\"" + spotted + "\" is not a whole callsign")
+                    : !freqIsReal ? "The frequency has to be a number in MHz"
+                    : null;
+
+                if (sendButton.IsEnabled)
+                {
+                    sendButton.Background = new SolidColorBrush(Color.FromRgb(0x2E, 0x7D, 0x32));
+                    sendButton.Foreground = Brushes.White;
+                    sendButton.BorderBrush = new SolidColorBrush(Color.FromRgb(0x1B, 0x5E, 0x20));
+                }
+                else
+                {
+                    sendButton.ClearValue(Control.BackgroundProperty);
+                    sendButton.ClearValue(Control.ForegroundProperty);
+                    sendButton.ClearValue(Control.BorderBrushProperty);
+                }
             };
+
+            if (mustChoose)
+            {
+                chooseLastButton.Click += (s, args) =>
+                {
+                    spottedCallsignTextBox.Text = lastQso.DXCall ?? string.Empty;
+                    frequencyTextBox.Text = lastQso.Freq ?? string.Empty;   // where that contact was made
+                    choiceMade = true;
+                    updateSendButtonState();
+                };
+                chooseDxBoxButton.Click += (s, args) =>
+                {
+                    spottedCallsignTextBox.Text = dxBoxCall;
+                    frequencyTextBox.Text = TB_Frequency.Text;              // a station heard now, here
+                    choiceMade = true;
+                    updateSendButtonState();
+                };
+            }
 
             spottedCallsignTextBox.TextChanged += (s, args) => updateSendButtonState();
             frequencyTextBox.TextChanged += (s, args) => updateSendButtonState();
@@ -3810,8 +3994,11 @@ namespace HolyLogger
                     }
                 }
             };
+            // Centred on the WINDOW, not on the right-hand column: spanning both columns is what makes
+            // "HorizontalAlignment.Center" mean the middle of the dialog. Always, in every case.
             Grid.SetRow(sendButton, 5);
-            Grid.SetColumn(sendButton, 1);
+            Grid.SetColumn(sendButton, 0);
+            Grid.SetColumnSpan(sendButton, 2);
             grid.Children.Add(sendButton);
 
             dialog.Content = grid;

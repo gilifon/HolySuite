@@ -3589,7 +3589,21 @@ namespace HolyLogger
                 && Properties.Settings.Default.ClusterAutoFillDxCall
                 && !string.IsNullOrWhiteSpace(onFreqCallsStr) && TB_DXCallsign != null)
             {
-                string firstCall = onFreqCallsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)[0].Trim();
+                // THE SPOT ON MY FREQUENCY MAY BE ME. Somebody works me, spots me, and the spot comes
+                // back round the world onto my own screen - on my own frequency, because that is where
+                // I am. Filling it in would put MY callsign in the DX box while I am calling CQ, and
+                // the box has to be empty and waiting for whoever answers.
+                // Skipped, not stopped: if two stations are on frequency and one of them is me, the
+                // other is still a perfectly good fill. Compared by identity, so 4Z5SL spotted as
+                // 4Z5SL/P is still me (see CallsignIdentity).
+                string firstCall = null;
+                foreach (string candidate in onFreqCallsStr.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    string c = candidate.Trim();
+                    if (c.Length == 0 || IsMyOwnStation(c)) continue;
+                    firstCall = c;
+                    break;
+                }
                 if (!string.IsNullOrWhiteSpace(firstCall))
                 {
                     Dispatcher.BeginInvoke(new Action(() =>
@@ -3670,6 +3684,23 @@ namespace HolyLogger
             }
 
             if (clusterLiveScaleOn && !_clusterBandHoverActive) UpdateClusterLiveScale();
+        }
+
+        // IS THIS SPOT ME? A station that works me may spot me, and that spot arrives back here like any
+        // other - sitting on my own frequency, because that is where I am transmitting. Everything that
+        // reads "the station on my frequency" has to be able to tell that one apart from a station I
+        // could work.
+        // The station callsign, not the operator: a spot names the station that was heard. Compared by
+        // identity so a portable suffix somebody else added ("4Z5SL/P") is still recognised as me.
+        private bool IsMyOwnStation(string callsign)
+        {
+            if (string.IsNullOrWhiteSpace(callsign)) return false;
+
+            string mine = TB_MyCallsign != null ? (TB_MyCallsign.Text ?? string.Empty).Trim() : string.Empty;
+            if (mine.Length == 0) mine = (Properties.Settings.Default.my_callsign ?? string.Empty).Trim();
+            if (mine.Length == 0) return false;
+
+            return CallsignIdentity.Same(callsign, mine);
         }
 
         // Enter/leave the band-checkbox hover preview: show ONLY the hovered band's spots in the table and
