@@ -2889,12 +2889,33 @@ namespace HolyLogger
                 return;
             }
 
-            row.IsSelected = true;
-            QSODataGrid.SelectedItem = row.Item;
+            // A SELECTION IS NOT THROWN AWAY BY THE CLICK THAT ASKS WHAT TO DO WITH IT. Right-clicking
+            // used to select the row under the mouse unconditionally, so Ctrl-clicking a dozen rows and
+            // then right-clicking them left one row selected and a menu about that one - the whole point
+            // of the selection gone at the moment it was about to be used. Now the selection survives if
+            // the clicked row belongs to it, and the menu is about the group.
+            var picked = SelectedQsosInLog();
+            bool clickedInsideSelection = picked.Count > 1 && picked.Contains(row.Item as QSO);
+
+            if (!clickedInsideSelection)
+            {
+                row.IsSelected = true;
+                QSODataGrid.SelectedItem = row.Item;
+            }
 
             QSO qso = row.Item as QSO;
             if (qso == null)
             {
+                e.Handled = true;
+                return;
+            }
+
+            if (clickedInsideSelection)
+            {
+                ContextMenu groupMenu = BuildLogSelectionMenu(picked);
+                groupMenu.PlacementTarget = QSODataGrid;
+                groupMenu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
+                groupMenu.IsOpen = true;
                 e.Handled = true;
                 return;
             }
@@ -3051,8 +3072,8 @@ namespace HolyLogger
   <Style x:Key='CtxItem' TargetType='MenuItem'>
     <Setter Property='FontSize' Value='15'/>
     <Setter Property='Foreground' Value='#1A1A1A'/>
-    <Setter Property='Padding' Value='12,7'/>
-    <Setter Property='Margin' Value='2,1'/>
+    <Setter Property='Padding' Value='12,3'/>
+    <Setter Property='Margin' Value='2,0'/>
     <Setter Property='Cursor' Value='Hand'/>
     <Setter Property='Template' Value='{StaticResource CtxItemTemplate}'/>
   </Style>
@@ -3063,7 +3084,7 @@ namespace HolyLogger
   </Style>
 
   <Style x:Key='CtxSep' TargetType='Separator'>
-    <Setter Property='Margin' Value='8,5'/>
+    <Setter Property='Margin' Value='8,3'/>
     <Setter Property='Template'>
       <Setter.Value>
         <ControlTemplate TargetType='Separator'>
@@ -3184,6 +3205,271 @@ namespace HolyLogger
             menu.Items.Add(close);
 
             return menu;
+        }
+
+        // ── SEVERAL ROWS AT ONCE ───────────────────────────────────────────────────────────────────
+        //
+        // Ctrl-clicking rows highlighted them and nothing more: the table promised a group and the
+        // program had nothing to do with one. These three are what a group is FOR - the same three the
+        // Log Workshop has offered for months, in the same words, so the two tables answer alike.
+        // "Clear selection" is not among them: Esc already does it in this window.
+
+        private List<QSO> SelectedQsosInLog()
+        {
+            var picked = new List<QSO>();
+            if (QSODataGrid == null) return picked;
+            foreach (object item in QSODataGrid.SelectedItems)
+            {
+                var q = item as QSO;
+                if (q != null && !picked.Contains(q)) picked.Add(q);
+            }
+            return picked;
+        }
+
+        private ContextMenu BuildLogSelectionMenu(List<QSO> picked)
+        {
+            // THE SAME DICTIONARY THE SINGLE-ROW MENU USES. It is a private one built in this window,
+            // not Application.Current.Resources - reading the app's resources found none of these keys,
+            // every style came back null, and the group menu appeared in bare WPF grey beside a
+            // carefully dressed one-row menu.
+            var res = QsoCtxMenuResources;
+            var itemStyle = (Style)res["CtxItem"];
+            var dangerStyle = (Style)res["CtxItemDanger"];
+            var sepStyle = (Style)res["CtxSep"];
+            var blue = (Brush)new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+            var red = (Brush)new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
+
+            var menu = new ContextMenu { Style = (Style)res["CtxMenu"] };
+            int n = picked.Count;
+
+            // The callsigns, not just the count: "delete 12 QSOs" is easy to agree to without checking,
+            // and the ticks may have been made minutes ago.
+            string names = string.Join(", ", picked.Take(6).Select(q => q.DXCall));
+            if (n > 6) names += string.Format(", … (+{0:N0} more)", n - 6);
+            menu.Items.Add(RowMenuParts.MakeMenuTitle(string.Format("{0:N0} QSOs selected", n), names));
+            menu.Items.Add(new Separator { Style = sepStyle });
+
+            var export = new MenuItem { Header = string.Format("Export these {0:N0} to ADIF…", n), Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            // Deferred like the delete: a modal dialog opened while the menu is still dismissing (and
+            // holding mouse capture) cannot take the click.
+            export.Click += (s, e) => Dispatcher.BeginInvoke(new Action(() => ExportSelectedToAdif(picked)),
+                                                             System.Windows.Threading.DispatcherPriority.Background);
+            menu.Items.Add(export);
+
+            var del = new MenuItem { Header = string.Format("Delete these {0:N0} QSOs", n), Style = dangerStyle, Icon = MakeMenuGlyph("", red) };
+            del.Click += (s, e) => Dispatcher.BeginInvoke(new Action(() => DeleteSelectedQsos(picked)),
+                                                          System.Windows.Threading.DispatcherPriority.Background);
+            menu.Items.Add(del);
+
+            menu.Items.Add(new Separator { Style = sepStyle });
+
+            var header = new MenuItem { Header = string.Format("Send these {0:N0} to upload queue for:", n), Style = itemStyle, IsEnabled = false, Icon = MakeMenuGlyph("", blue) };
+            menu.Items.Add(header);
+
+            var s0 = Properties.Settings.Default;
+            var cbLotw = RowMenuParts.MakeServiceCheck("LoTW", s0.UseLotwService);
+            var cbQrz = RowMenuParts.MakeServiceCheck("QRZ", s0.UseQrzLogbook);
+            var cbEqsl = RowMenuParts.MakeServiceCheck("eQSL", s0.UseEqslService);
+            var cbClub = RowMenuParts.MakeServiceCheck("Club Log", s0.UseClublogService);
+            menu.Items.Add(RowMenuParts.MakeServiceGrid(cbLotw, cbQrz, cbEqsl, cbClub));
+
+            var ok = new Button { Content = "OK", Width = 80, FontSize = 16, Padding = new Thickness(10, 4, 10, 4), Cursor = Cursors.Hand };
+            ok.Click += (s, e) =>
+            {
+                QueueSelectedForUpload(picked, cbLotw.IsChecked == true, cbQrz.IsChecked == true,
+                                       cbEqsl.IsChecked == true, cbClub.IsChecked == true);
+                menu.IsOpen = false;
+            };
+
+            // Centred under the items, exactly as the one-row menu closes itself off.
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(8, 8, 8, 4) };
+            buttons.Children.Add(ok);
+            var close = RowMenuParts.MakeCloseButton(menu);
+            close.Margin = new Thickness(10, 0, 0, 0);
+            buttons.Children.Add(close);
+            menu.Items.Add(new Separator { Style = sepStyle });
+            menu.Items.Add(buttons);
+
+            return menu;
+        }
+
+        // Puts them into the chosen services' queues (status 0 = pending). Always allowed, even for a QSO
+        // already sent: an edited contact must be able to go again, and the uploader reads its CURRENT
+        // fields when it goes.
+        private void QueueSelectedForUpload(List<QSO> picked, bool lotw, bool qrz, bool eqsl, bool club)
+        {
+            if (picked == null || picked.Count == 0) return;
+            if (!lotw && !qrz && !eqsl && !club) return;
+
+            var dal = DataAccess.GetInstance();
+            if (dal == null) return;
+
+            var services = new List<string>();
+            if (lotw) services.Add("LoTW");
+            if (qrz) services.Add("QRZ");
+            if (eqsl) services.Add("eQSL");
+            if (club) services.Add("Club Log");
+
+            int done = 0;
+            foreach (QSO q in picked)
+            {
+                try
+                {
+                    if (lotw) dal.SetLotwStatus(q.id, 0);
+                    if (qrz) dal.SetQrzStatus(q.id, 0);
+                    if (eqsl) dal.SetEqslStatus(q.id, 0);
+                    if (club) dal.SetClublogStatus(q.id, 0);
+                    done++;
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            }
+
+            try { UpdateEqslQueueIndicator(); } catch (Exception ex) { Log.Swallow(ex); }
+            try { UpdateLotwMenuCount(); } catch (Exception ex) { Log.Swallow(ex); }
+
+            HolyMessageBox.ShowSuccess(
+                string.Format("{0:N0} QSO{1} queued for {2}.", done, done == 1 ? "" : "s", string.Join(", ", services)),
+                "Upload queue", this);
+        }
+
+        // The same generator the File menu's export uses, so a selection comes out with exactly the
+        // fields and formats a whole log would.
+        private void ExportSelectedToAdif(List<QSO> picked)
+        {
+            if (picked == null || picked.Count == 0) return;
+            try
+            {
+                // The carried ADIF fields are not loaded with the log - they are most of its weight and
+                // no screen shows them - so they are fetched here for the QSOs being written out.
+                try { DataAccess.GetInstance()?.FillCarriedAdif(picked); }
+                catch (Exception ex) { Log.Swallow(ex); }
+
+                string adif = HolyParser.Services.GenerateAdif(picked, Contests.ContestService.Active?.CabrilloName,
+                                                               includeImportedFields: true);
+                var save = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "ADIF File|*.adi",
+                    DefaultExt = "adi",
+                    Title = string.Format("Export {0:N0} selected QSOs", picked.Count),
+                    FileName = string.Format("selection_{0:yyyyMMdd_HHmm}.adi", DateTime.Now)
+                };
+                if (save.ShowDialog() != true) return;
+
+                System.IO.File.WriteAllText(save.FileName, adif);
+                HolyMessageBox.ShowSuccess(
+                    string.Format("{0:N0} QSO{1} exported.", picked.Count, picked.Count == 1 ? "" : "s"),
+                    "Export ADIF", this);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Exporting the selection failed: " + ex.GetType().Name + ": " + ex.Message);
+                HolyMessageBox.ShowError("Export failed: " + ex.Message, "Export ADIF", this);
+            }
+        }
+
+        // What the last group delete removed, kept whole so it can be put back into the logs it came
+        // from. One step only: this is the way out of the delete just made, not a history.
+        private List<QSO> _deletedForUndo;
+        private List<long> _deletedForUndoLogIds;
+
+        private void DeleteSelectedQsos(List<QSO> picked)
+        {
+            if (picked == null || picked.Count == 0) return;
+
+            string preview = string.Join(", ", picked.Take(10).Select(q => q.DXCall));
+            if (picked.Count > 10) preview += string.Format(", … (+{0:N0} more)", picked.Count - 10);
+
+            if (!HolyMessageBox.ShowConfirm(
+                    string.Format("Delete these {0:N0} QSOs?\n\n{1}\n\nYou can put them straight back with the Undo button.", picked.Count, preview),
+                    "Delete QSOs", HolyMsgType.Warning, this))
+                return;
+
+            var dal = DataAccess.GetInstance();
+            var deleted = new List<QSO>(picked.Count);
+            var logIds = new List<long>(picked.Count);
+
+            try
+            {
+                foreach (QSO q in picked)
+                {
+                    long logId = dal != null ? dal.GetQsoLogId(q.id) : -1;
+                    if (dal != null) dal.Delete(q.id);
+                    Qsos?.Remove(q);
+                    deleted.Add(q);
+                    logIds.Add(logId);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Deleting the selection failed part-way: " + ex.GetType().Name + ": " + ex.Message);
+                HolyMessageBox.ShowError("Could not delete them all: " + ex.Message, "Delete QSOs", this);
+            }
+
+            _deletedForUndo = deleted;
+            _deletedForUndoLogIds = logIds;
+
+            UpdateNumOfQSOs();
+            RebuildWorkedCountriesAndRefreshCluster();
+
+            TB_DeleteUndoText.Text = string.Format("Deleted {0:N0} QSO{1}", deleted.Count, deleted.Count == 1 ? "" : "s");
+            DeleteUndoBar.Visibility = deleted.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void Btn_DeleteUndo_Click(object sender, RoutedEventArgs e)
+        {
+            if (_deletedForUndo == null || _deletedForUndo.Count == 0) { DeleteUndoBar.Visibility = Visibility.Collapsed; return; }
+
+            var dal = DataAccess.GetInstance();
+            int restored = 0;
+            for (int i = 0; i < _deletedForUndo.Count; i++)
+            {
+                try
+                {
+                    QSO q = _deletedForUndo[i];
+                    int newId = dal != null ? dal.RestoreQso(q, _deletedForUndoLogIds[i]) : 0;
+                    if (newId > 0) q.id = newId;
+                    restored++;
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            }
+
+            _deletedForUndo = null;
+            _deletedForUndoLogIds = null;
+            DeleteUndoBar.Visibility = Visibility.Collapsed;
+
+            // RELOADED, not added back one by one. A plain Add leaves them at the end, unsorted and
+            // probably off-screen, which reads as "nothing came back". The same three steps every other
+            // reload path here takes: Qsos is a plain field and the grid binds to the DataContext, so
+            // assigning Qsos alone changes nothing on screen.
+            try
+            {
+                if (dal != null)
+                {
+                    Qsos = dal.GetQSOsForLog(dal.ActiveLogId);
+                    Qsos.CollectionChanged += Qsos_CollectionChanged;
+                    FilteredQsos = null;
+                    _foreignFilterRows = null;
+                    DataContext = Qsos;
+                    LastQSO = Qsos.FirstOrDefault();
+                }
+            }
+            catch (Exception ex) { Log.Warn("Reloading the log after Undo failed: " + ex.Message); }
+
+            UpdateNumOfQSOs();
+            RebuildWorkedCountriesAndRefreshCluster();
+
+            HolyMessageBox.ShowSuccess(
+                string.Format("{0:N0} QSO{1} restored.", restored, restored == 1 ? "" : "s"),
+                "Undo", this);
+        }
+
+        private void Btn_DeleteUndoDismiss_Click(object sender, RoutedEventArgs e)
+        {
+            // The deletion stands. The QSOs are already gone from the database; only the way back is
+            // being put away.
+            _deletedForUndo = null;
+            _deletedForUndoLogIds = null;
+            DeleteUndoBar.Visibility = Visibility.Collapsed;
         }
 
         private void OpenQrzPage(string callsign)

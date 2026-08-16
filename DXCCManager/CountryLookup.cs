@@ -203,7 +203,7 @@ namespace DXCCManager
                     //
                     // The identical rule already guarded EntityCodeForCountry(name, date); it simply was
                     // never applied to the path that starts from a CALLSIGN.
-                    if (historic != null && HasCeasedToExistBy(historic.DxccCode, whenUtc))
+                    if (historic != null && EntityHadCeasedBy(historic.DxccCode, whenUtc))
                         historic = null;
 
                     if (historic != null) return Combine(historic, fromCty);
@@ -458,9 +458,17 @@ namespace DXCCManager
             return whenUtc <= clubLog.EntityEndUtc(code) ? code : 0;
         }
 
+        // The day an entity ceased to exist, or DateTime.MaxValue while it still does. Public because
+        // Verify prints the date in its report: "no longer existed on this date" is an accusation, and
+        // the operator is entitled to see the date it rests on.
+        public DateTime EntityEndUtc(int dxccCode)
+        {
+            return clubLog == null || dxccCode <= 0 ? DateTime.MaxValue : clubLog.EntityEndUtc(dxccCode);
+        }
+
         // True when this entity was already gone on the day asked about. Only deleted entities carry an
         // end date, so an entity that still exists always answers false and the caller is unaffected.
-        private bool HasCeasedToExistBy(int dxccCode, DateTime whenUtc)
+        public bool EntityHadCeasedBy(int dxccCode, DateTime whenUtc)
         {
             if (clubLog == null || dxccCode <= 0) return false;
             if (!clubLog.IsDeletedEntity(dxccCode)) return false;

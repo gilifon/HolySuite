@@ -1993,6 +1993,28 @@
             <!-- The letters are created by ConfirmationStripHelper (they are spread apart at runtime to
                  fill the strip's width), and inherit the font settings above. -->
         </Border>
+
+        <!-- AFTER A GROUP DELETE, THE WAY BACK - PUT WHERE THE ROWS WERE. A dozen rows leaving the table
+             at once is the most alarming thing this program does, and a delete with no visible way back
+             is one the operator will simply not risk. So the undo is not hidden in a menu: it sits over
+             the top of the table, in the red of the delete itself, until it is used or waved away.
+             Collapsed at every other moment.
+             Placed 44px down: BELOW the column headers, never across them. The headers are how the
+             operator reads the rows that are left, and a bar over them hides what is being explained. -->
+        <Border x:Name="DeleteUndoBar" Visibility="Collapsed" Panel.ZIndex="60"
+                HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,44,0,0"
+                Background="#C62828" BorderBrush="#8E1B1B" BorderThickness="1.5"
+                CornerRadius="5" Padding="20,12,14,12">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock x:Name="TB_DeleteUndoText" FontSize="20" FontWeight="Bold" Foreground="White"
+                           VerticalAlignment="Center" Margin="0,0,18,0"/>
+                <Button x:Name="Btn_DeleteUndo" Content="Undo" FontSize="18" FontWeight="Bold"
+                        Height="38" MinWidth="120" Click="Btn_DeleteUndo_Click"/>
+                <Button x:Name="Btn_DeleteUndoDismiss" Content="✕" FontSize="18" FontWeight="Bold"
+                        Height="38" Width="44" Margin="10,0,0,0"
+                        ToolTip="Keep the deletion" Click="Btn_DeleteUndoDismiss_Click"/>
+            </StackPanel>
+        </Border>
         </Grid>
 
         <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>

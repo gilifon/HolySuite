@@ -918,6 +918,29 @@ namespace HolyLogger
                 // --- the country, on the QSO's own date ---------------------------------------------
                 if (!dateOk) continue;
 
+                // A COUNTRY THAT HAD ALREADY CEASED TO EXIST. Checked against the number the LOG carries,
+                // before anything is resolved, because the resolver now refuses to name a dead entity and
+                // would simply say "Unknown" - so nobody would ever be told what the log actually holds.
+                //
+                // 1B1AB, 2 July 2007, filed under entity 23: Blenheim Reef, which ended on 30 June 1975.
+                // The contact is real; it is the COUNTRY that cannot be. Reported and never touched -
+                // changing what a QSO says is the Log Fixer's job, and only ever with the operator
+                // watching.
+                int loggedCode = q.DxccCode;
+                if (loggedCode > 0 && lookup.EntityHadCeasedBy(loggedCode, when))
+                {
+                    DateTime ended = lookup.EntityEndUtc(loggedCode);
+                    string named = (q.Country ?? string.Empty).Trim();
+                    if (named.Length == 0) named = "entity " + loggedCode;
+
+                    findings.Add(Fyi(q,
+                        "Country did not exist on QSO date",
+                        named + "  (entity " + loggedCode + ")",
+                        "check what was really worked",
+                        "Club Log: the entity ended " + ended.ToString("dd-MM-yyyy"),
+                        "Country"));
+                }
+
                 DXCC dated;
                 try { dated = lookup.Resolve(call, when); }
                 catch { continue; }
