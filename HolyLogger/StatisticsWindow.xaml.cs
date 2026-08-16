@@ -1051,8 +1051,7 @@ namespace HolyLogger
         //
         // The total counts deleted entities and the tiles opposite do not, which is why "331" here and
         // "326" there look like a contradiction and why 326 + 2 never reached 331. Naming the parts is
-        // what makes the two readable side by side - and on the LoTW folder it also says plainly which
-        // countries came from a card rather than from LoTW, since that folder counts both.
+        // what makes the two readable side by side.
         private List<KeyValuePair<string, string>> BuildCountryBreakdown(HashSet<string> countries)
         {
             var empty = new List<KeyValuePair<string, string>>();
@@ -1070,14 +1069,11 @@ namespace HolyLogger
             // them, and a plus sign invites the reader to add them to it instead.
             var parts = new List<KeyValuePair<string, string>>();
             parts.Add(new KeyValuePair<string, string>("active", active.ToString()));
-            if (_source == ConfSource.Lotw)
-            {
-                // Split the active ones by what actually earned them. Cards first-class, not an asterisk,
-                // and named exactly as their own folder names them.
-                int card = PaperOnlyEntities().Count(n => countries.Contains(n));
-                parts.Add(new KeyValuePair<string, string>("LoTW", (active - card).ToString()));
-                parts.Add(new KeyValuePair<string, string>("Paper QSL", card.ToString()));
-            }
+            // NO PAPER-QSL ROW ON THE LoTW FOLDER. It used to split "active" into "LoTW" and "Paper QSL",
+            // from the days when this folder counted cards as well. It has not counted them for a while:
+            // the table above is built from LoTW-confirmed QSOs alone, so a paper-only country is not in
+            // it and that row could only ever print 0. Cards belong to their own folder and to the ARRL
+            // DXCC Award folder, which is the one whose name promises the sum.
             // Nothing more on the other folders: "active" is already the line above. An else-branch here
             // added it a SECOND time, so every folder except LoTW printed "active 326" twice under the
             // total and the reader was left looking for the difference between two identical rows.
@@ -1447,48 +1443,21 @@ namespace HolyLogger
             QsoSubsetRequested?.Invoke(qsos, what);
         }
 
-        // How many CURRENT entities the operator holds a paper card for that the folder's own source has
-        // not confirmed. Deleted entities are left out: the figure sits beside a count measured against
-        // the 340 entities that exist today, and mixing the two is what made "330 / 340" unreadable.
-        // THE ONE SET the whole folder counts against: the entities this folder treats as achieved.
+        // THE ONE SET the whole folder counts against, by number: the entities this folder treats as
+        // achieved. Every number on the page reads from here - the Confirmed tile, the Missing list, the
+        // "worked, not confirmed" tile and the ticks in the table - so they cannot contradict each other.
+        // They did once: when the LoTW folder briefly counted paper cards, only the Confirmed tile and
+        // the Missing list learned about it and the middle tile kept measuring against LoTW alone, so
+        // Minami Torishima was confirmed AND not-confirmed at once and the tiles read 326 + 3 against
+        // 333 worked.
         //
-        // Every number on the page reads from here - the Confirmed tile, the Missing list, the "worked,
-        // not confirmed" tile and the ticks in the table - so they cannot contradict each other. They did:
-        // when the LoTW folder started counting paper cards, only the Confirmed tile and the Missing list
-        // learned about it, and the middle tile kept measuring against LoTW alone. Minami Torishima was
-        // then confirmed AND not-confirmed at once, and the tiles read 326 + 3 against 333 worked.
-        //
-        // On the LoTW folder that means LoTW's own confirmations plus the paper cards, because the ARRL
-        // accepts both. Every other folder answers only for its own service.
-        // THE ONE SET the whole folder counts against, by number. Everything that used to compare country
-        // names against each other compares these instead.
+        // EVERY FOLDER ANSWERS FOR ITS OWN SOURCE AND NOTHING ELSE - LoTW for LoTW, cards for cards. The
+        // one place they are added together is the ARRL DXCC Award folder, which is named for doing it.
+        // (PaperOnlyEntities lived here, counting the cards LoTW had not confirmed, for a line and a tile
+        // row that no longer exist.)
         private HashSet<int> AchievedCodes()
         {
             return _confirmedCodes;
-        }
-
-        private HashSet<string> PaperOnlyEntities()
-        {
-            var paper = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var lotw = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (_allQsos == null) return paper;
-
-            // Both sets are read from the QSOs themselves rather than from the folder's confirmed set,
-            // because that set now HOLDS the paper cards - comparing against it would always answer zero
-            // and the line explaining the tile would quietly disappear.
-            var current = new HashSet<string>(_masterResolver.GetAllEntityNames(), StringComparer.OrdinalIgnoreCase);
-            foreach (QSO q in _allQsos)
-            {
-                if (q == null) continue;
-                if (q.LotwQslRcvd != 1 && q.PaperQslRcvd != 1) continue;
-                DXCC d = Resolve(q.DXCall, q.Date);
-                if (d == null || string.IsNullOrEmpty(d.Name)) continue;
-                if (!current.Contains(d.Name)) continue;   // deleted entity - not part of "/ 340"
-                if (q.LotwQslRcvd == 1) lotw.Add(d.Name);
-                if (q.PaperQslRcvd == 1) paper.Add(d.Name);
-            }
-            paper.ExceptWith(lotw);   // what the card brings that LoTW does not
-            return paper;
         }
 
         // Whether an ADIF CREDIT_GRANTED list awards any DXCC credit. The field is a comma list of awards
@@ -1510,9 +1479,10 @@ namespace HolyLogger
         {
             switch (_source)
             {
-                // LoTW answers for LoTW ALONE. A paper card the ARRL would accept is reported beside this
-                // folder's number ("+1 by paper card") and counted in the ARRL DXCC Award folder, which is
-                // the one whose name promises that sum. Counting it here made the two folders identical.
+                // LoTW answers for LoTW ALONE, and this folder says nothing about paper cards anywhere -
+                // not in the tile, not in the line beneath it. A card the ARRL would accept is counted in
+                // the ARRL DXCC Award folder, which is the one whose name promises that sum, and in the
+                // Paper QSL folder. Counting it here made the two folders identical.
                 case ConfSource.Lotw:    return q.LotwQslRcvd == 1;
                 case ConfSource.Qrz:     return q.QrzQslRcvd == 1;
                 case ConfSource.Eqsl:    return q.EqslQslRcvd == 1;
@@ -1968,26 +1938,11 @@ namespace HolyLogger
             // headers, which share a fixed height). "of N" is dropped because the worked-countries
             // header right above already shows that total. The two figures are disjoint - the deleted
             // ones are NOT inside the active count - so the reader can add them up.
-            // On the LoTW folder ONLY: the current entities a paper card confirms and LoTW does not. The
-            // ARRL accepts both, so those countries count towards DXCC just as much - but they are NOT
-            // added into the LoTW figure, because that tile answers "what has LoTW confirmed" and must
-            // keep answering exactly that. Shown beside it instead, so the operator can see both halves
-            // of their real position without either number being quietly redefined. (The DXCC Award
-            // folder is where the two are actually added together.)
-            string paperNote = string.Empty;
-            if (_source == ConfSource.Lotw)
-            {
-                // Its OWN line. The line above it already fills the worked column at this font size, so
-                // anything appended is cut off mid-sentence - it read "…5 deleted,  +1" and stopped,
-                // which tells the operator nothing at all.
-                // The tile above counts LoTW ALONE, so the card is an ADDITION to it - not a slice of it.
-                // This line used to subtract the card from the tile (325 - 1 = "324 at LoTW"), which was
-                // right only while the tile counted cards too, and became a number belonging to nothing
-                // the moment LoTW went back to answering for itself.
-                int paperOnly = PaperOnlyEntities().Count;
-                if (paperOnly > 0)
-                    paperNote = $"\n+{paperOnly} by Paper QSL  →  {confirmedActive + paperOnly} for the award";
-            }
+            // THE LoTW FOLDER DOES NOT MENTION PAPER CARDS AT ALL. A line reading "+3 by Paper QSL → 329
+            // for the award" used to sit here, and it answered a question this folder was never asked:
+            // this folder reports what LoTW holds, and nothing else. The award sum has its own folder -
+            // ARRL DXCC Award - which adds LoTW, cards and granted credits together and is named for
+            // doing exactly that. Cards also have a folder of their own.
 
             // Built from inlines rather than one string, so the DELETED count can be a link: those
             // entities are the hardest thing on this page to check, and the operator had no way to see
@@ -2015,12 +1970,7 @@ namespace HolyLogger
                     TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run("0 deleted"));
                 }
 
-                if (!string.IsNullOrEmpty(paperNote))
-                    TB_LotwStatus.Inlines.Add(new System.Windows.Documents.Run(paperNote));
             }
-            // The tile above now counts the paper cards on the LoTW folder, so the deleted/active clause
-            // alone would no longer explain it - the second line does, by splitting the tile's own number
-            // into the two things it is made of.
 
             // The Confirmed tile only makes sense for a confirmation source; the Worked folder is the
             // plain log, so it shows just Worked / DXCC and Missing DXCC.
