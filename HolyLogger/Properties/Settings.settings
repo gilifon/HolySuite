@@ -737,5 +737,10 @@
     <Setting Name="ChannelsWindowHeight" Type="System.Double" Scope="User">
       <Value Profile="(Default)">NaN</Value>
     </Setting>
-  </Settings>
+    <Setting Name="SupportSenderName" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="SupportSenderEmail" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>  </Settings>
 </SettingsFile>

@@ -115,6 +115,7 @@
     <Reference Include="System.Device" />
     <Reference Include="System.Drawing" />
     <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Net.Http.Formatting, Version=5.2.7.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
       <HintPath>..\packages\Microsoft.AspNet.WebApi.Client.5.2.7\lib\net45\System.Net.Http.Formatting.dll</HintPath>
@@ -327,7 +328,10 @@
       <DependentUpon>LogVerifierWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
-    <Compile Include="LotwRestoreWindow.xaml.cs">
+    <Compile Include="SupportMailWindow.xaml.cs">
+      <DependentUpon>SupportMailWindow.xaml</DependentUpon>
+      <SubType>Code</SubType>
+    </Compile>    <Compile Include="LotwRestoreWindow.xaml.cs">
       <DependentUpon>LotwRestoreWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
@@ -444,7 +448,10 @@
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
-    <Page Include="LotwRestoreWindow.xaml">
+    <Page Include="SupportMailWindow.xaml">
+      <SubType>Designer</SubType>
+      <Generator>MSBuild:Compile</Generator>
+    </Page>    <Page Include="LotwRestoreWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>
@@ -825,6 +832,8 @@
     <Resource Include="Images\unlock.png" />
     <Resource Include="Images\newdxcc.gif" />
     <Resource Include="Images\exportC.png" />
+    <Resource Include="Images\mail.png" />
+    <Resource Include="Images\support.png" />
     <Resource Include="Images\flags\ad.png" />
     <Resource Include="Images\flags\ae.png" />
     <Resource Include="Images\flags\af.png" />

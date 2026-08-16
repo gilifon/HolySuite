@@ -91,9 +91,14 @@ namespace HolyLogger
                         string body = await _eqslHttp.GetStringAsync(url);
                         outcome = ClassifyEqslResponse(body);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        outcome = 0; // offline / timeout -> leave pending
+                        // Offline / timeout -> leave pending. Written down because a queue that never
+                        // empties looks identical whether eQSL is refusing the QSO, the password is
+                        // wrong, or there is simply no internet - and only this line says which.
+                        Log.Warn("eQSL upload of " + (qso != null ? (qso.DXCall ?? "?") : "?") +
+                                 " did not go through: " + ex.GetType().Name + ": " + ex.Message);
+                        outcome = 0;
                     }
 
                     if (outcome == 1) dal.SetEqslStatus(qso.id, 1);
@@ -108,9 +113,10 @@ namespace HolyLogger
                     _eqslPumpLock.Release();
                 }
             }
-            catch
+            catch (Exception ex)
             {
                 // Auto-upload must never crash the app; the QSO remains pending for a later retry.
+                Log.Swallow(ex);
             }
         }
 
@@ -165,9 +171,13 @@ namespace HolyLogger
                         string body = await _eqslHttp.GetStringAsync(url);
                         outcome = ClassifyEqslResponse(body);
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        networkError = true; // offline / timeout
+                        // Offline / timeout. The pump stops here and the rest stay queued; the reason
+                        // is only ever visible in the log.
+                        Log.Warn("eQSL queue upload stopped at " + (qso != null ? (qso.DXCall ?? "?") : "?") +
+                                 ": " + ex.GetType().Name + ": " + ex.Message);
+                        networkError = true;
                         outcome = 0;
                     }
 
@@ -307,9 +317,11 @@ namespace HolyLogger
                 }
                 UpdateQrzMenuCount();
             }
-            catch
+            catch (Exception ex)
             {
                 // Best effort; anything not confirmed sent simply stays pending.
+                Log.Warn("The QRZ Logbook queue could not be emptied: " +
+                         ex.GetType().Name + ": " + ex.Message);
             }
         }
 
@@ -321,7 +333,9 @@ namespace HolyLogger
             // Counts not-yet-sent QSOs whose callsign is in the eQSL table (the opt-in list). A
             // callsign that isn't in the table is ignored.
             try { if (dal != null) pending = dal.GetPendingEqslCount(); }
-            catch { pending = 0; }
+            // A count that cannot be read is shown as zero, which reads as "nothing waiting" - the most
+            // reassuring thing the menu could possibly say, and the least true.
+            catch (Exception ex) { Log.Swallow(ex); pending = 0; }
 
             if (SendQueueToEqslMenuItem != null)
             {

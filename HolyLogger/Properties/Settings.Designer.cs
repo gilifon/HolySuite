@@ -2966,5 +2966,28 @@ namespace HolyLogger.Properties {
                 this["ChannelsWindowHeight"] = value;
             }
         }
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SupportSenderName {
+            get {
+                return ((string)(this["SupportSenderName"]));
+            }
+            set {
+                this["SupportSenderName"] = value;
+            }
+        }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string SupportSenderEmail {
+            get {
+                return ((string)(this["SupportSenderEmail"]));
+            }
+            set {
+                this["SupportSenderEmail"] = value;
+            }
+        }
     }
 }

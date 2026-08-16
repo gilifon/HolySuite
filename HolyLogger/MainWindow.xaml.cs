@@ -8423,6 +8423,75 @@ namespace HolyLogger
             about.Show();
         }
 
+        // HELP > SUPPORT > SEND MAIL TO THE DEVELOPERS. The callsign is filled in from the station's own
+        // - the operator has already typed it once today and should not be asked again.
+        private void SendMailToDevelopersMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string from = (TB_MyCallsign != null ? (TB_MyCallsign.Text ?? string.Empty) : string.Empty).Trim();
+            var w = new SupportMailWindow(from) { Owner = this };
+            w.ShowDialog();
+        }
+
+        // HELP > SUPPORT > OPEN THE ERROR LOG.
+        // Everywhere the program catches a fault and keeps going, it writes a line here first. That is
+        // the only trace such a fault leaves, and until this menu existed the file could only be reached
+        // by being told its path - which is no use at all to someone whose program is misbehaving.
+        // Opened with Notepad by name rather than by letting Windows choose: ".log" is very often
+        // registered to nothing at all, and then Process.Start on the file offers "how do you want to
+        // open this?" instead of showing the operator their log.
+        private void OpenErrorLogMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string path = Log.FilePath;
+            if (string.IsNullOrEmpty(path) || !System.IO.File.Exists(path))
+            {
+                MessageBox.Show(this,
+                    "There is no error log yet.\n\nThat is good news: it means nothing has gone wrong " +
+                    "that HolyLogger had to write down.",
+                    "Error log", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+
+            try
+            {
+                System.Diagnostics.Process.Start("notepad.exe", "\"" + path + "\"");
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                MessageBox.Show(this, "The log could not be opened.\n\nIt is here:\n" + path,
+                    "Error log", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
+        // The same file, shown in its folder - which is also where logDB.db lives, so this is the way to
+        // reach the database for a backup or to send a copy to the developer.
+        private void ShowErrorLogFolderMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string path = Log.FilePath;
+            try
+            {
+                if (!string.IsNullOrEmpty(path) && System.IO.File.Exists(path))
+                {
+                    System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + path + "\"");
+                    return;
+                }
+
+                // No log file yet: open the folder it would be written to, which still holds the database.
+                string dir = string.IsNullOrEmpty(path) ? null : System.IO.Path.GetDirectoryName(path);
+                if (!string.IsNullOrEmpty(dir) && System.IO.Directory.Exists(dir))
+                    System.Diagnostics.Process.Start("explorer.exe", "\"" + dir + "\"");
+                else
+                    MessageBox.Show(this, "The folder could not be found.", "Error log",
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                MessageBox.Show(this, "The folder could not be opened.\n\nIt is here:\n" + path,
+                    "Error log", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+        }
+
         private void HolyLoggerMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string url = "https://4z1kd.github.io/HolyLogger/";

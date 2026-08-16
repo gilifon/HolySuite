@@ -186,7 +186,7 @@ namespace HolyLogger
 
             // A blank line at the top, because the box now keeps what it holds: without a way to choose
             // NOTHING, the only way back out of a program would be to select all of it and delete it.
-            var list = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>("", "no program") };
+            var list = new List<KeyValuePair<string, string>> { new KeyValuePair<string, string>("", "No Activity was selected") };
             list.AddRange(OtherActivityWindow.Known);
             CB_ActivitySig.ItemsSource = list;
             CB_ActivitySig.Text = (Properties.Settings.Default.LastActivityProgram ?? "").Trim();

@@ -331,6 +331,8 @@ namespace HolyLogger
                     {
                         // Roll back automatically: the operator asked for a restore, not to be left with
                         // nothing if the copy itself fails.
+                        Log.Warn("Restore FAILED while copying the backup over the database: " +
+                                 copyEx.GetType().Name + ": " + copyEx.Message);
                         try
                         {
                             if (File.Exists(safetyCopyPath) && !File.Exists(dbPath))
@@ -347,6 +349,7 @@ namespace HolyLogger
                 }
                 catch (Exception ex)
                 {
+                    Log.Warn("Restore FAILED: " + ex.GetType().Name + ": " + ex.Message);
                     result.Error = ex.Message;
                     return result;
                 }
@@ -709,7 +712,19 @@ Environment.NewLine +
                     return InsertQsoCopy(qso, targetId, qso.id);
                 }
             }
-            catch { return 0; }
+            // A FAILURE HERE IS INVISIBLE UNLESS IT IS WRITTEN DOWN. Every "return 0" above is a
+            // legitimate answer meaning "no copy was due" - no target log, wrong identity, already
+            // there - and the caller cannot tell those apart from a fault. So a QSO that should have
+            // been copied into the second log and was not leaves no mark anywhere: not in the target
+            // log, not on screen, nowhere. The line names the callsign so the QSO can be found and
+            // copied by hand.
+            catch (Exception ex)
+            {
+                Log.Warn("The copy of " + (qso != null ? (qso.DXCall ?? "?") : "?") +
+                         " into the copy-target log of log " + sourceLogId + " FAILED: " +
+                         ex.GetType().Name + ": " + ex.Message);
+                return 0;
+            }
         }
 
         public bool Insert(IEnumerable<QSO> qsos)
@@ -757,6 +772,10 @@ Environment.NewLine +
                 }
                 catch (Exception e)
                 {
+                    // The whole batch is rolled back and the caller is told "false" - which is all the
+                    // caller can say to the operator. WHY it failed only exists here, so write it down.
+                    Log.Warn("Insert of a batch of QSOs FAILED and was rolled back: " +
+                             e.GetType().Name + ": " + e.Message);
                     T.Rollback();
                     return false;
                 }
@@ -918,7 +937,11 @@ Environment.NewLine +
                     {
                         faultyQso++;
                         if (failed != null) failed.Add(new KeyValuePair<QSO, string>(qso, ex.Message));
-                        System.Diagnostics.Debug.WriteLine($"Failed to insert QSO in batch: {ex.Message}");
+                        // Debug.WriteLine reaches a debugger and nobody else - in a shipped build it goes
+                        // nowhere. A QSO that did not make it into the log is exactly the thing that must
+                        // still be answerable a week later, so it goes in the file, named.
+                        Log.Warn("QSO " + (qso != null ? (qso.DXCall ?? "?") : "?") + " on " +
+                                 (qso != null ? (qso.Date ?? "?") : "?") + " could not be inserted: " + ex.Message);
                     }
 
                     processedQso++;
@@ -990,7 +1013,10 @@ Environment.NewLine +
                             while (rdr.Read()) { long cid = Convert.ToInt64(rdr["Id"]); if (!ids.Contains(cid)) ids.Add(cid); }
                     }
                 }
-                catch { /* best-effort; at minimum the QSO itself is updated below */ }
+                // Best-effort: at minimum the QSO itself is updated below. Written down all the same,
+                // because the consequence of failing here is the one thing an operator would never
+                // suspect - the edit lands on this QSO and its copy in the other log keeps the old text.
+                catch (Exception ex) { Log.Swallow(ex); }
 
                 const string sql = "UPDATE qso SET my_callsign = @my_callsign ,operator = @operator ,my_square = @my_square,my_locator = @my_locator,dx_locator = @dx_locator,frequency = @frequency,band = @band,dx_callsign = @dx_callsign,rst_rcvd = @rst_rcvd,rst_sent = @rst_sent,date = @date,time = @time,mode = @mode,submode = @submode,exchange = @exchange,comment = @comment,name = @name,country = @country,continent = @continent,cq_zone = @cq_zone,itu_zone = @itu_zone,state = @state,qth = @qth,dxcc = @dxcc,prop_mode = @prop_mode,sat_name = @sat_name, soapbox = @soapbox,iota = @iota,sota_ref = @sota_ref,pota_ref = @pota_ref,wwff_ref = @wwff_ref,sig = @sig,sig_info = @sig_info WHERE id = @id";
                 try
@@ -1074,7 +1100,9 @@ Environment.NewLine +
                                 while (rdr.Read()) { long sid = Convert.ToInt64(rdr["Id"]); if (!ids.Contains(sid)) ids.Add(sid); }
                         }
                 }
-                catch { /* best-effort link lookup; still delete the QSO itself below */ }
+                // Best-effort link lookup; the QSO itself is still deleted below. Written down because
+                // the failure leaves the copy in the other log behind, alone, looking deliberate.
+                catch (Exception ex) { Log.Swallow(ex); }
 
                 try
                 {
@@ -1820,8 +1848,10 @@ Environment.NewLine +
                 try { File.Copy(dbPath, backupPath, false); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
                 con.Open();
             }
-            catch
+            catch (Exception ex)
             {
+                Log.Warn("The one-time backup taken before the multi-log migration FAILED: " +
+                         ex.GetType().Name + ": " + ex.Message);
                 if (con.State != System.Data.ConnectionState.Open)
                 {
                     try { con.Open(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
@@ -2499,7 +2529,7 @@ Environment.NewLine +
                 using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_eqsl_status ON qso(eqsl_status, my_callsign)", con))
                     cmd.ExecuteNonQuery();
             }
-            catch { /* an index is an optimization only; never block startup on it */ }
+            catch (Exception ex) { Log.Swallow(ex); }   // an index is an optimization only; never block startup on it
         }
 
         // Index that backs the QRZ Logbook pending-queue lookups (filter on qrz_status). Idempotent.
@@ -2510,7 +2540,7 @@ Environment.NewLine +
                 using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_qrz_status ON qso(qrz_status)", con))
                     cmd.ExecuteNonQuery();
             }
-            catch { /* an index is an optimization only; never block startup on it */ }
+            catch (Exception ex) { Log.Swallow(ex); }   // an index is an optimization only; never block startup on it
         }
 
         // Index that backs the Club Log pending-queue lookups (filter on clublog_status). Idempotent.
@@ -2521,7 +2551,7 @@ Environment.NewLine +
                 using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_clublog_status ON qso(clublog_status)", con))
                     cmd.ExecuteNonQuery();
             }
-            catch { /* an index is an optimization only; never block startup on it */ }
+            catch (Exception ex) { Log.Swallow(ex); }   // an index is an optimization only; never block startup on it
         }
 
         // Index that backs every per-log query (load, counts, dup checks, copy-dedupe — the qso table
@@ -2583,7 +2613,7 @@ Environment.NewLine +
                         + "WHERE " + service + "_qsl_rcvd = 1", con))
                         cmd.ExecuteNonQuery();
             }
-            catch { /* an index is an optimization only; never block startup on it */ }
+            catch (Exception ex) { Log.Swallow(ex); }   // an index is an optimization only; never block startup on it
         }
 
         // Adds the lotw_status column the first time the user runs a build that has the LoTW upload
@@ -3680,7 +3710,7 @@ Environment.NewLine +
                 using (var cmd = new SQLiteCommand("CREATE INDEX IF NOT EXISTS idx_qso_lotw_status ON qso(lotw_status)", con))
                     cmd.ExecuteNonQuery();
             }
-            catch { /* optimization only */ }
+            catch (Exception ex) { Log.Swallow(ex); }   // optimization only
         }
 
         // Returns the QSOs still waiting to be uploaded to LoTW (status 0), oldest first.

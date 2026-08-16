@@ -1,0 +1,123 @@
+<Window x:Class="HolyLogger.SupportMailWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Write to the people who make HolyLogger" Width="720" Height="820"
+        MinWidth="620" MinHeight="760"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+        Background="{DynamicResource WindowBg}">
+    <!-- WRITING TO THE DEVELOPER WITHOUT LEAVING THE PROGRAM. Someone whose logger is misbehaving is
+         the last person who should be asked to find a file in AppData and attach it to an email, so
+         the error log goes with the message every time - including when the message is a question or
+         an idea and nothing has gone wrong at all. It costs nothing to send and it is the one thing
+         that answers "what was your program actually doing?". -->
+    <Grid Margin="16,14,16,14">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>   <!-- heading            -->
+            <RowDefinition Height="Auto"/>   <!-- name                -->
+            <RowDefinition Height="Auto"/>   <!-- callsign            -->
+            <RowDefinition Height="Auto"/>   <!-- email               -->
+            <RowDefinition Height="Auto"/>   <!-- subject             -->
+            <RowDefinition Height="Auto"/>   <!-- description label   -->
+            <RowDefinition Height="*"/>      <!-- description box     -->
+            <RowDefinition Height="Auto"/>   <!-- pasted pictures     -->
+            <RowDefinition Height="Auto"/>   <!-- what gets attached  -->
+            <RowDefinition Height="Auto"/>   <!-- status              -->
+            <RowDefinition Height="Auto"/>   <!-- buttons             -->
+        </Grid.RowDefinitions>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="Auto"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2" FontSize="18" FontWeight="Bold" Margin="0,0,0,10"
+                   TextWrapping="Wrap" Foreground="{DynamicResource AccentBrush}"
+                   Text="Tell us what happened, or what you would like HolyLogger to do"/>
+
+        <!-- All four are required. The address most of all: without it a reply has nowhere to go, and a
+             report nobody can answer helps neither side. Name, callsign and address are remembered, so
+             they are typed once and are already filled in the next time. -->
+        <TextBlock Grid.Row="1" Grid.Column="0" FontSize="16"
+                   VerticalAlignment="Center" Margin="0,0,10,8"
+                   Foreground="{DynamicResource TextBrush}">
+            <Run Text="Your name"/><Run Text=" *" Foreground="Red" FontWeight="Bold"/>
+        </TextBlock>
+        <TextBox   Grid.Row="1" Grid.Column="1" x:Name="TB_Name" FontSize="16" Height="32" Margin="0,0,0,8"
+                   Width="280" HorizontalAlignment="Left" VerticalContentAlignment="Center"/>
+
+        <TextBlock Grid.Row="2" Grid.Column="0" FontSize="16"
+                   VerticalAlignment="Center" Margin="0,0,10,8"
+                   Foreground="{DynamicResource TextBrush}">
+            <Run Text="Your callsign"/><Run Text=" *" Foreground="Red" FontWeight="Bold"/>
+        </TextBlock>
+        <TextBox   Grid.Row="2" Grid.Column="1" x:Name="TB_Callsign" FontSize="16" Height="32" Margin="0,0,0,8"
+                   Width="140" HorizontalAlignment="Left"
+                   CharacterCasing="Upper" MaxLength="14" VerticalContentAlignment="Center"/>
+
+        <TextBlock Grid.Row="3" Grid.Column="0" FontSize="16"
+                   VerticalAlignment="Center" Margin="0,0,10,8"
+                   Foreground="{DynamicResource TextBrush}">
+            <Run Text="Your email"/><Run Text=" *" Foreground="Red" FontWeight="Bold"/>
+        </TextBlock>
+        <TextBox   Grid.Row="3" Grid.Column="1" x:Name="TB_Email" FontSize="16" Height="32" Margin="0,0,0,8"
+                   Width="320" HorizontalAlignment="Left"
+                   ToolTip="Where the answer will be sent" VerticalContentAlignment="Center"/>
+
+        <TextBlock Grid.Row="4" Grid.Column="0" FontSize="16"
+                   VerticalAlignment="Center" Margin="0,0,10,8"
+                   Foreground="{DynamicResource TextBrush}">
+            <Run Text="Subject"/><Run Text=" *" Foreground="Red" FontWeight="Bold"/>
+        </TextBlock>
+        <TextBox   Grid.Row="4" Grid.Column="1" x:Name="TB_Subject" FontSize="16" Height="32" Margin="0,0,0,8"
+                   VerticalContentAlignment="Center"/>
+
+        <TextBlock Grid.Row="5" Grid.ColumnSpan="2" FontSize="16" Margin="0,6,0,4"
+                   Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap">
+            <!-- No star: a subject line can be the whole message. "Cluster window will not close" says
+                 everything, and demanding a paragraph underneath it only invites "see above". -->
+            <Run Text="What happened - or what you would like.  A picture can be pasted straight in with Ctrl+V."/>
+        </TextBlock>
+        <TextBox   Grid.Row="6" Grid.ColumnSpan="2" x:Name="TB_Body" FontSize="16"
+                   AcceptsReturn="True" TextWrapping="Wrap" SpellCheck.IsEnabled="True"
+                   VerticalScrollBarVisibility="Auto" MinHeight="200"/>
+
+        <!-- PASTED PICTURES. A screenshot says in one glance what a paragraph struggles to describe, and
+             the operator already has one on the clipboard - they pressed PrintScreen before they came
+             looking for this window. The picture is NOT put inside the text: it is kept as a file and
+             attached, which is what the developer needs anyway. -->
+        <Border Grid.Row="7" Grid.ColumnSpan="2" x:Name="PicturesPanel" Visibility="Collapsed"
+                Margin="0,10,0,0" Padding="8" BorderThickness="1"
+                BorderBrush="{DynamicResource AccentBrush}" Background="{DynamicResource ControlBg}">
+            <StackPanel>
+                <TextBlock x:Name="TB_PicturesHeader" FontSize="16" FontWeight="Bold" Margin="0,0,0,6"
+                           Foreground="{DynamicResource TextBrush}"/>
+                <ItemsControl x:Name="IC_Pictures">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal"/>
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                </ItemsControl>
+            </StackPanel>
+        </Border>
+
+        <!-- Said plainly, and said every time. A program that quietly posts a file about the operator's
+             activity is not something to discover afterwards. -->
+        <TextBlock Grid.Row="8" Grid.ColumnSpan="2" x:Name="TB_Attachment" FontSize="16"
+                   TextWrapping="Wrap" Margin="0,10,0,0"
+                   Foreground="{DynamicResource MutedTextBrush}"/>
+
+        <TextBlock Grid.Row="9" Grid.ColumnSpan="2" x:Name="TB_Status" FontSize="16" TextAlignment="Center"
+                   Margin="0,8,0,0" Foreground="{DynamicResource MutedTextBrush}"/>
+
+        <StackPanel Grid.Row="10" Grid.ColumnSpan="2" Orientation="Horizontal"
+                    HorizontalAlignment="Center" Margin="0,12,0,0">
+            <Button x:Name="Btn_Cancel" Height="38" MinWidth="130" FontSize="16"
+                    Margin="0,0,14,0" Click="Btn_Cancel_Click" Content="Cancel" IsCancel="True"/>
+            <!-- Starts off. Nothing can be sent until every starred field has something in it, so the
+                 operator is never told off after the fact for a field they could not see was needed. -->
+            <Button x:Name="Btn_Send" Height="38" MinWidth="150" FontSize="16" IsEnabled="False"
+                    FontWeight="Bold" Click="Btn_Send_Click" Content="Send"
+                    Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20" BorderThickness="1.5"/>
+        </StackPanel>
+    </Grid>
+</Window>

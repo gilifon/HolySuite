@@ -855,6 +855,32 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
+                    <!-- SUPPORT. The error log is the only record of the faults the program swallows and
+                         carries on from, and until now the only way to reach it was to be told the path.
+                         Its own submenu because more will live here: writing to the developer, gathering
+                         a report to attach, and whatever else turns out to be needed when someone is
+                         stuck and the answer is sitting in a file they cannot find. -->
+                    <MenuItem x:Name="SupportMenuItem" Header="Support">
+                        <MenuItem.Icon>
+                            <!-- The life ring: what help means in almost every program there is. -->
+                            <Image Source="Images/support.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                        <MenuItem x:Name="SendMailToDevelopersMenuItem" Header="Send mail to the developers"
+                                  ToolTip="Write to us - the error log is attached for you"
+                                  Click="SendMailToDevelopersMenuItem_Click">
+                            <MenuItem.Icon>
+                                <Image Source="Images/mail.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                            </MenuItem.Icon>
+                        </MenuItem>
+                        <Separator />
+                        <MenuItem x:Name="OpenErrorLogMenuItem" Header="Open the error log"
+                                  ToolTip="Everything that went wrong, with the time it happened"
+                                  Click="OpenErrorLogMenuItem_Click"/>
+                        <MenuItem x:Name="ShowErrorLogFolderMenuItem" Header="Show the folder that holds it"
+                                  ToolTip="Opens the folder with the log file selected - the same folder as the log database"
+                                  Click="ShowErrorLogFolderMenuItem_Click"/>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -1672,8 +1698,8 @@
             <TextBox x:Name="TB_ActivitySigInfo" Canvas.Left="177" Canvas.Top="34" Width="150" Height="28" FontSize="16"
                      CharacterCasing="Upper" MaxLength="60" TabIndex="25" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center"
-                     ToolTip="The reference within that program, e.g. OK-00234"/>
-            <!-- "Program" written INSIDE the empty box, the way a placeholder is. The row's other boxes
+                     ToolTip="The reference within that activity, e.g. OK-00234"/>
+            <!-- "Activity" written INSIDE the empty box, the way a placeholder is. The row's other boxes
                  have a label to their left saying what they are; this one has no room for one, and an
                  empty box with a chevron says only "something goes here". Grey, so it cannot be mistaken
                  for a value, and not hit-testable, so a click goes through it to the box underneath.
@@ -1685,11 +1711,11 @@
             <Border x:Name="TB_ActivitySigPlaceholder" Canvas.Left="69" Canvas.Top="34" Width="104" Height="28"
                     Background="Transparent" IsHitTestVisible="False">
                 <!-- The 4px under it are what MAKES it look centred. Centring the line box is not the
-                     same as centring the letters: "Program" has a descender, so its ink hung 3px below
+                     same as centring the letters: "Activity" has a descender, so its ink hung 3px below
                      the middle while a typed value like ARLHS sits 1px below. Measured off the rendered
                      pixels, 4px of bottom margin lands the placeholder exactly where a real value sits,
                      which is the alignment the eye is actually comparing it against. -->
-                <TextBlock Text="Program" FontSize="16" VerticalAlignment="Center" Margin="5,0,0,4"
+                <TextBlock Text="Activity" FontSize="16" VerticalAlignment="Center" Margin="5,0,0,4"
                            Foreground="{DynamicResource MutedTextBrush}"/>
             </Border>
             <TextBlock x:Name="TB_ActivitySigHint" Canvas.Left="335" Canvas.Top="37" FontSize="16"
