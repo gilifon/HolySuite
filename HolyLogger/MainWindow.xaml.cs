@@ -11468,14 +11468,20 @@ namespace HolyLogger
                         html = await Task.Run(() => client.GetStringAsync("https://www.qrz.com/db/" + bareCallsign));
                     }
 
-                    Match match = Regex.Match(html, @"https://cdn-bio\.qrz\.com/[^""'<>\x00--]+", RegexOptions.IgnoreCase);
+                    // The address runs to the first quote, angle bracket or space - the characters that
+                    // can only be the HTML around it. What stood here was [^"'<>\x00-*] with three RAW
+                    // control characters in the source file, invisible in any editor: 0x00-0x1F, then
+                    // 0x7F-0x1F, a range running backwards. .NET rejects that, so BOTH of these matches
+                    // threw ArgumentException every single time and the profile page could never yield a
+                    // photo - proved by ArgumentException "range in reverse order" in holylogger.log.
+                    Match match = Regex.Match(html, @"https://cdn-bio\.qrz\.com/[^""'<>\s]+", RegexOptions.IgnoreCase);
                     if (match.Success)
                     {
                         SetQrzPhoto(match.Value);
                         return;
                     }
 
-                    Match altMatch = Regex.Match(html, @"https?://[^""'<>\x00--]+\.(jpg|jpeg|png|gif)", RegexOptions.IgnoreCase);
+                    Match altMatch = Regex.Match(html, @"https?://[^""'<>\s]+\.(jpg|jpeg|png|gif)", RegexOptions.IgnoreCase);
                     if (altMatch.Success)
                     {
                         SetQrzPhoto(altMatch.Value);

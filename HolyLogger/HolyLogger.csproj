@@ -832,6 +832,7 @@
     <Resource Include="Images\flags\al.png" />
     <Resource Include="Images\flags\am.png" />
     <Resource Include="Images\flags\ao.png" />
+    <Resource Include="Images\flags\aq.png" />
     <Resource Include="Images\flags\ar.png" />
     <Resource Include="Images\flags\as.png" />
     <Resource Include="Images\flags\at.png" />
@@ -975,6 +976,7 @@
     <Resource Include="Images\flags\no.png" />
     <Resource Include="Images\flags\np.png" />
     <Resource Include="Images\flags\nr.png" />
+    <Resource Include="Images\flags\nu.png" />
     <Resource Include="Images\flags\nz.png" />
     <Resource Include="Images\flags\om.png" />
     <Resource Include="Images\flags\pa.png" />
@@ -1030,6 +1032,7 @@
     <Resource Include="Images\flags\tz.png" />
     <Resource Include="Images\flags\ua.png" />
     <Resource Include="Images\flags\ug.png" />
+    <Resource Include="Images\flags\un.png" />
     <Resource Include="Images\flags\us.png" />
     <Resource Include="Images\flags\uy.png" />
     <Resource Include="Images\flags\uz.png" />
@@ -1042,6 +1045,7 @@
     <Resource Include="Images\flags\vu.png" />
     <Resource Include="Images\flags\wf.png" />
     <Resource Include="Images\flags\ws.png" />
+    <Resource Include="Images\flags\xk.png" />
     <Resource Include="Images\flags\ye.png" />
     <Resource Include="Images\flags\za.png" />
     <Resource Include="Images\flags\zm.png" />
