@@ -72,9 +72,10 @@
 
         <TextBlock Grid.Row="5" Grid.ColumnSpan="2" FontSize="16" Margin="0,6,0,4"
                    Foreground="{DynamicResource TextBrush}" TextWrapping="Wrap">
-            <!-- No star: a subject line can be the whole message. "Cluster window will not close" says
-                 everything, and demanding a paragraph underneath it only invites "see above". -->
-            <Run Text="What happened - or what you would like.  A picture can be pasted straight in with Ctrl+V."/>
+            <!-- Starred after all. The message is what the mail is MADE of - the server refuses one
+                 without it - so a subject line alone cannot be the whole thing. -->
+            <Run Text="What happened - or what you would like"/><Run Text=" *" Foreground="Red" FontWeight="Bold"/><Run
+                Text=".  A picture can be pasted straight in with Ctrl+V."/>
         </TextBlock>
         <TextBox   Grid.Row="6" Grid.ColumnSpan="2" x:Name="TB_Body" FontSize="16"
                    AcceptsReturn="True" TextWrapping="Wrap" SpellCheck.IsEnabled="True"

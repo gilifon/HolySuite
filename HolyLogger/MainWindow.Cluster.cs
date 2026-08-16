@@ -3292,10 +3292,19 @@ namespace HolyLogger
                         clusterAllSpots.RemoveAt(clusterAllSpots.Count - 1);
                     }
 
-                    if (newItems.Any(ClusterSpotQualifiesForNewCountryAlert))
-                        PlayNewCountrySpotAlert();
-                    else if (newItems.Any(ClusterSpotQualifiesForUnconfirmedAlert))
-                        PlayUnconfirmedSpotAlert();
+                    // ONLY WHILE THE CLUSTER WINDOW IS OPEN. Closing it does not close the connection -
+                    // the spots still feed the map in the main window - so the alerts went on sounding
+                    // for a table nobody had in front of them. A sound is a summons: it says "look at
+                    // the cluster", and there is nothing to look at. clusterWindow is set to null when
+                    // that window closes, which makes it the whole test.
+                    // The Test buttons in Cluster Settings are unaffected: they play the sound directly.
+                    if (clusterWindow != null)
+                    {
+                        if (newItems.Any(ClusterSpotQualifiesForNewCountryAlert))
+                            PlayNewCountrySpotAlert();
+                        else if (newItems.Any(ClusterSpotQualifiesForUnconfirmedAlert))
+                            PlayUnconfirmedSpotAlert();
+                    }
 
                     RefreshClusterVisibleSpots();
                 }));

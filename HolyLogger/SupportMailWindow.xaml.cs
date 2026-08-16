@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
@@ -25,8 +27,8 @@ namespace HolyLogger
     {
         // FILLED IN WHEN THE SERVER IS AGREED. One place, deliberately: the window does not care which
         // of the two it is doing, and neither does the operator.
-        private const string PostEndpoint = "";            // e.g. https://tools.iarc.org/iarc/Server/support.php
-        private const string DeveloperAddress = "";        // shown to the operator in the fallback text
+        private const string PostEndpoint = "https://tools.iarc.org/Holyland/server/sendmail.php";
+        private const string DeveloperAddress = "holylogger@iarc.org";   // only shown if the post is not used
 
         // Pictures pasted into the message, kept as files rather than pushed into the text: an image
         // inside a body of text has to be got back out again at the other end, and what the developer
@@ -74,11 +76,11 @@ namespace HolyLogger
 
         private void UpdateSendEnabled()
         {
-            // The message body is NOT among these. The subject alone can carry the whole point.
             bool ready = TB_Name.Text.Trim().Length > 0
                       && TB_Callsign.Text.Trim().Length > 0
                       && TB_Email.Text.Trim().Length > 0
-                      && TB_Subject.Text.Trim().Length > 0;
+                      && TB_Subject.Text.Trim().Length > 0
+                      && TB_Body.Text.Trim().Length > 0;
 
             Btn_Send.IsEnabled = ready;
             TB_Status.Text = ready ? "" : "The fields marked * have to be filled in.";
@@ -151,8 +153,20 @@ namespace HolyLogger
             return _pictureFolder;
         }
 
+        // The server takes six. Refusing the seventh here, with a word about it, is kinder than letting
+        // the whole message be rejected after it has been written.
+        private const int MaxPictures = 6;
+
+        private bool AtPictureLimit()
+        {
+            if (_pictures.Count < MaxPictures) return false;
+            TB_Status.Text = "That is as many pictures as one message can carry (" + MaxPictures + ").";
+            return true;
+        }
+
         private bool AddPicture(BitmapSource img)
         {
+            if (AtPictureLimit()) return true;   // handled: the paste is not passed on as text either
             try
             {
                 string file = Path.Combine(PictureFolder(), "picture-" + (_pictures.Count + 1) + ".png");
@@ -175,6 +189,7 @@ namespace HolyLogger
 
         private bool CopyPicture(string source)
         {
+            if (AtPictureLimit()) return false;
             try
             {
                 string file = Path.Combine(PictureFolder(),
@@ -249,7 +264,7 @@ namespace HolyLogger
             Close();
         }
 
-        private void Btn_Send_Click(object sender, RoutedEventArgs e)
+        private async void Btn_Send_Click(object sender, RoutedEventArgs e)
         {
             string name = (TB_Name.Text ?? string.Empty).Trim();
             string callsign = (TB_Callsign.Text ?? string.Empty).Trim();
@@ -262,6 +277,7 @@ namespace HolyLogger
             if (email.Length == 0) { Complain("Please put your email address in - without it there is nowhere to send the answer.", TB_Email); return; }
             if (!LooksLikeAnAddress(email)) { Complain("That does not look like an email address. Please check it - the answer goes there.", TB_Email); return; }
             if (subject.Length == 0) { Complain("Please give the message a subject.", TB_Subject); return; }
+            if (body.Length == 0) { Complain("Please write the message itself - the subject alone is not enough to answer.", TB_Body); return; }
 
             // Remembered only once the operator has actually sent something with them.
             try
@@ -274,13 +290,238 @@ namespace HolyLogger
 
             if (PostEndpoint.Length > 0)
             {
-                // The endpoint is known: post it, log and pictures and all. Written when the address is
-                // agreed - until then this branch is never taken.
-                TB_Status.Text = "Sending…";
+                await SendToServerAsync(name, callsign, email, subject, body);
                 return;
             }
 
             PackOneFileForTheDesktop(name, callsign, email, subject, body);
+        }
+
+        // POSTS THE MESSAGE TO HolyLogger's OWN ENDPOINT, which mails it on. The server's rules, which
+        // this has to satisfy exactly or the message is refused:
+        //
+        //   callsign, name, email, title, message   all required, none may be empty
+        //   attachment                              required, one file, name ending .txt - the error log
+        //   images[]                                optional, up to 6, PNG/JPEG/GIF/BMP - the pasted
+        //                                           screenshots, shown inside the mail and attached
+        //   sizes                                   message 10,000 characters; log 5 MB; each picture
+        //                                           5 MB; everything together 20 MB
+        //   answer                                  JSON - {"success":true} or {"success":false,"error":…}
+        //
+        // The message is what the mail is MADE of, so it is required here too - it was briefly optional,
+        // on the reasoning that a subject line can be the whole point, and it cannot. The attachment must
+        // always exist, so a machine with no error log yet sends a file saying so, which is a true and
+        // useful thing for the developer to receive.
+        private async System.Threading.Tasks.Task SendToServerAsync(
+            string name, string callsign, string email, string subject, string body)
+        {
+            SetSending(true);
+            try
+            {
+                string message = ComposeMessage(body);
+                byte[] attachment;
+                string attachmentName;
+                BuildAttachment(out attachment, out attachmentName);
+
+                string answer;
+                bool ok;
+
+                using (var content = new MultipartFormDataContent())
+                {
+                    content.Add(new StringContent(callsign, Encoding.UTF8), "callsign");
+                    content.Add(new StringContent(name, Encoding.UTF8), "name");
+                    content.Add(new StringContent(email, Encoding.UTF8), "email");
+                    content.Add(new StringContent(subject, Encoding.UTF8), "title");
+                    content.Add(new StringContent(message, Encoding.UTF8), "message");
+
+                    var file = new ByteArrayContent(attachment);
+                    file.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue("text/plain");
+                    content.Add(file, "attachment", attachmentName);
+
+                    // THE PASTED PICTURES, as images[] - the square brackets are what makes PHP present
+                    // them as a list rather than keeping only the last one. They are shown inside the
+                    // mail, in this order, and attached as well.
+                    foreach (string picture in _pictures)
+                    {
+                        try
+                        {
+                            if (!File.Exists(picture)) continue;
+                            var bytes = File.ReadAllBytes(picture);
+                            if (bytes.Length == 0) continue;
+
+                            var image = new ByteArrayContent(bytes);
+                            image.Headers.ContentType =
+                                new System.Net.Http.Headers.MediaTypeHeaderValue(MimeOf(picture));
+                            content.Add(image, "images[]", Path.GetFileName(picture));
+                        }
+                        catch (Exception ex) { Log.Swallow(ex); }
+                    }
+
+                    // Task.Run, as everywhere else that talks to the network here: on .NET Framework the
+                    // proxy is resolved on the thread that STARTS the request, and this one starts on the
+                    // UI thread from a button press.
+                    HttpResponseMessage response = await System.Threading.Tasks.Task.Run(
+                        () => SupportHttp.PostAsync(PostEndpoint, content)).ConfigureAwait(true);
+
+                    answer = await response.Content.ReadAsStringAsync().ConfigureAwait(true);
+                    ok = response.IsSuccessStatusCode && SaysSuccess(answer);
+                }
+
+                if (ok)
+                {
+                    HolyMessageBox.ShowSuccess(
+                        "Your message has been sent." +
+                        (_pictures.Count > 0
+                            ? "\n\n" + (_pictures.Count == 1 ? "Your picture went" : "Your " + _pictures.Count + " pictures went")
+                              + " with it."
+                            : string.Empty) +
+                        "\n\nThe answer will go to " + email + ".",
+                        "Sent", this);
+                    Close();
+                    return;
+                }
+
+                // The server says WHY in plain words; showing our own guess instead would be worse.
+                string why = ErrorFrom(answer);
+                Log.Warn("The support message was refused: " + (why ?? "(no reason given)") + " | " + Trim(answer, 300));
+                HolyMessageBox.ShowWarning(
+                    "The message was not sent.\n\n" + (why ?? "The service did not accept it.") +
+                    "\n\nYou can try again, or press Cancel and use Help > Support > Open the error log.",
+                    "Not sent", this);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("The support message could not be sent: " + ex.GetType().Name + ": " + ex.Message);
+                HolyMessageBox.ShowError(
+                    "The message could not be sent:\n\n" + ex.Message +
+                    "\n\nCheck that you are online and try again.",
+                    "Not sent", this);
+            }
+            finally
+            {
+                SetSending(false);
+            }
+        }
+
+        // One client for the window's lifetime, with a timeout of its own: the default 100 seconds is a
+        // very long time to watch a button say "Sending…".
+        private static readonly HttpClient SupportHttp =
+            new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
+
+        private void SetSending(bool sending)
+        {
+            _sending = sending;
+            Btn_Send.IsEnabled = !sending;
+            Btn_Cancel.IsEnabled = !sending;
+            TB_Name.IsEnabled = TB_Callsign.IsEnabled = TB_Email.IsEnabled =
+                TB_Subject.IsEnabled = TB_Body.IsEnabled = !sending;
+            TB_Status.Text = sending ? "Sending…" : string.Empty;
+            Cursor = sending ? System.Windows.Input.Cursors.Wait : null;
+            if (!sending) UpdateSendEnabled();
+        }
+
+        private bool _sending;
+
+        // The message the server receives: what was typed, plus the two facts every support message
+        // needs and no operator should have to look up.
+        private string ComposeMessage(string body)
+        {
+            var sb = new StringBuilder();
+            sb.AppendLine(body);
+            sb.AppendLine();
+            sb.AppendLine("— HolyLogger " + VersionText() + " on " + Environment.OSVersion.VersionString);
+
+            string message = sb.ToString();
+            const int ServerLimit = 10000;
+            return message.Length <= ServerLimit ? message : message.Substring(0, ServerLimit);
+        }
+
+        // The error log, sent as a .txt because that is the only kind of file the service takes. Trimmed
+        // to its LAST 4 MB if it has grown past the 5 MB the service accepts: the end of a log is the
+        // part that describes what just went wrong.
+        private void BuildAttachment(out byte[] bytes, out string fileName)
+        {
+            fileName = "holylogger-log.txt";
+            const int ServerLimit = 5 * 1024 * 1024;
+            const int KeepBytes = 4 * 1024 * 1024;
+
+            string path = Log.FilePath;
+            try
+            {
+                if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                {
+                    var info = new FileInfo(path);
+                    if (info.Length <= ServerLimit)
+                    {
+                        bytes = File.ReadAllBytes(path);
+                        if (bytes.Length > 0) return;
+                    }
+                    else
+                    {
+                        using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                        {
+                            fs.Seek(-KeepBytes, SeekOrigin.End);
+                            var tail = new byte[KeepBytes];
+                            int read = fs.Read(tail, 0, KeepBytes);
+                            var head = Encoding.UTF8.GetBytes(
+                                "(the earlier part of this log was left out - it is over the size the service accepts)\r\n\r\n");
+                            bytes = new byte[head.Length + read];
+                            Buffer.BlockCopy(head, 0, bytes, 0, head.Length);
+                            Buffer.BlockCopy(tail, 0, bytes, head.Length, read);
+                            return;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            // No log, or it could not be read. The service demands a file, and "there is no log on this
+            // machine" is worth knowing anyway - it means nothing has gone wrong that was written down.
+            bytes = Encoding.UTF8.GetBytes(
+                "There is no error log on this machine, or it could not be read." + Environment.NewLine +
+                "HolyLogger " + VersionText() + " on " + Environment.OSVersion.VersionString + Environment.NewLine);
+        }
+
+        // What the server is told the picture is. It checks the bytes itself and does not trust this,
+        // but sending "application/octet-stream" for a PNG invites it to say no.
+        private static string MimeOf(string path)
+        {
+            switch (Path.GetExtension(path ?? string.Empty).ToLowerInvariant())
+            {
+                case ".jpg":
+                case ".jpeg": return "image/jpeg";
+                case ".gif":  return "image/gif";
+                case ".bmp":  return "image/bmp";
+                default:      return "image/png";   // what Ctrl+V produces
+            }
+        }
+
+        private static bool SaysSuccess(string json)
+        {
+            try
+            {
+                var o = Newtonsoft.Json.Linq.JObject.Parse(json ?? string.Empty);
+                var v = o["success"] as Newtonsoft.Json.Linq.JValue;
+                return v != null && v.Type == Newtonsoft.Json.Linq.JTokenType.Boolean && (bool)v.Value;
+            }
+            catch (Exception ex) { Log.Swallow(ex); return false; }
+        }
+
+        private static string ErrorFrom(string json)
+        {
+            try
+            {
+                var o = Newtonsoft.Json.Linq.JObject.Parse(json ?? string.Empty);
+                string err = (string)o["error"];
+                return string.IsNullOrWhiteSpace(err) ? null : err;
+            }
+            catch (Exception ex) { Log.Swallow(ex); return null; }
+        }
+
+        private static string Trim(string s, int max)
+        {
+            s = s ?? string.Empty;
+            return s.Length <= max ? s : s.Substring(0, max) + "…";
         }
 
         // Deliberately loose: something, an @, something, a dot, something. A stricter rule rejects
@@ -298,7 +539,7 @@ namespace HolyLogger
 
         private void Complain(string what, Control focus)
         {
-            MessageBox.Show(this, what, "Not sent yet", MessageBoxButton.OK, MessageBoxImage.Information);
+            HolyMessageBox.Show(what, "Not sent yet", HolyMsgType.Info, this);
             focus.Focus();
         }
 
@@ -347,12 +588,12 @@ namespace HolyLogger
                 System.IO.Compression.ZipFile.CreateFromDirectory(staging, zip);
 
                 string address = DeveloperAddress.Length > 0 ? DeveloperAddress : "the HolyLogger address";
-                MessageBox.Show(this,
+                HolyMessageBox.Show(
                     "Your message is ready, saved on your Desktop as:\n\n" +
                     Path.GetFileName(zip) + "\n\n" +
                     "Attach that one file to an email to " + address + ". Everything is inside it - your " +
                     "message, the error log and your pictures - so there is nothing else to look for.",
-                    "Ready to send", MessageBoxButton.OK, MessageBoxImage.Information);
+                    "Ready to send", HolyMsgType.Info, this);
 
                 try { System.Diagnostics.Process.Start("explorer.exe", "/select,\"" + zip + "\""); }
                 catch (Exception ex) { Log.Swallow(ex); }
@@ -362,8 +603,8 @@ namespace HolyLogger
             catch (Exception ex)
             {
                 Log.Warn("The support message could not be packed: " + ex.GetType().Name + ": " + ex.Message);
-                MessageBox.Show(this, "The message could not be saved:\n\n" + ex.Message,
-                    "Not sent", MessageBoxButton.OK, MessageBoxImage.Warning);
+                HolyMessageBox.ShowWarning("The message could not be saved:\n\n" + ex.Message,
+                    "Not sent", this);
             }
             finally
             {
