@@ -429,7 +429,13 @@ namespace HolyLogger
             var sb = new StringBuilder();
             sb.AppendLine(body);
             sb.AppendLine();
-            sb.AppendLine("— HolyLogger " + VersionText() + " on " + Environment.OSVersion.VersionString);
+            // At the FOOT of the message, behind a line the reader cannot miss: what the operator wrote
+            // is the message, and this is a footnote to it. Never above, where it would push their own
+            // words down the page.
+            sb.AppendLine("==============================================");
+            sb.AppendLine("THIS MACHINE AND THIS LOG");
+            sb.AppendLine("==============================================");
+            sb.Append(MachineReport());
 
             string message = sb.ToString();
             const int ServerLimit = 10000;
@@ -480,6 +486,242 @@ namespace HolyLogger
             bytes = Encoding.UTF8.GetBytes(
                 "There is no error log on this machine, or it could not be read." + Environment.NewLine +
                 "HolyLogger " + VersionText() + " on " + Environment.OSVersion.VersionString + Environment.NewLine);
+        }
+
+        // WHAT MACHINE IS THIS, AND WHAT IS IT BEING ASKED TO DO? A report of "it is slow" means nothing
+        // without both halves: a 28,000-QSO log on a laptop with 2 GB free is a different program from a
+        // 300-QSO log on a new desktop, and the code cannot be improved for machines nobody can name.
+        //
+        // The last four lines are the ones that will actually teach us something - the size of the log,
+        // where its database sits, and whether that place is a network drive or a folder some cloud
+        // service is synchronising underneath it. SQLite on a synced or networked file is the single
+        // commonest cause of a logger that "went slow for no reason".
+        //
+        // What is deliberately NOT sent: the Windows user name, any file path, and anything at all about
+        // other software on the machine. None of it would help and all of it is theirs.
+        private static string MachineReport()
+        {
+            var sb = new StringBuilder();
+            try
+            {
+                // ONE SUBJECT TO A LINE. Two facts on one line read as one fact and the second is
+                // skipped - and the whole point of this block is that somebody's eye catches the line
+                // that explains the complaint.
+                sb.AppendLine("HolyLogger:     " + VersionText());
+                sb.AppendLine("Windows:        " + WindowsName()
+                              + ", " + (Environment.Is64BitOperatingSystem ? "64-bit" : "32-bit"));
+                sb.AppendLine(".NET:           " + DotNetVersion());
+                sb.AppendLine("CPU:            " + CpuName());
+                sb.AppendLine("Cores:          " + Environment.ProcessorCount);
+                sb.AppendLine("RAM:            " + MemoryLine());
+                sb.AppendLine("Screen:         " + ScreenLine());
+
+                var dal = DataAccess.GetInstance();
+                sb.AppendLine("Database:       " + DatabaseLine(dal != null ? dal.DbPath : null));
+                sb.AppendLine("Logs:           " + LogCountLine(dal));
+                sb.AppendLine("Active log:     " + ActiveLogLine(dal));
+                sb.AppendLine("Whole database: " + WholeDatabaseLine(dal));
+                sb.AppendLine("Memory in use:  "
+                              + (System.Diagnostics.Process.GetCurrentProcess().WorkingSet64 / (1024 * 1024))
+                              + " MB");
+            }
+            catch (Exception ex) { Log.Swallow(ex); sb.AppendLine("(the machine details could not be read)"); }
+            return sb.ToString();
+        }
+
+        // "Windows 10 22H2 (19045)". The friendly name lives in the registry; OSVersion alone reports
+        // only the build.
+        private static string WindowsName()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                           @"SOFTWARE\Microsoft\Windows NT\CurrentVersion"))
+                {
+                    if (key == null) return Environment.OSVersion.VersionString;
+                    string name = key.GetValue("ProductName") as string;
+                    string display = (key.GetValue("DisplayVersion") as string)
+                                     ?? (key.GetValue("ReleaseId") as string);
+                    string build = key.GetValue("CurrentBuild") as string;
+
+                    // Windows 11 keeps "Windows 10" in ProductName; the build number is what tells them
+                    // apart, and getting this wrong in a support mail wastes somebody's afternoon.
+                    int b;
+                    if (!string.IsNullOrEmpty(name) && int.TryParse(build, out b) && b >= 22000)
+                        name = name.Replace("Windows 10", "Windows 11");
+
+                    return (name ?? "Windows")
+                           + (string.IsNullOrEmpty(display) ? "" : " " + display)
+                           + (string.IsNullOrEmpty(build) ? "" : " (" + build + ")");
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); return Environment.OSVersion.VersionString; }
+        }
+
+        // The installed .NET Framework, from the release number Microsoft documents.
+        private static string DotNetVersion()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                           @"SOFTWARE\Microsoft\NET Framework Setup\NDP\v4\Full"))
+                {
+                    if (key == null) return "4.x";
+                    object release = key.GetValue("Release");
+                    if (release == null) return "4.x";
+                    int r = Convert.ToInt32(release);
+                    if (r >= 533320) return "4.8.1";
+                    if (r >= 528040) return "4.8";
+                    if (r >= 461808) return "4.7.2";
+                    if (r >= 460798) return "4.7";
+                    if (r >= 394802) return "4.6.2";
+                    return "4.x (" + r + ")";
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); return "4.x"; }
+        }
+
+        // Read from the registry rather than asked of WMI: the same answer, without the pause WMI takes.
+        private static string CpuName()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(
+                           @"HARDWARE\DESCRIPTION\System\CentralProcessor\0"))
+                {
+                    string name = key == null ? null : key.GetValue("ProcessorNameString") as string;
+                    return string.IsNullOrWhiteSpace(name) ? "unknown" : name.Trim();
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); return "unknown"; }
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        private class MEMORYSTATUSEX
+        {
+            public uint dwLength = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(MEMORYSTATUSEX));
+            public uint dwMemoryLoad;
+            public ulong ullTotalPhys, ullAvailPhys, ullTotalPageFile, ullAvailPageFile,
+                         ullTotalVirtual, ullAvailVirtual, ullAvailExtendedVirtual;
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+        [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+        private static extern bool GlobalMemoryStatusEx([System.Runtime.InteropServices.In, System.Runtime.InteropServices.Out] MEMORYSTATUSEX lpBuffer);
+
+        // How much there is and how much is left. The second number is the one that matters: a machine
+        // with 16 GB and 300 MB free behaves like a machine with no memory at all.
+        private static string MemoryLine()
+        {
+            try
+            {
+                var m = new MEMORYSTATUSEX();
+                if (!GlobalMemoryStatusEx(m)) return "unknown";
+                return (m.ullTotalPhys / (1024 * 1024 * 1024)) + " GB ("
+                       + Math.Round(m.ullAvailPhys / 1024.0 / 1024 / 1024, 1) + " GB free)";
+            }
+            catch (Exception ex) { Log.Swallow(ex); return "unknown"; }
+        }
+
+        // Size and scaling both: a 4K screen at 200% is a very different amount of drawing from a 1080p
+        // one, and this program draws two large tables.
+        private static string ScreenLine()
+        {
+            try
+            {
+                double w = SystemParameters.PrimaryScreenWidth;
+                double h = SystemParameters.PrimaryScreenHeight;
+
+                // Scaling from whichever window is actually on screen. Asking Application.Current
+                // .MainWindow alone answered "unknown" whenever there wasn't one - which is every time
+                // this is measured outside the running program, and would have been a permanent blank
+                // in the report if it ever ran a moment early.
+                int scale = 100;
+                foreach (Window w2 in Application.Current != null ? Application.Current.Windows : new WindowCollection())
+                {
+                    var src = System.Windows.PresentationSource.FromVisual(w2);
+                    if (src == null || src.CompositionTarget == null) continue;
+                    scale = (int)Math.Round(src.CompositionTarget.TransformToDevice.M11 * 100);
+                    break;
+                }
+
+                // More than one screen, without WinForms: the virtual desktop is wider or taller than
+                // the primary screen exactly when there is another one beside or above it.
+                bool several = SystemParameters.VirtualScreenWidth > w + 1
+                            || SystemParameters.VirtualScreenHeight > h + 1;
+
+                return (int)w + "x" + (int)h + ", " + scale + "% scaling"
+                       + (several ? ", more than one screen" : "");
+            }
+            catch (Exception ex) { Log.Swallow(ex); return "unknown"; }
+        }
+
+        // The database's size, the KIND of drive it sits on, and whether something is synchronising the
+        // folder. A log on a network share or inside a synced folder is the commonest reason a logger
+        // that was fast becomes slow, and no amount of reading our own code would ever reveal it.
+        private static string DatabaseLine(string dbPath)
+        {
+            try
+            {
+                if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath)) return "not found";
+
+                var info = new FileInfo(dbPath);
+                string size = info.Length >= 1024 * 1024
+                    ? Math.Round(info.Length / 1024.0 / 1024) + " MB"
+                    : Math.Round(info.Length / 1024.0) + " KB";
+
+                string where = "unknown drive";
+                long freeGb = -1;
+                try
+                {
+                    var drive = new DriveInfo(Path.GetPathRoot(info.FullName));
+                    where = drive.DriveType.ToString().ToLowerInvariant() + " disk";
+                    if (drive.IsReady) freeGb = drive.AvailableFreeSpace / (1024 * 1024 * 1024);
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+
+                // The folder is named only by the SERVICE synchronising it, never by its path.
+                string synced = null;
+                string lower = info.FullName.ToLowerInvariant();
+                if (lower.Contains("onedrive")) synced = "OneDrive";
+                else if (lower.Contains("dropbox")) synced = "Dropbox";
+                else if (lower.Contains("google drive") || lower.Contains("googledrive")) synced = "Google Drive";
+                else if (lower.Contains("icloud")) synced = "iCloud";
+
+                return size + " on a " + where
+                       + (freeGb >= 0 ? " (" + freeGb + " GB free)" : "")
+                       + (synced != null ? "  — inside a " + synced + " folder" : "");
+            }
+            catch (Exception ex) { Log.Swallow(ex); return "unknown"; }
+        }
+
+        private static string LogCountLine(DataAccess dal)
+        {
+            try
+            {
+                var logs = dal != null ? dal.GetLogs() : null;
+                return logs == null ? "unknown" : logs.Count.ToString();
+            }
+            catch (Exception ex) { Log.Swallow(ex); return "unknown"; }
+        }
+
+        private static string ActiveLogLine(DataAccess dal)
+        {
+            try
+            {
+                return dal == null ? "unknown"
+                                   : dal.GetQsoCountForLog(dal.ActiveLogId).ToString("N0") + " QSOs";
+            }
+            catch (Exception ex) { Log.Swallow(ex); return "unknown"; }
+        }
+
+        private static string WholeDatabaseLine(DataAccess dal)
+        {
+            try
+            {
+                return dal == null ? "unknown" : dal.GetQsoCount().ToString("N0") + " QSOs";
+            }
+            catch (Exception ex) { Log.Swallow(ex); return "unknown"; }
         }
 
         // What the server is told the picture is. It checks the bytes itself and does not trust this,
