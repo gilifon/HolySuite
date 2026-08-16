@@ -438,41 +438,29 @@
                   RowEditEnding="ResultsGrid_RowEditEnding"
                   Sorting="ResultsGrid_Sorting"
                   PreviewMouseRightButtonDown="ResultsGrid_PreviewMouseRightButtonDown"
+                  PreviewMouseLeftButtonDown="ResultsGrid_PreviewMouseLeftButtonDown"
+                  SelectionChanged="ResultsGrid_SelectionChanged"
+                  MouseDoubleClick="ResultsGrid_MouseDoubleClick"
+                  IsReadOnly="True"
                   CheckBox.Checked="PaperQsl_Changed" CheckBox.Unchecked="PaperQsl_Changed"
                   VerticalGridLinesBrush="{DynamicResource GridLine}" HorizontalGridLinesBrush="{DynamicResource GridLine}">
             <DataGrid.Resources>
-                <!-- Scoped to this grid, exactly as the Channels window does it: a very light blue
-                     selection so the band-coloured Frequency and Band text (green on 40M, etc.) stays
-                     readable. The app-wide SelectionBg is a strong #3399FF that swallowed it.
-                     SelectionText is dark so the plain columns still read on the light row. -->
-                <SolidColorBrush x:Key="SelectionBg" Color="#CFE8FF"/>
-                <SolidColorBrush x:Key="SelectionText" Color="#1A1A1A"/>
+                <!-- NO SELECTION COLOURS OF ITS OWN. A much lighter blue used to be scoped here so the
+                     band-coloured Frequency and Band text (green on 40M, and so on) stayed readable on a
+                     selected row. The main log table has the same coloured text and uses the app-wide
+                     blue, and the two tables looking alike matters more - so this grid now highlights
+                     exactly as the log does.
+                     If the coloured text turns out to be unreadable on it, put these two back. -->
 
-                <!-- In THIS table the tick boxes are the only thing that highlights a row, so the
-                     cells must not paint themselves as well.
-                     WHY: clicking a tick box also makes the DataGrid select the row it sits in -
-                     unavoidable, the box is inside a cell. The app-wide DataGridCell style (see
-                     Themes/Controls.xaml) colours every selected CELL, and that colour is not tied
-                     to the tick: unticking the row cleared IsPicked and the row's own background
-                     went back to normal, but the cells stayed blue, so the row still looked ticked.
-                     Cleared here only - every other grid in the program keeps the standard
-                     click-to-highlight, because there the click IS the selection. -->
-                <Style TargetType="DataGridCell" BasedOn="{StaticResource {x:Type DataGridCell}}">
-                    <Style.Triggers>
-                        <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Background" Value="Transparent"/>
-                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
-                            <!-- The BORDER matters as much as the fill: WPF's own DataGridCell template
-                                 outlines a selected cell in the Windows highlight colour (#0078D7), and
-                                 clearing only the background left every cell of the row framed in blue -
-                                 a row that still looked ticked, drawn as an outline instead of a block.
-                                 Set to the grid-line colour, not Transparent, so a selected row keeps the
-                                 same vertical rules as every other row. -->
-                            <Setter Property="BorderBrush" Value="{DynamicResource GridLine}"/>
-                        </Trigger>
-                    </Style.Triggers>
-                </Style>
-
+                <!-- CLICK-TO-HIGHLIGHT, exactly as in the main log table. This grid used to clear the
+                     selected-cell painting altogether, because clicking a TICK BOX also selects the row
+                     it sits in - unavoidable, the box is inside a cell - and the row then looked ticked
+                     when it was not. The cure was worse: a plain click anywhere in the table highlighted
+                     nothing at all, and the one table an operator edits in was the one that would not
+                     show them which row they were on.
+                     The tick is handled at its source instead: a click that lands on a check box leaves
+                     no selection behind (see ResultsGrid_PreviewMouseLeftButtonDown), so the two things
+                     stay apart and a normal click can highlight normally. -->
                 <!-- The grid's own header look (tan background, sort arrow, resize grippers), named so the
                      5 confirmation columns can inherit ALL of it and override only what the green strip
                      needs. Defined as a keyed style and applied implicitly below, so normal columns are
@@ -692,12 +680,22 @@
                                 <TextBlock.Style>
                                     <Style TargetType="TextBlock">
                                         <Setter Property="Background" Value="Transparent"/>
+                                        <!-- BLACK ON THE YELLOW, THE THEME'S COLOUR EVERYWHERE ELSE. The
+                                             callsign cell carries its own background - the yellow LoTW
+                                             tint - and a selected row turns its text white, which put
+                                             white letters on yellow and made the one column that names
+                                             the contact the hardest thing on the row to read. Black is
+                                             set only where that yellow is (the trigger below); a cell
+                                             with no tint keeps the theme's text colour, or it would go
+                                             black on a dark row in dark mode. -->
+                                        <Setter Property="Foreground" Value="{DynamicResource TextBrush}"/>
                                         <Setter Property="ToolTip" Value="Click to open this station's QRZ page"/>
                                         <Style.Triggers>
                                             <!-- LoTW-user tint only (same highlight as the log table / cluster);
                                                  no tooltip override, so it keeps the "open QRZ" hint. -->
                                             <DataTrigger Binding="{Binding DXCall, Converter={StaticResource LotwUserConverter}}" Value="True">
                                                 <Setter Property="Background" Value="{DynamicResource RowLotwBg}"/>
+                                                <Setter Property="Foreground" Value="#1A1A1A"/>
                                             </DataTrigger>
                                         </Style.Triggers>
                                     </Style>

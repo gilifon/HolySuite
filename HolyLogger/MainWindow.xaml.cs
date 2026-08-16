@@ -2161,6 +2161,15 @@ namespace HolyLogger
                 LastQSO = Qsos.FirstOrDefault();
 
                 ClearBtn_Click(null, null);       // reset the entry form for the newly active log
+
+                // A DELETE OFFERED IN ANOTHER LOG IS NOT OFFERED IN THIS ONE. The bar would otherwise
+                // still be standing over a table it says nothing about, and its Undo would put rows back
+                // into a log the operator is no longer looking at - the restore would appear to do
+                // nothing at all. The QSOs are still deleted; only the offer expires.
+                _deletedForUndo = null;
+                _deletedForUndoLogIds = null;
+                if (DeleteUndoBar != null) DeleteUndoBar.Visibility = Visibility.Collapsed;
+
                 ApplyContestModeForActiveLog();
                 UpdateActiveLogTitle();
 
@@ -3221,7 +3230,16 @@ namespace HolyLogger
             foreach (object item in QSODataGrid.SelectedItems)
             {
                 var q = item as QSO;
-                if (q != null && !picked.Contains(q)) picked.Add(q);
+                if (q == null || picked.Contains(q)) continue;
+
+                // ROWS BORROWED FROM ANOTHER LOG ARE NOT THIS LOG'S TO ACT ON. While a callsign filter is
+                // up, the table also shows contacts from the active log's copy-target, painted blue, for
+                // reference - the program already refuses to let them be EDITED (see
+                // QSODataGrid_BeginningEdit). Deleting one from here would have reached into a log the
+                // operator is not even looking at, so they are left out of the group entirely.
+                if (_foreignFilterRows != null && _foreignFilterRows.Contains(q)) continue;
+
+                picked.Add(q);
             }
             return picked;
         }
@@ -3372,7 +3390,7 @@ namespace HolyLogger
         private List<QSO> _deletedForUndo;
         private List<long> _deletedForUndoLogIds;
 
-        private void DeleteSelectedQsos(List<QSO> picked)
+        private async void DeleteSelectedQsos(List<QSO> picked)
         {
             if (picked == null || picked.Count == 0) return;
 
@@ -3384,31 +3402,104 @@ namespace HolyLogger
                     "Delete QSOs", HolyMsgType.Warning, this))
                 return;
 
+            // EACH DELETE IS A WRITE TO THE DATABASE, and a dozen of them is a visible pause - done on
+            // the UI thread with nothing shown, the window simply stops answering and the operator cannot
+            // tell a working program from a stuck one. Off the thread, behind the same progress panel the
+            // imports and uploads use, counting as it goes.
             var dal = DataAccess.GetInstance();
             var deleted = new List<QSO>(picked.Count);
             var logIds = new List<long>(picked.Count);
+            var toDelete = new List<QSO>(picked);
+            int total = toDelete.Count;
+            string failure = null;
+
+            UploadProgressTitle = "Deleting";
+            UploadProgress = string.Format("Deleting 0 of {0:N0}…", total);
+            ToggleUploadProgress(Visibility.Visible);
+
+            var progress = new Progress<int>(done =>
+                UploadProgress = string.Format("Deleting {0:N0} of {1:N0}…", done, total));
 
             try
             {
-                foreach (QSO q in picked)
+                await Task.Run(() =>
                 {
-                    long logId = dal != null ? dal.GetQsoLogId(q.id) : -1;
-                    if (dal != null) dal.Delete(q.id);
-                    Qsos?.Remove(q);
-                    deleted.Add(q);
-                    logIds.Add(logId);
+                    var report = (IProgress<int>)progress;
+                    var lastPost = System.Diagnostics.Stopwatch.StartNew();
+
+                    for (int i = 0; i < toDelete.Count; i++)
+                    {
+                        QSO q = toDelete[i];
+                        try
+                        {
+                            long logId = dal != null ? dal.GetQsoLogId(q.id) : -1;
+                            if (dal != null) dal.Delete(q.id);
+                            deleted.Add(q);
+                            logIds.Add(logId);
+                        }
+                        catch (Exception ex)
+                        {
+                            failure = ex.Message;
+                            Log.Warn("Deleting " + (q.DXCall ?? "?") + " failed: " + ex.GetType().Name + ": " + ex.Message);
+                            break;
+                        }
+
+                        // Throttled, and always on the last one: a report per row floods the dispatcher
+                        // at Normal priority, which outranks rendering - and the panel then never paints.
+                        if (i == toDelete.Count - 1 || lastPost.ElapsedMilliseconds >= 150)
+                        {
+                            lastPost.Restart();
+                            report.Report(i + 1);
+                        }
+                    }
+                });
+            }
+            finally
+            {
+                ToggleUploadProgress(Visibility.Hidden);
+                UploadProgressTitle = "";
+                UploadProgress = "";
+            }
+
+            // THE ROWS COME OUT WITH THE HANDLER DETACHED, and this is why the delete was slow. Removing
+            // from Qsos raises Qsos_CollectionChanged, which does the database delete ITSELF and then
+            // rebuilds the worked-country cache, the cluster colours and four menu counts - per row. So
+            // twelve rows meant twelve deletes of rows already deleted above, and twelve full rebuilds.
+            // Detached, removed, re-attached, and everything refreshed ONCE at the end.
+            //
+            // The filtered view has to be told as well: with a callsign filter on, the grid is bound to
+            // FilteredQsos, and rows removed only from Qsos stayed on screen after being deleted.
+            try
+            {
+                if (Qsos != null) Qsos.CollectionChanged -= Qsos_CollectionChanged;
+                foreach (QSO q in deleted)
+                {
+                    if (FilteredQsos != null) FilteredQsos.Remove(q);
+                    if (Qsos != null) Qsos.Remove(q);
                 }
             }
-            catch (Exception ex)
+            finally
             {
-                Log.Warn("Deleting the selection failed part-way: " + ex.GetType().Name + ": " + ex.Message);
-                HolyMessageBox.ShowError("Could not delete them all: " + ex.Message, "Delete QSOs", this);
+                if (Qsos != null) Qsos.CollectionChanged += Qsos_CollectionChanged;
             }
+
+            // Nothing may stay selected that no longer exists.
+            try { QSODataGrid.UnselectAll(); QSODataGrid.UnselectAllCells(); }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            if (failure != null)
+                HolyMessageBox.ShowError("Could not delete them all: " + failure, "Delete QSOs", this);
 
             _deletedForUndo = deleted;
             _deletedForUndoLogIds = logIds;
 
+            // Once, now, instead of once per row - the same work Qsos_CollectionChanged would have done.
+            LastQSO = Qsos?.FirstOrDefault();
             UpdateNumOfQSOs();
+            UpdateLotwMenuCount();
+            UpdateQrzMenuCount();
+            UpdateClublogMenuCount();
+            UpdateEqslQueueIndicator();
             RebuildWorkedCountriesAndRefreshCluster();
 
             TB_DeleteUndoText.Text = string.Format("Deleted {0:N0} QSO{1}", deleted.Count, deleted.Count == 1 ? "" : "s");

@@ -121,6 +121,97 @@ namespace HolyLogger
             return null;
         }
 
+        // ONE THING, NOT TWO. Highlighting a row and ticking its box are now the same act: clicking a row
+        // highlights it and ticks it, Ctrl+clicking another adds that one too, and the tick boxes go on
+        // working exactly as they did. The selection is the master and the ticks follow it.
+        //
+        // The PAPER QSL box is the exception and always will be: that tick is a fact about the contact -
+        // a card in the drawer - not a way of choosing rows. A click on it must leave the selection
+        // alone, or ticking a card would silently pick that row and drop every other.
+        private void ResultsGrid_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var box = FindVisualParent<CheckBox>(e.OriginalSource as DependencyObject);
+            if (box == null) return;
+            if ((box.Tag as string) == "PickBox") return;    // the pick box: selecting is its whole job
+
+            // Everything else with a tick in it - Paper QSL today - keeps its hands off the selection.
+            // Not enough to stop the ticks following: WPF still SELECTS the row the box sits in, so the
+            // row would light up while its pick box stayed empty and the two would openly disagree. The
+            // selection is put back the way it was, from the ticks, once the click has been delivered.
+            _selectionFrozen = true;
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    _syncingPicks = true;
+                    ResultsGrid.UnselectAll();
+                    foreach (QSO q in ResultsGrid.Items.OfType<QSO>())
+                        if (q.IsPicked) ResultsGrid.SelectedItems.Add(q);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                finally { _syncingPicks = false; _selectionFrozen = false; }
+            }), System.Windows.Threading.DispatcherPriority.Input);
+        }
+
+        // True while a click on a data checkbox is being delivered, so the selection that WPF makes
+        // underneath it is not turned into ticks.
+        private bool _selectionFrozen;
+        private bool _syncingPicks;
+
+        private void ResultsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_selectionFrozen || _syncingPicks) return;
+
+            try
+            {
+                _syncingPicks = true;
+                foreach (object item in e.RemovedItems)
+                {
+                    var q = item as QSO;
+                    if (q != null) q.IsPicked = false;
+                }
+                foreach (object item in e.AddedItems)
+                {
+                    var q = item as QSO;
+                    if (q != null) q.IsPicked = true;
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+            finally { _syncingPicks = false; }
+
+            UpdatePickState();
+        }
+
+        // EDITING IS A DOUBLE-CLICK, and nothing else. The grid is held read-only so a single click can
+        // do the one thing a single click should do - choose the row - without dropping a cell into edit
+        // mode under the operator's hand. A double-click opens that cell, and the grid is closed again as
+        // soon as the edit ends. Columns that are read-only in their own right stay read-only: the flag
+        // below only lifts the grid-wide lock, it cannot make a computed column editable.
+        private void ResultsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
+        {
+            try
+            {
+                var cell = FindVisualParent<DataGridCell>(e.OriginalSource as DependencyObject);
+                if (cell == null || cell.Column == null || cell.Column.IsReadOnly) return;
+                if (FindVisualParent<CheckBox>(e.OriginalSource as DependencyObject) != null) return;
+
+                ResultsGrid.IsReadOnly = false;
+                ResultsGrid.CurrentCell = new DataGridCellInfo(cell);
+                ResultsGrid.BeginEdit();
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // Whatever ended the edit - Enter, Esc, clicking away - the lock goes back on.
+        private void RelockAfterEdit()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { ResultsGrid.IsReadOnly = true; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }), System.Windows.Threading.DispatcherPriority.Background);
+        }
+
         private void ResultsGrid_PreviewMouseRightButtonDown(object sender, MouseButtonEventArgs e)
         {
             var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
@@ -1321,15 +1412,32 @@ namespace HolyLogger
             catch (Exception ex) { Log.Swallow(ex); }
         }
 
-        // ===== Row selection (the tick boxes in the first column) =====
+        // ===== Row selection: the tick boxes AND the highlight, which are one thing =====
         //
-        // Modelled on a mail client's message list: the boxes are the ONLY thing that selects. Clicking a
-        // cell to read or edit it never adds a row and never drops one, so a selection of eighty rows
-        // cannot be wiped by one stray click - which is exactly what the DataGrid's own click-to-select
-        // would do. That is why the state is QSO.IsPicked and not DataGrid.SelectedItems.
+        // The boxes were once the ONLY thing that selected - modelled on a mail client, so that a
+        // selection of eighty rows could not be wiped by one stray click. The operator asked for the
+        // plainer arrangement instead: clicking a row highlights it and ticks it, Ctrl+click adds
+        // another, Shift+click takes the range, and Esc clears the lot. QSO.IsPicked is still the state
+        // the menus read; the two are kept in step in both directions.
 
         private int _lastPickedIndex = -1;   // Shift+click anchor, as an index into the rows on show
         private bool _syncingPickAll;        // set while WE write the header box, so its handler stays quiet
+
+        // Ticks -> highlight. The other direction is ResultsGrid_SelectionChanged; this one is for the
+        // places that set IsPicked directly - a Shift+click across the boxes, the header's tick-all -
+        // where the rows must light up to match or the table contradicts itself.
+        private void SyncSelectionFromPicks()
+        {
+            try
+            {
+                _syncingPicks = true;
+                ResultsGrid.UnselectAll();
+                foreach (QSO q in ResultsGrid.Items.OfType<QSO>())
+                    if (q.IsPicked) ResultsGrid.SelectedItems.Add(q);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            finally { _syncingPicks = false; }
+        }
 
         private void PickBox_Click(object sender, RoutedEventArgs e)
         {
@@ -1353,6 +1461,7 @@ namespace HolyLogger
                 }
 
                 _lastPickedIndex = index;
+                SyncSelectionFromPicks();   // the rows light up to match the boxes
                 UpdatePickState();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -1368,6 +1477,7 @@ namespace HolyLogger
                 bool tickAll = !ResultsGrid.Items.OfType<QSO>().Any(q => q.IsPicked);
                 foreach (var q in ResultsGrid.Items.OfType<QSO>()) q.IsPicked = tickAll;
                 _lastPickedIndex = -1;
+                SyncSelectionFromPicks();   // every row lights up, or none does
                 UpdatePickState();
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -1404,6 +1514,19 @@ namespace HolyLogger
             if (_allQsos != null)
                 foreach (var q in _allQsos) q.IsPicked = false;
             _lastPickedIndex = -1;
+
+            // AND THE HIGHLIGHT WITH THEM. The ticks and the highlight are one thing now, so clearing
+            // one and leaving the other is the program disagreeing with itself: Esc emptied every box
+            // and left the rows still lit up, which reads as "something is still selected" - and after
+            // the change above, something WOULD still have been.
+            try
+            {
+                _syncingPicks = true;                 // the deselect must not be turned back into ticks
+                ResultsGrid?.UnselectAll();
+                ResultsGrid?.UnselectAllCells();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            finally { _syncingPicks = false; }
         }
 
         private void ClearAll()
@@ -1976,8 +2099,12 @@ namespace HolyLogger
             var found = new ObservableCollection<QSO>(
                 results.OrderByDescending(q => DateKey(q.Date), StringComparer.Ordinal)
                        .ThenByDescending(q => TimeKey(q.Time), StringComparer.Ordinal));
-            ClearPicks();                    // these are different rows now - see ClearPicks
+            // AFTER the rows are bound, not before. Clearing first cleared the ticks but left the
+            // DataGrid's own selection holding the very same QSO objects - the search re-runs over the
+            // same log - so the highlight survived and Esc emptied every box while the rows stayed lit
+            // up. Clearing afterwards clears both, which is now one thing anyway.
             ResultsGrid.DataContext = found;
+            ClearPicks();                    // these are different rows now - see ClearPicks
             ShowDateSortIndicator();
             UpdatePickState();
             TB_Count.Text = found.Count == 1 ? "1 QSO" : $"{found.Count:N0} QSOs";
@@ -2546,6 +2673,7 @@ namespace HolyLogger
         private void ResultsGrid_CellEditEnding(object sender, DataGridCellEditEndingEventArgs e)
         {
             _cellInEdit = false;
+            RelockAfterEdit();   // a double-click opened this cell; the grid goes back to read-only
             if (e.EditAction != DataGridEditAction.Commit) return;   // Esc: nothing was changed
 
             var qso = e.Row?.Item as QSO;
