@@ -1252,7 +1252,13 @@ namespace HolyLogger
                 QSO q = g.Key;
                 var row = new FixRow { Qso = q };
                 row.Findings.AddRange(g);
-                row.ApplyChanged = UpdateFixButton;
+                // The Fix button's count and the header's tick-all box both follow a tick. Neither
+                // touches the grid's selection: the row paints itself from Apply through the RowStyle
+                // trigger, which costs nothing even when four thousand rows change at once.
+                // Unticking one row must be able to clear its kind's box up in the panel: the kind no
+                // longer holds true. Cheap enough for a single row - it is the bulk paths that must not
+                // do this per row, and they are guarded.
+                row.ApplyChanged = () => { UpdateFixButton(); UpdateFixAllBox(); UpdateKindBoxes(); };
 
                 CellFor(row, "Date").Current = FormatDate(q.Date);
                 CellFor(row, "Time").Current = FormatTime(q.Time);
@@ -1315,6 +1321,16 @@ namespace HolyLogger
                 foreach (string key in IssueColumns)
                     if (used.Contains(key) && !row.Cells.ContainsKey(key))
                         CellFor(row, key).Current = CurrentOf(row.Qso, key);
+
+            // WHAT CAN BE PUT RIGHT COMES FIRST. The report-only findings - the ones with a dead tick box
+            // - happened to sort to the top, so ticking a kind or the header box left the operator
+            // looking at a screenful of empty boxes with the ticked rows far below, and the window
+            // appeared to have done nothing. Sorted ONCE, here, as the list is built: a live sort would
+            // move rows out from under the operator the moment a typed value made one fixable.
+            // Stable, so within each group the scan's own order survives.
+            var ordered = _rows.Where(r => r.Fixable).Concat(_rows.Where(r => !r.Fixable)).ToList();
+            _rows.Clear();
+            foreach (FixRow r in ordered) _rows.Add(r);
 
             var columns = new List<string>(AlwaysColumns);
             foreach (string key in IssueColumns) if (used.Contains(key)) columns.Add(key);
@@ -1407,6 +1423,32 @@ namespace HolyLogger
                 + "<CheckBox HorizontalAlignment='Center' VerticalAlignment='Center' IsEnabled='{Binding Fixable}' "
                 + "IsChecked='{Binding Apply, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}'/>"
                 + "</DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>");
+
+            // THE TICK-ALL BOX HAS TO BE BUILT HERE, not in the XAML. This method CLEARS the columns and
+            // makes them again on every scan, so a header declared in the window is thrown away the
+            // moment there is anything to show - which is why three attempts at putting a box there in
+            // the XAML never appeared on screen.
+            var fixAll = new CheckBox
+            {
+                IsThreeState = true,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                ToolTip = "Tick every row on show, or clear them all"
+            };
+            fixAll.Click += Chk_FixAll_Click;
+            _fixAllBox = fixAll;
+
+            var headerPanel = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
+            headerPanel.Children.Add(fixAll);
+            headerPanel.Children.Add(new TextBlock
+            {
+                Text = "Fix",
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(5, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center
+            });
+            tick.Header = headerPanel;
+
             FindingsGrid.Columns.Add(tick);
 
             foreach (string key in columns)
@@ -1499,9 +1541,24 @@ namespace HolyLogger
 
         // A kind was ticked or unticked: push it down onto every row of that kind. Rows whose finding
         // has nothing to propose stay untouched - Finding.Apply refuses a tick it cannot honour.
+        // Set while the kinds' own boxes are being brought in line with the rows, so that writing one
+        // does not send us back round through KindChecked - which would re-tick the rows and, worse,
+        // move the view.
+        private bool _settingKindBoxes;
+
         private void KindChecked(ProblemKind kind)
         {
-            if (kind == null) return;
+            if (kind == null || _settingKindBoxes) return;
+
+            // TICKING A KIND SHOWS THAT KIND FIRST, exactly as pressing its button would. Without this
+            // the operator ticks 4,366 rows while the table is still showing a different kind entirely -
+            // every row on screen stays unticked and uncoloured, and the window looks broken while it is
+            // in fact doing precisely what was asked. The rows being ticked have to be the rows in front
+            // of them.
+            // Only on the way IN: unticking is a retraction, and it should not drag the view somewhere.
+            if (kind.Checked && !string.Equals(_filterKind, kind.Name, StringComparison.Ordinal))
+                ApplyKindFilter(kind.Name);
+
             _syncingKind = true;
             try
             {
@@ -1513,6 +1570,138 @@ namespace HolyLogger
             }
             finally { _syncingKind = false; }
             UpdateFixButton();
+            UpdateFixAllBox();
+            UpdateKindBoxes();
+            ShowFirstTickedRow();
+        }
+
+        // HIGHLIGHTING A ROW TICKS IT, as in the Log Workshop's table - two tables that look alike must
+        // behave alike. Safe here because the tick is a DECISION, not an action: nothing is written until
+        // "Fix selected" is pressed, so a stray click costs a tick, never a change. A row that cannot be
+        // fixed cannot be ticked either; Apply refuses the value unless Fixable is true.
+        //
+        // Only the rows the operator actually clicked pass through here, so this is cheap. The bulk paths
+        // (a kind, the header box) never touch the grid's selection at all - see the RowStyle trigger.
+        private bool _syncingApply;
+
+        private void FindingsGrid_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (_syncingApply || _syncingKind) return;
+            try
+            {
+                _syncingApply = true;
+                foreach (object item in e.RemovedItems)
+                {
+                    var row = item as FixRow;
+                    if (row != null) row.Apply = false;
+                }
+                foreach (object item in e.AddedItems)
+                {
+                    var row = item as FixRow;
+                    if (row != null) row.Apply = true;     // ignored when the row is not fixable
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+            finally { _syncingApply = false; }
+
+            UpdateFixButton();
+            UpdateFixAllBox();
+        }
+
+        // The header's box, built in BuildColumns because the columns are remade on every scan.
+        private CheckBox _fixAllBox;
+
+        // Nothing ticked -> tick every row on show that CAN be fixed; anything ticked -> clear the lot.
+        // Only the rows currently listed, never the ones a kind filter is hiding.
+        private void Chk_FixAll_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                var rows = FindingsGrid.Items.OfType<FixRow>().ToList();
+                bool tickAll = !rows.Any(r => r.Apply);
+
+                _syncingKind = true;                       // one update at the end, not one per row
+                try
+                {
+                    foreach (FixRow r in rows) r.Apply = tickAll;
+                }
+                finally { _syncingKind = false; }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+
+            UpdateFixButton();
+            UpdateFixAllBox();
+            UpdateKindBoxes();
+            ShowFirstTickedRow();
+        }
+
+        // AFTER A BULK TICK, SHOW A TICKED ROW. The list opens on the report-only findings - the ones
+        // that can never be ticked - so ticking everything left the operator looking at a screenful of
+        // empty boxes and no sign that anything had happened at all. Scrolling to the first row that DID
+        // get ticked is the difference between "it worked" and "it ignored me".
+        private void ShowFirstTickedRow()
+        {
+            try
+            {
+                foreach (FixRow r in FindingsGrid.Items.OfType<FixRow>())
+                {
+                    if (!r.Apply) continue;
+                    FindingsGrid.ScrollIntoView(r);
+                    return;
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // THE KINDS' OWN BOXES FOLLOW THE ROWS. Ticking everything from the header must tick the kinds
+        // too, or the panel above says "nothing chosen" over a table where everything is - and unticking
+        // a kind up there then has nothing visible to undo. A kind is ticked when every one of its
+        // fixable rows is ticked, which is exactly what its own box means when the operator sets it.
+        private void UpdateKindBoxes()
+        {
+            // NEVER DURING A SWEEP. This walks every kind against every row, so running it once per
+            // ticked row is the whole list squared: ticking 4,558 rows called it 4,558 times, about 145
+            // million passes, and one click on the header box took 5.15 seconds - measured. The bulk
+            // paths call it once, at the end.
+            if (_kinds == null || _syncingKind) return;
+            try
+            {
+                _settingKindBoxes = true;
+                foreach (ProblemKind k in _kinds)
+                {
+                    if (!k.Fixable) continue;
+                    bool any = false, all = true;
+                    foreach (FixRow r in _rows)
+                    {
+                        if (!r.Has(k.Name) || !r.Fixable) continue;
+                        any = true;
+                        if (!r.Apply) { all = false; break; }
+                    }
+                    k.Checked = any && all;
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+            finally { _settingKindBoxes = false; }
+        }
+
+        // All, none, or the filled square for a partial choice.
+        private void UpdateFixAllBox()
+        {
+            if (_fixAllBox == null || _syncingKind) return;
+            try
+            {
+                int fixable = 0, ticked = 0;
+                foreach (FixRow r in FindingsGrid.Items.OfType<FixRow>())
+                {
+                    if (!r.Fixable) continue;
+                    fixable++;
+                    if (r.Apply) ticked++;
+                }
+                _fixAllBox.IsChecked = ticked == 0 ? (bool?)false
+                                     : ticked == fixable ? (bool?)true
+                                     : null;
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
         }
 
         // CLICKING A KIND SHOWS ONLY THAT KIND. Fifteen bad locators among four thousand spellings are
