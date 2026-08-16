@@ -191,6 +191,21 @@ namespace DXCCManager
                     ClubLogMatch historic = null;
                     try { historic = clubLog.ResolveHistoric(callsign, whenUtc); }
                     catch { historic = null; }
+
+                    // ...but never an entity that had already CEASED TO EXIST on the day of the contact.
+                    // The fallback above takes the last thing known about a callsign, which is right when
+                    // the country is still there under another prefix - 4N and 2O were withdrawn, Serbia
+                    // and England were not. It is wrong when the entity itself is gone: 1B was Blenheim
+                    // Reef until 30 June 1975, so 1B1AB worked in 2007 came back as Blenheim Reef, an
+                    // entity thirty-two years dead, and was counted as a deleted country chased and
+                    // confirmed. 1B in 2007 is Northern Cyprus, which the ARRL does not recognise at all,
+                    // and "no entity" is the true answer - the same answer a maritime-mobile station gets.
+                    //
+                    // The identical rule already guarded EntityCodeForCountry(name, date); it simply was
+                    // never applied to the path that starts from a CALLSIGN.
+                    if (historic != null && HasCeasedToExistBy(historic.DxccCode, whenUtc))
+                        historic = null;
+
                     if (historic != null) return Combine(historic, fromCty);
                 }
                 return WithEntityNumber(fromCty);
@@ -441,6 +456,15 @@ namespace DXCCManager
             if (code <= 0 || clubLog == null) return code;
             if (!clubLog.IsDeletedEntity(code)) return code;
             return whenUtc <= clubLog.EntityEndUtc(code) ? code : 0;
+        }
+
+        // True when this entity was already gone on the day asked about. Only deleted entities carry an
+        // end date, so an entity that still exists always answers false and the caller is unaffected.
+        private bool HasCeasedToExistBy(int dxccCode, DateTime whenUtc)
+        {
+            if (clubLog == null || dxccCode <= 0) return false;
+            if (!clubLog.IsDeletedEntity(dxccCode)) return false;
+            return whenUtc > clubLog.EntityEndUtc(dxccCode);
         }
 
         // True when that entity is one the ARRL has deleted. The QSO still counts - it is worked

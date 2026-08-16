@@ -1412,13 +1412,14 @@ namespace HolyLogger
             return subset;
         }
 
-        // Click the "N deleted" count -> THE QSOs THEMSELVES, in the Log Workshop.
+        // Click the "N deleted" count -> WHICH COUNTRIES, first; the contacts themselves on request.
         //
-        // It used to open a little read-only table of country names and a QSO count each, which answered
-        // "which ones" and nothing else. A deleted entity is often the rarest thing in an operator's log
-        // and the contact they most want to look at: when it was, on what band, whether it is confirmed,
-        // what the card says. The Workshop already shows all of that, sorts it, edits it, exports it and
-        // uploads it, so the honest thing is to hand it the contacts rather than build a lesser table.
+        // The question the number provokes is "which ones?", and that is answered by three countries and
+        // their dates, read in a second. Opening the Log Workshop straight away answered a much larger
+        // question - every field of every contact - which is the right answer only once the operator
+        // knows which countries they are looking at. So: the short answer here, and a button for the
+        // long one. The Workshop still does all the real work (sorting, editing, exporting, uploading);
+        // it is simply no longer the first thing that happens.
         private void DeletedCountries_Click(object sender, RoutedEventArgs e)
         {
             int entities;
@@ -1440,7 +1441,312 @@ namespace HolyLogger
                 ? $"deleted entities worked ({entities} {(entities == 1 ? "country" : "countries")}, {qsos.Count:N0} QSOs)"
                 : $"deleted entities confirmed by {SourceName} ({entities} {(entities == 1 ? "country" : "countries")}, {qsos.Count:N0} QSOs)";
 
-            QsoSubsetRequested?.Invoke(qsos, what);
+            ShowDeletedEntitySummary(qsos, entities, what, workedFolder);
+        }
+
+        // One row per deleted country: how many contacts, and when they run from and to. A country worked
+        // once in 1991 and a country worked forty times across a decade are different stories, and the
+        // dates are what tell them apart.
+        private void ShowDeletedEntitySummary(ObservableCollection<QSO> qsos, int entities, string what, bool workedFolder)
+        {
+            // entity name -> its row. Dates are compared as the stored yyyyMMdd, which sorts correctly as
+            // text and needs no parsing.
+            var byName = new Dictionary<string, DeletedEntityRow>(StringComparer.OrdinalIgnoreCase);
+            bool awardFolder = _source == ConfSource.Award;
+
+            foreach (QSO q in qsos)
+            {
+                DXCC d = ResolveQso(q);
+                string name = d != null && !string.IsNullOrEmpty(d.Name) ? d.Name : "—";
+
+                DeletedEntityRow row;
+                if (!byName.TryGetValue(name, out row))
+                    byName[name] = row = new DeletedEntityRow { Name = name, Code = EntityCodeOf(q) };
+
+                row.Count++;
+                string pfx = PrefixOfCall(q.DXCall);
+                if (pfx.Length > 0) row.Prefixes.Add(pfx);
+
+                // WHAT ACTUALLY EARNED THIS COUNTRY. Only asked on the ARRL DXCC Award folder, where the
+                // answer differs from row to row: that folder adds three things together, and a deleted
+                // entity held on a card alone is a different position from one confirmed at LoTW - the
+                // card has to be posted to Newington and can be lost, the LoTW confirmation cannot.
+                // Every other folder IS its own answer, so the column would repeat the tab's name.
+                if (awardFolder)
+                {
+                    if (q.LotwQslRcvd == 1) row.HasLotw = true;
+                    if (q.PaperQslRcvd == 1) row.HasPaper = true;
+                    if (HasDxccCredit(q.CreditGranted)) row.HasCredit = true;
+                }
+
+                string date = (q.Date ?? string.Empty).Trim();
+                if (date.Length != 8) continue;
+                if (row.FirstYmd == null || string.CompareOrdinal(date, row.FirstYmd) < 0) row.FirstYmd = date;
+                if (row.LastYmd == null || string.CompareOrdinal(date, row.LastYmd) > 0) row.LastYmd = date;
+            }
+
+            foreach (DeletedEntityRow row in byName.Values)
+                row.Range = DateRangeText(row.FirstYmd, row.LastYmd);
+
+            // On the Award folder the list is grouped by what confirms it - everything electronic first,
+            // then the countries riding on a paper card - so the operator sees the two halves of their
+            // DXCC position separated rather than interleaved alphabetically.
+            List<DeletedEntityRow> rows = awardFolder
+                ? byName.Values.OrderBy(r => r.SortGroup).ThenBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList()
+                : byName.Values.OrderBy(r => r.Name, StringComparer.OrdinalIgnoreCase).ToList();
+
+            var grid = new DataGrid
+            {
+                AutoGenerateColumns = false,
+                IsReadOnly = true,
+                CanUserAddRows = false,
+                HeadersVisibility = DataGridHeadersVisibility.Column,
+                GridLinesVisibility = DataGridGridLinesVisibility.Horizontal,
+                SelectionMode = DataGridSelectionMode.Single,
+                FontSize = 16,
+                ItemsSource = rows,
+            };
+            grid.GridLinesVisibility = DataGridGridLinesVisibility.All;   // vertical rules as well
+            grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
+            ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
+            // EVERY COLUMN AS WIDE AS WHAT IS IN IT. Fixed widths guessed at content that varies by log:
+            // "Confirmed by" can read "LoTW, Paper QSL, ARRL credit" and was cut to "LoTW, Paper QSL, ARR",
+            // and Country - the whole point of the table - was squeezed to a single letter. Auto measures
+            // the header AND the cells, so nothing is cut and nothing is padded out either.
+            grid.Columns.Add(new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Name"), Width = DataGridLength.Auto, MinWidth = 140 });
+            // The ARRL entity number - the same number LoTW puts in a confirmation's DXCC field, and the
+            // one that identifies the entity when its NAME has been written three different ways over
+            // fifty years. Blank when the log has nothing but our own internal id for it.
+            grid.Columns.Add(new DataGridTextColumn { Header = "Prefix", Binding = new System.Windows.Data.Binding("PrefixText"), Width = DataGridLength.Auto });
+            // "Country" over "Code", in the LOG TABLE'S OWN measurements - 12pt on a 12.5px line with 3px
+            // of negative margin top and bottom. The margin gives back the header style's padding, so the
+            // two lines have the full height of the bar to live in and the bar does not grow: exactly the
+            // arrangement worked out for the log table's column of the same name (MainWindow.xaml), and
+            // copied here so the two headers are the same thing rather than two attempts at it.
+            grid.Columns.Add(new DataGridTextColumn
+            {
+                Header = new TextBlock
+                {
+                    Text = "Country\nCode",
+                    FontSize = 12,
+                    FontWeight = FontWeights.Bold,
+                    LineHeight = 12.5,
+                    LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                    Margin = new Thickness(0, -3, 0, -3),
+                    TextAlignment = TextAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+                Binding = new System.Windows.Data.Binding("CodeText"),
+                Width = DataGridLength.Auto,
+                ElementStyle = CentredCell(),
+            });
+            grid.Columns.Add(new DataGridTextColumn { Header = "QSOs", Binding = new System.Windows.Data.Binding("Count"), Width = DataGridLength.Auto, ElementStyle = CentredCell() });
+            var datesColumn = new DataGridTextColumn
+            {
+                Header = "Dates",
+                Binding = new System.Windows.Data.Binding("Range"),
+                // Last column on every folder but the ARRL one, so it is the one that takes the slack.
+                Width = DataGridLength.Auto,
+            };
+            grid.Columns.Add(datesColumn);
+            if (awardFolder)
+            {
+                // Named, not just coloured. A colour separates the groups at a glance; the words say
+                // which is which without the operator having to learn what the colours mean - and a row
+                // holding both a LoTW confirmation and a card says both.
+                grid.Columns.Add(new DataGridTextColumn { Header = "Confirmed by", Binding = new System.Windows.Data.Binding("ConfirmedBy"), Width = DataGridLength.Auto });
+                grid.LoadingRow += DeletedEntityRow_Loading;
+                grid.UnloadingRow += (s, args) => args.Row.ClearValue(System.Windows.Controls.Control.BackgroundProperty);
+            }
+
+            var openButton = new Button
+            {
+                Content = "Show the contacts in the Log Workshop",
+                Height = 38,
+                MinWidth = 300,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 10, 0, 0),
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2E, 0x7D, 0x32)),
+                Foreground = System.Windows.Media.Brushes.White,
+                BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1B, 0x5E, 0x20)),
+                BorderThickness = new Thickness(1.5),
+            };
+
+            var layout = new Grid();
+            layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(grid, 0);
+            Grid.SetRow(openButton, 1);
+            layout.Children.Add(grid);
+            layout.Children.Add(openButton);
+
+            var win = new Window
+            {
+                Title = (workedFolder ? "Deleted DXCC entities worked" : "Deleted DXCC entities confirmed by " + SourceName)
+                        + $" ({entities} {(entities == 1 ? "country" : "countries")}, {qsos.Count:N0} QSOs)",
+                Owner = this,
+                // THE WINDOW FITS THE TABLE, not the table the window. Every column is sized to its own
+                // content, so any fixed width is wrong twice over: too narrow and "ARRL credit" is cut
+                // off, too wide and the last column is stretched across empty space with its text
+                // stranded at the far left. Measuring the columns and taking that as the width is the
+                // only arrangement where neither happens - for any log, in any folder, in any theme.
+                // Capped so a long country name can never push the window off the screen.
+                SizeToContent = SizeToContent.Width,
+                MaxWidth = 1300,
+                Height = 420,
+                MinHeight = 260,
+                ResizeMode = ResizeMode.CanResize,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                Background = (System.Windows.Media.Brush)ThemeManager.Brush("WindowBg"),
+                Content = new Border { Padding = new Thickness(10), Child = layout },
+            };
+
+            // Closed first: the Workshop is the thing being asked for, and leaving this list standing in
+            // front of it would only have to be dismissed.
+            openButton.Click += (s, args) =>
+            {
+                win.Close();
+                QsoSubsetRequested?.Invoke(qsos, what);
+            };
+
+            // NOT remembered, deliberately. A saved width would be restored over the measured one and put
+            // the window straight back to being too narrow or too wide - which is the whole fault this
+            // window has just stopped having. The height and position are hardly worth the trade.
+            win.ShowDialog();
+        }
+
+        // The prefix of a callsign: everything up to and including its last digit, taken from the FIRST
+        // segment - "OK1ABC" -> OK1, "PJ2/DL1ABC" -> PJ2, "4Z5SL" -> 4Z5. That first segment is where the
+        // operator was, which is the whole question here.
+        private static string PrefixOfCall(string callsign)
+        {
+            string s = (callsign ?? string.Empty).Trim().ToUpperInvariant();
+            if (s.Length == 0) return string.Empty;
+
+            int slash = s.IndexOf('/');
+            if (slash > 0) s = s.Substring(0, slash);
+
+            // Cut after the LAST digit, not the first: plenty of callsigns begin with one. Taking the
+            // first digit turned 4Z5SL into "4" and 9A1A into "9", which name no country at all. The
+            // same rule CallsignIdentity.Split uses to divide a callsign in two.
+            int lastDigit = -1;
+            for (int i = 0; i < s.Length; i++)
+                if (char.IsDigit(s[i])) lastDigit = i;
+
+            return lastDigit < 0 ? s : s.Substring(0, lastDigit + 1);
+        }
+
+        // A number belongs under its heading, not shoved against the left rule with the words.
+        private static Style CentredCell()
+        {
+            var style = new Style(typeof(TextBlock));
+            style.Setters.Add(new Setter(TextBlock.HorizontalAlignmentProperty, HorizontalAlignment.Center));
+            return style;
+        }
+
+        // One deleted country, as the summary shows it. A class rather than an anonymous type because the
+        // row is filled in over several passes and the colouring reads it back.
+        private class DeletedEntityRow
+        {
+            public string Name { get; set; }
+            public int Count { get; set; }
+            public int Code { get; set; }
+
+            // THE PREFIXES, TAKEN FROM THE CALLSIGNS ACTUALLY WORKED. The country databases carry no
+            // prefix for a deleted entity - Club Log answers with the name and the code and leaves the
+            // prefix field empty, which is exactly these rows - so the honest source is the operator's
+            // own contacts: OK and OL for Czechoslovakia because that is what they worked.
+            public SortedSet<string> Prefixes = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            public string PrefixText
+            {
+                get
+                {
+                    if (Prefixes.Count == 0) return string.Empty;
+                    // Three is enough to recognise the country by; a row is not the place for a list of
+                    // every prefix ever issued there.
+                    var shown = Prefixes.Take(3).ToList();
+                    return string.Join(", ", shown) + (Prefixes.Count > shown.Count ? ", …" : string.Empty);
+                }
+            }
+
+            // Blank rather than a meaningless number: when there is no Club Log file to take real ARRL
+            // numbers from, the entity is identified by one of our own negative session ids, which would
+            // mean nothing at all to somebody checking their DXCC standing.
+            public string CodeText { get { return Code > 0 ? Code.ToString() : string.Empty; } }
+            public string FirstYmd { get; set; }
+            public string LastYmd { get; set; }
+            public string Range { get; set; }
+
+            public bool HasLotw { get; set; }     // confirmed at LoTW
+            public bool HasPaper { get; set; }    // a card in the drawer
+            public bool HasCredit { get; set; }   // the ARRL has already granted credit for it
+
+            // Electronic first, then cards, then anything held only on a credit already granted. The
+            // difference matters to the operator: a LoTW confirmation is already at Newington, a card
+            // still has to travel there.
+            public int SortGroup
+            {
+                get
+                {
+                    if (HasLotw) return 0;
+                    if (HasPaper) return 1;
+                    return 2;
+                }
+            }
+
+            public string ConfirmedBy
+            {
+                get
+                {
+                    var parts = new List<string>();
+                    if (HasLotw) parts.Add("LoTW");
+                    if (HasPaper) parts.Add("Paper QSL");
+                    if (HasCredit) parts.Add("ARRL credit");
+                    return parts.Count > 0 ? string.Join(", ", parts) : "—";
+                }
+            }
+        }
+
+        // The three groups, coloured. Deliberately pale and fixed rather than themed: they sit behind
+        // black text in a small table, and the point is only to separate the blocks from each other.
+        private static readonly System.Windows.Media.Brush DeletedRowLotwBg =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xDC, 0xEB, 0xFB));
+        private static readonly System.Windows.Media.Brush DeletedRowPaperBg =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xFF, 0xF2, 0xCC));
+        private static readonly System.Windows.Media.Brush DeletedRowCreditBg =
+            new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE2, 0xF0, 0xD9));
+
+        private static void DeletedEntityRow_Loading(object sender, DataGridRowEventArgs e)
+        {
+            var row = e.Row.Item as DeletedEntityRow;
+            if (row == null) return;
+
+            e.Row.Background = row.SortGroup == 0 ? DeletedRowLotwBg
+                             : row.SortGroup == 1 ? DeletedRowPaperBg
+                                                  : DeletedRowCreditBg;
+            // The backgrounds are pale by design, so the text has to be dark whatever the theme is doing.
+            e.Row.Foreground = System.Windows.Media.Brushes.Black;
+        }
+
+        // "12-05-1991" when a country was worked once, "12-05-1991  →  03-08-1994" when it was worked
+        // over a span. Written the way the log table writes a date, so the two read alike.
+        private static string DateRangeText(string firstYmd, string lastYmd)
+        {
+            string a = PrettyDate(firstYmd);
+            string b = PrettyDate(lastYmd);
+            if (a.Length == 0) return b;
+            if (b.Length == 0 || string.Equals(a, b, StringComparison.Ordinal)) return a;
+            return a + "  →  " + b;
+        }
+
+        private static string PrettyDate(string ymd)
+        {
+            if (string.IsNullOrEmpty(ymd) || ymd.Length != 8) return string.Empty;
+            return ymd.Substring(6, 2) + "-" + ymd.Substring(4, 2) + "-" + ymd.Substring(0, 4);
         }
 
         // THE ONE SET the whole folder counts against, by number: the entities this folder treats as
