@@ -90,21 +90,41 @@ namespace HolyLogger
                     window.Top = b.T;
                 }
 
-                window.Loaded += (s, e) => EnsureVisibleOnSomeScreen(window);
+                window.Loaded += (s, e) =>
+                {
+                    EnsureVisibleOnSomeScreen(window);
+
+                    // A window that disables the rest of the program while it is up must never be the
+                    // one the operator cannot find. The Log Fixer opened behind the Log Workshop on a
+                    // second screen, and every other window went dead with nothing on screen to say
+                    // why - the program looked hung and there was no way back without the Task Manager.
+                    try { window.Activate(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                };
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private static bool IsRealNumber(double v) => !double.IsNaN(v) && !double.IsInfinity(v);
 
-        // Safety net, after layout: if the restored position leaves the title bar on NO monitor (the
-        // screen it was on has been unplugged), bring the window back so it can still be reached.
-        // Measured against the real monitor rectangles, converted into the same device-independent units
-        // the window's Left/Top use, so a scaled multi-monitor desktop is judged correctly.
+        // Safety net, after layout: the WHOLE window is brought inside the work area of the screen it
+        // is mostly on - size first, then position.
+        //
+        // It used to ask only whether a grab handle's worth of title bar touched some monitor, and
+        // that is not the same question. A Log Fixer restored to 2190,-27 passed it: the second screen
+        // begins a little above zero, so a sliver of title bar was technically on it. In practice the
+        // window sat behind the Log Workshop with its title bar level with the top edge of the screen,
+        // it was MODAL so every other window went dead, and the program could not be used or escaped
+        // from at all. "Technically reachable" is not the standard; "fully on a screen" is.
+        //
+        // Measured against the real monitor rectangles, converted into the same device-independent
+        // units the window's Left/Top use, so a scaled multi-monitor desktop is judged correctly.
+        // SystemParameters.WorkArea is never consulted: it answers for the primary screen only, and
+        // trusting it is what stranded a window on this very desktop once before.
         private static void EnsureVisibleOnSomeScreen(Window window)
         {
             try
             {
+                if (window.WindowState != WindowState.Normal) return;
                 if (!IsRealNumber(window.Left) || !IsRealNumber(window.Top)) return;
 
                 var src = PresentationSource.FromVisual(window);
@@ -113,21 +133,52 @@ namespace HolyLogger
                 if (sx <= 0) sx = 1.0;
                 if (sy <= 0) sy = 1.0;
 
-                // A grab handle's worth of title bar has to land inside some monitor.
-                var handle = new Rect(window.Left, window.Top,
-                                      Math.Max(80, window.ActualWidth * 0.25), 24);
+                double w = IsRealNumber(window.Width) && window.Width > 0 ? window.Width : window.ActualWidth;
+                double h = IsRealNumber(window.Height) && window.Height > 0 ? window.Height : window.ActualHeight;
+                if (w <= 0 || h <= 0) return;
+                var current = new Rect(window.Left, window.Top, w, h);
 
+                // The screen this window is MOSTLY on, so a rescue never throws it onto a different
+                // monitor from the one the operator put it on. Nothing overlapping at all -> primary.
+                Rect best = Rect.Empty;
+                double bestArea = -1;
                 foreach (var screen in System.Windows.Forms.Screen.AllScreens)
                 {
                     var wa = screen.WorkingArea;
-                    var inDips = new Rect(wa.Left / sx, wa.Top / sy, wa.Width / sx, wa.Height / sy);
-                    if (inDips.IntersectsWith(handle)) return;   // reachable - leave it exactly where it is
+                    var dips = new Rect(wa.Left / sx, wa.Top / sy, wa.Width / sx, wa.Height / sy);
+                    Rect over = Rect.Intersect(dips, current);
+                    double area = over.IsEmpty ? 0 : over.Width * over.Height;
+                    if (area > bestArea) { bestArea = area; best = dips; }
+                    if (screen.Primary && bestArea <= 0) best = dips;
                 }
+                if (best.IsEmpty) return;
 
-                Log.Warn($"Window '{window.Title}' at {window.Left},{window.Top} is on no monitor - recentring.");
-                var work = SystemParameters.WorkArea;
-                window.Left = work.Left + 60;
-                window.Top = work.Top + 60;
+                // A window taller or wider than its screen pushes its own title bar off the top: that
+                // is how a 1010-high window landed on an 840-high screen with nothing left to grab.
+                double newW = Math.Min(w, best.Width);
+                double newH = Math.Min(h, best.Height);
+
+                double newL = Math.Min(Math.Max(window.Left, best.Left), best.Right - newW);
+                double newT = Math.Min(Math.Max(window.Top, best.Top), best.Bottom - newH);
+
+                bool sizeChanged = Math.Abs(newW - w) > 0.5 || Math.Abs(newH - h) > 0.5;
+                bool moved = Math.Abs(newL - window.Left) > 0.5 || Math.Abs(newT - window.Top) > 0.5;
+                if (!sizeChanged && !moved) return;   // already wholly on a screen: leave it alone
+
+                Log.Warn($"Window '{window.Title}' at {window.Left},{window.Top} {w}x{h} is not wholly on a "
+                         + $"screen - moving to {newL},{newT} {newW}x{newH}.");
+
+                // A content-sized window must never have its Height set - WPF throws, and its height is
+                // the content's business anyway.
+                bool heightIsAuto = window.SizeToContent == SizeToContent.Height
+                                 || window.SizeToContent == SizeToContent.WidthAndHeight;
+                bool widthIsAuto = window.SizeToContent == SizeToContent.Width
+                                || window.SizeToContent == SizeToContent.WidthAndHeight;
+
+                if (!widthIsAuto && sizeChanged) window.Width = Math.Max(newW, window.MinWidth);
+                if (!heightIsAuto && sizeChanged) window.Height = Math.Max(newH, window.MinHeight);
+                window.Left = newL;
+                window.Top = newT;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }

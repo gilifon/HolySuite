@@ -881,6 +881,16 @@
                                   Click="ShowErrorLogFolderMenuItem_Click"/>
                     </MenuItem>
                     <Separator />
+                    <!-- WHAT CHANGED. Shown by itself the first time a new version runs, and reachable
+                         here for ever after - an operator who dismissed it, or who wants to check
+                         whether the thing he reported was fixed, should not have to ask anybody. -->
+                    <MenuItem x:Name="WhatsNewMenuItem" Header="What's New"
+                              ToolTip="What changed in this version" Click="WhatsNewMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>

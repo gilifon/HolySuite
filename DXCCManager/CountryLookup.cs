@@ -230,6 +230,29 @@ namespace DXCCManager
             // Two characters is the line: a one or two letter match is a block ("R", "EA"), three is a
             // prefix somebody assigned to a place ("EA8", "KP2", "R1F").
             const int BlockFallback = 2;
+
+            // ...AND NOT WHEN cty.dat IS DESCRIBING SOMETHING THAT HAD NOT HAPPENED YET.
+            //
+            // cty.dat's exception list has NO DATES. Once a callsign is written into it the entry is
+            // true for ever, in BOTH directions - which is right for a permanent assignment and wrong
+            // for a special-event call that gets reissued. K4A is the case: cty.dat files =K4A under
+            // Puerto Rico, and Club Log holds three K4A records - August 2014, and twice in 2026. A
+            // QSO with K4A on 18 February 2008 was a US special event station, which is what the log
+            // said and what QRZ says; the rule below saw three matched characters against Club Log's
+            // one-letter "K" and answered Puerto Rico for a contact made six years before the Puerto
+            // Rican operation existed.
+            //
+            // The test is that EVERY Club Log record for the callsign starts LATER than the QSO, and
+            // it is what keeps R1FJ working: Club Log's R1FJ record ran until January 2010, so it is
+            // in the past, cty.dat is the fresher witness and still wins. Only a cty.dat entry that
+            // describes the future is set aside.
+            int callLength = (callsign ?? string.Empty).Trim().Length;
+            bool ctyMatchedWholeCall = fromCty != null && callLength > 0
+                                       && fromCty.MatchedLength >= callLength;
+            if (ctyMatchedWholeCall && !cl.ExactCall
+                && clubLog.CallsignRecordsAllStartAfter(callsign, whenUtc))
+                return Combine(cl, fromCty);
+
             if (!cl.ExactCall && cl.MatchedLength <= BlockFallback
                 && fromCty != null && fromCty.MatchedLength > cl.MatchedLength
                 && fromCty.Name != "Unknown")
@@ -312,6 +335,222 @@ namespace DXCCManager
             result.InvalidOperation = cl.Invalid;
             result.ResolvedBy = "Club Log";
             return result;
+        }
+
+        // ── WHY THIS COUNTRY, IN WORDS THE OPERATOR CAN JUDGE ───────────────────────────────────────
+        //
+        // Resolve gives one answer and keeps its reasoning to itself, which is fine until the answer
+        // looks wrong. Then the only useful thing is what each database said ON ITS OWN and how much
+        // of the callsign each of them actually recognised: "Club Log only matched CQ, cty.dat matched
+        // CQ1" settles in one line what a country name on its own cannot.
+        //
+        // Worked out on demand for one callsign, never for a whole log - it costs two lookups.
+        public class Explanation
+        {
+            public string Callsign;
+            public DateTime WhenUtc;
+
+            public string CtyName;      public int CtyCode;   public string CtyMatched;
+            public string ClubName;     public int ClubCode;  public string ClubMatched;
+            public bool ClubExactCall;  public bool ClubHistoric;
+
+            // A longer prefix Club Log HOLDS but which did not apply on the QSO's date - the reason
+            // its answer is shorter than cty.dat's, and the one fact that turns "Club Log matched CQ"
+            // from an admission of ignorance into an explanation.
+            public string ClubNearKey, ClubNearName;
+            public int ClubNearCode;
+            public DateTime ClubNearFrom, ClubNearTo;
+
+            public string FinalName;    public int FinalCode;
+
+            public bool Agree { get { return CtyCode > 0 && ClubCode > 0 && CtyCode == ClubCode; } }
+
+            // THE VERDICT, ON ITS OWN LINE. What each database matched belongs UNDER it, one per line,
+            // not run together behind it: the reader is comparing two things and a paragraph makes him
+            // do that comparison inside his head.
+            public string Headline
+            {
+                get
+                {
+                    if (ClubCode <= 0 && CtyCode <= 0) return "Neither cty.dat nor Club Log knows this callsign.";
+                    if (ClubCode <= 0) return "Club Log has nothing for this callsign. cty.dat answered alone.";
+                    if (CtyCode <= 0) return "cty.dat has nothing for this callsign. Club Log answered alone.";
+                    return Agree ? "cty.dat and Club Log agree." : "cty.dat and Club Log disagree.";
+                }
+            }
+
+            // One line each, in the order they are argued about. The matched letters are wrapped in **
+            // so a caller that renders bold lifts them out; PlainDetails strips them for a text file.
+            public List<string> Details
+            {
+                get
+                {
+                    // THE LETTERS COME FIRST ON EACH LINE, so they start at the same place and can be
+                    // read one under the other. "Club Log matched UH" over "cty.dat matched UH8" put
+                    // them at different distances from the margin - the dialog's font is proportional,
+                    // so no amount of padding could ever have lined them up.
+                    var lines = new List<string>();
+                    if (!string.IsNullOrEmpty(ClubMatched))
+                        lines.Add("**" + ClubMatched + "** is what Club Log matched");
+                    if (!string.IsNullOrEmpty(CtyMatched))
+                        lines.Add("**" + CtyMatched + "** is what cty.dat matched");
+                    lines.AddRange(ExtraNotes);
+                    return lines;
+                }
+            }
+
+            // The part of Details that is NOT about the matched letters. A caller that already prints
+            // "cty.dat matched RY0U which is Asiatic Russia (15)" on its own line has said that much
+            // already, and repeating it four lines further down is noise.
+            public List<string> ExtraNotes
+            {
+                get
+                {
+                    var lines = new List<string>();
+
+                    if (!string.IsNullOrEmpty(ClubNearKey))
+                    {
+                        string when;
+                        if (ClubNearFrom > DateTime.MinValue && ClubNearTo < DateTime.MaxValue)
+                            when = "only between " + ClubNearFrom.ToString("dd-MM-yyyy")
+                                   + " and " + ClubNearTo.ToString("dd-MM-yyyy");
+                        else if (ClubNearFrom > DateTime.MinValue)
+                            when = "only from " + ClubNearFrom.ToString("dd-MM-yyyy");
+                        else
+                            when = "only until " + ClubNearTo.ToString("dd-MM-yyyy");
+
+                        lines.Add("Club Log knows **" + ClubNearKey + "** = "
+                                  + (ClubNearCode > 0 ? ClubNearName + " (" + ClubNearCode + ")" : ClubNearName)
+                                  + ", but " + when);
+                    }
+
+                    if (ClubExactCall) lines.Add("Club Log has an entry for this exact callsign");
+                    if (ClubHistoric) lines.Add("No Club Log record covers this date");
+                    return lines;
+                }
+            }
+
+            // Everything on one line, for a report where a row is a row.
+            public string Sentence
+            {
+                get
+                {
+                    var d = Details;
+                    return d.Count == 0 ? Headline : Headline + " " + string.Join("; ", d.ToArray()) + ".";
+                }
+            }
+
+            // The same, with the emphasis markers taken out, for anywhere that shows plain text.
+            public string PlainSentence { get { return (Sentence ?? "").Replace("**", ""); } }
+
+            // "Portugal (272)", and the number is never left off - it is the part that counts.
+            private static string Named(int code, string name)
+            {
+                string n = string.IsNullOrWhiteSpace(name) ? "(no name)" : name.Trim();
+                return code > 0 ? n + " (" + code + ")" : n;
+            }
+
+            // "cty.dat matched CQ8 which is Azores (149)", and the honest shorter forms: a stroke
+            // callsign, where the matched letters are not at the front and cannot be pointed at, and a
+            // database with nothing to say at all.
+            private static string Says(string who, string matched, int code, string name)
+            {
+                bool knows = code > 0 || !string.IsNullOrEmpty(name);
+                if (!knows) return who + " has nothing for this callsign";
+                if (string.IsNullOrEmpty(matched)) return who + " says " + Named(code, name);
+                return who + " matched **" + matched + "** which is " + Named(code, name);
+            }
+
+            // THE WHOLE ANSWER, WORDED ONCE. Both the Log Fixer's "?" box and any report written about
+            // a log say this - from here, so the two can never come to word it differently and an
+            // operator comparing the paper with the screen never has to wonder whether they mean the
+            // same thing. Emphasis is marked with ** for callers that render it; PlainReport strips it.
+            public string Report(string logCountryName, int logCountryCode, string dateText)
+            {
+                var sb = new System.Text.StringBuilder();
+                sb.AppendLine("**" + Callsign + "**"
+                              + (string.IsNullOrWhiteSpace(dateText) ? "" : "   worked " + dateText));
+                sb.AppendLine();
+                sb.AppendLine("Your log says:   " + Named(logCountryCode, logCountryName));
+                sb.AppendLine();
+                sb.AppendLine(Says("cty.dat", CtyMatched, CtyCode, CtyName));
+                sb.AppendLine(Says("Club Log", ClubMatched, ClubCode, ClubName));
+                sb.AppendLine();
+                sb.AppendLine("HolyLogger recommends: " + Named(FinalCode, FinalName));
+                sb.AppendLine();
+                sb.AppendLine(Headline);
+                foreach (string line in ExtraNotes) sb.AppendLine(line);
+                sb.AppendLine();
+                sb.AppendLine(Agree
+                    ? "Both agree, so this proposal is a safe one to accept."
+                    : "Please consider and decide.");
+                return sb.ToString();
+            }
+
+            public string PlainReport(string logCountryName, int logCountryCode, string dateText)
+            {
+                return Report(logCountryName, logCountryCode, dateText).Replace("**", "");
+            }
+        }
+
+        public Explanation Explain(string callsign, DateTime whenUtc)
+        {
+            var e = new Explanation { Callsign = (callsign ?? string.Empty).Trim(), WhenUtc = whenUtc };
+            if (e.Callsign.Length == 0) return e;
+
+            // A stroke callsign is looked up by the part that says where the station IS, which is not
+            // always at the front - so the number of matched characters cannot be turned into a piece
+            // of the callsign the operator would recognise. Then the names are given without it rather
+            // than pointing at the wrong letters.
+            bool plainCall = e.Callsign.IndexOf('/') < 0;
+            string upper = e.Callsign.ToUpperInvariant();
+
+            DXCC c = null;
+            try { c = cty.GetDXCC(e.Callsign); } catch (Exception) { c = null; }
+            if (c != null && c.Name != "Unknown")
+            {
+                e.CtyName = c.Name;
+                try { e.CtyCode = EntityCodeForCountry(c.Name, whenUtc); } catch (Exception) { e.CtyCode = 0; }
+                if (plainCall && c.MatchedLength > 0 && c.MatchedLength <= upper.Length)
+                    e.CtyMatched = upper.Substring(0, c.MatchedLength);
+            }
+
+            if (clubLog != null)
+            {
+                ClubLogMatch cl = null;
+                try { cl = clubLog.Resolve(e.Callsign, whenUtc); } catch (Exception) { cl = null; }
+                if (cl != null)
+                {
+                    e.ClubName = TitleCase(cl.EntityName);
+                    e.ClubCode = cl.DxccCode;
+                    e.ClubExactCall = cl.ExactCall;
+                    e.ClubHistoric = cl.Historic;
+                    if (plainCall && cl.MatchedLength > 0 && cl.MatchedLength <= upper.Length)
+                        e.ClubMatched = upper.Substring(0, cl.MatchedLength);
+                }
+
+                // Why its answer is shorter than cty.dat's, when it is.
+                try
+                {
+                    ClubLogData.NearMiss near = clubLog.LongerRecordNotInEffect(
+                        e.Callsign, whenUtc, cl == null ? 0 : cl.MatchedLength);
+                    if (near != null)
+                    {
+                        e.ClubNearKey = near.Key;
+                        e.ClubNearName = TitleCase(near.EntityName);
+                        e.ClubNearCode = near.DxccCode;
+                        e.ClubNearFrom = near.Start;
+                        e.ClubNearTo = near.End;
+                    }
+                }
+                catch (Exception) { }
+            }
+
+            DXCC final = null;
+            try { final = Resolve(e.Callsign, whenUtc); } catch (Exception) { final = null; }
+            if (final != null) { e.FinalName = final.Name; e.FinalCode = final.DxccCode; }
+
+            return e;
         }
 
         // Continent only, for callers that want nothing else.

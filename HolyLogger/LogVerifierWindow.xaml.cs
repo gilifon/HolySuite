@@ -17,6 +17,81 @@ using HolyParser;
 
 namespace HolyLogger
 {
+    // BOLD INSIDE A BOUND LINE OF TEXT. A TextBlock's Text is one flat string, so a sentence that
+    // needs one phrase to stand out has to be built from Runs - and a DataTemplate cannot do that from
+    // a binding. This carries the sentence as markup instead: everything between ** comes out bold,
+    // everything else inherits whatever the TextBlock was given.
+    public static class RichNote
+    {
+        public static readonly DependencyProperty MarkupProperty =
+            DependencyProperty.RegisterAttached("Markup", typeof(string), typeof(RichNote),
+                new PropertyMetadata(null, OnMarkupChanged));
+
+        public static void SetMarkup(DependencyObject d, string value) { d.SetValue(MarkupProperty, value); }
+        public static string GetMarkup(DependencyObject d) { return (string)d.GetValue(MarkupProperty); }
+
+        private static void OnMarkupChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var block = d as TextBlock;
+            if (block == null) return;
+
+            block.Inlines.Clear();
+            string text = e.NewValue as string;
+            if (string.IsNullOrEmpty(text)) return;
+
+            // {{r:...}} and {{g:...}} are the verdict words - "do not agree" and "agree". They carry
+            // the whole meaning of the line and are the reason the operator either works through a
+            // pile by hand or ticks it in one go, so they are coloured as well as bold.
+            foreach (Match m in ColouredPart.Matches(text))
+            {
+                if (m.Groups["plain"].Success) { AddBoldMarkup(block, m.Groups["plain"].Value); continue; }
+
+                var run = new Run(m.Groups["text"].Value) { FontWeight = FontWeights.Bold };
+                run.Foreground = m.Groups["colour"].Value == "r" ? Red() : Green();
+                block.Inlines.Add(run);
+            }
+        }
+
+        private static readonly Regex ColouredPart =
+            new Regex(@"\{\{(?<colour>[rg]):(?<text>[^}]*)\}\}|(?<plain>(?:(?!\{\{[rg]:).)+)",
+                      RegexOptions.Singleline);
+
+        // Everything between ** comes out bold; the rest inherits.
+        private static void AddBoldMarkup(TextBlock block, string text)
+        {
+            bool bold = false;
+            foreach (string part in text.Split(new[] { "**" }, StringSplitOptions.None))
+            {
+                if (part.Length > 0)
+                {
+                    var run = new Run(part);
+                    if (bold) run.FontWeight = FontWeights.Bold;
+                    block.Inlines.Add(run);
+                }
+                bold = !bold;
+            }
+        }
+
+        // Readable on both schemes: the light colours are too dark to see on the dark background and
+        // the dark ones wash out on the light.
+        private static Brush Red()
+        {
+            return Frozen(ThemeManager.IsDark ? "#FF6B6B" : "#C62828");
+        }
+
+        private static Brush Green()
+        {
+            return Frozen(ThemeManager.IsDark ? "#54D66A" : "#2E7D32");
+        }
+
+        private static Brush Frozen(string hex)
+        {
+            var b = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            b.Freeze();
+            return b;
+        }
+    }
+
     // Checks a whole log and offers corrections, one tick at a time.
     //
     // A logged QSO keeps the country that was worked out when it was saved, and that answer can be years
@@ -198,6 +273,12 @@ namespace HolyLogger
                         return "Club Log says this operation earned no award credit on that date";
 
                     // the country
+                    // The two country files are named in bold: they are what the operator is being
+                    // asked to weigh, and in a line of italic blue they would otherwise be just words.
+                    case CountryBothAgree:
+                        return "**cty.dat** and **Club Log** {{g:agree}}. The country in the log is wrong — safe to accept HolyLogger's recommendation";
+                    case CountryNeedsDecision:
+                        return "**cty.dat** and **Club Log** {{r:do not agree}}. The country in the log may be wrong — press ? on a row before you tick it";
                     case "Different country":
                         return "The country code in the log is wrong, so the QSO counts as the wrong country";
                     case "No country code":
@@ -666,6 +747,36 @@ namespace HolyLogger
             return best;
         }
 
+        // "?" ON A ROW: what each country database said about this callsign, on this QSO's own date.
+        //
+        // Worked out here and now rather than during the scan - it is two extra lookups for ONE
+        // callsign, against 28,000 QSOs if the scan did it for every row on the chance of being asked.
+        private void Btn_Why_Click(object sender, RoutedEventArgs e)
+        {
+            var button = sender as FrameworkElement;
+            var row = button == null ? null : button.Tag as FixRow;
+            if (row == null || row.Qso == null) return;
+
+            string call = Text(row.Qso.DXCall);
+            if (call.Length == 0) return;
+
+            CountryLookup.Explanation x;
+            try { x = CountryLookup.Shared.Explain(call, CountryLookup.QsoDate(row.Qso.Date)); }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HolyMessageBox.ShowWarning("The country databases could not be asked about " + call + ".",
+                                           "Why this country?", this);
+                return;
+            }
+
+            // Worded in CountryLookup.Explanation, not here: a report written about a log says exactly
+            // this, and two places composing the same paragraph is how they come to differ.
+            string text = x.Report(Text(row.Qso.Country), row.Qso.DxccCode, FormatDate(row.Qso.Date));
+
+            HolyMessageBox.Show(text, "Why this country?", HolyMsgType.Info, this, 640);
+        }
+
         private static Finding Difference(QSO q, string problem, string field, string current, string proposed)
         {
             Finding f = New(q, problem, current.Length == 0 ? "(empty)" : current, proposed, "LoTW");
@@ -1033,7 +1144,21 @@ namespace HolyLogger
 
                 if (ourCode > 0 && storedCode > 0 && storedCode != ourCode)
                 {
-                    Finding f = New(q, "Different country",
+                    // TWO KINDS, NOT ONE, because they are two different decisions. Where cty.dat and
+                    // Club Log name the same entity the proposal rests on both witnesses and a whole
+                    // kind can be ticked at once. Where they do not, it rests on one - and the operator
+                    // was being asked to take those on the same trust, with nothing on screen to say
+                    // which was which. Two extra lookups per country finding, dozens of them in a log
+                    // of 28,000, and only for findings that got this far.
+                    CountryLookup.Explanation why = null;
+                    try { why = lookup.Explain(call, when); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                    string kind = why != null && !why.Agree
+                        ? CountryNeedsDecision
+                        : CountryBothAgree;
+
+                    Finding f = New(q, kind,
                                     Named(storedCode, storedCountry) + ZoneSuffix(q.CQZone, q.ITUZone),
                                     Named(ourCode, dated.Name) + ZoneSuffix(
                                         dated.CqZone > 0 ? dated.CqZone.ToString() : q.CQZone,
@@ -1221,17 +1346,23 @@ namespace HolyLogger
             // A contact held twice is read first: it is the only fault here that makes the log hold
             // something that never happened, and it inflates every count the program shows.
             if (problem == "Duplicate contact") return 1;
-            if (problem == "Different country") return 2;
-            if (problem == "No country code") return 3;
-            if (problem == "No country") return 4;
-            if (problem == "Damaged callsign") return 5;
-            if (problem.StartsWith("Band") || problem.StartsWith("Frequency")) return 6;
-            if (problem == "Wrong continent") return 7;
+            // The ones needing a judgement are read FIRST: they are the shorter list and the only one
+            // that costs the operator anything. The agreed pile is a single tick, so it can wait.
+            // Given their own ranks rather than sharing one, because a tie is broken alphabetically
+            // and that put "agreed" above the pile he actually has to work through.
+            if (problem == CountryNeedsDecision) return 2;
+            if (problem == CountryBothAgree) return 3;
+            if (problem == "Different country") return 3;
+            if (problem == "No country code") return 4;
+            if (problem == "No country") return 5;
+            if (problem == "Damaged callsign") return 6;
+            if (problem.StartsWith("Band") || problem.StartsWith("Frequency")) return 7;
+            if (problem == "Wrong continent") return 8;
             // A name that belongs to another country is worth reading before a mere wording, because a
             // log that SAYS United States while counting as Galapagos misleads whoever reads it.
-            if (problem == "Wrong country name") return 8;
-            if (problem == "Country spelled differently") return 10;   // last: nothing counts wrongly
-            return 9;
+            if (problem == "Wrong country name") return 9;
+            if (problem == "Country spelled differently") return 11;   // last: nothing counts wrongly
+            return 10;
         }
 
         private static string ZoneSuffix(string cq, string itu)
@@ -1352,7 +1483,14 @@ namespace HolyLogger
                 // Unticking one row must be able to clear its kind's box up in the panel: the kind no
                 // longer holds true. Cheap enough for a single row - it is the bulk paths that must not
                 // do this per row, and they are guarded.
-                row.ApplyChanged = () => { UpdateFixButton(); UpdateFixAllBox(); UpdateKindBoxes(); };
+                FixRow thisRow = row;   // captured, or every row's callback would close over the last
+                row.ApplyChanged = () =>
+                {
+                    SyncSelectionFromApply(thisRow);
+                    UpdateFixButton();
+                    UpdateFixAllBox();
+                    UpdateKindBoxes();
+                };
 
                 CellFor(row, "Date").Current = FormatDate(q.Date);
                 CellFor(row, "Time").Current = FormatTime(q.Time);
@@ -1514,12 +1652,29 @@ namespace HolyLogger
         {
             FindingsGrid.Columns.Clear();
 
-            var tick = (DataGridTemplateColumn)XamlReader.Parse(
-                "<DataGridTemplateColumn xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
-                + "Header='Fix' Width='54' CanUserSort='False'><DataGridTemplateColumn.CellTemplate><DataTemplate>"
-                + "<CheckBox HorizontalAlignment='Center' VerticalAlignment='Center' IsEnabled='{Binding Fixable}' "
-                + "IsChecked='{Binding Apply, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}'/>"
-                + "</DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>");
+            // THE BOX HANDLES ITS OWN CLICK. A click anywhere in a DataGrid cell is taken by the grid
+            // first, to work out the selection - and the selection then drives the tick. Landing on
+            // the box itself therefore did nothing visible: the box toggled, the grid re-made the
+            // selection underneath it, and the tick came back to where it started. Pressing the box is
+            // now a decision the box makes, and the mouse event stops there.
+            //
+            // Built in code rather than parsed from a string for the same reason as the "?" column:
+            // XamlReader cannot wire a handler that lives in this class.
+            var tick = new DataGridTemplateColumn { Width = 54, CanUserSort = false };
+
+            var box = new FrameworkElementFactory(typeof(CheckBox));
+            box.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            box.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            box.SetBinding(UIElement.IsEnabledProperty, new System.Windows.Data.Binding("Fixable"));
+            box.SetBinding(System.Windows.Controls.Primitives.ToggleButton.IsCheckedProperty,
+                new System.Windows.Data.Binding("Apply")
+                {
+                    Mode = System.Windows.Data.BindingMode.TwoWay,
+                    UpdateSourceTrigger = System.Windows.Data.UpdateSourceTrigger.PropertyChanged
+                });
+            box.AddHandler(UIElement.PreviewMouseLeftButtonDownEvent,
+                           new System.Windows.Input.MouseButtonEventHandler(Chk_Fix_PreviewMouseDown));
+            tick.CellTemplate = new DataTemplate { VisualTree = box };
 
             // THE TICK-ALL BOX HAS TO BE BUILT HERE, not in the XAML. This method CLEARS the columns and
             // makes them again on every scan, so a header declared in the window is thrown away the
@@ -1547,6 +1702,35 @@ namespace HolyLogger
             tick.Header = headerPanel;
 
             FindingsGrid.Columns.Add(tick);
+
+            // WHY THIS ANSWER. A country proposal is the one finding the operator cannot check for
+            // himself: two databases were asked, one of them won, and the table shows only the winner.
+            // "?" opens what each of them said and how much of the callsign each recognised - which is
+            // the whole argument in one line ("Club Log only matched CQ and cty.dat matched CQ1").
+            var why = new DataGridTemplateColumn
+            {
+                Header = "?",
+                Width = 40,
+                CanUserSort = false
+            };
+            // Built in code, not parsed from a string: XamlReader has no idea what Btn_Why_Click is -
+            // event handlers are wired by the compiled x:Class, which a runtime parse does not have.
+            var button = new FrameworkElementFactory(typeof(Button));
+            button.SetValue(ContentControl.ContentProperty, "?");
+            button.SetValue(FrameworkElement.WidthProperty, 26.0);
+            button.SetValue(FrameworkElement.HeightProperty, 26.0);
+            button.SetValue(Control.FontSizeProperty, 16.0);
+            button.SetValue(Control.FontWeightProperty, FontWeights.Bold);
+            button.SetValue(Control.PaddingProperty, new Thickness(0));
+            button.SetValue(FrameworkElement.CursorProperty, System.Windows.Input.Cursors.Hand);
+            button.SetValue(FrameworkElement.ToolTipProperty, "Why this country?");
+            button.SetValue(FrameworkElement.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            button.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            button.SetBinding(FrameworkElement.TagProperty, new System.Windows.Data.Binding());
+            button.AddHandler(System.Windows.Controls.Primitives.ButtonBase.ClickEvent,
+                              new RoutedEventHandler(Btn_Why_Click));
+            why.CellTemplate = new DataTemplate { VisualTree = button };
+            FindingsGrid.Columns.Add(why);
 
             foreach (string key in columns)
             {
@@ -1599,6 +1783,79 @@ namespace HolyLogger
             }
         }
 
+        // THE WINDOW OPENS WIDE ENOUGH TO READ THE KINDS PANEL IN ONE LINE EACH.
+        //
+        // Those sentences are how an operator decides which pile is his work, and a sentence that wraps
+        // to a second line pushes the list taller and reads as an afterthought. The width they need is
+        // not a constant either - it changes every time one of them is reworded, and it did: the two
+        // country lines grew and the window that had fitted them stopped fitting.
+        //
+        // So it is MEASURED, not guessed, and only ever grows the window - never shrinks one the
+        // operator has sized himself - and never past the screen it is on.
+        private void WidenForKindNotes()
+        {
+            try
+            {
+                if (_kinds == null || _kinds.Count == 0) return;
+
+                double dpi = 1.0;
+                try { dpi = VisualTreeHelper.GetDpi(this).PixelsPerDip; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                // Bold throughout, which is the worst case: parts of every sentence are bold and bold
+                // is the wider face.
+                var face = new Typeface(new FontFamily("Segoe UI"), FontStyles.Italic,
+                                        FontWeights.Bold, FontStretches.Normal);
+                var chipFace = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal,
+                                            FontWeights.SemiBold, FontStretches.Normal);
+
+                double widestNote = 0, widestChip = 0;
+                foreach (ProblemKind k in _kinds)
+                {
+                    string note = (k.HandNote ?? string.Empty).Replace("**", "");
+                    note = System.Text.RegularExpressions.Regex.Replace(note, @"\{\{[rg]:([^}]*)\}\}", "$1");
+                    widestNote = Math.Max(widestNote, Measure(note, face, 16, dpi));
+                    widestChip = Math.Max(widestChip, Measure(k.Name ?? "", chipFace, 16, dpi) + 24);
+                }
+                if (widestNote <= 0) return;
+
+                double needed = 34            // the tick box column
+                              + Math.Max(300, widestChip)
+                              + 14 + 70       // the count, and the gap before it
+                              + 18 + widestNote + 16
+                              + 20            // the panel's own scroll bar
+                              + 60;           // frame, borders and the outer margins
+
+                double most = double.MaxValue;
+                try
+                {
+                    var hwnd = new System.Windows.Interop.WindowInteropHelper(this).Handle;
+                    if (hwnd != IntPtr.Zero)
+                    {
+                        var wa = System.Windows.Forms.Screen.FromHandle(hwnd).WorkingArea;
+                        var src = PresentationSource.FromVisual(this);
+                        double sx = src != null && src.CompositionTarget != null
+                                  ? src.CompositionTarget.TransformToDevice.M11 : 1.0;
+                        if (sx <= 0) sx = 1.0;
+                        most = wa.Width / sx;
+                    }
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                double want = Math.Min(needed, most);
+                if (want > Width) Width = want;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private static double Measure(string text, Typeface face, double size, double dpi)
+        {
+            if (string.IsNullOrEmpty(text)) return 0;
+            var ft = new FormattedText(text, CultureInfo.CurrentCulture, FlowDirection.LeftToRight,
+                                       face, size, Brushes.Black, dpi);
+            return ft.WidthIncludingTrailingWhitespace;
+        }
+
         // The kinds frame, built from the findings themselves rather than from a list of kinds kept
         // somewhere - a check added to Scan appears here without anyone remembering to register it.
         // Ordered the way the table is ordered, so the frame and the rows read in the same sequence.
@@ -1630,6 +1887,7 @@ namespace HolyLogger
                 _kinds.Add(kind);
             }
             IC_Kinds.ItemsSource = _kinds;
+            WidenForKindNotes();
 
             // A rebuilt list has no filter, and the summary line says what to do with it.
             ApplyKindFilter(null);
@@ -1703,6 +1961,41 @@ namespace HolyLogger
 
             UpdateFixButton();
             UpdateFixAllBox();
+        }
+
+        // A CLICK ON THE TICK BOX IS THE WHOLE OF WHAT THAT CLICK MEANS. Toggled here and stopped here,
+        // so the grid never sees it and never re-decides the selection - which is what made pressing
+        // the box itself appear to do nothing at all. SyncSelectionFromApply then brings the row's
+        // highlight into line, so the two halves still agree.
+        private void Chk_Fix_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            var box = sender as CheckBox;
+            var row = box == null ? null : box.DataContext as FixRow;
+            if (row == null) return;
+
+            if (row.Fixable) row.Apply = !row.Apply;
+            e.Handled = true;      // a row that cannot be fixed swallows the click rather than jumping
+        }
+
+        // ...AND THE SAME THING BACKWARDS. Clicking a row ticked it, but clearing the tick box left the
+        // row still SELECTED - so it stayed blue while its box was empty, saying two opposite things at
+        // once. Selection and tick are meant to be one state; only half of it was wired.
+        //
+        // One row at a time, and never from a bulk path: the kind boxes and the header box are guarded
+        // by _syncingKind and deliberately leave the selection alone, because SelectedItems.Add is
+        // quadratic and four thousand of them took seconds.
+        private void SyncSelectionFromApply(FixRow row)
+        {
+            if (row == null || _syncingApply || _syncingKind || FindingsGrid == null) return;
+            try
+            {
+                _syncingApply = true;
+                bool selected = FindingsGrid.SelectedItems.Contains(row);
+                if (row.Apply && !selected) FindingsGrid.SelectedItems.Add(row);
+                else if (!row.Apply && selected) FindingsGrid.SelectedItems.Remove(row);
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+            finally { _syncingApply = false; }
         }
 
         // The header's box, built in BuildColumns because the columns are remade on every scan.
@@ -1910,6 +2203,15 @@ namespace HolyLogger
         // "Looking up the locators" - the operator still learns that the grid was fetched rather than
         // worked out, and still sees which rows rest on it, without the window advertising which service
         // this station has an account with. Asked for by the operator.
+        // The two halves of "Different country". Named here because the scan writes them, Rank orders
+        // them and the kinds panel explains them - three places that must never spell one differently.
+        // SHORT ON THE CHIP, FULL IN THE SENTENCE BESIDE IT. The chips are sized by their longest label
+        // and sit in a column, so "Different country — cty.dat and Club Log agree" stretched the whole
+        // panel to fit one of them. The naming of the two files belongs in the explanation on the
+        // right, where there is room for it.
+        private const string CountryBothAgree = "Different country — safe to accept";
+        private const string CountryNeedsDecision = "Different country — needs a decision";
+
         private const string LocatorProblem = "DX Locator is wrong";
 
         // Run as part of the scan, not from a button. A wrong locator is the one fault this machine

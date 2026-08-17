@@ -267,10 +267,12 @@ namespace HolyLogger
             new HolyMessageBox(message, title, type, owner, confirm: false, width).ShowDialog();
         }
 
+        // width, like Show's: a question carrying a list - the changes in a new version, say - reads
+        // as a wall of text at the default 460.
         public static bool ShowConfirm(string message, string title = "HolyLogger",
-            HolyMsgType type = HolyMsgType.Warning, Window owner = null)
+            HolyMsgType type = HolyMsgType.Warning, Window owner = null, double width = 0)
         {
-            var dlg = new HolyMessageBox(message, title, type, owner, confirm: true);
+            var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width);
             dlg.ShowDialog();
             return dlg.Confirmed;
         }

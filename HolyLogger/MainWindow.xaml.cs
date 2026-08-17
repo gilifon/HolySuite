@@ -488,6 +488,14 @@ namespace HolyLogger
                 // owned by the main window rather than the splash window (prevents them from being closed with the splash).
                 Dispatcher.BeginInvoke(new Action(() => UpdatesMenuItem_Click(null, null)), DispatcherPriority.ApplicationIdle);
             }
+
+            // THE FIRST RUN AFTER AN UPDATE SAYS WHAT CHANGED. Deferred like the update check above, so
+            // the window it opens belongs to the main window and not to the splash - a dialog owned by
+            // the splash is torn down with it. Runs whether or not automatic update checking is on:
+            // this is about the version already installed, not about finding a newer one.
+            Dispatcher.BeginInvoke(new Action(async () => await ShowWhatsNewIfVersionChanged()),
+                                   DispatcherPriority.ApplicationIdle);
+
             this.Loaded += MainWindow_Loaded;
                 Properties.Settings.Default.PropertyChanged += Settings_PropertyChanged;
 
@@ -9069,6 +9077,56 @@ namespace HolyLogger
             }
         }
 
+        // HELP > WHAT'S NEW. The news for the version that is running, fetched fresh. Nothing is
+        // cached: the file is a few hundred bytes and the operator asking this question deserves the
+        // current answer rather than whatever was true the day he installed.
+        private async void WhatsNewMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            string version = ReleaseNotes.CurrentVersion;
+            string file = await ReleaseNotes.FetchAsync();
+            string notes = ReleaseNotes.SectionFor(file, version);
+
+            if (string.IsNullOrWhiteSpace(notes))
+            {
+                HolyMessageBox.Show(file == null
+                    ? "The list of changes could not be fetched. Check your internet connection and try again."
+                    : "Nothing has been written down for version " + version + " yet.",
+                    "What's New", HolyMsgType.Info, this);
+                return;
+            }
+
+            WhatsNewWindow.ShowIfAny(this, version, notes);
+        }
+
+        // THE FIRST RUN OF A NEW VERSION SHOWS WHAT CHANGED, BY ITSELF. Everything since the version
+        // this operator was last running, not merely the newest - somebody who skips three releases
+        // and then updates is told what happened in all three.
+        //
+        // A first-ever install shows nothing: there is no "before" to report on, and greeting a new
+        // operator with a list of repairs to a program he has never used explains nothing.
+        private async Task ShowWhatsNewIfVersionChanged()
+        {
+            try
+            {
+                string current = ReleaseNotes.CurrentVersion;
+                if (string.IsNullOrWhiteSpace(current)) return;
+
+                string seen = ReleaseNotes.LastSeenVersion;
+                if (string.Equals(seen, current, StringComparison.Ordinal)) return;
+
+                // Written FIRST, and whatever happens next. If the fetch fails, or the file has nothing
+                // for this version, the operator must not be asked the same question at every startup
+                // for ever after.
+                ReleaseNotes.LastSeenVersion = current;
+                if (string.IsNullOrWhiteSpace(seen)) return;   // first ever install
+
+                string file = await ReleaseNotes.FetchAsync();
+                string notes = ReleaseNotes.Since(file, seen);
+                WhatsNewWindow.ShowIfAny(this, current, notes);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
         private async void UpdatesMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string tempPath = Path.GetTempPath();
@@ -9096,7 +9154,23 @@ namespace HolyLogger
 
                     if (CompareVersions(CurrentVersion, responseFromServer))
                     {
-                        if (HolyMessageBox.ShowConfirm("There is a new version. Do you want to install?", "New updates are available", HolyMsgType.Info, this))
+                        // WHAT IS IN IT, BEFORE HE DECIDES. "There is a new version" asks an operator
+                        // to install something without telling him what it does - and the one time he
+                        // most wants to know is while the question is on screen. Everything between
+                        // the version he is running and the one on offer, so a run of releases he
+                        // skipped is not reduced to the last of them.
+                        string newVersion = (responseFromServer ?? "").Trim();
+                        string notesFile = await ReleaseNotes.FetchAsync();
+                        string notes = ReleaseNotes.Since(notesFile, CurrentVersion);
+
+                        string ask = "There is a new version"
+                                   + (newVersion.Length > 0 ? " — " + newVersion : "") + ".";
+                        if (!string.IsNullOrWhiteSpace(notes))
+                            ask += "\n\n" + notes.Trim();
+                        ask += "\n\nDo you want to install?";
+
+                        if (HolyMessageBox.ShowConfirm(ask, "New updates are available", HolyMsgType.Info, this,
+                                                       string.IsNullOrWhiteSpace(notes) ? 0 : 620))
                         {
                             try
                             {

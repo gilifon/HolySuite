@@ -274,6 +274,104 @@ namespace DXCCManager
             return LongestPrefix(call, whenUtc);
         }
 
+        // EVERY RECORD CLUB LOG HOLDS FOR THIS EXACT CALLSIGN BEGINS AFTER THE DATE ASKED ABOUT -
+        // in other words, on that day this callsign had not yet been used for the thing Club Log
+        // knows it for. False when Club Log has no record of the callsign at all.
+        //
+        // This exists to tell two look-alike cases apart, because cty.dat's exception list carries no
+        // dates and so cannot tell them apart itself:
+        //
+        //   R1FJ  - Club Log's record ran until January 2010 and cty.dat still files R1FJ under Franz
+        //           Josef Land. The record is in the PAST; cty.dat is the fresher fact and must win.
+        //   K4A   - Club Log holds three records, August 2014 and twice in 2026. For a QSO on 18
+        //           February 2008 every one of them is in the FUTURE, so cty.dat's undated =K4A entry
+        //           is describing a use of the callsign that had not happened yet and cannot be an
+        //           answer about 2008.
+        //
+        // Only "all of them start later" separates the second from the first.
+        public bool CallsignRecordsAllStartAfter(string callsign, DateTime whenUtc)
+        {
+            if (string.IsNullOrWhiteSpace(callsign)) return false;
+            string call = callsign.Trim().ToUpperInvariant();
+
+            List<Record> list;
+            if (!exceptions.TryGetValue(call, out list) || list == null || list.Count == 0)
+            {
+                // Same reach as Resolve: for a stroke callsign it is the operating part that is used.
+                string operating = EntityResolver.OperatingPart(call);
+                if (string.Equals(operating, call, StringComparison.Ordinal)) return false;
+                if (!exceptions.TryGetValue(operating, out list) || list == null || list.Count == 0)
+                    return false;
+            }
+
+            foreach (Record r in list)
+                if (r.Start <= whenUtc) return false;
+
+            return true;
+        }
+
+        // A LONGER RECORD CLUB LOG HOLDS THAT DID NOT APPLY ON THE DAY.
+        //
+        // "Club Log matched CQ" is true and unhelpful: it leaves the operator wondering whether Club
+        // Log has never heard of CQ8. It has - CQ8 is Azores from 1 June 2009 - and the QSO is from
+        // 1991, which is the entire explanation. Without this the answer looks like ignorance when it
+        // is actually a date.
+        //
+        // Longer than whatever Club Log DID match, or it would report the very record that answered.
+        public class NearMiss
+        {
+            public string Key;
+            public string EntityName;
+            public int DxccCode;
+            public DateTime Start;
+            public DateTime End;
+        }
+
+        public NearMiss LongerRecordNotInEffect(string callsign, DateTime whenUtc, int matchedLength)
+        {
+            if (string.IsNullOrWhiteSpace(callsign)) return null;
+            string call = callsign.Trim().ToUpperInvariant();
+            if (call.IndexOf('/') >= 0) return null;    // the lookup key is not the front of the call
+
+            int longest = Math.Min(call.Length, Math.Max(maxPrefixLength, call.Length));
+            for (int l = longest; l > Math.Max(matchedLength, 0); l--)
+            {
+                string key = call.Substring(0, l);
+
+                // A full-callsign exception counts too - that is where a special-event call lives.
+                Record found = Nearest(exceptions, key, whenUtc) ?? Nearest(prefixes, key, whenUtc);
+                if (found == null) continue;
+
+                return new NearMiss
+                {
+                    Key = key,
+                    EntityName = found.Entity ?? string.Empty,
+                    DxccCode = found.Adif,
+                    Start = found.Start,
+                    End = found.End
+                };
+            }
+            return null;
+        }
+
+        // The record for this key whose window sits closest to the date - and only when NO record for
+        // it covers the date, because a key that answered is not a near miss.
+        private static Record Nearest(Dictionary<string, List<Record>> from, string key, DateTime whenUtc)
+        {
+            List<Record> list;
+            if (!from.TryGetValue(key, out list) || list == null || list.Count == 0) return null;
+
+            Record best = null;
+            TimeSpan bestGap = TimeSpan.MaxValue;
+            foreach (Record r in list)
+            {
+                if (whenUtc >= r.Start && whenUtc <= r.End) return null;   // it DID apply; not a miss
+                TimeSpan gap = whenUtc < r.Start ? r.Start - whenUtc : whenUtc - r.End;
+                if (best == null || gap < bestGap) { best = r; bestGap = gap; }
+            }
+            return best;
+        }
+
         private ClubLogMatch LongestPrefix(string call, DateTime whenUtc)
         {
             int len = Math.Min(call.Length, maxPrefixLength);
