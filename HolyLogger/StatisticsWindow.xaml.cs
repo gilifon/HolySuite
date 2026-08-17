@@ -2972,8 +2972,8 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
-        // THE OTHER PILE: the station IS in the log, but LoTW's band, mode or date does not agree with
-        // what the log holds. Nothing here is missing, so nothing is added; it is a question about
+        // THE OTHER PILE: the station IS in the log, but LoTW's band, mode, date or COUNTRY does not
+        // agree with what the log holds. Nothing here is missing, so nothing is added; it is a question about
         // contacts that already exist, and it is asked in the Log Fixer - the table that exists for
         // exactly this shape of answer, the log in red on top and what is proposed in green underneath.
         private void OfferLotwDifferences(List<DataAccess.LotwConfirmation> nearMisses)
@@ -2987,8 +2987,8 @@ namespace HolyLogger
                 string n = "**" + nearMisses.Count.ToString("N0") + "**";
                 bool review = HolyMessageBox.ShowConfirm(
                     "LoTW has " + n + (nearMisses.Count == 1 ? " confirmation" : " confirmations")
-                    + " for stations that ARE in this log, but the band, the mode or the date does not "
-                    + "match what LoTW was sent.\n\n"
+                    + " for stations that ARE in this log, but the band, the mode, the date or the "
+                    + "country does not match what LoTW holds.\n\n"
                     + "Nothing is missing here — these are contacts you already have, with one detail "
                     + "that the two of you recorded differently.\n\n"
                     + "Look at them in the Log Fixer?",
@@ -2998,7 +2998,7 @@ namespace HolyLogger
                 int rows = LogVerifierWindow.ShowLotwDifferences(this, _allQsos, nearMisses);
                 if (rows == 0)
                     HolyMessageBox.Show(
-                        "Nothing to show: every one of them agrees with the log on band, mode and date. "
+                        "Nothing to show: every one of them agrees with the log on band, mode, date and country. "
                         + "They differ only in which of your callsigns was used, which is not something "
                         + "to change from here.",
                         "Where LoTW disagrees with this log", HolyMsgType.Info, this);

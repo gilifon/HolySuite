@@ -542,7 +542,7 @@ namespace HolyLogger
         // The TIME is deliberately never proposed. LoTW carries the OTHER station's logged time, which
         // routinely differs from ours by a minute or two - the matcher ignores it for that very reason,
         // and offering to overwrite our own clock with theirs would be a correction in the wrong
-        // direction. Only band, mode and date are offered.
+        // direction. Band, mode, date and the country are offered.
         public static int ShowLotwDifferences(Window owner, IEnumerable<QSO> logQsos,
                                               IEnumerable<DataAccess.LotwConfirmation> nearMisses)
         {
@@ -585,6 +585,35 @@ namespace HolyLogger
 
                 if (date.Length == 8 && !string.Equals(Text(q.Date), date, StringComparison.Ordinal))
                 { findings.Add(Difference(q, "LoTW logged another date", "Date", FormatDate(q.Date), FormatDate(date))); any = true; }
+
+                // THE COUNTRY, WHICH USED NOT TO BE COMPARED AT ALL. The log works the country out from
+                // the callsign; LoTW is TOLD it by the operator, who had to declare where he was
+                // transmitting from and prove it. When the two disagree the log is usually the one that
+                // is wrong, and until now nothing said so - band and mode were checked and the entity,
+                // which is what every count of countries is made of, was passed over in silence.
+                //
+                // JUDGED ON THE ENTITY NUMBER, NEVER THE NAME. LoTW writes "FED. REP. OF GERMANY" where
+                // we write "Federal Republic of Germany"; comparing names would report thousands of
+                // disagreements that are nothing but two spellings of one country. Both sides must have
+                // a number - a log QSO with none is the plain scan's business, not LoTW's.
+                if (c.DxccCode > 0 && q.DxccCode > 0 && c.DxccCode != q.DxccCode)
+                {
+                    // The NAME goes in the Country cell and the NUMBER in the Country Code cell beside
+                    // it - the table already pairs the two for a country correction, so putting the
+                    // number inside the name as well would print it twice.
+                    Finding f = Difference(q, "LoTW logged another country", "Country",
+                                           Text(q.Country), Text(c.Country));
+                    // The number, continent and zones travel with the name, exactly as they do when the
+                    // country databases propose a correction. A log left saying one country while
+                    // counting as another is the fault this is here to end.
+                    f.NewCode = c.DxccCode;
+                    f.NewContinent = Text(c.Continent).Length > 0 ? Text(c.Continent).ToUpperInvariant() : null;
+                    int cq, itu;
+                    if (int.TryParse(Text(c.CqZone), out cq) && cq > 0) f.NewCq = cq;
+                    if (int.TryParse(Text(c.ItuZone), out itu) && itu > 0) f.NewItu = itu;
+                    findings.Add(f);
+                    any = true;
+                }
 
                 if (any) taken.Add(q);
                 else sameOnEveryField++;
