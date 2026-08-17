@@ -74,12 +74,45 @@ namespace HolyLogger
                 HolyClusterClient = new UdpClient(Properties.Settings.Default.HolyClusterUDPPort);
                 HolyClusterClient.BeginReceive(new AsyncCallback(StartHolyClusterUDPClient), null);
             }
-            catch
+            catch (Exception ex)
             {
-                HolyMessageBox.ShowWarning("Failed to open the HolyCluster UDP port.", "HolyCluster Listener", this);
+                // The port is nearly always busy because something else has it - another copy of
+                // HolyLogger, or HolyCluster itself. Recorded, because until now this failed in
+                // silence and the operator was left wondering why spots never arrived.
+                Log.Warn("HolyCluster UDP port " + Properties.Settings.Default.HolyClusterUDPPort
+                         + " could not be opened: " + ex.Message + " - listener switched off.");
+
                 Properties.Settings.Default.EnableHolyClusterUDP = false;
                 HolyClusterClient = null;
+
+                WarnHolyClusterPortBusy();
             }
+        }
+
+        // THE WARNING WAITS FOR THE WINDOW. This method is called from MainWindow's CONSTRUCTOR as well
+        // as from Options, and a dialog raised before the window has ever been shown took the whole
+        // program down: WPF refuses to give a dialog an owner that was never shown, the exception
+        // escaped the constructor, and HolyLogger died on the splash screen with the port merely busy.
+        // From Options the window is up and the warning is immediate, as it always was.
+        private void WarnHolyClusterPortBusy()
+        {
+            string text = "The HolyCluster UDP port " + Properties.Settings.Default.HolyClusterUDPPort
+                        + " could not be opened — another program is probably using it.\n\n"
+                        + "The HolyCluster listener has been switched off. You can turn it back on, or "
+                        + "choose a different port, in Options.";
+
+            if (!IsLoaded)
+            {
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    try { HolyMessageBox.ShowWarning(text, "HolyCluster Listener", this); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                return;
+            }
+
+            try { HolyMessageBox.ShowWarning(text, "HolyCluster Listener", this); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void StartHolyClusterUDPClient(IAsyncResult res)

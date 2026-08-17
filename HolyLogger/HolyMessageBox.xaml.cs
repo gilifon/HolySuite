@@ -75,7 +75,17 @@ namespace HolyLogger
             InitializeComponent();
             Title = title;
             SetMessage(message);
-            if (owner != null) Owner = owner;
+            // AN OWNER THAT HAS NOT BEEN SHOWN YET IS NOT AN OWNER. WPF throws "Cannot set Owner
+            // property to a Window that has not been shown previously" - and a dialog raised from
+            // inside MainWindow's constructor hits exactly that. It took HolyLogger down at startup on
+            // an operator's machine: the HolyCluster UDP port was busy, the catch tried to warn him,
+            // and the warning killed the program before it ever appeared. A message that cannot say
+            // who owns it is still worth showing; being unable to start is not.
+            if (owner != null)
+            {
+                try { Owner = owner; }
+                catch (InvalidOperationException swallowed) { Log.Swallow(swallowed); }
+            }
             if (width > 0) Width = width;
             ApplyType(type);
 
