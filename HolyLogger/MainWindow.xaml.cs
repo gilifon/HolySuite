@@ -9077,25 +9077,34 @@ namespace HolyLogger
             }
         }
 
-        // HELP > WHAT'S NEW. The news for the version that is running, fetched fresh. Nothing is
-        // cached: the file is a few hundred bytes and the operator asking this question deserves the
-        // current answer rather than whatever was true the day he installed.
+        // HELP > WHAT'S NEW. THE WHOLE HISTORY, not merely the version that happens to be running.
+        //
+        // It used to show one section - the current version's - and that answered the wrong question.
+        // A release with one small fix in it then looked like the sum of the program's news, and
+        // everything done in the versions before it was invisible to anyone who had not been watching
+        // at the time. The file keeps every section for exactly this reason; showing one of them threw
+        // that away.
+        //
+        // The window that opens BY ITSELF after an update is still the narrow one: there, "what has
+        // changed since the version I was running" is precisely the question.
+        //
+        // Fetched fresh every time. The file is a few hundred bytes and the operator asking deserves
+        // the current answer, not whatever was true the day he installed.
         private async void WhatsNewMenuItem_Click(object sender, RoutedEventArgs e)
         {
-            string version = ReleaseNotes.CurrentVersion;
             string file = await ReleaseNotes.FetchAsync();
-            string notes = ReleaseNotes.SectionFor(file, version);
 
-            if (string.IsNullOrWhiteSpace(notes))
+            if (string.IsNullOrWhiteSpace(file))
             {
                 HolyMessageBox.Show(file == null
                     ? "The list of changes could not be fetched. Check your internet connection and try again."
-                    : "Nothing has been written down for version " + version + " yet.",
+                    : "Nothing has been written down yet.",
                     "What's New", HolyMsgType.Info, this);
                 return;
             }
 
-            WhatsNewWindow.ShowIfAny(this, version, notes);
+            // No version in the heading: this is every version there has been.
+            WhatsNewWindow.ShowIfAny(this, null, file.Trim());
         }
 
         // THE FIRST RUN OF A NEW VERSION SHOWS WHAT CHANGED, BY ITSELF. Everything since the version
@@ -9120,9 +9129,14 @@ namespace HolyLogger
                 ReleaseNotes.LastSeenVersion = current;
                 if (string.IsNullOrWhiteSpace(seen)) return;   // first ever install
 
+                // THE WHOLE HISTORY HERE TOO. This window used to show only what had changed since the
+                // version that was running - defensible, and not what was asked for. A release with
+                // one small fix in it then opened saying one line, and the twenty things that arrived
+                // in the version before were nowhere, which reads as though the program had barely
+                // changed. The newest section is at the top, so what IS new is still the first thing
+                // read; everything else is underneath for whoever wants it.
                 string file = await ReleaseNotes.FetchAsync();
-                string notes = ReleaseNotes.Since(file, seen);
-                WhatsNewWindow.ShowIfAny(this, current, notes);
+                WhatsNewWindow.ShowIfAny(this, null, (file ?? string.Empty).Trim());
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }

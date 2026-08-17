@@ -293,13 +293,13 @@ namespace HolyLogger
 
             var body = new TextBlock
             {
-                Text = (notes ?? "").Trim(),
                 FontSize = 16,
                 TextWrapping = TextWrapping.Wrap,
                 LineHeight = 24,
                 Margin = new Thickness(2, 2, 12, 2)
             };
             body.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            FillBody(body, notes);
 
             var scroll = new ScrollViewer
             {
@@ -330,6 +330,43 @@ namespace HolyLogger
 
             Content = grid;
             KeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Escape) Close(); };
+        }
+
+        // THE VERSION HEADINGS ARE HEADINGS, not the literal "== 8.8.9 ==" out of the file. Now that
+        // this window shows the whole history, the numbers are how the reader finds his place in it,
+        // so they are set bigger and bold with air above them.
+        private static void FillBody(TextBlock block, string notes)
+        {
+            block.Inlines.Clear();
+            string text = (notes ?? "").Trim();
+            if (text.Length == 0) return;
+
+            bool first = true;
+            foreach (string raw in text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n'))
+            {
+                string line = raw.TrimEnd();
+                string trimmed = line.Trim();
+
+                bool isHeading = trimmed.Length > 4 && trimmed.StartsWith("==") && trimmed.EndsWith("==");
+                if (isHeading)
+                {
+                    if (!first) block.Inlines.Add(new LineBreak());
+                    var head = new Run(trimmed.Trim('=', ' ', '\t'))
+                    {
+                        FontWeight = FontWeights.Bold,
+                        FontSize = 19
+                    };
+                    head.SetResourceReference(TextElement.ForegroundProperty, "AccentBrush");
+                    block.Inlines.Add(head);
+                }
+                else
+                {
+                    block.Inlines.Add(new Run(line));
+                }
+
+                block.Inlines.Add(new LineBreak());
+                first = false;
+            }
         }
 
         // Opens the window if there is anything to say, and does nothing at all if there is not.
