@@ -12359,35 +12359,41 @@ namespace HolyLogger
             // old "delete everything then re-insert the unique ones" -- means the log is never left
             // partial: cancelling mid-run simply leaves some duplicates un-removed.
             var all = dal.GetQSOsForLog(dal.ActiveLogId);
-            var groupsByKey = new Dictionary<string, List<QSO>>();
-            var groupOrder = new List<List<QSO>>();
-            foreach (var q in all)
-            {
-                // The program's one definition of "the same contact". A record too incomplete to
-                // identify - no callsign, or no date - is left alone rather than grouped with anything.
-                string key = DataAccess.MatchKey(q);
-                if (key == null) continue;
-                if (!groupsByKey.TryGetValue(key, out var group))
-                {
-                    group = new List<QSO>();
-                    groupsByKey[key] = group;
-                    groupOrder.Add(group);
-                }
-                group.Add(q);
-            }
+            List<DupGroup> groups = DuplicateScan.Find(all);
 
-            var dupGroups = groupOrder.Where(g => g.Count > 1).ToList();
-            var toDelete = dupGroups.SelectMany(g => g.Skip(1)).ToList();
-
-            if (toDelete.Count == 0)
+            if (groups.Count == 0)
             {
                 HolyMessageBox.Show("No duplicate QSOs were found in the active log.",
                     "Remove Duplicates", HolyMsgType.Info, this);
                 return;
             }
 
-            var review = new DuplicatesWindow(dupGroups) { Owner = this };
-            if (review.ShowDialog() != true) return;
+            // TWO STEPS, BECAUSE TWO DIFFERENT QUESTIONS ARE BEING ASKED. Nearly every duplicate is a
+            // plain copy: the same contact twice, nothing written on either that the other does not
+            // say. Those are reviewed and removed in one go. The rare group where the copies carry
+            // DIFFERENT comments is not a thing the program can settle - somebody wrote two different
+            // notes about one contact - so it is held back and asked about on its own screen.
+            var simple = groups.Where(g => !g.NeedsChoice).ToList();
+            var conflicts = groups.Where(g => g.NeedsChoice).ToList();
+
+            var approved = new List<DupGroup>();
+
+            if (simple.Count > 0)
+            {
+                var review = new DuplicatesWindow(simple.Select(g => g.Members).ToList()) { Owner = this };
+                if (review.ShowDialog() != true) return;   // backing out of the first step stops both
+                approved.AddRange(simple);
+            }
+
+            if (conflicts.Count > 0)
+            {
+                var choose = new DuplicatesWindow(conflicts) { Owner = this };
+                if (choose.ShowDialog() == true)
+                    approved.AddRange(conflicts.Where(g => !g.Skipped));
+            }
+
+            var toDelete = approved.SelectMany(g => g.Extras).ToList();
+            if (toDelete.Count == 0) return;
 
             _dedupCts = new CancellationTokenSource();
             var token = _dedupCts.Token;
@@ -12402,6 +12408,24 @@ namespace HolyLogger
             {
                 await Task.Run(() =>
                 {
+                    // THE COMMENT MOVES ACROSS BEFORE THE COPY GOES. Whether the operator chose it on
+                    // the second screen or the group simply had one comment on the copy and none on
+                    // the contact that stays, it is written first - so a note somebody wrote can never
+                    // be deleted along with the row that happened to be carrying it.
+                    foreach (DupGroup g in approved)
+                    {
+                        string chosen = (g.ChosenComment ?? string.Empty).Trim();
+                        if (chosen.Length == 0) continue;
+                        if (string.Equals(chosen, (g.Keep.Comment ?? string.Empty).Trim(),
+                                          StringComparison.Ordinal)) continue;
+                        try
+                        {
+                            g.Keep.Comment = chosen;
+                            lock (_syncLock) { dal.Update(g.Keep); }
+                        }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }
+
                     int lastPct = -1;
                     for (int i = 0; i < toDelete.Count; i++)
                     {

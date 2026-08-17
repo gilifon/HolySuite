@@ -54,6 +54,16 @@ namespace HolyLogger
             // counting as another - which is exactly the fault Verify exists to find.
             public int NewCode;
 
+            // THE ONE FINDING THAT TAKES A QSO OUT INSTEAD OF PUTTING A FIELD RIGHT. A contact held
+            // twice is not a wrong value anywhere - both copies are correct - so there is nothing to
+            // write; the second copy simply should not be there. Ticking it removes it.
+            public bool Deletes;
+
+            // The duplicate group this copy belongs to: which contact stays, and whether the copies
+            // carry different comments - in which case nothing is removed until the operator has been
+            // shown them and said which to keep.
+            public DupGroup Group;
+
             public string Call { get; set; }
             public string Time { get; set; }
             public string DateText { get; set; }
@@ -1063,6 +1073,58 @@ namespace HolyLogger
                 }
             }
 
+            // --- the same contact logged twice ---------------------------------------------------
+            //
+            // Every check above asks its question of ONE QSO. This one is about the log as a whole,
+            // and it is the fault that quietly inflates everything the program counts: a station
+            // worked once but held twice is two contacts to the statistics, two to the awards, and
+            // two records uploaded to LoTW.
+            //
+            // "The same contact" means here exactly what it means everywhere else - DataAccess.MatchKey,
+            // the one rule the import's merge and Tools > Remove Duplicates both answer to. A second
+            // definition living in this window is how the two halves of a program start to disagree.
+            //
+            // THE FIRST OF EACH GROUP IS NEVER TOUCHED. Only the copies after it are offered up, so
+            // ticking every row of this kind can never empty a contact out of the log altogether -
+            // the same guarantee Tools > Remove Duplicates gives.
+            var copies = new HashSet<QSO>();
+            foreach (DupGroup g in DuplicateScan.Find(qsos))
+            {
+                QSO first = g.Keep;
+                string where = "the same contact is already in this log at "
+                               + FormatDate(first.Date) + " " + FormatTime(first.Time) + ". ";
+
+                // A GROUP WHOSE COMMENTS DISAGREE IS NOT REMOVED HERE. Somebody wrote two different
+                // things about one contact and only the operator knows which is worth keeping, so the
+                // tick means "take me to that question", not "delete this". The screen that asks it is
+                // the same one Tools > Remove Duplicates uses, so the answer is given in one place.
+                string what = g.NeedsChoice
+                    ? where + "The two copies carry different comments — ticking this row asks you "
+                              + "which comment to keep before anything is removed"
+                    : where + "Ticking this row removes this copy";
+
+                foreach (QSO q in g.Extras)
+                {
+                    Finding f = New(q, "Duplicate contact", Text(q.DXCall), what,
+                                    "callsign, date, band, mode and minute all match");
+                    f.Deletes = true;
+                    f.Fixable = true;      // the tick means REMOVE, not write
+                    f.Where = "Callsign";  // which cell carries the note
+                    f.Group = g;
+                    findings.Add(f);
+                    copies.Add(q);
+                }
+            }
+
+            // A COPY CARRIES ONE FINDING AND ONE ONLY. The table ticks by ROW, and one tick applies
+            // every fixable finding on that row - so a copy that also had a misspelled country would be
+            // DELETED by an operator who ticked "Country spelled differently" and never looked at the
+            // callsign column. Its other problems come off: there is nothing to gain by correcting a
+            // contact that should not be in the log, and the copy that stays behind carries the same
+            // problems and gets them put right on its own row.
+            if (copies.Count > 0)
+                findings.RemoveAll(f => !f.Deletes && f.Qso != null && copies.Contains(f.Qso));
+
             // Worst first: a wrong country matters more than a missing continent, and within a kind the
             // oldest QSO first so a run through the list reads chronologically.
             return findings
@@ -1127,17 +1189,20 @@ namespace HolyLogger
         private static int Rank(string problem)
         {
             if (problem.StartsWith("Club Log:")) return 0;
-            if (problem == "Different country") return 1;
-            if (problem == "No country code") return 2;
-            if (problem == "No country") return 3;
-            if (problem == "Damaged callsign") return 4;
-            if (problem.StartsWith("Band") || problem.StartsWith("Frequency")) return 5;
-            if (problem == "Wrong continent") return 6;
+            // A contact held twice is read first: it is the only fault here that makes the log hold
+            // something that never happened, and it inflates every count the program shows.
+            if (problem == "Duplicate contact") return 1;
+            if (problem == "Different country") return 2;
+            if (problem == "No country code") return 3;
+            if (problem == "No country") return 4;
+            if (problem == "Damaged callsign") return 5;
+            if (problem.StartsWith("Band") || problem.StartsWith("Frequency")) return 6;
+            if (problem == "Wrong continent") return 7;
             // A name that belongs to another country is worth reading before a mere wording, because a
             // log that SAYS United States while counting as Galapagos misleads whoever reads it.
-            if (problem == "Wrong country name") return 7;
-            if (problem == "Country spelled differently") return 9;   // last: nothing counts wrongly
-            return 8;
+            if (problem == "Wrong country name") return 8;
+            if (problem == "Country spelled differently") return 10;   // last: nothing counts wrongly
+            return 9;
         }
 
         private static string ZoneSuffix(string cq, string itu)
@@ -1272,7 +1337,10 @@ namespace HolyLogger
                     Cell cell = CellFor(row, key);
                     cell.Wrong = true;
                     if (cell.Current.Length == 0) cell.Current = CurrentOf(q, key);
-                    if (f.Fixable && !string.IsNullOrEmpty(f.NewValue)) cell.Suggest(f.NewValue);
+                    // A removal has no value to propose - the green half would be empty - so it says in
+                    // words what ticking it does, exactly as a report-only finding does.
+                    if (f.Deletes) cell.Note = NoteFor(f);
+                    else if (f.Fixable && !string.IsNullOrEmpty(f.NewValue)) cell.Suggest(f.NewValue);
                     else if (!f.Fixable) cell.Note = NoteFor(f);
 
                     // The entity number travels with the country name, and is the half that decides
@@ -1917,6 +1985,28 @@ namespace HolyLogger
             List<Finding> chosen = rows.SelectMany(r => r.Findings).Where(f => f.Fixable).ToList();
             int typedCells = rows.Sum(r => r.Cells.Count(kv => kv.Value.UserEdited
                                                                && kv.Value.Proposed.Trim().Length > 0));
+
+            // A REMOVAL IS NOT A CORRECTION, and counting it as one would tell the operator that 284
+            // values are about to be written when 284 contacts are about to disappear. The two are
+            // separated here so the confirmation can name each for what it is, and so the writing loop
+            // never bothers updating fields on a QSO it is about to take out.
+            var removals = new HashSet<FixRow>(rows.Where(r => r.Findings.Any(f => f.Fixable && f.Deletes)));
+
+            // AND THE COPIES THAT CANNOT GO YET. A group whose comments disagree is held back from this
+            // whole run: the plain copies are removed first, then the operator is shown the comments
+            // side by side and asked which to keep. Nothing about these rows is written or deleted
+            // until he has answered.
+            var pending = new List<DupGroup>();
+            foreach (FixRow r in rows)
+            {
+                Finding d = r.Findings.FirstOrDefault(f => f.Fixable && f.Deletes && f.Group != null
+                                                           && f.Group.NeedsChoice);
+                if (d != null && !pending.Contains(d.Group)) pending.Add(d.Group);
+            }
+            var held = new HashSet<FixRow>(rows.Where(r => r.Findings.Any(f => f.Fixable && f.Deletes
+                                                            && f.Group != null && f.Group.NeedsChoice)));
+            removals.ExceptWith(held);
+
             if (chosen.Count == 0 && typedCells == 0)
             {
                 HolyMessageBox.Show("Nothing was written: the ticked rows have no value to write.\n\n"
@@ -1936,11 +2026,31 @@ namespace HolyLogger
             // The count of QSOs, not of findings: two problems on one contact are one row rewritten,
             // and "83 corrections" against "80 QSOs" would look like a discrepancy. Hand-typed values
             // are corrections too, and are counted with the rest.
-            int qsoCount = rows.Count;
-            int fixes = chosen.Count + typedCells;
+            int qsoCount = rows.Count - removals.Count - held.Count;
+            int fixes = chosen.Count(f => !f.Deletes) + typedCells;
+
+            // WHAT IS ABOUT TO HAPPEN, IN THE ORDER IT MATTERS. Contacts leaving the log is the graver
+            // half, so it is the first thing said and it is said in plain words - "removed from the
+            // log", not "fixed".
+            string what = "";
+            if (removals.Count > 0)
+                what += removals.Count.ToString("N0") + " duplicate contact"
+                        + (removals.Count == 1 ? " will be" : "s will be") + " REMOVED from the log";
+            if (fixes > 0)
+            {
+                if (what.Length > 0) what += ", and ";
+                what += fixes.ToString("N0") + " correction" + (fixes == 1 ? "" : "s")
+                        + " will be written to " + qsoCount.ToString("N0") + " QSO" + (qsoCount == 1 ? "" : "s");
+            }
+            if (what.Length == 0) what = "Nothing will be written yet";
+            if (pending.Count > 0)
+                what += ".\n\nThen you will be asked about " + pending.Count.ToString("N0") + " group"
+                        + (pending.Count == 1 ? "" : "s")
+                        + " where the copies carry different comments — nothing in "
+                        + (pending.Count == 1 ? "it is" : "those is") + " removed until you have chosen";
+
             if (!HolyMessageBox.ShowConfirm(
-                    fixes.ToString("N0") + " correction" + (fixes == 1 ? "" : "s")
-                    + " will be written to " + qsoCount.ToString("N0") + " QSO" + (qsoCount == 1 ? "" : "s")
+                    what
                     // Backups & Restore DOES list these now - they go into the Backups folder with the
                     // daily ones and restore by the same button - so the message can name the window
                     // rather than describing a file-rename.
@@ -1967,6 +2077,7 @@ namespace HolyLogger
             ShowFixOverlay(total);
 
             int written = 0;
+            var gone = new List<QSO>();      // the contacts actually removed, for the windows showing them
             try
             {
 
@@ -1978,6 +2089,39 @@ namespace HolyLogger
                     foreach (FixRow r in rows)
                     {
                         QSO qso = r.Qso;
+
+                        // Held back for the comment question: not written, not deleted, not counted.
+                        if (held.Contains(r)) continue;
+
+                        // A contact being taken out is not also corrected: writing fields into a row
+                        // that is about to be deleted is work nobody will ever see.
+                        if (removals.Contains(r))
+                        {
+                            // The one comment the group had moves to the contact that stays, so a note
+                            // is never deleted along with the row that happened to carry it.
+                            Finding d = r.Findings.First(f => f.Fixable && f.Deletes);
+                            if (d.Group != null)
+                            {
+                                string carry = (d.Group.ChosenComment ?? string.Empty).Trim();
+                                if (carry.Length > 0 && !string.Equals(carry,
+                                        (d.Group.Keep.Comment ?? string.Empty).Trim(), StringComparison.Ordinal))
+                                {
+                                    d.Group.Keep.Comment = carry;
+                                    dal.Update(d.Group.Keep);
+                                }
+                            }
+
+                            dal.Delete(qso.id);
+                            gone.Add(qso);
+                            written++;
+                            if (written % 50 == 0 || written == total)
+                            {
+                                int at = written;
+                                Dispatcher.BeginInvoke(new Action(() => UpdateFixOverlay(at, total)));
+                            }
+                            continue;
+                        }
+
                         foreach (Finding f in r.Findings) if (f.Fixable) ApplyTo(qso, f);
 
                         // Anything the operator typed is written AFTER the suggestions, so their word
@@ -2016,6 +2160,41 @@ namespace HolyLogger
             // Down before the message box, so the operator is not reading "fixing" behind "fixed".
             HideFixOverlay();
 
+            // ── STEP TWO: the groups whose comments disagree ─────────────────────────────────────
+            //
+            // The plain copies are gone by now. What is left is the handful the program refuses to
+            // decide: one contact, two different things written about it. The same screen Tools >
+            // Remove Duplicates uses puts them side by side with a Keep box against each comment.
+            // A group he ticks nothing in is left whole - both contacts stay in the log.
+            if (pending.Count > 0)
+            {
+                var choose = new DuplicatesWindow(pending) { Owner = this };
+                if (choose.ShowDialog() == true)
+                {
+                    foreach (DupGroup g in pending)
+                    {
+                        if (g.Skipped) continue;
+                        try
+                        {
+                            string keepText = (g.ChosenComment ?? string.Empty).Trim();
+                            if (keepText.Length > 0 && !string.Equals(keepText,
+                                    (g.Keep.Comment ?? string.Empty).Trim(), StringComparison.Ordinal))
+                            {
+                                g.Keep.Comment = keepText;
+                                dal.Update(g.Keep);
+                            }
+                            foreach (QSO extra in g.Extras)
+                            {
+                                dal.Delete(extra.id);
+                                gone.Add(extra);
+                                written++;
+                            }
+                        }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }
+                }
+            }
+
             // THE PATH IS CLICKABLE, so "where is my safety copy" is answered by pressing it rather
             // than by copying a line of text into Explorer. Clicking selects the file in its folder,
             // which is what somebody who wants to keep it, move it or restore it needs to see.
@@ -2023,7 +2202,34 @@ namespace HolyLogger
             // operator a fact about a file and left them to work out what to do with it. What they
             // want to know is how to change their mind - so the sentence is about undoing, and the
             // path underneath is the evidence that it exists.
-            string report = written.ToString("N0") + " QSO" + (written == 1 ? "" : "s") + " fixed."
+            // THE CONTACTS THAT ARE GONE MUST GO FROM EVERY WINDOW SHOWING THEM. This window's own list
+            // first, or the re-check below would scan rows that no longer exist and report them as
+            // duplicates all over again; then the log table and the Log Workshop, which are holding QSO
+            // objects read before the delete and would otherwise show contacts the database has lost.
+            if (gone.Count > 0)
+            {
+                var goneIds = new HashSet<int>(gone.Select(q => q.id));
+                _qsos.RemoveAll(q => goneIds.Contains(q.id));
+
+                try
+                {
+                    // ReloadActiveLogQsos re-reads the log table AND re-points the Log Workshop at the
+                    // fresh collection, so one call covers both windows.
+                    var main = Application.Current == null ? null
+                             : Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
+                    if (main != null) main.ReloadActiveLogQsos();
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
+            int removed = gone.Count;
+            int corrected = written - removed;
+            string report =
+                  (removed > 0 ? removed.ToString("N0") + " duplicate contact"
+                                 + (removed == 1 ? "" : "s") + " removed from the log." : "")
+                + (removed > 0 && corrected > 0 ? "\n" : "")
+                + (corrected > 0 ? corrected.ToString("N0") + " QSO" + (corrected == 1 ? "" : "s")
+                                   + " fixed." : "")
                 + "\n\nClose and reopen the log window to see the new values."
                 + (backup == null ? "" :
                     "\n\nChanged your mind? A copy of your database from just before this was saved. "

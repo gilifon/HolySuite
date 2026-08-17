@@ -4,7 +4,9 @@
         Title="Remove Duplicates" Width="760" Height="520" MinWidth="480"
         WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
         Background="{DynamicResource WindowBg}" Loaded="Window_Loaded">
-    <Grid Margin="14,10,14,12">
+    <Grid>
+    <!-- STEP ONE: the copies that can simply go. -->
+    <Grid x:Name="G_Stage1" Margin="14,10,14,12">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
@@ -16,7 +18,7 @@
                        Foreground="{DynamicResource AccentBrush}"/>
             <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
                        Foreground="{DynamicResource MutedTextBrush}"
-                       Text="QSOs are duplicates when ALL of these match: DX callsign, station callsign, operator, frequency, band, mode, date and time (to the minute). Rows with the same background color belong to the same duplicate group. The first QSO of each group is KEPT; the others are deleted."/>
+                       Text="Two QSOs are the same contact when the DX callsign, the date, the band, the mode and the time (to the minute) all match. Rows with the same background color belong to the same group. The first QSO of each group is KEPT; the others are deleted."/>
         </StackPanel>
 
         <DataGrid x:Name="DupsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="True"
@@ -64,5 +66,110 @@
             <TextBlock x:Name="TB_Summary" VerticalAlignment="Center" FontSize="16"
                        Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
         </DockPanel>
+    </Grid>
+
+    <!-- STEP TWO: the few copies whose comments disagree.
+         These are never removed on a guess. The same contact is in the log twice and somebody wrote
+         two different things on it; only the operator knows which of them is worth keeping, so the
+         comments are put side by side with a Keep box against each. Tick one, or tick several and
+         they are joined. A group with nothing ticked is left alone entirely - both contacts stay. -->
+    <Grid x:Name="G_Stage2" Margin="14,10,14,12" Visibility="Collapsed">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Margin="0,0,0,8">
+            <TextBlock x:Name="TB_Header2" FontSize="16" FontWeight="Bold"
+                       Foreground="{DynamicResource AccentBrush}"/>
+            <TextBlock FontSize="16" TextWrapping="Wrap" Margin="0,4,0,0"
+                       Foreground="{DynamicResource MutedTextBrush}"
+                       Text="These contacts are in the log twice, and the copies carry different comments. Everything else about them is identical, so the only thing to decide is which comment the log keeps. The first one is ticked for you — tick a different one, or tick several and they are joined together. One comment in each group must stay ticked; the copies are removed either way."/>
+        </StackPanel>
+
+        <DataGrid x:Name="CommentsGrid" Grid.Row="1" AutoGenerateColumns="False" IsReadOnly="False"
+                  CanUserAddRows="False" CanUserDeleteRows="False" SelectionMode="Single"
+                  HeadersVisibility="Column" GridLinesVisibility="All" FontSize="16" RowHeaderWidth="0"
+                  BorderBrush="#1565C0" BorderThickness="1"
+                  Foreground="{DynamicResource TextBrush}"
+                  HorizontalGridLinesBrush="{DynamicResource GridLine}"
+                  VerticalGridLinesBrush="{DynamicResource GridLine}">
+            <DataGrid.RowStyle>
+                <Style TargetType="DataGridRow">
+                    <Setter Property="Background" Value="{Binding RowBackground}"/>
+                </Style>
+            </DataGrid.RowStyle>
+            <DataGrid.Columns>
+                <!-- NO COLUMN SAYING WHICH RECORD GOES. Every field shown here is identical across the
+                     group - that is what made them the same contact - so naming one row "removed" told
+                     the operator nothing he could act on and fought with the Keep box beside it. The
+                     only decision on this screen is which comment the log ends up with. -->
+                <DataGridTextColumn Header="Group" Binding="{Binding GroupNo}" Width="62" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Date" Binding="{Binding Date}" Width="Auto" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Time" Binding="{Binding Time}" Width="Auto" IsReadOnly="True"/>
+                <DataGridTextColumn Header="DX Callsign" Binding="{Binding DXCall}" Width="Auto" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Band" Binding="{Binding Band}" Width="Auto" IsReadOnly="True"/>
+                <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="Auto" IsReadOnly="True"/>
+
+                <!-- The Keep box sits against the comment it belongs to, and appears only on the rows
+                     that have one: there is nothing to keep on a copy that says nothing. -->
+                <DataGridTemplateColumn Header="Keep comment" Width="130">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <CheckBox IsChecked="{Binding Keep, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                                      Visibility="{Binding BoxVisibility}"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+
+                <DataGridTextColumn Header="Comment" Binding="{Binding Comment}" Width="*" IsReadOnly="True">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="TextWrapping" Value="Wrap"/>
+                            <Setter Property="Margin" Value="4,3,4,3"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <DockPanel Grid.Row="2" Margin="0,12,0,0">
+            <Button x:Name="Btn_Cancel2" Content="Cancel" DockPanel.Dock="Right" Width="110" Height="34"
+                    FontSize="16" IsCancel="True" Click="Btn_Cancel_Click"/>
+            <!-- Plain OK, and green. The deleting was agreed to in step one; all that is settled here
+                 is which comment the log keeps, so a red "Remove" button was both alarming and
+                 pulling against the Keep boxes above it. -->
+            <Button x:Name="Btn_Delete2" DockPanel.Dock="Right" Width="110" Height="34" Margin="0,0,10,0"
+                    FontSize="16" FontWeight="Bold" Click="Btn_Delete_Click" Content="OK"
+                    Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20" BorderThickness="1.5">
+                <!-- ITS OWN TEMPLATE, SO THE GREEN STAYS GREEN. The default button template paints its
+                     own pale hover colour straight over Background, which turned a deliberate green
+                     button grey-blue the moment the mouse crossed it. Only the press is allowed to
+                     show, and then only as a shade of the same green. -->
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Face" CornerRadius="3"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Face" Property="Background" Value="#1B5E20"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter TargetName="Face" Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+            </Button>
+            <TextBlock x:Name="TB_Summary2" VerticalAlignment="Center" FontSize="16"
+                       Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
+        </DockPanel>
+    </Grid>
     </Grid>
 </Window>
