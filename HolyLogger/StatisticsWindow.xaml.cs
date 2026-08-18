@@ -1267,6 +1267,11 @@ namespace HolyLogger
             // entity -> QSO count, and which services confirmed any of its QSOs
             var counts = new Dictionary<int, int>();
             var sources = new Dictionary<int, SortedSet<string>>();
+            // THE CONTACTS THEMSELVES, kept as they are counted, so the button underneath has something
+            // to hand to the Log Workshop. Counting them and then going back over the log a second time
+            // to find them again would be two questions where there should be one - and the two could
+            // disagree.
+            var qsos = new System.Collections.ObjectModel.ObservableCollection<QSO>();
             if (_allQsos != null)
             {
                 foreach (QSO q in _allQsos)
@@ -1275,6 +1280,7 @@ namespace HolyLogger
                     int code = EntityCodeOf(q);
                     if (code == 0 || !_activeCodes.Contains(code) || achieved.Contains(code)) continue;
 
+                    qsos.Add(q);
                     int n;
                     counts[code] = counts.TryGetValue(code, out n) ? n + 1 : 1;
                     SortedSet<string> set;
@@ -1290,6 +1296,7 @@ namespace HolyLogger
             var rows = counts.Select(p => new
                              {
                                  Name = EntityNameOf(p.Key),
+                                 CodeText = p.Key > 0 ? p.Key.ToString() : "",
                                  Count = p.Value,
                                  ConfirmedBy = sources[p.Key].Count > 0 ? string.Join(", ", sources[p.Key]) : "— nothing —",
                              })
@@ -1318,22 +1325,79 @@ namespace HolyLogger
             grid.ColumnHeaderStyle = MainWindow.BuildLogTableHeaderStyle();
             ScrollViewer.SetVerticalScrollBarVisibility(grid, ScrollBarVisibility.Auto);
             grid.Columns.Add(new DataGridTextColumn { Header = "Country", Binding = new System.Windows.Data.Binding("Name"), Width = new DataGridLength(1, DataGridLengthUnitType.Star) });
+            // THE ENTITY NUMBER, in the header the rest of the program already uses for it: "Country"
+            // over "Code", 12pt on a 12.5px line with 3px of negative margin top and bottom. The margin
+            // gives back the header style's padding, so the two lines have the whole bar to live in and
+            // the bar does not grow. Copied from the country tables behind this window rather than
+            // written afresh, so the two headers are one thing and not two attempts at it.
+            grid.Columns.Add(new DataGridTextColumn
+            {
+                Header = new TextBlock
+                {
+                    Text = "Country\nCode",
+                    FontSize = 12,
+                    FontWeight = FontWeights.Bold,
+                    LineHeight = 12.5,
+                    LineStackingStrategy = LineStackingStrategy.BlockLineHeight,
+                    Margin = new Thickness(0, -3, 0, -3),
+                    TextAlignment = TextAlignment.Center,
+                    HorizontalAlignment = HorizontalAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center,
+                },
+                Binding = new System.Windows.Data.Binding("CodeText"),
+                Width = DataGridLength.Auto,
+                ElementStyle = CentredCell(),
+            });
             grid.Columns.Add(new DataGridTextColumn { Header = "QSOs", Binding = new System.Windows.Data.Binding("Count"), Width = 70 });
             grid.Columns.Add(new DataGridTextColumn { Header = "Confirmed by", Binding = new System.Windows.Data.Binding("ConfirmedBy"), Width = 190 });
+
+            // THE SAME GREEN BUTTON THE DELETED-ENTITIES WINDOW HAS. A list of countries answers "which
+            // ones", and the next question is always "which contacts" - and it was a question this
+            // window could not answer, while its neighbour could. Same wording, same colour, same event:
+            // the Log Workshop opens holding exactly the contacts counted here.
+            var openButton = new Button
+            {
+                Content = "Show the contacts in the Log Workshop",
+                Height = 38,
+                MinWidth = 300,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(0, 10, 0, 0),
+                Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x2E, 0x7D, 0x32)),
+                Foreground = System.Windows.Media.Brushes.White,
+                BorderBrush = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0x1B, 0x5E, 0x20)),
+                BorderThickness = new Thickness(1.5),
+            };
+
+            var layout = new Grid();
+            layout.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            layout.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            Grid.SetRow(grid, 0);
+            Grid.SetRow(openButton, 1);
+            layout.Children.Add(grid);
+            layout.Children.Add(openButton);
 
             var win = new Window
             {
                 Title = $"Worked, not confirmed at {SourceName} ({rows.Count})",
                 Owner = this,
-                Width = 560,
-                Height = 300,
-                MinWidth = 380,
-                MinHeight = 200,
+                Width = 620,
+                Height = 360,
+                MinWidth = 420,
+                MinHeight = 240,
                 ResizeMode = ResizeMode.CanResize,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 Background = (System.Windows.Media.Brush)ThemeManager.Brush("WindowBg"),
-                Content = new Border { Padding = new Thickness(10), Child = grid },
+                Content = new Border { Padding = new Thickness(10), Child = layout },
             };
+
+            openButton.Click += (s, args) =>
+            {
+                win.Close();
+                QsoSubsetRequested?.Invoke(qsos, "Worked, not confirmed at " + SourceName);
+            };
+
             WindowBounds.Attach(win, "WorkedNotConfirmed");
             win.ShowDialog();
         }
@@ -1804,26 +1868,24 @@ namespace HolyLogger
 
         // ---- LoTW "confirmed countries" (confirmed on LoTW) ----
 
-        // Fills the vertical folder strip with the confirmation sources this operator uses. "Worked"
-        // (the plain log, no confirmation) is always first; LoTW / QRZ appear when their service is in
-        // use, or when a past download left a cached confirmed set to show. Selecting index 0 lands on
-        // Worked and fires the first RefreshForSource.
+        // THE STRIP ALWAYS HOLDS THE SAME FOLDERS. Worked, LoTW, QRZ, eQSL, Paper QSL and the ARRL
+        // award - every one of them, every time, whatever is switched on in Options.
+        //
+        // They used to come and go with their service's tick box, and that was wrong twice over. A
+        // folder that is missing looks like a fault, not a setting: turning LoTW off in Options made
+        // the LoTW folder vanish from a window that has nothing to do with uploading, and an operator
+        // reported exactly that. And a folder is worth opening even with the service off - it shows
+        // what was confirmed and downloaded in the past, which does not stop being true because the
+        // service was turned off today. An empty folder is an answer: nothing is confirmed there.
+        //
+        // Selecting index 0 lands on Worked and fires the first RefreshForSource.
         private void BuildSourceFolders()
         {
-            var s = Properties.Settings.Default;
             LB_Source.Items.Clear();
             AddSourceFolder(ConfSource.Worked, "Worked");
-            if (s.UseLotwService || !string.IsNullOrWhiteSpace(LotwConfirmedEntities))
-                AddSourceFolder(ConfSource.Lotw, "LoTW");
-            if (s.UseQrzLogbook || !string.IsNullOrWhiteSpace(QrzConfirmedEntities))
-                AddSourceFolder(ConfSource.Qrz, "QRZ");
-            // eQSL is configured by the per-callsign accounts table, so show the folder when an account
-            // exists (or the service is on, or a past download left a cache).
-            bool hasEqsl = false;
-            try { hasEqsl = (DataAccess.GetInstance()?.GetEqslAccounts().Count ?? 0) > 0; }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-            if (s.UseEqslService || hasEqsl || !string.IsNullOrWhiteSpace(EqslConfirmedEntities))
-                AddSourceFolder(ConfSource.Eqsl, "eQSL");
+            AddSourceFolder(ConfSource.Lotw, "LoTW");
+            AddSourceFolder(ConfSource.Qrz, "QRZ");
+            AddSourceFolder(ConfSource.Eqsl, "eQSL");
             // NO CLUB LOG FOLDER. Club Log is still used by the program - QSOs are uploaded to it, and
             // its country database is one of the two the DXCC resolver reads - but its CONFIRMATIONS are
             // not shown as a folder here any more. Only this window's folder strip is affected; the
@@ -1832,7 +1894,6 @@ namespace HolyLogger
             // back by restoring this one call.
             //   if (s.UseClublogService || !string.IsNullOrWhiteSpace(ClublogConfirmedEntities))
             //       AddSourceFolder(ConfSource.Clublog, "Club Log");
-            // Paper QSL is manual (no service to configure), so it is ALWAYS available.
             AddSourceFolder(ConfSource.Paper, "Paper QSL");
             // ...and last, the one that answers the question every DXer actually asks. Always shown: it
             // needs no service and no setup, and it is the only tab whose number can be compared with an
