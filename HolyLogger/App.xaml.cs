@@ -69,8 +69,80 @@ namespace HolyLogger
      
         }
 
+        // ── A WINDOW THAT IS NOT IN THE TASKBAR MUST NOT BE MINIMISABLE ──────────────────────────
+        //
+        // The operator opened the Log Workshop, pressed Verify, and minimised the Log Fixer that
+        // appeared. It has ShowInTaskbar="False", so there was no button left to click - and it is
+        // MODAL, so the Workshop underneath it stayed dead. Nothing on screen could be used and
+        // nothing could be closed. His words: "this will put the users in dead end".
+        //
+        // Nearly every dialog in the program is declared that way, so this is fixed once, for all of
+        // them, rather than in the one that was reported. Registered as a class handler on Window, so
+        // it reaches every window there is and every window added later without anyone remembering.
+        //
+        // The minimise BUTTON is taken away rather than the minimising undone: a button that visibly
+        // does nothing is the next thing to be reported. The main window is untouched - it is in the
+        // taskbar, so minimising it is exactly what it should do.
+        private const int GWL_STYLE = -16;
+        private const int WS_MINIMIZEBOX = 0x00020000;
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int GetWindowLong(IntPtr hWnd, int nIndex);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern int SetWindowLong(IntPtr hWnd, int nIndex, int dwNewLong);
+
+        // Changing the style is not enough on a window that is already on screen: Windows goes on
+        // painting the caption it drew the first time, so the minimise button stayed there looking
+        // pressable and did nothing when pressed. SWP_FRAMECHANGED is what makes it redraw the frame
+        // and actually drop the button.
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr after, int x, int y, int cx, int cy, uint flags);
+
+        private const uint SWP_NOSIZE = 0x0001;
+        private const uint SWP_NOMOVE = 0x0002;
+        private const uint SWP_NOZORDER = 0x0004;
+        private const uint SWP_NOACTIVATE = 0x0010;
+        private const uint SWP_FRAMECHANGED = 0x0020;
+
+        private static void RemoveMinimiseFromTaskbarlessWindows()
+        {
+            EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent,
+                new RoutedEventHandler((sender, args) =>
+                {
+                    try
+                    {
+                        var w = sender as Window;
+                        if (w == null || w.ShowInTaskbar) return;
+
+                        IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(w).Handle;
+                        if (hwnd == IntPtr.Zero) return;
+
+                        int style = GetWindowLong(hwnd, GWL_STYLE);
+                        if ((style & WS_MINIMIZEBOX) != 0)
+                        {
+                            SetWindowLong(hwnd, GWL_STYLE, style & ~WS_MINIMIZEBOX);
+                            SetWindowPos(hwnd, IntPtr.Zero, 0, 0, 0, 0,
+                                         SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE
+                                         | SWP_FRAMECHANGED);
+                        }
+
+                        // Belt and braces: a window minimised some other way - the taskbar's "show the
+                        // desktop", a keyboard shortcut - comes straight back rather than disappearing.
+                        w.StateChanged += (s2, e2) =>
+                        {
+                            if (w.WindowState == WindowState.Minimized && !w.ShowInTaskbar)
+                                w.WindowState = WindowState.Normal;
+                        };
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }));
+        }
+
         private void Application_Startup(object sender, StartupEventArgs e)
         {
+            RemoveMinimiseFromTaskbarlessWindows();
+
             // Last-chance handling. Every unhandled exception lands in holylogger.log with a stack
             // trace. A UI (dispatcher) exception is additionally MARKED HANDLED so one bad click
             // doesn't kill a logging session mid-contest: the user is told it was recorded and the
