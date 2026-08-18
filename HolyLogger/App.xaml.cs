@@ -113,7 +113,23 @@ namespace HolyLogger
                     try
                     {
                         var w = sender as Window;
-                        if (w == null || w.ShowInTaskbar) return;
+                        if (w == null) return;
+
+                        // WILL THIS WINDOW HAVE A BUTTON IN THE TASKBAR? Only then may it be minimised.
+                        //
+                        // ShowInTaskbar is not the whole test. An OWNED window does not get a taskbar
+                        // button of its own - Windows shows the owner instead - so the Log Workshop,
+                        // which never set ShowInTaskbar at all, still disappeared when it was minimised:
+                        // "i simply did not see and icon of the workshop after minizing it". The main
+                        // window owns nothing and is in the taskbar, so it keeps its button.
+                        if (w.ShowInTaskbar && w.Owner == null) return;
+
+                        // A WINDOW THAT DRAWS ITS OWN TITLE BAR needs its own button hidden - there is
+                        // no system caption to take anything away from. The Workshop and the Channels
+                        // window are both WindowStyle="None" with hand-made caption buttons, so the
+                        // Win32 style below would have left theirs sitting there.
+                        var custom = w.FindName("TitleBar_MinimizeBtn") as UIElement;
+                        if (custom != null) custom.Visibility = Visibility.Collapsed;
 
                         IntPtr hwnd = new System.Windows.Interop.WindowInteropHelper(w).Handle;
                         if (hwnd == IntPtr.Zero) return;
@@ -131,7 +147,8 @@ namespace HolyLogger
                         // desktop", a keyboard shortcut - comes straight back rather than disappearing.
                         w.StateChanged += (s2, e2) =>
                         {
-                            if (w.WindowState == WindowState.Minimized && !w.ShowInTaskbar)
+                            if (w.WindowState == WindowState.Minimized
+                                && !(w.ShowInTaskbar && w.Owner == null))
                                 w.WindowState = WindowState.Normal;
                         };
                     }

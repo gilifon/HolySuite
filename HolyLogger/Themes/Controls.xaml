@@ -8,6 +8,69 @@
          Controls that set their own Background/Foreground inline keep those (accent panels, LED,
          colored status text, etc.). -->
 
+    <!-- ── THE RED KEYCAP: UNDO ────────────────────────────────────────────────────────────────
+         The shape of the Add (F1) / Clear (F9) keys on the main form, in red. Undo is not one of the
+         logging keys - it takes back something already done - so it has to be seen at a glance and
+         never mistaken for them.
+
+         The point of a hand-written template here is the mouse-over. The stock WPF button paints its
+         own pale grey over whatever Background it is given the moment the pointer arrives, and on a
+         coloured button that reads as "you cannot press this" - which is exactly how it was reported:
+         "when the mouse is over it gets gray and gives the felling that it is disabled". This one
+         lights UP instead.
+
+         In this file, not in a window, because BOTH Undo buttons wear it - the main window's and the
+         Log Workshop's - and a window's own resources cannot be seen from another window. -->
+    <Style x:Key="DangerActionButtonStyle" TargetType="Button">
+        <!-- The full red, not a tint of it. A pale red says "almost a warning"; this one is meant to
+             be seen from across the form. -->
+        <Setter Property="Background" Value="#C62828"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Margin" Value="0,1,0,1"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="KeyOuter" CornerRadius="5" Background="#8E1B1B" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                        <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#C62828" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <!-- BLUE under the mouse - the very same #A8D8FF the F1 and F9 keys light up
+                             to. Red sitting still, blue when the pointer is on it: the change is
+                             unmissable, and it is the change this form already teaches everywhere
+                             else. The text goes black at the same moment, because white on a pale
+                             blue face cannot be read. -->
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#1F5C8E"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#A8D8FF"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#3A80C8"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                            <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#7DC0F5"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                        </Trigger>
+                        <!-- The Workshop's Undo is always on show and merely disabled when there is
+                             nothing to take back, so grey is needed here after all - it is the one
+                             state that really does mean "you cannot press this". -->
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                            <Setter Property="Foreground" Value="#7A7A7A"/>
+                            <Setter Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Every window: themed surface + default text color (buttons/colored text override it). -->
     <Style TargetType="Window">
         <Setter Property="Background" Value="{DynamicResource WindowBg}"/>

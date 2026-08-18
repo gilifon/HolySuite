@@ -1755,6 +1755,13 @@ namespace HolyLogger
             }
             else if (state == State.Edit)
             {
+                // WHAT IT SAID BEFORE, taken before a single field is overwritten. The main window
+                // could delete a QSO and put it back, but an EDIT was final: a mistyped callsign or a
+                // date changed by accident had to be found and typed again from memory. The Log
+                // Workshop has had an undo for its edits all along; this side had none.
+                _editUndoTarget = QsoToUpdate;
+                _editUndoBefore = CopyOfQso(QsoToUpdate);
+
                 QsoToUpdate.Comment = TB_Comment.Text;
                 QsoToUpdate.DXCall = TB_DXCallsign.Text;
                 QsoToUpdate.Mode = CB_Mode.Text;
@@ -1812,6 +1819,8 @@ namespace HolyLogger
 
                 // Rebuild worked countries list after edit (callsign/country may have changed)
                 RebuildWorkedCountriesAndRefreshCluster();
+
+                ShowEditUndoBar();
 
                 LoadPreEditUserData();
             }
@@ -2188,10 +2197,9 @@ namespace HolyLogger
                 // A DELETE OFFERED IN ANOTHER LOG IS NOT OFFERED IN THIS ONE. The bar would otherwise
                 // still be standing over a table it says nothing about, and its Undo would put rows back
                 // into a log the operator is no longer looking at - the restore would appear to do
-                // nothing at all. The QSOs are still deleted; only the offer expires.
-                _deletedForUndo = null;
-                _deletedForUndoLogIds = null;
-                if (DeleteUndoBar != null) DeleteUndoBar.Visibility = Visibility.Collapsed;
+                // nothing at all. The QSOs are still deleted; only the offer expires. The same goes for
+                // an edit: the contact it belongs to is not in the table any more.
+                ClearUndo();
 
                 ApplyContestModeForActiveLog();
                 UpdateActiveLogTitle();
@@ -3513,8 +3521,13 @@ namespace HolyLogger
             if (failure != null)
                 HolyMessageBox.ShowError("Could not delete them all: " + failure, "Delete QSOs", this);
 
-            _deletedForUndo = deleted;
-            _deletedForUndoLogIds = logIds;
+            if (deleted.Count > 0)
+                PushUndo(new UndoStep
+                {
+                    Deleted = deleted,
+                    DeletedLogIds = logIds,
+                    Label = string.Format("Deleted {0:N0} QSO{1}", deleted.Count, deleted.Count == 1 ? "" : "s"),
+                });
 
             // Once, now, instead of once per row - the same work Qsos_CollectionChanged would have done.
             LastQSO = Qsos?.FirstOrDefault();
@@ -3524,32 +3537,184 @@ namespace HolyLogger
             UpdateClublogMenuCount();
             UpdateEqslQueueIndicator();
             RebuildWorkedCountriesAndRefreshCluster();
+        }
 
-            TB_DeleteUndoText.Text = string.Format("Deleted {0:N0} QSO{1}", deleted.Count, deleted.Count == 1 ? "" : "s");
-            DeleteUndoBar.Visibility = deleted.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
+        // ── ONE UNDO STACK FOR THE MAIN WINDOW ───────────────────────────────────────────────────
+        //
+        // Edits and deletions go on the SAME stack, so Undo always takes back the last thing done -
+        // whichever it was. Two separate one-shot slots would have to decide between themselves which
+        // to offer, and would get it wrong the moment an operator deleted a row and then edited
+        // another.
+        //
+        // A stack, not a single step, because the Log Workshop has had one all along and the two
+        // windows edit the same log: "do like we do in the workshop. keeps a stack".
+        //
+        // Deep in the stack the promise weakens by itself - an older edit undone after a newer one to
+        // the same contact would put back the older values - so the bar names only the top step and
+        // says how many are behind it.
+        private class UndoStep
+        {
+            public string Label;
+
+            // An edit: the live QSO object the grid is showing, and a copy of it as it was.
+            public QSO EditTarget;
+            public QSO EditBefore;
+
+            // A deletion: the contacts, and the log each came out of.
+            public List<QSO> Deleted;
+            public List<long> DeletedLogIds;
+
+            public bool IsEdit { get { return EditTarget != null && EditBefore != null; } }
+        }
+
+        private readonly Stack<UndoStep> _mainUndo = new Stack<UndoStep>();
+
+        // How deep it is allowed to go. Every step holds a copy of one QSO (or a list of deleted
+        // ones), so this is small - but it is not nothing, and an operator editing all afternoon
+        // should not be paying for a step he took four hours ago.
+        private const int MaxUndoSteps = 50;
+
+        private QSO _editUndoBefore;
+        private QSO _editUndoTarget;
+
+        private void PushUndo(UndoStep step)
+        {
+            if (step == null) return;
+            _mainUndo.Push(step);
+
+            // Stack<T> has no way to drop from the bottom, so it is rebuilt on the rare occasion it
+            // grows past the limit - newest kept, oldest let go.
+            if (_mainUndo.Count > MaxUndoSteps)
+            {
+                var keep = _mainUndo.ToArray();                    // top first
+                _mainUndo.Clear();
+                for (int i = MaxUndoSteps - 1; i >= 0; i--) _mainUndo.Push(keep[i]);
+            }
+
+            ShowUndoBar();
+        }
+
+        // ONE CONTROL, NOT TWO. There was a floating red bar as well, and after an edit both appeared
+        // at once saying the same thing - the bar over the log table and the button on the form. The
+        // bar is gone; this is the whole of it. What it would undo is in the tooltip, which is where a
+        // detail belongs when the button itself has to be small.
+        private void ShowUndoBar()
+        {
+            if (Btn_UndoMain == null) return;
+
+            if (_mainUndo.Count == 0)
+            {
+                Btn_UndoMain.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            UndoStep top = _mainUndo.Peek();
+            Btn_UndoMain.ToolTip = "Undo: " + top.Label
+                + (_mainUndo.Count > 1 ? string.Format("   ({0} more can be undone)", _mainUndo.Count - 1) : "");
+            Btn_UndoMain.Visibility = Visibility.Visible;
+        }
+
+        private void ClearUndo()
+        {
+            _mainUndo.Clear();
+            _editUndoBefore = null;
+            _editUndoTarget = null;
+            _deletedForUndo = null;
+            _deletedForUndoLogIds = null;
+            if (Btn_UndoMain != null) Btn_UndoMain.Visibility = Visibility.Collapsed;
+        }
+
+        // Every readable-and-writable property, copied. Written by reflection rather than by hand
+        // because a QSO has some seventy fields and a list typed out here would be missing one within
+        // a release - and the field it was missing is the field somebody would want back.
+        private static QSO CopyOfQso(QSO source)
+        {
+            if (source == null) return null;
+            var copy = new QSO();
+            foreach (var p in typeof(QSO).GetProperties())
+            {
+                if (!p.CanRead || !p.CanWrite) continue;
+                try { p.SetValue(copy, p.GetValue(source)); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+            return copy;
+        }
+
+        private void ShowEditUndoBar()
+        {
+            if (_editUndoBefore == null || _editUndoTarget == null) return;
+
+            string call = (_editUndoBefore.DXCall ?? string.Empty).Trim();
+            PushUndo(new UndoStep
+            {
+                EditTarget = _editUndoTarget,
+                EditBefore = _editUndoBefore,
+                Label = "Edited " + (call.Length > 0 ? call : "a QSO"),
+            });
+
+            _editUndoBefore = null;
+            _editUndoTarget = null;
+        }
+
+        private void UndoTheEdit(QSO live, QSO before)
+        {
+            if (before == null || live == null) return;
+
+            try
+            {
+                // Back onto the SAME object the grid is showing, so the row changes under the operator
+                // rather than after a reload - and the id is kept, because it is the row's identity and
+                // the copy's id is only a copy of it.
+                int id = live.id;
+                foreach (var p in typeof(QSO).GetProperties())
+                {
+                    if (!p.CanRead || !p.CanWrite) continue;
+                    try { p.SetValue(live, p.GetValue(before)); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+                live.id = id;
+
+                DataAccess.GetInstance()?.Update(live);
+                QSODataGrid.Items.Refresh();
+                RebuildWorkedCountriesAndRefreshCluster();
+                UpdateNumOfQSOs();
+
+                HolyMessageBox.ShowSuccess(
+                    "The edit was undone — " + ((before.DXCall ?? "").Trim().Length > 0 ? before.DXCall.Trim() : "the QSO")
+                    + " is back as it was.", "Undo", this);
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Undoing an edit failed: " + ex.Message);
+                HolyMessageBox.ShowError("The edit could not be undone.\n\n" + ex.Message, "Undo", this);
+            }
         }
 
         private void Btn_DeleteUndo_Click(object sender, RoutedEventArgs e)
         {
-            if (_deletedForUndo == null || _deletedForUndo.Count == 0) { DeleteUndoBar.Visibility = Visibility.Collapsed; return; }
+            // ONE STEP OFF THE TOP. The button goes on offering the next one down, so several undos in
+            // a row walk back through what was done - the same way the Log Workshop's does.
+            if (_mainUndo.Count == 0) { ShowUndoBar(); return; }
+
+            UndoStep step = _mainUndo.Pop();
+            ShowUndoBar();
+
+            if (step.IsEdit) { UndoTheEdit(step.EditTarget, step.EditBefore); return; }
+            if (step.Deleted == null || step.Deleted.Count == 0) return;
 
             var dal = DataAccess.GetInstance();
             int restored = 0;
-            for (int i = 0; i < _deletedForUndo.Count; i++)
+            for (int i = 0; i < step.Deleted.Count; i++)
             {
                 try
                 {
-                    QSO q = _deletedForUndo[i];
-                    int newId = dal != null ? dal.RestoreQso(q, _deletedForUndoLogIds[i]) : 0;
+                    QSO q = step.Deleted[i];
+                    int newId = dal != null ? dal.RestoreQso(q, step.DeletedLogIds[i]) : 0;
                     if (newId > 0) q.id = newId;
                     restored++;
                 }
                 catch (Exception ex) { Log.Swallow(ex); }
             }
-
-            _deletedForUndo = null;
-            _deletedForUndoLogIds = null;
-            DeleteUndoBar.Visibility = Visibility.Collapsed;
 
             // RELOADED, not added back one by one. A plain Add leaves them at the end, unsorted and
             // probably off-screen, which reads as "nothing came back". The same three steps every other
@@ -3577,13 +3742,10 @@ namespace HolyLogger
                 "Undo", this);
         }
 
+        // Kept only because the XAML that used it has gone and something may still reference it; it
+        // dismisses nothing now, because there is nothing to dismiss.
         private void Btn_DeleteUndoDismiss_Click(object sender, RoutedEventArgs e)
         {
-            // The deletion stands. The QSOs are already gone from the database; only the way back is
-            // being put away.
-            _deletedForUndo = null;
-            _deletedForUndoLogIds = null;
-            DeleteUndoBar.Visibility = Visibility.Collapsed;
         }
 
         private void OpenQrzPage(string callsign)
@@ -6998,7 +7160,15 @@ namespace HolyLogger
                 searchWindow.Activate();
                 return;
             }
-            searchWindow = new SearchWindow(Qsos, SafeActiveLogName()) { Owner = this };
+            // NO OWNER, DELIBERATELY. An owned window is pinned above its owner for ever: the Workshop
+            // sat over the main window and clicking the main window could not bring it forward. It is
+            // not a dialog - it is a second place to work, open for as long as the operator wants - so
+            // it is a window in its own right, orderable like any other, with its own taskbar button
+            // and its own minimise.
+            //
+            // Nothing is left running by this: the app is ShutdownMode="OnMainWindowClose", and the
+            // main window closes this one explicitly on its way out.
+            searchWindow = new SearchWindow(Qsos, SafeActiveLogName());
             searchWindow.Closed += (s, _) => searchWindow = null;
             searchWindow.Show();
             if (!string.IsNullOrWhiteSpace(presetCallsign))
@@ -7016,7 +7186,7 @@ namespace HolyLogger
                 searchWindow.Activate();
                 return;
             }
-            searchWindow = new SearchWindow(Qsos, SafeActiveLogName()) { Owner = this };
+            searchWindow = new SearchWindow(Qsos, SafeActiveLogName());   // no owner - see OpenSearchWindow
             searchWindow.Closed += (s, _) => searchWindow = null;
             searchWindow.Show();
             searchWindow.SetCountry(country, runSearch: true);

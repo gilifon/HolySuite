@@ -462,13 +462,21 @@ namespace HolyLogger
 
         // OK and Close side by side at the foot of the card. OK belongs to the logger boxes above it;
         // Close ends the menu whether or not anything was ticked.
+        //
+        // CENTRED UNDER THE CARD, not indented to the menu's text margin. Every other line here begins
+        // at 40px because it is a line of text with a glyph to its left; these two are not a line of
+        // text, they are the pair of buttons the card ends with, and starting them at the text indent
+        // left them hanging off to one side of a card whose width is set by the longest item above.
+        // Centring costs nothing and needs no number: the pair sits in the middle of whatever width
+        // the menu turns out to be.
         private static UIElement MakeButtonRow(Button ok, Button close)
         {
             close.Margin = new Thickness(10, 0, 0, 0);
             var row = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
-                Margin = new Thickness(40, 6, 8, 4)   // 40 = the menu's text indent, as everywhere else
+                HorizontalAlignment = HorizontalAlignment.Center,
+                Margin = new Thickness(8, 6, 8, 4)
             };
             row.Children.Add(ok);
             row.Children.Add(close);
@@ -2331,21 +2339,17 @@ namespace HolyLogger
             if (Btn_Undo == null) return;
             bool any = _undo.Count > 0;
             Btn_Undo.IsEnabled = any;
-            Btn_Undo.Content = any ? $"Undo ({_undo.Count})" : "Undo";
-            // Dark-red, bold, white text while there is something to undo, so it stands out; revert to the
-            // themed default when empty.
-            if (any)
-            {
-                Btn_Undo.Background = new SolidColorBrush(Color.FromRgb(0xC6, 0x28, 0x28));
-                Btn_Undo.Foreground = System.Windows.Media.Brushes.White;
-                Btn_Undo.FontWeight = FontWeights.Bold;
-            }
-            else
-            {
-                Btn_Undo.ClearValue(BackgroundProperty);
-                Btn_Undo.ClearValue(ForegroundProperty);
-                Btn_Undo.ClearValue(FontWeightProperty);
-            }
+
+            // THE ARROW IS PART OF THE BUTTON, not decoration on the XAML. This line used to write a
+            // bare "Undo" over it, so the button lost its arrow the moment anything was undone and
+            // looked like a different button from the one that had been there a second earlier.
+            Btn_Undo.Content = any ? string.Format("↶ Undo ({0})", _undo.Count) : "↶ Undo";
+
+            // THE COLOURS BELONG TO THE STYLE. They used to be painted on here - red while there was
+            // something to undo, cleared when there was not - and a local value outranks a style, so
+            // the red keycap could not colour its own face, and clearing it left a plain button beside
+            // a styled one. DangerActionButtonStyle already says red at rest, blue under the mouse and
+            // grey when disabled; IsEnabled above is all it needs to be told.
             Btn_Undo.ToolTip = any
                 ? "Undo: " + _undo.Peek().Label
                 : "Nothing to undo. Changes made in this window can be undone until it is closed.";
@@ -2438,6 +2442,30 @@ namespace HolyLogger
 
         private void OnSourceCollectionChanged(object sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
         {
+            // A CONTACT DELETED ANYWHERE IS GONE FROM HERE TOO.
+            //
+            // This window used to keep showing a QSO after it had been deleted in the log table - and
+            // its rows are not a picture, they are the thing itself: that row could still be opened,
+            // edited, uploaded or exported, all of it aimed at a contact the database no longer holds.
+            //
+            // Done BEFORE the two guards below, because they are about not disturbing a dropdown or a
+            // cell mid-edit, and a row that should not exist outranks both.
+            //
+            // Only removals are acted on. A newly logged QSO does NOT re-run the search: that would
+            // throw away the operator's ticks and his place in the list every time he logs a contact,
+            // and a result set missing a new row is merely incomplete, where a deleted row is wrong.
+            if (e.OldItems != null && e.OldItems.Count > 0)
+            {
+                try
+                {
+                    var shown = ResultsGrid?.DataContext as ObservableCollection<QSO>;
+                    if (shown != null)
+                        foreach (QSO gone in e.OldItems.OfType<QSO>())
+                            shown.Remove(gone);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
             // Not while a cell is being edited, and not while a list is open under the operator's
             // cursor - replacing the items of an open dropdown closes it mid-choice.
             if (_cellInEdit) return;

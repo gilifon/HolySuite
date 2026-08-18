@@ -391,7 +391,8 @@
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <!-- Undo of a SAVED edit. Ctrl+Z does the same, but a disabled button is the only
                          thing that tells you an undo exists and what it would put back. -->
-                    <Button x:Name="Btn_Undo" Content="Undo" FontSize="16" Padding="12,4" Margin="0,0,14,0"
+                    <Button x:Name="Btn_Undo" Style="{StaticResource DangerActionButtonStyle}"
+                            Content="↶ Undo" FontSize="16" Padding="12,4" Margin="0,0,14,0"
                             IsEnabled="False" Click="Btn_Undo_Click"/>
                     <Button x:Name="Btn_Search" FontSize="16" Padding="16,4"
                             Click="Btn_Search_Click" Background="#1565C0" Foreground="White"

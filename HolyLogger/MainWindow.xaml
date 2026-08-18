@@ -332,6 +332,10 @@
             </Setter>
         </Style>
         <!-- Action button style: same keyboard-key shape, light blue for Add/Clear -->
+        <!-- DangerActionButtonStyle - the red keycap the Undo buttons wear - lives in
+             Themes/Controls.xaml, because the Log Workshop needs it too and a window's own resources
+             are not visible to any other window. -->
+
         <Style x:Key="ActionButtonStyle" TargetType="Button">
             <Setter Property="Background" Value="#CCE8FF"/>
             <Setter Property="Foreground" Value="#000000"/>
@@ -1709,6 +1713,24 @@
                      CharacterCasing="Upper" MaxLength="60" TabIndex="25" TextWrapping="NoWrap"
                      VerticalContentAlignment="Center"
                      ToolTip="The reference within that activity, e.g. OK-00234"/>
+            <!-- UNDO, and only when there is something to undo.
+                 The main window could put back a deleted QSO but not an edited one, so a mistyped
+                 callsign or a date changed by accident had to be found and retyped from memory. Edits
+                 and deletions now share one stack and this is the way into it: press it and the last
+                 thing done is taken back, press it again for the one before.
+                 It is not in the tab order - it is a repair, not part of logging a contact - and it is
+                 Collapsed until the stack has something in it, so the row is empty in normal use.
+                 Right edge lined up with TB_WwffRef above it: 553 + 85 = 638, so 638 - 96 = 542.
+                 96 wide with no padding: enough for the arrow and the word at FontSize 16 and no more.
+                 120 trimmed the label, 148 was a slab across the row. -->
+            <!-- ActionButtonStyle - the keycap the F1 and F9 buttons wear. The plain button template
+                 paints its own pale grey over whatever Background it is given the moment the mouse
+                 arrives, and on a red button that read as "disabled". This style has no such colour:
+                 it lights UP to #A8D8FF instead, which is what every other button on this form does. -->
+            <Button x:Name="Btn_UndoMain" Style="{StaticResource DangerActionButtonStyle}"
+                    Canvas.Left="542" Canvas.Top="34" Width="96" Height="28"
+                    FontSize="16" FontWeight="Bold" Content="↶ Undo" Padding="0" Visibility="Collapsed"
+                    IsTabStop="False" Click="Btn_DeleteUndo_Click"/>
             <!-- "Activity" written INSIDE the empty box, the way a placeholder is. The row's other boxes
                  have a label to their left saying what they are; this one has no room for one, and an
                  empty box with a chevron says only "something goes here". Grey, so it cannot be mistaken
@@ -2011,20 +2033,8 @@
              Collapsed at every other moment.
              Placed 44px down: BELOW the column headers, never across them. The headers are how the
              operator reads the rows that are left, and a bar over them hides what is being explained. -->
-        <Border x:Name="DeleteUndoBar" Visibility="Collapsed" Panel.ZIndex="60"
-                HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,44,0,0"
-                Background="#C62828" BorderBrush="#8E1B1B" BorderThickness="1.5"
-                CornerRadius="5" Padding="20,12,14,12">
-            <StackPanel Orientation="Horizontal">
-                <TextBlock x:Name="TB_DeleteUndoText" FontSize="20" FontWeight="Bold" Foreground="White"
-                           VerticalAlignment="Center" Margin="0,0,18,0"/>
-                <Button x:Name="Btn_DeleteUndo" Content="Undo" FontSize="18" FontWeight="Bold"
-                        Height="38" MinWidth="120" Click="Btn_DeleteUndo_Click"/>
-                <Button x:Name="Btn_DeleteUndoDismiss" Content="✕" FontSize="18" FontWeight="Bold"
-                        Height="38" Width="44" Margin="10,0,0,0"
-                        ToolTip="Keep the deletion" Click="Btn_DeleteUndoDismiss_Click"/>
-            </StackPanel>
-        </Border>
+        <!-- The floating red "Deleted N QSOs - Undo" bar that used to sit here is gone. It said the same
+             thing as the Undo button on the activity row, at the same moment, in two places at once. -->
         </Grid>
 
         <ToolsUserControls:MapUserControl x:Name="MapControl" HorizontalAlignment="Stretch" Height="344" Margin="677,0,6,0" Grid.Row="1" VerticalAlignment="Top"/>
