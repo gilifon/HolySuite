@@ -2948,8 +2948,34 @@ Environment.NewLine +
         // time used only to choose between several contacts with the same station on the same band and mode
         // that day. Measured against a real 28,366-QSO log: 28,197 records identify a QSO outright, 169
         // share a key with another, and none of those were inseparable by time.
+        // WHAT A MERGE DID TO ONE QSO THE LOG ALREADY HELD.
+        //
+        // The completion pass writes into empty columns of contacts that are already stored, and
+        // afterwards those contacts look exactly as though they always held the values. Nothing else in
+        // the program can tell that a QSL date, a county or a contest name arrived from a file half an
+        // hour ago - which makes a bad file quietly editing good QSOs impossible to notice, let alone
+        // undo. So the merge says what it touched, field by field.
+        public class MergeNote
+        {
+            public string Call { get; set; }
+            public string Date { get; set; }
+            public string Time { get; set; }
+            public string Band { get; set; }
+            public string Mode { get; set; }
+            // field name -> what was put in it. Empty for a record that matched two QSOs, where nothing
+            // was written at all.
+            public List<KeyValuePair<string, string>> Fields = new List<KeyValuePair<string, string>>();
+        }
+
+        // Above this many notes the merge stops collecting them. A re-import of a large log can complete
+        // tens of thousands of QSOs, and a list of those is held in memory in a 32-bit process that has
+        // run out of room on a big import before now. The COUNTS are never capped.
+        private const int MaxMergeNotes = 20000;
+
         public List<QSO> CompleteExistingQsos(List<QSO> parsed, long logId, out int completed, out int ambiguous,
-                                              Action<int> progress = null)
+                                              Action<int> progress = null,
+                                              List<MergeNote> filledNotes = null,
+                                              List<MergeNote> ambiguousNotes = null)
         {
             completed = 0; ambiguous = 0;
             var unmatched = new List<QSO>();
@@ -3046,7 +3072,13 @@ Environment.NewLine +
                             // skipped rather than added as a duplicate.
                             bool tie;
                             target = ClosestByTime(bucket, p.Time, out tie);
-                            if (tie || target == null) { ambiguous++; continue; }
+                            if (tie || target == null)
+                            {
+                                ambiguous++;
+                                if (ambiguousNotes != null && ambiguousNotes.Count < MaxMergeNotes)
+                                    ambiguousNotes.Add(NoteFor(p));
+                                continue;
+                            }
                         }
                         bucket.Remove(target);
 
@@ -3076,7 +3108,44 @@ Environment.NewLine +
                         cmd.Parameters[16].Value = Blank(p.Qth);
                         cmd.Parameters[17].Value = target.id;
 
-                        try { if (cmd.ExecuteNonQuery() > 0) completed++; }
+                        // WORKED OUT BEFORE THE WRITE, because afterwards there is no way to tell what
+                        // was empty. The same test the SQL uses - empty here, something in the record -
+                        // so the list says exactly what the UPDATE is about to put in.
+                        MergeNote note = null;
+                        if (filledNotes != null && filledNotes.Count < MaxMergeNotes)
+                        {
+                            note = NoteFor(p);
+                            AddFill(note, "STATE", target.State, p.State);
+                            AddFill(note, "IOTA", target.Iota, p.Iota);
+                            AddFill(note, "SOTA_REF", target.SotaRef, p.SotaRef);
+                            AddFill(note, "POTA_REF", target.PotaRef, p.PotaRef);
+                            AddFill(note, "WWFF_REF", target.WwffRef, p.WwffRef);
+                            AddFill(note, "SIG", target.Sig, p.Sig);
+                            AddFill(note, "SIG_INFO", target.SigInfo, p.SigInfo);
+                            AddFill(note, "CREDIT_GRANTED", target.CreditGranted, p.CreditGranted);
+                            AddFill(note, "CNTY", target.Cnty, p.Cnty);
+                            AddFill(note, "QSL_VIA", target.QslVia, p.QslVia);
+                            AddFill(note, "QSLRDATE", target.QslRDate, p.QslRDate);
+                            AddFill(note, "QSL_SENT", target.QslSent, p.QslSent);
+                            AddFill(note, "CONTEST_ID", target.ContestId, p.ContestId);
+                            AddFill(note, "TIME_OFF", target.TimeOff, p.TimeOff);
+                            AddFill(note, "DATE_OFF", target.DateOff, p.DateOff);
+                            AddFill(note, "QTH", target.Qth, p.Qth);
+                            // Not printed value-by-value: it is every ADIF field this program has no
+                            // column of its own for, and on a Log4OM record that is hundreds of bytes.
+                            if (IsEmpty(target.ExtraAdif) && !IsEmpty(p.ExtraAdif))
+                                note.Fields.Add(new KeyValuePair<string, string>(
+                                    "other ADIF fields", "kept from the file"));
+                        }
+
+                        try
+                        {
+                            if (cmd.ExecuteNonQuery() > 0)
+                            {
+                                completed++;
+                                if (note != null && note.Fields.Count > 0) filledNotes.Add(note);
+                            }
+                        }
                         catch (Exception swallowed) { Log.Swallow(swallowed); }
                     }
 
@@ -3084,6 +3153,31 @@ Environment.NewLine +
                 }
             }
             return unmatched;
+        }
+
+        private static bool IsEmpty(string s) { return string.IsNullOrWhiteSpace(s); }
+
+        // Which QSO a note is about, in the same five things every other report names it by.
+        private static MergeNote NoteFor(QSO p)
+        {
+            return new MergeNote
+            {
+                Call = (p.DXCall ?? string.Empty).Trim(),
+                Date = (p.Date ?? string.Empty).Trim(),
+                Time = (p.Time ?? string.Empty).Trim(),
+                Band = (p.Band ?? string.Empty).Trim(),
+                Mode = (p.Mode ?? string.Empty).Trim(),
+            };
+        }
+
+        // Records one field the merge is about to fill - empty in the log, present in the file. Anything
+        // the log already holds is left alone and is not a change, so it is not listed.
+        private static void AddFill(MergeNote note, string field, string current, string incoming)
+        {
+            if (note == null) return;
+            if (!IsEmpty(current)) return;
+            if (IsEmpty(incoming)) return;
+            note.Fields.Add(new KeyValuePair<string, string>(field, incoming.Trim()));
         }
 
         // Whether a parsed record holds anything the completion pass could actually write.

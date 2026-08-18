@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -165,63 +165,17 @@ namespace HolyParser
             public string From { get; set; }
         }
 
-        // ONE RECORD WHOSE COUNTRY WE OVERRULED.
+        // WHAT THE PARSER NO LONGER KEEPS: CountryChange and EntityNote.
         //
-        // The importer reads the <COUNTRY> the file carries and then re-resolves the callsign against the
-        // QSO's own date, because a file's country is only as good as the day it was written: a prefix
-        // that has since changed hands, a DXpedition callsign whose entity is not what its prefix says
-        // (K9W was Wake Island for two weeks, not the USA), an entity deleted years ago. Our answer wins
-        // - and used to win in silence, with nothing kept to say the file had said otherwise.
-        //
-        // That silence is the problem. An operator importing years of logging has no way to see that
-        // hundreds of countries were rewritten, and no way to tell a correction from a mistake of ours.
-        // Only a REAL disagreement is recorded: same entity worded differently ("Germany" against "Fed.
-        // Rep. of Germany") is not a finding and would bury the ones that are.
-        public class CountryChange
-        {
-            public int Number { get; set; }        // the record's position in the file
-            public string Call { get; set; }
-            public string Date { get; set; }
-            public string FromFile { get; set; }   // what the file said - and what was STORED
-            public string OurAnswer { get; set; }  // what HolyLogger makes of the same callsign and date
-            public string ResolvedBy { get; set; } // which database answered: cty.dat or Club Log
-
-            // TWO QUITE DIFFERENT FINDINGS, and mixing them is what made the first report unreadable.
-            //
-            //   Spelling  - the same DXCC entity, written differently. "Fed. Rep. Germany" against
-            //               "Fed. Rep. of Germany". Nothing is wrong with the QSO; the operator may
-            //               simply want one wording through the log.
-            //   Entity    - the callsign belongs to a DIFFERENT DXCC entity from the one the file
-            //               names. That is a country counted wrongly, and it is the finding that
-            //               matters: an award total is built on it.
-            public bool IsSpellingOnly { get; set; }
-        }
-
-        // A QSO whose callsign HolyLogger cannot put a country to, or can only put a NON-country to.
-        //
-        // Two quite different things, worth telling apart:
-        //   * No entity recognised - no database has heard of the prefix. A typo (an O for a zero), a
-        //     retired prefix, or a callsign that was never valid. The QSO counts for nothing until the
-        //     callsign is right, and only the operator knows which it is.
-        //   * Not a DXCC entity - the databases DO recognise it and answer that it belongs to no
-        //     country: a station at sea (MARITIME MOBILE), in the air (AERONAUTICAL MOBILE), through a
-        //     satellite or repeater, or an operation Club Log lists as INVALID. Nothing is wrong with
-        //     the record; the contact simply counts towards no country, and an operator counting
-        //     entities should know which of their QSOs those are.
-        public class EntityNote
-        {
-            public int Number { get; set; }
-            public string Call { get; set; }
-            public string Date { get; set; }
-            public string Country { get; set; }   // what the file said, if anything
-            public string Note { get; set; }      // why it counts for no entity
-            public bool IsUnknown { get; set; }   // true = nothing recognised, false = a real non-entity
-        }
+        // Both were judgements about whether a QSO's country is right, made while reading the file -
+        // and the Log Fixer makes the same judgements about the log a moment later, from its own code.
+        // Two authorities on one question is how they came to disagree: the same T9/VE6PR was accepted
+        // by the Fixer and proposed for correction by this parser, in two reports read side by side.
+        // The Fixer is the authority now and opens by itself after every import. What this class keeps
+        // is only what it alone can know - what could not be stored, and what had to be worked out.
 
         private readonly List<RejectedRecord> m_rejected = new List<RejectedRecord>();
         private readonly List<FilledField> m_filled = new List<FilledField>();
-        private readonly List<CountryChange> m_countryChanges = new List<CountryChange>();
-        private readonly List<EntityNote> m_entityNotes = new List<EntityNote>();
 
         // Which record is being parsed, so a finding can name it. ParseRawQSO does not take the number.
         private int m_recordBeingParsed;
@@ -245,8 +199,6 @@ namespace HolyParser
 
         public List<RejectedRecord> GetRejected() { return m_rejected; }
         public List<FilledField> GetFilled() { return m_filled; }
-        public List<CountryChange> GetCountryChanges() { return m_countryChanges; }
-        public List<EntityNote> GetEntityNotes() { return m_entityNotes; }
 
         // The station callsign to fall back on when a record names neither STATION_CALLSIGN nor
         // OPERATOR. Set by the importer to the log's own identity; left empty, such a record is
@@ -456,8 +408,7 @@ namespace HolyParser
                 return ParseN1MMRawQSO(row);
 
             QSO qso_row = new QSO();
-            // Cleared per record, or a record carrying no <COUNTRY> would be compared against the one
-            // before it - see RecordCountryChange.
+            // Cleared per record, or a record carrying no <COUNTRY> would inherit the one before it.
             m_countryFromFile = null;
             m_datedAnswer = null;
             m_dxccFromFile = 0;
@@ -507,8 +458,8 @@ namespace HolyParser
                 // This used to overwrite the country the file stated, and the operator was never told.
                 // It is their log: a country they recorded is a fact about their contact, and replacing
                 // it silently - however good our reason - loses the only copy of what they believed.
-                // Where we disagree the import REPORTS it (see RecordCountryChange) and the log is left
-                // for the operator to decide about.
+                // Where we disagree, nothing is said HERE: the Log Fixer opens after the import and is
+                // the one place that judges whether a stored country is right.
                 if (string.IsNullOrWhiteSpace(m_countryFromFile) && ER_Dxcc.Name != "Unknown")
                     qso_row.Country = ER_Dxcc.Name;
                 qso_row.DXCC = ER_Dxcc.Entity;              // the file's own <dxcc> overrides below
@@ -819,11 +770,12 @@ namespace HolyParser
             ResolveCountryForDate(qso_row);
             SetEntityCode(qso_row);
 
-            // LAST, so it compares the file's country against what was actually stored - after the
-            // prefix answer AND the dated answer have each had their say. It also runs when the dated
-            // pass declined to change anything, because the prefix answer alone can differ from the file.
-            RecordCountryChange(qso_row);
-            RecordEntityNote(qso_row);
+            // THE PARSER NO LONGER JUDGES THE COUNTRY. It used to compare the file's country against
+            // its own answer here and report the difference, which made the import a second opinion
+            // alongside the Log Fixer - and the two disagreed, because their rules were written twice.
+            // One QSO now gets one verdict, from the one tool whose job that is; the Fixer opens by
+            // itself the moment an import finishes. What is left in this class is what only IT can
+            // know: what the file held, what had to be worked out, and what could not be stored.
 
             qso_row.StandartizeQSO();
             return qso_row;
@@ -855,8 +807,7 @@ namespace HolyParser
             catch { return; }
             if (dated == null || dated.Name == "Unknown") return;
 
-            // KEPT for the report whatever happens, so a disagreement can be shown even when nothing
-            // was written - see RecordCountryChange.
+            // KEPT whatever happens: SetEntityCode falls back to it when the file carried no <DXCC>.
             m_datedAnswer = dated;
 
             // A country the FILE stated is left exactly as it is. The dated answer only fills a gap.
@@ -870,78 +821,6 @@ namespace HolyParser
                 qso_row.Continent = dated.Continent;
         }
 
-        // Notes a country the file named and we overruled - but only when it is a REAL disagreement.
-        //
-        // Entity NUMBERS decide it wherever both sides have one: the databases word the same entity
-        // differently often enough that comparing text would report thousands of non-problems and hide
-        // the handful that matter. Where a number is missing (cty.dat carries no entity numbers of its
-        // own) the wording is levelled instead - "St." against "Saint", "Is." against "Islands" - by the
-        // same rule the country databases are matched with.
-        private void RecordCountryChange(QSO qso_row)
-        {
-            string fromFile = (m_countryFromFile ?? string.Empty).Trim();
-
-            // OUR answer, which is no longer what gets stored - the file's value is. Prefer the dated
-            // answer; fall back to the plain prefix answer when the record carried no usable date.
-            DXCC ours = m_datedAnswer ?? ER_Dxcc;
-            if (ours == null) return;
-
-            // AND IT HAS TO BE A COUNTRY. "Maritime Mobile" is the resolver saying the station was at
-            // sea and the contact counts for no entity at all - printing it in a column headed
-            // "HolyLogger suggests", against a country the file named, reads as though we were
-            // proposing a country called Maritime Mobile. Those QSOs are reported already, in the
-            // section about contacts that count towards no country, where they belong; this one is
-            // country against country.
-            if (!ours.IsDxccEntity) return;
-
-            string stored = (ours.Name ?? string.Empty).Trim();
-            if (fromFile.Length == 0 || stored.Length == 0) return;   // nothing to compare
-
-            try
-            {
-                DateTime when;
-                bool dated = DateTime.TryParseExact((qso_row.Date ?? string.Empty).Trim(), "yyyyMMdd",
-                    CultureInfo.InvariantCulture,
-                    DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out when);
-
-                int fileCode = dated ? CountryLookup.Shared.EntityCodeForCountry(fromFile, when)
-                                     : CountryLookup.Shared.EntityCodeForCountry(fromFile);
-                int ourCode = dated ? CountryLookup.Shared.EntityCodeForCountry(stored, when)
-                                    : CountryLookup.Shared.EntityCodeForCountry(stored);
-
-                // WRITTEN THE SAME WAY - there is nothing to say about it. Only a difference in the
-                // TEXT gets this far; what follows decides whether that difference matters.
-                if (CountryLookup.IsSameCountryName(fromFile, stored)) return;
-
-                // THE FILE'S OWN <DXCC> NUMBER IS THE BEST EVIDENCE THERE IS, when it carries one: two
-                // numbers settle whether this is one entity or two, with no argument about wording.
-                // Failing that, the numbers the two NAMES resolve to. Failing that - which happens when
-                // a name belongs to an entity long deleted, so no current number exists for it - the
-                // words of the names themselves.
-                bool sameEntity;
-                if (m_dxccFromFile > 0 && ourCode > 0)
-                    sameEntity = m_dxccFromFile == ourCode;
-                else if (fileCode > 0 && ourCode > 0)
-                    sameEntity = fileCode == ourCode;
-                else
-                    sameEntity = CountryLookup.IsSameCountryWording(fromFile, stored);
-
-                m_countryChanges.Add(new CountryChange
-                {
-                    IsSpellingOnly = sameEntity,
-                    Number = m_recordBeingParsed,
-                    Call = qso_row.DXCall,
-                    Date = qso_row.Date,
-                    FromFile = fromFile,
-                    OurAnswer = stored,
-                    ResolvedBy = ours.ResolvedBy,
-                });
-            }
-            catch
-            {
-                // A finding is a convenience; failing to work one out must never cost the QSO its import.
-            }
-        }
 
         // THE ENTITY NUMBER FOR THE QSO - the country's identity, stored with the contact.
         //
@@ -963,40 +842,6 @@ namespace HolyParser
 
             try { qso_row.DxccCode = CountryLookup.Shared.EntityCodeForCountry(answer.Name); }
             catch { /* a number is a bonus here, never a reason to lose the QSO */ }
-        }
-
-        // Notes a QSO that counts towards no DXCC entity, and why. See EntityNote.
-        private void RecordEntityNote(QSO qso_row)
-        {
-            if (string.IsNullOrWhiteSpace(qso_row.DXCall)) return;
-
-            DXCC answer = m_datedAnswer ?? ER_Dxcc;
-            if (answer == null) return;
-
-            bool unknown = string.IsNullOrEmpty(answer.Name)
-                        || string.Equals(answer.Name, "Unknown", StringComparison.OrdinalIgnoreCase);
-
-            // Recognised, and recognised as belonging to no entity: Entity "0" is how Club Log's
-            // MARITIME MOBILE, AERONAUTICAL MOBILE, SATELLITE/INTERNET OR REPEATER and INVALID arrive.
-            bool nonEntity = !unknown && !answer.IsDxccEntity;
-
-            if (!unknown && !nonEntity) return;
-
-            string note = unknown
-                ? "no country recognised for this callsign"
-                : (answer.InvalidOperation
-                    ? "Club Log lists this operation as one that never counted (INVALID)"
-                    : answer.Name + " — not a DXCC entity, so this contact counts towards no country");
-
-            m_entityNotes.Add(new EntityNote
-            {
-                Number = m_recordBeingParsed,
-                Call = qso_row.DXCall,
-                Date = qso_row.Date,
-                Country = (m_countryFromFile ?? string.Empty).Trim(),
-                Note = note,
-                IsUnknown = unknown,
-            });
         }
 
         // An ADIF value with its surrounding blanks gone, and null rather than an empty string, so an

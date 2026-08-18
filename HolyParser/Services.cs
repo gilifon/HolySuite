@@ -443,7 +443,13 @@ namespace HolyParser
                 csv.AppendFormat("{0},", time);
                 csv.AppendFormat("{0},", qso.RST_RCVD);
                 csv.AppendFormat("{0},", qso.RST_SENT);
-                csv.AppendFormat("{0},", CountryLookup.Shared.Resolve(qso.DXCall, CountryLookup.QsoDate(qso.Date)).Name);
+                // THE COUNTRY THE LOG HOLDS, not the one this code would work out. Exporting a resolved
+                // country was this file quietly overruling the operator: a CSV of his own log came back
+                // naming countries he had never written, with no way to tell which had been changed.
+                // Whether the stored country is RIGHT is the Log Fixer's question, and it answers it in
+                // the log itself - where a correction can be seen, checked and undone. An export copies
+                // what is there.
+                csv.AppendFormat("{0},", qso.Country);
                 csv.AppendFormat("{0},", qso.Name);
                 csv.AppendFormat("{0},", "");
                 csv.AppendFormat("{0}\r\n", qso.SRX);

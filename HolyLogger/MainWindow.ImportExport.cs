@@ -56,17 +56,8 @@ namespace HolyLogger
             // them. RejectsAdifPath is the same records as a file they can correct and import again.
             public int RejectedCount { get; set; }
             public int FilledCount { get; set; }
-            // Countries the imported file named differently from the answer stored. Not a fault count -
-            // it is usually HolyLogger correcting an old file - but the operator is told, and the report
-            // names every one, because a country silently rewritten is a country nobody can check.
-            public int CountryChangeCount { get; set; }
-            // Of those, the ones that are only a difference of spelling - the same DXCC entity written
-            // two ways. Counted apart from the real ones: an award total rests on the entity, never on
-            // how the name is spelled.
-            public int SpellingOnlyCount { get; set; }
-            // QSOs stored normally that count towards no DXCC entity - an unrecognised callsign, or a
-            // recognised one that belongs to no country (at sea, in the air, via satellite, invalid).
-            public int NoEntityCount { get; set; }
+            // There are no country counts here any more. Whether a QSO names the right country is the
+            // Log Fixer's judgement and only its judgement; this class reports what the IMPORT did.
             // Records the file(s) held, so the completion message can say what was CHECKED and not
             // leave "nothing was rejected" to be inferred from the absence of a line.
             public int RecordsRead { get; set; }
@@ -574,7 +565,6 @@ namespace HolyLogger
                 // once at the end in two sentences - the rest is in the report, which is what a report
                 // is for. Anything with nothing to say prints no line at all.
                 bool anyRejected = result.RejectedCount > 0;
-                bool anyFindings = result.CountryChangeCount > 0 || result.SpellingOnlyCount > 0 || result.NoEntityCount > 0;
 
                 string msg = anyRejected ? "Import finished.\n\n" : "Import completed successfully!\n\n";
 
@@ -594,37 +584,32 @@ namespace HolyLogger
                         ? $"\nAll {result.RecordsRead:N0} records in the file were checked."
                         : $"\nAll {result.RecordsRead:N0} records were checked — none was turned away.";
 
-                if (anyFindings || result.FilledCount > 0)
-                {
-                    msg += "\n\nWorth a look:\n";
-                    if (result.CountryChangeCount > 0)
-                        msg += $"\n• {result.CountryChangeCount:N0} QSO{(result.CountryChangeCount == 1 ? "" : "s")} "
-                             + "whose callsign belongs to a DIFFERENT country than the file says";
-                    if (result.SpellingOnlyCount > 0)
-                        msg += $"\n• {result.SpellingOnlyCount:N0} QSO{(result.SpellingOnlyCount == 1 ? "" : "s")} "
-                             + "where the country is right but spelled differently";
-                    if (result.NoEntityCount > 0)
-                        msg += $"\n• {result.NoEntityCount:N0} QSO{(result.NoEntityCount == 1 ? "" : "s")} "
-                             + "that count towards no country at all";
-                    if (result.FilledCount > 0)
-                        msg += $"\n• {result.FilledCount:N0} record{(result.FilledCount == 1 ? "" : "s")} "
-                             + "missing the band, worked out from the frequency";
-                }
+                // ONLY WHAT THE IMPORT DID. The country lines that used to stand here - a different
+                // country, a different spelling, a contact counting towards none - were this window
+                // judging the QSOs, which is the Log Fixer's job and is now done only by the Log Fixer.
+                if (result.FilledCount > 0)
+                    msg += $"\n\nWorth a look:\n\n• {result.FilledCount:N0} "
+                         + $"record{(result.FilledCount == 1 ? "" : "s")} "
+                         + "were missing a field that the rest of the record answered, so it was worked "
+                         + "out for you. The report names every one.";
 
                 // WHERE TO GO NEXT, named. "Act on them in the Log Workshop" told an operator that
                 // something could be done without saying what to press, and the two windows have
                 // different jobs: the Log Verifier finds, the Log Fixer puts right. Both names appear
                 // here exactly as they appear on screen, so there is nothing to hunt for.
-                if (anyFindings)
-                    msg += "\n\nYour file was stored exactly as it is — nothing was changed, and the "
-                         + "report names every one.\n\n"
-                         // The menu path on its own line and in bold: it is the instruction, and it was
-                         // buried mid-sentence among the words explaining it.
-                         + "To act on them, select\n"
-                         + "**Tools → Log Workshop** and press **Log Verifier**.\n\n"
-                         + "It checks the QSOs you have on screen and opens the Log Fixer, where you "
-                         + "check the kinds of problem you want put right and it corrects them for you. "
-                         + "Nothing is written until you press Fix, and your database is copied first.";
+                // WHAT HAPPENS NEXT, now that it happens by itself. This used to be an instruction -
+                // "select Tools → Log Workshop and press Log Verifier" - which asked the operator to go
+                // and start by hand the very check the numbers above had just told him he needed. The
+                // Log Fixer opens on its own when this message is closed, so the paragraph says what is
+                // about to appear instead of what to press.
+                // The Fixer opens whenever contacts actually arrived, so this paragraph is tied to the
+                // same condition rather than to findings this window no longer works out.
+                if (result.ImportedQsoCount > 0 || result.CompletedQsoCount > 0)
+                    msg += "\n\nYour file was stored exactly as it is — nothing was changed.\n\n"
+                         + "**The Log Fixer will open next** and check the whole log: countries, "
+                         + "continents, locators and duplicates. Tick the kinds of problem you want put "
+                         + "right and it corrects them for you. Nothing is written until you press Fix, "
+                         + "and your database is copied first.";
 
                 if (anyRejected)
                 {
@@ -667,6 +652,36 @@ namespace HolyLogger
 
             TB_Comment.Text = "";
             UpdateNumOfQSOs();
+
+            OpenFixerAfterImport(result);
+        }
+
+        // THE CHECK RUNS ITSELF WHEN AN IMPORT BRINGS QSOs IN.
+        //
+        // An imported log is exactly when a log is most likely to be wrong - the contacts came from
+        // somebody else's program, with their spelling of countries and their idea of what a locator is
+        // - and it is the one moment the operator is sitting there ready to deal with it. The import's
+        // own report covers the FILE it read; this covers the LOG, which is a different question, and
+        // it leaves a fixer report in the Reports folder beside the import one.
+        //
+        // AFTER the completion message, not before: that message says what the import did, and a window
+        // opening on top of it would bury the numbers. Only when contacts actually arrived - a run that
+        // added nothing has nothing new to check.
+        private void OpenFixerAfterImport(AdifImportResult result)
+        {
+            try
+            {
+                if (result == null) return;
+                if (result.ImportedQsoCount <= 0 && result.CompletedQsoCount <= 0) return;
+                if (Qsos == null || Qsos.Count == 0) return;
+
+                // Not owned by the main window, for the same reason the Log Workshop is not: an owned
+                // window is pinned above its owner for ever, and the operator will want to look at the
+                // log he has just imported while this is open.
+                var verifier = new LogVerifierWindow(Qsos, SafeActiveLogName());
+                verifier.Show();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // ── What the import was doing when it went wrong ──────────────────────────────────────────
@@ -850,8 +865,16 @@ namespace HolyLogger
             int ambiguousQso = 0;    // matched, but two candidates were equally close - left alone
             var rejects = new List<ImportReject>();                    // what did not make it, and why
             var filledIn = new List<HolyLogParser.FilledField>();      // what was worked out from the record
-            var countryChanges = new List<HolyLogParser.CountryChange>();  // countries the file and we disagree on
-            var entityNotes = new List<HolyLogParser.EntityNote>();         // QSOs that count towards no country
+            // WHAT THE MERGE DID TO QSOs THE LOG ALREADY HELD. Filling empty fields on stored contacts is
+            // the one thing an import does that leaves no trace of its own - afterwards the QSO looks as
+            // though it always held the value - so it is written down as it happens.
+            var mergeFilled = new List<DataAccess.MergeNote>();
+            var mergeAmbiguous = new List<DataAccess.MergeNote>();
+
+            // No list of country disagreements and no list of contacts that count towards no country:
+            // both were this code judging a QSO, and the Log Fixer is the one authority on that. It opens
+            // by itself when the import finishes. What is gathered here is only what the import alone
+            // knows - what could not be stored, and what had to be worked out.
             int recordsRead = 0;                                       // what the file(s) held, all told
             const int importBatchSize = 500;
             int lastReportedPercent = 0;
@@ -942,8 +965,6 @@ namespace HolyLogger
                             Call = r.Call, Date = r.Date, Time = r.Time, Band = r.Band, Mode = r.Mode,
                         });
                     filledIn.AddRange(parser.GetFilled());
-                    countryChanges.AddRange(parser.GetCountryChanges());
-                    entityNotes.AddRange(parser.GetEntityNotes());
                     recordsRead += parser.RecordsRead;
 
                     RawAdif = null;   // large file string no longer needed; free it before the save phase
@@ -1020,7 +1041,8 @@ namespace HolyLogger
                     lock (_syncLock)
                     {
                         rawQSOList = dal.CompleteExistingQsos(rawQSOList, dal.ActiveLogId,
-                                                              out completedThisFile, out ambiguousThisFile);
+                                                              out completedThisFile, out ambiguousThisFile,
+                                                              null, mergeFilled, mergeAmbiguous);
                     }
                     completedQso += completedThisFile;
                     ambiguousQso += ambiguousThisFile;
@@ -1109,8 +1131,17 @@ namespace HolyLogger
             AdifHandlerWorker.ReportProgress(100, "Import complete 100%");
 
             string reportPath = null, rejectsAdifPath = null;
-            if (rejects.Count > 0 || filledIn.Count > 0 || countryChanges.Count > 0 || entityNotes.Count > 0)
-                WriteImportReport(rejects, filledIn, countryChanges, entityNotes, importedQsoCount, completedQso, ambiguousQso,
+            // ONLY WHEN THE IMPORT ITSELF HAS SOMETHING TO SAY. An import that stored everything as it
+            // stood, worked nothing out and changed no existing QSO writes no file - there is nothing to
+            // record. Whether the QSOs are any GOOD is a different question and a different report,
+            // written by the Log Fixer.
+            //
+            // completedQso is in this test and was missing from it for one build - so a MERGE, which does
+            // nothing but complete QSOs already stored, quietly filled fields in the operator's log and
+            // wrote no report at all. That is the single case where a report matters most.
+            if (rejects.Count > 0 || filledIn.Count > 0 || completedQso > 0 || ambiguousQso > 0)
+                WriteImportReport(rejects, filledIn, mergeFilled, mergeAmbiguous,
+                                  importedQsoCount, completedQso, ambiguousQso,
                                   out reportPath, out rejectsAdifPath);
 
             e.Result = new AdifImportResult
@@ -1122,9 +1153,6 @@ namespace HolyLogger
                 RefreshedQsos = refreshedQsos,
                 RejectedCount = rejects.Count,
                 FilledCount = filledIn.Count,
-                CountryChangeCount = countryChanges.Count(c => !c.IsSpellingOnly),
-                SpellingOnlyCount = countryChanges.Count(c => c.IsSpellingOnly),
-                NoEntityCount = entityNotes.Count,
                 RecordsRead = recordsRead,
                 ReportPath = reportPath,
                 RejectsAdifPath = rejectsAdifPath,
@@ -1240,11 +1268,11 @@ namespace HolyLogger
         // of thousands of lines - a report too big to open, built in a StringBuilder inside a 32-bit
         // process that ran out of memory on this very file once already. The COUNTS and the summary of
         // corrections stay complete and are what the operator acts on; only the naming stops.
-        private const int MaxReportRows = 2000;
+        private const int MaxReportRows = 10000;
 
         private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,
-                                       List<HolyLogParser.CountryChange> countryChanges,
-                                       List<HolyLogParser.EntityNote> entityNotes,
+                                       List<DataAccess.MergeNote> mergeFilled,
+                                       List<DataAccess.MergeNote> mergeAmbiguous,
                                        int imported, int completed, int ambiguous,
                                        out string reportPath, out string rejectsAdifPath)
         {
@@ -1310,163 +1338,89 @@ namespace HolyLogger
                     sb.AppendLine();
                 }
 
-                var wrongEntity = countryChanges == null
-                    ? new List<HolyLogParser.CountryChange>()
-                    : countryChanges.Where(c => !c.IsSpellingOnly).ToList();
-                var spellingOnly = countryChanges == null
-                    ? new List<HolyLogParser.CountryChange>()
-                    : countryChanges.Where(c => c.IsSpellingOnly).ToList();
-
-                if (spellingOnly.Count > 0)
+                // ── WHAT WAS CHANGED IN QSOs YOU ALREADY HAD ────────────────────────────────────────
+                //
+                // The one part of an import that alters contacts already in the log. Everything else
+                // either adds a QSO or turns one away; this writes into stored ones, and afterwards they
+                // look exactly as though they always held the values. Named field by field, with what
+                // went in, because that is the only chance anyone has to spot a bad file writing over
+                // good QSOs - and the only record of it that will ever exist.
+                if (mergeFilled != null && mergeFilled.Count > 0)
                 {
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
-                    sb.AppendLine($"SAME COUNTRY, SPELLED DIFFERENTLY ({spellingOnly.Count:N0})");
+                    sb.AppendLine($"COMPLETED FROM THE FILE ({completed:N0})");
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
                     sb.AppendLine();
-                    sb.AppendLine("NOTHING IS WRONG WITH THESE QSOs. The callsign belongs to exactly the");
-                    sb.AppendLine("country your file names — the two databases simply write that country's");
-                    sb.AppendLine("name differently. They are listed only so you can choose one wording");
-                    sb.AppendLine("through the log if you would rather have that.");
+                    sb.AppendLine("These QSOs were already in your log. The file held something in a field");
+                    sb.AppendLine("that was EMPTY here, so it was filled in. Nothing that already had a");
+                    sb.AppendLine("value was touched, and no QSO was added for these.");
                     sb.AppendLine();
 
-                    foreach (var g in spellingOnly
-                                .GroupBy(c => (c.FromFile ?? "") + " → " + (c.OurAnswer ?? ""), StringComparer.OrdinalIgnoreCase)
-                                .OrderByDescending(g => g.Count()))
-                        sb.AppendLine($"  {g.Count(),6:N0}  {g.Key}");
-                    sb.AppendLine();
-                }
-
-                if (wrongEntity.Count > 0)
-                {
-                    countryChanges = wrongEntity;      // the section below is about these alone
-                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
-                    sb.AppendLine($"A DIFFERENT COUNTRY — NOT JUST A DIFFERENT SPELLING ({wrongEntity.Count:N0})");
-                    sb.AppendLine("────────────────────────────────────────────────────────────────────");
-                    sb.AppendLine();
-                    sb.AppendLine("IMPORTED is the country your file gave, and it is what is in your log.");
-                    sb.AppendLine("HOLYLOGGER SUGGESTS is only a suggestion — nothing was changed.");
-                    sb.AppendLine();
-
-                    // SORTED BY THE IMPORTED COUNTRY, so every QSO the file called by one name stands
-                    // together and the operator reads one country at a time instead of jumping between
-                    // them. Within a country the suggestion, then the date, so identical findings sit in
-                    // an unbroken run and the odd one out is easy to see.
-                    var rows = countryChanges
-                        .OrderBy(c => c.FromFile, StringComparer.OrdinalIgnoreCase)
-                        .ThenBy(c => c.OurAnswer, StringComparer.OrdinalIgnoreCase)
-                        .ThenBy(c => c.Date, StringComparer.Ordinal)
-                        .ToList();
-
-                    sb.AppendLine("  " + "#".PadLeft(5) + "  " + "CALL".PadRight(12)
-                                  + "  " + "IMPORTED".PadRight(26)
-                                  + "  " + "HOLYLOGGER SUGGESTS".PadRight(26) + "  DATE");
-                    sb.AppendLine("  " + new string('─', 5) + "  " + new string('─', 12)
-                                  + "  " + new string('─', 26) + "  " + new string('─', 26) + "  " + new string('─', 10));
-
-                    int rowNo = 0;
-                    foreach (var c in rows.Take(MaxReportRows))
+                    int shown = 0;
+                    foreach (var m in mergeFilled)
                     {
-                        rowNo++;
-                        sb.AppendLine("  " + rowNo.ToString("N0").PadLeft(5)
-                                      + "  " + (string.IsNullOrWhiteSpace(c.Call) ? "—" : c.Call).PadRight(12)
-                                      + "  " + (c.FromFile ?? "—").PadRight(26)
-                                      + "  " + (c.OurAnswer ?? "—").PadRight(26)
-                                      + "  " + FormatAdifDate(c.Date));
-                    }
-                    if (rows.Count > MaxReportRows)
-                        sb.AppendLine($"  … and {rows.Count - MaxReportRows:N0} more. "
-                                      + "Every one of them is counted in the summary below.");
-                    sb.AppendLine();
-
-                    // The same correction once each, so a file with 900 QSOs from one wrongly-named
-                    // country reads as one thing to check rather than 900 lines to scroll past.
-                    //
-                    // A CORRECTION is a pair - this country in your file should be that one. There are
-                    // MORE corrections than there are countries, because one country can be corrected
-                    // two ways: Asiatic Russia becomes European Russia for seven QSOs and European
-                    // Russia becomes Asiatic Russia for four. So the count is of corrections and the
-                    // heading says so - calling them entities would claim 34 countries need fixing
-                    // when the file names 23. The 23 itself is deliberately NOT printed: a second
-                    // number next to the first only invites the question of which one to act on, and
-                    // the answer is neither - what the operator acts on is the table underneath.
-                    var pairs = countryChanges
-                        .GroupBy(c => ((c.FromFile ?? "") + " → " + (c.OurAnswer ?? "")), StringComparer.OrdinalIgnoreCase)
-                        .Select(g => new
+                        if (shown >= MaxReportRows)
                         {
-                            Cases = g.Count(),
-                            Now = g.First().FromFile ?? "—",
-                            Should = g.First().OurAnswer ?? "—"
-                        })
-                        .OrderByDescending(p => p.Cases)
-                        .ThenBy(p => p.Now, StringComparer.OrdinalIgnoreCase)
-                        .ToList();
-                    sb.AppendLine($"  SUMMARY — {pairs.Count:N0} different correction{(pairs.Count == 1 ? "" : "s")}:");
-                    sb.AppendLine();
-                    // Headed like the table above it, and the two country columns are the same 26 wide,
-                    // so the eye runs straight down from one table to the other.
-                    sb.AppendLine("  " + Centred("#", 5) + "  " + "NUMBER OF CASES"
-                                  + "  " + "IN THE LOG NOW".PadRight(26) + "  SHALL BE");
-                    sb.AppendLine("  " + new string('─', 5) + "  " + new string('─', 15)
-                                  + "  " + new string('─', 26) + "  " + new string('─', 26));
-                    int pairNo = 0;
-                    foreach (var p in pairs)
-                    {
-                        pairNo++;
-                        sb.AppendLine("  " + Centred(pairNo.ToString("N0"), 5)
-                                      + "  " + Centred(p.Cases.ToString("N0"), 15)
-                                      + "  " + p.Now.PadRight(26)
-                                      + "  " + p.Should);
+                            sb.AppendLine($"  … and {mergeFilled.Count - shown:N0} more, not listed one by one.");
+                            break;
+                        }
+                        shown++;
+                        sb.AppendLine($"  {(string.IsNullOrWhiteSpace(m.Call) ? "—" : m.Call).PadRight(12)} "
+                                      + $"{FormatAdifDate(m.Date).PadRight(11)}{m.Time.PadRight(7)}"
+                                      + $"{m.Band.PadRight(7)}{m.Mode}");
+                        foreach (var f in m.Fields)
+                            sb.AppendLine($"        {f.Key} = {f.Value}");
                     }
+
+                    if (mergeFilled.Count < completed)
+                        sb.AppendLine($"  ({completed - mergeFilled.Count:N0} more were matched and needed nothing filling in.)");
                     sb.AppendLine();
                 }
 
-                if (entityNotes != null && entityNotes.Count > 0)
+                // MATCHED TWO CONTACTS AT ONCE, so nothing was done. The log holds this QSO more than
+                // once for the same minute, and there is no honest way to choose which copy the record
+                // belongs to. Naming them, not judging them: whether those copies are duplicates is the
+                // Log Fixer's question and it has a kind of its own for it.
+                if (mergeAmbiguous != null && mergeAmbiguous.Count > 0)
                 {
-                    int unknown = entityNotes.Count(n => n.IsUnknown);
-                    int nonEntity = entityNotes.Count - unknown;
-
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
-                    sb.AppendLine($"QSOs THAT COUNT TOWARDS NO COUNTRY ({entityNotes.Count:N0})");
+                    sb.AppendLine($"MATCHED MORE THAN ONE QSO — LEFT ALONE ({ambiguous:N0})");
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
                     sb.AppendLine();
-                    sb.AppendLine("These QSOs are IN your log and were stored normally. They are listed");
-                    sb.AppendLine("because no DXCC entity can be counted for them, which matters when you");
-                    sb.AppendLine("are counting countries.");
+                    sb.AppendLine("Your log holds this contact more than once for the same minute, so there");
+                    sb.AppendLine("was no way to tell which copy the record belonged to. Nothing was written");
+                    sb.AppendLine("and nothing was added. The Log Fixer lists repeated contacts under");
+                    sb.AppendLine("\"Duplicate contact\" if you want to deal with them.");
                     sb.AppendLine();
 
-                    if (unknown > 0)
+                    int shown = 0;
+                    foreach (var m in mergeAmbiguous)
                     {
-                        sb.AppendLine($"  NO COUNTRY RECOGNISED ({unknown:N0})");
-                        sb.AppendLine("  No database has heard of this callsign's prefix. Usually a typo — an");
-                        sb.AppendLine("  O typed for a zero is the common one — or a prefix long retired, or a");
-                        sb.AppendLine("  callsign that was never valid. Only you can say which.");
-                        sb.AppendLine();
-                        foreach (var n in entityNotes.Where(n => n.IsUnknown).Take(MaxReportRows))
-                            sb.AppendLine($"      {(string.IsNullOrWhiteSpace(n.Call) ? "—" : n.Call).PadRight(12)} "
-                                          + $"{(string.IsNullOrWhiteSpace(n.Date) ? "—" : n.Date).PadRight(10)} "
-                                          + (string.IsNullOrWhiteSpace(n.Country) ? "" : $"your file says {n.Country}"));
-                        if (unknown > MaxReportRows)
-                            sb.AppendLine($"      … and {unknown - MaxReportRows:N0} more.");
-                        sb.AppendLine();
+                        if (shown >= MaxReportRows)
+                        {
+                            sb.AppendLine($"  … and {mergeAmbiguous.Count - shown:N0} more, not listed one by one.");
+                            break;
+                        }
+                        shown++;
+                        sb.AppendLine($"  {(string.IsNullOrWhiteSpace(m.Call) ? "—" : m.Call).PadRight(12)} "
+                                      + $"{FormatAdifDate(m.Date).PadRight(11)}{m.Time.PadRight(7)}"
+                                      + $"{m.Band.PadRight(7)}{m.Mode}");
                     }
-
-                    if (nonEntity > 0)
-                    {
-                        sb.AppendLine($"  NOT A DXCC ENTITY ({nonEntity:N0})");
-                        sb.AppendLine("  Nothing is wrong with these records. The databases recognise them and");
-                        sb.AppendLine("  answer that they belong to no country: a station at sea or in the air,");
-                        sb.AppendLine("  one worked through a satellite or repeater, or an operation Club Log");
-                        sb.AppendLine("  lists as never having counted. They are real contacts and they are in");
-                        sb.AppendLine("  your log — they simply add nothing to a country total.");
-                        sb.AppendLine();
-                        foreach (var n in entityNotes.Where(n => !n.IsUnknown).Take(MaxReportRows))
-                            sb.AppendLine($"      {(string.IsNullOrWhiteSpace(n.Call) ? "—" : n.Call).PadRight(12)} "
-                                          + $"{(string.IsNullOrWhiteSpace(n.Date) ? "—" : n.Date).PadRight(10)} {n.Note}");
-                        if (nonEntity > MaxReportRows)
-                            sb.AppendLine($"      … and {nonEntity - MaxReportRows:N0} more.");
-                        sb.AppendLine();
-                    }
+                    sb.AppendLine();
                 }
+
+                // THE COUNTRY SECTIONS ARE GONE FROM THIS REPORT.
+                //
+                // They were 'HolyLogger suggests', 'same country spelled differently' and 'counts
+                // towards no country' - three judgements about whether a QSO is right, made here while
+                // the file was read. The Log Fixer judges the same QSOs from its own code a moment
+                // later, and the two disagreed: T9/VE6PR was proposed for correction by this report and
+                // accepted without comment by the Fixer, because only the Fixer knew that a stroke
+                // callsign names two countries and the operator's own answer settles it.
+                //
+                // One question, one authority. This report now says only what the import DID - what it
+                // could not store, and what it had to work out - and the Fixer, which opens by itself
+                // when the import finishes, says whether the log is right.
 
                 System.IO.File.WriteAllText(txt, sb.ToString(), Encoding.UTF8);
                 reportPath = txt;

@@ -461,6 +461,39 @@ namespace DXCCManager
                 return who + " matched **" + matched + "** which is " + Named(code, name);
             }
 
+            // THE SAME ANSWER IN ITS SEPARATE PIECES, for a report that lays them out in a table rather
+            // than as a paragraph. Report() below still composes the whole thing for the "?" box; these
+            // are the identical strings, so the two cannot come to word it differently - which is the
+            // whole reason the wording lives in this class and not in its callers.
+            //
+            // Plain text: the ** emphasis markers are for a screen that renders them, and a text file
+            // shows them as two asterisks.
+            public string CtySays { get { return Says("cty.dat", CtyMatched, CtyCode, CtyName).Replace("**", ""); } }
+            public string ClubSays { get { return Says("Club Log", ClubMatched, ClubCode, ClubName).Replace("**", ""); } }
+            public string Recommends { get { return "HolyLogger recommends: " + Named(FinalCode, FinalName); } }
+            public string PlainHeadline { get { return (Headline ?? "").Replace("**", ""); } }
+
+            // The last word: whether this one can be accepted without thinking about it.
+            public string Closing
+            {
+                get
+                {
+                    return Agree
+                        ? "Both agree, so this proposal is a safe one to accept."
+                        : "Please consider and decide.";
+                }
+            }
+
+            public List<string> PlainExtraNotes
+            {
+                get
+                {
+                    var lines = new List<string>();
+                    foreach (string s in ExtraNotes) lines.Add((s ?? "").Replace("**", ""));
+                    return lines;
+                }
+            }
+
             // THE WHOLE ANSWER, WORDED ONCE. Both the Log Fixer's "?" box and any report written about
             // a log say this - from here, so the two can never come to word it differently and an
             // operator comparing the paper with the screen never has to wonder whether they mean the
@@ -671,6 +704,35 @@ namespace DXCCManager
                 if (code > 0) codes.Add(code);
             }
             return codes;
+        }
+
+        // THE OPERATOR'S OWN COUNTRY SETTLES A STROKE, asked in ONE place because two places ask it.
+        //
+        // A callsign with a stroke names two entities, one per side, and which one is meant is a
+        // convention rather than anything in the callsign: T9/VE6PR is a Canadian operator working from
+        // Bosnia. This resolver picks a side and is sometimes wrong. When the entity already recorded
+        // against the QSO is ONE OF THOSE TWO, it came from the person who was there, and disagreeing
+        // with it is not a finding - it is this program preferring its own guess to a fact.
+        //
+        // It lives here rather than in either caller because it HAS two callers and they had drifted
+        // apart: the Log Fixer applied the rule and the ADIF import did not, so the same T9/VE6PR was
+        // silently accepted by one and proposed for correction by the other, in two reports the operator
+        // was reading side by side. One rule, one place, no second opinion.
+        //
+        // Only ever a reason to say NOTHING. An entity that is neither side of the stroke is still a
+        // finding, and a callsign with no stroke has no second candidate, so nothing is weakened.
+        public bool StrokeSettledByLog(string callsign, int recordedEntityCode, DateTime whenUtc)
+        {
+            if (recordedEntityCode <= 0) return false;
+            if (string.IsNullOrWhiteSpace(callsign)) return false;
+            if (callsign.IndexOf('/') < 0) return false;
+
+            try
+            {
+                HashSet<int> sides = CandidateEntityCodes(callsign, whenUtc);
+                return sides != null && sides.Contains(recordedEntityCode);
+            }
+            catch { return false; }
         }
 
         public int EntityCodeForCountry(string countryName)

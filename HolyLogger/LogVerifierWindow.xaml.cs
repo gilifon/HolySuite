@@ -1,10 +1,11 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
@@ -901,6 +902,291 @@ namespace HolyLogger
                   + (found.Count - suggested).ToString("N0") + " are for you to judge. "
                   + "Double-click a row to open the QSO.";
             UpdateFixButton();
+
+            // THE WHOLE LIST, IN A FILE. The window answers one row at a time; a log with hundreds of
+            // findings needs the set somewhere it can be read away from the screen, printed, or worked
+            // through on paper. Off the UI thread because the country explanations are two database
+            // lookups each, and awaited so a check that is still writing cannot be overtaken by the next.
+            if (found.Count > 0)
+            {
+                List<Finding> forReport = found;
+                await Task.Run(() => WriteFixerReport(forReport));
+            }
+        }
+
+        // How many rows a section of the report names one by one before it stops. A log can hold tens of
+        // thousands of findings of one kind - a file that big is one nobody opens - and the counts in the
+        // headings stay complete either way, which is what tells the operator the size of the job.
+        // 10,000, raised from 2,000 the first time a real log met it: a 28,513-QSO import produced 4,369
+        // country findings, so a third of them were never named - and the operator searching the file for
+        // one callsign found nothing and had no way to tell whether that meant "not a problem" or "past
+        // the limit". A file of this size is still an ordinary text file; the point of the cap is only to
+        // stop a few hundred thousand imported QSOs producing one nobody can open.
+        private const int MaxFixerReportRows = 10000;
+
+        private const string FixerReportRule =
+            "────────────────────────────────────────────────────────────────────";
+
+        // THE SAME FINDINGS THE WINDOW SHOWS, WRITTEN OUT. It lands in the same Reports folder as the
+        // import report and is announced the same way, so File → Open Reports Folder finds both.
+        //
+        // NONE OF THE WORDING IS WRITTEN AGAIN HERE. Each section's note is the kind's own HandNote -
+        // the sentence beside its chip in the window - and the country explanation is
+        // Explanation.PlainReport, which is the "?" dialog's own text with the emphasis markers taken
+        // out. Two places composing the same paragraph is exactly how they come to differ.
+        private void WriteFixerReport(List<Finding> found)
+        {
+            try
+            {
+                if (found == null || found.Count == 0) return;
+
+                var sb = new StringBuilder();
+                sb.AppendLine("HolyLogger — Log Fixer report");
+                sb.AppendLine(DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm"));
+                sb.AppendLine();
+                if (!string.IsNullOrEmpty(_logName))
+                    sb.AppendLine("Log               : " + _logName);
+                sb.AppendLine("QSOs checked      : " + _qsos.Count.ToString("N0"));
+                sb.AppendLine("Problems found    : " + found.Count.ToString("N0"));
+                int fixable = found.Count(f => f.Fixable);
+                sb.AppendLine("Can be fixed here : " + fixable.ToString("N0"));
+                sb.AppendLine("For you to judge  : " + (found.Count - fixable).ToString("N0"));
+                sb.AppendLine();
+                sb.AppendLine("Nothing in this file has been changed in your log. The Log Fixer only");
+                sb.AppendLine("reports; a QSO is altered when you tick it and press Fix selected.");
+                sb.AppendLine();
+
+                // Biggest kind first: the size of a group is the first thing worth knowing about it.
+                foreach (var group in found.GroupBy(f => f.Problem ?? string.Empty)
+                                           .OrderByDescending(g => g.Count()))
+                {
+                    sb.AppendLine(FixerReportRule);
+                    sb.AppendLine(group.Key + "   (" + group.Count().ToString("N0") + ")");
+                    sb.AppendLine(FixerReportRule);
+
+                    string note = PlainKindNote(group.Key);
+                    if (note.Length > 0)
+                    {
+                        sb.AppendLine();
+                        sb.AppendLine(note);
+                    }
+                    sb.AppendLine();
+
+                    // WHAT EACH DATABASE MATCHED, AS TWO MORE COLUMNS. They were two sentences under the
+                    // row - "cty.dat matched R which is European Russia (54)" - which is a fact about a
+                    // column of a table written out as prose. As columns they line up down the page, so
+                    // the section can be read by running an eye down cty.dat and then down Club Log,
+                    // which is the comparison the operator is actually making.
+                    //
+                    // Only the two country kinds have them: nothing else in the report is an argument
+                    // between two databases. Resolved ONCE here and kept, because each one costs two
+                    // database lookups and the widths have to be measured before a single row is printed.
+                    bool explains = group.Key == CountryBothAgree || group.Key == CountryNeedsDecision;
+
+                    var rows = group.Take(MaxFixerReportRows).ToList();
+                    var why = new Dictionary<Finding, CountryLookup.Explanation>();
+                    if (explains)
+                    {
+                        foreach (Finding g in rows)
+                        {
+                            if (g.Qso == null) continue;
+                            string gc = Text(g.Qso.DXCall);
+                            if (gc.Length == 0) continue;
+                            try { why[g] = CountryLookup.Shared.Explain(gc, CountryLookup.QsoDate(g.Qso.Date)); }
+                            catch (Exception swallowed) { Log.Swallow(swallowed); }
+                        }
+                    }
+
+                    // EVERY COLUMN IS AS WIDE AS THIS SECTION NEEDS, and no wider. A fixed width has to
+                    // be chosen for the worst case in the whole file, so a section whose longest country
+                    // is "ASIATIC RUSSIA (15)" was padded out to fit "Bonaire, Curacao (Neth Antilles)"
+                    // from a different section entirely - half the row was empty space.
+                    //
+                    // The ZONES are not measured: they sit on their own line underneath and are always
+                    // shorter than the country above them.
+                    int nowWidth = "Country In Log".Length;
+                    int newWidth = "Holylogger suggest".Length;
+                    int ctyWidth = "cty.dat matched".Length;
+                    foreach (Finding g in rows)
+                    {
+                        string gh, gz;
+                        SplitZones(Text(g.Current), out gh, out gz);
+                        if (gh.Length > nowWidth) nowWidth = gh.Length;
+
+                        SplitZones(Text(g.Suggested), out gh, out gz);
+                        if (gh.Length > newWidth) newWidth = gh.Length;
+
+                        CountryLookup.Explanation gx;
+                        if (why.TryGetValue(g, out gx) && gx != null)
+                        {
+                            string s = MatchedPart(gx.CtySays, "cty.dat");
+                            if (s.Length > ctyWidth) ctyWidth = s.Length;
+                        }
+                    }
+                    nowWidth = Math.Min(nowWidth, 38) + 2;   // past 38 a name is cut, not carried
+                    newWidth = Math.Min(newWidth, 38) + 2;
+                    ctyWidth = Math.Min(ctyWidth, 40) + 2;
+
+                    // "In Log", not "In File": this report is the verifier's, and the verifier reads the
+                    // LOG. The import report is the one that speaks about a file, and it no longer judges
+                    // countries at all. The last column has no width - nothing follows it to push out.
+                    sb.AppendLine("  " + Col("Date", 12) + Col("Time", 7) + Col("Callsign", 14)
+                                  + Col("Country In Log", nowWidth)
+                                  + (explains ? Col("Holylogger suggest", newWidth)
+                                                + Col("cty.dat matched", ctyWidth) + "Club Log matched"
+                                              : "Holylogger suggest"));
+                    sb.AppendLine("  " + Col(new string('-', 10), 12) + Col(new string('-', 5), 7)
+                                  + Col(new string('-', 12), 14)
+                                  + Col(new string('-', nowWidth - 2), nowWidth)
+                                  + (explains ? Col(new string('-', newWidth - 2), newWidth)
+                                                + Col(new string('-', ctyWidth - 2), ctyWidth) + new string('-', 30)
+                                              : new string('-', 30)));
+
+                    int printed = 0;
+                    foreach (Finding f in rows)
+                    {
+                        printed++;
+
+                        // THE ZONES GO ON A LINE OF THEIR OWN, under the country they belong to. They are
+                        // part of what a country fix would write, so they cannot be dropped - but carried
+                        // on the same line they made both country columns half as wide again.
+                        string nowHead, nowZones, newHead, newZones;
+                        SplitZones(Text(f.Current), out nowHead, out nowZones);
+                        SplitZones(Text(f.Suggested), out newHead, out newZones);
+
+                        string ctyPart = string.Empty, clubPart = string.Empty;
+                        CountryLookup.Explanation x;
+                        if (why.TryGetValue(f, out x) && x != null)
+                        {
+                            ctyPart = MatchedPart(x.CtySays, "cty.dat");
+                            clubPart = MatchedPart(x.ClubSays, "Club Log");
+                        }
+
+                        sb.AppendLine(("  " + Col(FormatDate(f.Qso == null ? "" : f.Qso.Date), 12)
+                                      + Col(Text(f.Time), 7)
+                                      + Col(Text(f.Call), 14)
+                                      + Col(nowHead, nowWidth)
+                                      + (explains ? Col(newHead, newWidth) + Col(ctyPart, ctyWidth) + clubPart
+                                                  : newHead)).TrimEnd());
+
+                        // THE CONTINUATION LINES, FILLED ACROSS RATHER THAN ONE UNDER THE OTHER.
+                        //
+                        // The zones and Club Log's notes used to take a line each, in that order - so in
+                        // the Club Log column the row's own answer was on one line, NOTHING on the next,
+                        // and the note on the one after. Read down that column there was a blank line in
+                        // the middle of a single QSO, which is exactly what a blank line is supposed to
+                        // mean the end of. They share the line now: zones on the left, note on the right.
+                        var notes = (x == null) ? new List<string>() : x.PlainExtraNotes;
+                        bool hasZones = nowZones.Length > 0 || newZones.Length > 0;
+                        int extraLines = Math.Max(hasZones ? 1 : 0, notes.Count);
+                        bool manyLines = extraLines > 0;
+
+                        for (int k = 0; k < extraLines; k++)
+                        {
+                            string zNow = (k == 0 && hasZones) ? nowZones : string.Empty;
+                            string zNew = (k == 0 && hasZones) ? newZones : string.Empty;
+                            string clubNote = k < notes.Count ? notes[k] : string.Empty;
+
+                            string line = "  " + new string(' ', 33) + Col(zNow, nowWidth)
+                                        + (explains ? Col(zNew, newWidth) + Col(string.Empty, ctyWidth) + clubNote
+                                                    : zNew);
+                            sb.AppendLine(line.TrimEnd());
+                        }
+
+                        // WHAT ELSE CLUB LOG HAS TO SAY, under the Club Log column it belongs to.
+                        //
+                        // All three of these notes are facts about Club Log and nothing else: that it
+                        // holds this exact callsign rather than just its prefix, that the prefix it
+                        // holds did not apply on this date, or that no record of its covers the date at
+                        // all. Left at the margin they read as a remark about the whole row; under the
+                        // column they read as more of what that column already says.
+                        //
+                        // They keep a line rather than joining the cell because they have no fixed
+                        // shape - and they are on a small minority of rows, so the cost is small. The
+                        // one that says "Club Log has an entry for this exact callsign" is worth
+                        // seeing: it is the difference between an answer read off a prefix and one
+                        // recorded against that very station.
+                        // A BLANK LINE ONLY WHERE A CONTACT TOOK MORE THAN ONE. Where a finding runs to
+                        // three lines - the row, its zones, and whatever Club Log adds - nothing else
+                        // shows where one QSO ends and the next begins. Where every finding is a single
+                        // line, a blank between them doubles the length of the section and makes it
+                        // harder to run an eye down, not easier: "Country spelled differently" alone is
+                        // 4,369 rows. Decided per finding rather than per section, so a section that
+                        // happens to hold one long row is spaced only around that row.
+                        if (manyLines) sb.AppendLine();
+                    }
+
+                    if (group.Count() > printed)
+                        sb.AppendLine("  … and " + (group.Count() - printed).ToString("N0")
+                                      + " more of this kind, not listed one by one.");
+
+                    sb.AppendLine();
+                }
+
+                Reports.Write("holylogger_fixer_report_"
+                              + DateTime.Now.ToString("yyyy-MM-dd_HHmm") + ".txt", sb.ToString());
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // "cty.dat matched R which is European Russia (54)" -> "R which is European Russia (54)".
+        //
+        // The database's name is the COLUMN HEADING now, so repeating it on every row underneath is the
+        // one word on the line that carries no information at all. Taken off by name rather than by
+        // cutting a fixed number of characters, so a wording change in CountryLookup cannot silently
+        // start eating the first letters of the answer.
+        private static string MatchedPart(string says, string who)
+        {
+            string s = (says ?? string.Empty).Trim();
+            string prefix = who + " matched ";
+            if (s.StartsWith(prefix, StringComparison.Ordinal)) return s.Substring(prefix.Length);
+
+            // The honest shorter forms: "cty.dat says X" when there are no matched letters to point at,
+            // and "cty.dat has nothing for this callsign". Both keep their own wording, minus the name.
+            prefix = who + " ";
+            if (s.StartsWith(prefix, StringComparison.Ordinal)) return s.Substring(prefix.Length);
+            return s;
+        }
+
+        // SPLITS "ASIATIC RUSSIA (15)   (CQ 17, ITU 20)" into the country and its zones.
+        //
+        // Cut at the exact separator ZoneSuffix writes - three spaces before "(CQ " - and not by hunting
+        // for a bracket: a DXCC name can hold brackets of its own ("Bonaire, Curacao (Neth Antilles)"),
+        // and a rule that looked for the first "(" would cut that country in half.
+        private static void SplitZones(string value, out string head, out string zones)
+        {
+            head = value ?? string.Empty;
+            zones = string.Empty;
+
+            int at = head.IndexOf("   (CQ ", StringComparison.Ordinal);
+            if (at < 0) return;
+
+            zones = head.Substring(at).Trim();
+            head = head.Substring(0, at).Trim();
+        }
+
+        // ONE CELL OF THE TABLE: padded to its column, and cut with an ellipsis when it will not fit.
+        // Cutting matters more than showing every letter here - a single long DXCC name ("Bonaire,
+        // Curacao (Neth Antilles)") would otherwise push every column after it out of line for that row
+        // alone, and a table that stops lining up is no longer a table.
+        private static string Col(string text, int width)
+        {
+            string s = text ?? string.Empty;
+            if (s.Length >= width) return s.Substring(0, Math.Max(1, width - 2)) + "… ";
+            return s.PadRight(width);
+        }
+
+        // A kind's own sentence, with the screen's emphasis and colour markers taken out. Built from a
+        // ProblemKind so the report cannot drift from the chip in the window - both ask HandNote.
+        private static string PlainKindNote(string kindName)
+        {
+            try
+            {
+                string note = new ProblemKind { Name = kindName }.HandNote ?? string.Empty;
+                note = note.Replace("**", "");
+                return Regex.Replace(note, @"\{\{[rg]:([^}]*)\}\}", "$1").Trim();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
         }
 
         private static List<Finding> Scan(List<QSO> qsos)
@@ -1124,23 +1410,17 @@ namespace HolyLogger
                 int storedCode = q.DxccCode;
                 int ourCode = EntityCodeOf(dated);
 
-                // THE OPERATOR'S OWN <DXCC> SETTLES A STROKE. When the callsign has a stroke there are
-                // two entities it could name, one per side, and which is meant is a convention rather
-                // than anything in the callsign - this program picks a side and is sometimes wrong.
-                // M/ON4CJK is England to one reading and Belgium to the other. If the number the log
-                // carries is ONE OF THOSE TWO it came from the person who was there, and it is not our
-                // place to argue with it.
+                // THE OPERATOR'S OWN <DXCC> SETTLES A STROKE. M/ON4CJK is England to one reading and
+                // Belgium to the other; if the number the log carries is one of the two, it came from
+                // the person who was there.
                 //
-                // This is only ever a reason to say NOTHING. A stored entity that is neither side of
-                // the stroke is still reported, and a callsign with no stroke has no second candidate
-                // to defer to, so nothing is weakened by it.
-                if (ourCode > 0 && storedCode > 0 && storedCode != ourCode && call.IndexOf('/') >= 0)
-                {
-                    HashSet<int> sides;
-                    try { sides = lookup.CandidateEntityCodes(call, when); }
-                    catch { sides = null; }
-                    if (sides != null && sides.Contains(storedCode)) continue;
-                }
+                // The rule is in CountryLookup and NOT written out here, because the ADIF import asks
+                // exactly the same question of the file it is reading. It used to be written here only,
+                // and the two duly disagreed: T9/VE6PR was left alone by this window and proposed for
+                // correction by the import, in two reports the operator was reading side by side.
+                if (ourCode > 0 && storedCode > 0 && storedCode != ourCode
+                    && lookup.StrokeSettledByLog(call, storedCode, when))
+                    continue;
 
                 if (ourCode > 0 && storedCode > 0 && storedCode != ourCode)
                 {
