@@ -1268,6 +1268,9 @@ namespace HolyLogger
             spotsGrid.PreviewMouseLeftButtonDown += ClusterSpotsGrid_MouseLeftButtonDown;
             spotsGrid.MouseMove += ClusterSpotsGrid_MouseMove;
             spotsGrid.MouseLeave += ClusterSpotsGrid_MouseLeave;
+            // Right-click a spot: the menu that puts it on the Try Again list. PREVIEW, because the
+            // DataGrid's own right-button handling selects rows and would otherwise get there first.
+            spotsGrid.PreviewMouseRightButtonDown += ClusterSpotsGrid_MouseRightButtonDown;
             spotsGrid.SizeChanged += (s, e) => RequestClusterHeaderAlignmentRefresh();
             spotsGrid.ColumnReordered += (s, e) =>
             {
@@ -4618,33 +4621,424 @@ namespace HolyLogger
 
         private void ClusterSpotsGrid_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            var grid = sender as DataGrid;
-            var source = e.OriginalSource as DependencyObject;
-            DataGridCell cell = FindVisualParent<DataGridCell>(source);
-            ClusterSpotViewItem selectedSpot = null;
-
-            if (cell != null)
-            {
-                selectedSpot = cell.DataContext as ClusterSpotViewItem;
-            }
-
-            if (selectedSpot == null)
-            {
-                while (source != null && !(source is DataGridRow))
-                {
-                    source = VisualTreeHelper.GetParent(source);
-                }
-
-                var row = source as DataGridRow;
-                selectedSpot = row?.Item as ClusterSpotViewItem ?? grid?.SelectedItem as ClusterSpotViewItem;
-            }
-
+            var selectedSpot = ClusterSpotFromEventSource(e.OriginalSource as DependencyObject, sender as DataGrid);
             if (selectedSpot == null)
             {
                 return;
             }
 
             TuneToClusterSpot(selectedSpot);
+        }
+
+        // Which spot is under the mouse. The cell's DataContext is the direct answer; the walk up to
+        // the row covers a click that landed on padding between cells, and the grid's selection is the
+        // last resort. Shared by the double-click (tune to it) and the right-click (menu about it), so
+        // both agree on which row was meant.
+        private ClusterSpotViewItem ClusterSpotFromEventSource(DependencyObject source, DataGrid grid)
+        {
+            DataGridCell cell = FindVisualParent<DataGridCell>(source);
+            if (cell != null)
+            {
+                var fromCell = cell.DataContext as ClusterSpotViewItem;
+                if (fromCell != null) return fromCell;
+            }
+
+            while (source != null && !(source is DataGridRow))
+            {
+                source = VisualTreeHelper.GetParent(source);
+            }
+
+            var row = source as DataGridRow;
+            return row?.Item as ClusterSpotViewItem ?? grid?.SelectedItem as ClusterSpotViewItem;
+        }
+
+        // RIGHT-CLICK ON A SPOT. One menu, one item for now: put this station on the Try Again list.
+        // Handled (and the event stopped) only when a spot was actually hit - a right-click on the
+        // header or on empty space below the last row must keep doing whatever it did before.
+        private void ClusterSpotsGrid_MouseRightButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            var grid = sender as DataGrid;
+            if (grid == null) return;
+
+            var spot = ClusterSpotFromEventSource(e.OriginalSource as DependencyObject, grid);
+            if (spot == null) return;
+
+            try
+            {
+                var menu = BuildClusterSpotContextMenu(spot);
+                if (menu == null) return;
+
+                // THE MENU MUST NOT COVER THE SPOT IT IS ABOUT. Opening at the mouse point - which is
+                // what a context menu does by default - put the card straight over the row that had
+                // just been right-clicked, so the callsign, frequency and mode being acted on were
+                // hidden at the moment of deciding. The card names the station at the top, but the
+                // operator still wants to see the row itself: whether it is a new country, whether it
+                // is a LoTW user, what the comment says.
+                //
+                // So it sits ABOVE THE ROW. Above rather than below because the cluster grows downwards
+                // from the top: a card hanging below would cover the rows the operator is working
+                // through next, while the space above holds spots he has already passed over. Placement
+                // is measured against the row, not the grid. WPF still turns it the other way up by
+                // itself if the row is near the top of the screen with no room above - the row stays
+                // uncovered either way, which is the point.
+                var row = FindVisualParent<DataGridRow>(e.OriginalSource as DependencyObject);
+                if (row != null)
+                {
+                    menu.PlacementTarget = row;
+                    menu.Placement = System.Windows.Controls.Primitives.PlacementMode.Top;
+
+                    // ALWAYS THE SAME PLACE ACROSS, a few pixels in from the left edge of the table.
+                    // Top placement already lines the card up with the row's left edge, and the row is
+                    // as wide as the table, so a fixed 8 is 8px from the table's edge on every spot.
+                    //
+                    // It used to be offset by the pointer's own position, to keep the card under the
+                    // hand. That made the card land somewhere different on every right-click, so there
+                    // was nowhere to learn to look and the eye had to hunt for it each time. A card
+                    // that is always in the same place is read faster than one that follows the mouse.
+                    menu.HorizontalOffset = 8;
+
+                    // AND A LITTLE HIGHER STILL. With Top placement the card's bottom edge lands exactly
+                    // on the row's top edge, which leaves them touching - the card looks like part of the
+                    // row, and the row's own top border is lost under it. NEGATIVE, because the offset is
+                    // measured in screen coordinates where down is positive, so up is below zero.
+                    menu.VerticalOffset = -10;
+                }
+                else
+                {
+                    menu.PlacementTarget = grid;
+                }
+
+                menu.IsOpen = true;
+                e.Handled = true;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE MENU. Light green, the Try Again colour - the styles live in Themes/Controls.xaml and are
+        // shared with the Try Again window's own right-click menu, so the whole feature reads as one
+        // thing. NOT the log's white-and-blue menu resources: those belong to the log.
+        private ContextMenu BuildClusterSpotContextMenu(ClusterSpotViewItem spot)
+        {
+            var menu = new ContextMenu { Style = (Style)FindResource("HolyCtxMenu") };
+            var darkGreen = (Brush)new SolidColorBrush(Color.FromRgb(0x1B, 0x5E, 0x20));
+
+            // Which spot this menu is about, spelled out. A cluster list scrolls under the pointer as
+            // new spots arrive, and a menu that does not name its station leaves the operator guessing
+            // whether he right-clicked the row he was aiming at.
+            //
+            // FLAG, CALLSIGN, FREQUENCY, MODE - each carrying the same meaning in colour that it carries
+            // in the table behind the card, so the line is read the same way the row is: the flag says
+            // the country at a glance, the frequency is its band's colour, and the mode is red for CW
+            // and blue for SSB.
+            //
+            // The colours are spelled out here rather than taken from the spot's own ModeForeground.
+            // That property falls back to the theme's TextBrush for anything that is not CW or SSB, and
+            // TextBrush is a LIGHT colour in the dark schemes - which on this light green card would be
+            // a line of text nobody could read. The band brushes are fixed colours and are safe as they
+            // are. Same reasoning as the rest of this window's palette.
+            string call = (spot.DXCallsign ?? string.Empty).Trim().ToUpperInvariant();
+            string freq = (spot.FreqDisplayText ?? spot.FreqText ?? string.Empty).Trim();
+            string mode = (spot.Mode ?? string.Empty).Trim().ToUpperInvariant();
+
+            // ONE LINE: flag, callsign, frequency, mode.
+            //
+            // It is wrapped in a MenuItem of our own carrying HolyCtxTitle, and that is not decoration.
+            // Handing a bare panel to ContextMenu.Items makes WPF wrap it in a DEFAULT MenuItem, which
+            // reserves an icon column, a shortcut-text column and a submenu arrow that this line will
+            // never use - measured, 66px of empty structure around a 90px title. Worse, the items panel
+            // stretches every row to the widest, so that invisible 66px set the width of the whole card
+            // and of the button underneath it. HolyCtxTitle is a Border and the content, nothing else.
+            var titleContent = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Margin = new Thickness(3, 2, 3, 4)
+            };
+
+            if (!string.IsNullOrWhiteSpace(spot.FlagPath))
+            {
+                try
+                {
+                    titleContent.Children.Add(new System.Windows.Controls.Image
+                    {
+                        Source = new System.Windows.Media.Imaging.BitmapImage(new Uri(spot.FlagPath)),
+                        Width = 24,
+                        Height = 16,
+                        Stretch = Stretch.Uniform,
+                        VerticalAlignment = VerticalAlignment.Center,
+                        Margin = new Thickness(0, 0, 5, 0)
+                    });
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
+            titleContent.Children.Add(MenuTitlePart(call, darkGreen, 0));
+            if (freq.Length > 0)
+                titleContent.Children.Add(MenuTitlePart(freq, GetBandBrush((spot.BandText ?? string.Empty).Trim()), 6));
+            if (mode.Length > 0)
+                titleContent.Children.Add(MenuTitlePart(mode, MenuModeBrush(mode), 6));
+
+            menu.Items.Add(new MenuItem
+            {
+                Header = titleContent,
+                Style = (Style)FindResource("HolyCtxTitle")
+            });
+            menu.Items.Add(new Separator { Style = (Style)FindResource("HolyCtxSep") });
+
+            var tryAgain = new MenuItem
+            {
+                Header = "Copy into Try Again",
+                Style = (Style)FindResource("HolyCtxItemGo"),
+                // A RIGHT ARROW, to the RIGHT of the words: the line reads "Copy into Try Again" and
+                // then points at where it is going. What was there first was the pair of circular
+                // arrows out of the icon font - the mark this program uses for Undo and for a refresh,
+                // which is the opposite of the feeling wanted for something being pushed somewhere.
+                //
+                // DRAWN, not typed. It began as the text arrow U+2192, which was too thin to see at
+                // this size, and a font's arrow cannot be made thicker - only bigger, which would have
+                // widened the card. A shape can: this one is a 3px shaft into a 9px head inside the
+                // same 13x12 box the character occupied, so it is far heavier at exactly the same size.
+                // Drawing it also settles the question of whether a given font has the glyph at all.
+                //
+                // The fill FOLLOWS THE ITEM'S Foreground, which a shape does not inherit the way text
+                // does - hence the binding. Without it the arrow would stay dark when the row lights up
+                // dark green, and disappear into it.
+                Icon = MakeRightArrow(),
+                ToolTip = "Put this station on the Try Again list, to come back to later"
+            };
+            tryAgain.Click += (s, args) => CopySpotIntoTryAgain(spot);
+            menu.Items.Add(tryAgain);
+
+            return menu;
+        }
+
+        // One coloured word of the menu's title line.
+        private static TextBlock MenuTitlePart(string text, Brush colour, double leftGap)
+        {
+            return new TextBlock
+            {
+                Text = text,
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Foreground = colour,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(leftGap, 0, 0, 0)
+            };
+        }
+
+        // The mode's colour for the menu title: the cluster's own rule - red for CW, blue for SSB -
+        // but with a FIXED dark for everything else instead of the theme's TextBrush. The card is light
+        // green whatever colour scheme is running, and TextBrush goes light in the dark schemes.
+        private static Brush MenuModeBrush(string mode)
+        {
+            if (mode == "CW") return Brushes.Red;
+            if (mode == "SSB") return new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+            return new SolidColorBrush(Color.FromRgb(0x1A, 0x1A, 0x1A));
+        }
+
+        // The solid right arrow the "Copy into Try Again" button carries. 13 wide by 12 high - the same
+        // box a text arrow filled - but a 3px shaft and a 9px head instead of a hairline.
+        private static UIElement MakeRightArrow()
+        {
+            var arrow = new System.Windows.Shapes.Path
+            {
+                Data = Geometry.Parse("M 0,4.5 L 7.5,4.5 L 7.5,1.5 L 13,6 L 7.5,10.5 L 7.5,7.5 L 0,7.5 Z"),
+                Width = 13,
+                Height = 12,
+                Stretch = Stretch.Fill,
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+
+            // Follow the menu item's own text colour, so the arrow goes white with the words when the
+            // row is highlighted. A Path has no inherited Foreground of its own.
+            arrow.SetBinding(System.Windows.Shapes.Shape.FillProperty,
+                new System.Windows.Data.Binding("Foreground")
+                {
+                    RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor)
+                    {
+                        AncestorType = typeof(MenuItem)
+                    }
+                });
+
+            return arrow;
+        }
+
+        // Sends one cluster spot to the Try Again list. The frequency is stored exactly as the cluster
+        // gave it, so pressing Try later tunes to the same place the spot said.
+        private void CopySpotIntoTryAgain(ClusterSpotViewItem spot)
+        {
+            if (spot == null || dal == null) return;
+
+            string call = (spot.DXCallsign ?? string.Empty).Trim();
+            if (call.Length == 0) return;
+
+            try
+            {
+                dal.AddTryAgain(call, spot.FreqText, spot.Mode, spot.BandText);
+                // Whether it was added or was already there, the list is not empty now: show the
+                // button, and let an open Try Again window pick the new row up.
+                RefreshTryAgain();
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // ---------------------------------------------------------------------------------------
+        // TRY AGAIN
+        //
+        // A list of stations the operator saw on the cluster and meant to come back to. Kept in the
+        // database rather than in memory, so it is still there tomorrow - the whole point of "try
+        // again" is that the try does not have to be today.
+        // ---------------------------------------------------------------------------------------
+
+        // The open Try Again window, or null. One at a time: a second copy of the same list would show
+        // stale rows the moment the other one deleted something.
+        private TryAgainWindow _tryAgainWindow;
+
+        // Brings the button and any open window back in step with the table. Called after anything
+        // that can change the list: a spot copied in, a row deleted, a QSO logged.
+        private void RefreshTryAgain()
+        {
+            try
+            {
+                int n = dal != null ? dal.GetTryAgainCount() : 0;
+
+                if (Btn_TryAgain != null)
+                {
+                    // Hidden entirely at zero: the button's only job is to open a list, and an empty
+                    // list is not worth a trip. The count is in the TOOLTIP, not on the face - the row
+                    // is only 677px wide and a face wide enough for "Try Again (100)" ran over the
+                    // activity hint beside it.
+                    Btn_TryAgain.Visibility = n > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    Btn_TryAgain.ToolTip = n == 1
+                        ? "1 station waiting to be tried again"
+                        : string.Format(CultureInfo.InvariantCulture, "{0} stations waiting to be tried again", n);
+                }
+
+                if (_tryAgainWindow != null)
+                    _tryAgainWindow.ReloadList();
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        private void Btn_TryAgain_Click(object sender, RoutedEventArgs e)
+        {
+            ShowTryAgainWindow();
+        }
+
+        private void ShowTryAgainWindow()
+        {
+            try
+            {
+                if (_tryAgainWindow != null)
+                {
+                    // Already open, possibly behind something or on the other screen. Un-minimise and
+                    // raise it rather than opening a second one.
+                    if (_tryAgainWindow.WindowState == WindowState.Minimized)
+                        _tryAgainWindow.WindowState = WindowState.Normal;
+                    _tryAgainWindow.Activate();
+                    return;
+                }
+
+                // NOT owned by the main window, for the same reason the Log Workshop is not: an owned
+                // window is pinned above its owner for ever, so clicking the main window could never
+                // bring it forward. This is a second place to work, not a dialog.
+                //
+                // Asked BEFORE the window is built, because building it restores any saved placement.
+                bool firstEverOpen = !WindowBounds.HasSaved("TryAgain");
+
+                var win = new TryAgainWindow(dal);
+                win.TryRequested += TryAgainEntryPressed;
+                win.ListChanged += RefreshTryAgain;
+                win.Closed += (s, args) => { _tryAgainWindow = null; };
+                _tryAgainWindow = win;
+
+                if (firstEverOpen)
+                    CenterOnLogTable(win);
+
+                win.Show();
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // FIRST EVER OPENING: over the middle of the log table. Only the first, and only when the
+        // operator has never placed this window himself - after that his own position is restored and
+        // this is never consulted again.
+        //
+        // Measured from the LOG TABLE'S OWN position on screen, which is a real rectangle on whichever
+        // monitor the main window is on. SystemParameters.WorkArea is not consulted and must not be:
+        // it answers for the primary screen only, and trusting it is what stranded a window on this
+        // desktop once before. PointToScreen returns device pixels while Left/Top are measured in
+        // device-INDEPENDENT units, so the two are converted through the window's own transform - on a
+        // scaled desktop, skipping that puts the window a long way from the middle of anything.
+        private void CenterOnLogTable(Window win)
+        {
+            try
+            {
+                if (win == null || QSODataGrid == null) return;
+                if (!QSODataGrid.IsVisible || QSODataGrid.ActualWidth <= 0 || QSODataGrid.ActualHeight <= 0) return;
+
+                var source = PresentationSource.FromVisual(this);
+                double sx = source?.CompositionTarget?.TransformToDevice.M11 ?? 1.0;
+                double sy = source?.CompositionTarget?.TransformToDevice.M22 ?? 1.0;
+                if (sx <= 0) sx = 1.0;
+                if (sy <= 0) sy = 1.0;
+
+                Point topLeftDevice = QSODataGrid.PointToScreen(new Point(0, 0));
+                double centerX = (topLeftDevice.X / sx) + (QSODataGrid.ActualWidth / 2.0);
+                double centerY = (topLeftDevice.Y / sy) + (QSODataGrid.ActualHeight / 2.0);
+
+                win.WindowStartupLocation = WindowStartupLocation.Manual;
+
+                // BOTH sizes are the window's own business now (SizeToContent="WidthAndHeight"), worked
+                // out from the list it is about to show. That means neither Width nor Height exists to
+                // centre on yet - both read NaN until the window has measured itself, and NaN/2 would
+                // put it nowhere at all. So the whole placement waits for Loaded, which runs after the
+                // measure and before the window is painted.
+                RoutedEventHandler placeIt = null;
+                placeIt = (s, args) =>
+                {
+                    win.Loaded -= placeIt;
+                    double w = win.ActualWidth;
+                    double h = win.ActualHeight;
+                    if (w > 0) win.Left = centerX - (w / 2.0);
+                    if (h > 0) win.Top = centerY - (h / 2.0);
+                };
+                win.Loaded += placeIt;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE TRY BUTTON. Everything it has to do is already written: a spot's callsign, frequency and
+        // mode go to the radio through TuneToClusterSpot, which is what a double-click on a live spot
+        // does. A Try Again entry is those same three things, so it is handed over as one.
+        private void TryAgainEntryPressed(TryAgainEntry entry)
+        {
+            if (entry == null) return;
+
+            TuneToClusterSpot(new ClusterSpotViewItem
+            {
+                DXCallsign = entry.DXCallsign,
+                FreqText = entry.FreqText,
+                Mode = entry.Mode
+            });
+
+            // The main window is where the QSO gets typed, so bring it forward - the operator pressed
+            // Try in order to work the station, not to keep looking at the list.
+            try { Activate(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // He is in the log now, so he comes off the list. Matched on the callsign's identity, so
+        // logging 4Z5SL/M clears an entry that says 4Z5SL, and every entry for that station goes -
+        // on whatever band it was spotted.
+        private void RemoveFromTryAgainAfterLogging(string dxCallsign)
+        {
+            try
+            {
+                if (dal == null || string.IsNullOrWhiteSpace(dxCallsign)) return;
+                if (dal.RemoveTryAgainForCallsign(dxCallsign) > 0)
+                    RefreshTryAgain();
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void ShowClusterSpotOnMap(ClusterSpotViewItem spot)

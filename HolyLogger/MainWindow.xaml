@@ -1727,10 +1727,31 @@
                  paints its own pale grey over whatever Background it is given the moment the mouse
                  arrives, and on a red button that read as "disabled". This style has no such colour:
                  it lights UP to #A8D8FF instead, which is what every other button on this form does. -->
+            <!-- 30 high from Top 32, NOT 28 from 34: the bottom edge is unchanged at 62 and the text
+                 gains the 2px it was missing. The keycap template gives its content the face height
+                 less 3px of key travel and 2px top and bottom, so a 28px key leaves 21px - and a bold
+                 16px line needs a shade over 21. The letters that pay for that shade are the ones with
+                 a tail: "Try Again" had its y and its g cut off. Both keys are changed together
+                 because they sit side by side and are meant to read as one pair. -->
             <Button x:Name="Btn_UndoMain" Style="{StaticResource DangerActionButtonStyle}"
-                    Canvas.Left="542" Canvas.Top="34" Width="96" Height="28"
+                    Canvas.Left="542" Canvas.Top="32" Width="96" Height="30"
                     FontSize="16" FontWeight="Bold" Content="↶ Undo" Padding="0" Visibility="Collapsed"
                     IsTabStop="False" Click="Btn_DeleteUndo_Click"/>
+            <!-- TRY AGAIN, and only when there is somebody to try.
+                 The stations the operator right-clicked in the cluster and meant to come back to. The
+                 button is Collapsed while the list is empty, exactly as Undo is: a button that opens an
+                 empty window is a button that teaches the operator not to press it. The count is on the
+                 face because that is the whole question being asked - how many are still waiting.
+                 96 wide, the same as Undo beside it: two keys of one size read as a pair, and a wider
+                 one ate the activity hint that shares this row. The count is NOT on the face for the
+                 same reason - it is in the tooltip and in the window's own title instead.
+                 Right edge 10px clear of Undo: 436 + 96 = 532, Undo starts at 542.
+                 It is not in the tab order - like Undo, it is not part of logging a contact. -->
+            <Button x:Name="Btn_TryAgain" Style="{StaticResource OrangeActionButtonStyle}"
+                    Canvas.Left="436" Canvas.Top="32" Width="96" Height="30"
+                    FontSize="16" FontWeight="Bold" Content="Try Again" Padding="0" Visibility="Collapsed"
+                    IsTabStop="False" Click="Btn_TryAgain_Click"
+                    ToolTip="The stations you sent over from the cluster to try again"/>
             <!-- "Activity" written INSIDE the empty box, the way a placeholder is. The row's other boxes
                  have a label to their left saying what they are; this one has no room for one, and an
                  empty box with a chevron says only "something goes here". Grey, so it cannot be mistaken
@@ -1750,7 +1771,13 @@
                 <TextBlock Text="Activity" FontSize="16" VerticalAlignment="Center" Margin="5,0,0,4"
                            Foreground="{DynamicResource MutedTextBrush}"/>
             </Border>
+            <!-- MaxWidth, because this line has to STOP before the Try Again button at 436. A Canvas
+                 draws in declaration order and this text is declared last, so without a limit it ran
+                 straight over the button's face - the button and the words appeared on top of one
+                 another. 95 = 436 - 335, less a 6px gap. Long names lose their tail to the ellipsis
+                 that was already set here; the drop-down spells every one of them out in full. -->
             <TextBlock x:Name="TB_ActivitySigHint" Canvas.Left="335" Canvas.Top="37" FontSize="16"
+                       MaxWidth="95"
                        Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis"
                        IsHitTestVisible="False"/>
         </Canvas>

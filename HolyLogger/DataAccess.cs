@@ -4176,6 +4176,176 @@ Environment.NewLine +
                 cmd.ExecuteNonQuery();
         }
 
+        // TRY AGAIN: the stations the operator meant to come back to. Filled from the cluster's
+        // right-click menu, worked off in the Try Again window. Its own table, not part of a log,
+        // because it is not log data - it is a note to self, and it outlives the log that was open
+        // when the spot was seen. CREATE TABLE IF NOT EXISTS, never DROP: the list the operator
+        // built up must survive every future schema change.
+        private void EnsureTryAgainTable()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS [try_again] (" +
+                    "[Id] INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                    "[dx_callsign] nvarchar(50) NOT NULL COLLATE NOCASE, " +
+                    // The stroke-suffix-free identity (4Z5SL/M -> 4Z5SL), stored rather than computed
+                    // so "he is in the log now, drop him from the list" is one DELETE instead of a
+                    // read-every-row-and-compare.
+                    "[call_base] nvarchar(50) NOT NULL COLLATE NOCASE, " +
+                    "[freq_text] nvarchar(30) NULL, " +
+                    "[mode] nvarchar(20) NULL, " +
+                    // The band NAME as the cluster itself worked it out ("20M", "40M"). Stored rather
+                    // than derived back out of the frequency, so the colour this row is painted is the
+                    // colour that very spot wore in the cluster - no second opinion, no rounding at a
+                    // band edge, and no question of whether the frequency was written in kHz or MHz.
+                    "[band] nvarchar(20) NULL, " +
+                    "[added_utc] nvarchar(20) NULL)", con))
+                    cmd.ExecuteNonQuery();
+
+                // For a list created before the band was kept. Those rows simply have no band and are
+                // painted in the ordinary text colour, which is what GetBandBrush does with a blank.
+                AddColToTable("try_again", "band", "nvarchar(20) NULL");
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // Every station waiting to be tried, NEWEST FIRST - the last spot sent over is the one the
+        // operator is most likely to want, so it is the one at the top.
+        // added_utc is stored as "yyyyMMdd HHmmss", which sorts correctly as plain text. Id breaks the
+        // tie for two entries added inside the same second.
+        public List<TryAgainEntry> GetTryAgainList()
+        {
+            lock (_dbLock)
+            {
+            var list = new List<TryAgainEntry>();
+            if (con == null || con.State != ConnectionState.Open) return list;
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "SELECT Id, dx_callsign, freq_text, mode, band, added_utc FROM try_again " +
+                    "ORDER BY added_utc DESC, Id DESC", con))
+                using (var rdr = cmd.ExecuteReader())
+                {
+                    while (rdr.Read())
+                    {
+                        list.Add(new TryAgainEntry
+                        {
+                            Id = rdr["Id"] == DBNull.Value ? 0 : Convert.ToInt64(rdr["Id"]),
+                            DXCallsign = rdr["dx_callsign"] == DBNull.Value ? string.Empty : rdr["dx_callsign"].ToString(),
+                            FreqText = rdr["freq_text"] == DBNull.Value ? string.Empty : rdr["freq_text"].ToString(),
+                            Mode = rdr["mode"] == DBNull.Value ? string.Empty : rdr["mode"].ToString(),
+                            Band = rdr["band"] == DBNull.Value ? string.Empty : rdr["band"].ToString(),
+                            AddedUtc = rdr["added_utc"] == DBNull.Value ? string.Empty : rdr["added_utc"].ToString()
+                        });
+                    }
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+            return list;
+            }
+        }
+
+        // Adds a station to the Try Again list. The SAME station on the SAME frequency in the SAME
+        // mode is one entry however many times the operator sends it over - a spot re-posted every
+        // few minutes would otherwise fill the list with copies of one station. The same station on
+        // another band IS a separate entry: it is a different thing to try.
+        // Returns false when the entry was already there.
+        public bool AddTryAgain(string callsign, string freqText, string mode, string band)
+        {
+            lock (_dbLock)
+            {
+            string call = (callsign ?? string.Empty).Trim().ToUpperInvariant();
+            if (call.Length == 0 || con == null || con.State != ConnectionState.Open) return false;
+
+            string freq = (freqText ?? string.Empty).Trim();
+            string md = (mode ?? string.Empty).Trim().ToUpperInvariant();
+            try
+            {
+                using (var dup = new SQLiteCommand(
+                    "SELECT count(*) FROM try_again WHERE dx_callsign = @c COLLATE NOCASE " +
+                    "AND IFNULL(freq_text,'') = @f AND IFNULL(mode,'') = @m COLLATE NOCASE", con))
+                {
+                    dup.Parameters.Add(new SQLiteParameter("@c", call));
+                    dup.Parameters.Add(new SQLiteParameter("@f", freq));
+                    dup.Parameters.Add(new SQLiteParameter("@m", md));
+                    if (Convert.ToInt32(dup.ExecuteScalar()) > 0) return false;
+                }
+
+                using (var cmd = new SQLiteCommand(
+                    "INSERT INTO try_again (dx_callsign, call_base, freq_text, mode, band, added_utc) " +
+                    "VALUES (@c, @b, @f, @m, @bd, @t)", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@c", call));
+                    cmd.Parameters.Add(new SQLiteParameter("@b", CallsignIdentity.Base(call).ToUpperInvariant()));
+                    cmd.Parameters.Add(new SQLiteParameter("@f", freq));
+                    cmd.Parameters.Add(new SQLiteParameter("@m", md));
+                    cmd.Parameters.Add(new SQLiteParameter("@bd", (band ?? string.Empty).Trim()));
+                    cmd.Parameters.Add(new SQLiteParameter("@t", DateTime.UtcNow.ToString("yyyyMMdd HHmmss")));
+                    cmd.ExecuteNonQuery();
+                }
+                return true;
+            }
+            catch (Exception ex) { Log.Swallow(ex); return false; }
+            }
+        }
+
+        // Removes one entry, by the row the operator right-clicked.
+        public void RemoveTryAgain(long id)
+        {
+            lock (_dbLock)
+            {
+            if (id <= 0 || con == null || con.State != ConnectionState.Open) return;
+            try
+            {
+                using (var cmd = new SQLiteCommand("DELETE FROM try_again WHERE Id = @id", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@id", id));
+                    cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+            }
+        }
+
+        // Drops a station from the list because he is now in the log. Matched on the stroke-free
+        // identity, so logging 4Z5SL/M clears an entry that says 4Z5SL. EVERY entry for that station
+        // goes, on whatever band or mode - the operator asked for the row to leave when the callsign
+        // is worked, not when that exact frequency is worked.
+        // Returns how many entries were removed, so the caller knows whether to refresh the window.
+        public int RemoveTryAgainForCallsign(string callsign)
+        {
+            lock (_dbLock)
+            {
+            string b = CallsignIdentity.Base((callsign ?? string.Empty).Trim()).ToUpperInvariant();
+            if (b.Length == 0 || con == null || con.State != ConnectionState.Open) return 0;
+            try
+            {
+                using (var cmd = new SQLiteCommand("DELETE FROM try_again WHERE call_base = @b COLLATE NOCASE", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@b", b));
+                    return cmd.ExecuteNonQuery();
+                }
+            }
+            catch (Exception ex) { Log.Swallow(ex); return 0; }
+            }
+        }
+
+        // How many stations are waiting. The main window's Try Again button is hidden while this is 0.
+        public int GetTryAgainCount()
+        {
+            lock (_dbLock)
+            {
+            if (con == null || con.State != ConnectionState.Open) return 0;
+            try
+            {
+                using (var cmd = new SQLiteCommand("SELECT count(Id) FROM try_again", con))
+                    return Convert.ToInt32(cmd.ExecuteScalar());
+            }
+            catch (Exception ex) { Log.Swallow(ex); return 0; }
+            }
+        }
+
         private static EqslAccount ReadEqslAccount(SQLiteDataReader rdr)
         {
             return new EqslAccount
@@ -4672,6 +4842,7 @@ Environment.NewLine +
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             EnsureEqslAccountsTable();
+            EnsureTryAgainTable();
             EnsureEqslIndexes();
             EnsureQrzIndexes();
             EnsureLotwIndex();
@@ -4743,6 +4914,101 @@ Environment.NewLine +
     // the call is a different station: 4X/OK1DL is OK1DL operating from Israel, not the same station
     // callsign as OK1DL at home — so a leading country prefix stays part of the identity.
     // (Not the same as Services.getBareCallsign, which strips the leading prefix too.)
+    // One station on the Try Again list: who, where, and in what mode. A plain record - the window
+    // shows it, the Try button hands it to the radio, and that is all it has to do. It is NOT a QSO
+    // and is deliberately not one: nothing here has been worked yet.
+    public class TryAgainEntry : System.ComponentModel.INotifyPropertyChanged
+    {
+        public long Id { get; set; }
+        public string DXCallsign { get; set; }
+        // Kept exactly as the cluster spotted it, so the Try button tunes to the same place the spot
+        // said. TuneToClusterSpot already accepts either kHz or MHz and works out which.
+        public string FreqText { get; set; }
+        public string Mode { get; set; }
+        // The band name the cluster gave this spot ("20M"). Kept only so the frequency can be painted
+        // the band's colour, exactly as the cluster paints it.
+        public string Band { get; set; }
+        // Stored as "yyyyMMdd HHmmss" UTC - sortable as plain text, which is what the list is ordered on.
+        public string AddedUtc { get; set; }
+
+        // The country's flag and its name, for the callsign column. NOT columns in the try_again table
+        // and deliberately so: they are worked out from the callsign each time the list is read, so a
+        // later country-file update corrects an entry that was already sitting on the list, and a
+        // database written on one machine does not carry another machine's image paths around with it.
+        // Filled in by the Try Again window - resolving a callsign to a country is not the database's job.
+        public string FlagPath { get; set; }
+        public string Country { get; set; }
+
+        // The band's colour, for the frequency text. Filled in by the window from the same
+        // MainWindow.GetBandBrush the cluster's own frequency column uses, so the two agree; a brush is
+        // a screen thing and has no business being worked out down here.
+        public System.Windows.Media.Brush FreqBrush { get; set; }
+
+        // HOW LONG HE HAS BEEN WAITING, so nobody has to work it out. This replaced a column that
+        // printed the clock time the station was copied in: reading "22:14" and subtracting it from the
+        // wall clock is exactly the arithmetic the operator should not be doing.
+        //
+        // Rounded down, deliberately. "6 min" turning into "7 min" a moment early would be wrong in the
+        // one direction that matters here: a spot is never fresher than it is said to be.
+        //
+        // ONE UNIT ONLY - minutes - and everything past the hour is "60+". Hours and days were spelled
+        // out at first ("1 h 05", "2 days") and that was more precision than the answer is worth: past
+        // an hour the station has gone, and how long ago he went changes nothing about what to do next.
+        // A single unit also means no two rows have to be compared across units to see which is fresher.
+        // "now" is the one exception, for under a minute, because "0 min" reads like a fault.
+        // SPLIT IN TWO so the column can print the number in bold and the unit beside it in plain text.
+        // The number is the thing being read - "39" - and "min" is the same three letters on every row,
+        // which is exactly the sort of text that should stay out of the way of what changes.
+        public string AgoNumber
+        {
+            get
+            {
+                TimeSpan since;
+                if (!TryElapsed(out since)) return string.Empty;
+                if (since.TotalMinutes < 1) return "now";
+                if (since.TotalMinutes < 60) return ((int)since.TotalMinutes).ToString(CultureInfo.InvariantCulture);
+                return "60+";
+            }
+        }
+
+        // Blank for "now" and for "60+": neither is a count of anything, so neither takes a unit.
+        public string AgoUnit
+        {
+            get
+            {
+                TimeSpan since;
+                if (!TryElapsed(out since)) return string.Empty;
+                return (since.TotalMinutes >= 1 && since.TotalMinutes < 60) ? " min" : string.Empty;
+            }
+        }
+
+        private bool TryElapsed(out TimeSpan since)
+        {
+            since = TimeSpan.Zero;
+            DateTime added;
+            if (!DateTime.TryParseExact((AddedUtc ?? string.Empty).Trim(), "yyyyMMdd HHmmss",
+                                        CultureInfo.InvariantCulture,
+                                        System.Globalization.DateTimeStyles.None, out added))
+                return false;
+
+            since = DateTime.UtcNow - added;
+            if (since < TimeSpan.Zero) since = TimeSpan.Zero;   // a clock that went backwards
+            return true;
+        }
+
+        // Time passes whether or not anything in the database changes, so the window's clock tick calls
+        // this on every row to make the Ago column re-read itself. Nothing else about the row moves.
+        public void NotifyAgoChanged()
+        {
+            var handler = PropertyChanged;
+            if (handler == null) return;
+            handler(this, new System.ComponentModel.PropertyChangedEventArgs("AgoNumber"));
+            handler(this, new System.ComponentModel.PropertyChangedEventArgs("AgoUnit"));
+        }
+
+        public event System.ComponentModel.PropertyChangedEventHandler PropertyChanged;
+    }
+
     public static class CallsignIdentity
     {
         // A complete amateur callsign (prefix letters/digits + digit + suffix ending in a letter),

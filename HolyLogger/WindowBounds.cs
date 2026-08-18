@@ -37,6 +37,19 @@ namespace HolyLogger
             window.Closed += (s, e) => _attached.Remove(window);
         }
 
+        // Has this window ever been placed by the operator? Asked BEFORE opening a window that wants
+        // its own first-time position (Try Again opens centred on the log table). Once there is a
+        // saved placement, that placement wins and the first-time rule never applies again.
+        public static bool HasSaved(string key)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(key)) return false;
+                return Load().TryGetValue(key, out Box b) && b != null && IsRealNumber(b.L) && IsRealNumber(b.T);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return false; }
+        }
+
         // Saves the placement of every attached window that is still open.
         //
         // Closing a window yourself saves it, but when the PROGRAM closes the child windows are torn
@@ -67,7 +80,15 @@ namespace HolyLogger
                 // was ignored - so the window opened at its XAML default of 540 and looked as though it
                 // had forgotten everything. Clamping keeps the operator's own size wherever it is still
                 // usable, which is what a remembered size is for.
-                if (b.W > 0) window.Width = Math.Max(b.W, window.MinWidth);
+                // A window whose WIDTH is content-driven is left alone, for the same reason the height
+                // is below: its width is worked out from what it is showing, and a width saved from a
+                // session when it was showing something else is not an improvement on that. Without
+                // this, a window that had been made content-sized went on opening at whatever width it
+                // happened to have before the change - so no adjustment to its layout ever reached the
+                // operator, and it looked as though nothing had been done.
+                bool widthIsAuto = window.SizeToContent == SizeToContent.Width
+                                || window.SizeToContent == SizeToContent.WidthAndHeight;
+                if (!widthIsAuto && b.W > 0) window.Width = Math.Max(b.W, window.MinWidth);
 
                 // A window whose height is content-driven (SizeToContent="Height" / "WidthAndHeight") must
                 // never have Height set explicitly - WPF throws if you try, and the whole point of that

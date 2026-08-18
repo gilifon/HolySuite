@@ -71,6 +71,261 @@
         </Setter>
     </Style>
 
+    <!-- ── THE DARK GREEN KEYCAP: GO ───────────────────────────────────────────────────────────
+         The same key as the red one above, in dark green, for a button that DOES the thing rather
+         than takes it back. The Try Again list's row buttons wear it: one per row, so the colour has
+         to say "press me" down a whole column without shouting.
+
+         Dark green (#1B5E20) rather than a bright one: a column of bright green would read as a
+         column of status lamps, and these are buttons. White text, because dark green will not carry
+         black. Under the mouse it lights to the same #A8D8FF every other key in this program lights
+         to - the stock WPF button would instead paint pale grey over the green, which reads as
+         "disabled". -->
+    <Style x:Key="GoActionButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="#1B5E20"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Margin" Value="0,1,0,1"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="KeyOuter" CornerRadius="5" Background="#0E3A12" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                        <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#2E7D32" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#1F5C8E"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#A8D8FF"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#3A80C8"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                            <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#7DC0F5"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                            <Setter Property="Foreground" Value="#7A7A7A"/>
+                            <Setter Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── THE ORANGE KEYCAP: TRY AGAIN ────────────────────────────────────────────────────────
+         The same key again, in orange. It is NOT the blue ActionButtonStyle that Add (F1) and Clear
+         (F9) wear, and that is the whole point: those two are the logging keys, pressed on every
+         contact, and this one only appears when there is unfinished business waiting. Orange reads as
+         "something is pending" beside them without competing with the red Undo, which means the
+         opposite - undoing something already done.
+
+         Under the mouse it lights to the same #A8D8FF as every other key in this program, with the
+         text going black; the stock WPF button would paint pale grey over the orange instead, which
+         reads as "you cannot press this". -->
+    <Style x:Key="OrangeActionButtonStyle" TargetType="Button">
+        <Setter Property="Background" Value="#EF6C00"/>
+        <Setter Property="Foreground" Value="#FFFFFF"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Margin" Value="0,1,0,1"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="KeyOuter" CornerRadius="5" Background="#A34A00" SnapsToDevicePixels="True" Padding="0,0,0,3">
+                        <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#FF9130" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
+                        </Border>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#1F5C8E"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#A8D8FF"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#3A80C8"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
+                            <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#7DC0F5"/>
+                            <Setter Property="Foreground" Value="#000000"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
+                            <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
+                            <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
+                            <Setter Property="Foreground" Value="#7A7A7A"/>
+                            <Setter Property="Opacity" Value="0.8"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── THE HOUSE RIGHT-CLICK MENU ──────────────────────────────────────────────────────────
+         Rounded card, red for anything that deletes. The log's menu and the Log Workshop's menu each
+         parse their own private copy of a white-and-blue version of this at runtime; these keys are
+         the TRY AGAIN version, and they are the SAME LIGHT GREEN as the Try Again window itself. Both
+         menus that use them are about that list - the cluster's "Copy into Try Again" and the list's
+         own Delete - so the colour is the thread that ties the three together: the operator sees green
+         and knows which feature he is in.
+
+         Deliberately literal colours, not theme tokens, so the card stays this green in every colour
+         scheme. That is also why every text colour here is spelled out: the theme's TextBrush is a
+         LIGHT colour in the dark schemes, and light text on light green cannot be read. -->
+    <Style x:Key="HolyCtxMenu" TargetType="ContextMenu">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <!-- Padding 3 and an 8px corner: the card is small and every edge it does not need
+                         is width the operator has to read across. -->
+                    <Border Background="#E8F5E9" BorderBrush="#2E7D32" BorderThickness="1.5" CornerRadius="8" Padding="3" SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="14" ShadowDepth="2" Opacity="0.35" Color="#666666"/>
+                        </Border.Effect>
+                        <StackPanel IsItemsHost="True" KeyboardNavigation.DirectionalNavigation="Cycle"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+    <ControlTemplate x:Key="HolyCtxItemTemplate" TargetType="MenuItem">
+        <Border x:Name="bd" Background="Transparent" CornerRadius="6" Padding="{TemplateBinding Padding}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="24"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <ContentPresenter Grid.Column="0" ContentSource="Icon" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                <ContentPresenter Grid.Column="1" ContentSource="Header" VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="#D32F2F"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+    <Style x:Key="HolyCtxItemDanger" TargetType="MenuItem">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="Foreground" Value="#C62828"/>
+        <Setter Property="Padding" Value="12,7"/>
+        <Setter Property="Margin" Value="2,1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template" Value="{StaticResource HolyCtxItemTemplate}"/>
+    </Style>
+
+    <!-- AN ITEM THAT SENDS SOMETHING SOMEWHERE, with its mark on the RIGHT.
+         Reading order is the reason. A mark on the left is a label for what follows - it says what
+         KIND of thing the line is. A mark on the right is the destination the words have just named,
+         so the eye reaches "Copy into Try Again" and then the arrow, in that order. It also lets the
+         mark be an arrow pointing out of the menu, which a left-hand column cannot do.
+
+         The icon deliberately has no colour of its own: it inherits the item's Foreground, so it goes
+         white with the text when the row lights up blue. An arrow painted a fixed blue would vanish
+         into the blue highlight at exactly the moment the operator is looking at it. -->
+    <!-- IT LOOKS LIKE A BUTTON, because it is one and nothing else on this card is. A line of plain
+         text in a small floating panel does not announce that it can be pressed - it can be read as a
+         heading, or as a note about the station named above it. A face, a border and a raised bottom
+         edge say "press me" with no explaining. Bold for the same reason: the words are the command.
+
+         4px between the words and the arrow, not 10. The arrow belongs TO the words - it is where they
+         are pointing - and a wide gap made it look like a second, separate thing sitting in a column of
+         its own. -->
+    <ControlTemplate x:Key="HolyCtxItemGoTemplate" TargetType="MenuItem">
+        <Border x:Name="KeyOuter" CornerRadius="5" Background="#2E7D32" SnapsToDevicePixels="True" Padding="0,0,0,2">
+            <Border x:Name="bd" CornerRadius="5" Background="#C8E6C9" BorderBrush="#2E7D32"
+                    BorderThickness="1" SnapsToDevicePixels="True" Padding="{TemplateBinding Padding}">
+                <!-- BOTH COLUMNS AUTO AND THE PAIR CENTRED. The header column was "*", which stretches
+                     to whatever width the card ends up being - and the card is as wide as its widest
+                     line, so the arrow was pushed to the far edge with a hand's breadth of empty green
+                     between it and the words it belongs to. The 4px margin was never the problem; the
+                     stretching was. Auto columns keep the words and the arrow the width of the words
+                     and the arrow, and centring the pair puts that group in the middle of the button
+                     however wide the button turns out to be. -->
+                <Grid HorizontalAlignment="Center">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <ContentPresenter Grid.Column="0" ContentSource="Header" VerticalAlignment="Center"/>
+                    <ContentPresenter Grid.Column="1" ContentSource="Icon" VerticalAlignment="Center" Margin="6,0,0,0"/>
+                </Grid>
+            </Border>
+        </Border>
+        <ControlTemplate.Triggers>
+            <!-- Dark green, not the blue the older menus use: this card is green, and it is the same
+                 dark green as a selected row in the Try Again window. One highlight colour across the
+                 whole feature. -->
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="bd" Property="Background" Value="#1B5E20"/>
+                <Setter Property="Foreground" Value="White"/>
+            </Trigger>
+            <!-- Sinks by 2px like every other key in this program, so the press is felt. -->
+            <Trigger Property="IsPressed" Value="True">
+                <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,0"/>
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+    <Style x:Key="HolyCtxItemGo" TargetType="MenuItem">
+        <Setter Property="FontSize" Value="16"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="#1A1A1A"/>
+        <!-- 8,4 against the older menus' 12,7. Bold text is wider than plain, so the room for it had
+             to come from somewhere if the card was to end up SMALLER than it started. -->
+        <Setter Property="Padding" Value="6,4"/>
+        <Setter Property="Margin" Value="1,1"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Template" Value="{StaticResource HolyCtxItemGoTemplate}"/>
+    </Style>
+
+    <!-- THE TITLE LINE OF A CARD - and the reason this style has to exist at all.
+         Anything handed to ContextMenu.Items that is not already a MenuItem gets WRAPPED in a default
+         MenuItem, and a default MenuItem reserves room for things this line does not have: a 22px icon
+         column, about 20px for the shortcut text on the right, and 10px for a submenu arrow. Measured,
+         that was 66px of empty structure around a 90px title - and because the items panel stretches
+         every row to the widest one, it set the width of the WHOLE card and of the button below it.
+         The card looked padded out at the sides for no visible reason, because the reason was invisible.
+
+         This template is a Border and the header, and nothing else. -->
+    <Style x:Key="HolyCtxTitle" TargetType="MenuItem">
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Margin" Value="0"/>
+        <Setter Property="Focusable" Value="False"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border Background="Transparent" Padding="{TemplateBinding Padding}">
+                        <ContentPresenter ContentSource="Header" VerticalAlignment="Center"/>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="HolyCtxSep" TargetType="Separator">
+        <Setter Property="Margin" Value="3,3"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Border Height="1" Background="#BDBDBD" SnapsToDevicePixels="True"/>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- Every window: themed surface + default text color (buttons/colored text override it). -->
     <Style TargetType="Window">
         <Setter Property="Background" Value="{DynamicResource WindowBg}"/>

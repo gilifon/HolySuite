@@ -1231,6 +1231,10 @@ namespace HolyLogger
             // eQSL table). Nothing is sent automatically here.
             UpdateEqslQueueIndicator();
 
+            // Try Again: the list survives between sessions, so the button has to know at startup
+            // whether anybody is still waiting on it. It stays hidden when nobody is.
+            RefreshTryAgain();
+
             // QRZ Logbook: show pending count and silently retry any QSOs that could not be pushed
             // earlier (e.g. logged while offline).
             UpdateQrzMenuCount();
@@ -1720,6 +1724,9 @@ namespace HolyLogger
                         QSODataGrid.ScrollIntoView(QSODataGrid.Items[0]);
 
                     AddWorkedCountryAndRefreshCluster(qso.DXCall);
+
+                    // He was on the Try Again list and he is in the log now, so he comes off it.
+                    RemoveFromTryAgainAfterLogging(qso.DXCall);
 
                     // In a contest whose sent exchange is a serial number, advance it for the next QSO.
                     AdvanceContestSerial();

@@ -1,0 +1,306 @@
+<Window x:Class="HolyLogger.TryAgainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Try Again" MinWidth="380"
+        SizeToContent="WidthAndHeight" MaxHeight="720" MaxWidth="900"
+        WindowStartupLocation="CenterScreen" ResizeMode="CanResize"
+        Icon="Images/crown.png"
+        Background="#E8F5E9"
+        Foreground="#1A1A1A">
+    <!-- THE STATIONS THE OPERATOR MEANT TO COME BACK TO.
+         Filled from the cluster's right-click menu, emptied by working them. The list lives in the
+         database, not in this window, so closing the program does not lose it - the whole point of
+         "try again" is that the try does not have to be today.
+
+         AS TALL AS THE LIST IS LONG (SizeToContent="Height"). Two rows get a two-row window; there is
+         no empty green field under the last station. The width and the position are still the
+         operator's own and are remembered - the HEIGHT is not his to keep, because it is worked out
+         from the list every time it is shown.
+
+         AND AS WIDE AS THE TABLE IS WIDE - no Width at all, SizeToContent does both directions. Every
+         hand-picked width tried here was wrong within a change or two, because what this window has to
+         show kept growing: a flag, a country, a unit in a heading. Worse, a fixed width was being
+         overruled anyway - the saved placement restored the width from the session before, so nothing
+         set here ever reached the operator (WindowBounds now leaves a content-sized width alone).
+
+         Measured, the columns want about 560 with ordinary callsigns and the two lines of text want
+         about 400, so the TABLE is what sets the width and the sentences fit inside it comfortably.
+         Letting the window ask the table means it is never wider than it needs to be - and it gets
+         narrower by itself when the list holds only short callsigns.
+
+         MaxHeight stops a long list from growing a window taller than the screen: past that point the
+         table scrolls inside instead. It is a plain number and not a measurement of the monitor on
+         purpose - the only API that answers that question (SystemParameters.WorkArea) speaks for the
+         primary screen alone, and this program has been bitten by trusting it.
+
+         LIGHT GREEN, and fixed - it does not follow the colour scheme. That is deliberate and it is
+         why every colour in this window is spelled out below: the theme's TextBrush is a LIGHT colour
+         in the dark schemes, and light text on a light green window cannot be read at all. A window
+         that commits to its own colour has to bring its own text colour with it. -->
+    <Window.Resources>
+        <!-- Dark text everywhere in this window, whatever the rest of the program is wearing. -->
+        <Style TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#1A1A1A"/>
+        </Style>
+        <Style TargetType="DataGridCell">
+            <Setter Property="Foreground" Value="#1A1A1A"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Style.Triggers>
+                <Trigger Property="IsSelected" Value="True">
+                    <Setter Property="Background" Value="#1B5E20"/>
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+        <!-- Close, in this window's own colours. The app-wide button follows the colour scheme, and
+             its dark-mode face on a light green window would be a dark slab with dark text on it the
+             moment the pointer arrived. -->
+        <Style x:Key="GreenCloseButton" TargetType="Button">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Setter Property="Foreground" Value="#1A1A1A"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bd" Background="{TemplateBinding Background}" BorderBrush="#7CB47F"
+                                BorderThickness="1" CornerRadius="4" SnapsToDevicePixels="True">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#A8D8FF"/>
+                                <Setter TargetName="bd" Property="BorderBrush" Value="#3A80C8"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bd" Property="Background" Value="#7DC0F5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+        <!-- The headers a shade deeper than the window, so the strip reads as a header without a
+             border being drawn round it. -->
+        <Style TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#C8E6C9"/>
+            <Setter Property="Foreground" Value="#1A1A1A"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="BorderBrush" Value="#A5D6A7"/>
+            <Setter Property="BorderThickness" Value="0,0,1,1"/>
+        </Style>
+        <!-- A heading centred over its column. The headings are left-aligned by default, which is right
+             for a column of words but wrong over a column holding one centred button. BasedOn the
+             implicit style above so it keeps the green face and the rest - and it has to be declared
+             AFTER that style, because StaticResource can only see what has already been declared. -->
+        <Style x:Key="CenteredHeader" TargetType="DataGridColumnHeader"
+               BasedOn="{StaticResource {x:Type DataGridColumnHeader}}">
+            <Setter Property="HorizontalContentAlignment" Value="Center"/>
+        </Style>
+    </Window.Resources>
+    <!-- 6px above the text rather than 14. The band holding those two lines looked far taller than two
+         lines of writing needs, and the margin was most of what was making it so - the text itself is
+         two 16px lines, about 43px, and that part cannot shrink without going under the 16 this program
+         writes everything at. Sides and bottom stay at 12 so the table is not jammed against the frame. -->
+    <Grid Margin="12,6,12,12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <!-- MinHeight so the "nobody on the list yet" line still has somewhere to be printed when
+                 the last station is deleted or logged while this window is open. -->
+            <RowDefinition Height="*" MinHeight="80"/>
+            <RowDefinition Height="Auto"/>
+        </Grid.RowDefinitions>
+
+        <!-- WHAT THE BUTTONS DO, and nothing else. This line used to open with "Stations you sent over
+             from the cluster", which was the one sentence here that said something the window already
+             says for itself - it is called Try Again and it is filled from a menu item called "Copy
+             into Try Again". What is left is the part that cannot be worked out by looking: that the
+             button drives the radio, and that a station takes himself off this list once he is worked. -->
+        <!-- A LINE BREAK BETWEEN THE TWO SENTENCES, not left to the wrap. Wrapping broke the second
+             sentence wherever the window's width happened to fall - "...once you" and then "log him."
+             on the next line - so the two statements ran into one another and neither could be taken in
+             at a glance. One sentence, one line. TextWrapping stays on as the safety net for a window
+             dragged narrower than the text. -->
+        <!-- "Try Again" in bold because it is the NAME OF THE BUTTON, not part of the sentence: the eye
+             should be able to jump from these words to the green key on the row without reading the
+             line. Plain Runs with literal text - no bindings here, so none of the two-way trouble that
+             the Ago column's Runs ran into. -->
+        <TextBlock Grid.Row="0" FontSize="16" Margin="2,0,2,6" TextWrapping="Wrap"><Run
+                   Text="Press "/><Run Text="Try Again" FontWeight="Bold"/><Run
+                   Text=" to put the radio on one."/><LineBreak/><Run
+                   Text="A station leaves this list by itself once you log him."/></TextBlock>
+
+        <!-- EVERY COLUMN THAT HOLDS TEXT IS AUTO WIDTH, so nothing is ever cut off - a truncated
+             callsign or a frequency missing its last digit is worse than useless here. Auto measures
+             the header as well as the cells, so a short column still fits its own title. Only the last
+             column, the one holding the buttons, is "*": see the note on it.
+
+             Sorting is fixed and the headers do not re-sort: newest at the top, always. The order is
+             the answer to "who did I just see", and a column the operator sorted by accident would
+             hide the row he had come to press. -->
+        <DataGrid x:Name="Grid_TryAgain" Grid.Row="1"
+                  AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False"
+                  CanUserDeleteRows="False" CanUserSortColumns="False" CanUserReorderColumns="False"
+                  HeadersVisibility="Column" SelectionMode="Single" SelectionUnit="FullRow"
+                  GridLinesVisibility="Horizontal" RowHeaderWidth="0" FontSize="16"
+                  Background="#FFFFFF" BorderBrush="#A5D6A7" BorderThickness="1"
+                  HorizontalGridLinesBrush="#D7E9D8"
+                  RowBackground="#FFFFFF" AlternatingRowBackground="#F1F8F2" AlternationCount="2"
+                  PreviewMouseRightButtonDown="Grid_TryAgain_MouseRightButtonDown">
+            <DataGrid.Columns>
+                <!-- HOW LONG AGO IT WENT ON THE LIST, leftmost, and the list is ordered by it.
+                     There WAS a "Time (UTC)" column here showing the clock time it was copied in. It
+                     went because it made the operator do the arithmetic it was trying to save him:
+                     what he wants to know is how long the station has been waiting, and reading "22:14"
+                     and subtracting it from the wall clock is how he had to find that out. This column
+                     answers the question directly and counts up on its own while the window is open -
+                     see the timer in the code. -->
+                <DataGridTemplateColumn Header="Ago" Width="Auto" SortMemberPath="AddedUtc">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <!-- The NUMBER in bold, the unit beside it in plain text. "min" is the same
+                                 three letters on every row; the figure is the only part that changes and
+                                 the only part worth reading, so it is the part that carries the weight.
+
+                                 Mode=OneWay is REQUIRED, not tidiness. Run.Text is registered to bind
+                                 two-way by default - it has to be, so a RichTextBox can write back what
+                                 the user types into it - and both of these properties are read-only,
+                                 which WPF reports at run time as "a TwoWay or OneWayToSource binding
+                                 cannot work on the read-only property". TextBlock.Text elsewhere in this
+                                 file is one-way by default and needs nothing. -->
+                            <TextBlock Padding="6,3" HorizontalAlignment="Right" VerticalAlignment="Center"
+                                       FontSize="16"><Run Text="{Binding AgoNumber, Mode=OneWay}" FontWeight="Bold"/><Run Text="{Binding AgoUnit, Mode=OneWay}"/></TextBlock>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <!-- THE FLAG SITS INSIDE THIS COLUMN, not in one of its own. It belongs to the callsign
+                     - it is the same fact said in a picture - and a separate column would have cost a
+                     header, a grid line and the width of both for nothing. The tooltip names the
+                     country in words, since a flag alone is a guess for anyone who does not know it.
+
+                     24x16 Uniform, the same size the cluster's flag column uses, so the two tables show
+                     a country identically. A callsign the country file does not recognise simply has no
+                     picture: the Image is left with nothing to show and takes its 24px quietly, which
+                     keeps every callsign in the column starting at the same place. -->
+                <DataGridTemplateColumn Header="Callsign" Width="Auto" SortMemberPath="DXCallsign">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Center"
+                                        Margin="6,3" ToolTip="{Binding Country}">
+                                <Image Source="{Binding FlagPath}" Width="24" Height="16"
+                                       Stretch="Uniform" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding DXCallsign}" FontWeight="Bold" FontSize="16"
+                                           VerticalAlignment="Center" Margin="6,0,0,0"/>
+                            </StackPanel>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <!-- THE COUNTRY IN WORDS, beside the flag that is the same fact in a picture. Plain
+                     text, no colour of its own - which is exactly how the cluster shows it: its Country
+                     column is an ordinary text column, and only DX, Freq and Mode there carry meaning
+                     in their colour.
+
+                     AUTO like the rest. It was "*" while the window had a fixed width, to soak up the
+                     leftover so no empty strip appeared on the right - but the window now takes its
+                     width FROM these columns, so there is no leftover for anything to soak up, and a
+                     star column under SizeToContent would only collapse to its minimum.
+
+                     MaxWidth for the handful of enormous DXCC names - "Bonaire, Curacao (Neth
+                     Antilles)" among them - one of which would otherwise stretch the whole window.
+                     Trimming cuts it and the tooltip carries the full name, so nothing is really lost. -->
+                <DataGridTextColumn Header="Country" Binding="{Binding Country}" Width="Auto" MaxWidth="150">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Padding" Value="6,3"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                            <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                            <Setter Property="ToolTip" Value="{Binding Country}"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <!-- Kept exactly as the cluster spotted it, so Try Again tunes where the spot said.
+                     Centred, not right-aligned: these are all cluster frequencies on the same few
+                     bands, so they are the same length as each other and line up anyway - and centred
+                     they sit under the middle of their own heading instead of away from it. -->
+                <DataGridTemplateColumn Width="Auto" SortMemberPath="FreqText">
+                    <!-- THE UNIT IN THE HEADING, where the cluster also puts it. These numbers come
+                         straight off the cluster and are kHz - "7199.0" - while the same station in the
+                         log below is written 7.199000 in MHz. Saying which is which is the difference
+                         between reading the row and having to work it out. Bold and smaller: it is a
+                         note on the heading, not a second heading.
+
+                         STACKED, not side by side: "Frequency kHz" on one line measured 120px and was
+                         the widest heading in the table, which made the unit cost 27px of window for
+                         three characters. Underneath, it costs nothing at all - the column was already
+                         that tall. The cluster writes its own frequency heading the same way. -->
+                    <DataGridTemplateColumn.Header>
+                        <TextBlock TextAlignment="Center" LineHeight="15"
+                                   LineStackingStrategy="BlockLineHeight">
+                            <Run Text="Frequency"/><LineBreak/><Run Text="kHz" FontWeight="Bold" FontSize="13"/>
+                        </TextBlock>
+                    </DataGridTemplateColumn.Header>
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <TextBlock Text="{Binding FreqText}" Foreground="{Binding FreqBrush}"
+                                       FontWeight="Bold" FontSize="16" Padding="6,3"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+                <DataGridTextColumn Header="Mode" Binding="{Binding Mode}" Width="Auto">
+                    <DataGridTextColumn.ElementStyle>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Padding" Value="6,3"/>
+                            <Setter Property="HorizontalAlignment" Value="Center"/>
+                            <Setter Property="VerticalAlignment" Value="Center"/>
+                        </Style>
+                    </DataGridTextColumn.ElementStyle>
+                </DataGridTextColumn>
+                <!-- THE BUTTON, at the right end of the row, under the heading "Action". The heading was
+                     blank at first, on the grounds that the button says what it does - but a nameless
+                     column leaves a gap in the row of headings that reads as something missing, and
+                     "Action" says what the column is for rather than repeating what the button says.
+                     It is narrower than the button, so it costs no width.
+
+                     AUTO, so the column is exactly as wide as the button and not a pixel more. It was
+                     "*" for a while, to stop an empty strip appearing down the right-hand side of the
+                     table - but that job has moved to the Country column, which can carry spare width
+                     without looking odd. A button marooned in the middle of a wide empty lane looks
+                     like a mistake. -->
+                <DataGridTemplateColumn Header="Action" Width="Auto" CanUserResize="False"
+                                        HeaderStyle="{StaticResource CenteredHeader}">
+                    <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate>
+                            <!-- 30 high, not 28. The keycap gives its content the face height less 3px
+                                 of key travel and 2px top and bottom, so a 28px key leaves 21 - and a
+                                 bold 16px line needs a shade more than that. The letters that pay are
+                                 the ones with a tail, which is both the y and the g in "Try Again".
+
+                                 The 12px side margins are what make the COLUMN a few px wider without
+                                 touching the button itself: the column is Auto, so it measures the cell
+                                 content including this margin. Widening the button's own padding would
+                                 have made the button bigger, which is not what was asked for. -->
+                            <Button Content="Try Again" Style="{StaticResource GoActionButtonStyle}"
+                                    FontSize="16" Height="30" Padding="12,0" Margin="12,3"
+                                    HorizontalAlignment="Center"
+                                    Click="Btn_Try_Click"
+                                    ToolTip="Put the radio on this station and close this window"/>
+                        </DataTemplate>
+                    </DataGridTemplateColumn.CellTemplate>
+                </DataGridTemplateColumn>
+            </DataGrid.Columns>
+        </DataGrid>
+
+        <!-- Nothing to say when the list is empty except that it is. Sits over the grid rather than
+             taking a row of its own, so it cannot change the layout when it appears. -->
+        <TextBlock x:Name="TB_Empty" Grid.Row="1" FontSize="16"
+                   HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed"
+                   TextAlignment="Center"
+                   Text="Nobody on the list yet.&#x0a;Right-click a spot in the cluster and choose &quot;Copy into Try Again&quot;."/>
+
+        <Button Grid.Row="2" x:Name="Btn_Close" Content="Close" FontSize="16" Width="110" Height="30"
+                Style="{StaticResource GreenCloseButton}"
+                HorizontalAlignment="Center" Margin="0,12,0,0" Click="Btn_Close_Click" IsCancel="True"/>
+    </Grid>
+</Window>
