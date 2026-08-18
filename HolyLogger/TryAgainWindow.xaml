@@ -38,18 +38,52 @@
          in the dark schemes, and light text on a light green window cannot be read at all. A window
          that commits to its own colour has to bring its own text colour with it. -->
     <Window.Resources>
-        <!-- Dark text everywhere in this window, whatever the rest of the program is wearing. -->
+        <!-- Dark text everywhere in this window, whatever the rest of the program is wearing - and WHITE
+             on the one row the right-click menu is about, which is painted dark green. An explicit
+             Foreground on a TextBlock beats anything inherited from the row, so the exception has to be
+             made here as well as on the cell, or the marked row would be dark text on a dark ground.
+             The two sentences at the top of the window have no row behind them, so IsMarked never
+             resolves for them and the trigger never fires. -->
         <Style TargetType="TextBlock">
             <Setter Property="Foreground" Value="#1A1A1A"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding IsMarked}" Value="True">
+                    <Setter Property="Foreground" Value="#FFFFFF"/>
+                </DataTrigger>
+            </Style.Triggers>
         </Style>
+        <!-- Background Transparent and NO IsSelected trigger: the grid's own selection must never paint
+             anything here, because a left click selects and a left click has to leave the list looking
+             as it found it. The row's own colour shows through instead - see RowStyle below. -->
         <Style TargetType="DataGridCell">
             <Setter Property="Foreground" Value="#1A1A1A"/>
+            <Setter Property="Background" Value="Transparent"/>
             <Setter Property="BorderThickness" Value="0"/>
             <Style.Triggers>
-                <Trigger Property="IsSelected" Value="True">
-                    <Setter Property="Background" Value="#1B5E20"/>
+                <DataTrigger Binding="{Binding IsMarked}" Value="True">
                     <Setter Property="Foreground" Value="#FFFFFF"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <!-- EVERY ROW COLOUR IN ONE PLACE, striping included, and that is not tidiness - it is the only
+             way the mark can win.
+             DataGrid.RowBackground and AlternatingRowBackground are applied by the grid as a LOCAL VALUE
+             on each row, and a local value outranks a style trigger however the trigger is written. With
+             those two properties set on the grid, the mark's trigger below fired - the text really did
+             turn white - and the row stayed white underneath it, so the marked row read as a row that
+             had gone blank. Striping done here is a Setter and a trigger, which the mark can outrank.
+             The mark's trigger is LAST because, among triggers setting the same property, the last
+             active one wins. -->
+        <Style x:Key="MarkableRow" TargetType="DataGridRow">
+            <Setter Property="Background" Value="#FFFFFF"/>
+            <Style.Triggers>
+                <Trigger Property="AlternationIndex" Value="1">
+                    <Setter Property="Background" Value="#F1F8F2"/>
                 </Trigger>
+                <!-- The one row the right-click menu is about. Nothing else paints a row. -->
+                <DataTrigger Binding="{Binding IsMarked}" Value="True">
+                    <Setter Property="Background" Value="#1B5E20"/>
+                </DataTrigger>
             </Style.Triggers>
         </Style>
         <!-- Close, in this window's own colours. The app-wide button follows the colour scheme, and
@@ -146,8 +180,10 @@
                   GridLinesVisibility="Horizontal" RowHeaderWidth="0" FontSize="16"
                   Background="#FFFFFF" BorderBrush="#A5D6A7" BorderThickness="1"
                   HorizontalGridLinesBrush="#D7E9D8"
-                  RowBackground="#FFFFFF" AlternatingRowBackground="#F1F8F2" AlternationCount="2"
-                  PreviewMouseRightButtonDown="Grid_TryAgain_MouseRightButtonDown">
+                  AlternationCount="2"
+                  RowStyle="{StaticResource MarkableRow}"
+                  PreviewMouseRightButtonDown="Grid_TryAgain_MouseRightButtonDown"
+                  PreviewMouseLeftButtonDown="Grid_TryAgain_MouseLeftButtonDown">
             <DataGrid.Columns>
                 <!-- HOW LONG AGO IT WENT ON THE LIST, leftmost, and the list is ordered by it.
                      There WAS a "Time (UTC)" column here showing the clock time it was copied in. It

@@ -29,6 +29,7 @@ namespace HolyLogger
         // leave "6 min" on screen for the best part of two minutes.
         private System.Windows.Threading.DispatcherTimer _agoTimer;
 
+
         // Pressed Try Again on a row: the main window puts the radio there. Raised, rather than done
         // here, because tuning a radio and filling the logging form is the main window's job and it
         // already has the code for it.
@@ -152,7 +153,10 @@ namespace HolyLogger
                 var entry = RowUnderMouse(e.OriginalSource as DependencyObject);
                 if (entry == null) return;      // header, or empty space below the last row
 
-                Grid_TryAgain.SelectedItem = entry;   // so it is plain which row the menu is about
+                // Paint the row the menu is about, so there is no doubt which station is being deleted.
+                // Any earlier mark goes first: only ever one row is the one in question.
+                ClearMarks();
+                entry.IsMarked = true;
 
                 var menu = new ContextMenu { Style = (Style)FindResource("HolyCtxMenu") };
                 var del = new MenuItem
@@ -179,12 +183,55 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+        // THE PAINTED ROW BELONGS TO THE RIGHT-CLICK AND TO NOTHING ELSE.
+        //
+        // A green row here means one thing: "this is the station the menu is about to delete". If a left
+        // click painted one too, a row left over from a menu the operator thought better of would look
+        // exactly like a row he had just picked out to delete - and the moment before a delete is the
+        // one moment that has to be unambiguous.
+        //
+        // The mark is a flag on the row itself, NOT the DataGrid's selection. Two attempts were made to
+        // borrow the selection and both failed on the same fact - the grid decides when it selects, and
+        // this window does not get to say no. Undoing the selection inside SelectionChanged did nothing
+        // at all, because the grid discards a selection changed from within its own transaction; undoing
+        // it afterwards worked, but the row was painted for a frame first and then unpainted, which
+        // looks like a fault. Nothing is painted here that was not asked for, so there is nothing to
+        // take back.
+        private void ClearMarks()
+        {
+            foreach (TryAgainEntry row in _rows)
+                row.IsMarked = false;
+        }
+
+        private void Grid_TryAgain_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            ClearMarks();
+        }
+
         // Which row the pointer is on. The cell's DataContext is the direct answer; the walk up to the
         // row covers a click that landed on the padding between cells.
+        //
+        // THE WALK HAS TO CROSS OUT OF THE TEXT. A Run is a FrameworkContentElement, not a Visual, and
+        // VisualTreeHelper.GetParent THROWS when handed one - so a right-click that landed on the words
+        // inside a Run raised an exception the handler quietly swallowed, and no menu appeared at all.
+        // It showed up on the Ago column because that is the only column built out of Runs, to print
+        // the number in bold and the unit beside it in plain text. Content elements are climbed by
+        // their logical parent until the walk is back among visuals.
         private TryAgainEntry RowUnderMouse(DependencyObject source)
         {
             while (source != null && !(source is DataGridRow) && !(source is DataGridCell))
-                source = VisualTreeHelper.GetParent(source);
+            {
+                if (source is Visual || source is System.Windows.Media.Media3D.Visual3D)
+                {
+                    source = VisualTreeHelper.GetParent(source);
+                }
+                else
+                {
+                    var content = source as FrameworkContentElement;
+                    if (content == null) return null;
+                    source = content.Parent;
+                }
+            }
 
             var cell = source as DataGridCell;
             if (cell != null) return cell.DataContext as TryAgainEntry;

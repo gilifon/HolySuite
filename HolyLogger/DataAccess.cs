@@ -4944,6 +4944,24 @@ Environment.NewLine +
         // a screen thing and has no business being worked out down here.
         public System.Windows.Media.Brush FreqBrush { get; set; }
 
+        // THE ROW THE RIGHT-CLICK MENU IS ABOUT, and the only thing that paints a row in the Try Again
+        // window. It is deliberately NOT the DataGrid's own selection: the grid selects on a left click
+        // too, and a left click must leave the list looking exactly as it found it. Trying to undo the
+        // grid's selection instead of replacing it meant the row was painted and then unpainted a moment
+        // later, which is worse than either.
+        private bool _isMarked;
+        public bool IsMarked
+        {
+            get { return _isMarked; }
+            set
+            {
+                if (_isMarked == value) return;
+                _isMarked = value;
+                var handler = PropertyChanged;
+                if (handler != null) handler(this, new System.ComponentModel.PropertyChangedEventArgs("IsMarked"));
+            }
+        }
+
         // HOW LONG HE HAS BEEN WAITING, so nobody has to work it out. This replaced a column that
         // printed the clock time the station was copied in: reading "22:14" and subtracting it from the
         // wall clock is exactly the arithmetic the operator should not be doing.
