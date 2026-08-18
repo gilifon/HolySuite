@@ -45,6 +45,94 @@ namespace HolyLogger
         // returns nothing, which is the truthful answer to "what is in the log" when there is no log.
         public bool HasActiveLog => ActiveLogId > 0;
 
+        // OPENING THE DATABASE IS ALLOWED TO FAIL FOR A MOMENT, AND ONLY FOR A MOMENT.
+        //
+        // Straight after an installation the very first launch met "attempt to write a readonly
+        // database", HolyLogger showed it and SHUT ITSELF DOWN; starting it again worked. The
+        // installer ships a logDB.db into the same folder the live database lives in, so for a second
+        // or two after it finishes the file is still the installer's - being replaced, or held, or not
+        // yet given the operator's own permissions. Trying once and giving up turned a two-second
+        // condition into a program that appeared broken on the day it was installed.
+        //
+        // So: try, wait, try again - five times across about four seconds. A fault that is real (a
+        // missing folder, a corrupt file, a genuinely read-only disk) still fails, only four seconds
+        // later, which nobody minds. Each attempt is recorded, so a log from an operator this happens
+        // to shows how long it took rather than nothing at all.
+        //
+        // The waits are deliberately not equal: the common case clears almost at once, and a first
+        // wait of a quarter second keeps that case fast.
+        private static readonly int[] OpenRetryWaitsMs = { 250, 500, 1000, 2000 };
+
+        private void OpenWithRetry()
+        {
+            Exception last = null;
+
+            for (int attempt = 0; attempt <= OpenRetryWaitsMs.Length; attempt++)
+            {
+                try
+                {
+                    // AND IF IT IS SIMPLY MARKED READ-ONLY, UNMARK IT. An installer can leave the
+                    // attribute set on a file it laid down, and no amount of waiting clears that.
+                    // HolyLogger's own log database is never meant to be read-only, so there is
+                    // nothing to weigh up: it is put right and recorded.
+                    try
+                    {
+                        if (File.Exists(dbPath))
+                        {
+                            var attrs = File.GetAttributes(dbPath);
+                            if ((attrs & FileAttributes.ReadOnly) == FileAttributes.ReadOnly)
+                            {
+                                File.SetAttributes(dbPath, attrs & ~FileAttributes.ReadOnly);
+                                Log.Warn("The log database was marked read-only; the mark has been removed.");
+                            }
+                        }
+                    }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                    if (con != null)
+                    {
+                        try { con.Dispose(); } catch (Exception swallowed) { Log.Swallow(swallowed); }
+                        con = null;
+                    }
+
+                    var opening = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
+                    opening.Open();
+
+                    // OPENING IS NOT THE TEST. SQLite opens a file it cannot write to perfectly
+                    // happily and only complains at the first write - which would be some later
+                    // innocent-looking operation, long past the point where retrying is possible.
+                    // So the write is done here, deliberately, while there is still something to do
+                    // about it: a transaction that is opened and immediately rolled back changes
+                    // nothing and proves the file and its folder will take a write.
+                    using (var probe = opening.BeginTransaction())
+                    {
+                        using (var cmd = new SQLiteCommand(
+                            "CREATE TABLE IF NOT EXISTS holy_write_probe (x INTEGER)", opening, probe))
+                            cmd.ExecuteNonQuery();
+                        probe.Rollback();
+                    }
+
+                    con = opening;
+                    if (attempt > 0)
+                        Log.Warn("The log database opened on attempt " + (attempt + 1)
+                                 + " - it was busy or read-only until then.");
+                    return;
+                }
+                catch (Exception ex)
+                {
+                    last = ex;
+                    if (attempt == OpenRetryWaitsMs.Length) break;
+
+                    Log.Warn("The log database could not be opened (attempt " + (attempt + 1) + " of "
+                             + (OpenRetryWaitsMs.Length + 1) + "): " + ex.Message + " - waiting "
+                             + OpenRetryWaitsMs[attempt] + " ms.");
+                    System.Threading.Thread.Sleep(OpenRetryWaitsMs[attempt]);
+                }
+            }
+
+            throw last ?? new Exception("the database could not be opened");
+        }
+
         private DataAccess()
         {
             try
@@ -70,14 +158,18 @@ namespace HolyLogger
                 // way, so even a backup of an already-corrupted-by-us session is impossible.
                 BackupDatabaseDaily();
 
-                con = new SQLiteConnection(@"DataSource = " + dbPath + @";Version=3");
-                con.Open();
+                OpenWithRetry();
                 BackupBeforeLogsMigration();   // one-time safety copy before the logs-schema upgrade
                 UpdateSchema();
 
             }
             catch (Exception e)
             {
+                // RECORDED. This is the one failure that stops the program dead - MainWindow shows it
+                // and shuts down - and it was the only one that never reached the log, so the file an
+                // operator is asked to send said nothing about the thing he was complaining of.
+                Log.Warn("Could not open the log database at " + dbPath + " - " + e.GetType().Name
+                         + ": " + e.Message);
                 throw new Exception("Failed to connect to DB: " + e.Message);
             }
             

@@ -525,7 +525,22 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
-                HolyMessageBox.ShowError(e.Message, "Database Error");
+                // WHAT TO DO ABOUT IT, not the database engine's own words. "attempt to write a
+                // readonly database" is true and tells an operator nothing; it happened to one on the
+                // first launch after installing, because the installer had not finished with the file.
+                // The program waits and retries now, so reaching here means it really is stuck - and
+                // then the two things worth saying are WHERE the file is and that closing everything
+                // and starting again is the usual cure.
+                HolyMessageBox.ShowError(
+                    "HolyLogger cannot open your log database.\n\n"
+                    + "If you have just installed or updated the program, give it a few seconds and "
+                    + "start it again — the installer may not have finished with the file.\n\n"
+                    + "The database is:\n"
+                    + System.IO.Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "4Z1KD", "HolyLogger", "logDB.db")
+                    + "\n\nDetails: " + e.Message,
+                    "Database Error", null, 620);
                 System.Windows.Application.Current.Shutdown();
                 return;
             }
