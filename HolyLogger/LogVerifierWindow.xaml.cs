@@ -1004,7 +1004,31 @@ namespace HolyLogger
                     //
                     // The ZONES are not measured: they sit on their own line underneath and are always
                     // shorter than the country above them.
-                    int nowWidth = "Country In Log".Length;
+                    // THE HEADING NAMES THE FIELD THIS SECTION IS ABOUT. It said "Country In Log" on
+                    // every section, which is true of the country ones and plainly wrong over a column
+                    // of Maidenhead locators - the DX Locator section was headed Country and filled with
+                    // grid squares. Taken from the findings themselves, and only when they all agree
+                    // about which field they are: a section that mixed two would be headed by whichever
+                    // row happened to come first.
+                    string field = null;
+                    bool oneField = true;
+                    foreach (Finding g in rows)
+                    {
+                        string label = (g.FieldLabel ?? string.Empty).Trim();
+                        if (label.Length == 0 || label == "—") continue;
+                        if (field == null) field = label;
+                        else if (field != label) { oneField = false; break; }
+                    }
+                    string nowHeader = (oneField && !string.IsNullOrEmpty(field)) ? field + " In Log" : "In Log";
+
+                    // A CONTINENT IS TWO LETTERS UNDER A SIXTEEN-LETTER HEADING. Left-aligned it sits in
+                    // the corner of a column of white space and the eye has to hunt for it down the page;
+                    // centred, the pairs line up under the middle of their own heading. Only for values
+                    // this short - a country name or a locator fills its column and centring one would
+                    // just move it about.
+                    bool centre = oneField && string.Equals(field, "Continent", StringComparison.OrdinalIgnoreCase);
+
+                    int nowWidth = nowHeader.Length;
                     int newWidth = "Holylogger suggest".Length;
                     int ctyWidth = "cty.dat matched".Length;
                     foreach (Finding g in rows)
@@ -1031,10 +1055,10 @@ namespace HolyLogger
                     // LOG. The import report is the one that speaks about a file, and it no longer judges
                     // countries at all. The last column has no width - nothing follows it to push out.
                     sb.AppendLine("  " + Col("Date", 12) + Col("Time", 7) + Col("Callsign", 14)
-                                  + Col("Country In Log", nowWidth)
+                                  + Pad(nowHeader, nowWidth, centre)
                                   + (explains ? Col("Holylogger suggest", newWidth)
                                                 + Col("cty.dat matched", ctyWidth) + "Club Log matched"
-                                              : "Holylogger suggest"));
+                                              : Pad("Holylogger suggest", newWidth, centre).TrimEnd()));
                     sb.AppendLine("  " + Col(new string('-', 10), 12) + Col(new string('-', 5), 7)
                                   + Col(new string('-', 12), 14)
                                   + Col(new string('-', nowWidth - 2), nowWidth)
@@ -1065,9 +1089,9 @@ namespace HolyLogger
                         sb.AppendLine(("  " + Col(FormatDate(f.Qso == null ? "" : f.Qso.Date), 12)
                                       + Col(Text(f.Time), 7)
                                       + Col(Text(f.Call), 14)
-                                      + Col(nowHead, nowWidth)
+                                      + Pad(nowHead, nowWidth, centre)
                                       + (explains ? Col(newHead, newWidth) + Col(ctyPart, ctyWidth) + clubPart
-                                                  : newHead)).TrimEnd());
+                                                  : Pad(newHead, newWidth, centre))).TrimEnd());
 
                         // THE CONTINUATION LINES, FILLED ACROSS RATHER THAN ONE UNDER THE OTHER.
                         //
@@ -1076,7 +1100,7 @@ namespace HolyLogger
                         // and the note on the one after. Read down that column there was a blank line in
                         // the middle of a single QSO, which is exactly what a blank line is supposed to
                         // mean the end of. They share the line now: zones on the left, note on the right.
-                        var notes = (x == null) ? new List<string>() : x.PlainExtraNotes;
+                        var notes = SplitNotes(x == null ? null : x.PlainExtraNotes);
                         bool hasZones = nowZones.Length > 0 || newZones.Length > 0;
                         int extraLines = Math.Max(hasZones ? 1 : 0, notes.Count);
                         bool manyLines = extraLines > 0;
@@ -1146,6 +1170,55 @@ namespace HolyLogger
             prefix = who + " ";
             if (s.StartsWith(prefix, StringComparison.Ordinal)) return s.Substring(prefix.Length);
             return s;
+        }
+
+        // BREAKS A LONG NOTE IN TWO, at the comma before "but".
+        //
+        //   Club Log knows UH8 = Asiatic Russia (15)
+        //   but only from 21-01-2010
+        //
+        // The comma goes with the break rather than staying at the end of the first line: it was there
+        // to join two halves of one sentence, and once they are on separate lines the line break does
+        // that job. A comma hanging off the end of a line is punctuation for a sentence that no longer
+        // runs on.
+        //
+        // Those notes are the widest thing in the report and they sit in the last column, so one of them
+        // pushes the line far past everything else. The break is at ", but " and NOT simply at the first
+        // comma: several DXCC names carry one of their own - "Bonaire, Curacao (Neth Antilles)" - and a
+        // rule that broke at the first comma would cut a country in half.
+        //
+        // The two lines are consecutive, so in the Club Log column they read as one remark on two lines.
+        private static List<string> SplitNotes(List<string> notes)
+        {
+            var lines = new List<string>();
+            if (notes == null) return lines;
+
+            foreach (string note in notes)
+            {
+                string s = (note ?? string.Empty).Trim();
+                if (s.Length == 0) continue;
+
+                int at = s.IndexOf(", but ", StringComparison.Ordinal);
+                if (at < 0) { lines.Add(s); continue; }
+
+                lines.Add(s.Substring(0, at).TrimEnd());   // without the comma
+                lines.Add(s.Substring(at + 2).Trim());     // "but only from ..."
+            }
+            return lines;
+        }
+
+        // A cell, left-aligned or centred in its column. Centring is by whole spaces and an odd
+        // remainder goes to the RIGHT, so a column of two-letter continents lands on one line down the
+        // page rather than wobbling by a character between rows.
+        private static string Pad(string text, int width, bool centre)
+        {
+            if (!centre) return Col(text, width);
+
+            string s = text ?? string.Empty;
+            if (s.Length >= width) return Col(s, width);
+
+            int left = (width - s.Length) / 2;
+            return new string(' ', left) + s + new string(' ', width - s.Length - left);
         }
 
         // SPLITS "ASIATIC RUSSIA (15)   (CQ 17, ITU 20)" into the country and its zones.
