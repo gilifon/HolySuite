@@ -184,6 +184,21 @@ namespace HolyParser
         // operator cannot tell from a record that was never read.
         private readonly List<QSO> m_droppedDuplicates = new List<QSO>();
 
+        // ABOVE THIS MANY, THEY ARE COUNTED AND NOT KEPT.
+        //
+        // Each one held here is a whole QSO the parser has already decided to throw away, and this is a
+        // 32-bit program with about 3 GB to live in - which is already holding the parsed file and the
+        // log it is importing into. A messy file with 200,000 repeats would have this list carrying
+        // 200,000 contacts that exist only to be listed, and that is how an import dies half way
+        // through with "out of memory".
+        //
+        // 10,000 because that is what the report prints; past it the report says "and N more, not
+        // listed one by one" and never looks at them. The COUNT is never capped - DroppedDuplicateCount
+        // is the true figure, and it is what the report's heading and summary use.
+        private const int MaxDroppedKept = 10000;
+
+        private int m_droppedDuplicateCount;
+
         // Which record is being parsed, so a finding can name it. ParseRawQSO does not take the number.
         private int m_recordBeingParsed;
 
@@ -220,7 +235,12 @@ namespace HolyParser
         public bool Stopped { get { return m_stopped; } }
 
         // Empty unless the operator has turned "Import Duplicates" off - with it on, nothing is dropped.
+        // The ones it could keep - at most MaxDroppedKept of them. Use DroppedDuplicateCount for how
+        // many there really were.
         public List<QSO> GetDroppedDuplicates() { return m_droppedDuplicates; }
+
+        // How many records the option threw away, all told, kept or not.
+        public int DroppedDuplicateCount { get { return m_droppedDuplicateCount; } }
 
         // The station callsign to fall back on when a record names neither STATION_CALLSIGN nor
         // OPERATOR. Set by the importer to the log's own identity; left empty, such a record is
@@ -369,7 +389,11 @@ namespace HolyParser
                 {
                     string key = QSO.MatchKey(q);
                     if (key == null || seen.Add(key)) kept.Add(q);
-                    else m_droppedDuplicates.Add(q);
+                    else
+                    {
+                        m_droppedDuplicateCount++;
+                        if (m_droppedDuplicates.Count < MaxDroppedKept) m_droppedDuplicates.Add(q);
+                    }
                 }
                 m_qsoList = kept;
             }

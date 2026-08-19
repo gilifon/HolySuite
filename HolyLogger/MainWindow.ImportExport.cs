@@ -1249,6 +1249,9 @@ namespace HolyLogger
             // Records the "Import Duplicates" option threw away before the log was ever consulted -
             // empty unless that option is off. Gathered so the report can account for them.
             var droppedDuplicates = new List<QSO>();
+            // How many were dropped ALL TOLD. The list above stops collecting after 10,000 - they are
+            // whole QSOs and this program has 3 GB to live in - so its Count is not the answer.
+            int droppedCount = 0;
 
             // No list of country disagreements and no list of contacts that count towards no country:
             // both were this code judging a QSO, and the Log Fixer is the one authority on that. It opens
@@ -1380,6 +1383,7 @@ namespace HolyLogger
                         });
                     filledIn.AddRange(parser.GetFilled());
                     droppedDuplicates.AddRange(parser.GetDroppedDuplicates());
+                    droppedCount += parser.DroppedDuplicateCount;
                     recordsRead += parser.RecordsRead;
 
                     RawAdif = null;   // large file string no longer needed; free it before the save phase
@@ -1632,7 +1636,7 @@ namespace HolyLogger
                 try { totalInLog = dal.GetQsoCountForLog(dal.ActiveLogId); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-                WriteImportReport(rejects, filledIn, mergeFilled, mergeAmbiguous, droppedDuplicates,
+                WriteImportReport(rejects, filledIn, mergeFilled, mergeAmbiguous, droppedDuplicates, droppedCount,
                                   importedQsoCount, completedQso, ambiguousQso,
                                   recordsRead, totalInLog, files, logName,
                                   stopped, stoppedWhileReading, undoneQsos, undoneFields, undoFailed,
@@ -1849,7 +1853,7 @@ namespace HolyLogger
         private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,
                                        List<DataAccess.MergeNote> mergeFilled,
                                        List<DataAccess.MergeNote> mergeAmbiguous,
-                                       List<QSO> droppedDuplicates,
+                                       List<QSO> droppedDuplicates, int droppedCount,
                                        int imported, int completed, int ambiguous,
                                        int recordsRead, int totalInLog,
                                        List<string> files, string logName,
@@ -1869,7 +1873,7 @@ namespace HolyLogger
 
                 ImportChoice choice = _importChoice;
                 bool newLog = choice == ImportChoice.NewLog;
-                int dropped = droppedDuplicates == null ? 0 : droppedDuplicates.Count;
+                int dropped = droppedCount;
 
                 var sb = new StringBuilder();
                 sb.AppendLine("HolyLogger — import report");
@@ -2143,6 +2147,13 @@ namespace HolyLogger
                                        + Pad(string.IsNullOrWhiteSpace(q.DXCall) ? "—" : q.DXCall, 14)
                                        + Pad(q.Band, 7) + Pad(q.Mode, 7) + (q.MyCall ?? string.Empty)).TrimEnd());
                     }
+
+                    // The parser keeps at most 10,000 of them - they are whole QSOs and it has already
+                    // thrown them away. The count above is the true one; this says why the list is
+                    // shorter than the count, rather than leaving the two to disagree in silence.
+                    if (dropped > droppedDuplicates.Count)
+                        sb.AppendLine($"  … and {dropped - droppedDuplicates.Count:N0} more, not listed one by one.");
+
                     sb.AppendLine();
                 }
 
