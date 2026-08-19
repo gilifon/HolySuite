@@ -196,7 +196,7 @@ namespace HolyLogger
                 var qsos = _dal.GetQSOsForLog(id);
                 if (qsos == null || qsos.Count == 0)
                 {
-                    HolyMessageBox.ShowWarning($"\"{name}\" has no QSOs to check.", "Verify Log", this);
+                    HolyMessageBox.ShowWarning($"\"{name}\" has no QSOs to check.", "Log Fixer", this);
                     return;
                 }
 
@@ -206,7 +206,7 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not check this log.\n\n" + ex.Message, "Verify Log", this);
+                HolyMessageBox.ShowError("Could not check this log.\n\n" + ex.Message, "Log Fixer", this);
             }
         }
 

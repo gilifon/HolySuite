@@ -60,7 +60,7 @@
                     <Button x:Name="Btn_Search" Content="Search In Log" Height="32" Padding="9,0" FontSize="16"
                             Margin="0,0,8,0" Click="Btn_Search_Click"
                             ToolTip="Search this log without activating it — the log you are working in stays open"/>
-                    <Button x:Name="Btn_Verify" Content="Verify Log" Height="34" Padding="9,0" FontSize="16"
+                    <Button x:Name="Btn_Verify" Content="Log Fixer" Height="34" Padding="9,0" FontSize="16"
                             Click="Btn_Verify_Click"
                             ToolTip="Check every QSO in this log for a wrong country, a fake callsign and other errors, and offer corrections"/>
                 </StackPanel>

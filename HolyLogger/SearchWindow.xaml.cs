@@ -2385,7 +2385,7 @@ namespace HolyLogger
             var list = shown == null ? new System.Collections.Generic.List<QSO>() : shown.ToList();
             if (list.Count == 0)
             {
-                HolyMessageBox.ShowWarning("There are no QSOs on screen to check.", "Log Verifier", this);
+                HolyMessageBox.ShowWarning("There are no QSOs on screen to check.", "Log Fixer", this);
                 return;
             }
 
@@ -2402,7 +2402,7 @@ namespace HolyLogger
             }
             catch (Exception ex)
             {
-                HolyMessageBox.ShowError("Could not check these QSOs.\n\n" + ex.Message, "Log Verifier", this);
+                HolyMessageBox.ShowError("Could not check these QSOs.\n\n" + ex.Message, "Log Fixer", this);
             }
         }
 

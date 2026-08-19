@@ -5379,10 +5379,61 @@ namespace HolyLogger
             return true;
         }
 
+        // THE BOX HAS ITS OWN VISIBILITY NOW. It used to follow the spinner image's, which meant the
+        // spinner could never be hidden on its own - taking it away took the message with it. That is
+        // why a stopped import went on spinning: the only way to stop the picture was to pause the GIF
+        // through the animation library, and that did not work.
         private void ToggleUploadProgress(Visibility visibility)
         {
-            UploadProgressSpinner.Visibility = visibility;
+            bool show = visibility == Visibility.Visible;
+            if (UploadProgressBox != null)
+                UploadProgressBox.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
             L_UploadProgress.Visibility = visibility;
+            SetSpinnerRunning(show && !_importStopping);
+            if (!show && UploadProgressSpinner != null)
+                UploadProgressSpinner.Visibility = Visibility.Collapsed;
+        }
+
+        // THE SPINNING PICTURE, PUT OUT RATHER THAN HIDDEN.
+        //
+        // Hiding it was not enough - it went on turning on the screen after a stopped import, three
+        // times over. So the animation is taken away from the control: no animated source, no source
+        // at all, and the control collapsed. There is then nothing left to draw, whatever else in this
+        // program or in the animation library thinks it should be visible.
+        //
+        // Turning it back on rebuilds the source. Cheap: a 44x44 GIF from the program's own resources.
+        private void SetSpinnerRunning(bool on)
+        {
+            if (UploadProgressSpinner == null || UploadSpinnerRotate == null) return;
+            try
+            {
+                if (on)
+                {
+                    var turn = new System.Windows.Media.Animation.DoubleAnimation(0, 360,
+                        new Duration(TimeSpan.FromSeconds(1.1)))
+                    {
+                        RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+                    };
+                    UploadSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, turn);
+                    UploadProgressSpinner.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    // STOPPED, AND STILL THERE. Passing null REMOVES the animation from the property, so
+                    // the arc stands still at the angle it had reached; nothing can restart it but this
+                    // method. It is deliberately NOT hidden - a spinner that disappears leaves a hole
+                    // where something was a moment ago, and the operator cannot see that it stopped,
+                    // only that it went. Standing still is what "stopped" looks like.
+                    //
+                    // The whole box is hidden at the end of the import (ToggleUploadProgress), which
+                    // takes this with it.
+                    double where = UploadSpinnerRotate.Angle;
+                    UploadSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
+                    UploadSpinnerRotate.Angle = where;
+                    UploadProgressSpinner.Visibility = Visibility.Visible;
+                }
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // Show/hide the spinner's Stop button. Only the cancellable operations (Remove Duplicates,
@@ -5396,8 +5447,9 @@ namespace HolyLogger
         }
 
         // Stop button inside the spinner window: cancels whichever long operation is running.
-        // True while the "Stop the import?" question is waiting for an answer. Read by the import
-        // worker, which is why it is volatile: the two threads must not disagree about it.
+        // True while the "Stop the import?" question is waiting for an answer. Read by the screen thread
+        // (to hold the numbers still) and by the import worker (to hold the WORK still, so it cannot
+        // finish behind the question) - so it is volatile, and the worker's wait is bounded.
         private volatile bool _stopConfirmOpen;
 
         // True from the moment the operator answers Yes until the import has finished winding down.
@@ -5419,32 +5471,48 @@ namespace HolyLogger
             // The import carries on while this question is on screen, and that is fine: whatever it
             // manages in those few seconds is undone with the rest.
             bool importRunning = AdifHandlerWorker != null && AdifHandlerWorker.IsBusy;
+            Log.Warn("STOP: button pressed. worker=" + (AdifHandlerWorker == null ? "null" : "there")
+                     + ", busy=" + (AdifHandlerWorker != null && AdifHandlerWorker.IsBusy)
+                     + ", supportsCancel=" + (AdifHandlerWorker != null && AdifHandlerWorker.WorkerSupportsCancellation));
             if (importRunning)
             {
-                // THE IMPORT HOLDS ITS TONGUE WHILE THIS IS ON SCREEN. It runs on its own thread and
-                // asks the operator things - "this file was made under a different callsign, import it
-                // anyway?" - by pushing a dialog onto this one. Twice now that question has appeared on
-                // top of THIS one, so a man who had just decided to stop was asked to approve the very
-                // import he was stopping. It waits for an answer here first, and if the answer is Yes
-                // it never asks at all.
-                _stopConfirmOpen = true;
-                try
-                {
                 // THE QUESTION AND NOTHING ELSE. It carried two paragraphs explaining that the import
                 // would be undone and could be run again; a man with his finger on Stop is not reading
                 // them, and the answer to both is the same either way. What actually happens is shown
                 // where it belongs - the progress label says the log is being put back, and the report
                 // holds the numbers.
-                if (!HolyMessageBox.ShowConfirm(
-                        "Stop The Import?",
-                        "Stop the import?", HolyMsgType.Warning, this))
-                    return;   // "No" - the import was never told anything, and carries on
+                // EVERYTHING STOPS THE MOMENT THE QUESTION APPEARS - the numbers, the spinner, and the
+                // import itself at its next checkpoint. The work has to stop too: left running, it
+                // finished behind the question more than once, and a finished import has nothing to
+                // stop - it announced success and opened the Log Fixer over the dialog asking whether
+                // to stop it.
+                _stopConfirmOpen = true;
+                SetSpinnerRunning(false);
+                bool yes;
+                try
+                {
+                    yes = HolyMessageBox.ShowConfirm(
+                            "Stop The Import?",
+                            "Stop the import?", HolyMsgType.Warning, this);
                 }
                 finally { _stopConfirmOpen = false; }
+
+                // "No" - so it picks up where it left off, spinner and all.
+                if (!yes) SetSpinnerRunning(true);
+                Log.Warn("STOP: the answer was " + (yes ? "YES" : "NO"));
+                if (!yes)
+                    return;   // "No" - the import was never told anything, and carries on
+
+                // THE PICTURE GOES FIRST, before anything that could throw and take the rest of this
+                // handler with it. Everything below it - cancelling other jobs' tokens, telling the
+                // worker to stop - is work that CAN fail, and one exception there used to mean the
+                // operator saw a spinner going round on an import he had just stopped.
+                _importStopping = true;
+                SetSpinnerRunning(false);
             }
 
-            _dedupCts?.Cancel();
-            _qrzCts?.Cancel();
+            try { _dedupCts?.Cancel(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            try { _qrzCts?.Cancel(); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             // The import worker is a BackgroundWorker rather than a token: it asks CancellationPending
             // between records while reading and between batches while saving, so the press takes effect
             // at the next checkpoint rather than in the middle of a write.
@@ -5454,7 +5522,11 @@ namespace HolyLogger
                     AdifHandlerWorker.CancelAsync();
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
-            if (importRunning) _importStopping = true;
+
+            Log.Warn("STOP: told the worker. cancellationPending="
+                     + (AdifHandlerWorker != null && AdifHandlerWorker.CancellationPending)
+                     + ", spinner=" + (UploadProgressSpinner == null ? "null" : UploadProgressSpinner.Visibility.ToString()));
+
             Btn_StopProgress.IsEnabled = false;
             Btn_StopProgress.Content = "Stopping…";
             UploadProgress = importRunning ? "Stopping — putting your log back…" : "Stopping…";

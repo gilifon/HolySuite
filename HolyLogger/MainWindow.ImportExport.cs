@@ -1170,6 +1170,12 @@ namespace HolyLogger
             // spinning over a program that had finished.
             if (!_importRunning) return;
 
+            // NOTHING MOVES WHILE THE STOP QUESTION IS ON THE SCREEN. The import holds still at its next
+            // checkpoint until the question is answered, so there is nothing new to report anyway - and
+            // any report already posted before it stopped is dropped here rather than climbing behind
+            // the very dialog asking whether to stop. Answer No and it picks up where it left off.
+            if (_stopConfirmOpen) return;
+
             ToggleUploadProgress(Visibility.Visible);
 
             // ONCE HE HAS SAID STOP, THE PERCENTAGES ARE NOT SHOWN ANY MORE. The worker reports its
@@ -1185,19 +1191,38 @@ namespace HolyLogger
             UploadProgress = e.UserState as string ?? (e.ProgressPercentage.ToString() + "%");
         }
 
-        // ASKED BEFORE THE IMPORT PUTS A QUESTION ON THE SCREEN, and before it starts the next file.
+        // HAS THE OPERATOR STOPPED IT? Asked at every checkpoint: before each file, before the import
+        // puts a question on the screen, before each batch is saved, and once more before anything is
+        // made permanent.
         //
-        // Returns true when the operator has stopped it and the worker should give up now. If he is in
-        // the middle of ANSWERING the stop question, this waits for him: whatever the import was about
-        // to ask would land on top of that question, and a man deciding whether to stop should not be
-        // asked to approve the thing he is stopping.
+        // IT ASKS AND RETURNS. It used to WAIT here while the "Stop the import?" question was on the
+        // screen, so that the import would pause while the operator decided. That waiting froze the
+        // whole program: a worker thread that blocks on a flag the screen thread owns is one half of a
+        // deadlock, and the program stopped answering the mouse with the spinner still turning - drawn
+        // by Windows, over a program that was no longer running. The pause was worth nothing anyway:
+        // whatever the import does in those few seconds is undone with the rest of it.
         //
         // Called on the worker thread only.
         private bool StopWasAskedFor()
         {
-            while (_stopConfirmOpen)
-                System.Threading.Thread.Sleep(100);
-            return AdifHandlerWorker.CancellationPending;
+            // THE IMPORT HOLDS STILL WHILE THE QUESTION IS ON THE SCREEN.
+            //
+            // Without this it went on working behind the dialog and could FINISH before the operator
+            // answered - and a finished import has nothing left to stop, so it announced its success
+            // and opened the Log Fixer over the question asking whether to stop it. That is what a man
+            // who pressed Stop and then read something for a minute actually got.
+            //
+            // BOUNDED, because this is a worker thread waiting on the screen thread and that is the
+            // shape a hang has. Five minutes is far longer than anyone stares at a Yes/No box, and if
+            // it is ever reached the import simply carries on rather than standing there for ever.
+            var waited = System.Diagnostics.Stopwatch.StartNew();
+            while (_stopConfirmOpen && waited.Elapsed.TotalMinutes < 5)
+                System.Threading.Thread.Sleep(50);
+
+            if (_stopConfirmOpen)
+                Log.Warn("STOP: the question has been on screen for five minutes; the import is carrying on.");
+
+            return AdifHandlerWorker != null && AdifHandlerWorker.CancellationPending;
         }
 
         private void AdifHandlerWorker_DoWork(object sender, DoWorkEventArgs e)
