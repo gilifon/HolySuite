@@ -368,8 +368,9 @@ namespace HolyLogger
 
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
-            LoadCallsignIndex();
-            Log.Step("ctor: callsign index loaded");
+            // The callsign index is NOT read here - see LoadCallsignIndexInBackground, started once
+            // the window is up. It is 588,000 callsigns and nine seconds of disk.
+            Log.Step("ctor: callsign index deferred");
             FetchCallsignListUpdateInfoFireAndForget();
             LoadNewCallsignsSet();
             Log.Step("ctor: new-callsigns set loaded");
@@ -611,9 +612,11 @@ namespace HolyLogger
             UpdateQrzMenuCount();
             LastQSO = Qsos.FirstOrDefault();
             ApplyDefaultLogSort();
+            Log.Step("ctor: log sorted + bound to the table");
 
-            UpdateNumOfQSOs();
+            UpdateNumOfQSOs(withCountryCount: false);   // the country count waits until the window is up
             TB_Frequency_TextChanged(null, null);
+            Log.Step("ctor: counts + frequency box");
             // Log in to QRZ entirely on a background thread so NOTHING about the request — not even
             // the synchronous DNS/proxy resolution that GetResponseAsync does on the calling thread —
             // can stall the UI thread during startup. The key is stored when it arrives.
@@ -637,6 +640,7 @@ namespace HolyLogger
             {
                 GenerateNewSignboardWindow();
             }
+            Log.Step("ctor: QRZ login + extra windows");
             if (Properties.Settings.Default.TimerWindowIsOpen)
             {
                 GenerateNewTimerWindow();
@@ -1181,6 +1185,26 @@ namespace HolyLogger
             // Old QSOs have no entity number; this fills them in, once, quietly, in the background.
             StartEntityCodeBackfill();
             Log.Step("loaded: entity backfill started");
+
+            // The country count, skipped during the start, worked out now the window is up.
+            var countries = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(3) };
+            countries.Tick += (sender2, args2) =>
+            {
+                countries.Stop();
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                try { UpdateNumOfQSOs(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                Log.Warn("STARTUP  country count: worked out in " + sw.ElapsedMilliseconds + " ms, off the startup path");
+            };
+            countries.Start();
+
+            // AND THE CALLSIGN INDEX, five seconds from now, for the same reason.
+            //
+            // Reading it on a worker was not enough: 588,000 callsigns is nine seconds of disk, and
+            // run beside the startup it took the disk away from the log read, which doubled from 3.2 to
+            // 7.1 seconds. The whole start got SLOWER for being made parallel. Work that nobody is
+            // waiting for should not merely be moved off the thread - it should be moved out of the way.
+            LoadCallsignIndexInBackground();
 
             // The active profile's file was gone at startup, so factory defaults were loaded. Say so
             // once the main window exists (it owns the dialog) instead of letting the whole setup
@@ -5328,11 +5352,26 @@ namespace HolyLogger
             return name;
         }
 
-        private void UpdateNumOfQSOs()
+        // THE COUNTRY COUNT IS THE EXPENSIVE THIRD OF THIS.
+        //
+        // The two counts above it are one SQL query each. The third resolves the DXCC entity of EVERY
+        // QSO in the log - 28,000 of them at startup, a second of it, on the thread that is trying to
+        // put the window on the screen. It cannot go on a worker: the cache it fills is a plain
+        // Dictionary and CountryLookup is not written for two threads. So it is DEFERRED instead -
+        // skipped while the program is coming up, and worked out a few seconds later when the operator
+        // already has his log. Until then the box shows a dash rather than a wrong number.
+        private void UpdateNumOfQSOs(bool withCountryCount = true)
         {
             //parseAdif();
             NumOfQSOs = dal.GetQsoCountForLog(dal.ActiveLogId).ToString();
             NumOfGrids = dal.GetGridCountForLog(dal.ActiveLogId).ToString();
+
+            if (!withCountryCount)
+            {
+                NumOfDXCCs = "—";
+                Score = "0";
+                return;
+            }
             // Count distinct DXCC entities resolved live from callsigns (always fresh, never from stale
             // stored strings). Only names that are in the OFFICIAL DXCC entity list are counted — the exact
             // same basis the Statistics window uses — so the two numbers always agree (a callsign that
@@ -11208,6 +11247,10 @@ namespace HolyLogger
             // Add truly new callsigns to the in-memory dropdown index.
             callsignIndex.Insert(~idx, call);
 
+            // The big index may still be on its way (it is read in the background at startup). Kept
+            // here as well, so the hand-over does not throw this one away.
+            if (_callsignsAddedWhileIndexLoaded != null) _callsignsAddedWhileIndexLoaded.Add(call);
+
             // Append to callsigns_new.txt only if not already recorded
             if (newCallsignsSet.Add(call))
             {
@@ -11242,6 +11285,54 @@ namespace HolyLogger
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
+
+        // THE CALLSIGN INDEX IS READ WHILE THE OPERATOR IS LOOKING AT HIS LOG, not before he can see it.
+        //
+        // It is a 100,000-line text file turned into a sorted list, and it cost 1,485 ms of every
+        // startup - measured. Nothing needs it until a callsign is being TYPED, which cannot happen
+        // before the window exists, so there is no reason for the window to wait for it.
+        //
+        // The list is built on a worker and then handed over in one assignment on the screen thread:
+        // readers either see the old list or the new one, never a half-built one. Anything the operator
+        // managed to add in the meantime (AddNewCallsignIfMissing) is folded in, so a callsign logged
+        // in the first second is not lost when the big list lands.
+        private void LoadCallsignIndexInBackground()
+        {
+            var wait = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            wait.Tick += (s, e) => { wait.Stop(); ReadCallsignIndexNow(); };
+            wait.Start();
+        }
+
+        private void ReadCallsignIndexNow()
+        {
+            Task.Run(() =>
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                LoadCallsignIndex();
+                var loaded = callsignIndex;
+
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    var addedMeanwhile = _callsignsAddedWhileIndexLoaded;
+                    _callsignsAddedWhileIndexLoaded = null;
+
+                    if (addedMeanwhile != null && addedMeanwhile.Count > 0)
+                    {
+                        foreach (string call in addedMeanwhile)
+                            if (loaded.BinarySearch(call, StringComparer.Ordinal) < 0)
+                                loaded.Add(call);
+                        loaded.Sort(StringComparer.Ordinal);
+                    }
+
+                    callsignIndex = loaded;
+                    Log.Warn("STARTUP  callsign index: " + loaded.Count.ToString("N0")
+                             + " callsigns, read in " + sw.ElapsedMilliseconds + " ms, off the startup path");
+                }));
+            });
+        }
+
+        // Filled only while the big index is still being read - null once it has landed.
+        private List<string> _callsignsAddedWhileIndexLoaded = new List<string>();
 
         private void LoadCallsignIndex()
         {

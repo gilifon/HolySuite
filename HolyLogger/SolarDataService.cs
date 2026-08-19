@@ -23,6 +23,18 @@ namespace HolyLogger
     // no internet still gets his log.
     internal static class SolarDataService
     {
+        // THE HOLY CLUSTER'S OWN READING COMES FIRST.
+        //
+        // Its server already reads NOAA once an hour and serves the three numbers in one small reply.
+        // Taking them from there rather than from NOAA directly is better three ways: NOAA sees ONE
+        // caller - the IARC server - instead of one per operator; our bars and the cluster's can never
+        // disagree, because they are the same reading; and it is one request and one parse instead of
+        // three.
+        //
+        // NOAA IS STILL THERE AS THE FALLBACK. The IARC server is one machine, and an operator whose
+        // cluster is down should still be told what the sun is doing.
+        private const string HolyClusterPropagation = "https://holycluster.iarc.org/propagation";
+
         private const string Host = "https://services.swpc.noaa.gov";
         private const string KIndexPath = "/products/noaa-planetary-k-index.json";
         private const string AIndexPath = "/text/daily-geomagnetic-indices.txt";
@@ -82,6 +94,25 @@ namespace HolyLogger
 
                 bool anyRead = false;
 
+                // One request, and if it answers there is nothing else to ask.
+                var fromCluster = await ReadFromHolyClusterAsync().ConfigureAwait(false);
+                if (fromCluster != null && fromCluster.HasAny)
+                {
+                    fromCluster.ReadAtUtc = DateTime.UtcNow;
+                    LastReadSucceeded = true;
+                    _latest = fromCluster;
+
+                    var clusterHandler = Updated;
+                    if (clusterHandler != null)
+                    {
+                        try { clusterHandler(fromCluster); }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                    }
+                    return;
+                }
+
+                Log.Warn("Solar data: the cluster did not answer, asking NOAA directly.");
+
                 double? k = await ReadKIndexAsync().ConfigureAwait(false);
                 if (k.HasValue) { next.KIndex = k; anyRead = true; }
 
@@ -110,6 +141,42 @@ namespace HolyLogger
                 Log.Warn("Solar data could not be read: " + ex.Message);
             }
             finally { Interlocked.Exchange(ref _reading, 0); }
+        }
+
+        // {"k_index":{"value":1.67,"timestamp":...},"a_index":{...},"sfi":{...},"time":...}
+        //
+        // Any of the three can come back as {"error":"no data"} instead of a value - the server says so
+        // rather than pretending - so each is taken on its own and a missing one leaves the last good
+        // reading of THAT number standing.
+        private static async Task<Reading> ReadFromHolyClusterAsync()
+        {
+            try
+            {
+                string body = await Http.GetStringAsync(HolyClusterPropagation).ConfigureAwait(false);
+                var root = JObject.Parse(body);
+
+                var reading = new Reading
+                {
+                    AIndex = ValueFrom(root["a_index"]) ?? _latest.AIndex,
+                    KIndex = ValueFrom(root["k_index"]) ?? _latest.KIndex,
+                    Sfi = ValueFrom(root["sfi"]) ?? _latest.Sfi
+                };
+                return reading.HasAny ? reading : null;
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Solar data from the cluster: " + ex.Message);
+                return null;
+            }
+        }
+
+        private static double? ValueFrom(JToken node)
+        {
+            var obj = node as JObject;
+            if (obj == null) return null;
+            double value;
+            if (!TryNumber(obj["value"], out value)) return null;
+            return value < 0 ? (double?)null : value;
         }
 
         // [{"time_tag":"2026-08-19T15:00:00","Kp":2.00,...}, ...] - newest last, but sorted here rather

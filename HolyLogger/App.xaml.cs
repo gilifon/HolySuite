@@ -347,11 +347,23 @@ namespace HolyLogger
 
             _mainWindowRendered = true;
             ((Window)sender).ContentRendered -= OnMainWindowContentRendered;
-            Dispatcher.BeginInvoke(new Action(CloseSplash), DispatcherPriority.Background);
+
+            // Normal priority, NOT Background. Background means "when the window has nothing better to
+            // do", and at startup it has plenty: the splash stood over a window that was already
+            // painted for another 1,100 ms - measured. ContentRendered has already fired; the picture
+            // is on the screen; there is nothing left to wait for.
+            Dispatcher.BeginInvoke(new Action(CloseSplash), DispatcherPriority.Normal);
         }
+
+        private bool _splashClosed;
 
         private void CloseSplash()
         {
+            // ONCE. Two paths lead here - the ContentRendered event and the safety-net timer - and both
+            // used to run, which is why the log carried the line twice, a second apart.
+            if (_splashClosed) return;
+            _splashClosed = true;
+
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  splash closing - the program is up");
 
             if (_splashCloseTimer != null)
