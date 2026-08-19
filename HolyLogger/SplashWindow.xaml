@@ -8,12 +8,30 @@
     <Grid>
         <Image x:Name="SplashImage" Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         
-        <Image x:Name="TimerIcon"
-               Width="34" Height="34"
-               HorizontalAlignment="Right"
-               VerticalAlignment="Center"
-               Margin="0,0,42,0"
-               Stretch="Uniform"/>
+        <!-- WHAT USED TO BE A PICTURE OF A CLOCK.
+             A drawing of a clock says "this takes time" and nothing else - it looks the same at the
+             first second and at the twentieth. This is the spinner the import uses, with the number of
+             seconds the program has been starting in the middle of it. It also tells the truth: it is
+             drawn by the program, on the same thread the program is loading on, so when it stalls the
+             program really is busy - unlike an animated GIF, which Windows keeps playing over a program
+             that has stopped answering. -->
+        <Grid Width="46" Height="46"
+              HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,36,0">
+            <Ellipse Width="42" Height="42" HorizontalAlignment="Center" VerticalAlignment="Center"
+                     Stroke="White" StrokeThickness="4" Opacity="0.25"/>
+            <Canvas Width="46" Height="46" RenderTransformOrigin="0.5,0.5">
+                <Path Stroke="White" StrokeThickness="4"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                      Data="M 23,2 A 21,21 0 0 1 44,23"/>
+                <Canvas.RenderTransform>
+                    <RotateTransform x:Name="SplashSpinnerRotate" Angle="0"/>
+                </Canvas.RenderTransform>
+            </Canvas>
+            <TextBlock x:Name="SecondsText" Text="0"
+                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                       FontSize="15" FontWeight="Bold" Foreground="White"
+                       Effect="{DynamicResource DropShadowEffect}"/>
+        </Grid>
         <Border HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Height="30" Background="Transparent">
             <TextBlock x:Name="VersionText"
                        HorizontalAlignment="Center" VerticalAlignment="Center"

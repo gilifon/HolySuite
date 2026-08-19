@@ -251,8 +251,7 @@ namespace HolyLogger
             // Keep app alive while splash is shown before the real main window is tracked.
             ShutdownMode = ShutdownMode.OnLastWindowClose;
 
-            _splash = new SplashWindow();
-            _splash.Show(); // no auto-close, topmost
+            StartSplashOnItsOwnThread();
             Mouse.OverrideCursor = Cursors.Wait;
 
             // Hook main window events as soon as WPF creates StartupUri window.
@@ -262,6 +261,48 @@ namespace HolyLogger
             _splashCloseTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(200) };
             _splashCloseTimer.Tick += SplashCloseTimer_Tick;
             _splashCloseTimer.Start();
+        }
+
+        // THE SPLASH GETS A THREAD OF ITS OWN, and it has to.
+        //
+        // WPF draws an animation on the thread that owns the window. The splash used to be owned by the
+        // thread that is loading the program - the log, the country files, the cluster - so its spinner
+        // could not move while any of that was happening: it stood still for the first ten seconds of a
+        // thirteen-second start and then span for the last three. A spinner that only moves when there
+        // is nothing to wait for is worse than none.
+        //
+        // On its own thread it turns steadily throughout, and the seconds in the middle of it count in
+        // real time, because nothing that thread owns is doing any work.
+        //
+        // The window is created, shown and closed ON THAT THREAD. Nothing else in the program touches
+        // it; CloseSplash asks it to close through its own dispatcher.
+        private System.Threading.Thread _splashThread;
+
+        private void StartSplashOnItsOwnThread()
+        {
+            var showing = new System.Threading.ManualResetEventSlim(false);
+
+            _splashThread = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    _splash = new SplashWindow();
+                    _splash.Show();
+                }
+                catch (Exception ex) { Log.Warn("Splash could not be shown: " + ex); }
+                finally { showing.Set(); }
+
+                // Its own message loop: this is what makes the animation and the seconds tick while the
+                // main thread is busy. It ends when CloseSplash shuts this dispatcher down.
+                System.Windows.Threading.Dispatcher.Run();
+            });
+            _splashThread.SetApartmentState(System.Threading.ApartmentState.STA);
+            _splashThread.IsBackground = true;   // never keeps the program alive on its own
+            _splashThread.Start();
+
+            // Waited for, so the splash is up before the loading starts - but only briefly. A splash is
+            // never worth holding the program for.
+            showing.Wait(2000);
         }
 
         private void HookMainWindowForSplashClose()
@@ -322,8 +363,23 @@ namespace HolyLogger
                 _realMainWindow.Cursor = null;
             }
 
-            _splash?.Close();
+            // Closed on the thread that owns it, and that thread's loop ended with it - anything else
+            // throws "the calling thread cannot access this object".
+            var splash = _splash;
             _splash = null;
+            if (splash != null)
+            {
+                try
+                {
+                    splash.Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        try { splash.Close(); }
+                        catch (Exception swallowed) { Log.Swallow(swallowed); }
+                        splash.Dispatcher.InvokeShutdown();
+                    }));
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }
             Mouse.OverrideCursor = null;
 
             // The splash was topmost and stole activation. Explicitly re-activate the main window
