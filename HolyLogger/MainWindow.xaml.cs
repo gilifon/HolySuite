@@ -5402,9 +5402,22 @@ namespace HolyLogger
         // program or in the animation library thinks it should be visible.
         //
         // Turning it back on rebuilds the source. Cheap: a 44x44 GIF from the program's own resources.
+        // Whether the arc is turning RIGHT NOW. Without it every call to start it started it again.
+        private bool _spinnerTurning;
+
         private void SetSpinnerRunning(bool on)
         {
             if (UploadProgressSpinner == null || UploadSpinnerRotate == null) return;
+
+            // ASKED FOR WHAT IT IS ALREADY DOING, IT DOES NOTHING.
+            //
+            // ToggleUploadProgress runs on EVERY progress report - several times a second during an
+            // import - and it asked for the spinner every time. Each ask built a new animation and
+            // began it, which threw the arc back to the top: it turned a little, jumped back, turned a
+            // little, jumped back, in step with the percentage. That reads as a program stuttering
+            // under the work, and it was nothing of the kind - it was this line restarting the picture.
+            if (on == _spinnerTurning && on) return;
+
             try
             {
                 if (on)
@@ -5416,6 +5429,7 @@ namespace HolyLogger
                     };
                     UploadSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, turn);
                     UploadProgressSpinner.Visibility = Visibility.Visible;
+                    _spinnerTurning = true;
                 }
                 else
                 {
@@ -5431,6 +5445,7 @@ namespace HolyLogger
                     UploadSpinnerRotate.BeginAnimation(RotateTransform.AngleProperty, null);
                     UploadSpinnerRotate.Angle = where;
                     UploadProgressSpinner.Visibility = Visibility.Visible;
+                    _spinnerTurning = false;
                 }
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); }
