@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Runtime.CompilerServices;
 
@@ -99,5 +99,41 @@ namespace HolyLogger
                 return string.Empty;   // remembered: disk logging disabled, Debug output still works
             }
         }
+
+        // HOW FAR INTO THE START WE ARE, in seconds from the moment Windows launched the program -
+        // not from some point inside it. "It takes 23 seconds to come up" cannot be answered by
+        // reading code; it is answered by a handful of these, one per step, and then reading the log.
+        public static string SinceLaunch()
+        {
+            try
+            {
+                var started = System.Diagnostics.Process.GetCurrentProcess().StartTime;
+                return "+" + (DateTime.Now - started).TotalSeconds.ToString("0.0") + "s";
+            }
+            catch (Exception) { return "+?s"; }
+        }
+
+
+        // ONE STEP OF THE START, and how long the step before it took.
+        //
+        // "It takes 23 seconds to come up" is not answerable by reading code - the start is a hundred
+        // calls and any of them could be the one. A line per step, each carrying the milliseconds since
+        // the last, turns that into a list to read: the big number names the culprit.
+        private static DateTime _lastStep = DateTime.MinValue;
+
+        public static void Step(string what)
+        {
+            try
+            {
+                DateTime now = DateTime.Now;
+                string delta = _lastStep == DateTime.MinValue
+                    ? ""
+                    : "  (" + (now - _lastStep).TotalMilliseconds.ToString("0") + " ms)";
+                _lastStep = now;
+                Warn("STARTUP " + SinceLaunch() + "  " + what + delta);
+            }
+            catch (Exception) { }
+        }
+
     }
 }

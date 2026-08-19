@@ -294,6 +294,7 @@ namespace HolyLogger
 
         public MainWindow()
         {
+            Log.Warn("STARTUP " + Log.SinceLaunch() + "  main window: building");
             MachineName = Environment.MachineName;
             // Must run before ANYTHING reads the settings that used to be loose files (the QRZ photo
             // bounds right below, the cluster ones when the cluster is built later).
@@ -308,7 +309,9 @@ namespace HolyLogger
             // files before the first lookup is built.
             ClublogCtyService.Initialize();
             rem = new EntityResolver();
+            Log.Step("ctor: country files + entity resolver");
             InitializeComponent();
+            Log.Step("ctor: XAML built");
 
             // Build the View > Color Scheme submenu from the palette's scheme registry, and
             // re-paint code-colored areas (QSO rows) whenever the theme changes.
@@ -366,8 +369,10 @@ namespace HolyLogger
             isInitializeComponentsComplete = true;
             ApplyCallsignSuggestionRowsSetting();
             LoadCallsignIndex();
+            Log.Step("ctor: callsign index loaded");
             FetchCallsignListUpdateInfoFireAndForget();
             LoadNewCallsignsSet();
+            Log.Step("ctor: new-callsigns set loaded");
             _callsignUploader = new CallsignUploader(AppDomain.CurrentDomain.BaseDirectory);
             _callsignUploader.TrySendFireAndForget();
 
@@ -382,6 +387,7 @@ namespace HolyLogger
             // Load the cached LoTW user list (for the yellow cluster highlight) and refresh it in the
             // background if it's missing or more than a week old. Failures are ignored.
             LotwUserService.Initialize();
+            Log.Step("ctor: LoTW user list");
             CheckLotwUpdateFireAndForget();
 
             if (Properties.Settings.Default.EnableUDPClient)
@@ -413,6 +419,7 @@ namespace HolyLogger
             }
 
             ApplyHolyClusterListener();
+            Log.Step("ctor: HolyCluster listener");
 
             // The program must not wait on the internet in order to appear. Windows' own answer - is any
             // adapter up - costs nothing and sends nothing, so it is what the program believes for the
@@ -477,6 +484,7 @@ namespace HolyLogger
             // refresh the mirror so it always reflects the current logins. Runs every start (not only on
             // a version change), so the mirror recovers even a store that a bad upgrade left half-empty.
             CredentialStore.RestoreMissing();
+            Log.Step("ctor: credentials restored");
             CredentialStore.Backup();
 
             NormalizeEnterKeyBehaviorSettings();
@@ -595,6 +603,7 @@ namespace HolyLogger
             TP_Time.Value = DateTime.UtcNow;
             
             Qsos = dal.GetQSOsForLog(dal.ActiveLogId);
+            Log.Step("ctor: LOG READ from the database");
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
             UpdateActiveLogTitle();
@@ -1127,7 +1136,29 @@ namespace HolyLogger
         // callsign, and the operator did not ask for it - it must not hold the window for a second. It
         // only ever writes rows whose number is missing, so an interrupted run simply finishes next time,
         // and a number the operator has corrected by hand is never overwritten.
+        // HOUSEKEEPING, AND IT WAITS ITS TURN.
+        //
+        // It used to start the moment the window loaded, and it takes the database lock for its whole
+        // run - so the window's very next question stood in the queue behind it. With the partial index
+        // in place (DataAccess: idx_qso_dxcc_missing) the scan is now instant, but the principle holds:
+        // nothing whose result nobody is waiting for should run while the program is still coming up.
+        //
+        // Five seconds in, the window is on screen and the operator is reading his log.
         private void StartEntityCodeBackfill()
+        {
+            var start = new System.Windows.Threading.DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(5)
+            };
+            start.Tick += (s, e) =>
+            {
+                start.Stop();
+                RunEntityCodeBackfill();
+            };
+            start.Start();
+        }
+
+        private void RunEntityCodeBackfill()
         {
             Task.Run(() =>
             {
@@ -1145,8 +1176,11 @@ namespace HolyLogger
 
         private void MainWindow_Loaded(object sender, RoutedEventArgs e)
         {
+            Log.Warn("STARTUP " + Log.SinceLaunch() + "  main window: loaded, running its startup work");
+
             // Old QSOs have no entity number; this fills them in, once, quietly, in the background.
             StartEntityCodeBackfill();
+            Log.Step("loaded: entity backfill started");
 
             // The active profile's file was gone at startup, so factory defaults were loaded. Say so
             // once the main window exists (it owns the dialog) instead of letting the whole setup
@@ -1190,18 +1224,24 @@ namespace HolyLogger
             // already sets it, but if that early call hit a transient DB hiccup the title would be left
             // bare; doing it again here (dal + ActiveLogId are settled by now) makes it reliable.
             UpdateActiveLogTitle();
+            Log.Step("loaded: log name in the title");
 
             // Show the red "copying is live" dot if the active log already copies its QSOs elsewhere.
             RefreshCopyIndicator();
+            Log.Step("loaded: copy indicator");
 
             // A log that already has QSOs but no identity (legacy log) gets prompted now, at startup. An
             // empty log waits — its identity is set when you import into it or log the first QSO.
             EnsureActiveLogHasIdentity(promptIfEmpty: false);
+            Log.Step("loaded: log identity checked");
             SyncCallsignToActiveLog();   // startup: box shows the active log's callsign (no stray lock)
+            Log.Step("loaded: callsign synced");
 
             ApplyClusterWindowSetting();
+            Log.Step("loaded: CLUSTER WINDOW opened");
 
             _stickyWindow = new StickyWindow(this);
+            Log.Step("loaded: sticky window");
             _stickyWindow.StickToScreen = false;
             _stickyWindow.StickToOther = true;
             _stickyWindow.StickOnResize = true;
@@ -1218,6 +1258,7 @@ namespace HolyLogger
             MapControl.SpotHovered += OnMapSpotHovered;
             MapControl.SpotHoverEnded += OnMapSpotHoverEnded;
             ShowHomeMap();
+            Log.Step("loaded: home map drawn");
 
             // Reflect the persisted suggestions on/off state on the Suggest (F4) toggle button.
             if (BtnSuggestToggle != null)
@@ -1233,6 +1274,7 @@ namespace HolyLogger
             // eQSL queue: show how many QSOs are waiting (only for callsigns the user added to the
             // eQSL table). Nothing is sent automatically here.
             UpdateEqslQueueIndicator();
+            Log.Step("loaded: eQSL queue counted");
 
             // Try Again: the list survives between sessions, so the button has to know at startup
             // whether anybody is still waiting on it. It stays hidden when nobody is.
@@ -1241,15 +1283,18 @@ namespace HolyLogger
             // QRZ Logbook: show pending count and silently retry any QSOs that could not be pushed
             // earlier (e.g. logged while offline).
             UpdateQrzMenuCount();
+            Log.Step("loaded: QRZ queue counted");
             _ = PumpQrzQueue();
 
             // Club Log: same idea — show the pending count and silently drain the queue if the service
             // is on and configured (e.g. QSOs logged while offline get pushed now).
             UpdateClublogMenuCount();
+            Log.Step("loaded: Club Log queue counted");
             _ = PumpClublogQueue();
 
             // Initialize RST fields based on the selected mode after window is fully loaded
             ResetRstForMode();
+            Log.Step("loaded: END of the startup work");
 
             // One-time, skippable offer to set an off-machine backup folder. Deferred to ApplicationIdle
             // so it appears only after the startup splash has closed (the splash is Topmost and would

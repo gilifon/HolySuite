@@ -251,6 +251,7 @@ namespace HolyLogger
             // Keep app alive while splash is shown before the real main window is tracked.
             ShutdownMode = ShutdownMode.OnLastWindowClose;
 
+            Log.Warn("STARTUP " + Log.SinceLaunch() + "  app: showing the splash");
             StartSplashOnItsOwnThread();
             Mouse.OverrideCursor = Cursors.Wait;
 
@@ -342,6 +343,8 @@ namespace HolyLogger
 
         private void OnMainWindowContentRendered(object sender, EventArgs e)
         {
+            Log.Warn("STARTUP " + Log.SinceLaunch() + "  main window: painted");
+
             _mainWindowRendered = true;
             ((Window)sender).ContentRendered -= OnMainWindowContentRendered;
             Dispatcher.BeginInvoke(new Action(CloseSplash), DispatcherPriority.Background);
@@ -349,6 +352,8 @@ namespace HolyLogger
 
         private void CloseSplash()
         {
+            Log.Warn("STARTUP " + Log.SinceLaunch() + "  splash closing - the program is up");
+
             if (_splashCloseTimer != null)
             {
                 _splashCloseTimer.Stop();

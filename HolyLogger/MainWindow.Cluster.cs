@@ -483,6 +483,8 @@ namespace HolyLogger
 
         private async void GenerateNewClusterWindow()
         {
+            Log.Warn("STARTUP " + Log.SinceLaunch() + "  cluster window: building");
+
             clusterLiveScaleOn = false;   // engaged below (after the window is built) if it was remembered on
             clusterHoverPopupEnabled = LoadClusterHoverPopupSetting();
             clusterLastMinutesFilterValue = LoadClusterLastMinutesFilterSetting();
@@ -639,7 +641,12 @@ namespace HolyLogger
             clusterWindow.PreviewKeyDown += ForwardGlobalFunctionKeys;
 
             clusterWorkedCountries = GetWorkedCountriesFromLog();
+            Log.Warn("STARTUP " + Log.SinceLaunch() + "  cluster window: showing");
             clusterWindow.Show();
+
+            // The A / K / SFI bars start reading now and stop when this window closes - there is no
+            // point asking NOAA about the sun for a window nobody has open.
+            StartPropagationUpdates();
 
             // Live Scale is a remembered state: if it was on when the cluster was last used, re-engage it
             // now (after the window has laid out, so the grid/scroll measurements are real).
@@ -784,6 +791,8 @@ namespace HolyLogger
 
         private void ClusterWindow_Closed(object sender, EventArgs e)
         {
+            StopPropagationUpdates();
+
             Properties.Settings.Default.ClusterColWidthDX = clusterDxColumn != null ? clusterDxColumn.ActualWidth : Properties.Settings.Default.ClusterColWidthDX;
             Properties.Settings.Default.ClusterColWidthSpotter = clusterSpotterColumn != null ? clusterSpotterColumn.ActualWidth : Properties.Settings.Default.ClusterColWidthSpotter;
             if (clusterCountryColumn != null)
@@ -1516,6 +1525,11 @@ namespace HolyLogger
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             headerGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            // The A / K / SFI bars live in the right column, which until now was created and left
+            // empty. See MainWindow.Propagation.cs - the numbers are NOAA's, read once an hour, and
+            // the ranges and colours are The Holy Cluster's own, so the two can never disagree.
+            rightColumnPanel.Children.Add(BuildPropagationBars());
+
             Grid.SetColumn(leftColumnPanel, 0);
             Grid.SetColumn(rightColumnPanel, 2);
             headerGrid.Children.Add(leftColumnPanel);
@@ -4568,15 +4582,18 @@ namespace HolyLogger
                 {
                     clusterWorkedCountries = GetWorkedCountriesFromLog();
                 }
+                Log.Step("cluster: worked countries read from the log");
 
                 // Load filter settings even if window is not shown
                 clusterLastMinutesFilterValue = LoadClusterLastMinutesFilterSetting();
 
                 // Refresh visible spots and map with any existing data
                 RefreshClusterVisibleSpots();
+                Log.Step("cluster: visible spots refreshed");
 
                 // Start WebSocket connection for cluster activity
                 StartClusterConnectionAsync();
+                Log.Step("cluster: websocket connection started");
 
                 // Open window only if Visible is checked
                 if (Properties.Settings.Default.ShowClusterWindowOption && clusterWindow == null)

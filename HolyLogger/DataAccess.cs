@@ -1342,8 +1342,16 @@ Environment.NewLine +
         public int BackfillEntityCodes(Func<string, string, int> codeForCall, Action<int, int> progress = null)
         {
             if (codeForCall == null) return 0;
+
+            // TIMED, AND THE WAIT FOR THE LOCK TIMED TOO. This runs on a background thread at startup
+            // and holds _dbLock for its whole run, so anything the WINDOW asks the database meanwhile
+            // stands and waits. Whether that is what costs the operator ten seconds of his start is a
+            // question about numbers, and these are the numbers.
+            var sinceCalled = System.Diagnostics.Stopwatch.StartNew();
             lock (_dbLock)
             {
+                Log.Warn("STARTUP  entity backfill: got the database after "
+                         + sinceCalled.ElapsedMilliseconds + " ms");
                 if (con == null || con.State != ConnectionState.Open) return 0;
 
                 var rows = new List<KeyValuePair<long, KeyValuePair<string, string>>>();
@@ -1363,6 +1371,8 @@ Environment.NewLine +
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); return 0; }
 
+                Log.Warn("STARTUP  entity backfill: " + rows.Count + " QSO(s) to fill, found in "
+                         + sinceCalled.ElapsedMilliseconds + " ms");
                 if (rows.Count == 0) return 0;
 
                 int filled = 0, done = 0;
@@ -1394,6 +1404,8 @@ Environment.NewLine +
                     }
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
+                Log.Warn("STARTUP  entity backfill: DONE, held the database for "
+                         + sinceCalled.ElapsedMilliseconds + " ms in all");
                 return filled;
             }
         }
@@ -2704,6 +2716,20 @@ Environment.NewLine +
                         "CREATE INDEX IF NOT EXISTS idx_qso_" + service + "_rcvd ON qso(log_id) "
                         + "WHERE " + service + "_qsl_rcvd = 1", con))
                         cmd.ExecuteNonQuery();
+
+                // 4. "Is there a QSO left without an entity number?" - asked at EVERY startup by
+                //    BackfillEntityCodes, and until this index existed the answer cost a read of every
+                //    QSO in the database. Measured on the operator's own machine: 4,711 ms to find
+                //    NOTHING, on every start, while holding the database lock - so the window's next
+                //    question (the log name for the title bar) waited that long too. It was a quarter
+                //    of a twenty-second startup, spent proving there was no work to do.
+                //
+                //    PARTIAL, like the five above: it holds only the rows that still need a number,
+                //    which after the first fill is none at all - an empty index, instantly answered,
+                //    and it still catches any new QSO that arrives without one.
+                using (var cmd = new SQLiteCommand(
+                    "CREATE INDEX IF NOT EXISTS idx_qso_dxcc_missing ON qso(Id) WHERE dxcc IS NULL", con))
+                    cmd.ExecuteNonQuery();
             }
             catch (Exception ex) { Log.Swallow(ex); }   // an index is an optimization only; never block startup on it
         }
