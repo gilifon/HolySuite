@@ -1,4 +1,4 @@
-using HolyParser;
+﻿using HolyParser;
 using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
@@ -2955,6 +2955,161 @@ Environment.NewLine +
         // the program can tell that a QSL date, a county or a contest name arrived from a file half an
         // hour ago - which makes a bad file quietly editing good QSOs impossible to notice, let alone
         // undo. So the merge says what it touched, field by field.
+        // EVERYTHING ONE IMPORT CHANGED, kept so it can be put back.
+        //
+        // An import does two things to a log that already holds QSOs: it ADDS rows, and it FILLS empty
+        // fields on rows that were already there. Both are undoable exactly, and neither needs the old
+        // values kept:
+        //
+        //   added rows  - every row this import wrote has a bigger Id than any row the log held before
+        //                 it started, because Id is AUTOINCREMENT and the import is the only writer
+        //                 while it runs. The high-water mark is the whole record of them.
+        //   filled fields - the merge only ever writes into a field that is EMPTY. So putting one back
+        //                 means emptying it again; the old value was nothing, and nothing needs storing.
+        //
+        // Which fields were filled is kept as one BIT PER COLUMN rather than a list of names: a big
+        // merge touches tens of thousands of QSOs, and this program has run out of memory on an import
+        // before now. Twelve bytes a QSO, whatever it filled.
+        public sealed class ImportUndo
+        {
+            public long LogId;
+            // The largest QSO Id the log held BEFORE the import. Anything above it is this import's.
+            public long HighWaterQsoId = -1;
+
+            internal readonly List<long> FilledIds = new List<long>();
+            internal readonly List<int> FilledColumns = new List<int>();
+
+            public int FilledQsoCount { get { return FilledIds.Count; } }
+
+            internal void NoteFill(long id, int columnBits)
+            {
+                if (columnBits == 0) return;
+                FilledIds.Add(id);
+                FilledColumns.Add(columnBits);
+            }
+        }
+
+        // The columns the merge can fill, in the bit order ImportUndo records them in. The UPDATE in
+        // CompleteExistingQsos writes these and only these - the two lists have to stay in step, and
+        // they sit a few lines apart for that reason.
+        private static readonly string[] MergeFillColumns =
+        {
+            "extra_adif", "state", "iota", "sota_ref", "pota_ref", "wwff_ref", "sig", "sig_info",
+            "credit_granted", "cnty", "qsl_via", "qsl_rdate", "qsl_sent", "contest_id", "time_off",
+            "date_off", "qth"
+        };
+
+        // The biggest QSO Id in a log, or 0 for a log with no QSOs. Taken before an import so a stopped
+        // one can tell its own rows from the ones that were already there.
+        public long MaxQsoId(long logId)
+        {
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return -1;
+                using (var cmd = new SQLiteCommand("SELECT IFNULL(MAX(Id), 0) FROM qso WHERE log_id = ?", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter(null, logId));
+                    object o = cmd.ExecuteScalar();
+                    return o == null || o == DBNull.Value ? -1 : Convert.ToInt64(o);
+                }
+            }
+        }
+
+        // PUTS THE LOG BACK AS IT WAS. One transaction: either the whole import is undone or none of it
+        // is, which is the only promise worth making to somebody who pressed Stop.
+        //
+        // Returns the number of QSOs deleted. Throws nothing the caller has to handle - a failure leaves
+        // the transaction unrolled and is reported, because telling an operator his log is untouched
+        // when it is not would be worse than the import he stopped.
+        public int UndoImport(ImportUndo undo, out int fieldsPutBack)
+        {
+            fieldsPutBack = 0;
+            if (undo == null || undo.HighWaterQsoId < 0) return 0;
+
+            BumpContentVersion();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+
+                int deleted = 0;
+                using (SQLiteTransaction tx = con.BeginTransaction())
+                {
+                    using (var del = new SQLiteCommand(
+                        "DELETE FROM qso WHERE log_id = @log AND Id > @hw", con, tx))
+                    {
+                        del.Parameters.Add(new SQLiteParameter("@log", undo.LogId));
+                        del.Parameters.Add(new SQLiteParameter("@hw", undo.HighWaterQsoId));
+                        deleted = del.ExecuteNonQuery();
+                    }
+
+                    // ONE PREPARED STATEMENT PER COMBINATION OF COLUMNS, not per QSO. A file fills the
+                    // same handful of fields on record after record, so a few statements serve tens of
+                    // thousands of rows.
+                    var byMask = new Dictionary<int, SQLiteCommand>();
+                    try
+                    {
+                        for (int i = 0; i < undo.FilledIds.Count; i++)
+                        {
+                            int mask = undo.FilledColumns[i];
+                            SQLiteCommand cmd;
+                            if (!byMask.TryGetValue(mask, out cmd))
+                            {
+                                var sets = new List<string>();
+                                for (int b = 0; b < MergeFillColumns.Length; b++)
+                                    if ((mask & (1 << b)) != 0) sets.Add(MergeFillColumns[b] + " = ''");
+                                if (sets.Count == 0) continue;
+                                cmd = new SQLiteCommand(
+                                    "UPDATE qso SET " + string.Join(", ", sets) + " WHERE Id = @id", con, tx);
+                                cmd.Parameters.Add(new SQLiteParameter("@id"));
+                                byMask[mask] = cmd;
+                            }
+                            cmd.Parameters["@id"].Value = undo.FilledIds[i];
+                            if (cmd.ExecuteNonQuery() > 0) fieldsPutBack++;
+                        }
+                    }
+                    finally
+                    {
+                        foreach (var c in byMask.Values) c.Dispose();
+                    }
+
+                    tx.Commit();
+                }
+                return deleted;
+            }
+        }
+
+        // THE SECOND HALF OF A REPLACE, done at the END instead of the beginning.
+        //
+        // Replace used to empty the log the moment the operator chose it, before one record had been
+        // read - so a file that turned out to be unreadable, an import that ran out of memory, or a
+        // press of Stop left him with an empty log and an ADIF backup to re-import by hand.
+        //
+        // Now the new QSOs are added ALONGSIDE the old ones, and when the file is safely in, the old
+        // ones - everything at or below the high-water mark - go in one statement. Until that moment
+        // the log still holds every QSO it started with, so anything going wrong costs nothing.
+        //
+        // Returns how many old QSOs were removed.
+        public int FinishReplace(long logId, long highWaterQsoId)
+        {
+            if (highWaterQsoId < 0) return 0;
+
+            BumpContentVersion();
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return 0;
+                using (SQLiteTransaction tx = con.BeginTransaction())
+                using (var cmd = new SQLiteCommand(
+                    "DELETE FROM qso WHERE log_id = @log AND Id <= @hw", con, tx))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@log", logId));
+                    cmd.Parameters.Add(new SQLiteParameter("@hw", highWaterQsoId));
+                    int gone = cmd.ExecuteNonQuery();
+                    tx.Commit();
+                    return gone;
+                }
+            }
+        }
+
         public class MergeNote
         {
             public string Call { get; set; }
@@ -2975,7 +3130,8 @@ Environment.NewLine +
         public List<QSO> CompleteExistingQsos(List<QSO> parsed, long logId, out int completed, out int ambiguous,
                                               Action<int> progress = null,
                                               List<MergeNote> filledNotes = null,
-                                              List<MergeNote> ambiguousNotes = null)
+                                              List<MergeNote> ambiguousNotes = null,
+                                              ImportUndo undo = null)
         {
             completed = 0; ambiguous = 0;
             var unmatched = new List<QSO>();
@@ -3111,6 +3267,33 @@ Environment.NewLine +
                         // WORKED OUT BEFORE THE WRITE, because afterwards there is no way to tell what
                         // was empty. The same test the SQL uses - empty here, something in the record -
                         // so the list says exactly what the UPDATE is about to put in.
+                        // WHICH COLUMNS THIS WRITE IS ABOUT TO FILL, worked out with the same test the
+                        // SQL uses: empty here, something in the record. Kept whether or not the notes
+                        // are still being collected - the notes are capped at MaxMergeNotes because a
+                        // report nobody can read is no use, but an undo that stops halfway through is
+                        // not an undo.
+                        int fillMask = 0;
+                        if (undo != null)
+                        {
+                            if (IsEmpty(target.ExtraAdif)      && !IsEmpty(p.ExtraAdif))      fillMask |= 1 << 0;
+                            if (IsEmpty(target.State)          && !IsEmpty(p.State))          fillMask |= 1 << 1;
+                            if (IsEmpty(target.Iota)           && !IsEmpty(p.Iota))           fillMask |= 1 << 2;
+                            if (IsEmpty(target.SotaRef)        && !IsEmpty(p.SotaRef))        fillMask |= 1 << 3;
+                            if (IsEmpty(target.PotaRef)        && !IsEmpty(p.PotaRef))        fillMask |= 1 << 4;
+                            if (IsEmpty(target.WwffRef)        && !IsEmpty(p.WwffRef))        fillMask |= 1 << 5;
+                            if (IsEmpty(target.Sig)            && !IsEmpty(p.Sig))            fillMask |= 1 << 6;
+                            if (IsEmpty(target.SigInfo)        && !IsEmpty(p.SigInfo))        fillMask |= 1 << 7;
+                            if (IsEmpty(target.CreditGranted)  && !IsEmpty(p.CreditGranted))  fillMask |= 1 << 8;
+                            if (IsEmpty(target.Cnty)           && !IsEmpty(p.Cnty))           fillMask |= 1 << 9;
+                            if (IsEmpty(target.QslVia)         && !IsEmpty(p.QslVia))         fillMask |= 1 << 10;
+                            if (IsEmpty(target.QslRDate)       && !IsEmpty(p.QslRDate))       fillMask |= 1 << 11;
+                            if (IsEmpty(target.QslSent)        && !IsEmpty(p.QslSent))        fillMask |= 1 << 12;
+                            if (IsEmpty(target.ContestId)      && !IsEmpty(p.ContestId))      fillMask |= 1 << 13;
+                            if (IsEmpty(target.TimeOff)        && !IsEmpty(p.TimeOff))        fillMask |= 1 << 14;
+                            if (IsEmpty(target.DateOff)        && !IsEmpty(p.DateOff))        fillMask |= 1 << 15;
+                            if (IsEmpty(target.Qth)            && !IsEmpty(p.Qth))            fillMask |= 1 << 16;
+                        }
+
                         MergeNote note = null;
                         if (filledNotes != null && filledNotes.Count < MaxMergeNotes)
                         {
@@ -3144,6 +3327,7 @@ Environment.NewLine +
                             {
                                 completed++;
                                 if (note != null && note.Fields.Count > 0) filledNotes.Add(note);
+                                if (undo != null) undo.NoteFill(target.id, fillMask);
                             }
                         }
                         catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -3214,27 +3398,10 @@ Environment.NewLine +
         // another program rounds the frequency and often carries no operator at all, so demanding those
         // would make every re-import look new and DOUBLE the log, which is a worse fault than the one
         // this fixes.
-        internal static string MatchKey(QSO q)
-        {
-            if (q == null) return null;
-            string call = (q.DXCall ?? string.Empty).Trim();
-            string date = (q.Date ?? string.Empty).Trim();
-            string band = (q.Band ?? string.Empty).Trim();
-            string mode = (q.Mode ?? string.Empty).Trim();
-            if (call.Length == 0 || date.Length == 0) return null;
-
-            // The date sometimes arrives as "yyyyMMdd HHmmss"; only the day identifies the contact.
-            int space = date.IndexOf(' ');
-            if (space > 0) date = date.Substring(0, space);
-
-            // "HHmmss" or "HHmm" -> "HHmm". A record with no readable time keeps an empty slot, so it can
-            // still only ever match another record that has none either.
-            string time = (q.Time ?? string.Empty).Trim();
-            if (time.Length > 4) time = time.Substring(0, 4);
-
-            return call.ToUpperInvariant() + "|" + date + "|" + band.ToUpperInvariant() + "|"
-                   + mode.ToUpperInvariant() + "|" + time;
-        }
+        // THE RULE ITSELF NOW LIVES ON QSO, in HolyParser, so that the parser can answer to it too - its
+        // "Import Duplicates" option had a second definition of its own and the two disagreed. This
+        // stays as the name the rest of this program calls it by; there is only one implementation.
+        internal static string MatchKey(QSO q) { return QSO.MatchKey(q); }
 
         // The QSO in the bucket logged closest to that time. tie = two are equally close, so the caller
         // leaves them alone rather than guessing.

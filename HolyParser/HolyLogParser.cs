@@ -177,6 +177,13 @@ namespace HolyParser
         private readonly List<RejectedRecord> m_rejected = new List<RejectedRecord>();
         private readonly List<FilledField> m_filled = new List<FilledField>();
 
+        // THE RECORDS THE "Import Duplicates" OPTION THREW AWAY. With that option off, a repeat of a
+        // contact already in the same file is dropped here, before the importer ever sees it - so the
+        // file held 100 records, 95 reached the log, and nothing anywhere accounted for the other five.
+        // They are kept so the import report can name them: a record that left no trace is one the
+        // operator cannot tell from a record that was never read.
+        private readonly List<QSO> m_droppedDuplicates = new List<QSO>();
+
         // Which record is being parsed, so a finding can name it. ParseRawQSO does not take the number.
         private int m_recordBeingParsed;
 
@@ -199,6 +206,21 @@ namespace HolyParser
 
         public List<RejectedRecord> GetRejected() { return m_rejected; }
         public List<FilledField> GetFilled() { return m_filled; }
+
+        // ASKED BEFORE EACH RECORD: has the operator pressed Stop? Reading a 77 MB file takes minutes,
+        // and until now there was no way out of it. A Func rather than a flag because the answer lives
+        // in the importer's BackgroundWorker, which this project knows nothing about.
+        //
+        // Stopping HERE is the cheapest place to stop: nothing has been written to the log yet, so what
+        // it costs is the reading, not the log. Whatever was read before the press is kept and can be
+        // stored - the caller decides - and Stopped says which happened.
+        public Func<bool> StopRequested { get; set; }
+
+        private bool m_stopped;
+        public bool Stopped { get { return m_stopped; } }
+
+        // Empty unless the operator has turned "Import Duplicates" off - with it on, nothing is dropped.
+        public List<QSO> GetDroppedDuplicates() { return m_droppedDuplicates; }
 
         // The station callsign to fall back on when a record names neither STATION_CALLSIGN nor
         // OPERATOR. Set by the importer to the log's own identity; left empty, such a record is
@@ -313,6 +335,15 @@ namespace HolyParser
                 {
                     lastReportedProgress = progress;
                     progressCallback?.Invoke(progress);
+
+                    // Asked once per per-cent of the file rather than once per record: a record is a
+                    // few microseconds' work and a hundred thousand delegate calls to answer "no" is a
+                    // measurable cost on the one path that must not get slower.
+                    if (StopRequested != null && StopRequested())
+                    {
+                        m_stopped = true;
+                        break;
+                    }
                 }
             }
 
@@ -321,7 +352,26 @@ namespace HolyParser
             m_fileText = null;
             if (!IsParseDuplicates)
             {
-                m_qsoList= m_qsoList.DistinctBy(p => p.HASH).ToList();
+                // BY THE PROGRAM'S ONE RULE - QSO.MatchKey, the same rule the Log Fixer, the import's
+                // merge and Tools > Remove Duplicates all use: callsign, date, band, mode and MINUTE.
+                //
+                // It used to use HASH, which has no time in it at all, so two contacts with the same
+                // station on one band and one mode on one day were one - however many hours apart - and
+                // the second was thrown away while the Log Fixer, looking at the very same pair, called
+                // them two proper contacts.
+                //
+                // A record too incomplete to identify (no callsign or no date) has no key, and is KEPT:
+                // it cannot be shown to be a repeat of anything, and losing a contact is the failure
+                // that matters.
+                var kept = new List<QSO>(m_qsoList.Count);
+                var seen = new HashSet<string>();
+                foreach (var q in m_qsoList)
+                {
+                    string key = QSO.MatchKey(q);
+                    if (key == null || seen.Add(key)) kept.Add(q);
+                    else m_droppedDuplicates.Add(q);
+                }
+                m_qsoList = kept;
             }
             m_qsoList = m_qsoList.OrderBy(p => p.Date).ThenBy(p => p.Time).ToList();
         }

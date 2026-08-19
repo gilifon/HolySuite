@@ -63,6 +63,27 @@ namespace HolyLogger
             public int RecordsRead { get; set; }
             public string ReportPath { get; set; }
             public string RejectsAdifPath { get; set; }
+            // The operator pressed Stop. Everything else in here is then a PART of the file, which is
+            // a different thing from the whole of it and has to be said out loud rather than left to
+            // look like an import that simply found less than expected.
+            public bool Stopped { get; set; }
+            // Stopped while the file was still being READ, before one QSO had been written. The
+            // difference decides what can be offered afterwards: nothing to clean up, or a log with
+            // part of a file in it.
+            public bool StoppedBeforeAnythingWasStored { get; set; }
+            // What the rollback put back, when the import went into a log that already existed: QSOs
+            // taken out again, and fields emptied again. UndoFailed says the log is NOT as it was.
+            public int UndoneQsoCount { get; set; }
+            public int UndoneFieldCount { get; set; }
+            public bool UndoFailed { get; set; }
+            // Replace: how many of the log's own QSOs were removed once the file was safely in, and
+            // whether that step was skipped because the file brought nothing worth replacing them with.
+            public int ReplacedQsoCount { get; set; }
+            public bool ReplaceLeftAlone { get; set; }
+            // The new log this import created, when that is what it was for - so a stopped import can
+            // offer to take it away again. 0 when the import went into a log that already existed.
+            public long NewLogId { get; set; }
+            public string NewLogName { get; set; }
         }
 
         // One record that did not make it into the log, from whichever stage turned it away: the
@@ -204,7 +225,9 @@ namespace HolyLogger
         // Public entry point so the Log Manager's "Import ADIF" button runs the same import flow.
         public void ImportAdif() => ImportAdifMenuItem_Click(null, null);
 
-        private void ImportAdifMenuItem_Click(object sender, RoutedEventArgs e)
+        // async so the two steps that take seconds - scanning the file for its callsigns and writing the
+        // backup a replace makes - can run off this thread with a message standing on the screen.
+        private async void ImportAdifMenuItem_Click(object sender, RoutedEventArgs e)
         {
             // Offer to save an in-progress new QSO before an import reloads the log.
             GuardUnsavedQso("import the ADIF file");
@@ -216,13 +239,43 @@ namespace HolyLogger
 
             if (openFileDialog.ShowDialog() == true)
             {
-                // First: does this file become its OWN new log, or get added to the log open now?
+                // WHO MADE THIS FILE, read before a single question is asked about it. The scan walks
+                // the file line by line and keeps nothing but the callsigns, so it is cheap next to the
+                // parse - and it lets the one question that can send the operator away be asked first.
+                // Nothing below asks for it again; the lists are carried down.
+                ShowBusyOverlay("Reading the file\u2026");
+                string scanPath = openFileDialog.FileName;
+                System.Collections.Generic.List<string> scannedCalls = null, scannedOps = null;
+                try
+                {
+                    await System.Threading.Tasks.Task.Run(() =>
+                        ScanAdifIdentity(scanPath, out scannedCalls, out scannedOps));
+                }
+                finally { HideBusyOverlay(); }
+                var adifCalls = scannedCalls ?? new System.Collections.Generic.List<string>();
+                var adifOps = scannedOps ?? new System.Collections.Generic.List<string>();
+
+                // "Not my callsign - import anyway?" comes before everything else. Answering No after
+                // naming a new log, or after choosing merge or replace, wastes all of that.
+                if (!ApproveDifferentStationCallsign(openFileDialog.FileName, adifCalls)) return;
+
+                // Next: does this file become its OWN new log, or get added to the log open now?
                 // With NO log open there is no "log open now" to add to, so the question is not asked -
                 // the file becomes its own new log, which is the only answer there is. Import is
                 // deliberately NOT blocked when no log is open: bringing a file in is exactly how an
                 // operator with no logs gets one.
-                ImportTarget target = dal != null && !dal.HasActiveLog ? ImportTarget.NewLog : AskImportTarget();
+                bool noLogOpen = dal != null && !dal.HasActiveLog;
+                ImportTarget target = AskImportTarget(noLogOpen);
                 if (target == ImportTarget.Cancel) return;
+
+                _importChoice = ImportChoice.NewLog;   // corrected below if it goes into the log open now
+
+                // THE LOG THIS IMPORT MAKES, remembered so that abandoning the import can take it away
+                // again. It has to exist before the import can write into it, and the operator can
+                // still back out after it exists - one more dialog stands between here and the reading.
+                // Backing out used to leave the empty log behind for ever; two of them were sitting in
+                // the Log Manager, named after a file that never went in.
+                long createdLogId = 0;
 
                 if (target == ImportTarget.NewLog)
                 {
@@ -230,9 +283,9 @@ namespace HolyLogger
                     // nothing touches the existing logs. Its identity comes from the ADIF (below).
                     string suggested = UniqueLogName(System.IO.Path.GetFileNameWithoutExtension(openFileDialog.FileName));
                     var nameDlg = new NewLogWindow(dal, "Name the new log for the imported file:", suggested) { Owner = this };
-                    if (nameDlg.ShowDialog() != true) return;   // cancelled -> abort
-                    long newId = dal.CreateLog(nameDlg.LogName, string.Empty);
-                    SwitchActiveLog(newId);
+                    if (nameDlg.ShowDialog() != true) return;   // cancelled -> abort, nothing created yet
+                    createdLogId = dal.CreateLog(nameDlg.LogName, string.Empty);
+                    SwitchActiveLog(createdLogId);
                 }
                 else
                 {
@@ -241,13 +294,17 @@ namespace HolyLogger
                     try { if (dal != null) existing = dal.GetQsoCountForLog(dal.ActiveLogId); }
                     catch { existing = 0; }
 
+                    _importChoice = ImportChoice.Merge;   // an empty log open: nothing to replace
+
                     if (existing > 0)
                     {
                         ImportLogChoice choice = AskImportMergeOrReplace(existing);
                         if (choice == ImportLogChoice.Cancel)
                             return;
-                        if (choice == ImportLogChoice.Replace && !BackupAndClearLogForReplace())
+                        if (choice == ImportLogChoice.Replace && !await BackupLogForReplace())
                             return; // backup cancelled or failed -> abort; the log is left untouched
+                        _importChoice = choice == ImportLogChoice.Replace ? ImportChoice.Replace
+                                                                          : ImportChoice.Merge;
                     }
                 }
 
@@ -255,7 +312,6 @@ namespace HolyLogger
                 // it was made under.
                 if (dal != null)
                 {
-                    ScanAdifIdentity(openFileDialog.FileName, out var adifCalls, out var adifOps);
                     string fileName = System.IO.Path.GetFileName(openFileDialog.FileName);
 
                     if (!dal.LogHasIdentity(dal.ActiveLogId))
@@ -263,7 +319,7 @@ namespace HolyLogger
                         // No identity yet -> confirm (and let the user cancel) the identity the imported
                         // log will get. Station callsign from the ADIF (not editable); operator editable.
                         var idDlg = new ImportIdentityWindow(adifCalls, adifOps, fileName) { Owner = this };
-                        if (idDlg.ShowDialog() != true) return;   // cancel -> abort the whole import
+                        if (idDlg.ShowDialog() != true) { AbandonNewLog(createdLogId); return; }
                         _pendingImportCallsign = idDlg.Callsign;
                         _pendingImportOperator = idDlg.Operator;
                     }
@@ -284,7 +340,7 @@ namespace HolyLogger
                                     "That differs from this log's permanent identity:\n    " + idCall + " / " + idOp + "\n\n" +
                                     "The QSOs will be added, but any that don't match this log's identity will NOT be copied to a copy-target. Import anyway?",
                                     "Different callsign / operator", HolyMsgType.Warning, this))
-                                return;   // user declined -> abort the import
+                            { AbandonNewLog(createdLogId); return; }   // declined -> abort the import
                         }
                     }
                 }
@@ -294,9 +350,43 @@ namespace HolyLogger
             }
         }
 
+        // THE EMPTY LOG AN ABANDONED IMPORT LEAVES BEHIND, taken away again.
+        //
+        // A log created for a file that never went in is not a log: it is named after that file, holds
+        // nothing, and sits in the Log Manager for ever waiting to be noticed and deleted by hand. It
+        // is only ever called with a log this import made a moment ago, and only when the import is
+        // being abandoned - never with a log that existed before.
+        private void AbandonNewLog(long logId)
+        {
+            if (logId <= 0 || dal == null) return;
+            try
+            {
+                if (logId == dal.ActiveLogId) CloseActiveLog();
+                dal.DeleteLog(logId);
+                RefreshCopyIndicator();
+                _pendingImportCallsign = null;
+                _pendingImportOperator = null;
+                UpdateNumOfQSOs();
+            }
+            catch (Exception ex)
+            {
+                // Not worth a dialog: the operator has just cancelled something and an empty log is
+                // harmless. It goes in the log file so it can be explained if he ever asks.
+                Log.Warn("Could not remove the empty log an abandoned import created: " + ex);
+            }
+        }
+
         // Identity confirmed in the import dialog; applied to the log once the import finishes.
         private string _pendingImportCallsign;
         private string _pendingImportOperator;
+
+        // WHICH OF THE THREE THE OPERATOR CHOSE, kept for the report. The choice was made in a dialog,
+        // acted on, and forgotten - so the report could say what the import DID but never what it had
+        // been asked to do, and "Added to the log: 0" reads very differently under "a new log for this
+        // file" than under "replace the log with this file". A file dropped on the grid asks nothing
+        // and goes into the log open now, which is Merge.
+        private enum ImportChoice { NewLog, Merge, Replace }
+        private ImportChoice _importChoice = ImportChoice.Merge;
 
         // Peeks at an ADIF file for its station callsign(s) and operator(s) so the imported log's identity
         // can be confirmed before importing. Distinct values, most-frequent first. Best-effort.
@@ -310,6 +400,34 @@ namespace HolyLogger
         //
         // Reading by line is safe here because an ADIF tag never contains a line break, and neither a
         // station callsign nor an operator ever does.
+        // "THIS FILE WAS MADE UNDER A DIFFERENT CALLSIGN - IMPORT IT ANYWAY?", asked BEFORE the file is
+        // read instead of after.
+        //
+        // It used to be asked by the import worker, from the parsed QSOs, which meant the operator sat
+        // through the whole file - three minutes on a big logbook, the spinner reading "Parsing ADIF
+        // 100%" - and was only then asked whether he wanted it at all. Answering No threw away every
+        // second of it. Nothing needed the parsed records: the callsigns come from a scan of the file
+        // that already runs before the import, so the same question with the same list can be asked at
+        // once.
+        //
+        // Returns false when the operator says no; the caller must then leave the file alone.
+        private bool ApproveDifferentStationCallsign(string filePath,
+                                                     System.Collections.Generic.List<string> callsInFile)
+        {
+            string myCallsign = Properties.Settings.Default.my_callsign;
+            if (string.IsNullOrWhiteSpace(myCallsign)) return true;
+            if (callsInFile == null || callsInFile.Count == 0) return true;
+            if (!callsInFile.Any(c => !CallsignIdentity.Same(c, myCallsign))) return true;
+
+            return HolyMessageBox.ShowConfirm(
+                "The ADIF file \"" + System.IO.Path.GetFileName(filePath) + "\" contains QSOs logged "
+                + "under a different callsign than your current station callsign.\n\n"
+                + "Callsign(s) in the file:  " + string.Join(", ", callsInFile) + "\n"
+                + "Your current station callsign:  " + myCallsign.Trim() + "\n\n"
+                + "Do you want to import these QSOs into your log anyway?",
+                "Different callsign in ADIF file", HolyMsgType.Warning, this);
+        }
+
         private static void ScanAdifIdentity(string filePath, out System.Collections.Generic.List<string> stationCallsigns, out System.Collections.Generic.List<string> operators)
         {
             var callCounts = new System.Collections.Generic.Dictionary<string, int>(System.StringComparer.OrdinalIgnoreCase);
@@ -358,7 +476,13 @@ namespace HolyLogger
         private enum ImportTarget { Cancel, NewLog, CurrentLog }
 
         // Asks whether an imported ADIF becomes its own NEW log or is added to the log open now.
-        private ImportTarget AskImportTarget()
+        //
+        // WITH NO LOG OPEN THE DIALOG STILL APPEARS, with the question it can still answer. There is
+        // nothing to add the file to, so where the QSOs go is not in doubt - but "Import Duplicates"
+        // is, and it decides whether a contact the file holds twice is stored once or twice. Skipping
+        // the dialog altogether hid that from the one operator most likely to be affected by it: the
+        // one importing a lifetime's logbook from another program on the day he installs this one.
+        private ImportTarget AskImportTarget(bool newLogIsTheOnlyAnswer = false)
         {
             ImportTarget result = ImportTarget.Cancel;
             var dialog = new Window
@@ -373,7 +497,8 @@ namespace HolyLogger
             var root = new StackPanel { Margin = new Thickness(18, 14, 18, 16) };
             root.Children.Add(new TextBlock
             {
-                Text = "Where should the imported QSOs go?",
+                Text = newLogIsTheOnlyAnswer ? "Import this file into a new log"
+                                             : "Where should the imported QSOs go?",
                 FontSize = 16, FontWeight = FontWeights.Bold, Margin = new Thickness(0, 0, 0, 14)
             });
 
@@ -387,16 +512,74 @@ namespace HolyLogger
                 tb.Inlines.Add(new System.Windows.Documents.Run(" — " + desc));
                 root.Children.Add(tb);
             }
-            AddOption("New log", "create a new log just for this file (recommended for a logbook from another program) — your existing logs are untouched.", new Thickness(0, 0, 0, 12));
-            AddOption("Current log", "add the file's QSOs to the log open now" + (string.IsNullOrWhiteSpace(curName) ? "" : " (" + curName + ")") + ".", new Thickness(0, 0, 0, 30));
+            if (newLogIsTheOnlyAnswer)
+            {
+                root.Children.Add(new TextBlock
+                {
+                    Text = "No log is open, so the file becomes a log of its own. You will be asked "
+                         + "what to call it next.",
+                    TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                    Margin = new Thickness(0, 0, 0, 18)
+                });
+            }
+            else
+            {
+                AddOption("New log", "create a new log just for this file (recommended for a logbook from another program) — your existing logs are untouched.", new Thickness(0, 0, 0, 12));
+                AddOption("Current log", "add the file's QSOs to the log open now" + (string.IsNullOrWhiteSpace(curName) ? "" : " (" + curName + ")") + ".", new Thickness(0, 0, 0, 18));
+            }
+
+            // THE ONE IMPORT SETTING THAT DECIDES HOW MANY QSOs SURVIVE, ASKED WHERE THE IMPORT IS.
+            //
+            // It lived in Options → Import Settings and nowhere else, so an operator who had never gone
+            // looking through the options did not know it existed - and it silently drops records: with
+            // it off, a file holding a contact twice puts one in the log and the second is gone. A
+            // setting that throws away data has to be visible at the moment it is about to do it.
+            //
+            // It is the SAME setting, not a copy of it: the box opens showing what Options holds, and
+            // whatever it is left at is saved back there, exactly as though it had been changed in the
+            // options window. Two places to look at one switch, never two switches.
+            var dupBox = new CheckBox
+            {
+                Content = "Import Duplicates",
+                IsChecked = Properties.Settings.Default.IsParseDuplicates,
+                FontSize = 16,
+                Margin = new Thickness(0, 0, 0, 4)
+            };
+            root.Children.Add(dupBox);
+            root.Children.Add(new TextBlock
+            {
+                Text = "Off, a contact the file holds more than once is stored only once. Two records are "
+                     + "the same contact when the callsign, the date, the band, the mode and the minute "
+                     + "are all the same — the same rule the Log Fixer uses. This is the same setting as "
+                     + "Options → Import Settings, and what you leave it at is kept.",
+                TextWrapping = TextWrapping.Wrap, FontSize = 16, MaxWidth = 440,
+                Opacity = 0.75, Margin = new Thickness(24, 0, 0, 30)
+            });
 
             var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
             Button MakeButton(string text) => new Button { Content = text, MinWidth = 100, Margin = new Thickness(6, 0, 6, 0), Padding = new Thickness(12, 5, 12, 5), FontSize = 16 };
-            var newBtn = MakeButton("New log");
+            var newBtn = MakeButton(newLogIsTheOnlyAnswer ? "Import" : "New log");
             var curBtn = MakeButton("Current log");
+            if (newLogIsTheOnlyAnswer) curBtn.Visibility = Visibility.Collapsed;
             var cancelBtn = MakeButton("Cancel"); cancelBtn.IsCancel = true;
-            newBtn.Click += (s, e) => { result = ImportTarget.NewLog; dialog.Close(); };
-            curBtn.Click += (s, e) => { result = ImportTarget.CurrentLog; dialog.Close(); };
+            // Saved when the import goes ahead, not when it is cancelled: a cancelled dialog is the
+            // operator saying "not this", and it should leave his options as he found them.
+            void KeepDuplicatesChoice()
+            {
+                try
+                {
+                    bool wanted = dupBox.IsChecked == true;
+                    if (Properties.Settings.Default.IsParseDuplicates != wanted)
+                    {
+                        Properties.Settings.Default.IsParseDuplicates = wanted;
+                        Properties.Settings.Default.Save();
+                    }
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
+
+            newBtn.Click += (s, e) => { KeepDuplicatesChoice(); result = ImportTarget.NewLog; dialog.Close(); };
+            curBtn.Click += (s, e) => { KeepDuplicatesChoice(); result = ImportTarget.CurrentLog; dialog.Close(); };
             cancelBtn.Click += (s, e) => { result = ImportTarget.Cancel; dialog.Close(); };
             buttonRow.Children.Add(newBtn);
             buttonRow.Children.Add(curBtn);
@@ -462,7 +645,7 @@ namespace HolyLogger
             }
 
             root.Children.Add(MakeOption("Merge", "add the file's QSOs to your existing log.", new Thickness(0, 0, 0, 12)));
-            root.Children.Add(MakeOption("Replace", "first save a backup of your current log to a file you choose, then clear the log and import the file.", new Thickness(0, 0, 0, 34)));
+            root.Children.Add(MakeOption("Replace", "first save a backup of your current log to a file you choose, then import the file. The QSOs your log holds now are removed only once the file is safely in — if anything goes wrong, or you stop it, your log is left as it is.", new Thickness(0, 0, 0, 34)));
 
             var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Center };
             Button MakeButton(string text)
@@ -491,8 +674,13 @@ namespace HolyLogger
             if (AdifHandlerWorker == null || AdifHandlerWorker.IsBusy)
                 return;
 
+            _importStopping = false;
+            _importRunning = true;
             UploadProgress = "Starting import 0%";
             ToggleUploadProgress(Visibility.Visible);
+            // AN IMPORT CAN BE STOPPED NOW. A 77 MB logbook is minutes of work and there was no way out
+            // of it once it started - the only exit was killing the program mid-write.
+            ShowStopButton(true);
             AdifHandlerWorker.RunWorkerAsync();
         }
         
@@ -501,9 +689,12 @@ namespace HolyLogger
             // Whatever got past the per-file catch - the reload at the end of the import runs outside it,
             // and that is the very phase where a big log is most likely to run out of room. It gets the
             // same report rather than the one-line "Import failed." it used to get.
+            _importRunning = false;   // nothing posted before this moment may show the spinner again
+
             if (e.Error != null)
             {
                 ToggleUploadProgress(Visibility.Hidden);
+                ShowStopButton(false);
                 Log.Warn($"Import failed while {_importPhase}" + Environment.NewLine
                        + MemoryReport() + Environment.NewLine + e.Error);
                 ShowImportFailure(ImportFailureText(e.Error, null, 0, null, -1));
@@ -531,6 +722,8 @@ namespace HolyLogger
                 RefreshClusterVisibleSpots();
 
             ToggleUploadProgress(Visibility.Hidden);
+            ShowStopButton(false);
+            _importStopping = false;
             UpdateNumOfQSOs();
             UpdateLotwMenuCount();
             UpdateQrzMenuCount();
@@ -540,7 +733,36 @@ namespace HolyLogger
             // and try again." - so an operator who imported 28,000 QSOs and lost 3 was told nothing
             // about the 28,000, and nothing about WHICH 3 either. Both halves are always said now, and
             // the ones that did not make it are named in a file on the Desktop.
-            if (result.ImportedQsoCount > 0 || result.CompletedQsoCount > 0 || result.RejectedCount > 0)
+            // A REPLACE THAT DID NOT REPLACE. Two ways to get here, and they are not the same thing, so
+            // they do not share a sentence: the file brought nothing worth swapping the log for, or the
+            // swap itself failed and the log now holds BOTH sets. The first is the safety net doing its
+            // job; the second is a mess the operator has to be told about at once.
+            if (!result.Stopped && result.ReplaceLeftAlone)
+            {
+                if (result.ImportedQsoCount > 0)
+                    HolyMessageBox.ShowError(
+                        "The replace could not be finished.\n\n"
+                        + $"The {result.ImportedQsoCount:N0} QSO(s) from the file went in, but the QSOs "
+                        + "your log already held could NOT be removed - so the log now holds BOTH.\n\n"
+                        + "Use Tools \u2192 Log Workshop to sort it out, or delete this log and import "
+                        + "your backup ADIF and then the new file.",
+                        "Replace not finished", this, 620);
+                else
+                    HolyMessageBox.ShowWarning(
+                        "Nothing in the file could be stored, so your log was NOT replaced.\n\n"
+                        + "It still holds every QSO it had. The report says what was wrong with the file.",
+                        "Log not replaced", this, 620);
+            }
+
+            if (result.Stopped)
+            {
+                ShowStoppedImport(result);
+            }
+            else if (result.ReplaceLeftAlone)
+            {
+                // Already spoken about, just above.
+            }
+            else if (result.ImportedQsoCount > 0 || result.CompletedQsoCount > 0 || result.RejectedCount > 0)
             {
                 // The count of THIS log, asked of the database directly. It used to be taken from the
                 // refreshed collection, which was every QSO in every log (the old GetAllQSOs had no
@@ -650,10 +872,100 @@ namespace HolyLogger
                 RefreshCopyIndicator();
             }
 
+            // The log's contents were swapped wholesale, so the "recent QSOs" count means nothing any
+            // more - it was reset by the old clearing step, and the reset belongs with the swap.
+            if (result.ReplacedQsoCount > 0)
+            {
+                Properties.Settings.Default.RecentQSOCounter = 0;
+                try { Properties.Settings.Default.Save(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                UpdateEqslQueueIndicator();
+            }
+
             TB_Comment.Text = "";
             UpdateNumOfQSOs();
 
             OpenFixerAfterImport(result);
+        }
+
+        // WHAT AN OPERATOR SEES WHEN HE STOPS AN IMPORT HIMSELF.
+        //
+        // Not the ordinary completion message with smaller numbers in it: the numbers count a PART of
+        // the file, and the two questions he has are what is in the log now and how to get rid of it.
+        // Both are answered here - the second with a button rather than instructions, because the log
+        // this import created is a log HE has no use for and would otherwise have to go and find in
+        // Tools -> Logs and delete by hand.
+        private void ShowStoppedImport(AdifImportResult result)
+        {
+            // A NEW LOG DOES NOT SURVIVE A STOPPED IMPORT. It was created for one purpose - to hold this
+            // file - and the file did not go in, so what is left is a fragment cut off wherever the
+            // operator's finger happened to land. The log did not exist before the import, so taking it
+            // away IS putting things back.
+            //
+            // MERGE AND REPLACE ARE NOT UNDONE HERE: their rollback runs on the worker, before the log
+            // is reloaded, so that the grid and the report both show the log as it ends up.
+            bool hadANewLog = result.NewLogId > 0;
+            bool newLogDeleted = false;
+            string newLogName = result.NewLogName;
+
+            if (hadANewLog)
+            {
+                try
+                {
+                    long id = result.NewLogId;
+                    // Closed BEFORE the row goes, so the active log id never names a log that is not
+                    // there - the same order the Log Manager uses, and for the same reason.
+                    if (id == dal.ActiveLogId) CloseActiveLog();
+                    dal.DeleteLog(id);
+                    RefreshCopyIndicator();
+
+                    // The identity confirmed for that log has nowhere to go now.
+                    _pendingImportCallsign = null;
+                    _pendingImportOperator = null;
+
+                    UpdateNumOfQSOs();
+                    newLogDeleted = true;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn("Could not delete the log a stopped import created: " + ex);
+                }
+            }
+
+            // NOTHING IS SAID WHEN IT WENT AS PROMISED.
+            //
+            // The operator was told, in the dialog he had to answer Yes in, that everything would be
+            // undone and the log put back as it was. It was. A message afterwards saying the same thing
+            // again is one more box to close after the box he closed to get here, and it tells him
+            // nothing he was not told a moment ago. The report is written either way and is in
+            // File -> Open Reports Folder for anyone who wants the numbers.
+            //
+            // A FAILURE IS ALWAYS SAID. This is the only case where what he was promised did not happen,
+            // and silence would leave him believing his log is clean when it is not.
+            bool somethingIsWrong = result.UndoFailed || (hadANewLog && !newLogDeleted);
+            if (!somethingIsWrong) return;
+
+            string msg = "Import stopped.\n\n";
+            if (result.UndoFailed)
+            {
+                msg += "WARNING: the import could NOT be undone, so part of the file is still in your log.\n\n"
+                     + $"QSOs stored before you stopped:  {result.ImportedQsoCount:N0}\n\n"
+                     + "The report lists what went in. Check your log before you import this file again.";
+            }
+            else
+            {
+                msg += "WARNING: the log this import created"
+                     + (string.IsNullOrWhiteSpace(newLogName) ? "" : " (\"" + newLogName + "\")")
+                     + " could NOT be removed. It is still there and holds part of the file.\n\n"
+                     + "Delete it yourself in Tools \u2192 Logs.";
+            }
+
+            var links = FileLinks(result);
+            if (links.Count > 0)
+                HolyMessageBox.ShowWithLinks(msg, "Import stopped", HolyMsgType.Warning, this,
+                                             links, OpenPath, 620, ReportsFooter);
+            else
+                HolyMessageBox.ShowWarning(msg, "Import stopped", this, 620);
         }
 
         // THE CHECK RUNS ITSELF WHEN AN IMPORT BRINGS QSOs IN.
@@ -672,6 +984,10 @@ namespace HolyLogger
             try
             {
                 if (result == null) return;
+                // NOT AFTER A STOPPED IMPORT. What is in the log is a piece of a file, chosen by where
+                // the operator happened to press Stop; checking it for country and locator problems
+                // invites him to correct half a logbook he may be about to import properly.
+                if (result.Stopped) return;
                 if (result.ImportedQsoCount <= 0 && result.CompletedQsoCount <= 0) return;
                 if (Qsos == null || Qsos.Count == 0) return;
 
@@ -845,8 +1161,43 @@ namespace HolyLogger
 
         private void AdifHandlerWorker_ProgressChanged(object sender, ProgressChangedEventArgs e)
         {
+            // A PROGRESS REPORT THAT ARRIVES AFTER THE END IS THROWN AWAY.
+            //
+            // ReportProgress does not deliver the message, it POSTS it: the worker can finish, the
+            // completion handler can hide the spinner, and a report posted a moment before the end then
+            // arrives and shows it again - with nothing left to hide it, so it turned for ever. That is
+            // what was seen after a stop: the import really had stopped, and the spinner was left
+            // spinning over a program that had finished.
+            if (!_importRunning) return;
+
             ToggleUploadProgress(Visibility.Visible);
+
+            // ONCE HE HAS SAID STOP, THE PERCENTAGES ARE NOT SHOWN ANY MORE. The worker reports its
+            // progress for a few seconds yet - it has a batch to finish, a log to put back and a grid to
+            // reload - and those numbers climbing after Stop read as "it ignored me". What it is
+            // actually doing is said instead, and it is the last thing this label says.
+            if (_importStopping)
+            {
+                UploadProgress = "Stopping — putting your log back…";
+                return;
+            }
+
             UploadProgress = e.UserState as string ?? (e.ProgressPercentage.ToString() + "%");
+        }
+
+        // ASKED BEFORE THE IMPORT PUTS A QUESTION ON THE SCREEN, and before it starts the next file.
+        //
+        // Returns true when the operator has stopped it and the worker should give up now. If he is in
+        // the middle of ANSWERING the stop question, this waits for him: whatever the import was about
+        // to ask would land on top of that question, and a man deciding whether to stop should not be
+        // asked to approve the thing he is stopping.
+        //
+        // Called on the worker thread only.
+        private bool StopWasAskedFor()
+        {
+            while (_stopConfirmOpen)
+                System.Threading.Thread.Sleep(100);
+            return AdifHandlerWorker.CancellationPending;
         }
 
         private void AdifHandlerWorker_DoWork(object sender, DoWorkEventArgs e)
@@ -870,11 +1221,19 @@ namespace HolyLogger
             // though it always held the value - so it is written down as it happens.
             var mergeFilled = new List<DataAccess.MergeNote>();
             var mergeAmbiguous = new List<DataAccess.MergeNote>();
+            // Records the "Import Duplicates" option threw away before the log was ever consulted -
+            // empty unless that option is off. Gathered so the report can account for them.
+            var droppedDuplicates = new List<QSO>();
 
             // No list of country disagreements and no list of contacts that count towards no country:
             // both were this code judging a QSO, and the Log Fixer is the one authority on that. It opens
             // by itself when the import finishes. What is gathered here is only what the import alone
             // knows - what could not be stored, and what had to be worked out.
+            // THE OPERATOR PRESSED STOP. Two facts, not one: that it was stopped, and whether it was
+            // stopped early enough that the log was never touched.
+            bool stopped = false;
+            bool stoppedWhileReading = false;
+
             int recordsRead = 0;                                       // what the file(s) held, all told
             const int importBatchSize = 500;
             int lastReportedPercent = 0;
@@ -889,6 +1248,9 @@ namespace HolyLogger
             // it already holds is half the explanation when an import runs out of room.
             string logName = null;
             int qsosAlreadyInLog = -1;
+            // WHERE THE LOG STOOD BEFORE THIS IMPORT TOUCHED IT, so that pressing Stop can put it back.
+            // Taken before the first record is read, and only good for the log open now.
+            DataAccess.ImportUndo undo = null;
             try
             {
                 lock (_syncLock)
@@ -896,11 +1258,20 @@ namespace HolyLogger
                     logName = dal.GetLogName(dal.ActiveLogId);
                     qsosAlreadyInLog = dal.GetQsoCountForLog(dal.ActiveLogId);
                 }
+                undo = new DataAccess.ImportUndo
+                {
+                    LogId = dal.ActiveLogId,
+                    HighWaterQsoId = dal.MaxQsoId(dal.ActiveLogId)
+                };
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             foreach (var filename in files)
             {
+                // Several files can be dropped at once. Stop means stop: the ones not started are not
+                // started, and a stop being decided on right now is waited for rather than raced.
+                if (StopWasAskedFor()) { stopped = true; break; }
+
                 long fileBytes = 0;
                 try
                 {
@@ -934,6 +1305,12 @@ namespace HolyLogger
                         HolyLogParser.IsIsraeliStation(myCallsign) ? HolyLogParser.Operator.Israeli : HolyLogParser.Operator.Foreign,
                         isParseDuplicates, isParseWARC);
 
+                    // Stop while READING costs the log nothing: not one record has been written yet.
+                    // Waits while the "Stop the import?" question is on screen, so the file stops being
+                    // read the moment the operator presses Stop rather than carrying on behind the
+                    // question he is answering. If he says No it goes straight back to reading.
+                    parser.StopRequested = StopWasAskedFor;
+
                     // Whose log this is, for records that name no station callsign at all. The identity
                     // just confirmed for a brand-new log comes first (it is not written to the log until
                     // the import finishes), then the log's stored identity, then the station callsign
@@ -953,6 +1330,18 @@ namespace HolyLogger
                             AdifHandlerWorker.ReportProgress(percent, $"Parsing ADIF {parseProgress}%");
                         }
                     });
+                    // STOPPED WHILE READING: the file is abandoned whole. Keeping the part that had
+                    // been read would put a piece of a logbook in the log - chosen by how fast the
+                    // disk was, which is no way to decide what an operator's log contains. Nothing was
+                    // written, so there is nothing to undo either.
+                    if (parser.Stopped)
+                    {
+                        stopped = true;
+                        stoppedWhileReading = true;
+                        recordsRead += parser.RecordsRead;
+                        break;
+                    }
+
                     List<QSO> rawQSOList = parser.GetRawQSO();
 
                     // Everything the file held that could not become a QSO, kept with its own text so
@@ -965,6 +1354,7 @@ namespace HolyLogger
                             Call = r.Call, Date = r.Date, Time = r.Time, Band = r.Band, Mode = r.Mode,
                         });
                     filledIn.AddRange(parser.GetFilled());
+                    droppedDuplicates.AddRange(parser.GetDroppedDuplicates());
                     recordsRead += parser.RecordsRead;
 
                     RawAdif = null;   // large file string no longer needed; free it before the save phase
@@ -980,42 +1370,15 @@ namespace HolyLogger
                         string why = turnedAway > 0
                             ? $"All {turnedAway:N0} of its records were turned away - the report on your Desktop says which and why."
                             : "The file may be in an unsupported format or empty.";
+                        if (StopWasAskedFor()) { stopped = true; break; }
                         this.Dispatcher.Invoke(() =>
                             HolyMessageBox.ShowWarning($"No QSOs were taken from:\n{filename}\n\n{why}", "Import Warning", this));
                         continue;
                     }
 
-                    // If the file's station callsign(s) differ from the current station callsign, warn
-                    // the user with a clear prompt centered on the program window and let them approve
-                    // or cancel importing this file.
-                    if (!string.IsNullOrWhiteSpace(myCallsign))
-                    {
-                        List<string> fileCalls = rawQSOList
-                            .Select(q => (q.MyCall ?? string.Empty).Trim())
-                            .Where(s => s.Length > 0)
-                            .Distinct(StringComparer.OrdinalIgnoreCase)
-                            .ToList();
-
-                        bool differentCall = fileCalls.Any(c => !CallsignIdentity.Same(c, myCallsign));
-                        if (differentCall)
-                        {
-                            string fileName = System.IO.Path.GetFileName(filename);
-                            string callsInFile = fileCalls.Count > 0 ? string.Join(", ", fileCalls) : "(none)";
-                            bool approved = this.Dispatcher.Invoke(() =>
-                                HolyMessageBox.ShowConfirm(
-                                    "The ADIF file \"" + fileName + "\" contains QSOs logged under a different callsign than your current station callsign.\n\n" +
-                                    "Callsign(s) in the file:  " + callsInFile + "\n" +
-                                    "Your current station callsign:  " + myCallsign.Trim() + "\n\n" +
-                                    "Do you want to import these QSOs into your log anyway?",
-                                    "Different callsign in ADIF file", HolyMsgType.Warning, this));
-
-                            if (!approved)
-                            {
-                                // User declined importing this file's QSOs.
-                                continue;
-                            }
-                        }
-                    }
+                    // NO CALLSIGN QUESTION HERE ANY MORE. It was asked at this point - after the whole
+                    // file had been read - and is now asked before the reading starts, where a No costs
+                    // nothing. See ApproveDifferentStationCallsign.
 
                     foreach (var rq in rawQSOList)
                     {
@@ -1035,14 +1398,21 @@ namespace HolyLogger
                     // them to import it again used to double their log. It also means someone who has been
                     // logging here since their first import keeps those newer QSOs: they are not in the
                     // file, so nothing here touches them.
-                    _importPhase = $"checking which of the file's {count:N0} QSOs this log already has";
-                    AdifHandlerWorker.ReportProgress(lastReportedPercent, "Checking for QSOs already in this log");
+                    // NOT WHEN REPLACING. Replace means the file becomes the log; the QSOs still sitting
+                    // in it are the ones about to be thrown away, and matching against them would fill
+                    // in QSOs that are on their way out and drop records that belong in the new log.
+                    // They are only still there because the deleting now happens at the end.
                     int completedThisFile = 0, ambiguousThisFile = 0;
-                    lock (_syncLock)
+                    if (_importChoice != ImportChoice.Replace)
                     {
-                        rawQSOList = dal.CompleteExistingQsos(rawQSOList, dal.ActiveLogId,
-                                                              out completedThisFile, out ambiguousThisFile,
-                                                              null, mergeFilled, mergeAmbiguous);
+                        _importPhase = $"checking which of the file's {count:N0} QSOs this log already has";
+                        AdifHandlerWorker.ReportProgress(lastReportedPercent, "Checking for QSOs already in this log");
+                        lock (_syncLock)
+                        {
+                            rawQSOList = dal.CompleteExistingQsos(rawQSOList, dal.ActiveLogId,
+                                                                  out completedThisFile, out ambiguousThisFile,
+                                                                  null, mergeFilled, mergeAmbiguous, undo);
+                        }
                     }
                     completedQso += completedThisFile;
                     ambiguousQso += ambiguousThisFile;
@@ -1050,6 +1420,12 @@ namespace HolyLogger
 
                     for (int i = 0; i < count; i += importBatchSize)
                     {
+                        // BETWEEN BATCHES, never inside one. A batch is one transaction; stopping in
+                        // the middle of it would leave the question of what a half-written batch is,
+                        // and 500 QSOs is a fraction of a second. What went in before the press stays
+                        // in - it is stored, and the report says how much of the file made it.
+                        if (StopWasAskedFor()) { stopped = true; break; }
+
                         _importPhase = $"saving to the log (QSO {i + 1:N0} of {count:N0})";
                         List<QSO> batch = rawQSOList.Skip(i).Take(importBatchSize).ToList();
                         int batchFaulty;
@@ -1100,6 +1476,85 @@ namespace HolyLogger
                     string errorMsg = ImportFailureText(ex, filename, fileBytes, logName, qsosAlreadyInLog);
                     this.Dispatcher.Invoke(() => ShowImportFailure(errorMsg));
                 }
+
+                // Several files can be queued by dropping them on the grid. Stop means stop - the ones
+                // not yet started are not started.
+                if (stopped) break;
+            }
+
+            // ONE LAST LOOK BEFORE ANY OF IT IS MADE PERMANENT.
+            //
+            // The checks inside the loop are per record read and per batch saved, so a Stop pressed in
+            // the last of those - or during the merge check, which runs as one uninterruptible
+            // statement - was found by nothing and the import finished as though the button had never
+            // been touched. It was: 28,426 QSOs went in and the operator was shown "Import completed
+            // successfully" for an import he had stopped. Asked once more here, where the answer still
+            // means something, because everything below undoes, replaces or reports.
+            if (!stopped && StopWasAskedFor()) stopped = true;
+
+            // ── PUTTING THE LOG BACK, when the operator said stop and meant it ──────────────────────
+            //
+            // A new log is not undone here: it is DELETED afterwards, whole, which undoes it better than
+            // any row-by-row work could. This is for an import that went into a log that already held
+            // QSOs, where the rows it added and the empty fields it filled are the only difference
+            // between the log now and the log an hour ago.
+            //
+            // Before the reload and before the report, so both of them describe the log as it ends up
+            // rather than as it was mid-import.
+            int undoneQsos = 0, undoneFields = 0;
+            bool undoFailed = false;
+            if (stopped && _importChoice != ImportChoice.NewLog && undo != null)
+            {
+                _importPhase = "putting the log back as it was";
+                AdifHandlerWorker.ReportProgress(lastReportedPercent, "Undoing the import…");
+                try
+                {
+                    lock (_syncLock) { undoneQsos = dal.UndoImport(undo, out undoneFields); }
+                }
+                catch (Exception ex)
+                {
+                    // SAID OUT LOUD, never swallowed. An operator told "your log is untouched" about a
+                    // log that is not would find out months later, if ever.
+                    undoFailed = true;
+                    Log.Warn("Could not undo a stopped import: " + ex);
+                }
+            }
+
+            // ── THE SECOND HALF OF A REPLACE ────────────────────────────────────────────────────────
+            //
+            // The file is in. Only now do the QSOs the log started with go, in one statement, and only
+            // if the file actually brought something: a replace that stored NOTHING would otherwise
+            // empty a log and put nothing in its place, which is the exact disaster this reordering
+            // exists to prevent. Nothing was read that could be read? Then the log is left as it is and
+            // the operator still has it.
+            //
+            // Not after a stop, either - the rollback above has already taken the new QSOs out again,
+            // and the old ones must stay where they are.
+            int replacedQsos = 0;
+            bool replaceLeftAlone = false;
+            if (!stopped && _importChoice == ImportChoice.Replace && undo != null)
+            {
+                if (importedQsoCount > 0)
+                {
+                    _importPhase = "removing the QSOs the log held before";
+                    AdifHandlerWorker.ReportProgress(lastReportedPercent, "Replacing the log…");
+                    try
+                    {
+                        lock (_syncLock) { replacedQsos = dal.FinishReplace(undo.LogId, undo.HighWaterQsoId); }
+                    }
+                    catch (Exception ex)
+                    {
+                        // The log now holds BOTH sets. Said out loud - it is not a state to leave a
+                        // man in without telling him.
+                        replaceLeftAlone = true;
+                        Log.Warn("Could not finish a replace (the old QSOs are still in the log): " + ex);
+                    }
+                }
+                else
+                {
+                    replaceLeftAlone = true;
+                    Log.Warn("Replace stored no QSOs, so the log was left exactly as it was.");
+                }
             }
 
             if (lastReportedPercent < savePhaseEndPercent)
@@ -1107,6 +1562,12 @@ namespace HolyLogger
                 lastReportedPercent = savePhaseEndPercent;
                 AdifHandlerWorker.ReportProgress(lastReportedPercent, $"Saving to log {savePhaseEndPercent}%");
             }
+
+            // THE BUTTON GOES WHEN THE ANSWER WOULD BE NO. From here on the import is drawing the log on
+            // the screen; there is nothing left to stop, and a Stop button that cannot stop anything is
+            // a lie. It was pressed here once and the import carried on to its success message, which
+            // is exactly what a button standing there for seconds after its last checkpoint invites.
+            this.Dispatcher.Invoke(() => ShowStopButton(false));
 
             _importPhase = "reloading the log to show it on screen";
             ObservableCollection<QSO> refreshedQsos;
@@ -1131,18 +1592,28 @@ namespace HolyLogger
             AdifHandlerWorker.ReportProgress(100, "Import complete 100%");
 
             string reportPath = null, rejectsAdifPath = null;
-            // ONLY WHEN THE IMPORT ITSELF HAS SOMETHING TO SAY. An import that stored everything as it
-            // stood, worked nothing out and changed no existing QSO writes no file - there is nothing to
-            // record. Whether the QSOs are any GOOD is a different question and a different report,
-            // written by the Log Fixer.
+            // EVERY IMPORT THAT READ A RECORD LEAVES A REPORT. It used to be written only when there was
+            // a PROBLEM to describe, which meant the imports that went perfectly - the great majority -
+            // left no trace of themselves at all: two runs of 28,513 QSOs each produced no file, and the
+            // operator had nothing to check afterwards except his own memory. What went in, what was
+            // already there and what the log now holds is worth recording whether or not anything went
+            // wrong; a report that appears only in trouble is one that teaches its absence means nothing.
             //
-            // completedQso is in this test and was missing from it for one build - so a MERGE, which does
-            // nothing but complete QSOs already stored, quietly filled fields in the operator's log and
-            // wrote no report at all. That is the single case where a report matters most.
-            if (rejects.Count > 0 || filledIn.Count > 0 || completedQso > 0 || ambiguousQso > 0)
-                WriteImportReport(rejects, filledIn, mergeFilled, mergeAmbiguous,
+            // The only import with nothing to say is one that read no records at all - a cancelled file
+            // dialog, or a file with nothing in it.
+            if (recordsRead > 0 || rejects.Count > 0 || stopped)
+            {
+                int totalInLog = 0;
+                try { totalInLog = dal.GetQsoCountForLog(dal.ActiveLogId); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                WriteImportReport(rejects, filledIn, mergeFilled, mergeAmbiguous, droppedDuplicates,
                                   importedQsoCount, completedQso, ambiguousQso,
+                                  recordsRead, totalInLog, files, logName,
+                                  stopped, stoppedWhileReading, undoneQsos, undoneFields, undoFailed,
+                                  qsosAlreadyInLog, replacedQsos,
                                   out reportPath, out rejectsAdifPath);
+            }
 
             e.Result = new AdifImportResult
             {
@@ -1156,6 +1627,15 @@ namespace HolyLogger
                 RecordsRead = recordsRead,
                 ReportPath = reportPath,
                 RejectsAdifPath = rejectsAdifPath,
+                Stopped = stopped,
+                StoppedBeforeAnythingWasStored = stoppedWhileReading,
+                UndoneQsoCount = undoneQsos,
+                UndoneFieldCount = undoneFields,
+                UndoFailed = undoFailed,
+                ReplacedQsoCount = replacedQsos,
+                ReplaceLeftAlone = replaceLeftAlone,
+                NewLogId = _importChoice == ImportChoice.NewLog && dal != null ? dal.ActiveLogId : 0,
+                NewLogName = _importChoice == ImportChoice.NewLog ? logName : null,
             };
             this.Dispatcher.Invoke(() => ImportFileQ.Clear());
         }
@@ -1270,10 +1750,87 @@ namespace HolyLogger
         // corrections stay complete and are what the operator acts on; only the naming stops.
         private const int MaxReportRows = 10000;
 
+        // One cell of a report table: padded to its column, cut with an ellipsis when it will not fit.
+        // Cutting matters more than showing every letter - one long value would otherwise push every
+        // column after it out of line for that row alone, and a table that stops lining up is not one.
+        // The Log Fixer's report has its own copy: these two files are read side by side and are meant
+        // to look alike, but neither should have to reach into the other for a helper this small.
+        private static string Pad(string text, int width)
+        {
+            string s = string.IsNullOrWhiteSpace(text) ? string.Empty : text.Trim();
+            if (s.Length >= width) return s.Substring(0, Math.Max(1, width - 2)) + "… ";
+            return s.PadRight(width);
+        }
+
+        // The rule that separates one section of a report from the next. The Log Fixer's report draws
+        // the same line at the same width - the two files land in the same folder and are read one
+        // after the other, and a reader should not have to notice which one they are holding.
+        private const string ImportReportRule =
+            "────────────────────────────────────────────────────────────────────";
+
+        // A line of the summary: what it is, how many, and what to do about it.
+        private static string SummaryRow(string label, int count, string tail)
+        {
+            return "  " + label.PadRight(27) + count.ToString("N0").PadLeft(9)
+                 + (string.IsNullOrEmpty(tail) ? string.Empty : "   " + tail);
+        }
+
+        // "12.4 MB" / "873 KB" - the size the operator sees in Explorer, for the file the report names.
+        private static string FileSizeText(string path)
+        {
+            try
+            {
+                long b = new System.IO.FileInfo(path).Length;
+                if (b >= 1024L * 1024L) return (b / (1024.0 * 1024.0)).ToString("N1") + " MB";
+                if (b >= 1024L) return (b / 1024.0).ToString("N0") + " KB";
+                return b.ToString("N0") + " bytes";
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // What the operator answered when the import asked where the file should go, in his own words
+        // rather than the enum's.
+        private static string ChoiceSentence(ImportChoice choice)
+        {
+            switch (choice)
+            {
+                case ImportChoice.NewLog:  return "a NEW LOG of its own for this file";
+                case ImportChoice.Replace: return "REPLACE the log that was open with this file";
+                default:                   return "ADD this file to the log that was open";
+            }
+        }
+
+        // The identity the log carries - the station callsign and operator its QSOs were made under.
+        // For a brand-new log this is the one just confirmed in the import dialog, which is not written
+        // to the database until the import finishes, so it is read from there first.
+        private string ImportLogIdentity()
+        {
+            try
+            {
+                if (!string.IsNullOrWhiteSpace(_pendingImportCallsign))
+                    return (_pendingImportCallsign ?? string.Empty).Trim()
+                         + (string.IsNullOrWhiteSpace(_pendingImportOperator)
+                            ? string.Empty : "  /  " + _pendingImportOperator.Trim());
+
+                string call, op;
+                lock (_syncLock) { dal.GetLogIdentity(dal.ActiveLogId, out call, out op); }
+                if (string.IsNullOrWhiteSpace(call) && string.IsNullOrWhiteSpace(op)) return null;
+                return (call ?? string.Empty).Trim()
+                     + (string.IsNullOrWhiteSpace(op) ? string.Empty : "  /  " + op.Trim());
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
         private void WriteImportReport(List<ImportReject> rejects, List<HolyLogParser.FilledField> filled,
                                        List<DataAccess.MergeNote> mergeFilled,
                                        List<DataAccess.MergeNote> mergeAmbiguous,
+                                       List<QSO> droppedDuplicates,
                                        int imported, int completed, int ambiguous,
+                                       int recordsRead, int totalInLog,
+                                       List<string> files, string logName,
+                                       bool stopped, bool stoppedWhileReading,
+                                       int undoneQsos, int undoneFields, bool undoFailed,
+                                       int heldBefore, int replacedQsos,
                                        out string reportPath, out string rejectsAdifPath)
         {
             reportPath = null;
@@ -1285,20 +1842,207 @@ namespace HolyLogger
                 string txt = System.IO.Path.Combine(folder, $"holylogger_import_report_{stamp}.txt");
                 string adi = System.IO.Path.Combine(folder, $"holylogger_rejected_qsos_{stamp}.adi");
 
+                ImportChoice choice = _importChoice;
+                bool newLog = choice == ImportChoice.NewLog;
+                int dropped = droppedDuplicates == null ? 0 : droppedDuplicates.Count;
+
                 var sb = new StringBuilder();
                 sb.AppendLine("HolyLogger — import report");
                 sb.AppendLine(DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm"));
                 sb.AppendLine();
-                sb.AppendLine($"Added to the log         : {imported:N0}");
-                if (completed > 0) sb.AppendLine($"Already here, filled in  : {completed:N0}");
-                if (ambiguous > 0) sb.AppendLine($"Already here, too alike  : {ambiguous:N0}");
-                sb.AppendLine($"NOT stored               : {rejects.Count:N0}");
+
+                // WHAT WAS ASKED FOR, AND OF WHAT.
+                //
+                // The report used to open on its numbers, and named neither the file it read nor the log
+                // it wrote to nor which of the three things the operator had asked for. Read a week later
+                // - or read by anyone but the person who ran it - "Added to the log: 0" cannot be judged
+                // without them: it is a disaster under "replace the log", and it is exactly what
+                // re-importing a file you already have is supposed to say.
+                // STOPPED SAYS SO FIRST. Every number under it counts a PART of the file, and a report
+                // that leads with "Added to the new log: 4,000" out of a file of 28,000 reads as a
+                // failed import unless the first thing it says is that the operator stopped it.
+                if (stopped)
+                {
+                    sb.AppendLine("YOU STOPPED THIS IMPORT.");
+                    if (undoFailed)
+                    {
+                        sb.AppendLine("The import could NOT be undone. Part of the file is in your log.");
+                        sb.AppendLine("What went in is listed below.");
+                    }
+                    else if (undoneQsos > 0 || undoneFields > 0)
+                    {
+                        sb.AppendLine("Everything it had done was put back. " + undoneQsos.ToString("N0")
+                                      + " QSO(s) were taken out again and " + undoneFields.ToString("N0")
+                                      + " QSO(s) had the fields this import filled emptied again.");
+                        sb.AppendLine("Your log is exactly as it was before you started.");
+                        sb.AppendLine("The numbers below are what the import HAD done before you stopped it.");
+                        sb.AppendLine("None of it is in your log now.");
+                    }
+                    else if (stoppedWhileReading)
+                    {
+                        sb.AppendLine("It stopped while the file was still being read, so nothing was ever");
+                        sb.AppendLine("stored. Your log is exactly as it was.");
+                    }
+                    else
+                    {
+                        sb.AppendLine("Nothing had been stored yet, so your log is exactly as it was.");
+                    }
+                    sb.AppendLine();
+                }
+
+                sb.AppendLine("What you asked for : " + ChoiceSentence(choice));
+                if (files != null)
+                {
+                    bool first = true;
+                    foreach (var f in files)
+                    {
+                        sb.AppendLine((first ? "File               : " : "                     ")
+                                      + System.IO.Path.GetFileName(f));
+                        string size = FileSizeText(f);
+                        sb.AppendLine("                     " + f
+                                      + (string.IsNullOrEmpty(size) ? string.Empty : "   (" + size + ")"));
+                        first = false;
+                    }
+                }
+                if (!string.IsNullOrWhiteSpace(logName))
+                    sb.AppendLine((newLog ? "New log            : " : "Log                : ") + logName);
+                string identity = ImportLogIdentity();
+                if (!string.IsNullOrWhiteSpace(identity))
+                    sb.AppendLine("Made under         : " + identity);
                 sb.AppendLine();
+
+                if (newLog)
+                {
+                    // EVERY RECORD THE FILE HELD, ACCOUNTED FOR.
+                    //
+                    // The numbers ADD UP, and that is the whole point of the block: read = added +
+                    // repeated + turned away. Before, records could go missing between "read from the
+                    // file" and "added to the log" with nothing to say where - the "Import Duplicates"
+                    // option throws repeats away in silence, so a file of 100 could put 95 in the log
+                    // and the report would print both figures without a word about the other five.
+                    //
+                    // The reconciliation is checked rather than trusted: if the numbers do not add up
+                    // the report says so, instead of quietly presenting an arithmetic that is wrong.
+                    sb.AppendLine(ImportReportRule);
+                    sb.AppendLine(stopped ? "WHAT BECAME OF EVERY RECORD READ BEFORE YOU STOPPED"
+                                          : "WHAT BECAME OF EVERY RECORD IN THE FILE");
+                    sb.AppendLine(ImportReportRule);
+                    sb.AppendLine();
+                    sb.AppendLine(SummaryRow(stopped ? "Records read before Stop" : "Records read from the file",
+                                             recordsRead, null));
+                    sb.AppendLine("  " + new string('-', 36));
+                    sb.AppendLine(SummaryRow("Added to the new log", imported, null));
+                    if (dropped > 0)
+                        sb.AppendLine(SummaryRow("Repeated inside the file", dropped, "not stored — listed below"));
+                    if (completed > 0)
+                        sb.AppendLine(SummaryRow("Already added by this import", completed, "nothing was added twice"));
+                    sb.AppendLine(SummaryRow("Could not be stored", rejects.Count,
+                                             rejects.Count > 0 ? "listed below, and handed back as an ADIF"
+                                                               : "nothing was turned away"));
+                    // A STOPPED RUN IS ALLOWED NOT TO ADD UP. Records read and then abandoned are the
+                    // difference, and they are the operator's own doing - saying "please report this"
+                    // about them would be crying wolf on the one line that has to keep its meaning.
+                    int unaccounted = recordsRead - imported - dropped - completed - rejects.Count;
+                    if (unaccounted != 0)
+                        sb.AppendLine(SummaryRow(stopped ? "Read, then abandoned" : "Not accounted for", unaccounted,
+                                                 stopped ? "you stopped the import before these were saved"
+                                                         : "please report this - the figures above should add up"));
+                    sb.AppendLine();
+
+                    // A STOPPED NEW-LOG IMPORT KEEPS NOTHING, so "Now in this log" would name a log
+                    // that is about to be deleted - the log was made for this file and goes with it.
+                    // The report is written a moment before that happens, so it says what is about to
+                    // be true rather than a count nobody will ever be able to check.
+                    if (stopped)
+                    {
+                        sb.AppendLine("  Nothing was kept. The log created for this import is removed when you");
+                        sb.AppendLine("  stop it, so your logs are as they were before you started. Import the");
+                        sb.AppendLine("  file again when you want it - it starts from the beginning.");
+                    }
+                    else
+                    {
+                        sb.AppendLine(SummaryRow("Now in this log", totalInLog, null));
+                    }
+                    sb.AppendLine();
+                }
+                else
+                {
+                    // ── MERGE AND REPLACE, ACCOUNTED FOR THE SAME WAY ────────────────────────────────
+                    //
+                    // The same spine as the new-log summary: every record the file held, said once,
+                    // ending in a total that can be checked against the log itself. What differs is
+                    // where a record can END UP - a log that already holds QSOs can recognise one, and
+                    // then the record adds nothing and is not lost either.
+                    //
+                    // The old block printed six unrelated lines that did not add up to anything and
+                    // never named the log's size before the import, so "Added: 1,204" could not be
+                    // placed against anything. Both ends are printed now: what the log held, and what
+                    // it holds.
+                    bool replacing = choice == ImportChoice.Replace;
+
+                    sb.AppendLine(ImportReportRule);
+                    sb.AppendLine(stopped ? "WHAT BECAME OF EVERY RECORD READ BEFORE YOU STOPPED"
+                                          : "WHAT BECAME OF EVERY RECORD IN THE FILE");
+                    sb.AppendLine(ImportReportRule);
+                    sb.AppendLine();
+                    sb.AppendLine(SummaryRow(stopped ? "Records read before Stop" : "Records read from the file",
+                                             recordsRead, null));
+                    sb.AppendLine("  " + new string('-', 36));
+                    sb.AppendLine(SummaryRow("Added to the log", imported, null));
+
+                    // Replace does not match against the log: the QSOs in it are the ones being thrown
+                    // away, so these two lines are always zero there and are not printed at all.
+                    if (!replacing)
+                    {
+                        int changed = mergeFilled == null ? 0 : mergeFilled.Count;
+                        sb.AppendLine(SummaryRow("Already in your log", completed,
+                                                 completed > 0 ? "nothing added twice" : null));
+                        if (completed > 0)
+                            sb.AppendLine(SummaryRow("   of those, filled in", changed,
+                                                     changed > 0 ? "empty fields filled from the file — listed below"
+                                                                 : "nothing was written; they were complete already"));
+                        if (ambiguous > 0)
+                            sb.AppendLine(SummaryRow("Matched two QSOs at once", ambiguous,
+                                                     "left alone — listed below"));
+                    }
+
+                    if (dropped > 0)
+                        sb.AppendLine(SummaryRow("Repeated inside the file", dropped, "not stored — listed below"));
+
+                    sb.AppendLine(SummaryRow("Could not be stored", rejects.Count,
+                                             rejects.Count > 0 ? "listed below, and handed back as an ADIF"
+                                                               : "nothing was turned away"));
+
+                    int unaccounted = recordsRead - imported - dropped - completed - ambiguous - rejects.Count;
+                    if (unaccounted != 0)
+                        sb.AppendLine(SummaryRow(stopped ? "Read, then abandoned" : "Not accounted for", unaccounted,
+                                                 stopped ? "you stopped the import before these were saved"
+                                                         : "please report this - the figures above should add up"));
+                    sb.AppendLine();
+
+                    // BOTH ENDS OF THE LOG. One number is a fact; two are a change, which is what an
+                    // import is.
+                    if (heldBefore >= 0)
+                        sb.AppendLine(SummaryRow("This log held before", heldBefore, null));
+                    if (replacing && replacedQsos > 0)
+                        sb.AppendLine(SummaryRow("Removed by the replace", replacedQsos,
+                                                 "the QSOs it held before — your backup ADIF has them"));
+                    if (stopped)
+                    {
+                        sb.AppendLine();
+                        if (undoFailed)
+                            sb.AppendLine("  The import could NOT be undone, so some of the above is still in your log.");
+                        else
+                            sb.AppendLine("  Nothing above is in your log. It was all put back.");
+                    }
+                    sb.AppendLine(SummaryRow("This log holds now", totalInLog, null));
+                    sb.AppendLine();
+                }
 
                 if (rejects.Count > 0)
                 {
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
-                    sb.AppendLine("QSOs THAT DID NOT MAKE IT");
+                    sb.AppendLine($"COULD NOT BE STORED ({rejects.Count:N0})");
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
                     sb.AppendLine();
                     sb.AppendLine("Each of these is in your file and is NOT in your log. A QSO cannot be");
@@ -1310,15 +2054,69 @@ namespace HolyLogger
                     sb.AppendLine("Correct them there and import that file — anything already in your log");
                     sb.AppendLine("is recognised, so nothing will be duplicated.");
                     sb.AppendLine();
-                    sb.AppendLine("  " + "CALL".PadRight(12) + " " + "DATE".PadRight(10) + " " + "TIME".PadRight(6)
-                                  + " " + "BAND".PadRight(6) + " " + "MODE".PadRight(6) + "  WHY IT WAS NOT STORED");
-                    sb.AppendLine();
+                    sb.AppendLine("  " + Pad("Date", 12) + Pad("Time", 7) + Pad("Callsign", 14)
+                                  + Pad("Band", 7) + Pad("Mode", 7) + Pad("Why it was not stored", 34)
+                                  + "Where in the file");
+                    sb.AppendLine("  " + Pad(new string('-', 10), 12) + Pad(new string('-', 5), 7)
+                                  + Pad(new string('-', 12), 14) + Pad(new string('-', 5), 7)
+                                  + Pad(new string('-', 5), 7) + Pad(new string('-', 32), 34)
+                                  + new string('-', 30));
 
                     foreach (var r in rejects)
                     {
-                        string where = r.Number > 0 ? $"record {r.Number:N0}" : "record";
-                        sb.AppendLine($"  {r.Describe()}  {r.Reason}");
-                        sb.AppendLine($"        in {r.FileName}, {where}");
+                        string where = r.Number > 0
+                            ? $"{r.FileName}, record {r.Number:N0}"
+                            : r.FileName;
+                        sb.AppendLine(("  " + Pad(FormatAdifDate(r.Date), 12) + Pad(r.Time, 7)
+                                       + Pad(string.IsNullOrWhiteSpace(r.Call) ? "—" : r.Call, 14)
+                                       + Pad(r.Band, 7) + Pad(r.Mode, 7)
+                                       + Pad(r.Reason, 34) + where).TrimEnd());
+                    }
+                    sb.AppendLine();
+                }
+
+                // WHAT THE "Import Duplicates" OPTION THREW AWAY.
+                //
+                // These never reached the log and never reached the rejects file either: with that option
+                // off the parser drops them where it stands, so until now they were the difference between
+                // two numbers in a report that never mentioned them. Named here, with the rule that
+                // decided it spelled out - the rule is coarser than the one the log itself uses for a
+                // duplicate, and an operator who is losing contacts to it deserves to see which.
+                if (dropped > 0)
+                {
+                    sb.AppendLine(ImportReportRule);
+                    sb.AppendLine($"REPEATED INSIDE THE FILE ({dropped:N0})");
+                    sb.AppendLine(ImportReportRule);
+                    sb.AppendLine();
+                    sb.AppendLine("The file itself holds each of these contacts more than once, and Options →");
+                    sb.AppendLine("Import → \"Import Duplicates\" is switched off, so only the first of each was");
+                    sb.AppendLine("kept. Two records are the same contact when the callsign, the date, the");
+                    sb.AppendLine("band, the mode and the MINUTE are all the same — the same rule the Log Fixer");
+                    sb.AppendLine("and Tools → Remove Duplicates use. Two contacts with the same station at");
+                    sb.AppendLine("different times of day are two contacts, and both were kept.");
+                    sb.AppendLine();
+                    sb.AppendLine("If you want them all, switch \"Import Duplicates\" on and import the file");
+                    sb.AppendLine("again — whatever is already in the log is recognised, so nothing else will");
+                    sb.AppendLine("be duplicated.");
+                    sb.AppendLine();
+                    sb.AppendLine("  " + Pad("Date", 12) + Pad("Time", 7) + Pad("Callsign", 14)
+                                  + Pad("Band", 7) + Pad("Mode", 7) + "Station");
+                    sb.AppendLine("  " + Pad(new string('-', 10), 12) + Pad(new string('-', 5), 7)
+                                  + Pad(new string('-', 12), 14) + Pad(new string('-', 5), 7)
+                                  + Pad(new string('-', 5), 7) + new string('-', 12));
+
+                    int shownDupes = 0;
+                    foreach (var q in droppedDuplicates)
+                    {
+                        if (shownDupes >= MaxReportRows)
+                        {
+                            sb.AppendLine($"  … and {dropped - shownDupes:N0} more, not listed one by one.");
+                            break;
+                        }
+                        shownDupes++;
+                        sb.AppendLine(("  " + Pad(FormatAdifDate(q.Date), 12) + Pad(q.Time, 7)
+                                       + Pad(string.IsNullOrWhiteSpace(q.DXCall) ? "—" : q.DXCall, 14)
+                                       + Pad(q.Band, 7) + Pad(q.Mode, 7) + (q.MyCall ?? string.Empty)).TrimEnd());
                     }
                     sb.AppendLine();
                 }
@@ -1332,9 +2130,16 @@ namespace HolyLogger
                     sb.AppendLine("These records were missing a field that the rest of the record already");
                     sb.AppendLine("answered, so it was worked out instead of turning the QSO away.");
                     sb.AppendLine();
+                    // No Date or Time columns: the parser keeps neither for a filled field, and a column
+                    // of nothing but dashes is worse than no column.
+                    sb.AppendLine("  " + Pad("Callsign", 14) + Pad("Field", 20) + Pad("Value", 20)
+                                  + "Taken from");
+                    sb.AppendLine("  " + Pad(new string('-', 12), 14) + Pad(new string('-', 18), 20)
+                                  + Pad(new string('-', 18), 20) + new string('-', 30));
+
                     foreach (var f in filled)
-                        sb.AppendLine($"  {(string.IsNullOrWhiteSpace(f.Call) ? "—" : f.Call).PadRight(12)} "
-                                      + $"{f.Field} = {f.Value}   (from {f.From})");
+                        sb.AppendLine(("  " + Pad(string.IsNullOrWhiteSpace(f.Call) ? "—" : f.Call, 14)
+                                       + Pad(f.Field, 20) + Pad(f.Value, 20) + f.From).TrimEnd());
                     sb.AppendLine();
                 }
 
@@ -1345,36 +2150,61 @@ namespace HolyLogger
                 // look exactly as though they always held the values. Named field by field, with what
                 // went in, because that is the only chance anyone has to spot a bad file writing over
                 // good QSOs - and the only record of it that will ever exist.
-                if (mergeFilled != null && mergeFilled.Count > 0)
+                if (completed > 0)
                 {
+                    int changed = mergeFilled == null ? 0 : mergeFilled.Count;
+
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
-                    sb.AppendLine($"COMPLETED FROM THE FILE ({completed:N0})");
+                    sb.AppendLine($"ALREADY IN YOUR LOG ({completed:N0})");
                     sb.AppendLine("────────────────────────────────────────────────────────────────────");
                     sb.AppendLine();
-                    sb.AppendLine("These QSOs were already in your log. The file held something in a field");
-                    sb.AppendLine("that was EMPTY here, so it was filled in. Nothing that already had a");
-                    sb.AppendLine("value was touched, and no QSO was added for these.");
+                    sb.AppendLine("These records matched a QSO your log already held, so none of them added");
+                    sb.AppendLine("a contact. Where the file held something in a field that was EMPTY here,");
+                    sb.AppendLine("it was filled in; nothing that already had a value was touched.");
+                    sb.AppendLine();
+                    sb.AppendLine($"  Matched and changed  : {changed:N0}");
+                    sb.AppendLine($"  Matched, nothing new : {completed - changed:N0}");
                     sb.AppendLine();
 
-                    int shown = 0;
-                    foreach (var m in mergeFilled)
+                    // A MERGE THAT CHANGED NOTHING STILL SAYS SO. Re-importing a file the log already
+                    // holds is the commonest thing an operator does with an import, and "it added nothing
+                    // and changed nothing" is the answer he is looking for - printed, not left to be
+                    // inferred from a report that has no section about it.
+                    if (changed == 0)
                     {
-                        if (shown >= MaxReportRows)
-                        {
-                            sb.AppendLine($"  … and {mergeFilled.Count - shown:N0} more, not listed one by one.");
-                            break;
-                        }
-                        shown++;
-                        sb.AppendLine($"  {(string.IsNullOrWhiteSpace(m.Call) ? "—" : m.Call).PadRight(12)} "
-                                      + $"{FormatAdifDate(m.Date).PadRight(11)}{m.Time.PadRight(7)}"
-                                      + $"{m.Band.PadRight(7)}{m.Mode}");
-                        foreach (var f in m.Fields)
-                            sb.AppendLine($"        {f.Key} = {f.Value}");
+                        sb.AppendLine("  Nothing was written. Every record was already complete here.");
+                        sb.AppendLine();
                     }
+                    else
+                    {
+                        // ONE LINE PER FIELD, with the contact repeated on each. A QSO that gained three
+                        // fields is three lines - which is longer, and is the shape that sorts, greps and
+                        // pastes into a spreadsheet. The alternative, a contact line with its fields
+                        // indented underneath, cannot do any of those.
+                        sb.AppendLine("  " + Pad("Date", 12) + Pad("Time", 7) + Pad("Callsign", 14)
+                                      + Pad("Band", 7) + Pad("Mode", 7) + Pad("Field", 16) + "Written");
+                        sb.AppendLine("  " + Pad(new string('-', 10), 12) + Pad(new string('-', 5), 7)
+                                      + Pad(new string('-', 12), 14) + Pad(new string('-', 5), 7)
+                                      + Pad(new string('-', 5), 7) + Pad(new string('-', 14), 16)
+                                      + new string('-', 30));
 
-                    if (mergeFilled.Count < completed)
-                        sb.AppendLine($"  ({completed - mergeFilled.Count:N0} more were matched and needed nothing filling in.)");
-                    sb.AppendLine();
+                        int shown = 0;
+                        foreach (var m in mergeFilled)
+                        {
+                            if (shown >= MaxReportRows)
+                            {
+                                sb.AppendLine($"  … and {mergeFilled.Count - shown:N0} more, not listed one by one.");
+                                break;
+                            }
+                            shown++;
+                            foreach (var f in m.Fields)
+                                sb.AppendLine(("  " + Pad(FormatAdifDate(m.Date), 12) + Pad(m.Time, 7)
+                                               + Pad(string.IsNullOrWhiteSpace(m.Call) ? "—" : m.Call, 14)
+                                               + Pad(m.Band, 7) + Pad(m.Mode, 7)
+                                               + Pad(f.Key, 16) + f.Value).TrimEnd());
+                        }
+                        sb.AppendLine();
+                    }
                 }
 
                 // MATCHED TWO CONTACTS AT ONCE, so nothing was done. The log holds this QSO more than
@@ -1393,6 +2223,12 @@ namespace HolyLogger
                     sb.AppendLine("\"Duplicate contact\" if you want to deal with them.");
                     sb.AppendLine();
 
+                    sb.AppendLine("  " + Pad("Date", 12) + Pad("Time", 7) + Pad("Callsign", 14)
+                                  + Pad("Band", 7) + "Mode");
+                    sb.AppendLine("  " + Pad(new string('-', 10), 12) + Pad(new string('-', 5), 7)
+                                  + Pad(new string('-', 12), 14) + Pad(new string('-', 5), 7)
+                                  + new string('-', 5));
+
                     int shown = 0;
                     foreach (var m in mergeAmbiguous)
                     {
@@ -1402,9 +2238,9 @@ namespace HolyLogger
                             break;
                         }
                         shown++;
-                        sb.AppendLine($"  {(string.IsNullOrWhiteSpace(m.Call) ? "—" : m.Call).PadRight(12)} "
-                                      + $"{FormatAdifDate(m.Date).PadRight(11)}{m.Time.PadRight(7)}"
-                                      + $"{m.Band.PadRight(7)}{m.Mode}");
+                        sb.AppendLine(("  " + Pad(FormatAdifDate(m.Date), 12) + Pad(m.Time, 7)
+                                       + Pad(string.IsNullOrWhiteSpace(m.Call) ? "—" : m.Call, 14)
+                                       + Pad(m.Band, 7) + m.Mode).TrimEnd());
                     }
                     sb.AppendLine();
                 }

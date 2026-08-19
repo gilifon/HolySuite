@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -453,6 +453,42 @@ namespace HolyParser
             if (!isValid) this.ERROR += "DXCC is empty -";
             return isValid;
         }
+        // WHAT MAKES TWO RECORDS THE SAME CONTACT, for the whole program: the callsign worked, the
+        // date, the band, the mode and the MINUTE. Null when the record is too incomplete to identify,
+        // which is safer than matching it to the wrong QSO.
+        //
+        // IT LIVES HERE so that there is one of it. The import's merge, Tools > Remove Duplicates and
+        // the Log Fixer all answer to this rule through DataAccess.MatchKey; the "Import Duplicates"
+        // option used to answer to a different one of its own (HASH - no time at all), so a file
+        // holding one station twice on one band and mode on one day lost the second contact, however
+        // many hours apart, while the Log Fixer looking at the same two called them two proper
+        // contacts. One program, one answer.
+        //
+        // NOT the frequency, the station callsign or the operator - deliberately. A file exported by
+        // another program rounds the frequency and often carries no operator at all, so demanding
+        // those would make every re-import look new and DOUBLE the log.
+        public static string MatchKey(QSO q)
+        {
+            if (q == null) return null;
+            string call = (q.DXCall ?? string.Empty).Trim();
+            string date = (q.Date ?? string.Empty).Trim();
+            string band = (q.Band ?? string.Empty).Trim();
+            string mode = (q.Mode ?? string.Empty).Trim();
+            if (call.Length == 0 || date.Length == 0) return null;
+
+            // The date sometimes arrives as "yyyyMMdd HHmmss"; only the day identifies the contact.
+            int space = date.IndexOf(' ');
+            if (space > 0) date = date.Substring(0, space);
+
+            // "HHmmss" or "HHmm" -> "HHmm". A record with no readable time keeps an empty slot, so it
+            // can still only ever match another record that has none either.
+            string time = (q.Time ?? string.Empty).Trim();
+            if (time.Length > 4) time = time.Substring(0, 4);
+
+            return call.ToUpperInvariant() + "|" + date + "|" + band.ToUpperInvariant() + "|"
+                   + mode.ToUpperInvariant() + "|" + time;
+        }
+
         private void Hash()
         {
             string mycall = !string.IsNullOrWhiteSpace(MyCall) ? MyCall : "MyCall";
@@ -487,9 +523,40 @@ namespace HolyParser
         {
             return IsGeneratedSoapboxId(soapbox) ? string.Empty : soapbox;
         }
+        // IS THIS THE VERY SAME QSO? - which is not the same question as "are these the same contact?".
+        //
+        // It used to answer with HASH: station, callsign, band, mode and DATE, no time. So two real
+        // contacts with one station on one band and mode on one day - 06:00 and 19:00 - were ONE QSO to
+        // every list that asked, and picking one row picked the other with it.
+        //
+        // Worse, it did not even answer the same way twice. GetHashCode was never written to match, so
+        // a List said "the same" (it asks Equals) while a HashSet and Distinct said "two" (they ask
+        // GetHashCode first and never reach Equals). One question, two answers, in one run.
+        //
+        // A STORED QSO IS ITS ROW. Every QSO the database holds has its own Id, and that is what makes
+        // it itself: it is how the Log Fixer can say "delete row 812, keep row 44" about two rows that
+        // are duplicates of each other - which is exactly the case where the duplicate rule cannot tell
+        // them apart, because saying they are the same contact is its whole purpose.
+        //
+        // A record not yet stored has no Id (0), and there the only honest answer is the object itself.
+        // Two parsed records that look alike are still two records; whether they are the same CONTACT is
+        // asked of QSO.MatchKey, by the code whose business that is.
         public bool Equals(QSO other)
         {
-            return (this.HASH == other.HASH);
+            if (ReferenceEquals(this, other)) return true;
+            if (other is null) return false;
+            if (id != 0 || other.id != 0) return id == other.id;
+            return false;   // neither is stored: only the same object is the same QSO
+        }
+
+        public override bool Equals(object obj) { return Equals(obj as QSO); }
+
+        // MUST agree with Equals, or the answer depends on which kind of list is asking - which is the
+        // fault this pair was written to end. A stored QSO hashes by its row; an unstored one keeps the
+        // object's own hash, so it can only ever match itself.
+        public override int GetHashCode()
+        {
+            return id != 0 ? id : System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(this);
         }
     }
 }

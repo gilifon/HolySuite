@@ -1,4 +1,4 @@
-<Window x:Class="HolyLogger.HolyMessageBox"
+﻿<Window x:Class="HolyLogger.HolyMessageBox"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="HolyLogger" Width="460" SizeToContent="Height"
@@ -46,7 +46,7 @@
         <!-- Yes / No buttons (confirm mode) -->
         <StackPanel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2"
                     x:Name="ConfirmPanel"
-                    Orientation="Horizontal" HorizontalAlignment="Right"
+                    Orientation="Horizontal" HorizontalAlignment="Center"
                     Visibility="Collapsed">
             <Button x:Name="YesBtn" Content="Yes"
                     Width="110" Height="38" FontSize="17"

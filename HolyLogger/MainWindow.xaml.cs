@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -504,6 +504,9 @@ namespace HolyLogger
 
             AdifHandlerWorker = new BackgroundWorker();
             AdifHandlerWorker.WorkerReportsProgress = true;
+            // An import can be STOPPED. It reads, parses and saves in phases that each check
+            // CancellationPending, so the Stop button on the progress spinner reaches it.
+            AdifHandlerWorker.WorkerSupportsCancellation = true;
             AdifHandlerWorker.DoWork += AdifHandlerWorker_DoWork;
             AdifHandlerWorker.ProgressChanged += AdifHandlerWorker_ProgressChanged;
             AdifHandlerWorker.RunWorkerCompleted += AdifHandlerWorker_RunWorkerCompleted;
@@ -2275,6 +2278,27 @@ namespace HolyLogger
 
         // Toggle the "Loading log…" overlay. When showing, force a render pass so it actually
         // paints before the heavy, UI-thread-blocking load begins.
+        // THE SAME OVERLAY, SAYING WHAT IT IS DOING. Several steps of an import run on the UI thread
+        // and take seconds with nothing on the screen at all - scanning a file for its callsigns,
+        // writing a backup of a 28,000-QSO log before a replace. The operator's report of it was "it
+        // looks like nothing is happening", and he was right: nothing was.
+        //
+        // Shown around work that BLOCKS this thread, so the window will not repaint afterwards - the
+        // Render pass inside ShowLogLoadingOverlay is what puts it on the screen before the work starts.
+        private void ShowBusyOverlay(string what)
+        {
+            if (LogLoadingText != null) LogLoadingText.Text = what;
+            Mouse.OverrideCursor = Cursors.Wait;
+            ShowLogLoadingOverlay(true);
+        }
+
+        private void HideBusyOverlay()
+        {
+            ShowLogLoadingOverlay(false);
+            Mouse.OverrideCursor = null;
+            if (LogLoadingText != null) LogLoadingText.Text = "Loading log\u2026";
+        }
+
         private void ShowLogLoadingOverlay(bool show)
         {
             if (LogLoadingOverlay == null) return;
@@ -5290,10 +5314,20 @@ namespace HolyLogger
             Process.Start(AppDomain.CurrentDomain.BaseDirectory);
         }
 
-        // For "Replace": let the user save a backup of the current log to a file they choose, then
-        // clear the log. Returns false (log left untouched) if the user cancels the save dialog or the
-        // backup fails — we never destroy the log without a successful backup.
-        private bool BackupAndClearLogForReplace()
+        // For "Replace": let the user save a backup of the current log to a file they choose. Returns
+        // false (import abandoned) if the user cancels the save dialog or the backup fails.
+        //
+        // IT NO LONGER CLEARS THE LOG. It used to: backup, empty the log, then start reading the file -
+        // so between those two steps the operator's log existed only in the ADIF just written, and a
+        // file that could not be read, an import that ran out of memory, or a press of Stop left him
+        // with nothing and a manual re-import to do. The old QSOs are now removed at the END, once the
+        // new ones are safely in (DataAccess.FinishReplace), and the backup stands as it always did.
+        // ASYNC BECAUSE THE MESSAGE HAS TO BE SEEN. Showing an overlay and then doing seconds of work on
+        // this same thread does not put it on the screen - WPF cannot paint while the thread that paints
+        // is busy, so the operator gets a frozen window and then, out of nowhere, the next dialog. The
+        // reading and the ADIF building happen on a worker; this thread does nothing but hold the
+        // message up, which is all it was ever asked to do.
+        private async System.Threading.Tasks.Task<bool> BackupLogForReplace()
         {
             // The active log's name is part of the proposed backup filename so it is easy to tell which
             // log the backup belongs to. Invalid filename characters are replaced with '_'.
@@ -5312,31 +5346,36 @@ namespace HolyLogger
             if (saveDialog.ShowDialog() != true)
                 return false; // user cancelled -> abort the replace
 
+            // Read here, on the thread that owns them, and handed to the worker as plain values.
+            long logId = dal.ActiveLogId;
+            string contestName = Contests.ContestService.Active?.CabrilloName;
+            string backupPath = saveDialog.FileName;
+
             try
             {
-                // Back up ONLY the active log (Replace replaces just this log, not every log).
-                // A backup that drops fields is not a backup: carried imported fields go in too - and
-                // since the log read no longer carries them, they are fetched for this backup.
-                var backupQsos = dal.GetQSOsForLog(dal.ActiveLogId);
-                dal.FillCarriedAdif(backupQsos);
-                string adif = Services.GenerateAdif(backupQsos, Contests.ContestService.Active?.CabrilloName,
-                                                    includeImportedFields: true);
-                System.IO.File.WriteAllText(saveDialog.FileName, adif);
+                ShowBusyOverlay("Saving a backup of your log\u2026");
+
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    // Back up ONLY the active log (Replace replaces just this log, not every log).
+                    // A backup that drops fields is not a backup: carried imported fields go in too -
+                    // and since the log read no longer carries them, they are fetched for this backup.
+                    var backupQsos = dal.GetQSOsForLog(logId);
+                    dal.FillCarriedAdif(backupQsos);
+                    string adif = Services.GenerateAdif(backupQsos, contestName, includeImportedFields: true);
+                    System.IO.File.WriteAllText(backupPath, adif);
+                });
             }
             catch (Exception ex)
             {
+                HideBusyOverlay();
                 HolyMessageBox.ShowError("Failed to save the backup:\n" + ex.Message + "\n\nReplace cancelled — your log was not changed.", "Backup Failed", this);
                 return false;
             }
+            finally { HideBusyOverlay(); }
 
-            // Backup succeeded -> safe to clear ONLY the active log before importing the new file.
-            Properties.Settings.Default.RecentQSOCounter = 0;
-            Qsos.Clear();
-            dal.DeleteQSOsForLog(dal.ActiveLogId);
-            ClearBtn_Click(null, null);
-            UpdateNumOfQSOs();
-            UpdateEqslQueueIndicator();
-            UpdateQrzMenuCount();
+            // Backup succeeded. The log is NOT touched here - it keeps every QSO it holds until the
+            // import has read the file and stored it.
             return true;
         }
 
@@ -5347,7 +5386,7 @@ namespace HolyLogger
         }
 
         // Show/hide the spinner's Stop button. Only the cancellable operations (Remove Duplicates,
-        // Full-Log QRZ Service) turn it on; everything else leaves it hidden.
+        // Full-Log QRZ Service, ADIF import) turn it on; everything else leaves it hidden.
         private void ShowStopButton(bool show)
         {
             if (Btn_StopProgress == null) return;
@@ -5357,13 +5396,68 @@ namespace HolyLogger
         }
 
         // Stop button inside the spinner window: cancels whichever long operation is running.
+        // True while the "Stop the import?" question is waiting for an answer. Read by the import
+        // worker, which is why it is volatile: the two threads must not disagree about it.
+        private volatile bool _stopConfirmOpen;
+
+        // True from the moment the operator answers Yes until the import has finished winding down.
+        // Keeps the progress label off the percentages, which by then mean nothing.
+        private volatile bool _importStopping;
+
+        // True only between the import worker starting and its completion handler running. Progress
+        // reports that arrive outside that window are stale and are ignored.
+        private volatile bool _importRunning;
+
         private void Btn_StopProgress_Click(object sender, RoutedEventArgs e)
         {
+            // STOPPING AN IMPORT IS ASKED ABOUT FIRST, because it is not the same as stopping the other
+            // two. Remove Duplicates and the QRZ service stop where they are and keep what they did;
+            // an import UNDOES what it did, so a slip of the hand throws away twenty minutes of reading
+            // a 77 MB file. The other two are still stopped on the first press - there is nothing to
+            // warn them about.
+            //
+            // The import carries on while this question is on screen, and that is fine: whatever it
+            // manages in those few seconds is undone with the rest.
+            bool importRunning = AdifHandlerWorker != null && AdifHandlerWorker.IsBusy;
+            if (importRunning)
+            {
+                // THE IMPORT HOLDS ITS TONGUE WHILE THIS IS ON SCREEN. It runs on its own thread and
+                // asks the operator things - "this file was made under a different callsign, import it
+                // anyway?" - by pushing a dialog onto this one. Twice now that question has appeared on
+                // top of THIS one, so a man who had just decided to stop was asked to approve the very
+                // import he was stopping. It waits for an answer here first, and if the answer is Yes
+                // it never asks at all.
+                _stopConfirmOpen = true;
+                try
+                {
+                // THE QUESTION AND NOTHING ELSE. It carried two paragraphs explaining that the import
+                // would be undone and could be run again; a man with his finger on Stop is not reading
+                // them, and the answer to both is the same either way. What actually happens is shown
+                // where it belongs - the progress label says the log is being put back, and the report
+                // holds the numbers.
+                if (!HolyMessageBox.ShowConfirm(
+                        "Stop The Import?",
+                        "Stop the import?", HolyMsgType.Warning, this))
+                    return;   // "No" - the import was never told anything, and carries on
+                }
+                finally { _stopConfirmOpen = false; }
+            }
+
             _dedupCts?.Cancel();
             _qrzCts?.Cancel();
+            // The import worker is a BackgroundWorker rather than a token: it asks CancellationPending
+            // between records while reading and between batches while saving, so the press takes effect
+            // at the next checkpoint rather than in the middle of a write.
+            try
+            {
+                if (importRunning && AdifHandlerWorker.WorkerSupportsCancellation)
+                    AdifHandlerWorker.CancelAsync();
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            if (importRunning) _importStopping = true;
             Btn_StopProgress.IsEnabled = false;
             Btn_StopProgress.Content = "Stopping…";
-            UploadProgress = "Stopping…";
+            UploadProgress = importRunning ? "Stopping — putting your log back…" : "Stopping…";
         }
         
         private void QSODataGrid_Drop(object sender, DragEventArgs e)
@@ -5373,14 +5467,26 @@ namespace HolyLogger
                 // Note that you can have more than one file.
                 string[] files = (string[])e.Data.GetData(DataFormats.FileDrop);
 
+                // Dropped on the grid: no dialog, so nothing was chosen - the files go into the log
+                // that is open, which is what Merge means. Said out loud for the report.
+                _importChoice = ImportChoice.Merge;
+
                 //collect files in Queue
                 foreach (var file in files)
                 {
+                    // THE CALLSIGN QUESTION IS ASKED HERE TOO, per file, before anything is read.
+                    // The import worker used to ask it after parsing, which covered dropped files as
+                    // well; now that it is asked up front, this path has to ask it itself or a dropped
+                    // file would go in with no warning at all.
+                    ScanAdifIdentity(file, out var droppedCalls, out _);
+                    if (!ApproveDifferentStationCallsign(file, droppedCalls)) continue;
+
                     ImportFileQ.Add(file);
                     //HandleAdifFileImport(file);
                 }
+
                 //run async handler
-                StartAdifImportWorker();
+                if (ImportFileQ.Count > 0) StartAdifImportWorker();
             }
         }
 
