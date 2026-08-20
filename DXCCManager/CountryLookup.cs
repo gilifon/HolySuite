@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Text.RegularExpressions;
@@ -89,8 +89,41 @@ namespace DXCCManager
         // touches this once at startup rather than on the first keystroke.
         public static CountryLookup Shared
         {
-            get { lock (SharedLock) { return _shared ?? (_shared = Create()); } }
+            get
+            {
+                lock (SharedLock)
+                {
+                    if (_shared != null) return _shared;
+
+                    // TIMED, AND IT SAYS WHO ASKED. This is built on FIRST USE, and building it parses
+                    // cty.dat and Club Log's 9.6 MB file - tens of megabytes of objects in a 32-bit
+                    // program. Something freezes the window for six seconds a few seconds after it
+                    // opens, and this is the best candidate: nobody knows when "first use" happens,
+                    // because it is whoever asks first.
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    _shared = Create();
+                    sw.Stop();
+
+                    try
+                    {
+                        var by = new System.Diagnostics.StackTrace(1, false);
+                        string caller = by.FrameCount > 0 ? by.GetFrame(0).GetMethod().Name : "?";
+                        string caller2 = by.FrameCount > 1 ? by.GetFrame(1).GetMethod().Name : "?";
+                        System.Diagnostics.Trace.WriteLine("STARTUP  country databases built in "
+                            + sw.ElapsedMilliseconds + " ms, first asked for by " + caller + " <- " + caller2);
+                        WhenBuilt = "built in " + sw.ElapsedMilliseconds + " ms, first asked for by "
+                                    + caller + " <- " + caller2;
+                    }
+                    catch { }
+
+                    return _shared;
+                }
+            }
         }
+
+        // What the timing above found, for whoever wants to write it to the program's log - this
+        // project has no logger of its own.
+        public static string WhenBuilt { get; private set; }
 
         // Drops the shared instance so the next caller reloads both databases - used after a refreshed
         // file has been downloaded.

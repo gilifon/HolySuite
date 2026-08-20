@@ -502,6 +502,7 @@
       <DependentUpon>MainWindow.xaml</DependentUpon>
       <SubType>Code</SubType>
     </Compile>
+    <Compile Include="CallsignIndex.cs" />
     <Compile Include="SolarDataService.cs" />
     <Compile Include="MainWindow.Activity.cs">
       <DependentUpon>MainWindow.xaml</DependentUpon>

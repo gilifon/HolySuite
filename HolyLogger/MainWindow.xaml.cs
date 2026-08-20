@@ -1197,6 +1197,61 @@ namespace HolyLogger
         {
             Log.Warn("STARTUP " + Log.SinceLaunch() + "  main window: loaded, running its startup work");
 
+            // A WATCH ON THE THREAD THAT DRAWS THE WINDOW.
+            //
+            // "The menu opens but its items do not answer for a few seconds" is a statement about ONE
+            // thread being busy, and no amount of reading the code says which work is on it. This ticks
+            // five times a second at the same priority as the operator's own clicks: when a tick comes
+            // late, the thread was busy for exactly that long, and the line says when. It watches the
+            // first half-minute and then stops - long enough to cover the start, short enough to cost
+            // nothing afterwards.
+            var lastTick = DateTime.UtcNow;
+            var startedWatching = DateTime.UtcNow;
+            bool _countryBuildLogged = false;
+
+            // (A watchdog that suspended this thread to read its stack lived here while the long
+            // freeze was being hunted. Suspending the thread that draws the window is not something to
+            // leave in a program people use, and it only ever answered "inside a Windows message".)
+            int lastGen0 = GC.CollectionCount(0), lastGen1 = GC.CollectionCount(1), lastGen2 = GC.CollectionCount(2);
+            var uiWatch = new System.Windows.Threading.DispatcherTimer(DispatcherPriority.Input)
+            {
+                Interval = TimeSpan.FromMilliseconds(200)
+            };
+            uiWatch.Tick += (ws, we) =>
+            {
+                var now = DateTime.UtcNow;
+                double late = (now - lastTick).TotalMilliseconds - 200;
+                lastTick = now;
+
+                int gen0 = GC.CollectionCount(0), gen1 = GC.CollectionCount(1), gen2 = GC.CollectionCount(2);
+
+                if (late > 300)
+                {
+                    // WAS IT THE COLLECTOR? A full (gen 2) collection stops every thread in the program
+                    // while it runs, whatever their priority, and in a 32-bit process holding a large
+                    // log it can take seconds. If the gen-2 count went up across a block this long, the
+                    // answer is yes and the cure is to allocate less - not to move work to another
+                    // thread, which is what was tried first and changed nothing.
+                    Log.Warn("STARTUP  the window could not answer for " + late.ToString("0") + " ms  ("
+                             + Log.SinceLaunch() + ")   collections since the last tick: gen0="
+                             + (gen0 - lastGen0) + " gen1=" + (gen1 - lastGen1) + " gen2=" + (gen2 - lastGen2)
+                             + ", memory now " + (GC.GetTotalMemory(false) / (1024 * 1024)) + " MB");
+                }
+
+                lastGen0 = gen0; lastGen1 = gen1; lastGen2 = gen2;
+
+                // The country databases are built on first use, in another project that has no logger.
+                // Whatever it found is carried across here, once.
+                if (!_countryBuildLogged && DXCCManager.CountryLookup.WhenBuilt != null)
+                {
+                    _countryBuildLogged = true;
+                    Log.Warn("STARTUP  country databases: " + DXCCManager.CountryLookup.WhenBuilt);
+                }
+
+                if ((now - startedWatching).TotalSeconds > 30) uiWatch.Stop();
+            };
+            uiWatch.Start();
+
             // Old QSOs have no entity number; this fills them in, once, quietly, in the background.
             StartEntityCodeBackfill();
             Log.Step("loaded: entity backfill started");
@@ -11255,12 +11310,12 @@ namespace HolyLogger
             string call = bareCallsign.Trim().ToUpperInvariant();
 
             // If the callsign is already known from the big index, it is not "new".
-            int idx = callsignIndex.BinarySearch(call, StringComparer.Ordinal);
-            if (idx >= 0)
+            if (callsignIndex.BinarySearch(call) >= 0)
                 return;
 
-            // Add truly new callsigns to the in-memory dropdown index.
-            callsignIndex.Insert(~idx, call);
+            // Add truly new callsigns to the in-memory dropdown index. They are kept beside the packed
+            // block rather than in it - one new callsign must not rewrite a four-megabyte array.
+            callsignIndex.Add(call);
 
             // The big index may still be on its way (it is read in the background at startup). Kept
             // here as well, so the hand-over does not throw this one away.
@@ -11318,12 +11373,26 @@ namespace HolyLogger
             wait.Start();
         }
 
+        // A THREAD OF ITS OWN, BELOW THE WINDOW'S PRIORITY.
+        //
+        // Task.Run was not enough. This machine has two cores; building a 588,000-entry set and sorting
+        // it takes one of them outright, and the garbage it makes forces collections that pause EVERY
+        // thread - including the one drawing the menus. The operator saw it plainly: the program came
+        // up, and then the menus would not answer for a few seconds. The log put the index build at
+        // 09:07:08.0 to 09:07:09.65, which is exactly when.
+        //
+        // BelowNormal means the window wins the processor whenever it wants it, and this waits. It has
+        // nothing to be in a hurry about: nobody can type a callsign into a window that is not up yet.
         private void ReadCallsignIndexNow()
         {
-            Task.Run(() =>
+            var worker = new System.Threading.Thread(() =>
             {
                 var sw = System.Diagnostics.Stopwatch.StartNew();
                 LoadCallsignIndex();
+                // STOPPED HERE, ON THIS THREAD. Read later, on the window's thread, it would include
+                // however long that thread was busy - which is how a 123 ms load came to be reported as
+                // 6,781 ms and sent me hunting the wrong thing twice.
+                sw.Stop();
                 var loaded = callsignIndex;
 
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -11331,19 +11400,20 @@ namespace HolyLogger
                     var addedMeanwhile = _callsignsAddedWhileIndexLoaded;
                     _callsignsAddedWhileIndexLoaded = null;
 
-                    if (addedMeanwhile != null && addedMeanwhile.Count > 0)
-                    {
+                    // Anything worked while the big list was still being read is folded in. Add checks
+                    // the block itself, so one the file already had is not kept twice.
+                    if (addedMeanwhile != null)
                         foreach (string call in addedMeanwhile)
-                            if (loaded.BinarySearch(call, StringComparer.Ordinal) < 0)
-                                loaded.Add(call);
-                        loaded.Sort(StringComparer.Ordinal);
-                    }
+                            loaded.Add(call);
 
                     callsignIndex = loaded;
                     Log.Warn("STARTUP  callsign index: " + loaded.Count.ToString("N0")
                              + " callsigns, read in " + sw.ElapsedMilliseconds + " ms, off the startup path");
                 }));
             });
+            worker.IsBackground = true;
+            worker.Priority = System.Threading.ThreadPriority.BelowNormal;
+            worker.Start();
         }
 
         // Filled only while the big index is still being read - null once it has landed.
@@ -11367,7 +11437,7 @@ namespace HolyLogger
                 string bigTextPath = bigTextCandidatePaths.FirstOrDefault(File.Exists);
                 if (string.IsNullOrWhiteSpace(bigTextPath))
                 {
-                    callsignIndex = new List<string>();
+                    callsignIndex = new CallsignIndex();
                     return;
                 }
 
@@ -11375,47 +11445,65 @@ namespace HolyLogger
             }
             catch
             {
-                callsignIndex = new List<string>();
+                callsignIndex = new CallsignIndex();
             }
         }
 
+        // The reading and the packing are CallsignIndex's business now - see the long note there for
+        // why 588,000 separate strings could not stay.
         private bool LoadCallsignIndexFromText(string filePath)
         {
             try
             {
-                callsignListVersion = 0;
-                var set = new HashSet<string>(StringComparer.Ordinal);
-                bool firstDataLineHandled = false;
-                foreach (var rawLine in File.ReadLines(filePath))
-                {
-                    string line = rawLine.Trim().ToUpperInvariant();
-                    if (line.Length == 0 || line.StartsWith("#") || line.StartsWith(";")) continue;
+                var index = new CallsignIndex();
+                int version;
+                bool wasSorted;
+                bool ok = index.LoadFromFile(filePath, out version, out wasSorted);
 
-                    string token = line.Split(new[] { ' ', '\t', ',' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-                    if (!firstDataLineHandled)
-                    {
-                        firstDataLineHandled = true;
-                        int parsedVersion;
-                        if (!string.IsNullOrWhiteSpace(token) && int.TryParse(token, NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedVersion))
-                        {
-                            callsignListVersion = parsedVersion;
-                            continue;
-                        }
-                    }
+                if (!wasSorted)
+                    Log.Warn("The callsign file is no longer in order - suggestions may be incomplete "
+                             + "until it is rebuilt.");
 
-                    if (string.IsNullOrWhiteSpace(token) || token.Length > 15) continue;
-
-                    set.Add(token);
-                }
-
-                callsignIndex = set.ToList();
-                callsignIndex.Sort(StringComparer.Ordinal);
-                return callsignIndex.Count > 0;
+                callsignListVersion = version;
+                callsignIndex = index;
+                return ok;
             }
             catch
             {
                 return false;
             }
+        }
+
+        // The first word of a line, upper case, without making a new string unless it has to.
+        // Returns null for a line with nothing on it.
+        private static string FirstToken(string line)
+        {
+            if (line == null) return null;
+
+            int start = 0, end = line.Length;
+            while (start < end && char.IsWhiteSpace(line[start])) start++;
+            while (end > start && char.IsWhiteSpace(line[end - 1])) end--;
+            if (start == end) return null;
+
+            for (int i = start; i < end; i++)
+            {
+                char c = line[i];
+                if (c == ' ' || c == '	' || c == ',') { end = i; break; }
+            }
+            if (start == end) return null;
+
+            // Already the whole line, already upper case: hand back the string ReadLine made, rather
+            // than a copy of it. This is every line of the callsign file, and it is where the 2.3
+            // million objects went.
+            bool whole = start == 0 && end == line.Length;
+            bool upper = true;
+            for (int i = start; i < end; i++)
+                if (char.IsLower(line[i])) { upper = false; break; }
+
+            if (whole && upper) return line;
+
+            string token = line.Substring(start, end - start);
+            return upper ? token : token.ToUpperInvariant();
         }
 
         // Background check for a newer cty.dat from country-files.com. The download (if any) is
@@ -11518,6 +11606,10 @@ namespace HolyLogger
                         int batchNumber = 0;
                         bool hasMore;
 
+                        // ONE of these for the whole run. Every page adds to it; nothing touches the
+                        // file until the last page is in.
+                        var pending = new PendingCallsignUpdate { Version = callsignListVersion };
+
                         do
                         {
                             int requestVersion = callsignListVersion;
@@ -11575,7 +11667,7 @@ namespace HolyLogger
                                 + ", removes=" + removeRequests.ToString(CultureInfo.InvariantCulture)
                                 + ", net=" + (addRequests - removeRequests).ToString(CultureInfo.InvariantCulture));
 
-                            string updateResult = ApplyCallsignListUpdate(serverReply);
+                            string updateResult = ApplyCallsignListUpdate(serverReply, pending);
                             File.AppendAllText(logPath, "Update result: " + updateResult + "\n");
                             appendTrace("Apply result: " + updateResult);
                             appendTrace("Local version after apply: " + callsignListVersion.ToString(CultureInfo.InvariantCulture));
@@ -11644,7 +11736,29 @@ namespace HolyLogger
             });
         }
 
-        private string ApplyCallsignListUpdate(string jsonResponse)
+        // WHAT A WHOLE RUN OF BATCHES ADDS UP TO.
+        //
+        // The update used to be applied batch by batch, and applying ONE batch meant: read all 588,120
+        // lines of the file, build a set of them, copy that to a list, sort it, copy it again with the
+        // version line on top, write the file TWICE, and rebuild the whole in-memory index. Five copies
+        // of 588,000 strings and two 4.3 MB writes - for a batch that might carry twenty new callsigns.
+        // Then the next batch did the same again.
+        //
+        // That is what froze the window for seven seconds a few seconds after it opened: forty-eight
+        // garbage collections, four of them full, and a full collection stops every thread there is.
+        //
+        // The batches are collected here instead - only the callsigns to add and to take away - and the
+        // file is read, merged, sorted, written and re-indexed ONCE, when they are all in.
+        private sealed class PendingCallsignUpdate
+        {
+            public readonly HashSet<string> Add = new HashSet<string>(StringComparer.Ordinal);
+            public readonly HashSet<string> Remove = new HashSet<string>(StringComparer.Ordinal);
+            public int Version;
+            public int Batches;
+            public bool Any { get { return Add.Count > 0 || Remove.Count > 0; } }
+        }
+
+        private string ApplyCallsignListUpdate(string jsonResponse, PendingCallsignUpdate pending)
         {
             try
             {
@@ -11652,86 +11766,137 @@ namespace HolyLogger
                 if (response == null || response["success"] == null || !response["success"].ToObject<bool>())
                     return "ERROR: Invalid server response or success field";
 
-                string callsignFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"Data\callsigns_merged_big.txt");
-                if (!File.Exists(callsignFilePath))
-                    return "ERROR: Callsign file not found at " + callsignFilePath;
+                var dataArray = response["data"] as Newtonsoft.Json.Linq.JArray;
+                if (dataArray == null)
+                    return "ERROR: Invalid data array in response";
 
-                // In dev runs (bin/x86/Debug or Release), also keep project Data file in sync.
-                string projectDataFilePath = Path.GetFullPath(
-                    Path.Combine(AppDomain.CurrentDomain.BaseDirectory, @"..\..\..\Data\callsigns_merged_big.txt"));
-
-                var callsignSet = new HashSet<string>(StringComparer.Ordinal);
-                var fileLines = File.ReadAllLines(callsignFilePath);
                 int newVersion = callsignListVersion;
                 bool hasLatestVersion = false;
-
                 if (response["latestVersion"] != null)
                 {
                     int parsedLatestVersion;
-                    if (int.TryParse(response["latestVersion"].ToString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsedLatestVersion))
+                    if (int.TryParse(response["latestVersion"].ToString(), NumberStyles.Integer,
+                                     CultureInfo.InvariantCulture, out parsedLatestVersion))
                     {
                         newVersion = parsedLatestVersion;
                         hasLatestVersion = true;
                     }
                 }
 
-                foreach (var line in fileLines.Skip(1))
-                {
-                    string trimmed = line.Trim().ToUpperInvariant();
-                    if (string.IsNullOrWhiteSpace(trimmed) || trimmed.StartsWith("#") || trimmed.StartsWith(";"))
-                        continue;
-                    string token = trimmed.Split(new[] { ' ', '\t', ',' }, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
-                    if (!string.IsNullOrWhiteSpace(token) && token.Length <= 15)
-                        callsignSet.Add(token);
-                }
-
-                var dataArray = response["data"] as Newtonsoft.Json.Linq.JArray;
-                if (dataArray == null)
-                    return "ERROR: Invalid data array in response";
-
                 int lastItemVersion = 0;
+                int added = 0, removed = 0;
 
                 foreach (var item in dataArray)
                 {
-                    string callsign = (item["callsign"]?.ToString() ?? "").ToUpperInvariant();
+                    string callsign = (item["callsign"] == null ? "" : item["callsign"].ToString()).ToUpperInvariant();
                     int active = item["active"] != null ? item["active"].ToObject<int>() : 0;
                     int version = item["version"] != null ? item["version"].ToObject<int>() : 0;
 
-                    if (!string.IsNullOrEmpty(callsign))
+                    if (callsign.Length > 0 && callsign.Length <= 15)
                     {
-                        if (active == 1)
-                            callsignSet.Add(callsign);
-                        else if (active == -1)
-                            callsignSet.Remove(callsign);
+                        // A callsign named again later in the run overrides what an earlier page said
+                        // about it, so it leaves the other set as it joins this one.
+                        if (active == 1) { pending.Add.Add(callsign); pending.Remove.Remove(callsign); added++; }
+                        else if (active == -1) { pending.Remove.Add(callsign); pending.Add.Remove(callsign); removed++; }
                     }
 
                     lastItemVersion = version;
                 }
 
-                if (!hasLatestVersion && lastItemVersion > 0)
-                    newVersion = lastItemVersion;
+                if (!hasLatestVersion && lastItemVersion > 0) newVersion = lastItemVersion;
 
-                var sortedCallsigns = callsignSet.ToList();
+                callsignListVersion = newVersion;
+                pending.Version = newVersion;
+                pending.Batches++;
+
+                // NOTHING IS READ OR WRITTEN HERE. The file and the index are done once, when every
+                // page is in - see CommitCallsignListUpdate.
+                return "OK: +" + added.ToString(CultureInfo.InvariantCulture)
+                       + " -" + removed.ToString(CultureInfo.InvariantCulture)
+                       + ", version " + newVersion.ToString(CultureInfo.InvariantCulture);
+            }
+            catch (Exception ex)
+            {
+                return "ERROR: " + ex.Message;
+            }
+        }
+
+        // ONCE, WHEN EVERY PAGE IS IN: read the file, merge, sort, write, re-index.
+        //
+        // And not at all when there is nothing to do. The old code did the whole job even for an empty
+        // answer - "count":0, "hasMore":false - so every start of the program rewrote 4.3 MB twice and
+        // rebuilt 588,000 callsigns to change nothing whatever. That is why the file's timestamp moved
+        // every time the program ran.
+        private string CommitCallsignListUpdate(PendingCallsignUpdate pending)
+        {
+            if (pending == null || !pending.Any) return "OK: nothing new, nothing written";
+
+            try
+            {
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+
+                string callsignFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                                                       "Data" + Path.DirectorySeparatorChar + "callsigns_merged_big.txt");
+                if (!File.Exists(callsignFilePath))
+                    return "ERROR: Callsign file not found at " + callsignFilePath;
+
+                // In dev runs (bin/x86/Debug or Release), also keep the project's own copy in step.
+                string projectDataFilePath = Path.GetFullPath(Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    ".." + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + ".." +
+                    Path.DirectorySeparatorChar + "Data" + Path.DirectorySeparatorChar + "callsigns_merged_big.txt"));
+
+                // Read line by line rather than ReadAllLines: the same result without holding an array
+                // of 588,120 strings on top of the set they go into.
+                var callsignSet = new HashSet<string>(650000, StringComparer.Ordinal);
+                bool firstLine = true;
+                using (var reader = new StreamReader(callsignFilePath))
+                {
+                    string line;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        if (firstLine) { firstLine = false; continue; }   // the version
+                        string token = FirstToken(line);
+                        if (token == null || token.Length == 0) continue;
+                        if (token[0] == '#' || token[0] == ';') continue;
+                        if (token.Length <= 15) callsignSet.Add(token);
+                    }
+                }
+
+                foreach (string call in pending.Add) callsignSet.Add(call);
+                foreach (string call in pending.Remove) callsignSet.Remove(call);
+
+                var sortedCallsigns = new List<string>(callsignSet);
                 sortedCallsigns.Sort(StringComparer.Ordinal);
 
-                var outputLines = new List<string> { newVersion.ToString(CultureInfo.InvariantCulture) };
-                outputLines.AddRange(sortedCallsigns);
+                // Written straight out, a line at a time - not built into one more list first.
+                using (var writer = new StreamWriter(callsignFilePath, false))
+                {
+                    writer.WriteLine(pending.Version.ToString(CultureInfo.InvariantCulture));
+                    for (int i = 0; i < sortedCallsigns.Count; i++) writer.WriteLine(sortedCallsigns[i]);
+                }
 
-                File.WriteAllLines(callsignFilePath, outputLines);
-
-                bool projectFileUpdated = false;
+                // Copied, not written again: the same bytes, at a fraction of the cost.
                 if (!string.Equals(callsignFilePath, projectDataFilePath, StringComparison.OrdinalIgnoreCase)
                     && File.Exists(projectDataFilePath))
                 {
-                    File.WriteAllLines(projectDataFilePath, outputLines);
-                    projectFileUpdated = true;
+                    try { File.Copy(callsignFilePath, projectDataFilePath, true); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
                 }
 
-                callsignListVersion = newVersion;
+                callsignListVersion = pending.Version;
                 LoadCallsignIndex();
+                sw.Stop();
 
-                return "SUCCESS: File updated to version " + newVersion.ToString() + " with " + sortedCallsigns.Count + " callsigns"
-                    + (projectFileUpdated ? " (project Data file synced)" : "");
+                Log.Warn("Callsign list: " + pending.Batches.ToString(CultureInfo.InvariantCulture)
+                         + " page(s) from the server, +" + pending.Add.Count.ToString(CultureInfo.InvariantCulture)
+                         + " -" + pending.Remove.Count.ToString(CultureInfo.InvariantCulture)
+                         + " -> " + sortedCallsigns.Count.ToString("N0") + " callsigns at version "
+                         + pending.Version.ToString(CultureInfo.InvariantCulture)
+                         + ". Written and re-indexed ONCE, in " + sw.ElapsedMilliseconds + " ms.");
+
+                return "OK: written once, " + sortedCallsigns.Count.ToString(CultureInfo.InvariantCulture)
+                       + " callsigns";
             }
             catch (Exception ex)
             {
@@ -11759,15 +11924,19 @@ namespace HolyLogger
                     }
                 }
 
-                callsignIndex = set.ToList();
-                callsignIndex.Sort(StringComparer.Ordinal);
-                return callsignIndex.Count > 0;
+                var packed = new CallsignIndex();
+                bool ok = packed.LoadFromStrings(set);
+                callsignIndex = packed;
+                return ok;
             }
             catch
             {
                 return false;
             }
         }
+
+        private int _suggestionTraces;
+        private int _suggestionLastMatched;
 
         private void UpdateCallsignSuggestions()
         {
@@ -11806,9 +11975,21 @@ namespace HolyLogger
             int start = 0;
             if (literalPrefix.Length > 0)
             {
-                int index = callsignIndex.BinarySearch(literalPrefix, StringComparer.Ordinal);
+                int index = callsignIndex.BinarySearch(literalPrefix);
                 if (index < 0) index = ~index;
                 start = index;
+            }
+
+            // TEMPORARY, while "no suggestions appear" is being chased. Says what the box was given,
+            // how many callsigns are in the index, and where the search landed - the three facts that
+            // together say whether the fault is the index, the search, or the list that shows them.
+            if (_suggestionTraces < 6)
+            {
+                _suggestionTraces++;
+                Log.Warn("SUGGEST  typed=\"" + pattern + "\"  index holds "
+                         + callsignIndex.Count.ToString("N0") + "  search landed at " + start
+                         + "  first there: "
+                         + (start < callsignIndex.Count ? (callsignIndex[start] ?? "(null)") : "(past the end)"));
             }
 
             for (int i = start; i < callsignIndex.Count; i++)
@@ -11840,6 +12021,7 @@ namespace HolyLogger
                 // Early exit if we have enough matches
                 if (literalPrefix.Length > 0 && matches.Count >= maxCallsignSuggestions)
                     break;
+                _suggestionLastMatched = matches.Count + slashMatches.Count;
             }
 
             // Fill remaining slots with slash matches (non-slash callsigns are shown first).

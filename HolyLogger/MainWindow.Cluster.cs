@@ -224,7 +224,9 @@ namespace HolyLogger
         QSO QsoPreUpdate;
         QSO LastQSO;
 
-        private List<string> callsignIndex = new List<string>();
+        // Not a List<string> any more: 588,000 strings froze the program for seven seconds at every
+        // start, in garbage collections. See CallsignIndex.
+        private CallsignIndex callsignIndex = new CallsignIndex();
         private bool isApplyingSuggestion = false;
         // Set when a callsign is pulled from the cluster/map (not typed) so the suggestions dropdown stays closed.
         private bool suppressNextCallsignSuggestions = false;
@@ -4143,7 +4145,20 @@ namespace HolyLogger
             return enabled.Contains(normalized);
         }
 
+        // Timed while a long freeze at startup is being hunted: whatever holds the drawing
+        // thread for eight seconds is on it, and this says whether it is this.
         private void RefreshClusterVisibleSpots()
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try { RefreshClusterVisibleSpotsCore(); }
+            finally
+            {
+                if (sw.ElapsedMilliseconds > 150)
+                    Log.Warn("STARTUP  RefreshClusterVisibleSpots held the window for " + sw.ElapsedMilliseconds + " ms");
+            }
+        }
+
+        private void RefreshClusterVisibleSpotsCore()
         {
             if (clusterVisibleSpots == null)
             {
@@ -4277,7 +4292,20 @@ namespace HolyLogger
             _mapUpdateDebounceTimer.Start();
         }
 
+        // Timed while a long freeze at startup is being hunted: whatever holds the drawing
+        // thread for eight seconds is on it, and this says whether it is this.
         private void DoUpdateClusterSpotsOnMap()
+        {
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            try { DoUpdateClusterSpotsOnMapCore(); }
+            finally
+            {
+                if (sw.ElapsedMilliseconds > 150)
+                    Log.Warn("STARTUP  DoUpdateClusterSpotsOnMap held the window for " + sw.ElapsedMilliseconds + " ms");
+            }
+        }
+
+        private void DoUpdateClusterSpotsOnMapCore()
         {
             if (MapControl == null || MapControl.Visibility != Visibility.Visible)
                 return;
