@@ -235,6 +235,11 @@
       <LogicalName>HolyLogger.clublog.key</LogicalName>
     </EmbeddedResource>
     <EmbeddedResource Include="MapAssets\d3.v5.min.js" />
+    <EmbeddedResource Include="MapAssets\leaflet.min.js" />
+    <EmbeddedResource Include="MapAssets\leaflet.min.css" />
+    <EmbeddedResource Include="MapAssets\leaflet-marker-icon.png" />
+    <EmbeddedResource Include="MapAssets\leaflet-marker-icon-2x.png" />
+    <EmbeddedResource Include="MapAssets\leaflet-marker-shadow.png" />
     <EmbeddedResource Include="MapAssets\dxcc_colored.json" />
     <Compile Include="CtyDatService.cs" />
     <Compile Include="ClublogCtyService.cs" />

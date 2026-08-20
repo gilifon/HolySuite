@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -438,7 +438,7 @@ namespace HolyLogger.ToolsUserControls
     font-size:13px; font-weight:700; font-family:sans-serif; color:#333; white-space:nowrap;
   }
 </style>
-<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
+" + MapAssetProvider.LeafletStyleTag + @"
 </head>
 <body>
 <div id='map'></div>
@@ -479,7 +479,7 @@ namespace HolyLogger.ToolsUserControls
   <div id='distance-box'>DIST --</div>
 </div>
 " + MapAssetProvider.CountryDataScriptTag + @"
-<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
+" + MapAssetProvider.LeafletScriptTag + MapAssetProvider.LeafletDefaultIconScriptTag + @"
 <script>
 window.onerror = function() { return true; };
 var homeLat = " + homeLatJs + @", homeLon = " + homeLonJs + @";
@@ -1925,7 +1925,7 @@ window.addEventListener('resize', function() {
     white-space:nowrap;
   }
 </style>
-<link rel='stylesheet' href='https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'/>
+" + MapAssetProvider.LeafletStyleTag + @"
 </head>
 <body>
 <div id='map'></div>
@@ -1967,7 +1967,7 @@ window.addEventListener('resize', function() {
   <button id='dx-center-btn' title='Center on DX' style='display:none'></button>
   <div id='distance-box'>DIST --</div>
 </div>
-<script src='https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'></script>
+" + MapAssetProvider.LeafletScriptTag + MapAssetProvider.LeafletDefaultIconScriptTag + @"
 <script>
 window.onerror = function() { return true; };
 var homeLat = " + latStr + @", homeLon = " + lonStr + @";
