@@ -1085,8 +1085,29 @@ namespace HolyLogger
             {
                 if (dal == null) return;
 
-                var fixes = dal.FindKhzFrequencyFixes();
-                if (fixes.Count == 0) return;
+                // HOW FAR THIS HAS ALREADY READ. Kept in the database itself, so it survives a restore
+                // and describes THAT file rather than this machine. Empty on the first run after the
+                // change, which means one last reading of the whole log - and never again.
+                long checkedUpTo = 0;
+                long.TryParse(dal.GetDbState(FreqRepairMarkKey), NumberStyles.Integer,
+                              CultureInfo.InvariantCulture, out checkedUpTo);
+
+                var declined = ReadDeclinedFrequencyIds();
+
+                long readUpTo;
+                var fixes = dal.FindKhzFrequencyFixes(checkedUpTo, declined, out readUpTo);
+
+                // Remembered whatever the answer turns out to be: these QSOs have now been read, and
+                // reading them again next time would cost the same seconds for the same result. The
+                // ones being offered are kept by number just below, so declining still brings them back.
+                if (readUpTo > checkedUpTo)
+                    dal.SetDbState(FreqRepairMarkKey, readUpTo.ToString(CultureInfo.InvariantCulture));
+
+                if (fixes.Count == 0)
+                {
+                    if (declined.Count > 0) dal.SetDbState(FreqRepairDeclinedIdsKey, string.Empty);
+                    return;
+                }
 
                 // "Not now" is remembered as the number of QSOs it was said about, rather than a plain
                 // yes/no. Nothing changes -> the question stays away; but import a log that brings in
@@ -1130,12 +1151,14 @@ namespace HolyLogger
                 {
                     Properties.Settings.Default.FreqRepairDeclinedCount = fixes.Count;
                     Properties.Settings.Default.Save();
+                    WriteDeclinedFrequencyIds(fixes);
                     return;
                 }
 
                 int changed = dal.ApplyFrequencyFixes(fixes);
                 Properties.Settings.Default.FreqRepairDeclinedCount = 0;
                 Properties.Settings.Default.Save();
+                dal.SetDbState(FreqRepairDeclinedIdsKey, string.Empty);
 
                 if (changed > 0)
                 {
@@ -1145,6 +1168,45 @@ namespace HolyLogger
                         "The list of changes is on your Desktop:\nholylogger_frequency_changes.txt",
                         "Frequencies corrected", this);
                 }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // What the database remembers about this one-off repair: how far it has been read, and which
+        // QSOs the operator has already been shown and left alone.
+        private const string FreqRepairMarkKey = "freq_repair_read_upto";
+        private const string FreqRepairDeclinedIdsKey = "freq_repair_declined_ids";
+
+        // The QSOs already offered and not corrected. Held by NUMBER rather than by count, so they can
+        // be fetched straight back by number - instant, however large the log - and offering them again
+        // costs nothing. Saying "not now" should not mean "never ask me again".
+        private List<long> ReadDeclinedFrequencyIds()
+        {
+            var ids = new List<long>();
+            try
+            {
+                string saved = dal.GetDbState(FreqRepairDeclinedIdsKey);
+                if (string.IsNullOrWhiteSpace(saved)) return ids;
+
+                foreach (string part in saved.Split(','))
+                {
+                    long id;
+                    if (long.TryParse(part.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out id)
+                        && id > 0)
+                        ids.Add(id);
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            return ids;
+        }
+
+        private void WriteDeclinedFrequencyIds(IList<DataAccess.FreqFix> fixes)
+        {
+            try
+            {
+                var numbers = new List<string>();
+                foreach (var f in fixes) numbers.Add(f.Id.ToString(CultureInfo.InvariantCulture));
+                dal.SetDbState(FreqRepairDeclinedIdsKey, string.Join(",", numbers.ToArray()));
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
@@ -1208,6 +1270,39 @@ namespace HolyLogger
             var lastTick = DateTime.UtcNow;
             var startedWatching = DateTime.UtcNow;
             bool _countryBuildLogged = false;
+
+            // WHICH WINDOWS MESSAGE IS HOLDING THE WINDOW?
+            //
+            // The collector is cleared - gen0=1 gen1=1 gen2=0 across the whole freeze - and a stack
+            // taken from outside showed only "inside DispatchMessage", because the work is under it in
+            // native code. So the question is which MESSAGE that is: every one the window receives is
+            // timed here, and any that takes longer than half a second says so, with its number.
+            //
+            // Cheap: two clock reads per message, and it stops after the first minute.
+            try
+            {
+                var source = System.Windows.Interop.HwndSource.FromVisual(this) as System.Windows.Interop.HwndSource;
+                if (source != null)
+                {
+                    var watchUntil = DateTime.UtcNow.AddMinutes(1);
+                    source.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
+                    {
+                        if (DateTime.UtcNow > watchUntil) return IntPtr.Zero;
+
+                        var started = System.Diagnostics.Stopwatch.StartNew();
+                        // The message is handled after this returns, so the time is taken on the NEXT
+                        // one - which is why the line names the message that came before it.
+                        if (_lastMessageWatch != null && _lastMessageWatch.ElapsedMilliseconds > 500)
+                            Log.Warn("STARTUP  window message 0x" + _lastMessageId.ToString("X")
+                                     + " took " + _lastMessageWatch.ElapsedMilliseconds + " ms");
+
+                        _lastMessageWatch = started;
+                        _lastMessageId = msg;
+                        return IntPtr.Zero;
+                    });
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             // (A watchdog that suspended this thread to read its stack lived here while the long
             // freeze was being hunted. Suspending the thread that draws the window is not something to
@@ -11366,9 +11461,18 @@ namespace HolyLogger
         // readers either see the old list or the new one, never a half-built one. Anything the operator
         // managed to add in the meantime (AddNewCallsignIfMissing) is folded in, so a callsign logged
         // in the first second is not lost when the big list lands.
+        // ONE SECOND, NOT FIVE.
+        //
+        // Five was right when reading this list cost seven seconds and froze the program: the further
+        // out of the way it was, the better. Packed, it costs 367 ms and almost no garbage - and the
+        // waiting had become the whole problem, because the operator could see his window, type a
+        // callsign, and get no suggestions for another nine seconds. He reported it as "the DX callsign
+        // box does not respond": it responded perfectly, it just had nothing to suggest.
+        //
+        // A second is enough to let the window finish painting, and no more than that.
         private void LoadCallsignIndexInBackground()
         {
-            var wait = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+            var wait = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
             wait.Tick += (s, e) => { wait.Stop(); ReadCallsignIndexNow(); };
             wait.Start();
         }
@@ -11412,7 +11516,9 @@ namespace HolyLogger
                 }));
             });
             worker.IsBackground = true;
-            worker.Priority = System.Threading.ThreadPriority.BelowNormal;
+            // Normal priority now. BelowNormal was a guess at the freeze and it never helped - the
+            // freeze was garbage, not the processor - and at below-normal on a busy two-core machine
+            // this thread was left waiting long after its 367 ms of work was ready to do.
             worker.Start();
         }
 
@@ -11934,6 +12040,9 @@ namespace HolyLogger
                 return false;
             }
         }
+
+        private System.Diagnostics.Stopwatch _lastMessageWatch;
+        private int _lastMessageId;
 
         private int _suggestionTraces;
         private int _suggestionLastMatched;

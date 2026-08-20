@@ -259,6 +259,52 @@ namespace HolyLogger
             return !string.IsNullOrEmpty(GetLogState(logId, key));
         }
 
+        // WHOLE-FILE STATE, as against the per-log kind above.
+        //
+        // A few things are true of the DATABASE rather than of any one log inside it - how far the
+        // one-off frequency repair has already read, for one. Kept in the database rather than in the
+        // application settings so that it travels with the file: restore a backup and the file's own
+        // record of what has been read comes back with it, instead of a setting still describing a
+        // database that is no longer there.
+        public string GetDbState(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return string.Empty;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return string.Empty;
+                try
+                {
+                    using (var cmd = new SQLiteCommand("SELECT value FROM db_state WHERE key = @k", con))
+                    {
+                        cmd.Parameters.AddWithValue("@k", key);
+                        object v = cmd.ExecuteScalar();
+                        return v == null || v == DBNull.Value ? string.Empty : v.ToString();
+                    }
+                }
+                catch (Exception ex) { Log.Swallow(ex); return string.Empty; }
+            }
+        }
+
+        public void SetDbState(string key, string value)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return;
+                try
+                {
+                    using (var cmd = new SQLiteCommand(
+                        "INSERT OR REPLACE INTO db_state (key, value) VALUES (@k, @v)", con))
+                    {
+                        cmd.Parameters.AddWithValue("@k", key);
+                        cmd.Parameters.AddWithValue("@v", (object)value ?? string.Empty);
+                        cmd.ExecuteNonQuery();
+                    }
+                }
+                catch (Exception ex) { Log.Swallow(ex); }
+            }
+        }
+
         // The folder holding logDB.db (and the Backups subfolder).
         public string DataFolder => Path.GetDirectoryName(dbPath);
 
@@ -2021,6 +2067,20 @@ Environment.NewLine +
                     "[key] nvarchar(60) NOT NULL COLLATE NOCASE, " +
                     "[value] TEXT NULL, " +
                     "PRIMARY KEY ([log_id], [key]))", con))
+                    cmd.ExecuteNonQuery();
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+        }
+
+        // The same idea for what belongs to the whole file rather than to one log - see GetDbState.
+        private void EnsureDbStateTable()
+        {
+            try
+            {
+                using (var cmd = new SQLiteCommand(
+                    "CREATE TABLE IF NOT EXISTS [db_state] (" +
+                    "[key] nvarchar(60) NOT NULL COLLATE NOCASE PRIMARY KEY, " +
+                    "[value] TEXT NULL)", con))
                     cmd.ExecuteNonQuery();
             }
             catch (Exception ex) { Log.Swallow(ex); }
@@ -4917,54 +4977,124 @@ Environment.NewLine +
         //   * the QSO must already carry a band, and that band must be one where kHz is unambiguous;
         //   * dividing by 1000 must land the QSO inside that same band.
         // Anything else - a band-less row, an odd value, a microwave contact - is never offered.
-        public List<FreqFix> FindKhzFrequencyFixes()
+        // READ EACH QSO ONCE IN THE LIFE OF THE LOG, NOT ONCE EVERY MORNING.
+        //
+        // "CAST(frequency AS REAL) >= 1000" is a condition no index can answer, so SQLite reads every
+        // QSO in the file - and it was doing that at every single start, on the thread that draws the
+        // window. Measured on this operator's 400 MB log: seven to eight seconds in which the window
+        // could not answer at all, caught in the act by a sampler outside the program - the thread was
+        // inside SQLite, inside ReadFile, waiting on the disk, for the whole of it. It looked like a
+        // freeze that came and went, because a start soon after the last one found the file still in
+        // Windows's memory and cost nothing.
+        //
+        // So the caller remembers the highest QSO number already read, and only QSOs newer than that
+        // are looked at: "Id > @since" IS a condition the primary key answers - SQLite says
+        // "SEARCH qso USING INTEGER PRIMARY KEY (rowid>?)" instead of "SCAN qso". New and imported
+        // QSOs are still checked; the old ones are never read again.
+        //
+        // 'alsoTheseIds' brings back the handful the operator was already asked about and said "not
+        // now" to, so declining is not the same as never being asked again. They are fetched by
+        // number, which is instant however large the log.
+        public List<FreqFix> FindKhzFrequencyFixes(long sinceId, IList<long> alsoTheseIds, out long highestIdRead)
         {
             var fixes = new List<FreqFix>();
+            highestIdRead = sinceId;
+
             try
             {
+                // How far this reading gets. Taken BEFORE the search, so a QSO logged while it runs is
+                // left for next time rather than being counted as read without having been.
+                using (var top = new SQLiteCommand("SELECT MAX(Id) FROM qso", con))
+                {
+                    object v = top.ExecuteScalar();
+                    if (v != null && v != DBNull.Value) highestIdRead = Convert.ToInt64(v);
+                }
+                if (highestIdRead < sinceId) highestIdRead = sinceId;
+
                 using (var read = new SQLiteCommand(
                     "SELECT Id, dx_callsign, date, time, band, frequency FROM qso " +
-                    "WHERE CAST(frequency AS REAL) >= 1000 ORDER BY date, time", con))
-                using (var rdr = read.ExecuteReader())
+                    "WHERE Id > @since AND CAST(frequency AS REAL) >= 1000", con))
                 {
-                    while (rdr.Read())
-                    {
-                        string band = rdr["band"]?.ToString()?.Trim();
-                        string freq = rdr["frequency"]?.ToString()?.Trim();
-                        if (string.IsNullOrWhiteSpace(band) || string.IsNullOrWhiteSpace(freq)) continue;
-                        if (!UnambiguousKhzBands.Contains(band)) continue;
-
-                        string mhz = HolyParser.HolyLogParser.NormalizeFreqToMhz(freq);
-                        if (string.IsNullOrWhiteSpace(mhz)) continue;
-
-                        // The rewritten value has to agree with the band the operator logged.
-                        if (!string.Equals(HolyParser.HolyLogParser.convertFreqToBand(mhz), band,
-                                           StringComparison.OrdinalIgnoreCase)) continue;
-
-                        // Stored with six decimals ("14.200000") to match how frequencies already look
-                        // in the log, so a repaired row is indistinguishable from an untouched one in
-                        // the grid. The trimmed form the normaliser returns is only for ADIF output.
-                        double value;
-                        if (!double.TryParse(mhz, System.Globalization.NumberStyles.Float,
-                                             System.Globalization.CultureInfo.InvariantCulture, out value))
-                            continue;
-
-                        fixes.Add(new FreqFix
-                        {
-                            Id = Convert.ToInt64(rdr["Id"]),
-                            Callsign = rdr["dx_callsign"]?.ToString() ?? string.Empty,
-                            Date = rdr["date"]?.ToString() ?? string.Empty,
-                            Time = rdr["time"]?.ToString() ?? string.Empty,
-                            Band = band,
-                            OldFreq = freq,
-                            NewFreq = value.ToString("0.000000",
-                                                     System.Globalization.CultureInfo.InvariantCulture)
-                        });
-                    }
+                    read.Parameters.AddWithValue("@since", sinceId);
+                    CollectKhzFrequencyFixes(read, fixes);
                 }
+
+                if (alsoTheseIds != null && alsoTheseIds.Count > 0)
+                {
+                    var numbers = new List<string>();
+                    foreach (long id in alsoTheseIds)
+                        if (id > 0 && id <= sinceId) numbers.Add(id.ToString(CultureInfo.InvariantCulture));
+
+                    // Built from numbers this method turned into text itself, never from anything typed.
+                    if (numbers.Count > 0)
+                        using (var again = new SQLiteCommand(
+                            "SELECT Id, dx_callsign, date, time, band, frequency FROM qso " +
+                            "WHERE Id IN (" + string.Join(",", numbers.ToArray()) + ")", con))
+                            CollectKhzFrequencyFixes(again, fixes);
+                }
+
+                // The ORDER BY was in the query and is done here instead: the list is a handful of rows,
+                // and asking SQLite to sort it meant a temporary index built over the whole search.
+                fixes.Sort((a, b) =>
+                {
+                    int byDate = string.CompareOrdinal(a.Date ?? string.Empty, b.Date ?? string.Empty);
+                    if (byDate != 0) return byDate;
+                    return string.CompareOrdinal(a.Time ?? string.Empty, b.Time ?? string.Empty);
+                });
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             return fixes;
+        }
+
+        // The timid part, shared by both searches: which of the rows that came back are really a
+        // frequency written in kHz, and what it would become.
+        private void CollectKhzFrequencyFixes(SQLiteCommand read, List<FreqFix> fixes)
+        {
+            using (var rdr = read.ExecuteReader())
+            {
+                while (rdr.Read())
+                {
+                    string band = rdr["band"]?.ToString()?.Trim();
+                    string freq = rdr["frequency"]?.ToString()?.Trim();
+                    if (string.IsNullOrWhiteSpace(band) || string.IsNullOrWhiteSpace(freq)) continue;
+                    if (!UnambiguousKhzBands.Contains(band)) continue;
+
+                    string mhz = HolyParser.HolyLogParser.NormalizeFreqToMhz(freq);
+                    if (string.IsNullOrWhiteSpace(mhz)) continue;
+
+                    // The rewritten value has to agree with the band the operator logged.
+                    if (!string.Equals(HolyParser.HolyLogParser.convertFreqToBand(mhz), band,
+                                       StringComparison.OrdinalIgnoreCase)) continue;
+
+                    // Stored with six decimals ("14.200000") to match how frequencies already look
+                    // in the log, so a repaired row is indistinguishable from an untouched one in
+                    // the grid. The trimmed form the normaliser returns is only for ADIF output.
+                    double value;
+                    if (!double.TryParse(mhz, System.Globalization.NumberStyles.Float,
+                                         System.Globalization.CultureInfo.InvariantCulture, out value))
+                        continue;
+
+                    long id = Convert.ToInt64(rdr["Id"]);
+
+                    // The two searches can overlap - a declined QSO that is also newer than the mark.
+                    bool already = false;
+                    for (int i = 0; i < fixes.Count; i++)
+                        if (fixes[i].Id == id) { already = true; break; }
+                    if (already) continue;
+
+                    fixes.Add(new FreqFix
+                    {
+                        Id = id,
+                        Callsign = rdr["dx_callsign"]?.ToString() ?? string.Empty,
+                        Date = rdr["date"]?.ToString() ?? string.Empty,
+                        Time = rdr["time"]?.ToString() ?? string.Empty,
+                        Band = band,
+                        OldFreq = freq,
+                        NewFreq = value.ToString("0.000000",
+                                                 System.Globalization.CultureInfo.InvariantCulture)
+                    });
+                }
+            }
         }
 
         // Writes the frequencies found by FindKhzFrequencyFixes. Returns how many rows were changed.
@@ -5218,6 +5348,7 @@ Environment.NewLine +
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();
             EnsureLogStateTable();
+            EnsureDbStateTable();
             // Real-time copy-to-log feature: a log may copy its new QSOs into another log.
             AddColToTable("logs", "copy_target_log_id", "INTEGER NULL");   // where this log's new QSOs are copied (NULL = off)
             AddColToTable("logs", "log_callsign", "nvarchar(50) NULL");    // this log's station-callsign identity
