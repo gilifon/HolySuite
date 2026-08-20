@@ -444,7 +444,22 @@ namespace HolyLogger
             HeartbeatTimer.Tick += HeartbeatTimer_Tick;
             CallsignLookupDebounceTimer.Interval = TimeSpan.FromMilliseconds(CallsignLookupDebounceMs);
             CallsignLookupDebounceTimer.Tick += CallsignLookupDebounceTimer_Tick;
-            VoiceMessageAvailabilityTimer.Interval = TimeSpan.FromMilliseconds(500);
+            // TWICE A SECOND, FOR EVER, ASKING THE RADIO A QUESTION IT WOULD HAVE ANSWERED BY ITSELF.
+            //
+            // This tick calls Rig.Status and Rig.RigType - COM calls into OmniRig - to decide whether to
+            // dim one row of buttons, and then writes the same values back into the same properties. It
+            // ran every 500 ms from the moment the program started until it closed, on mains and on
+            // battery, whether or not a radio was connected.
+            //
+            // Everything it watches has an event: OmniRig raises StatusChange when the radio comes and
+            // goes and ParamsChange when the mode changes, and this program already handles both. The
+            // state is worked out THERE now (see OmniRigEngine_StatusChange / _ParamsChange).
+            //
+            // The timer stays as a safety net, at five seconds instead of half of one - a tenth of the
+            // work - because the state also depends on the Mode box and on settings, and a stale dimmed
+            // row that fixes itself within five seconds is a small price for not having to prove that
+            // every one of those paths raises something.
+            VoiceMessageAvailabilityTimer.Interval = TimeSpan.FromSeconds(5);
             VoiceMessageAvailabilityTimer.Tick += VoiceMessageAvailabilityTimer_Tick;
             VoiceMessageAvailabilityTimer.Start();
             _mapUpdateDebounceTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(600) };

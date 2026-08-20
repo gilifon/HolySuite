@@ -451,6 +451,20 @@ namespace HolyLogger
         // How many daily backups to keep in the Backups folder; older ones are pruned.
         private const int DailyBackupsToKeep = 12;
 
+        // AND HOW MUCH ROOM THEY MAY TAKE, ALTOGETHER.
+        //
+        // Twelve was chosen when a log database was 10 MB. This operator's is 382 MB - half of it the
+        // ADIF text carried on each QSO - so twelve of them is four and a half gigabytes, and the rule
+        // never noticed, because it counted FILES. A backup that quietly fills a laptop is not a
+        // safeguard; it is the next problem.
+        //
+        // So both rules apply, and the tighter one wins: at most twelve, and at most this many bytes.
+        // The newest are always kept - what is given up is the oldest, which is also the least likely
+        // to be wanted. At least TWO are always kept whatever their size: a single backup is one bad
+        // copy away from none, and "your database was too big to protect" is not an answer.
+        private const long DailyBackupsMaxBytes = 2L * 1024 * 1024 * 1024;   // 2 GB
+        private const int DailyBackupsAlwaysKeep = 2;
+
         // Copies logDB.db to Backups\logDB-yyyy-MM-dd.db once per calendar day (extra app starts
         // on the same day are no-ops), then prunes to the newest DailyBackupsToKeep copies.
         // Runs BEFORE the SQLite connection opens, so the copied file is never mid-write.
@@ -491,10 +505,38 @@ namespace HolyLogger
                 PruneSafetyCopies(backupDir, SafetyCopiesToKeep);
 
                 // Prune: the date-stamped names sort chronologically, so ordering by name
-                // descending puts the newest first.
-                var old = Directory.GetFiles(backupDir, "logDB-????-??-??.db")
+                // descending puts the newest first - and then BOTH rules are applied, the count and
+                // the total size, keeping whichever leaves fewer.
+                var newestFirst = Directory.GetFiles(backupDir, "logDB-????-??-??.db")
                                    .OrderByDescending(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
-                                   .Skip(DailyBackupsToKeep);
+                                   .ToList();
+
+                int keep = 0;
+                long running = 0;
+                foreach (string f in newestFirst)
+                {
+                    long size = 0;
+                    try { size = new FileInfo(f).Length; } catch (Exception ex) { Log.Swallow(ex); }
+
+                    bool withinCount = keep < DailyBackupsToKeep;
+                    bool withinSize = running + size <= DailyBackupsMaxBytes;
+                    bool mustKeep = keep < DailyBackupsAlwaysKeep;
+
+                    if (mustKeep || (withinCount && withinSize))
+                    {
+                        keep++;
+                        running += size;
+                        continue;
+                    }
+                    break;   // everything from here down is older still, and goes
+                }
+
+                if (keep < newestFirst.Count)
+                    Log.Warn("Backups: keeping " + keep + " of " + newestFirst.Count + " daily copies ("
+                             + (running / (1024 * 1024)) + " MB); the rest are past the "
+                             + (DailyBackupsMaxBytes / (1024 * 1024)) + " MB limit.");
+
+                var old = newestFirst.Skip(keep);
                 foreach (string f in old)
                 {
                     try { File.Delete(f); } catch (Exception ex) { Log.Swallow(ex); }

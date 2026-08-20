@@ -543,12 +543,19 @@ namespace HolyLogger
             if (!rigOnline)
             {
                 ClearVoiceMessageState();
+                // THE ROW IS DIMMED HERE, on the event, rather than by a timer noticing half a second
+                // later. This is the path taken when the radio goes away - switched off, cable pulled,
+                // OmniRig stopped - and it is exactly the moment the send buttons stop being usable.
+                UpdateVoiceMessageAvailabilityState();
                 UpdateFreqLed();   // no live rig -> blank the LED instead of showing a stale value
                 return;
             }
 
             if (Properties.Settings.Default.isManualMode || state == State.Edit)
             {
+                // Still worth refreshing: the radio IS online, and that alone can change whether the
+                // buttons may be used, even when this method goes no further.
+                UpdateVoiceMessageAvailabilityState();
                 return;
             }
             try
