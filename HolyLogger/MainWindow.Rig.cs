@@ -383,14 +383,27 @@ namespace HolyLogger
                 {
 
                     OmniRigEngine = new OmniRig.OmniRigX();
-                    //OmniRigEngine = (OmniRig.OmniRigX)Activator.CreateInstance(Type.GetTypeFromProgID("OmniRig.OmniRigX"));
-                    // we want OmniRig interface V.1.1 to 1.99
-                    // as V2.0 will likely be incompatible  with 1.x
-                    if (OmniRigEngine.InterfaceVersion < 0x101 && OmniRigEngine.InterfaceVersion > 0x299)
+
+                    // WE WANT OMNIRIG'S 1.x INTERFACE - 1.01 to 1.99 - because a 2.0 would very likely
+                    // not be compatible with it.
+                    //
+                    // THE TEST USED TO BE "&&", which asks for a number that is at once below 0x101 and
+                    // above 0x299. No number is, so the check never once fired and the message behind
+                    // it was never shown, whatever was installed. It also carried on into GetRigTypes
+                    // afterwards, having just set the engine to null.
+                    int version = OmniRigEngine.InterfaceVersion;
+                    if (version < 0x101 || version > 0x299)
                     {
                         OmniRigEngine = null;
-                        MessageBox.Show("OmniRig Is Not installed Or has a wrong version number");
+                        Status = "Wrong version";
+                        ReportOmniRigProblem(
+                            "The OmniRig on this computer answers with interface version "
+                            + (version >> 8) + "." + (version & 0xFF).ToString("00")
+                            + ", and HolyLogger works with version 1.\n\n"
+                            + "Radio control (CAT) will not work until a version 1 OmniRig is installed.");
+                        return;
                     }
+
                     GetRigTypes();
                     SubscribeToEvents();
                     SelectRig();
@@ -399,12 +412,46 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
-                Log.Swallow(e);
-                //Mouse.OverrideCursor = null;
-                //MessageBox.Show(ex.Message);
-                //throw;
+                Log.Warn("OmniRig could not be started: " + e.GetType().Name + ": " + e.Message);
+                OmniRigEngine = null;
                 Status = "Not installed";
+
+                // AND THE OPERATOR IS TOLD.
+                //
+                // This used to fail in silence: the exception was swallowed, a small label read "Not
+                // installed", and the radio simply never answered - with nothing on screen to say why.
+                // His words: "if the program have problems with OmniRig, the program must tell it to
+                // the user".
+                //
+                // Only reached when CAT is switched ON in Options, so an operator with no radio
+                // interface is never shown it.
+                ReportOmniRigProblem(
+                    "HolyLogger could not start OmniRig, so radio control (CAT) will not work.\n\n"
+                    + "Reason: " + e.Message + "\n\n"
+                    + "OmniRig is a separate free program that HolyLogger uses to talk to the radio. If "
+                    + "it is not installed, install it and start HolyLogger again. If you do not use a "
+                    + "radio interface, switch CAT off in Options > General and this will not come back.");
             }
+        }
+
+        // SAID ONCE IN A RUN. StartOmniRig is called again every time the CAT setting is touched, and a
+        // message box that comes back on every visit to Options is a message box nobody reads.
+        private bool _omniRigProblemReported;
+
+        private void ReportOmniRigProblem(string message)
+        {
+            if (_omniRigProblemReported) return;
+            _omniRigProblemReported = true;
+
+            // NOT WHILE THE WINDOW IS STILL COMING UP. One caller is Window_Loaded, and a dialog there
+            // stands in front of a window that has not finished appearing - the operator sees a warning
+            // over a half-drawn program and cannot tell what it belongs to. At ApplicationIdle the log
+            // is on screen and the message can be read for what it is.
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try { HolyMessageBox.ShowWarning(message, "Radio control (OmniRig)", this); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }), DispatcherPriority.ApplicationIdle);
         }
         private void StopOmniRig()
         {
