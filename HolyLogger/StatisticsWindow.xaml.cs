@@ -1,4 +1,4 @@
-using DXCCManager;
+﻿using DXCCManager;
 using HolyParser;
 using Newtonsoft.Json;
 using System;
@@ -2221,20 +2221,10 @@ namespace HolyLogger
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
-            return;
-
-            // Self-heal a bogus total left over from earlier broken-download testing: the confirmed-QSO
-            // count can never be below the number of confirmed countries (each country has >=1 confirmed
-            // QSO). If it is, drop the incremental marker so the next Check LoTW does a one-time full
-            // re-download that recomputes the true total. The cached colors stay until then. LoTW-only:
-            // the incremental marker belongs to the LoTW download.
-            if (_source != ConfSource.Lotw) return;
-            var s = Properties.Settings.Default;
-            if (LotwConfirmedQsoCount < _confirmedCodes.Count && !string.IsNullOrWhiteSpace(LotwLastQsl))
-            {
-                LotwLastQsl = string.Empty;
-                s.Save();
-            }
+            // (A self-heal for a bogus confirmed-QSO total lived here, behind a return that made it
+            // unreachable. It was left stranded by "Confirmed countries are counted from the log, not
+            // from a saved list" (d3a35bc): the count no longer comes from a saved total, so there is
+            // no stale total to heal.)
         }
 
         // Green-highlight the worked rows whose entity is in the confirmed set, and update the count line.

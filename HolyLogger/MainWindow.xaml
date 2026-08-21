@@ -661,11 +661,6 @@
                             <Image Source="Images/onair.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <!--<MenuItem x:Name="LogInfoMenuItem" Header="Statistics" ToolTip="Show some log statistics" Click="LogInfoMenuItem_Click">
-                                <MenuItem.Icon>
-                                    <Image Source="Images/chart.png" Stretch="UniformToFill" Width="16" Height="16"/>
-                                </MenuItem.Icon>
-                            </MenuItem>-->
                 </MenuItem>
                 <MenuItem Header="Tools" FontSize="16" SubmenuOpened="ToolsMenu_SubmenuOpened">
                     <!--<MenuItem x:Name="MyStationMenuItem" Header="My Station" ToolTip="Set your station info">

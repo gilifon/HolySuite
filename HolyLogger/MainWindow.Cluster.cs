@@ -94,7 +94,6 @@ namespace HolyLogger
         Button clusterBandFilterPreSelectedBtn = null;
         Button clusterBandFilterActiveBtn = null;
         StackPanel clusterShowBandsPanel = null;
-        TextBlock clusterShowBandsLabelText = null;
         TextBlock clusterNewCountryLegendText = null;
         TextBlock clusterNewCountryCountText = null;
         TextBlock clusterUnconfirmedCountText = null;   // counter for the "Unconfirmed" legend line
@@ -137,7 +136,6 @@ namespace HolyLogger
         string clusterPreLiveScaleSortMember = "UnixTime";
         System.ComponentModel.ListSortDirection clusterPreLiveScaleSortDir = System.ComponentModel.ListSortDirection.Descending;
 
-        bool clusterTableMarginInitialized = false;
         StackPanel clusterLastMinutesFilterPanel = null;
         StackPanel clusterBandSelectorPanel = null;
         StackPanel clusterModeSelectorPanel = null;
@@ -195,7 +193,6 @@ namespace HolyLogger
         // it. Kept with the DX callsign it belongs to, so a hand-typed DX doesn't reuse a stale spotter.
         double? _selectedSpotterLat, _selectedSpotterLon;
         string _selectedSpotterDxCall;
-        LogInfoWindow loginfo = null;
         AboutWindow about = null;
         OptionsWindow options = null;
         SearchWindow searchWindow = null;
@@ -653,7 +650,7 @@ namespace HolyLogger
             // Live Scale is a remembered state: if it was on when the cluster was last used, re-engage it
             // now (after the window has laid out, so the grid/scroll measurements are real).
             if (Properties.Settings.Default.ClusterLiveScaleOn)
-                Dispatcher.BeginInvoke(new Action(() =>
+                _ = Dispatcher.BeginInvoke(new Action(() =>
                 {
                     if (!clusterLiveScaleOn) ToggleClusterLiveScale(userInitiated: false);
                 }), System.Windows.Threading.DispatcherPriority.Loaded);
@@ -2989,7 +2986,7 @@ namespace HolyLogger
 
                     if (statusText != null)
                     {
-                        statusText.Dispatcher.BeginInvoke(new Action(() =>
+                        _ = statusText.Dispatcher.BeginInvoke(new Action(() =>
                         {
                             statusText.Text = "(connected)";
                             statusText.Foreground = new SolidColorBrush(Color.FromRgb(0, 190, 0));
@@ -3023,7 +3020,7 @@ namespace HolyLogger
                 AppendClusterLog("Waiting 10 seconds before reconnecting...");
                 if (statusText != null)
                 {
-                    statusText.Dispatcher.BeginInvoke(new Action(() =>
+                    _ = statusText.Dispatcher.BeginInvoke(new Action(() =>
                     {
                         statusText.Text = "(reconnecting...)";
                         statusText.Foreground = Brushes.Orange;
@@ -3043,7 +3040,7 @@ namespace HolyLogger
 
             if (statusText != null)
             {
-                statusText.Dispatcher.BeginInvoke(new Action(() =>
+                _ = statusText.Dispatcher.BeginInvoke(new Action(() =>
                 {
                     statusText.Text = "(disconnected)";
                     statusText.Foreground = Brushes.Red;
@@ -3068,7 +3065,7 @@ namespace HolyLogger
                             await clusterWebSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed", CancellationToken.None);
                             if (statusText != null)
                             {
-                                statusText.Dispatcher.BeginInvoke(new Action(() =>
+                                _ = statusText.Dispatcher.BeginInvoke(new Action(() =>
                                 {
                                     statusText.Text = "(disconnected)";
                                     statusText.Foreground = Brushes.Red;

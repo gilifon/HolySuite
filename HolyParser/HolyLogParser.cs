@@ -58,7 +58,6 @@ namespace HolyParser
         private int _qso10;
         private int _qsoCW;
         private int _qsoSSB;
-        private int _qsoDIGI;
 
         public int qso160 { get { return _qso160; } }
         public int qso80 { get { return _qso80; } }
@@ -72,7 +71,6 @@ namespace HolyParser
 
         public int qsoCW { get { return _qsoCW; } }
         public int qsoSSB { get { return _qsoSSB; } }
-        public int qsoDIGI { get { return _qsoDIGI; } }
         
         //patterns
         private string mycall_pattern = @"<station_callsign:(\d{1,4})(?::[a-z]{1})?>";

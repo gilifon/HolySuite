@@ -1907,6 +1907,7 @@ namespace HolyLogger
                     }
                     catch (Exception ex)
                     {
+                        Log.Swallow(ex);
                         ToggleUploadProgress(Visibility.Hidden);
                     }
                     
@@ -3652,10 +3653,6 @@ namespace HolyLogger
             }
         }
 
-        // What the last group delete removed, kept whole so it can be put back into the logs it came
-        // from. One step only: this is the way out of the delete just made, not a history.
-        private List<QSO> _deletedForUndo;
-        private List<long> _deletedForUndoLogIds;
 
         private async void DeleteSelectedQsos(List<QSO> picked)
         {
@@ -3855,8 +3852,6 @@ namespace HolyLogger
             _mainUndo.Clear();
             _editUndoBefore = null;
             _editUndoTarget = null;
-            _deletedForUndo = null;
-            _deletedForUndoLogIds = null;
             if (Btn_UndoMain != null) Btn_UndoMain.Visibility = Visibility.Collapsed;
         }
 
@@ -8410,26 +8405,6 @@ namespace HolyLogger
             }
         }
 
-        private void LogInfoMenuItem_Click(object sender, RoutedEventArgs e)
-        {
-            if (loginfo != null)
-            {
-                var existingWindow = Application.Current.Windows.Cast<Window>().SingleOrDefault(w => w == loginfo); /* return "true" if 'w' is the window your are about to open */
-
-                if (existingWindow != null)
-                {
-                    existingWindow.Activate();
-                }
-                else
-                {
-                    GenerateNewLogInfoWindow();
-                }
-            }
-            else
-            {
-                GenerateNewLogInfoWindow();
-            }
-        }
         
         private void GenerateNewMatrixWindow()
         {
@@ -8459,33 +8434,6 @@ namespace HolyLogger
             // Owner, not just a constructor argument: the XAML asks for CenterOwner, and without an
             // Owner WPF quietly falls back to centring on the PRIMARY screen.
             new ProfilesWindow(this) { Owner = this }.ShowDialog();
-        }
-
-        private void GenerateNewLogInfoWindow()
-        {
-            // Placement is handled by WindowBounds inside LogInfoWindow itself. It used to be restored
-            // here from LogInfoWindowLeft/Top, but nothing ever WROTE those, so the window never actually
-            // remembered where it was put.
-            loginfo = new LogInfoWindow();
-
-            if (_holyLogParser != null)
-            {
-                loginfo.CW.Value = _holyLogParser.qsoCW;
-                loginfo.SSB.Value = _holyLogParser.qsoSSB;
-
-                //loginfo.Band6.Value = p.qso6;
-                loginfo.Band10.Value = _holyLogParser.qso10;
-                loginfo.Band12.Value = _holyLogParser.qso12;
-                loginfo.Band15.Value = _holyLogParser.qso15;
-                loginfo.Band17.Value = _holyLogParser.qso17;
-                loginfo.Band20.Value = _holyLogParser.qso20;
-                loginfo.Band30.Value = _holyLogParser.qso30;
-                loginfo.Band40.Value = _holyLogParser.qso40;
-                //loginfo.Band60.Value = p.qso60;
-                loginfo.Band80.Value = _holyLogParser.qso80;
-                loginfo.Band160.Value = _holyLogParser.qso160;
-            }
-            loginfo.Show();
         }
 
         private void GridSquareMenuItem_Click(object sender, RoutedEventArgs e)
@@ -13410,6 +13358,7 @@ namespace HolyLogger
                 }
                 catch(Exception e)
                 {
+                    Log.Swallow(e);
                     isRemoteServerLiveLog = false;
                 }
             }

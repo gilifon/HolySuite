@@ -399,6 +399,7 @@ namespace HolyLogger
             }
             catch (Exception e)
             {
+                Log.Swallow(e);
                 //Mouse.OverrideCursor = null;
                 //MessageBox.Show(ex.Message);
                 //throw;

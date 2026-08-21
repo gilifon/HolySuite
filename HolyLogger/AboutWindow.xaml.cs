@@ -23,7 +23,6 @@ namespace HolyLogger
     /// </summary>
     public partial class AboutWindow : Window
     {
-        Mutex myMutex;
         public AboutWindow(int callsignVersion = 0)
         {
             InitializeComponent();

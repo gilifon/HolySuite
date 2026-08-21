@@ -2430,6 +2430,7 @@ namespace HolyLogger
                     }
                     catch (Exception ex)
                     {
+                        Log.Swallow(ex);
                         return $"Error uploading file";
                     }
                 }

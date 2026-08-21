@@ -255,9 +255,6 @@
     <Compile Include="WaveOutPlayer.cs" />
     <Compile Include="TqslStationData.cs" />
     <Compile Include="Enums.cs" />
-    <Compile Include="LogInfoWindow.xaml.cs">
-      <DependentUpon>LogInfoWindow.xaml</DependentUpon>
-    </Compile>
     <Compile Include="LogUploadWindow.xaml.cs">
       <DependentUpon>LogUploadWindow.xaml</DependentUpon>
     </Compile>
@@ -472,10 +469,6 @@
       <Generator>MSBuild:Compile</Generator>
     </Page>
     <Page Include="SplashWindow.xaml">
-      <SubType>Designer</SubType>
-      <Generator>MSBuild:Compile</Generator>
-    </Page>
-    <Page Include="LogInfoWindow.xaml">
       <SubType>Designer</SubType>
       <Generator>MSBuild:Compile</Generator>
     </Page>

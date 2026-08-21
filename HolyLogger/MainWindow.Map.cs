@@ -168,6 +168,7 @@ namespace HolyLogger
                 }
                 catch (Exception e)
                 {
+                    Log.Swallow(e);
                     ClearAzimuth();
                 }
             }
