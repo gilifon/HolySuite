@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -48,11 +49,44 @@ namespace HolyLogger
         // or the whole window (and everything it references) stays in memory forever.
         public static event Action ThemeChanged;
 
+        // FOUND ONCE PER COLOUR, NOT ONCE PER ROW.
+        //
+        // TryFindResource walks the whole resource chain - the element tree, then the application's
+        // dictionaries and every dictionary merged into them - hashing the key at each level. That is
+        // a fair price to pay when a window is built. It is the wrong price to pay while SCROLLING:
+        // the log grid asks for a row's background in LoadingRow, so every row that comes into view
+        // walks that chain again, for one of six answers that cannot have changed since the row above.
+        //
+        // The brushes are frozen, so one instance is shared safely by everything that draws with it.
+        // The only thing that can make an answer stale is a change of theme, and every change of theme
+        // goes through Apply below - which empties this. Nothing else writes the theme tokens: the
+        // colour-scheme editor calls Apply too.
+        // Locked, cheaply. Sixty-eight places ask for a brush and they are meant to be on the window's
+        // thread, but a plain dictionary read racing a write does not merely give a wrong answer - it
+        // can spin for ever. The lock costs nothing beside the resource walk it replaces.
+        private static readonly Dictionary<string, SolidColorBrush> _brushes =
+            new Dictionary<string, SolidColorBrush>(StringComparer.Ordinal);
+        private static readonly object _brushLock = new object();
+
         public static SolidColorBrush Brush(string key)
         {
+            if (key == null) return Brushes.Transparent as SolidColorBrush;
+
+            lock (_brushLock)
+            {
+                SolidColorBrush known;
+                if (_brushes.TryGetValue(key, out known)) return known;
+            }
+
             var app = Application.Current;
-            if (app != null && app.TryFindResource(key) is SolidColorBrush b) return b;
-            return Brushes.Transparent as SolidColorBrush;
+            var found = (app != null ? app.TryFindResource(key) : null) as SolidColorBrush
+                        ?? Brushes.Transparent as SolidColorBrush;
+
+            // Remembered only once the application's dictionaries are actually in place. Asked before
+            // that - from a static initialiser, say - the honest answer is "not yet", and keeping it
+            // would freeze that "not yet" for the rest of the run.
+            if (app != null) lock (_brushLock) { _brushes[key] = found; }
+            return found;
         }
 
         public static Color Color(string key)
@@ -63,6 +97,10 @@ namespace HolyLogger
 
         public static void Apply(string schemeId)
         {
+            // EVERY REMEMBERED BRUSH IS NOW WRONG. Emptied FIRST, before a single token is replaced, so
+            // that nothing can be handed yesterday's colour while this is half way through.
+            lock (_brushLock) { _brushes.Clear(); }
+
             CurrentScheme = ThemePalette.FindScheme(schemeId);
             CurrentSchemeId = CurrentScheme.Id;
             // Layer this scheme's saved user edits over its factory palette column.
