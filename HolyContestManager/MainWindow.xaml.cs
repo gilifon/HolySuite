@@ -182,7 +182,7 @@ namespace HolyContestManager
             }
         }
 
-        private async void SendMail()
+        private void SendMail()
         {
             
             //string to = @"gilifon@gmail.com";

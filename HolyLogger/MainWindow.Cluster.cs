@@ -242,7 +242,6 @@ namespace HolyLogger
         // up to this many matches so the user can scroll through the full set (often hundreds).
         private const int MaxCallsignSuggestionResults = 500;
         private int maxCallsignSuggestions = MaxCallsignSuggestionResults;
-        private bool callsignSuggestionMouseControl = false;
         // Last physical cursor position over the suggestion list. Used to ignore synthetic MouseMove
         // events WPF raises when the item under a stationary cursor changes (list re-populates after
         // deleting '?', or scrolls via the keyboard).

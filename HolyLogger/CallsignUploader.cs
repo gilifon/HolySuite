@@ -15,7 +15,11 @@ namespace HolyLogger
     {
         private const string EndpointUrl = "https://tools.iarc.org/holyland/server/addcallsign.php";
         private const int BatchSize = 100;
-        private const bool ShowUploadPopups = false;
+        // A switch, deliberately off: the upload runs quietly and writes to the server log instead of
+        // putting a message box in front of the operator. Kept as a field rather than a const so the
+        // code behind it still counts as reachable - as a const the compiler folds it away and reports
+        // "unreachable code detected", which is a warning about a switch working exactly as intended.
+        private static readonly bool ShowUploadPopups = false;
 
         private static readonly HttpClient _http = new HttpClient { Timeout = TimeSpan.FromSeconds(15) };
         private readonly SemaphoreSlim _lock = new SemaphoreSlim(1, 1);

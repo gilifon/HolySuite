@@ -9977,9 +9977,6 @@ namespace HolyLogger
         {
             if (e.Key == Key.Down && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
-                // An arrow key always hands control back to the keyboard (even right after the mouse
-                // hovered/scrolled the list), so navigation is never blocked.
-                callsignSuggestionMouseControl = false;
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Min(LB_DXCallsignSuggestions.SelectedIndex + 1, LB_DXCallsignSuggestions.Items.Count - 1);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
                 // Arrow keys only navigate; do not auto-fill the textbox
@@ -9987,7 +9984,6 @@ namespace HolyLogger
             }
             else if (e.Key == Key.Up && CallsignSuggestionsPopup.IsOpen && LB_DXCallsignSuggestions.Items.Count > 0)
             {
-                callsignSuggestionMouseControl = false;
                 LB_DXCallsignSuggestions.SelectedIndex = Math.Max(LB_DXCallsignSuggestions.SelectedIndex - 1, 0);
                 LB_DXCallsignSuggestions.ScrollIntoView(LB_DXCallsignSuggestions.SelectedItem);
                 // Arrow keys only navigate; do not auto-fill the textbox
@@ -10766,7 +10762,11 @@ namespace HolyLogger
                 System.Windows.FlowDirection.LeftToRight,
                 new System.Windows.Media.Typeface(TB_DX_Name.FontFamily, TB_DX_Name.FontStyle, TB_DX_Name.FontWeight, TB_DX_Name.FontStretch),
                 TB_DX_Name.FontSize,
-                System.Windows.Media.Brushes.Black);
+                System.Windows.Media.Brushes.Black,
+                // The pixels-per-dip of the screen this window is actually on. The overload without it
+                // is obsolete because it assumed 96 DPI, which measures the text wrongly on a scaled
+                // display - and this measurement decides how far the Name box may grow.
+                System.Windows.Media.VisualTreeHelper.GetDpi(this).PixelsPerDip);
 
             double neededWidth = ft.Width + 16; // padding
             double newLeft = rightEdge - neededWidth;
@@ -11325,7 +11325,6 @@ namespace HolyLogger
         
         private void TB_DXCallsign_LostFocus(object sender, RoutedEventArgs e)
         {
-            callsignSuggestionMouseControl = false;
             CallsignSuggestionsPopup.IsOpen = false;
             TB_Exchange.Focusable = true;
         }
@@ -12089,7 +12088,6 @@ namespace HolyLogger
 
             LB_DXCallsignSuggestions.ItemsSource = matches;
             LB_DXCallsignSuggestions.SelectedIndex = matches.Count > 0 ? 0 : -1;
-            callsignSuggestionMouseControl = false;
 
             CallsignSuggestionsPopup.IsOpen = matches.Count > 0 && Properties.Settings.Default.ShowCallsignDropdown;
 
@@ -12330,7 +12328,6 @@ namespace HolyLogger
             var item = ItemsControl.ContainerFromElement(LB_DXCallsignSuggestions, source) as ListBoxItem;
             if (item?.DataContext is CallsignSuggestionItem clicked)
             {
-                callsignSuggestionMouseControl = true;
                 LB_DXCallsignSuggestions.SelectedItem = clicked;
                 ApplySelectedCallsignSuggestion();
                 e.Handled = true;
@@ -12351,7 +12348,6 @@ namespace HolyLogger
             var item = ItemsControl.ContainerFromElement(LB_DXCallsignSuggestions, source) as ListBoxItem;
             if (item?.DataContext is CallsignSuggestionItem hovered)
             {
-                callsignSuggestionMouseControl = true;
                 if (!Equals(LB_DXCallsignSuggestions.SelectedItem, hovered))
                 {
                     LB_DXCallsignSuggestions.SelectedItem = hovered;
@@ -12362,8 +12358,7 @@ namespace HolyLogger
 
         private void LB_DXCallsignSuggestions_MouseLeave(object sender, MouseEventArgs e)
         {
-            // Keep the last highlighted row selected, but give arrow-key control back to keyboard.
-            callsignSuggestionMouseControl = false;
+            // Keep the last highlighted row selected.
             lastCallsignSuggestionMousePos = null;
         }
 

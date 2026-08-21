@@ -1,4 +1,4 @@
-using System.Linq;
+﻿using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -51,12 +51,14 @@ namespace HolyLogger
 
         private void LB_Contests_MouseDoubleClick(object sender, MouseButtonEventArgs e)
         {
-            if (Selected != null && Selected.Supported) Activate();
+            if (Selected != null && Selected.Supported) ActivateSelectedContest();
         }
 
-        private void Btn_Activate_Click(object sender, RoutedEventArgs e) => Activate();
+        private void Btn_Activate_Click(object sender, RoutedEventArgs e) => ActivateSelectedContest();
 
-        private void Activate()
+        // NOT called Activate: that is Window's own method for bringing a window to the
+        // front, and a private one of the same name quietly hid it.
+        private void ActivateSelectedContest()
         {
             if (Selected == null || !Selected.Supported) return;
             SelectedContest = Selected.Contest;
