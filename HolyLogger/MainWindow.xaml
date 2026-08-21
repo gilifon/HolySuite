@@ -1341,7 +1341,7 @@
                 <Button x:Name="Btn_StopProgress" Content="Stop" Visibility="Collapsed" HorizontalAlignment="Center" Margin="0,12,0,0" Padding="20,5" FontSize="16" FontWeight="Bold" Cursor="Hand" Click="Btn_StopProgress_Click"/>
             </StackPanel>
         </Border>
-        <Image x:Name="NewDXCC" gif:ImageBehavior.AnimatedSource="Images\newdxcc.gif" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
+        <Image x:Name="NewDXCC" HorizontalAlignment="Left" Margin="99,25,0,0" VerticalAlignment="Top" Source="Images/newdxcc.gif" Height="189" Width="189" Grid.Row="1" Visibility="Hidden" Panel.ZIndex="999"/>
 
         <!-- Centred, like the drop-down that stands in for it, so the band does not jump sideways when
              the box swaps between the two. -->

@@ -2093,11 +2093,30 @@ namespace HolyLogger
             
         }
 
+        // THE NEW-COUNTRY GIF ANIMATES ONLY WHILE IT IS ON SCREEN.
+        //
+        // It used to be given its AnimatedSource in the XAML, which starts the animation the moment
+        // the window loads - and an animation does not care that the picture is Hidden. It ran all
+        // day, and while ANY animation is running WPF goes on drawing at about sixty frames a second.
+        // That was the "CPU floor that never lifts" from the house check: 12% of one core, spent on a
+        // picture nobody could see. It shows for two and a half seconds when a new country is worked;
+        // the rest of the time there is nothing to animate.
+        //
+        // Found by asking WPF itself: UIElement.HasAnimatedProperties over every open window's tree
+        // named this Image and the blinking text caret, and nothing else.
         private void ShowNewDXCC()
         {
             var dups = from qso in Qsos where qso.Country == TB_DXCC.Text select qso;
             if (dups.Count() == 1) //if there is only one -> it is the one we just added -> it was a new one!
             {
+                try
+                {
+                    WpfAnimatedGif.ImageBehavior.SetAnimatedSource(NewDXCC,
+                        new System.Windows.Media.Imaging.BitmapImage(
+                            new Uri("pack://application:,,,/HolyLogger;component/Images/newdxcc.gif")));
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
                 NewDXCC.Visibility = Visibility.Visible;
                 NewDXCCTimer.Start();
             }
@@ -2106,6 +2125,11 @@ namespace HolyLogger
         {
             NewDXCCTimer.Stop();
             NewDXCC.Visibility = Visibility.Hidden;
+
+            // AND THE ANIMATION STOPS WITH IT. Hiding the picture does not stop its animation - only
+            // taking the animated source away does, which is the whole point of this change.
+            try { WpfAnimatedGif.ImageBehavior.SetAnimatedSource(NewDXCC, null); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void LoadPreEditUserData()
