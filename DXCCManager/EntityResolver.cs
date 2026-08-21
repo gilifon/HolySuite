@@ -48,16 +48,22 @@ namespace DXCCManager
             public int Itu;
         }
 
-        // Exact full-callsign matches (from "=CALL" aliases).
-        private readonly Dictionary<string, CtyMatch> exactCalls =
-            new Dictionary<string, CtyMatch>(2000, StringComparer.OrdinalIgnoreCase);
+        // Exact full-callsign matches (from "=CALL" aliases). Shared with the prefix table below, and
+        // it MUST be: left out of the sharing it was silently empty on every resolver after the first,
+        // and 521 callsigns in this operator's log changed their answer - 3D2C fell from Conway Reef
+        // back to plain Fiji, 2O12W from Wales to Unknown. That is what the check is for.
+        private Dictionary<string, CtyMatch> exactCalls;
 
         // Prefix -> match. Resolution picks the longest matching prefix.
-        private readonly Dictionary<string, CtyMatch> prefixMap =
-            new Dictionary<string, CtyMatch>(4000, StringComparer.OrdinalIgnoreCase);
+        //
+        // NOT readonly any more, and not built here: both of these come from the shared parse below
+        // when one is already in hand. Everything that WRITES to them runs inside LoadCtyDat; from the
+        // moment a resolver is constructed they are only ever read, which is what makes sharing them
+        // safe rather than merely cheap.
+        private Dictionary<string, CtyMatch> prefixMap;
 
         private int maxPrefixLength = 1;
-        private readonly List<CtyEntity> allEntities = new List<CtyEntity>(360);
+        private List<CtyEntity> allEntities;
 
         // Entities whose primary prefix still has to be registered as a prefix. The format spec says
         // the alias lines carry "alias DXCC prefixes (including the primary one)", but 16 of ~340
@@ -84,9 +90,81 @@ namespace DXCCManager
         private static readonly Regex OverrideAnnotations =
             new Regex(@"\([^)]*\)|\[[^\]]*\]|<[^>]*>|\{[^}]*\}|~[^~]*~", RegexOptions.Compiled);
 
+        // cty.dat IS READ ONCE, NOT ONCE PER RESOLVER.
+        //
+        // Reading it costs 31.9 MB of garbage and 84 ms - ninety times the size of the 350 KB file,
+        // because the parse copies the whole text twice, splits it into an array of lines, and runs a
+        // regular expression over every alias. That would be a fair price to pay once. It was being
+        // paid SIX times in one run of HolyLogger: CountryLookup builds one, the main window builds one
+        // of its own, the QSO editor, the Log Workshop and the Statistics window each hold a static
+        // one, and the ADIF parser builds a fresh one per import. Two of those land during the start,
+        // where about two seconds of the window not answering is the collector at work.
+        //
+        // The file cannot change while the program runs - and if it does (a newer cty.dat downloaded
+        // from country-files.com), the key below carries its path, size and date, so the next resolver
+        // built parses the new file instead of handing back the old one.
+        private sealed class Parsed
+        {
+            public Dictionary<string, CtyMatch> ExactCalls;
+            public Dictionary<string, CtyMatch> PrefixMap;
+            public List<CtyEntity> AllEntities;
+            public int MaxPrefixLength;
+            public string Version;
+        }
+
+        private static Parsed _shared;
+        private static string _sharedKey;
+        private static readonly object SharedLock = new object();
+
         public EntityResolver()
         {
-            LoadCtyDat();
+            string key = CurrentFileKey();
+
+            // Held for the whole parse, not just the lookup: two threads arriving together would
+            // otherwise both read the file and one of the two parses would be thrown away.
+            lock (SharedLock)
+            {
+                if (_shared != null && string.Equals(_sharedKey, key, StringComparison.Ordinal))
+                {
+                    exactCalls = _shared.ExactCalls;
+                    prefixMap = _shared.PrefixMap;
+                    allEntities = _shared.AllEntities;
+                    maxPrefixLength = _shared.MaxPrefixLength;
+                    Version = _shared.Version;
+                    return;
+                }
+
+                exactCalls = new Dictionary<string, CtyMatch>(2000, StringComparer.OrdinalIgnoreCase);
+                prefixMap = new Dictionary<string, CtyMatch>(4000, StringComparer.OrdinalIgnoreCase);
+                allEntities = new List<CtyEntity>(360);
+                LoadCtyDat();
+
+                _shared = new Parsed
+                {
+                    ExactCalls = exactCalls,
+                    PrefixMap = prefixMap,
+                    AllEntities = allEntities,
+                    MaxPrefixLength = maxPrefixLength,
+                    Version = Version
+                };
+                _sharedKey = key;
+            }
+        }
+
+        // Which file the parse in hand was made from: its path, its size and when it was last written.
+        // A cty.dat replaced under the program answers to a different key and is read afresh.
+        private static string CurrentFileKey()
+        {
+            try
+            {
+                if (!string.IsNullOrEmpty(DataFilePath) && File.Exists(DataFilePath))
+                {
+                    var f = new FileInfo(DataFilePath);
+                    return f.FullName + "|" + f.Length + "|" + f.LastWriteTimeUtc.Ticks;
+                }
+            }
+            catch { }
+            return "embedded";
         }
 
         private void LoadCtyDat()
