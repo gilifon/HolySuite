@@ -34,8 +34,22 @@ namespace HolyLogger
         private static readonly EntityResolver _masterResolver = new EntityResolver();
         private static readonly Dictionary<string, BitmapImage> _flagCache = new Dictionary<string, BitmapImage>();
 
-        private List<CountryItem> _workedList;
-        private List<CountryItem> _missingList;
+        // EMPTY, NEVER NULL - and this is not tidiness, it is a crash that reached an operator.
+        //
+        // ComputeStats returns EARLY when the log holds no QSOs ("No QSOs to analyze"), before
+        // BuildCountryTables runs - so _workedList stayed null. The constructor then calls
+        // BuildSourceFolders, which sets LB_Source.SelectedIndex = 0, which raises SelectionChanged,
+        // which calls RefreshForSource -> RebuildMissingCountries -> _workedList.Where(...). That
+        // threw ArgumentNullException on the dispatcher and took HolyLogger down with it.
+        //
+        // Reported from a fresh install of 8.9.1: the operator opened Statistics on a log with
+        // nothing in it and the program died. Reproduced here by opening this window with an empty
+        // collection, and it threw in exactly the same place as his log said.
+        //
+        // An empty log is a perfectly ordinary thing - it is what every new user has - so the answer
+        // is a list with nothing in it, not a list that does not exist.
+        private List<CountryItem> _workedList = new List<CountryItem>();
+        private List<CountryItem> _missingList = new List<CountryItem>();
 
         // DXCC entity names confirmed by the SELECTED confirmation source. Populated from that source's
         // cached download result; drives the Confirmed column (tick) in the worked list. Reloaded from a
