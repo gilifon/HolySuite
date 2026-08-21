@@ -2378,7 +2378,35 @@ namespace HolyLogger
         // treated as "unsaved" here -- that QSO already exists in the log.
         private bool HasUnsavedQso()
         {
-            return state == State.New && !string.IsNullOrWhiteSpace(TB_DXCallsign?.Text);
+            if (state != State.New) return false;
+
+            string typed = (TB_DXCallsign?.Text ?? string.Empty).Trim();
+            if (typed.Length == 0) return false;
+
+            // A PREFIX IS NOT A QSO.
+            //
+            // Any text at all used to count as a started QSO, so typing "SV1" while looking for a
+            // station and then closing the program was answered with "you have started a QSO for SV1,
+            // save it?". There is no such station: SV1 is a country prefix, and half a callsign cannot
+            // be logged. The question is worth asking about a contact; about three letters it is only
+            // in the way.
+            //
+            // LooksLikeCallsign is the test the program already uses to tell a callsign from something
+            // that is not one: a whole call, ending in a letter after its digit.
+            if (CallsignIdentity.LooksLikeCallsign(typed)) return true;
+
+            // AND ONE MORE CHANCE, for the shapes that test turns down. A few real callsigns end in a
+            // digit, which the shape rule cannot allow without letting every bare country prefix in
+            // beside them. If the big list has heard of it, it is a station whatever it looks like -
+            // and being asked one question too many is better than losing a contact that was typed.
+            try
+            {
+                if (callsignIndex != null && callsignIndex.BinarySearch(typed.ToUpperInvariant()) >= 0)
+                    return true;
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            return false;
         }
 
         // Call before any action that would discard the in-progress QSO (switch log, exit, import,
