@@ -293,7 +293,13 @@ namespace HolyLogger
                     await TryTuneRigFrequencyAsync(freqHz, modeToSend);
                 }
             }
-            catch { /* never crash the app from the undo button */ }
+            catch (Exception ex)
+            {
+                // NEVER CRASH THE APP FROM THE UNDO BUTTON - but never fail in silence
+                // either. What is being undone here is a change to the RADIO; if it does
+                // not happen, the rig is left where it was and the screen says otherwise.
+                Log.Warn("Radio undo failed: " + ex.GetType().Name + ": " + ex.Message);
+            }
         }
 
         private void UpdateLogRadioUndoButtonState()

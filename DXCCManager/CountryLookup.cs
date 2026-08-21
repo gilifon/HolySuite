@@ -609,7 +609,15 @@ namespace DXCCManager
                         e.ClubNearTo = near.End;
                     }
                 }
-                catch (Exception) { }
+                catch (Exception ex)
+                {
+                    // The near-miss is an EXPLANATION, not an answer: it says why Club Log's record
+                    // is shorter than cty.dat's when a report is being written. Losing it must not
+                    // cost the resolution itself, so it is swallowed - but it is written down, since
+                    // a blank half of a country report is otherwise a mystery.
+                    System.Diagnostics.Trace.WriteLine("CountryLookup near-miss failed: "
+                                                       + ex.GetType().Name + ": " + ex.Message);
+                }
             }
 
             DXCC final = null;

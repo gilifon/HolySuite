@@ -11138,7 +11138,12 @@ namespace HolyLogger
                     _holyClusterSelectedCall = null;   // operator took over the DX field; forget the HolyCluster selection
                 }
             }
-            catch { }
+            catch (Exception swallowed)
+            {
+                // Only two flags are set above, and losing them costs nothing worse than the cluster
+                // filling the box again. Logged rather than dropped, so it is not a blank spot.
+                Log.Swallow(swallowed);
+            }
 
             // While loading a QSO into the form for editing, the callsign is set programmatically and
             // we must NOT run the typing lookup (it would clear/overwrite the QSO's saved fields).
@@ -13363,6 +13368,8 @@ namespace HolyLogger
             ToggleUploadProgress(Visibility.Visible);
 
             int removed = 0;
+
+            int couldNotRemove = 0;   // rows that refused to delete - reported, not hidden
             bool cancelled = false;
             try
             {
@@ -13395,7 +13402,19 @@ namespace HolyLogger
                             lock (_syncLock) { dal.Delete(toDelete[i].id); }
                             removed++;
                         }
-                        catch { /* skip a row that won't delete; never abort the whole run */ }
+                        catch (Exception ex)
+                        {
+                            // SKIPPED, BUT NOT IN SILENCE. One row that will not delete must never
+                            // abort the run - but it used to vanish completely: the operator was told
+                            // "Removed 40 duplicate QSO(s)" when he had asked about 42, and the two
+                            // that stayed were never mentioned anywhere. Counted now, named in the log,
+                            // and said out loud at the end.
+                            couldNotRemove++;
+                            Log.Warn("Remove Duplicates: QSO " + toDelete[i].id + " ("
+                                     + (toDelete[i].DXCall ?? "?") + " " + (toDelete[i].Date ?? "?") + " "
+                                     + (toDelete[i].Time ?? "?") + ") could not be removed: "
+                                     + ex.GetType().Name + ": " + ex.Message);
+                        }
 
                         int pct = (i + 1) * 100 / toDelete.Count;
                         if (pct != lastPct)
@@ -13424,11 +13443,16 @@ namespace HolyLogger
                 Qsos.Add(item);
             UpdateNumOfQSOs();
 
+            string trouble = couldNotRemove > 0
+                ? $"\n\n{couldNotRemove:N0} could NOT be removed and are still in the log. "
+                  + "The reason for each is in the error log (Help > Support > Open the error log)."
+                : "";
+
             HolyMessageBox.Show(
-                cancelled
+                (cancelled
                     ? $"Stopped. Removed {removed:N0} duplicate(s); the rest were left in place."
-                    : $"Removed {removed:N0} duplicate QSO(s).",
-                "Remove Duplicates", HolyMsgType.Info, this);
+                    : $"Removed {removed:N0} duplicate QSO(s).") + trouble,
+                "Remove Duplicates", couldNotRemove > 0 ? HolyMsgType.Warning : HolyMsgType.Info, this);
         }
 
         private void StatusBar_MouseDoubleClick(object sender, MouseButtonEventArgs e)
