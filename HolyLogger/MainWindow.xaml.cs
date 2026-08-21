@@ -1271,42 +1271,13 @@ namespace HolyLogger
             var startedWatching = DateTime.UtcNow;
             bool _countryBuildLogged = false;
 
-            // WHICH WINDOWS MESSAGE IS HOLDING THE WINDOW?
-            //
-            // The collector is cleared - gen0=1 gen1=1 gen2=0 across the whole freeze - and a stack
-            // taken from outside showed only "inside DispatchMessage", because the work is under it in
-            // native code. So the question is which MESSAGE that is: every one the window receives is
-            // timed here, and any that takes longer than half a second says so, with its number.
-            //
-            // Cheap: two clock reads per message, and it stops after the first minute.
-            try
-            {
-                var source = System.Windows.Interop.HwndSource.FromVisual(this) as System.Windows.Interop.HwndSource;
-                if (source != null)
-                {
-                    var watchUntil = DateTime.UtcNow.AddMinutes(1);
-                    source.AddHook((IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled) =>
-                    {
-                        if (DateTime.UtcNow > watchUntil) return IntPtr.Zero;
-
-                        var started = System.Diagnostics.Stopwatch.StartNew();
-                        // The message is handled after this returns, so the time is taken on the NEXT
-                        // one - which is why the line names the message that came before it.
-                        if (_lastMessageWatch != null && _lastMessageWatch.ElapsedMilliseconds > 500)
-                            Log.Warn("STARTUP  window message 0x" + _lastMessageId.ToString("X")
-                                     + " took " + _lastMessageWatch.ElapsedMilliseconds + " ms");
-
-                        _lastMessageWatch = started;
-                        _lastMessageId = msg;
-                        return IntPtr.Zero;
-                    });
-                }
-            }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
-
-            // (A watchdog that suspended this thread to read its stack lived here while the long
-            // freeze was being hunted. Suspending the thread that draws the window is not something to
-            // leave in a program people use, and it only ever answered "inside a Windows message".)
+            // (Two more watches lived here while the long freeze was being hunted, and both are gone.
+            // One suspended this thread to read its stack, which is not something to leave in a program
+            // people use. The other timed every Windows message the window received - and it named the
+            // wrong thing anyway: it can only report the last message to ARRIVE before the thread went
+            // away, which was as often as not a harmless one. What actually answered the question was a
+            // sampler run from OUTSIDE the program, which read the stuck thread's own stack and found
+            // it in SQLite, in ReadFile, waiting on the disk. See FindKhzFrequencyFixes.)
             int lastGen0 = GC.CollectionCount(0), lastGen1 = GC.CollectionCount(1), lastGen2 = GC.CollectionCount(2);
             var uiWatch = new System.Windows.Threading.DispatcherTimer(DispatcherPriority.Input)
             {
@@ -9288,6 +9259,18 @@ namespace HolyLogger
                 return workedCountries;
             }
 
+            // MEASURED, AND LEFT ALONE. A cache of already-answered callsign-and-date pairs lived here
+            // for one afternoon. Across the whole database it looked worth having - 113,626 QSOs but
+            // only 52,948 different pairs - but this walks ONE LOG, not the database, and inside one log
+            // the repeats are 1,060 of 10,946. The loop itself costs 6.4 MB and 41 ms; the 64 MB that
+            // sent me looking belongs to the country databases, which are built on FIRST USE and this
+            // happens to be the first caller.
+            //
+            // Using the entity number already stored on each QSO was measured too, and it is wrong:
+            // PJ2/LY4F in 2007 carries 517 (Curacao) where resolving on its own date says 85,
+            // Netherlands Antilles, and OK2OII in 1991 carries 218 but resolves to Czechoslovakia. Six
+            // worked countries went missing from the set - all of them DELETED entities, which are the
+            // whole reason this resolves per QSO date in the first place.
             foreach (var qso in Qsos)
             {
                 if (!string.IsNullOrWhiteSpace(qso.DXCall))
@@ -12041,12 +12024,6 @@ namespace HolyLogger
             }
         }
 
-        private System.Diagnostics.Stopwatch _lastMessageWatch;
-        private int _lastMessageId;
-
-        private int _suggestionTraces;
-        private int _suggestionLastMatched;
-
         private void UpdateCallsignSuggestions()
         {
             // The user can switch the suggestions dropdown off/on with F4 (state persists). When it's
@@ -12089,18 +12066,6 @@ namespace HolyLogger
                 start = index;
             }
 
-            // TEMPORARY, while "no suggestions appear" is being chased. Says what the box was given,
-            // how many callsigns are in the index, and where the search landed - the three facts that
-            // together say whether the fault is the index, the search, or the list that shows them.
-            if (_suggestionTraces < 6)
-            {
-                _suggestionTraces++;
-                Log.Warn("SUGGEST  typed=\"" + pattern + "\"  index holds "
-                         + callsignIndex.Count.ToString("N0") + "  search landed at " + start
-                         + "  first there: "
-                         + (start < callsignIndex.Count ? (callsignIndex[start] ?? "(null)") : "(past the end)"));
-            }
-
             for (int i = start; i < callsignIndex.Count; i++)
             {
                 string call = callsignIndex[i];
@@ -12130,7 +12095,6 @@ namespace HolyLogger
                 // Early exit if we have enough matches
                 if (literalPrefix.Length > 0 && matches.Count >= maxCallsignSuggestions)
                     break;
-                _suggestionLastMatched = matches.Count + slashMatches.Count;
             }
 
             // Fill remaining slots with slash matches (non-slash callsigns are shown first).
