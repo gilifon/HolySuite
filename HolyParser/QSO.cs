@@ -365,16 +365,31 @@ namespace HolyParser
             IsAllowWARC = false;
         }
 
+        // BUILT ONCE FOR THE PROGRAM, NOT ONCE FOR EVERY QSO.
+        //
+        // Both of these used to be constructed inside StandartizeQSO, which runs on every QSO as the
+        // log is read - 10,946 of them on this operator's log, every time the program starts. Building
+        // a Regex PARSES its pattern and builds a machine for it; doing that ten thousand times to
+        // match a handful of characters is the expensive part of reading a log. The first one was even
+        // built when SRX was empty and there was nothing to match at all.
+        //
+        // Same patterns, same options, so the answers are unchanged. Compiled because they are now
+        // built once and used for the life of the program, which is exactly what Compiled is for.
+        private static readonly Regex GridExchange = new Regex(
+            @"([a-zA-Z]{1,2})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
+        private static readonly Regex FirstNumber = new Regex(
+            @"(\d+)", RegexOptions.IgnoreCase | RegexOptions.Compiled);
+
         public void StandartizeQSO()
         {
             IsValid = false;
             IsIsraeli = HolyLogParser.IsIsraeliStation(DXCall);
             Hash();
-            string pattern = @"([a-zA-Z]{1,2})[-/\\_ ]*([0-9]{1,2})[-/\\_ ]*([a-zA-Z]{2})";
-            Regex regex = new Regex(pattern, RegexOptions.IgnoreCase);
             if (!string.IsNullOrWhiteSpace(SRX))//srx not empty -> good, try match
             {
-                Match match = regex.Match(SRX);
+                Match match = GridExchange.Match(SRX);
                 if (match.Success) //srx matches grid
                 {
                     this.SRX = match.Groups[1].Value + match.Groups[2].Value + match.Groups[3].Value;
@@ -382,9 +397,7 @@ namespace HolyParser
                 }
                 else //srx does NOT matche grid
                 {
-                    pattern = @"(\d+)";
-                    regex = new Regex(pattern, RegexOptions.IgnoreCase);
-                    match = regex.Match(SRX);
+                    match = FirstNumber.Match(SRX);
                     if (match.Success)
                     {
                         this.SRX = match.Groups[1].Value;
