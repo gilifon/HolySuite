@@ -620,6 +620,7 @@ namespace HolyLogger
             
             Qsos = dal.GetQSOsForLog(dal.ActiveLogId);
             Log.Step("ctor: LOG READ from the database");
+            StartCountryDatabasesInBackground();
             Qsos.CollectionChanged += Qsos_CollectionChanged;
             DataContext = Qsos;
             UpdateActiveLogTitle();
@@ -1225,6 +1226,37 @@ namespace HolyLogger
         // nothing whose result nobody is waiting for should run while the program is still coming up.
         //
         // Five seconds in, the window is on screen and the operator is reading his log.
+        // THE COUNTRY DATABASES, BUILT BEFORE ANYBODY ASKS FOR THEM.
+        //
+        // cty.dat and Club Log's 10 MB file are built on FIRST USE, and first use turns out to be the
+        // cluster asking which countries have been worked - about a second after the window appears,
+        // which is exactly when the operator is trying to type into it. Measured: 13.7 MB and some 275
+        // ms, on the thread that draws the window, inside the stretch where it cannot answer at all.
+        //
+        // STARTED HERE, AND NOT EARLIER. The log read just above wants the disk to itself; reading a
+        // 10 MB file beside it is how the callsign list once turned a 3.2 second log read into 7.1.
+        // From here there is a second or more of window-building left, which is more than enough.
+        //
+        // Nothing waits on this, and nothing can be made worse by it. CountryLookup.Shared is built
+        // under its own lock: a caller arriving first builds it exactly as before, and one arriving
+        // while this is running waits no longer than it would have waited to build it itself.
+        private void StartCountryDatabasesInBackground()
+        {
+            var worker = new System.Threading.Thread(() =>
+            {
+                try
+                {
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+                    _ = DXCCManager.CountryLookup.Shared;
+                    Log.Warn("STARTUP  country databases: built off the startup path in "
+                             + sw.ElapsedMilliseconds + " ms");
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            });
+            worker.IsBackground = true;
+            worker.Start();
+        }
+
         private void StartEntityCodeBackfill()
         {
             var start = new System.Windows.Threading.DispatcherTimer
