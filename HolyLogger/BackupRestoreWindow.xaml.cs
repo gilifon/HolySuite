@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.IO;
@@ -416,7 +416,10 @@ namespace HolyLogger
 
             // Into the Backups folder with everything else, so there is one place to look. Falls back
             // to a bare name beside the database only if there is no database to ask about.
-            string safetyPath = DataAccess.GetInstance()?.SafetyCopyPath("restore")
+            // THE NAME ONLY, so far. Nothing is deleted and nothing is written until the question
+            // below has been answered YES - this used to make room for the new copy right here, which
+            // meant that saying No had already cost the operator one of the copies in the list.
+            string safetyPath = DataAccess.GetInstance()?.SafetyCopyName("restore")
                 ?? ("logDB.db.pre-restore-" + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak");
             string safetyName = safetyPath;
 
@@ -429,6 +432,13 @@ namespace HolyLogger
             if (!confirmed) return;
 
             var dal = DataAccess.GetInstance();
+
+            // NOW room is made - and the copy being restored FROM is named, so that whatever else is
+            // cleared away, it is not the one file this restore cannot do without. Choosing an older
+            // safety copy used to delete it at this moment and then fail with "That backup file no
+            // longer exists", which is what the operator saw on 2026-08-21.
+            dal?.MakeRoomForSafetyCopy(_selectedBackup.Path);
+
             var result = dal?.RestoreFromBackup(_selectedBackup.Path, safetyName);
 
             if (result == null || !result.Ok)

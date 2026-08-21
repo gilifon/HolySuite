@@ -435,17 +435,45 @@ namespace HolyLogger
         // was made" and ask the operator whether to go on regardless.
         public string SafetyCopyPath(string kind)
         {
+            string name = SafetyCopyName(kind);
+            if (name != null) MakeRoomForSafetyCopy(null);
+            return name;
+        }
+
+        // JUST THE NAME. NOTHING IS DELETED, NOTHING IS WRITTEN.
+        //
+        // Split out because the Restore window shows this path in its "are you sure" question, and
+        // that question must be answerable with NO. It used to call SafetyCopyPath to get the name -
+        // and that deleted a safety copy on the spot, before the operator had said anything, so a
+        // cancelled restore quietly cost him one of the copies he was looking at.
+        public string SafetyCopyName(string kind)
+        {
             try
             {
                 if (string.IsNullOrEmpty(dbPath) || !File.Exists(dbPath)) return null;
                 string dir = BackupsFolder;
                 Directory.CreateDirectory(dir);
-                // One fewer, to leave room for the copy about to be made.
-                PruneSafetyCopies(dir, SafetyCopiesToKeep - 1);
                 return Path.Combine(dir, "logDB.db.pre-" + kind + "-"
                                          + DateTime.Now.ToString("yyyyMMdd-HHmmss") + ".bak");
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // ROOM FOR THE COPY ABOUT TO BE MADE - AND NEVER AT THE COST OF THE ONE BEING READ.
+        //
+        // `doNotDelete` is the file the operator is restoring FROM. Without it this deleted that very
+        // file and the restore then failed with "That backup file no longer exists" - the operator
+        // watching a copy he could see in the list vanish between choosing it and pressing the button.
+        // Reported from his own machine on 2026-08-21.
+        public void MakeRoomForSafetyCopy(string doNotDelete)
+        {
+            try
+            {
+                string dir = BackupsFolder;
+                Directory.CreateDirectory(dir);
+                PruneSafetyCopies(dir, SafetyCopiesToKeep - 1, doNotDelete);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // How many safety copies to keep. Unlike the daily backups, these are made on DEMAND - every
@@ -463,7 +491,7 @@ namespace HolyLogger
         //
         // Both folders are swept, for the copies older versions left beside the database in case the
         // move at startup could not shift one.
-        private void PruneSafetyCopies(string backupsDir, int keep)
+        private void PruneSafetyCopies(string backupsDir, int keep, string doNotDelete = null)
         {
             try
             {
@@ -474,6 +502,21 @@ namespace HolyLogger
                     if (all.Count > 0 && string.Equals(dir, backupsDir, StringComparison.OrdinalIgnoreCase)) continue;
                     all.AddRange(Directory.GetFiles(dir, "logDB.db.pre-*.bak"));
                 }
+
+                // THE ONE BEING READ IS NOT A CANDIDATE. It is taken out of the list entirely rather
+                // than merely skipped, so it does not take up one of the places either: the operator
+                // asked to restore FROM it, and deleting it to make room for a copy of what it is
+                // about to replace is the one thing this must never do.
+                string keepThis = null;
+                try { if (!string.IsNullOrEmpty(doNotDelete)) keepThis = Path.GetFullPath(doNotDelete); }
+                catch (Exception ex) { Log.Swallow(ex); }
+
+                if (keepThis != null)
+                    all = all.Where(f =>
+                    {
+                        try { return !string.Equals(Path.GetFullPath(f), keepThis, StringComparison.OrdinalIgnoreCase); }
+                        catch (Exception ex) { Log.Swallow(ex); return true; }
+                    }).ToList();
 
                 // Newest first by the timestamp in the name, which sorts chronologically as text.
                 foreach (string f in all.OrderByDescending(p => Path.GetFileName(p), StringComparer.OrdinalIgnoreCase)
