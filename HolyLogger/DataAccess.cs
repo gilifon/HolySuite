@@ -311,6 +311,84 @@ namespace HolyLogger
         // The daily-backups folder (with HOW TO RESTORE.txt) -- for Help > Open Backups Folder.
         public string BackupsFolder => Path.Combine(DataFolder, "Backups");
 
+        // HOW BIG THE LOG FILE IS, AND HOW MUCH OF IT IS NOTHING.
+        //
+        // A deleted QSO does not shrink the file; its pages are simply marked free and re-used later.
+        // On this operator's log 147 MB of a 381 MB file was empty in that way. It costs nothing to
+        // hold, but every read of the file walks past it, and the log is read at every start.
+        public long DatabaseFileBytes
+        {
+            get
+            {
+                try { return File.Exists(dbPath) ? new FileInfo(dbPath).Length : 0; }
+                catch (Exception ex) { Log.Swallow(ex); return 0; }
+            }
+        }
+
+        public long DatabaseFreeBytes
+        {
+            get
+            {
+                lock (_dbLock)
+                {
+                    if (con == null || con.State != ConnectionState.Open) return 0;
+                    try
+                    {
+                        long freePages, pageSize;
+                        using (var c = new SQLiteCommand("PRAGMA freelist_count", con))
+                            freePages = Convert.ToInt64(c.ExecuteScalar());
+                        using (var c = new SQLiteCommand("PRAGMA page_size", con))
+                            pageSize = Convert.ToInt64(c.ExecuteScalar());
+                        return freePages * pageSize;
+                    }
+                    catch (Exception ex) { Log.Swallow(ex); return 0; }
+                }
+            }
+        }
+
+        // GIVES THE EMPTY SPACE BACK. Rewrites the file without the free pages.
+        //
+        // Minutes of work on a large log and it holds the database for all of it, so it is never done
+        // by itself - the operator asks for it, and is told what it will cost first. SQLite writes the
+        // new file beside the old one and swaps them at the end, so an interrupted run leaves the
+        // original untouched; that is why this needs as much free disk space as the file itself.
+        public bool CompactDatabase(out string error)
+        {
+            error = null;
+            lock (_dbLock)
+            {
+                if (con == null || con.State != ConnectionState.Open)
+                {
+                    error = "The log database is not open.";
+                    return false;
+                }
+
+                try
+                {
+                    long before = DatabaseFileBytes;
+                    var sw = System.Diagnostics.Stopwatch.StartNew();
+
+                    using (var cmd = new SQLiteCommand("VACUUM", con))
+                    {
+                        cmd.CommandTimeout = 3600;   // a big log takes minutes; the default would give up
+                        cmd.ExecuteNonQuery();
+                    }
+
+                    sw.Stop();
+                    long after = DatabaseFileBytes;
+                    Log.Warn("Database compacted: " + (before / 1048576) + " MB -> " + (after / 1048576)
+                             + " MB in " + (sw.ElapsedMilliseconds / 1000) + " s.");
+                    return true;
+                }
+                catch (Exception ex)
+                {
+                    Log.Warn("Compacting the database FAILED: " + ex.GetType().Name + ": " + ex.Message);
+                    error = ex.Message;
+                    return false;
+                }
+            }
+        }
+
         // WHERE EVERY REPORT GOES. The import report, the rejected-records ADIF, the LoTW upload log,
         // the unmatched-confirmations list - all of them used to be dropped on the operator's DESKTOP,
         // which is somebody's own space and not the program's to litter. One folder of the program's

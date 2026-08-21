@@ -1366,6 +1366,19 @@ namespace HolyLogger
             };
             countries.Start();
 
+            // AND THE OFFER TO COMPACT THE LOG FILE, well clear of the start.
+            //
+            // Fifteen seconds, not three: this one puts a QUESTION on the screen, and a question that
+            // arrives while the operator is still waiting for his log to appear is an interruption
+            // rather than an offer. By then the window is up and in use, and it can be read properly.
+            var compact = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(15) };
+            compact.Tick += (sender3, args3) =>
+            {
+                compact.Stop();
+                OfferToCompactDatabase();
+            };
+            compact.Start();
+
             // AND THE CALLSIGN INDEX, five seconds from now, for the same reason.
             //
             // Reading it on a worker was not enough: 588,000 callsigns is nine seconds of disk, and
@@ -9550,6 +9563,84 @@ namespace HolyLogger
         // File -> Backups & Restore: shows the restore instructions in-app (the same text as
         // HOW TO RESTORE.txt) with a button to open the daily-backups folder, so the user sees
         // exactly what to do without having to hunt for and open the text file.
+        // WHAT THE DATABASE REMEMBERS ABOUT THIS OFFER. Kept in the log file, so it belongs to that
+        // file and comes back with it when a backup is restored.
+        private const string CompactDeclinedKey = "compact_declined_at_free_bytes";
+
+        // THE PROGRAM OFFERS; THE OPERATOR DECIDES.
+        //
+        // A deleted QSO does not give its space back - the file keeps it and re-uses it later. Nobody
+        // watches that, so it goes unnoticed until the log file is 382 MB with 143 MB of nothing in it,
+        // which is where this operator's log had got to. The whole file is read at every start, so the
+        // empty space is paid for every morning.
+        //
+        // NOT DONE BY ITSELF, ever. It holds the log for half a minute, and a program that stops
+        // answering in the middle of a contact because it decided to tidy up is worse than a large
+        // file. So it asks, once, and only when there is enough to be worth the half minute.
+        //
+        // AND IT DOES NOT NAG. "Not now" is remembered as the amount of empty space it was said about;
+        // the question only comes back when there is 100 MB more than there was then. Say no today and
+        // the answer holds until the log has grown enough for the question to be a different one.
+        private void OfferToCompactDatabase()
+        {
+            try
+            {
+                if (dal == null || !dal.HasActiveLog) return;
+
+                const long WorthIt = 100L * 1024 * 1024;
+
+                long free = dal.DatabaseFreeBytes;
+                if (free < WorthIt) return;
+
+                long declinedAt;
+                long.TryParse(dal.GetDbState(CompactDeclinedKey), NumberStyles.Integer,
+                              CultureInfo.InvariantCulture, out declinedAt);
+                if (declinedAt > 0 && free < declinedAt + WorthIt) return;
+
+                // Never over a dialog that is already asking something.
+                if (System.Windows.Interop.ComponentDispatcher.IsThreadModal) return;
+
+                string file = (dal.DatabaseFileBytes / 1048576.0).ToString("0");
+                string empty = (free / 1048576.0).ToString("0");
+
+                bool now = HolyMessageBox.ShowConfirm(
+                    "Your log file is " + file + " MB, and about " + empty + " MB of it is empty space "
+                    + "left behind by QSOs that were deleted.\n\n"
+                    + "Compacting gives that space back, so the log opens from a smaller file. Nothing "
+                    + "is deleted and no QSO is changed.\n\n"
+                    + "It takes about half a minute, and HolyLogger cannot use the log while it runs. "
+                    + "You can also do it later from File > Compact the Database.\n\n"
+                    + "Do it now?",
+                    "Compact the log database", HolyMsgType.Info, this);
+
+                if (!now)
+                {
+                    dal.SetDbState(CompactDeclinedKey, free.ToString(CultureInfo.InvariantCulture));
+                    return;
+                }
+
+                new CompactDatabaseWindow(dal) { Owner = this }.ShowDialog();
+                dal.SetDbState(CompactDeclinedKey, string.Empty);
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Gives back the empty space a deleted QSO leaves behind in the log file. Never automatic:
+        // the window says what it will cost and what it will save before anything is rewritten.
+        private void CompactDatabaseMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                new CompactDatabaseWindow(dal) { Owner = this }.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Log.Warn("Compact database window failed: " + ex.GetType().Name + ": " + ex.Message);
+                HolyMessageBox.ShowError("Could not open the compact window: " + ex.Message,
+                                         "Compact the Database", this);
+            }
+        }
+
         private void BackupRestoreMenuItem_Click(object sender, RoutedEventArgs e)
         {
             try

@@ -601,6 +601,15 @@
                             </Viewbox>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <MenuItem x:Name="CompactDatabaseMenuItem" Header="Compact the Database" ToolTip="Give back the empty space left by deleted QSOs" Click="CompactDatabaseMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- Material "compress" -->
+                            <Viewbox Width="16" Height="16">
+                                <Path Stretch="Uniform" Fill="{DynamicResource TextBrush}"
+                                      Data="M4 20h16v-2H4v2zM4 4v2h16V4H4zm9 5h3l-4-4-4 4h3v6H8l4 4 4-4h-3V9z"/>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
                     <!-- Every report the program writes lands in one folder now; this is how it is
                          reached without knowing where AppData is. -->
                     <MenuItem x:Name="ReportsFolderMenuItem" Header="Open Reports Folder"
