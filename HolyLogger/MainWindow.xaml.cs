@@ -9874,8 +9874,13 @@ namespace HolyLogger
                         string notesFile = await ReleaseNotes.FetchAsync();
                         string notes = ReleaseNotes.Since(notesFile, CurrentVersion);
 
+                        // BOTH NUMBERS, SIDE BY SIDE. "There is a new version" leaves the operator to
+                        // remember which one he is running before he can tell whether it matters to
+                        // him - and the one place he cannot go and look is here, with the question on
+                        // screen in front of him.
                         string ask = "There is a new version"
-                                   + (newVersion.Length > 0 ? " — " + newVersion : "") + ".";
+                                   + (newVersion.Length > 0 ? " — " + newVersion : "") + ".\n"
+                                   + "Your version is: " + (CurrentVersion ?? "").Trim() + ".";
                         if (!string.IsNullOrWhiteSpace(notes))
                             ask += "\n\n" + notes.Trim();
 
