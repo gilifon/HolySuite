@@ -88,7 +88,14 @@ namespace HolyLogger
                     int outcome;
                     try
                     {
-                        string body = await _eqslHttp.GetStringAsync(url);
+                        // Task.Run, not a bare await. On .NET Framework the proxy for a request is
+                        // worked out on whichever thread STARTS it, before the call goes off on its
+                        // own - and this one is started from the window's thread every time a QSO is
+                        // saved with eQSL auto-upload on. With "automatically detect proxy settings"
+                        // switched on, which is the Windows default, that is a real pause in the
+                        // middle of logging a contact. The answer still comes back here, on the
+                        // window's thread, so the database and the screen stay single-threaded.
+                        string body = await Task.Run(() => _eqslHttp.GetStringAsync(url));
                         outcome = ClassifyEqslResponse(body);
                     }
                     catch (Exception ex)
@@ -168,7 +175,9 @@ namespace HolyLogger
                     try
                     {
                         // No ConfigureAwait(false): resume on the UI thread so DB/UI stay single-threaded.
-                        string body = await _eqslHttp.GetStringAsync(url);
+                        // Task.Run around the START, though - the proxy is resolved on the thread that
+                        // begins a request, and this queue is pumped from the window's thread.
+                        string body = await Task.Run(() => _eqslHttp.GetStringAsync(url));
                         outcome = ClassifyEqslResponse(body);
                     }
                     catch (Exception ex)

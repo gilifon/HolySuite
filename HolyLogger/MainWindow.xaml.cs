@@ -5952,7 +5952,6 @@ namespace HolyLogger
             foreach (var chunk in ChunkedQSOs)
             {
                 string chunkJSON = JsonConvert.SerializeObject(chunk).Replace("'", "");
-                //string insert = GenerateMultipleInsert(chunk);
 
                 var values = new Dictionary<string, string>
                 {
@@ -6003,49 +6002,7 @@ namespace HolyLogger
             return SplittedQSO;
         }
 
-        private void PostQSO(QSO qso)
-        {
-            string content = GenerateMultipleInsert(new List<QSO> { qso });
-            var formData = new System.Collections.Generic.Dictionary<string, string>
-            {
-                { "insertlog", content }
-            };
-            var formContent = new FormUrlEncodedContent(formData);
-            _sharedHttpClient.PostAsync("https://tools.iarc.org/Holyland/Server/AddLog.php", formContent)
-                             .ContinueWith(_ => { });
-        }
        
-        private string GenerateMultipleInsert(IList<QSO> qsos)
-        {
-            StringBuilder sb = new StringBuilder("INSERT INTO `log` ", 500);
-            sb.Append("(`my_callsign`, `operator`, `my_square`, `my_locator`, `dx_locator`, `frequency`, `band`, `dx_callsign`, `rst_rcvd`, `rst_sent`, `timestamp`, `mode`, `exchange`, `comment`, `name`, `country`, `continent`, `prop_mode`, `sat_name` ) VALUES ");
-            foreach (QSO qso in qsos)
-            {
-                sb.Append("(");
-                sb.Append("'"); sb.Append(qso.MyCall.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Operator.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.STX.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.MyLocator.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.DXLocator.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Freq.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Band.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.DXCall.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.RST_RCVD.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.RST_SENT.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Date.Trim().Replace("'", "\"") + " " + qso.Time.Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Mode.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.SRX.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Comment.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Name.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Country.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.Continent.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.PROP_MODE.Trim().Replace("'", "\"")); sb.Append("',");
-                sb.Append("'"); sb.Append(qso.SAT_NAME.Trim().Replace("'", "\"")); sb.Append("'),");
-            }
-            string result = sb.ToString().TrimEnd(',');
-            result += " ON DUPLICATE KEY UPDATE my_callsign=my_callsign";
-            return result;
-        }
         
         private void QSODataGrid_PreviewKeyDown(object sender, KeyEventArgs e)
         {

@@ -66,7 +66,12 @@ namespace HolyLogger
                 ServicePointManager.Expect100Continue = true;
                 ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
                 WebRequest request = WebRequest.Create("https://xmldata.qrz.com/xml/current/?username=" + Properties.Settings.Default.qrz_username + ";password=" + Properties.Settings.Default.qrz_password);
-                using (WebResponse response = await request.GetResponseAsync().ConfigureAwait(false))
+
+                // Task.Run around the START. Awaiting already leaves the thread free while the round
+                // trip is in flight, but the proxy is resolved BEFORE that, on whichever thread begins
+                // the request - and the callers here are the Options window closing and the Test
+                // Connection button, both on the window's thread.
+                using (WebResponse response = await Task.Run(() => request.GetResponseAsync()).ConfigureAwait(false))
                 using (Stream dataStream = response.GetResponseStream())
                 using (StreamReader reader = new StreamReader(dataStream))
                 {
@@ -95,11 +100,28 @@ namespace HolyLogger
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12;
             if (string.IsNullOrEmpty(callsign) || string.IsNullOrEmpty(frequency) || string.IsNullOrEmpty(mode)) return;
             string IsVisible = is_visible ? "1" : "0";
-            WebRequest request = WebRequest.Create("https://tools.iarc.org/Holyland/Server/heartbeat.php?callsign=" + callsign + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode + "&machine=" + machineName + "&is_visible=" + IsVisible);
-            request.GetResponseAsync().ContinueWith(t =>
+            string url = "https://tools.iarc.org/Holyland/Server/heartbeat.php?callsign=" + callsign
+                       + "&operator=" + op_callsign + "&frequency=" + frequency + "&mode=" + mode
+                       + "&machine=" + machineName + "&is_visible=" + IsVisible;
+
+            // STARTED AWAY FROM THE WINDOW'S THREAD, and it matters more here than anywhere else.
+            //
+            // A timer calls this EVERY MINUTE for as long as the program is open. On .NET Framework the
+            // proxy for a request is worked out on whichever thread STARTS it, so with "automatically
+            // detect proxy settings" switched on - the Windows default - the window was paying that
+            // price once a minute, all day. Nobody waits for the answer: it is a heartbeat.
+            Task.Run(() =>
             {
-                if (t.Status == TaskStatus.RanToCompletion)
-                    t.Result?.Dispose();
+                try
+                {
+                    WebRequest request = WebRequest.Create(url);
+                    request.GetResponseAsync().ContinueWith(t =>
+                    {
+                        if (t.Status == TaskStatus.RanToCompletion)
+                            t.Result?.Dispose();
+                    });
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
             });
         }
 
