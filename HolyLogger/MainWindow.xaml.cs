@@ -11952,11 +11952,41 @@ namespace HolyLogger
                     }
                 }
 
+                // WHAT THE FILE HELD BEFORE THE CHANGES. Counted from the set, not from the lines, so a
+                // repeated line in the file is not mistaken for a callsign lost in the merge.
+                int wasHolding = callsignSet.Count;
+
                 foreach (string call in pending.Add) callsignSet.Add(call);
                 foreach (string call in pending.Remove) callsignSet.Remove(call);
 
                 var sortedCallsigns = new List<string>(callsignSet);
                 sortedCallsigns.Sort(StringComparer.Ordinal);
+
+                // THE LIST IS NEVER ALLOWED TO SHRINK BY ITSELF.
+                //
+                // This has already happened once: the file lost 921,961 of its 1.5 million callsigns on
+                // 1 August 2026 and had to be restored by hand from the repository. Nothing noticed at
+                // the time, and nothing could have - the server is only ever asked "what changed since
+                // version N", never "how many should there be", so a short file stays short for ever and
+                // the missing callsigns are never asked for again.
+                //
+                // The rule is exact, not a guess at a sensible margin. The only callsigns allowed to
+                // leave are the ones the server asked to remove; anything beyond that is a fault in the
+                // reading, the merge or the file itself, and the safe answer is to write NOTHING and
+                // keep what we have. A file that is still whole can be updated tomorrow. One that has
+                // been overwritten with half of itself cannot be got back.
+                int lost = wasHolding - sortedCallsigns.Count;
+                if (lost > pending.Remove.Count || sortedCallsigns.Count < 1000)
+                {
+                    Log.Warn("CALLSIGN LIST NOT WRITTEN - it would have SHRUNK. The file held "
+                             + wasHolding.ToString("N0") + " callsigns, the merge produced "
+                             + sortedCallsigns.Count.ToString("N0") + ", and the server asked to remove only "
+                             + pending.Remove.Count.ToString(CultureInfo.InvariantCulture)
+                             + ". Nothing was written; the file on disk is untouched and still holds "
+                             + wasHolding.ToString("N0") + ".");
+                    return "ERROR: refused to write - the list would have lost "
+                           + lost.ToString("N0") + " callsigns";
+                }
 
                 // Written straight out, a line at a time - not built into one more list first.
                 using (var writer = new StreamWriter(callsignFilePath, false))
