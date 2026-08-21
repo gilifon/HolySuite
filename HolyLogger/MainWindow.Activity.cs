@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text.RegularExpressions;
 using System.Windows;
@@ -221,6 +221,29 @@ namespace HolyLogger
             // The word "Program" shows only while the box is empty - it is a label, not a value.
             if (TB_ActivitySigPlaceholder != null)
                 TB_ActivitySigPlaceholder.Visibility = typed.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+
+            UpdateActivityHintWidth();
+        }
+
+        // AS MUCH ROOM AS THE ROW HAS SPARE. The hint shares its line with Try Again and Undo, and both
+        // of those are Collapsed in normal use - so a fixed limit that always left space for them meant
+        // "World Castles Award" was cut to "World Castl..." on a row that was two thirds empty.
+        // The limit now follows whichever button is actually showing:
+        //   Try Again visible -> stop at its left edge, 436
+        //   only Undo visible -> stop at its left edge, 542
+        //   neither           -> the row's own right edge, 638 (the right edge of the WWFF box above)
+        // less a 6px gap in each case, so the words never touch a key. Anything still too long keeps the
+        // ellipsis it always had, and the drop-down spells every name out in full.
+        private void UpdateActivityHintWidth()
+        {
+            if (TB_ActivitySigHint == null) return;
+
+            const double hintLeft = 335, gap = 6;
+            double stopAt = 638;
+            if (Btn_TryAgain != null && Btn_TryAgain.Visibility == Visibility.Visible) stopAt = 436;
+            else if (Btn_UndoMain != null && Btn_UndoMain.Visibility == Visibility.Visible) stopAt = 542;
+
+            TB_ActivitySigHint.MaxWidth = stopAt - hintLeft - gap;
         }
 
         private void ActivitySig_TextChanged(object sender, TextChangedEventArgs e)

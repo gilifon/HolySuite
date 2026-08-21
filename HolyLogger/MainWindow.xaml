@@ -1794,13 +1794,16 @@
                 <TextBlock Text="Activity" FontSize="16" VerticalAlignment="Center" Margin="5,0,0,4"
                            Foreground="{DynamicResource MutedTextBrush}"/>
             </Border>
-            <!-- MaxWidth, because this line has to STOP before the Try Again button at 436. A Canvas
+            <!-- MaxWidth, because this line has to STOP before whatever button is showing. A Canvas
                  draws in declaration order and this text is declared last, so without a limit it ran
                  straight over the button's face - the button and the words appeared on top of one
-                 another. 95 = 436 - 335, less a 6px gap. Long names lose their tail to the ellipsis
-                 that was already set here; the drop-down spells every one of them out in full. -->
+                 another. The limit is NOT fixed: Try Again and Undo are both Collapsed in normal use,
+                 and reserving their space always meant "World Castles Award" was cut short on a row
+                 that was two thirds empty. UpdateActivityHintWidth sets it from what is actually on the
+                 row; 297 here (638 - 335, less a 6px gap) is the empty-row case it starts in. Anything
+                 still too long keeps the ellipsis; the drop-down spells every name out in full. -->
             <TextBlock x:Name="TB_ActivitySigHint" Canvas.Left="335" Canvas.Top="37" FontSize="16"
-                       MaxWidth="95"
+                       MaxWidth="297"
                        Foreground="{DynamicResource AccentBrush}" TextTrimming="CharacterEllipsis"
                        IsHitTestVisible="False"/>
         </Canvas>

@@ -3935,6 +3935,7 @@ namespace HolyLogger
             if (_mainUndo.Count == 0)
             {
                 Btn_UndoMain.Visibility = Visibility.Collapsed;
+                UpdateActivityHintWidth();   // the hint beside it takes the room back
                 return;
             }
 
@@ -3942,6 +3943,7 @@ namespace HolyLogger
             Btn_UndoMain.ToolTip = "Undo: " + top.Label
                 + (_mainUndo.Count > 1 ? string.Format("   ({0} more can be undone)", _mainUndo.Count - 1) : "");
             Btn_UndoMain.Visibility = Visibility.Visible;
+            UpdateActivityHintWidth();       // the hint beside it gives the room up
         }
 
         private void ClearUndo()
@@ -3950,6 +3952,7 @@ namespace HolyLogger
             _editUndoBefore = null;
             _editUndoTarget = null;
             if (Btn_UndoMain != null) Btn_UndoMain.Visibility = Visibility.Collapsed;
+            UpdateActivityHintWidth();
         }
 
         // Every readable-and-writable property, copied. Written by reflection rather than by hand

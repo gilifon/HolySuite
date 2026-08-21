@@ -4924,6 +4924,8 @@ namespace HolyLogger
                     // is only 677px wide and a face wide enough for "Try Again (100)" ran over the
                     // activity hint beside it.
                     Btn_TryAgain.Visibility = n > 0 ? Visibility.Visible : Visibility.Collapsed;
+                    UpdateActivityHintWidth();   // the activity hint beside it sizes to what is left
+
                     Btn_TryAgain.ToolTip = n == 1
                         ? "1 station waiting to be tried again"
                         : string.Format(CultureInfo.InvariantCulture, "{0} stations waiting to be tried again", n);
