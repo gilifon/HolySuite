@@ -9854,6 +9854,17 @@ namespace HolyLogger
                                    + (newVersion.Length > 0 ? " — " + newVersion : "") + ".";
                         if (!string.IsNullOrWhiteSpace(notes))
                             ask += "\n\n" + notes.Trim();
+
+                        // AND WHAT HAPPENS NEXT, SAID BEFORE IT HAPPENS.
+                        //
+                        // Answering yes downloads the installer, starts it, and CLOSES HolyLogger -
+                        // and nothing brings it back afterwards. An operator who was not told that
+                        // sees his logger vanish in the middle of the afternoon and is left wondering
+                        // whether the update broke it.
+                        ask += "\n\nHolyLogger will close so that the update can install. "
+                             + "It does NOT start again by itself — open it from your desktop or the "
+                             + "Start menu once the update has finished.";
+
                         ask += "\n\nDo you want to install?";
 
                         if (HolyMessageBox.ShowConfirm(ask, "New updates are available", HolyMsgType.Info, this,
