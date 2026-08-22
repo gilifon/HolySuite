@@ -1,4 +1,4 @@
-<?xml version='1.0' encoding='utf-8'?>
+﻿<?xml version='1.0' encoding='utf-8'?>
 <SettingsFile xmlns="http://schemas.microsoft.com/VisualStudio/2004/01/settings" CurrentProfile="(Default)" GeneratedClassNamespace="HolyLogger.Properties" GeneratedClassName="Settings">
   <Profiles />
   <Settings>
@@ -742,5 +742,11 @@
     </Setting>
     <Setting Name="SupportSenderEmail" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="CwKeyboardHistoryRows" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">3</Value>
+    </Setting>
+    <Setting Name="CwKeyboardBreakSeconds" Type="System.Int32" Scope="User">
+      <Value Profile="(Default)">3</Value>
     </Setting>  </Settings>
 </SettingsFile>

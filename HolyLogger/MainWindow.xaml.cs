@@ -889,6 +889,17 @@ namespace HolyLogger
         // connected -> normal QRZ lookup; not connected -> open the QRZ Service options page.
         private bool _qrzConnected = true;
 
+        // The state that icon shows, readable from the other windows: their right-click "Open QRZ
+        // Page" is offered only while there is a QRZ session to open a page with. UI thread only -
+        // it walks the window list.
+        internal static bool QrzIsConnected()
+        {
+            if (Application.Current == null) return false;
+            foreach (Window w in Application.Current.Windows)
+                if (w is MainWindow) return ((MainWindow)w)._qrzConnected;
+            return false;
+        }
+
         // Callsigns that QRZ returned no data for — skip them on subsequent service runs this session.
         private readonly HashSet<string> _qrzNoData = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -2811,6 +2822,16 @@ namespace HolyLogger
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
+            // Ctrl+K: the CW keyboard, the same key every contest logger uses for it. It TOGGLES -
+            // the key that opened the window also puts it away. The same key does the same job from
+            // inside the window itself (see CwKeyboardWindow), which is where the focus usually is.
+            if (e.Key == Key.K && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
+            {
+                if (cwKeyboard != null) CloseCwKeyboard(); else OpenCwKeyboard();
+                e.Handled = true;
+                return;
+            }
+
             if (e.Key == Key.Enter && Properties.Settings.Default.AddQSOWithEnter)
             {
                 AddBtn_Click(null, null);
@@ -2965,6 +2986,137 @@ namespace HolyLogger
                 case 4: return Btn_Msg4;
                 default: return null;
             }
+        }
+
+        // ---- THE CW KEYBOARD ----------------------------------------------------------------------
+        //
+        // The canned messages above send a whole text at one press. This is the other half: a window
+        // the operator types into, going out of the radio as it is typed. The window itself is in
+        // CwKeyboardWindow - see the note at the top of that file for how the pacing works and why the
+        // typing is sent in chunks rather than letter by letter.
+        //
+        // IT ONLY OPENS ON A RADIO THAT IS IN CW. Not because the program could not send otherwise,
+        // but because a CW keyboard in front of a radio sitting on SSB is a trap: the operator types,
+        // presses nothing, and hears nothing. If the radio leaves CW while the window is open, the
+        // window goes with it (see UpdateVoiceMessageAvailabilityState).
+        //
+        // It also OPENS BY ITSELF the moment the radio goes to CW - the operator should not have to
+        // remember Ctrl+K after every mode change. That path passes silent: true, because a warning
+        // box thrown up by a mode change nobody asked a question about is worse than no keyboard.
+        private CwKeyboardWindow cwKeyboard;
+
+        private void OpenCwKeyboard(bool silent = false)
+        {
+            if (cwKeyboard != null)
+            {
+                cwKeyboard.Activate();
+                return;
+            }
+
+            if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
+            {
+                if (!silent) HolyMessageBox.ShowWarning("OmniRig CAT is not available.", "CW Keyboard", this);
+                return;
+            }
+
+            if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
+            {
+                if (!silent) HolyMessageBox.ShowWarning("The radio is offline.", "CW Keyboard", this);
+                return;
+            }
+
+            if (!IsCwModeActive())
+            {
+                if (!silent) HolyMessageBox.ShowWarning("The radio is not in CW. Put it in CW and open the keyboard again.",
+                                                       "CW Keyboard", this);
+                return;
+            }
+
+            string rigType = NormalizeRigType(Rig != null ? Rig.RigType : null);
+
+            if (BuildCwChunkCommand(rigType, "E") == null)
+            {
+                if (!silent) HolyMessageBox.ShowWarning("CW keying by CAT is not supported for this radio model ("
+                                                       + rigType + ").", "CW Keyboard", this);
+                return;
+            }
+
+            cwKeyboard = new CwKeyboardWindow(
+                chunk =>
+                {
+                    string command = BuildCwChunkCommand(rigType, chunk);
+                    return command != null && TrySendOmniRigCustomCommand(command);
+                },
+                () =>
+                {
+                    string stop = BuildCwStopCommand(rigType);
+                    if (!string.IsNullOrWhiteSpace(stop)) TrySendOmniRigCustomCommand(stop);
+                },
+                () => cwLearnedWpm,
+                CwChunkSizeFor(rigType))
+            {
+                Owner = this,
+                Icon = Icon
+            };
+
+            cwKeyboard.Closed += (s, e) => cwKeyboard = null;
+            cwKeyboard.Show();
+        }
+
+        private void CloseCwKeyboard()
+        {
+            if (cwKeyboard == null) return;
+
+            try { cwKeyboard.Close(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            cwKeyboard = null;
+        }
+
+        // ONE CHUNK OF TYPING, not a whole message: no truncation to a message length and - for the KY
+        // radios - NO PADDING. The canned-message command pads the text out to 28 characters because
+        // it is sent once and the trailing spaces cost nothing. Here a chunk follows another chunk,
+        // and padding would put twenty spaces of silence in the middle of a word.
+        //
+        // The Icom form is the one already proven in this program (command 17, sub-command 00, the
+        // text as ASCII bytes). The KY form is the same command the canned messages use, minus the
+        // padding; it has not been tried against a Yaesu, Kenwood or Elecraft here.
+        private static string BuildCwChunkCommand(string rigType, string text)
+        {
+            if (string.IsNullOrEmpty(text)) return null;
+
+            string safe = new string(text.ToUpper().Where(c => c >= ' ' && c <= 'Z').ToArray());
+            if (safe.Length == 0) return null;
+
+            string icomAddress = GetIcomCivAddress(rigType);
+            if (icomAddress != null)
+            {
+                string textHex = string.Join(" ", safe.Select(c => ((byte)c).ToString("X2")));
+                return "FE FE " + icomAddress + " E0 17 00 " + textHex + " FD";
+            }
+
+            bool isYaesu = rigType.StartsWith("FT", StringComparison.OrdinalIgnoreCase)
+                        || rigType.StartsWith("FTDX", StringComparison.OrdinalIgnoreCase);
+            bool isElecraft = rigType.StartsWith("K3", StringComparison.OrdinalIgnoreCase);
+            bool isKenwood = rigType.StartsWith("TS", StringComparison.OrdinalIgnoreCase);
+
+            if (isYaesu || isElecraft || isKenwood)
+            {
+                return "KY " + safe + ";";
+            }
+
+            return null;
+        }
+
+        // How much one command may carry. Under every radio's real buffer on purpose: the pacing keeps
+        // the radio busy anyway, and a short chunk is a short wait between typing and hearing it.
+        private static int CwChunkSizeFor(string rigType)
+        {
+            return 12;
+        }
+
+        private void CwKeyboardMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            OpenCwKeyboard();
         }
 
         private void TriggerCwTextMessage(int messageNumber)
@@ -4079,7 +4231,7 @@ namespace HolyLogger
         {
         }
 
-        private void OpenQrzPage(string callsign)
+        internal static void OpenQrzPage(string callsign)
         {
             string call = (callsign ?? string.Empty).Trim().ToUpperInvariant();
             if (string.IsNullOrWhiteSpace(call))
@@ -5319,6 +5471,10 @@ namespace HolyLogger
         // this flag gates only the left-click / F-key SEND action.
         private bool _messageSendAvailable = false;
 
+        // Whether the radio was in CW and reachable last time this was worked out, so the keyboard is
+        // opened on the CHANGE into CW and not on every pass through it.
+        private bool _cwKeyboardWasWanted = false;
+
         private void UpdateVoiceMessageAvailabilityState()
         {
             if (PlayCommandsBorder == null)
@@ -5352,6 +5508,30 @@ namespace HolyLogger
             if (!isAvailable)
             {
                 ClearVoiceMessageState();
+            }
+
+            // THE CW KEYBOARD FOLLOWS THE RADIO. Not in CW, or not there at all, and it goes; in CW
+            // and reachable, and it comes up by itself. This runs on every ParamsChange (see
+            // ShowRigParams), so "by itself" means as the mode changes, not five seconds later.
+            //
+            // ON THE EDGE ONLY. Opening on the state, rather than on the change into it, would put the
+            // window back the instant the operator closed it - a window that cannot be closed. Closed
+            // by hand, it stays closed until the radio leaves CW and comes back.
+            //
+            // NOT BEFORE THE MAIN WINDOW IS UP. This also runs from the constructor, where a child
+            // window cannot take an Owner that has never been shown. The flag is left alone in that
+            // case, so a radio already in CW at startup gets its keyboard on the next pass instead.
+            bool cwKeyboardWanted = isCw && isAvailable;
+
+            if (!cwKeyboardWanted)
+            {
+                CloseCwKeyboard();
+                _cwKeyboardWasWanted = false;
+            }
+            else if (!_cwKeyboardWasWanted && IsLoaded)
+            {
+                OpenCwKeyboard(true);
+                _cwKeyboardWasWanted = true;
             }
 
             UpdateMessageButtonLabels();
@@ -9691,7 +9871,7 @@ namespace HolyLogger
 
         private void GenerateNewAboutWindow()
         {
-            about = new AboutWindow(callsignListVersion);
+            about = new AboutWindow(callsignListVersion, callsignIndex == null ? -1 : callsignIndex.Count);
             about.Show();
         }
 
@@ -11747,6 +11927,13 @@ namespace HolyLogger
             // Run async work on background thread
             Task.Run(async () =>
             {
+                // DECLARED OUT HERE so the pages that DID arrive are written even when a later one
+                // never does. A run that dies halfway - the network goes, the server answers badly -
+                // still holds good, whole batches, and each carries its own version, so writing them
+                // is honest: the file records the last version actually merged and the next run asks
+                // from there. Letting them go meant asking for the same pages again tomorrow.
+                PendingCallsignUpdate pending = null;
+
                 try
                 {
                     string logDir = Path.Combine(
@@ -11800,7 +11987,7 @@ namespace HolyLogger
 
                         // ONE of these for the whole run. Every page adds to it; nothing touches the
                         // file until the last page is in.
-                        var pending = new PendingCallsignUpdate { Version = callsignListVersion };
+                        pending = new PendingCallsignUpdate { Version = callsignListVersion };
 
                         do
                         {
@@ -11925,7 +12112,276 @@ namespace HolyLogger
                     
                     // No popup on failure; error is kept in status and log.
                 }
+
+                // AND NOW THE FILE. This call was missing altogether: every start of the program asked
+                // the server what had changed, collected the answer into `pending` - and then let it
+                // go out of scope. Nothing was ever written, so nothing the server has sent since the
+                // installer was built had ever reached the list the suggestions come from. The whole
+                // update path ran, logged every page, and changed nothing.
+                //
+                // It stays on this background thread: it reads and writes an 11 MB file and rebuilds
+                // the index, which is not work to hand to the window.
+                try
+                {
+                    if (pending != null && pending.Any)
+                    {
+                        string result = CommitCallsignListUpdate(pending);
+
+                        string commitLogDir = Path.Combine(
+                            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                            "HolyLogger",
+                            "Logs");
+                        Directory.CreateDirectory(commitLogDir);
+                        File.AppendAllText(Path.Combine(commitLogDir, "callsign_update.log"),
+                                           "Commit: " + result + "\n");
+                    }
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+
+                // AND THEN THE SECOND QUESTION: not "what has changed", but "how many should there
+                // be". Asked after the deltas are in, so a list that is merely out of date is put
+                // right by the cheap conversation and never provokes the expensive one.
+                try
+                {
+                    string reconcileLogDir = Path.Combine(
+                        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                        "HolyLogger",
+                        "Logs");
+                    Directory.CreateDirectory(reconcileLogDir);
+                    await ReconcileCallsignListWithServer(Path.Combine(reconcileLogDir, "callsign_update.log"));
+                }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
             });
+        }
+
+        // ---- IS THE LIST STILL WHOLE? -------------------------------------------------------------
+        //
+        // THE HOLE THIS FILLS. The update the program has always done is a DELTA: it asks the server
+        // "what has changed since version N" and merges the answer. That can only ever add what is
+        // new. It cannot notice that the file is SHORT, because nothing in that conversation says how
+        // many callsigns there are supposed to be - and on 1 August 2026 the file lost 921,961 of its
+        // 1.5 million and no part of the program was able to tell. It had to be put back by hand from
+        // the repository.
+        //
+        // So, once the delta run is over, the program asks a second question - HOW MANY SHOULD THERE
+        // BE - and, only if the answer is more than it is holding, fetches the whole list and starts
+        // again from that.
+        //
+        // WHAT THE SERVER HAS TO OFFER for any of this to happen:
+        //
+        //   1. getcallsigncount.php  ->  {"success":true,"total":1510342,"latestVersion":102}
+        //      Cheap: it is asked at every start. `total` is how many callsigns the server's full
+        //      list holds. Anything else in the reply is ignored.
+        //
+        //   2. getcallsignlist.php   ->  text/plain, the WHOLE list: one callsign per line, upper
+        //      case, sorted, no duplicates, first line the version number - the same shape as the
+        //      file the installer ships, because it replaces exactly that file.
+        //
+        // Neither is required. If the server does not answer them, or answers something else, this
+        // writes a line in the log and the program goes on behaving exactly as it does today - so the
+        // client end can be finished now and the server can catch up whenever it likes.
+        //
+        // NOTHING IS HELD IN MEMORY. The list is 11 MB and this is a 32-bit program that has already
+        // been brought down by holding one big thing at once (see CallsignIndex): the download goes
+        // straight to a temporary file, counted and checked for order as it is written, and only then
+        // takes the place of the real one. A list that arrives short, out of order, or plainly wrong
+        // is thrown away and the file on disk is not touched.
+        private const string CallsignCountUrl = "https://tools.iarc.org/holyland/server/getcallsigncount.php";
+        private const string CallsignFullListUrl = "https://tools.iarc.org/holyland/server/getcallsignlist.php";
+
+        private async Task ReconcileCallsignListWithServer(string logPath)
+        {
+            Action<string> note = message =>
+            {
+                try { if (logPath != null) File.AppendAllText(logPath, message + "\n"); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            };
+
+            string callsignFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory,
+                                                   "Data" + Path.DirectorySeparatorChar + "callsigns_merged_big.txt");
+            if (!File.Exists(callsignFilePath))
+            {
+                note("Reconcile: there is no callsign file to check.");
+                return;
+            }
+
+            int serverTotal;
+            using (var client = new HttpClient())
+            {
+                client.Timeout = TimeSpan.FromSeconds(20);
+                try
+                {
+                    string reply = await client.GetStringAsync(CallsignCountUrl);
+                    var json = Newtonsoft.Json.Linq.JObject.Parse(reply);
+                    bool ok = json["success"] != null && json["success"].ToObject<bool>();
+                    serverTotal = ok && json["total"] != null ? json["total"].ToObject<int>() : -1;
+                }
+                catch (Exception ex)
+                {
+                    // The endpoint is not there yet, or the network is not. Either way there is
+                    // nothing to compare against, and so nothing to do.
+                    note("Reconcile: the server could not say how many callsigns there are (" + ex.Message + ").");
+                    return;
+                }
+            }
+
+            if (serverTotal <= 1000)
+            {
+                note("Reconcile: the server answered " + serverTotal.ToString(CultureInfo.InvariantCulture)
+                     + " - that is not a whole list, so nothing was done.");
+                return;
+            }
+
+            int localTotal = CountCallsignsInFile(callsignFilePath);
+            note("Reconcile: " + localTotal.ToString("N0") + " callsigns here, "
+                 + serverTotal.ToString("N0") + " at the server.");
+
+            // AHEAD IS NOT SHORT. A file holding more than the server does is not a fault to repair -
+            // it is a station that has worked callsigns the server was never told about, and those are
+            // not to be thrown away.
+            if (localTotal < 0 || localTotal >= serverTotal)
+            {
+                note("Reconcile: the list is whole. Nothing was fetched.");
+                return;
+            }
+
+            note("Reconcile: the list is short by " + (serverTotal - localTotal).ToString("N0")
+                 + ". Fetching the whole list.");
+
+            string tempPath = callsignFilePath + ".new";
+            int written = 0;
+            int version = callsignListVersion;
+            bool sorted = true;
+
+            try
+            {
+                using (var client = new HttpClient())
+                {
+                    // 11 MB over whatever line the operator has. Nothing is waiting on it - this runs
+                    // on the background thread the update runs on - so it is given room.
+                    client.Timeout = TimeSpan.FromMinutes(5);
+
+                    using (var response = await client.GetAsync(CallsignFullListUrl, HttpCompletionOption.ResponseHeadersRead))
+                    {
+                        response.EnsureSuccessStatusCode();
+
+                        using (var stream = await response.Content.ReadAsStreamAsync())
+                        using (var reader = new StreamReader(stream))
+                        using (var writer = new StreamWriter(tempPath, false))
+                        {
+                            string line;
+                            string previous = null;
+                            bool firstLine = true;
+
+                            while ((line = reader.ReadLine()) != null)
+                            {
+                                if (firstLine)
+                                {
+                                    firstLine = false;
+                                    int parsed;
+                                    if (int.TryParse(line.Trim(), NumberStyles.Integer, CultureInfo.InvariantCulture, out parsed))
+                                    {
+                                        version = parsed;
+                                        writer.WriteLine(parsed.ToString(CultureInfo.InvariantCulture));
+                                        continue;
+                                    }
+
+                                    // No version line: keep the version we already have, and let this
+                                    // first line fall through to be read as a callsign like any other.
+                                    writer.WriteLine(version.ToString(CultureInfo.InvariantCulture));
+                                }
+
+                                string call = FirstToken(line);
+                                if (call == null || call.Length == 0 || call.Length > 15) continue;
+                                if (call[0] == '#' || call[0] == ';') continue;
+
+                                // ORDER IS THE WHOLE POINT of this file: the index binary-searches it,
+                                // and an unsorted file makes the suggestions answer nonsense. Checked
+                                // as it goes past, which costs one comparison and no memory at all.
+                                if (previous != null && string.CompareOrdinal(call, previous) <= 0) sorted = false;
+                                previous = call;
+
+                                writer.WriteLine(call);
+                                written++;
+                            }
+                        }
+                    }
+                }
+
+                // EVERY REASON TO THROW IT AWAY, found before anything on disk is touched. The rule is
+                // the one the delta merge follows: the list is never allowed to shrink by itself.
+                string refuse = null;
+                if (!sorted) refuse = "the list did not arrive in order";
+                else if (written < localTotal) refuse = "it holds " + written.ToString("N0")
+                                                        + ", fewer than the " + localTotal.ToString("N0") + " already here";
+                else if (written < serverTotal) refuse = "it holds " + written.ToString("N0")
+                                                        + ", fewer than the " + serverTotal.ToString("N0") + " the server promised";
+
+                if (refuse != null)
+                {
+                    note("Reconcile: NOT USED - " + refuse + ". The file on disk is untouched.");
+                    Log.Warn("Callsign list: the whole list was fetched and refused - " + refuse + ".");
+                    try { File.Delete(tempPath); } catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+                    return;
+                }
+
+                // In place of the real one, and the project's own copy with it on a dev run - the same
+                // two files the delta merge keeps in step.
+                File.Copy(tempPath, callsignFilePath, true);
+                File.Delete(tempPath);
+
+                string projectDataFilePath = Path.GetFullPath(Path.Combine(
+                    AppDomain.CurrentDomain.BaseDirectory,
+                    ".." + Path.DirectorySeparatorChar + ".." + Path.DirectorySeparatorChar + ".." +
+                    Path.DirectorySeparatorChar + "Data" + Path.DirectorySeparatorChar + "callsigns_merged_big.txt"));
+                if (!string.Equals(callsignFilePath, projectDataFilePath, StringComparison.OrdinalIgnoreCase)
+                    && File.Exists(projectDataFilePath))
+                {
+                    try { File.Copy(callsignFilePath, projectDataFilePath, true); }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                callsignListVersion = version;
+                LoadCallsignIndex();
+
+                note("Reconcile: the whole list was fetched and put in place - " + written.ToString("N0")
+                     + " callsigns at version " + version.ToString(CultureInfo.InvariantCulture) + ".");
+                Log.Warn("Callsign list: refilled from the server - was " + localTotal.ToString("N0")
+                         + ", now " + written.ToString("N0") + " callsigns at version "
+                         + version.ToString(CultureInfo.InvariantCulture) + ".");
+            }
+            catch (Exception ex)
+            {
+                note("Reconcile: fetching the whole list failed (" + ex.Message + "). The file on disk is untouched.");
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); }
+                catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+            }
+        }
+
+        // How many callsigns the file actually holds, counted by walking it. The first line is the
+        // version and not a callsign, and blank or commented lines are not callsigns either - read the
+        // same way the merge reads them, so that the two numbers can be compared at all.
+        private static int CountCallsignsInFile(string path)
+        {
+            int n = 0;
+            try
+            {
+                using (var reader = new StreamReader(path))
+                {
+                    string line;
+                    bool firstLine = true;
+                    while ((line = reader.ReadLine()) != null)
+                    {
+                        if (firstLine) { firstLine = false; continue; }
+                        string token = FirstToken(line);
+                        if (token == null || token.Length == 0) continue;
+                        if (token[0] == '#' || token[0] == ';') continue;
+                        if (token.Length <= 15) n++;
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return -1; }
+            return n;
         }
 
         // WHAT A WHOLE RUN OF BATCHES ADDS UP TO.

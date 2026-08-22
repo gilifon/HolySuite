@@ -23,13 +23,20 @@ namespace HolyLogger
     /// </summary>
     public partial class AboutWindow : Window
     {
-        public AboutWindow(int callsignVersion = 0)
+        // callsignCount is what the program is ACTUALLY holding - the callsigns it can suggest from,
+        // counted in memory rather than taken from anything the file or the server claims. Negative
+        // (or zero) means the big list has not finished loading yet, which is worth saying plainly
+        // rather than showing a nought.
+        public AboutWindow(int callsignVersion = 0, int callsignCount = -1)
         {
             InitializeComponent();
             Left = (System.Windows.SystemParameters.PrimaryScreenWidth - Width) / 2;
             Top = (System.Windows.SystemParameters.PrimaryScreenHeight - Height) / 2;
             L_Version.Text = "Version " + Assembly.GetExecutingAssembly().GetName().Version.ToString();
             L_CallsignVersion.Text = "Callsigns Version: " + callsignVersion.ToString();
+            L_CallsignCount.Text = callsignCount > 0
+                ? "Callsigns in this program: " + callsignCount.ToString("N0")
+                : "Callsigns in this program: still loading";
             L_LastUpdate.Text = "Last Update: " + GetLinkerDateTime(Assembly.GetExecutingAssembly()).ToShortDateString();
         }
 

@@ -216,6 +216,7 @@
     <Compile Include="ViewLogsWindow.xaml.cs">
       <DependentUpon>ViewLogsWindow.xaml</DependentUpon>
     </Compile>
+    <Compile Include="CwKeyboardWindow.cs" />
     <Compile Include="CwSendMonitorWindow.cs" />
     <Compile Include="SplashWindow.xaml.cs">
       <DependentUpon>SplashWindow.xaml</DependentUpon>

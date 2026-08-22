@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
 using System.Windows;
@@ -106,6 +106,15 @@ namespace HolyLogger
             if (cell == null) return null;
             var parts = new List<string>();
             Collect(cell, parts);
+
+            // A HALF THAT SAYS THE SAME AS THE ONE ABOVE IT IS NOT WORTH SAYING TWICE. The Log Fixer's
+            // cells are stacked pairs - what the log holds now, and what it would hold after the fix -
+            // and the fields the fix does not touch carry the same text in both halves, which came out
+            // as "UH8EA  UH8EA". Only a repeat of the part immediately before it is dropped, so a pair
+            // that really differs still comes out whole.
+            for (int i = parts.Count - 1; i > 0; i--)
+                if (string.Equals(parts[i], parts[i - 1], StringComparison.Ordinal)) parts.RemoveAt(i);
+
             return string.Join("  ", parts);
         }
 
@@ -160,6 +169,23 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
+
+        // THE MARK EVERY PROGRAM USES FOR COPY: two sheets of paper, one behind the other. Taken from
+        // the icon font Windows itself is drawn with, so it matches the glyphs on the log table's own
+        // right-click lines, and in the same blue.
+        private static TextBlock CopyGlyph()
+        {
+            return new TextBlock
+            {
+                Text = "",
+                FontFamily = new System.Windows.Media.FontFamily("Segoe MDL2 Assets"),
+                FontSize = 15,
+                Foreground = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0)),
+                VerticalAlignment = VerticalAlignment.Center,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+        }
+
         // The two menu items, ready to be added to a table's existing right-click menu. `cellText` is
         // captured when the menu is built, because by the time the item is clicked the mouse has moved
         // off the cell it was over.
@@ -171,7 +197,8 @@ namespace HolyLogger
             var item = new MenuItem
             {
                 Header = shown.Length == 0 ? "Copy this cell" : "Copy \"" + shown + "\"",
-                IsEnabled = !string.IsNullOrWhiteSpace(cellText)
+                IsEnabled = !string.IsNullOrWhiteSpace(cellText),
+                Icon = CopyGlyph()
             };
             if (itemStyle != null) item.Style = itemStyle;
             item.Click += (s, e) => Put(cellText);
@@ -184,7 +211,8 @@ namespace HolyLogger
             var item = new MenuItem
             {
                 Header = n > 1 ? "Copy these " + n.ToString("N0") + " rows" : "Copy this row",
-                IsEnabled = n > 0
+                IsEnabled = n > 0,
+                Icon = CopyGlyph()
             };
             if (itemStyle != null) item.Style = itemStyle;
             item.Click += (s, e) => CopySelectedRows(grid);

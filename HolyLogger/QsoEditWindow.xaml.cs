@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -28,14 +28,60 @@ namespace HolyLogger
         // picker so a band offered in one place is offered in the other.
         private static readonly string[] _bands = HolyLogParser.KnownBands;
 
-        public QsoEditWindow(QSO qso, Rect avoidScreenRect = default(Rect))
+        // READ-ONLY IS THE SAME WINDOW WITH NOTHING TO PRESS. The Log Fixer opens a contact to be
+        // looked at, not changed, so the whole form is frozen rather than a second, thinner window
+        // being written and then drifting out of step with this one.
+        private readonly bool _viewOnly;
+
+        public QsoEditWindow(QSO qso, Rect avoidScreenRect = default(Rect), bool viewOnly = false)
         {
             InitializeComponent();
             _qso = qso;
             _avoidRect = avoidScreenRect;
+            _viewOnly = viewOnly;
             foreach (var b in _bands) CB_Band.Items.Add(b);
             LoadFromQso();
-            Loaded += (s, e) => PositionWindow();
+            Loaded += (s, e) =>
+            {
+                // Freezing waits for Loaded because it walks the visual tree, and there is no visual
+                // tree to walk until the window has been laid out.
+                if (_viewOnly) MakeViewOnly();
+                PositionWindow();
+            };
+        }
+
+        // Every box refuses typing, the pickers and the ticks are frozen, Save is gone and Cancel says
+        // Close. The text is left black and selectable on purpose: this window is for reading a QSO,
+        // and greyed-out boxes are exactly what a reader does not want.
+        private void MakeViewOnly()
+        {
+            Title = "QSO";
+            TB_TitleMode.Text = "Full View";
+            BTN_Save.Visibility = Visibility.Collapsed;
+            BTN_Save.IsDefault = false;   // otherwise Enter still finds it, hidden or not
+            BTN_Cancel.Content = "Close";
+            BTN_Cancel.IsDefault = true;
+            Freeze(this);
+        }
+
+        private static void Freeze(DependencyObject root)
+        {
+            int n = VisualTreeHelper.GetChildrenCount(root);
+            for (int i = 0; i < n; i++)
+            {
+                DependencyObject child = VisualTreeHelper.GetChild(root, i);
+
+                TextBox tb = child as TextBox;
+                if (tb != null) { tb.IsReadOnly = true; tb.IsReadOnlyCaretVisible = false; }
+
+                ComboBox cb = child as ComboBox;
+                if (cb != null) { cb.IsReadOnly = true; cb.IsHitTestVisible = false; cb.Focusable = false; }
+
+                CheckBox chk = child as CheckBox;
+                if (chk != null) { chk.IsHitTestVisible = false; chk.Focusable = false; }
+
+                Freeze(child);
+            }
         }
 
         // Open on the SAME monitor HolyLogger (the owner) is on - never the primary just because that is

@@ -215,7 +215,7 @@
                   VirtualizingPanel.VirtualizationMode="Recycling"
                   VerticalGridLinesBrush="{DynamicResource GridLine}"
                   ClipboardCopyMode="IncludeHeader"
-                  ContextMenuOpening="FindingsGrid_ContextMenuOpening"
+                  PreviewMouseRightButtonDown="FindingsGrid_PreviewMouseRightButtonDown"
                   MouseDoubleClick="FindingsGrid_MouseDoubleClick"
                   SelectionChanged="FindingsGrid_SelectionChanged">
             <DataGrid.RowStyle>

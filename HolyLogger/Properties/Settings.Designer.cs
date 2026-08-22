@@ -2989,5 +2989,29 @@ namespace HolyLogger.Properties {
                 this["SupportSenderEmail"] = value;
             }
         }
+        
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int CwKeyboardHistoryRows {
+            get {
+                return ((int)(this["CwKeyboardHistoryRows"]));
+            }
+            set {
+                this["CwKeyboardHistoryRows"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("3")]
+        public int CwKeyboardBreakSeconds {
+            get {
+                return ((int)(this["CwKeyboardBreakSeconds"]));
+            }
+            set {
+                this["CwKeyboardBreakSeconds"] = value;
+            }
+        }
     }
 }

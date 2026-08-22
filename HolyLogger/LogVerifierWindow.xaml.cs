@@ -3090,15 +3090,122 @@ namespace HolyLogger
             e.Handled = true;
         }
 
-        // This table has no right-click menu of its own, so the two copy commands ARE its menu. Built
-        // fresh on every click because the cell under the mouse is part of what it offers.
-        private void FindingsGrid_ContextMenuOpening(object sender, ContextMenuEventArgs e)
+        // The right-click menu: the station's QRZ page, the whole QSO, and then the two copy commands.
+        // Built fresh on every click because the row and the cell under the mouse are part of what it
+        // offers.
+        //
+        // BUILT ON BUTTON-DOWN, not in ContextMenuOpening. A menu attached while the opening event is
+        // already running arrives too late for that click: WPF had nothing to open, so the first
+        // right-click only highlighted the row and the menu appeared on the second. Attaching it on
+        // the way down means it is in place when the button comes up, which is when WPF opens it.
+        private void FindingsGrid_PreviewMouseRightButtonDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             var menu = new ContextMenu { FontSize = 16 };
             var cell = GridCopy.CellFrom(e.OriginalSource);
+
+            // THE ROW IS SELECTED FIRST, or "Copy this row" has no row to copy. A DataGrid does not
+            // select on a right-click, and this menu is built before the click is over, so without
+            // this the copy line came up greyed out. A row already inside a selection is left alone,
+            // so right-clicking one of several still copies all of them.
+            var clicked = cell == null ? null : ItemsControl.ContainerFromElement(FindingsGrid, cell) as DataGridRow;
+            if (clicked != null && !clicked.IsSelected)
+            {
+                FindingsGrid.SelectedItem = clicked.Item;
+                clicked.IsSelected = true;
+            }
+
+            // The callsign comes from the row the mouse is over, whichever of its cells was clicked -
+            // the same commands the log table offers, so a call whose country looks wrong here can be
+            // looked at without leaving the window.
+            FixRow row = cell == null ? null : cell.DataContext as FixRow;
+            string call = row == null || row.Qso == null
+                        ? null
+                        : (row.Qso.DXCall ?? string.Empty).Trim().ToUpperInvariant();
+
+            if (!string.IsNullOrWhiteSpace(call))
+            {
+                // Greyed while there is no QRZ session, because then there is nothing to open the
+                // page with.
+                bool qrzUp = MainWindow.QrzIsConnected();
+                var qrzItem = new MenuItem
+                {
+                    Header = "Open " + call + " at QRZ.com",
+                    IsEnabled = qrzUp,
+                    ToolTip = qrzUp ? null : "No connection to QRZ.com"
+                };
+                // The QRZ globe beside it, so the line is recognisable at a glance. Dimmed with the
+                // item when there is no connection - WPF greys a disabled header but leaves the icon
+                // in full colour, which would read as though the line were live.
+                try
+                {
+                    qrzItem.Icon = new Image
+                    {
+                        Source = new System.Windows.Media.Imaging.BitmapImage(
+                                     new Uri("Images/qrz_mini_icon.png", UriKind.Relative)),
+                        Width = 20,
+                        Height = 20,
+                        Stretch = Stretch.Uniform,
+                        Opacity = qrzUp ? 1.0 : 0.4
+                    };
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                ToolTipService.SetShowOnDisabled(qrzItem, true);
+                qrzItem.Click += (s, a) => MainWindow.OpenQrzPage(call);
+                menu.Items.Add(qrzItem);
+
+                // The QSO itself, in the editing window but with nothing to press: this table is for
+                // deciding, and a decision often needs the fields the table has no column for.
+                var showItem = new MenuItem { Header = "Show full QSO" };
+                // A DRAWN EYE, not a font glyph: the icon font's "view" marks are boxes and cards
+                // with an eye buried in them, and this line wants the eye itself - the lid curving
+                // over the pupil, the shape everything else uses for "look at this".
+                var eyeBrush = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+                var eye = new Canvas { Width = 20, Height = 20 };
+                eye.Children.Add(new System.Windows.Shapes.Path
+                {
+                    Data = Geometry.Parse("M1.5,10 C5,4.5 15,4.5 18.5,10 C15,15.5 5,15.5 1.5,10 Z"),
+                    Stroke = eyeBrush,
+                    StrokeThickness = 1.6,
+                    Fill = Brushes.Transparent
+                });
+                var pupil = new System.Windows.Shapes.Ellipse
+                {
+                    Width = 6.4,
+                    Height = 6.4,
+                    Fill = eyeBrush
+                };
+                Canvas.SetLeft(pupil, 6.8);
+                Canvas.SetTop(pupil, 6.8);
+                eye.Children.Add(pupil);
+                showItem.Icon = eye;
+                showItem.Click += (s, a) => ShowQsoReadOnly(row);
+                menu.Items.Add(showItem);
+
+                menu.Items.Add(new Separator());
+            }
+
             menu.Items.Add(GridCopy.CopyCellItem(GridCopy.TextOf(cell)));
             menu.Items.Add(GridCopy.CopyRowsItem(FindingsGrid));
+
             FindingsGrid.ContextMenu = menu;
+        }
+
+        // The QSO on screen exactly as the editor shows it, frozen. Nothing is written back, so unlike
+        // the double-click there is no re-scan afterwards.
+        private void ShowQsoReadOnly(FixRow row)
+        {
+            if (row == null || row.Qso == null) return;
+            try
+            {
+                var viewer = new QsoEditWindow(row.Qso, default(Rect), true) { Owner = this };
+                viewer.ShowDialog();
+            }
+            catch (Exception ex)
+            {
+                Log.Swallow(ex);
+                HolyMessageBox.ShowWarning("This QSO could not be opened:\n\n" + ex.Message,
+                                           "Log Fixer", this);
+            }
         }
 
         private void Btn_Close_Click(object sender, RoutedEventArgs e)

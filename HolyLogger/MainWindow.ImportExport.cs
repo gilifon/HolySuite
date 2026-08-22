@@ -1389,6 +1389,17 @@ namespace HolyLogger
                     RawAdif = null;   // large file string no longer needed; free it before the save phase
                     int count = rawQSOList.Count;
 
+                    // WHAT THE FILE ACTUALLY GAVE, written down every time. An import that took nothing
+                    // was reported twice from two different machines and the log said nothing at all
+                    // about it - not the file, not its size, not whether the records were read and
+                    // turned away or never read. One line, so the next report answers itself.
+                    Log.Warn(string.Format(CultureInfo.InvariantCulture,
+                        "IMPORT: file={0}  {1:N0} bytes  mode={2}  ->  {3:N0} records read, " +
+                        "{4:N0} QSOs, {5:N0} turned away, {6:N0} dropped as repeats",
+                        System.IO.Path.GetFileName(filename), fileBytes, _importChoice,
+                        parser.RecordsRead, count, parser.GetRejected().Count,
+                        parser.DroppedDuplicateCount));
+
                     if (count == 0)
                     {
                         // "Nothing here" and "everything here was turned away" are two different

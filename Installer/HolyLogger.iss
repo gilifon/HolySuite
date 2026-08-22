@@ -19,7 +19,11 @@ DefaultDirName={autopf}\{#MyAppName}
 DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 UninstallDisplayIcon={app}\{#MyAppExeName}
-SetupIconFile=..\HolyLogger\HolyLogger icon.ico
+; NOT the program own crown. Pointing this at HolyLogger icon gave the SETUP file the same icon as
+; the program itself, so on a desktop the installer and the program looked like one and the same
+; thing. This is the classic setup icon, kept beside the script rather than read out of the Inno
+; installation folder, so the installer builds the same on anybody machine.
+SetupIconFile=setup.ico
 ; Relative to this script, so whoever builds the installer gets it next to the source instead of
 ; needing one particular user's folder to exist on their machine.
 OutputDir=Output

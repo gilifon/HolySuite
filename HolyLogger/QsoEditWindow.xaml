@@ -67,7 +67,7 @@
                     MouseLeftButtonDown="TitleBar_MouseDown">
                 <!-- Grid, not DockPanel: the callsign is centred on the BAR, not on what is left of it. -->
                 <Grid>
-                    <TextBlock Text="Full View &amp; Edit" Foreground="White" FontSize="16" FontWeight="Bold"
+                    <TextBlock x:Name="TB_TitleMode" Text="Full View &amp; Edit" Foreground="White" FontSize="16" FontWeight="Bold"
                                VerticalAlignment="Center" HorizontalAlignment="Left"/>
                     <TextBlock x:Name="TB_TitleCall" Foreground="#FFFFFF" FontSize="17"
                                FontWeight="Bold" VerticalAlignment="Center" HorizontalAlignment="Center"/>
