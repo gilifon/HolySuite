@@ -3220,7 +3220,7 @@ namespace HolyLogger
                 {
                     if (measured >= 5 && measured <= 80)
                     {
-                        cwLearnedWpm = (cwLearnedWpm * 0.4) + (measured * 0.6);
+                        cwLearnedWpm = (cwLearnedWpm * 0.8) + (measured * 0.2);
                         cwWpmMeasured = true;
                     }
                 },
@@ -3445,8 +3445,11 @@ namespace HolyLogger
                     double measuredWpm = 1.2 / unitSeconds;
                     if (measuredWpm >= 5 && measuredWpm <= 80)
                     {
-                        // Light smoothing so a single odd reading doesn't swing the estimate.
-                        cwLearnedWpm = (cwLearnedWpm * 0.4) + (measuredWpm * 0.6);
+                        // HEAVY smoothing, not light. Each reading carries the error of a transmit
+                        // state polled a few times a second, and at four-tenths' weight the number
+                        // on screen moved after every message and never looked settled. At a fifth
+                        // it takes a few messages to move and then stays where it is put.
+                        cwLearnedWpm = (cwLearnedWpm * 0.8) + (measuredWpm * 0.2);
                         cwWpmMeasured = true;
                     }
                 }

@@ -74,14 +74,8 @@ namespace HolyLogger
             _text = string.IsNullOrEmpty(text) ? string.Empty : text.ToUpperInvariant();
             _wpm = initialWpm < 5 ? 5 : (initialWpm > 80 ? 80 : initialWpm);
 
-            _cumulativeUnits = new double[_text.Length];
-            double running = 0;
-            for (int i = 0; i < _text.Length; i++)
-            {
-                running += CharUnits(_text[i]);
-                _cumulativeUnits[i] = running;
-            }
-            _totalUnits = running;
+            _cumulativeUnits = CumulativeUnits(_text);
+            _totalUnits = _cumulativeUnits.Length == 0 ? 0 : _cumulativeUnits[_cumulativeUnits.Length - 1];
 
             Title = title;
             // Frameless, compact: no title bar/chrome, and the window shrinks to fit its content.
@@ -211,21 +205,63 @@ namespace HolyLogger
         }
 
         /// <summary>Computes the total PARIS units for a message (static, for the owner's calibration).</summary>
+        // MORSE SPACING, AND ONLY WHERE IT BELONGS. Three units between the letters of a word, seven
+        // between words - and the seven REPLACES the three, it is not added to it.
+        public const double LetterGapUnits = 3.0;
+        public const double WordGapUnits = 7.0;
+
+        // THE COUNT USED TO RUN ABOUT A SEVENTH TOO HIGH, and everything resting on it went wrong in
+        // the same direction. Every character was charged a trailing three-unit gap, including the
+        // last one where no gap follows, and a space was charged seven ON TOP of the three already
+        // added by the character in front of it - ten units for a word gap that is seven.
+        //
+        // It mattered twice over. The keying speed is worked out as units divided by the seconds the
+        // radio was on air, so an inflated count read the radio FASTER than it keys: a radio set to
+        // twenty was reported at twenty-three. And the cursor that walks the message as it goes out
+        // was pacing itself against a message longer than the one being sent, so it arrived at the
+        // last letter after the operator had already heard it.
+        public static double[] CumulativeUnits(string text)
+        {
+            text = text ?? string.Empty;
+
+            var cumulative = new double[text.Length];
+            double running = 0;
+            bool afterLetter = false;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = char.ToUpperInvariant(text[i]);
+
+                if (c == ' ')
+                {
+                    // A run of spaces is one word gap, not one each.
+                    if (afterLetter) running += WordGapUnits;
+                    afterLetter = false;
+                }
+                else
+                {
+                    if (afterLetter) running += LetterGapUnits;
+                    running += ElementUnits(c);
+                    afterLetter = true;
+                }
+
+                cumulative[i] = running;
+            }
+
+            return cumulative;
+        }
+
         public static double ComputeTotalUnits(string text)
         {
             if (string.IsNullOrEmpty(text)) return 0;
-            double total = 0;
-            foreach (char c in text.ToUpperInvariant())
-            {
-                total += CharUnits(c);
-            }
-            return total;
+            var cumulative = CumulativeUnits(text);
+            return cumulative.Length == 0 ? 0 : cumulative[cumulative.Length - 1];
         }
 
-        private static double CharUnits(char c)
+        // The dits and dahs of one character, with the one-unit gaps between them. NO gap after it -
+        // what follows the character is the business of whatever comes next.
+        private static double ElementUnits(char c)
         {
-            if (c == ' ') return 7.0;
-
             if (!Morse.TryGetValue(char.ToUpperInvariant(c), out string pattern) || string.IsNullOrEmpty(pattern))
             {
                 return 4.0;
@@ -237,7 +273,6 @@ namespace HolyLogger
                 units += pattern[i] == '-' ? 3 : 1;
                 if (i < pattern.Length - 1) units += 1; // intra-character gap
             }
-            units += 3; // trailing inter-character gap
             return units;
         }
 

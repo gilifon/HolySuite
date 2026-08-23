@@ -144,9 +144,7 @@ namespace HolyLogger
         // not the end of the message - it is the radio not having started yet - so it is ignored.
         private const double FastestPlausibleWpm = 60.0;
 
-        // Morse spacing, in units: three between the letters of a word, seven between words.
-        private const double LetterGapUnits = 3.0;
-        private const double WordGapUnits = 7.0;
+
 
         // The earliest everything handed over could possibly be finished.
         private DateTime _earliestDoneUtc = DateTime.MinValue;
@@ -479,7 +477,8 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
             if (gapWpm < 5) gapWpm = 5;
 
-            double heardAsWordGap = (WordGapUnits - LetterGapUnits) * 1.2 / gapWpm;
+            double heardAsWordGap =
+                (CwSendMonitorWindow.WordGapUnits - CwSendMonitorWindow.LetterGapUnits) * 1.2 / gapWpm;
 
             // Measured against WHAT HAS BEEN HANDED TO THE RADIO, not against the record below. The
             // record fills only when the send line is cleared, which is seconds later - so while the
@@ -728,7 +727,11 @@ namespace HolyLogger
             if (_txStartedUtc == DateTime.MinValue || _txStoppedUtc == DateTime.MaxValue) return;
 
             double seconds = (_txStoppedUtc - _txStartedUtc).TotalSeconds;
-            if (seconds <= 0.2) return;      // too short to measure anything from
+            // A SHORT TRANSMISSION MEASURES NOTHING USEFUL. The transmit state is polled a few times
+            // a second, so a two-tenths error sits on every reading; on a message lasting half a
+            // second that is a fifth of the answer, and the speed on screen jumped about even though
+            // the radio had not been touched. Below a second, the reading is thrown away.
+            if (seconds < 1.0) return;
 
             try { _learnWpm(units * 1.2 / seconds); }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
@@ -792,13 +795,15 @@ namespace HolyLogger
             if (elapsed <= 0) return 0;
 
             double unitsDone = elapsed * wpm / 1.2;
-            double running = 0;
             int limit = Math.Min(_handedUpTo, text.Length);
+
+            // The same running total the sending monitor walks, so the two agree character for
+            // character - and it counts the gaps BETWEEN letters rather than charging one to each.
+            var cumulative = CwSendMonitorWindow.CumulativeUnits(text.Substring(0, limit));
 
             for (int i = 0; i < limit; i++)
             {
-                running += CwSendMonitorWindow.ComputeTotalUnits(text[i].ToString());
-                if (running > unitsDone) return i;
+                if (cumulative[i] > unitsDone) return i;
             }
 
             return limit;
