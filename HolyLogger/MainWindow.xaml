@@ -291,46 +291,10 @@
             </Setter>
         </Style>
         <!-- Msg button style for CW mode: cyan keyboard-key shape with 3D effect, matching SSB style -->
-        <Style x:Key="MsgButtonCwStyle" TargetType="Button">
-            <Setter Property="Background" Value="#7FFEFF"/>
-            <Setter Property="Foreground" Value="#000000"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="FontSize" Value="11"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Margin" Value="0,1,0,1"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <!-- Outer border: darker bottom edge like a physical key -->
-                        <Border x:Name="KeyOuter" CornerRadius="5" Background="#0099CC" SnapsToDevicePixels="True" Padding="0,0,0,3">
-                            <!-- Inner face -->
-                            <Border x:Name="KeyFace" CornerRadius="5" BorderThickness="1" BorderBrush="#00CCFF" SnapsToDevicePixels="True" Background="{TemplateBinding Background}">
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,2"/>
-                            </Border>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="KeyOuter" Property="Background" Value="#005C80"/>
-                                <Setter TargetName="KeyFace" Property="Background" Value="#33C2D6"/>
-                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#0077AA"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="KeyFace" Property="Margin" Value="0,2,0,0"/>
-                                <Setter TargetName="KeyOuter" Property="Padding" Value="0,2,0,1"/>
-                                <Setter TargetName="KeyFace" Property="Background" Value="#1FA6BC"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="KeyOuter" Property="Background" Value="#888888"/>
-                                <Setter TargetName="KeyFace" Property="Background" Value="#E4E4E4"/>
-                                <Setter TargetName="KeyFace" Property="BorderBrush" Value="#B5B5B5"/>
-                                <Setter Property="Foreground" Value="#7A7A7A"/>
-                                <Setter Property="Opacity" Value="0.8"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
+        <!-- MsgButtonCwStyle - the cyan keycap the CW buttons wear - now lives in
+             Themes/Controls.xaml, because the CW Keyer wears it too and a window's own resources are
+             not visible to any other window. -->
+
         <!-- Action button style: same keyboard-key shape, light blue for Add/Clear -->
         <!-- DangerActionButtonStyle - the red keycap the Undo buttons wear - lives in
              Themes/Controls.xaml, because the Log Workshop needs it too and a window's own resources
@@ -655,6 +619,27 @@
                             <Image Source="Images/sign.png" Stretch="UniformToFill" Width="16" Height="16"/>
                         </MenuItem.Icon>
                     </MenuItem>
+                    <!-- Greyed while the radio is not in CW, or not reachable: the keyer has nothing
+                         to key through. UpdateVoiceMessageAvailabilityState decides, the same place
+                         that decides whether the window may open at all. -->
+                    <MenuItem x:Name="CwKeyboardMenuItem" Header="CW Keyer (Ctrl+K)" ToolTip="Type CW and send it as you type - the radio has to be in CW" Click="CwKeyboardMenuItem_Click">
+                        <MenuItem.Icon>
+                            <!-- A straight key, side on: base, upright, lever arm, knob. Drawn here
+                                 rather than fetched from anywhere - it costs five shapes, carries no
+                                 licence to honour, and takes the theme's text colour like the rest of
+                                 the menu icons. -->
+                            <Viewbox Width="16" Height="16">
+                                <Canvas Width="24" Height="24">
+                                    <Rectangle Canvas.Left="2" Canvas.Top="18.5" Width="20" Height="3" RadiusX="1.2" RadiusY="1.2" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="15.2" Canvas.Top="11" Width="2.6" Height="7.5" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="4.5" Canvas.Top="10.4" Width="14" Height="2.4" RadiusX="1.2" RadiusY="1.2" Fill="{DynamicResource TextBrush}"/>
+                                    <Rectangle Canvas.Left="6.6" Canvas.Top="12.8" Width="1.8" Height="5.7" Fill="{DynamicResource TextBrush}"/>
+                                    <Ellipse Canvas.Left="3.6" Canvas.Top="6.2" Width="7.8" Height="5" Fill="{DynamicResource TextBrush}"/>
+                                </Canvas>
+                            </Viewbox>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator/>
                     <MenuItem x:Name="TimerItem" Header="Timer" ToolTip="Open a 1 hour countdown timer" Click="TimerMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/timer.png" Stretch="UniformToFill" Width="16" Height="16"/>
@@ -689,8 +674,6 @@
                             </Rectangle>
                         </MenuItem.Icon>
                     </MenuItem>
-                    <Separator />
-                    <MenuItem x:Name="CwKeyboardMenuItem" Header="CW Keyer (Ctrl+K)" ToolTip="Type CW and send it as you type - the radio has to be in CW" Click="CwKeyboardMenuItem_Click"/>
                     <Separator />
                     <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Full-Log QRZ Service" ToolTip="Try to get QRZ info for the entire log" Click="EntireLogQrzServiseMenuItem_Click">
                         <MenuItem.Icon>

@@ -2982,20 +2982,13 @@ namespace HolyLogger
 
             Action refreshPreview = () =>
             {
-                string typed = tb.Text ?? string.Empty;
-                string problem = DescribeCwMacroProblem(typed);
-
-                if (problem != null)
-                {
-                    preview.Text = "Cannot send: " + problem;
-                    preview.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-                    preview.Foreground = System.Windows.Media.Brushes.Firebrick;
-                    return;
-                }
-
-                preview.ClearValue(TextBlock.ForegroundProperty);
+                // NO REFUSAL HERE. A message is written long before it is sent, with the entry form
+                // empty and no contest running - that is the normal case, not a fault. Saying
+                // "cannot send" over a text being composed reads as though something is wrong with
+                // it. What is missing is named in its place instead, so the operator sees where the
+                // callsign will go. The refusal still stands at the moment of sending.
                 preview.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-                preview.Text = "Sends: " + ExpandCwMacros(typed);
+                preview.Text = "Sends: " + ExpandCwMacrosForPreview(tb.Text ?? string.Empty);
             };
 
             tb.TextChanged += (s, e) => refreshPreview();
@@ -3040,6 +3033,32 @@ namespace HolyLogger
                 .Replace("!", HisCallForMacro())
                 .Replace("#", SentSerialForMacro())
                 .Replace("$", SentExchangeForMacro());
+        }
+
+        // The same expansion, but with a name in place of anything that has nothing behind it yet,
+        // so a message can be read while it is being written.
+        internal string ExpandCwMacrosForPreview(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            string mine = MyCallForMacro();
+            string his = HisCallForMacro();
+            string serial = SentSerialForMacro();
+            string exchange = SentExchangeForMacro();
+
+            if (mine.Length == 0) mine = "[Station Callsign]";
+            if (his.Length == 0) his = "[DX Callsign]";
+            if (serial.Length == 0) serial = "[serial]";
+            if (exchange.Length == 0) exchange = "[exchange]";
+
+            return text
+                .Replace("{MYCALL}", mine)
+                .Replace("{HISCALL}", his)
+                .Replace("{EXCH}", exchange)
+                .Replace("*", mine)
+                .Replace("!", his)
+                .Replace("#", serial)
+                .Replace("$", exchange);
         }
 
         private string MyCallForMacro()
@@ -5721,7 +5740,15 @@ namespace HolyLogger
             // NOT BEFORE THE MAIN WINDOW IS UP. This also runs from the constructor, where a child
             // window cannot take an Owner that has never been shown. The flag is left alone in that
             // case, so a radio already in CW at startup gets its keyboard on the next pass instead.
-            bool cwKeyboardWanted = isCw && isAvailable;
+            // MANUAL MODE COUNTS AS NOT WANTED. In Manual the program is not following the radio at
+            // all, so the keyer has no business being up - and, more to the point, going to Manual and
+            // back is then a real change out of CW and into it again. Without this the state never
+            // moved, so the keyer that had been closed during Manual never came back when CAT
+            // returned, even with the radio sitting in CW the whole time.
+            bool cwKeyboardWanted = isCw && isAvailable && !Properties.Settings.Default.isManualMode;
+
+            // The View menu says the same thing the window does: no CW, nothing to key.
+            if (CwKeyboardMenuItem != null) CwKeyboardMenuItem.IsEnabled = cwKeyboardWanted;
 
             if (!cwKeyboardWanted)
             {
@@ -10207,6 +10234,14 @@ namespace HolyLogger
                 string stamp = ReleaseNotes.CurrentInstallStamp;
                 bool freshInstall = !string.IsNullOrEmpty(stamp)
                                  && !string.Equals(stamp, ReleaseNotes.SeenInstallStamp, StringComparison.Ordinal);
+
+#if DEBUG
+                // RUNNING FROM VISUAL STUDIO: show it EVERY time, and never write the stamp that would
+                // stop it showing again. There is no other way to look at this window while working on
+                // it - it is by nature a once-per-install thing - and a released build is unaffected.
+                freshInstall = true;
+                stamp = null;
+#endif
 
                 string seen = ReleaseNotes.LastSeenVersion;
                 bool newVersion = !string.Equals(seen, current, StringComparison.Ordinal);

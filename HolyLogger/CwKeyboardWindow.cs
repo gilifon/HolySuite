@@ -162,6 +162,11 @@ namespace HolyLogger
         private TextBlock _titleText;
         private int _shownWpm = -1;
 
+        // Working out whether every button can be sent means reading the entry form eight times over.
+        // Four times a second is far oftener than a callsign is typed and far seldomer than the pump.
+        private DateTime _availabilityAskedUtc = DateTime.MinValue;
+        private static readonly TimeSpan AvailabilityEvery = TimeSpan.FromMilliseconds(250);
+
         private double _unitsThisSend;
         private DateTime _txStartedUtc = DateTime.MinValue;
 
@@ -205,6 +210,17 @@ namespace HolyLogger
         // The blue of a character that has left. Fixed rather than themed: it has to mean the same
         // thing in every colour scheme, and it is legible on all of them.
         private static readonly Brush SentBrush = MakeSentBrush();
+
+        // The face colour of a CW message button. Fixed, like the buttons themselves - it is what
+        // marks CW out from everything else on the screen, in any colour scheme.
+        private static readonly Brush CwKeyBrush = MakeCwKeyBrush();
+
+        private static Brush MakeCwKeyBrush()
+        {
+            var brush = new SolidColorBrush(Color.FromRgb(0x7F, 0xFE, 0xFF));
+            brush.Freeze();
+            return brush;
+        }
 
         private static Brush MakeSentBrush()
         {
@@ -340,6 +356,13 @@ namespace HolyLogger
             };
             ApplyHistoryRows();
 
+            // THE SEND LINE IS A BOX LIKE THE ONE BELOW IT. Its own TextBox paints nothing - that is
+            // how the two colours of the text are drawn - so without this the window's grey showed
+            // through and the top row looked disabled beside the white record under it. Bound rather
+            // than set, so the two stay the same colour through a change of scheme.
+            sendFrame.SetBinding(Border.BackgroundProperty,
+                new System.Windows.Data.Binding("Background") { Source = _history });
+
             var body = new DockPanel { LastChildFill = false };
 
             var titleBar = BuildTitleBar();
@@ -360,7 +383,7 @@ namespace HolyLogger
             frame.SetResourceReference(Border.BorderBrushProperty, "TextBrush");
 
             Content = frame;
-            Loaded += (s, e) => _box.Focus();
+            Loaded += (s, e) => { _box.Focus(); LockMinimumHeight(); };
 
             _pump = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
             _pump.Tick += Pump_Tick;
@@ -429,6 +452,7 @@ namespace HolyLogger
             // Whatever the radio has finished keying leaves the typing row first, so the row always
             // shows what is still to come rather than what has just gone.
             RefreshTitle();
+            RefreshButtonAvailability();
             RepaintSendLine();
             DropWhatTheRadioHasKeyed();
 
@@ -809,6 +833,85 @@ namespace HolyLogger
             return limit;
         }
 
+        // A BUTTON THAT CANNOT BE SENT IS DIMMED. Its text asks for something that is not there - most
+        // often ! with no callsign yet in the entry form - and dimming says so before it is pressed
+        // rather than after.
+        //
+        // DIMMED, NOT DISABLED. A disabled button in WPF receives no mouse at all, so it could not be
+        // right-clicked to edit either, and a button that cannot be used OR changed is a dead end.
+        // The Msg buttons on the main window are dimmed for the same reason.
+        // A STRAIGHT KEY, SIDE ON: base, upright, lever arm, contact post, knob. The same drawing as
+        // the one on the View menu item, so the window and the way in to it are plainly the same
+        // thing. Drawn rather than fetched - five shapes, and no licence to carry.
+        private static UIElement BuildStraightKeyIcon()
+        {
+            var canvas = new Canvas { Width = 24, Height = 24 };
+
+            canvas.Children.Add(Piece(2, 18.5, 20, 3, 1.2));      // base
+            canvas.Children.Add(Piece(15.2, 11, 2.6, 7.5, 0));    // upright at the back
+            canvas.Children.Add(Piece(4.5, 10.4, 14, 2.4, 1.2));  // lever arm
+            canvas.Children.Add(Piece(6.6, 12.8, 1.8, 5.7, 0));   // contact post under the knob
+
+            var knob = new System.Windows.Shapes.Ellipse
+            {
+                Width = 7.8,
+                Height = 5,
+                Fill = Brushes.Black
+            };
+            Canvas.SetLeft(knob, 3.6);
+            Canvas.SetTop(knob, 6.2);
+            canvas.Children.Add(knob);
+
+            return new Viewbox
+            {
+                Width = 18,
+                Height = 18,
+                Margin = new Thickness(10, 0, 0, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = canvas
+            };
+        }
+
+        private static System.Windows.Shapes.Rectangle Piece(double left, double top, double width, double height, double radius)
+        {
+            var piece = new System.Windows.Shapes.Rectangle
+            {
+                Width = width,
+                Height = height,
+                RadiusX = radius,
+                RadiusY = radius,
+                Fill = Brushes.Black
+            };
+            Canvas.SetLeft(piece, left);
+            Canvas.SetTop(piece, top);
+            return piece;
+        }
+
+        private void RefreshButtonAvailability()
+        {
+            if (_macroProblem == null) return;
+            if (DateTime.UtcNow - _availabilityAskedUtc < AvailabilityEvery) return;
+            _availabilityAskedUtc = DateTime.UtcNow;
+
+            for (int i = 0; i < ButtonCount; i++)
+            {
+                var button = _buttons[i];
+                if (button == null) continue;
+
+                string text = _buttonTexts[i] ?? string.Empty;
+                bool usable = true;
+
+                if (text.Trim().Length > 0)
+                {
+                    try { usable = _macroProblem(text) == null; }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+
+                double wanted = usable ? 1.0 : 0.5;
+                if (button.Opacity != wanted) button.Opacity = wanted;
+            }
+        }
+
         private void RefreshTitle()
         {
             if (_titleText == null || _currentWpm == null) return;
@@ -825,7 +928,7 @@ namespace HolyLogger
                 if (_shownWpm == -1) return;
                 _shownWpm = -1;
                 _titleText.Inlines.Clear();
-                _titleText.Inlines.Add(new Run("CW Keyer"));
+                _titleText.Inlines.Add(new Run("CW Keyer") { Foreground = Brushes.Black });
                 return;
             }
 
@@ -841,7 +944,7 @@ namespace HolyLogger
             // Bigger than the title beside it and in the same blue as the sent text, because it is a
             // reading the operator glances at mid-QSO - not a caption.
             _titleText.Inlines.Clear();
-            _titleText.Inlines.Add(new Run("CW Keyer      "));
+            _titleText.Inlines.Add(new Run("CW Keyer      ") { Foreground = Brushes.Black });
             _titleText.Inlines.Add(new Run(shown + " WPM") { FontSize = 20, Foreground = SentBrush });
         }
 
@@ -933,6 +1036,27 @@ namespace HolyLogger
             _history.MinLines = rows;
             _history.MaxLines = rows;
             _history.ScrollToHome();
+
+            LockMinimumHeight();
+        }
+
+        // THE WINDOW CANNOT BE SHRUNK PAST ITS OWN CONTENTS. Dragging the bottom edge up hid the eight
+        // buttons entirely - the window still had them, there was simply nowhere for them to be drawn.
+        // The floor is whatever the rows currently need, so it rises and falls with the history row
+        // count set at the gear instead of being a number written down once.
+        private void LockMinimumHeight()
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                try
+                {
+                    MinHeight = 0;
+                    SizeToContent = SizeToContent.Height;
+                    UpdateLayout();
+                    if (ActualHeight > 0) MinHeight = ActualHeight;
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+            }), System.Windows.Threading.DispatcherPriority.Loaded);
         }
 
         // Two rows of four. One row of eight would need close to eight hundred pixels to show eight
@@ -952,9 +1076,13 @@ namespace HolyLogger
 
                 var button = new Button
                 {
+                    // The same cyan keycap the CW message buttons wear, so the two sets of CW
+                    // buttons in front of the operator look like the same kind of thing. Its own
+                    // font size is 11, which is far too small here, so that one setter is overridden.
+                    Style = Application.Current.Resources["MsgButtonCwStyle"] as Style,
                     FontSize = 16,
                     FontFamily = typeface,
-                    Height = 32,
+                    Height = 34,
                     Margin = new Thickness(3),
                     Padding = new Thickness(2, 0, 2, 0),
 
@@ -1204,6 +1332,7 @@ namespace HolyLogger
                 Content = "",
                 FontSize = 16,
                 Style = Application.Current.Resources["CaptionButtonStyle"] as Style,
+                Foreground = Brushes.Black,
                 ToolTip = "CW keyer settings"
             };
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(gearBtn, true);
@@ -1213,6 +1342,7 @@ namespace HolyLogger
             {
                 Content = "",
                 Style = Application.Current.Resources["CaptionCloseButtonStyle"] as Style,
+                Foreground = Brushes.Black,
                 ToolTip = "Close"
             };
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(closeBtn, true);
@@ -1231,16 +1361,19 @@ namespace HolyLogger
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(10, 0, 0, 0)
             };
-            _titleText.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            _titleText.Foreground = Brushes.Black;
+            var keyIcon = BuildStraightKeyIcon();
+            DockPanel.SetDock(keyIcon, Dock.Left);
             DockPanel.SetDock(_titleText, Dock.Left);
             RefreshTitle();
 
             var bar = new DockPanel { LastChildFill = false };
             bar.Children.Add(right);
+            bar.Children.Add(keyIcon);
             bar.Children.Add(_titleText);
 
-            var border = new Border { Height = 32, Child = bar };
-            border.SetResourceReference(Border.BackgroundProperty, "TitleBarBg");
+            // The pale cyan of the CW keycaps, so the window is plainly part of the same set.
+            var border = new Border { Height = 32, Child = bar, Background = CwKeyBrush };
             return border;
         }
 

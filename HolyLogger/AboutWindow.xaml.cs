@@ -121,11 +121,31 @@ namespace HolyLogger
                     var reply = await Task.Run(() => http.GetAsync(Url + "?v=" + DateTime.Now.Ticks));
 
                     if (reply.StatusCode == System.Net.HttpStatusCode.NotFound) return string.Empty;
-                    if (!reply.IsSuccessStatusCode) return null;
+                    if (!reply.IsSuccessStatusCode) return LocalCopy();
 
                     string text = await reply.Content.ReadAsStringAsync();
                     return text ?? string.Empty;
                 }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return LocalCopy(); }
+        }
+
+        // THE COPY THAT CAME WITH THE PROGRAM, used when GitHub cannot be reached. It is the file as
+        // it stood when this version was built - so it always covers this version and everything
+        // before it, which is exactly what a first run after an install needs. A newer release's
+        // news is the one thing it cannot have, and that is the one thing the operator does not yet
+        // need. Without it, installing without internet meant never being told what changed.
+        private static string LocalCopy()
+        {
+            try
+            {
+                string exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                if (string.IsNullOrEmpty(exe)) return null;
+
+                string beside = System.IO.Path.Combine(System.IO.Path.GetDirectoryName(exe), "WhatsNew.txt");
+                if (!System.IO.File.Exists(beside)) return null;
+
+                return System.IO.File.ReadAllText(beside);
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
         }
@@ -351,15 +371,7 @@ namespace HolyLogger
             Grid.SetRow(heading, 0);
             grid.Children.Add(heading);
 
-            var body = new TextBlock
-            {
-                FontSize = 16,
-                TextWrapping = TextWrapping.Wrap,
-                LineHeight = 24,
-                Margin = new Thickness(2, 2, 12, 2)
-            };
-            body.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-            FillBody(body, notes);
+            var body = BuildBody(notes);
 
             var scroll = new ScrollViewer
             {
@@ -395,38 +407,121 @@ namespace HolyLogger
         // THE VERSION HEADINGS ARE HEADINGS, not the literal "== 8.8.9 ==" out of the file. Now that
         // this window shows the whole history, the numbers are how the reader finds his place in it,
         // so they are set bigger and bold with air above them.
-        private static void FillBody(TextBlock block, string notes)
+        // A BULLET THAT WRAPS KEEPS ITS OWN LEFT EDGE. This was one TextBlock holding the whole file
+        // with line breaks in it, so a line too long for the window came back to the far left, under
+        // the dash rather than under the words - and a list stopped looking like a list.
+        //
+        // Each item is now a block of its own: the dash in a narrow column, the words in a column
+        // beside it that wraps within itself. Lines the file had already broken by hand are joined
+        // back into their item first, so the wrapping is decided by the window's width and not by
+        // wherever the text happened to be split when it was written.
+        private static Panel BuildBody(string notes)
         {
-            block.Inlines.Clear();
-            string text = (notes ?? "").Trim();
-            if (text.Length == 0) return;
+            var panel = new StackPanel { Margin = new Thickness(2, 2, 12, 2) };
 
-            bool first = true;
+            string text = (notes ?? "").Trim();
+            if (text.Length == 0) return panel;
+
+            var items = new List<string>();
+
             foreach (string raw in text.Replace("\r\n", "\n").Replace("\r", "\n").Split('\n'))
             {
                 string line = raw.TrimEnd();
                 string trimmed = line.Trim();
 
-                bool isHeading = trimmed.Length > 4 && trimmed.StartsWith("==") && trimmed.EndsWith("==");
-                if (isHeading)
+                // A line that is only the continuation of the item above it - the file wraps its own
+                // long entries with a couple of spaces at the front.
+                bool continuation = items.Count > 0
+                                 && line.Length > 0
+                                 && char.IsWhiteSpace(line[0])
+                                 && !trimmed.StartsWith("-");
+
+                if (continuation)
                 {
-                    if (!first) block.Inlines.Add(new LineBreak());
-                    var head = new Run(trimmed.Trim('=', ' ', '\t'))
-                    {
-                        FontWeight = FontWeights.Bold,
-                        FontSize = 19
-                    };
-                    head.SetResourceReference(TextElement.ForegroundProperty, "AccentBrush");
-                    block.Inlines.Add(head);
-                }
-                else
-                {
-                    block.Inlines.Add(new Run(line));
+                    items[items.Count - 1] = items[items.Count - 1] + " " + trimmed;
+                    continue;
                 }
 
-                block.Inlines.Add(new LineBreak());
+                items.Add(trimmed);
+            }
+
+            bool first = true;
+
+            foreach (string item in items)
+            {
+                bool isHeading = item.Length > 4 && item.StartsWith("==") && item.EndsWith("==");
+
+                if (item.Length == 0)
+                {
+                    panel.Children.Add(new Border { Height = 8 });
+                    continue;
+                }
+
+                if (isHeading)
+                {
+                    var head = new TextBlock
+                    {
+                        Text = item.Trim('=', ' ', '\t'),
+                        FontSize = 19,
+                        FontWeight = FontWeights.Bold,
+                        Margin = new Thickness(0, first ? 0 : 14, 0, 6)
+                    };
+                    head.SetResourceReference(TextBlock.ForegroundProperty, "AccentBrush");
+                    panel.Children.Add(head);
+                    first = false;
+                    continue;
+                }
+
+                if (item.StartsWith("-"))
+                {
+                    panel.Children.Add(BuildBullet(item.Substring(1).Trim()));
+                    first = false;
+                    continue;
+                }
+
+                // "New", "Fixed", "Faster" - the words that head a list.
+                var label = new TextBlock
+                {
+                    Text = item,
+                    FontSize = 16,
+                    FontWeight = FontWeights.Bold,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 6, 0, 2)
+                };
+                label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                panel.Children.Add(label);
                 first = false;
             }
+
+            return panel;
+        }
+
+        private static UIElement BuildBullet(string words)
+        {
+            var dash = new TextBlock
+            {
+                Text = "\u2013",
+                FontSize = 16,
+                LineHeight = 24,
+                Width = 16,
+                VerticalAlignment = VerticalAlignment.Top
+            };
+            dash.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            var body = new TextBlock
+            {
+                Text = words,
+                FontSize = 16,
+                LineHeight = 24,
+                TextWrapping = TextWrapping.Wrap
+            };
+            body.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            var row = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 0, 0, 2) };
+            DockPanel.SetDock(dash, Dock.Left);
+            row.Children.Add(dash);
+            row.Children.Add(body);
+            return row;
         }
 
         // Opens the window if there is anything to say, and does nothing at all if there is not.
