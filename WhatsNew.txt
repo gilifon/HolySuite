@@ -1,5 +1,9 @@
 == 8.9.1 ==
 
+NEW: SEND CW BY TYPING. Put the radio in CW and a keyer window opens by itself. Type and it
+goes out as you type, or press one of its eight buttons for the things you send over and
+over. Ctrl+K opens and closes it at any time.
+
 CW KEYER (was "CW Keyboard")
 
 * The keyer opens by itself the moment the radio goes to CW, and closes when it leaves CW.
