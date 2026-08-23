@@ -430,10 +430,14 @@ namespace HolyLogger
         }
 
         // Opens the window if there is anything to say, and does nothing at all if there is not.
-        public static void ShowIfAny(Window owner, string version, string notes)
+        // TRUE WHEN THE OPERATOR WAS ACTUALLY SHOWN SOMETHING. The caller needs to know: marking an
+        // install as greeted when nothing was on the screen - because GitHub could not be reached -
+        // spends the one chance that install had to say what is new.
+        public static bool ShowIfAny(Window owner, string version, string notes)
         {
-            if (string.IsNullOrWhiteSpace(notes)) return;
+            if (string.IsNullOrWhiteSpace(notes)) return false;
             new WhatsNewWindow(version, notes, owner).ShowDialog();
+            return true;
         }
     }
 }

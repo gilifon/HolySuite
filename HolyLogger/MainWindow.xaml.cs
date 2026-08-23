@@ -10217,7 +10217,6 @@ namespace HolyLogger
                 // for this version, the operator must not be asked the same question at every startup
                 // for ever after.
                 ReleaseNotes.LastSeenVersion = current;
-                if (!string.IsNullOrEmpty(stamp)) ReleaseNotes.SeenInstallStamp = stamp;
 
                 // A FIRST-EVER INSTALL IS GREETED TOO. It used to be passed over on the grounds that
                 // there is no "before" to report on - but a new operator is exactly the one who has
@@ -10230,7 +10229,12 @@ namespace HolyLogger
                 // changed. The newest section is at the top, so what IS new is still the first thing
                 // read; everything else is underneath for whoever wants it.
                 string file = await ReleaseNotes.FetchAsync();
-                WhatsNewWindow.ShowIfAny(this, null, (file ?? string.Empty).Trim());
+                bool shown = WhatsNewWindow.ShowIfAny(this, null, (file ?? string.Empty).Trim());
+
+                // ONLY NOW IS THE INSTALL COUNTED AS GREETED. It used to be written before the fetch,
+                // so a moment without internet at the wrong startup swallowed the announcement for
+                // good. If nothing was shown, the next startup tries again.
+                if (shown && !string.IsNullOrEmpty(stamp)) ReleaseNotes.SeenInstallStamp = stamp;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
