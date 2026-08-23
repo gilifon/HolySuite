@@ -3013,5 +3013,17 @@ namespace HolyLogger.Properties {
                 this["CwKeyboardBreakSeconds"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string CwKeyerButtonsJson {
+            get {
+                return ((string)(this["CwKeyerButtonsJson"]));
+            }
+            set {
+                this["CwKeyerButtonsJson"] = value;
+            }
+        }
     }
 }

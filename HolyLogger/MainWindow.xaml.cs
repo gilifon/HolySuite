@@ -273,6 +273,11 @@ namespace HolyLogger
         private DateTime cwMonitorStartUtc;
         private double cwLearnedWpm = 20.0;
 
+        // Has that number ever been MEASURED, or is it still the figure it started life with? The
+        // pacing is happy either way - it has to work from the first message - but nothing should be
+        // SHOWN to the operator as the radio's speed until the radio has actually told us.
+        private bool cwWpmMeasured;
+
         // The two states of the main-window QRZ icon: the normal blue globe when QRZ.com is
         // reachable/logged in, and the grayed globe when there is no connection to QRZ.com.
         // Swapped by SetQrzConnected().
@@ -2822,7 +2827,7 @@ namespace HolyLogger
 
         private void Window_KeyDown(object sender, KeyEventArgs e)
         {
-            // Ctrl+K: the CW keyboard, the same key every contest logger uses for it. It TOGGLES -
+            // Ctrl+K: the CW keyer, the same key every contest logger uses for it. It TOGGLES -
             // the key that opened the window also puts it away. The same key does the same job from
             // inside the window itself (see CwKeyboardWindow), which is where the focus usually is.
             if (e.Key == Key.K && (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control)
@@ -2861,15 +2866,35 @@ namespace HolyLogger
                 e.Handled = true;
         }
 
+        // The Msg buttons' editor: the shared one below, and then the one thing only they need done
+        // afterwards - their own face redrawn.
         private void ShowCwMessageEditDialog(int messageNumber)
         {
-            string currentText = GetCwMessageText(messageNumber);
+            string updated = ShowCwTextEditDialog("Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")",
+                                                  GetCwMessageText(messageNumber));
+            if (updated == null) return;
 
+            SetCwMessageText(messageNumber, updated);
+            UpdateMessageButtonLabel(GetMessageButton(messageNumber), messageNumber, isCw: true);
+
+            // The keyer shows these same four along its bottom row. Edited here, redrawn there.
+            if (cwKeyboard != null) cwKeyboard.RefreshSharedButtons();
+        }
+
+        // ONE EDITOR FOR EVERY STORED CW TEXT - the four Msg buttons here and the eight in the keyer.
+        // It hands back the new text, or null when the operator cancelled; what to do with the text
+        // afterwards is the caller's business, and that is the only part that differed between them.
+        internal string ShowCwTextEditDialog(string title, string currentText)
+        {
             Window dialog = new Window
             {
-                Title = "Edit CW Text " + messageNumber + " (F" + (messageNumber + 4) + ")",
-                Width = 360,
-                Height = 130,
+                Title = title,
+
+                // Wider and taller than it was: there is a line under the box now showing what the
+                // text would actually key, and a callsign or an exchange in place of a macro needs
+                // more room than the macro did.
+                Width = 460,
+                Height = 190,
                 ResizeMode = ResizeMode.NoResize,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
                 ShowInTaskbar = false,
@@ -2878,9 +2903,14 @@ namespace HolyLogger
             };
 
             Grid grid = new Grid { Margin = new Thickness(10) };
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(8) });
-            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            // TWO ROWS, one under the other: what is typed, and what that would put on air. The
+            // buttons move down to make room - the second row belongs against the first, not below
+            // the Save button where it would read as an afterthought.
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // what you type
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(6) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // what it sends
+            grid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(14) });
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });   // buttons
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(6) });
             grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -2902,7 +2932,10 @@ namespace HolyLogger
                 // Valid CW characters: A-Z, 0-9, space, . , ? / @ = + -
                 // Compare case-insensitively so lowercase typing (Caps Lock off) is accepted;
                 // CharacterCasing.Upper still displays the letters as capitals.
-                string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,?/@=+-";
+                // The keyable characters, plus the two macro marks. * and ! are never keyed - they
+                // are replaced by a callsign before anything reaches the radio - but they have to be
+                // typeable here or the messages that use them could not be written.
+                string validChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 .,?/@=+-*!#${}";
                 if (!validChars.Contains(e.Text.ToUpperInvariant()))
                 {
                     e.Handled = true;  // Block invalid character
@@ -2920,7 +2953,7 @@ namespace HolyLogger
                 Height = 28,
                 IsDefault = true
             };
-            Grid.SetRow(btnSave, 2);
+            Grid.SetRow(btnSave, 4);
             Grid.SetColumn(btnSave, 2);
             grid.Children.Add(btnSave);
 
@@ -2931,23 +2964,142 @@ namespace HolyLogger
                 Height = 28,
                 IsCancel = true
             };
-            Grid.SetRow(btnCancel, 2);
+            Grid.SetRow(btnCancel, 4);
             Grid.SetColumn(btnCancel, 0);
             grid.Children.Add(btnCancel);
 
+            // WHAT WOULD GO ON AIR, worked out again on every keystroke. A macro is only ever as good
+            // as what is behind it, and until now the only way to find out was to press the button.
+            var preview = new TextBlock
+            {
+                FontSize = 16,
+                TextWrapping = TextWrapping.Wrap,
+                FontFamily = new System.Windows.Media.FontFamily("Consolas")
+            };
+            Grid.SetRow(preview, 2);
+            Grid.SetColumnSpan(preview, 3);
+            grid.Children.Add(preview);
+
+            Action refreshPreview = () =>
+            {
+                string typed = tb.Text ?? string.Empty;
+                string problem = DescribeCwMacroProblem(typed);
+
+                if (problem != null)
+                {
+                    preview.Text = "Cannot send: " + problem;
+                    preview.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                    preview.Foreground = System.Windows.Media.Brushes.Firebrick;
+                    return;
+                }
+
+                preview.ClearValue(TextBlock.ForegroundProperty);
+                preview.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+                preview.Text = "Sends: " + ExpandCwMacros(typed);
+            };
+
+            tb.TextChanged += (s, e) => refreshPreview();
+            refreshPreview();
+
             dialog.Content = grid;
 
-            btnSave.Click += (s, e) =>
-            {
-                SetCwMessageText(messageNumber, tb.Text.Trim());
-                UpdateMessageButtonLabel(GetMessageButton(messageNumber), messageNumber, isCw: true);
-                dialog.DialogResult = true;
-            };
+            btnSave.Click += (s, e) => { dialog.DialogResult = true; };
             btnCancel.Click += (s, e) => { dialog.DialogResult = false; };
 
             tb.SelectAll();
             tb.Focus();
-            dialog.ShowDialog();
+            return dialog.ShowDialog() == true ? tb.Text.Trim() : null;
+        }
+
+        // THE MACROS. The same four N1MM leans on hardest, written the way N1MM writes them so a
+        // message copied across from there works as it stands:
+        //
+        //   *  {MYCALL}    your own callsign
+        //   !  {HISCALL}   the callsign in the entry form
+        //   #              the serial number you are sending for this QSO
+        //   $  {EXCH}      the rest of your sent exchange
+        //
+        // The $ is ours, not N1MM's - N1MM makes you type {EXCH} in full. It costs nothing to take
+        // both, and the long form still works for a message copied across from there.
+        //
+        // The last two are read off the contest SEND frame, which only exists while a contest is
+        // selected. Outside one there is no serial and no exchange - and rather than key a gap where
+        // a number should have been, the send is refused and says why (see DescribeCwMacroProblem).
+        //
+        // Cut numbers - N1MM's {SENTRSTCUT}, where 9 becomes N - are NOT here. Nothing in this
+        // program decides that today, and guessing at it would put wrong characters on air.
+        internal string ExpandCwMacros(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            return text
+                .Replace("{MYCALL}", MyCallForMacro())
+                .Replace("{HISCALL}", HisCallForMacro())
+                .Replace("{EXCH}", SentExchangeForMacro())
+                .Replace("*", MyCallForMacro())
+                .Replace("!", HisCallForMacro())
+                .Replace("#", SentSerialForMacro())
+                .Replace("$", SentExchangeForMacro());
+        }
+
+        private string MyCallForMacro()
+        {
+            return TB_MyCallsign != null ? (TB_MyCallsign.Text ?? string.Empty).Trim() : string.Empty;
+        }
+
+        private string HisCallForMacro()
+        {
+            return TB_DXCallsign != null ? (TB_DXCallsign.Text ?? string.Empty).Trim() : string.Empty;
+        }
+
+        // The serial cell of the SEND frame. Null when contest mode is off - the frame is not built.
+        private string SentSerialForMacro()
+        {
+            if (_contestSendSerialBox == null) return string.Empty;
+            return (_contestSendSerialBox.Text ?? string.Empty).Trim();
+        }
+
+        // Every field of the sent exchange, in the order the frame shows them, separated by a space.
+        // RST is not among them - it has its own cell and its own place in a message.
+        private string SentExchangeForMacro()
+        {
+            if (_contestSendBoxes == null || _contestSendBoxes.Count == 0) return string.Empty;
+
+            var parts = _contestSendBoxes
+                .Select(b => b != null ? (b.Text ?? string.Empty).Trim() : string.Empty)
+                .Where(t => t.Length > 0);
+
+            return string.Join(" ", parts);
+        }
+
+        // Names the FIRST macro in the text that has nothing to put there, in words the operator can
+        // act on. Null when everything the message asks for can be supplied.
+        internal string DescribeCwMacroProblem(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return null;
+
+            if (UsesCwMacro(text, "*", "{MYCALL}") && MyCallForMacro().Length == 0)
+                return "your own callsign is empty";
+
+            if (UsesCwMacro(text, "!", "{HISCALL}") && HisCallForMacro().Length == 0)
+                return "there is no callsign in the entry form";
+
+            if (UsesCwMacro(text, "#") && SentSerialForMacro().Length == 0)
+                return "there is no serial number to send - turn contest mode on";
+
+            if (UsesCwMacro(text, "$", "{EXCH}") && SentExchangeForMacro().Length == 0)
+                return "there is no sent exchange - turn contest mode on";
+
+            return null;
+        }
+
+        private static bool UsesCwMacro(string text, params string[] marks)
+        {
+            foreach (string mark in marks)
+            {
+                if (text.IndexOf(mark, StringComparison.Ordinal) >= 0) return true;
+            }
+            return false;
         }
 
         private string GetCwMessageText(int messageNumber)
@@ -2988,7 +3140,7 @@ namespace HolyLogger
             }
         }
 
-        // ---- THE CW KEYBOARD ----------------------------------------------------------------------
+        // ---- THE CW KEYER ----------------------------------------------------------------------
         //
         // The canned messages above send a whole text at one press. This is the other half: a window
         // the operator types into, going out of the radio as it is typed. The window itself is in
@@ -2996,7 +3148,7 @@ namespace HolyLogger
         // typing is sent in chunks rather than letter by letter.
         //
         // IT ONLY OPENS ON A RADIO THAT IS IN CW. Not because the program could not send otherwise,
-        // but because a CW keyboard in front of a radio sitting on SSB is a trap: the operator types,
+        // but because a CW keyer in front of a radio sitting on SSB is a trap: the operator types,
         // presses nothing, and hears nothing. If the radio leaves CW while the window is open, the
         // window goes with it (see UpdateVoiceMessageAvailabilityState).
         //
@@ -3015,20 +3167,20 @@ namespace HolyLogger
 
             if (!Properties.Settings.Default.EnableOmniRigCAT || OmniRigEngine == null || Rig == null)
             {
-                if (!silent) HolyMessageBox.ShowWarning("OmniRig CAT is not available.", "CW Keyboard", this);
+                if (!silent) HolyMessageBox.ShowWarning("OmniRig CAT is not available.", "CW Keyer", this);
                 return;
             }
 
             if (Rig.Status != OmniRig.RigStatusX.ST_ONLINE)
             {
-                if (!silent) HolyMessageBox.ShowWarning("The radio is offline.", "CW Keyboard", this);
+                if (!silent) HolyMessageBox.ShowWarning("The radio is offline.", "CW Keyer", this);
                 return;
             }
 
             if (!IsCwModeActive())
             {
                 if (!silent) HolyMessageBox.ShowWarning("The radio is not in CW. Put it in CW and open the keyboard again.",
-                                                       "CW Keyboard", this);
+                                                       "CW Keyer", this);
                 return;
             }
 
@@ -3037,7 +3189,7 @@ namespace HolyLogger
             if (BuildCwChunkCommand(rigType, "E") == null)
             {
                 if (!silent) HolyMessageBox.ShowWarning("CW keying by CAT is not supported for this radio model ("
-                                                       + rigType + ").", "CW Keyboard", this);
+                                                       + rigType + ").", "CW Keyer", this);
                 return;
             }
 
@@ -3053,7 +3205,33 @@ namespace HolyLogger
                     if (!string.IsNullOrWhiteSpace(stop)) TrySendOmniRigCustomCommand(stop);
                 },
                 () => cwLearnedWpm,
-                CwChunkSizeFor(rigType))
+                () => cwWpmMeasured,
+                CwChunkSizeFor(rigType),
+                // Whether the radio is keying RIGHT NOW. The keyer times its line breaks from this
+                // rather than from the program's estimate of how long the keying would take.
+                () => Rig != null && Rig.Tx == (OmniRig.RigParamX)PM_TX,
+                // Its eight buttons hold the same kind of text as the four here, so they get the same
+                // macros and the same editor rather than copies of either.
+                ExpandCwMacros,
+                DescribeCwMacroProblem,
+                // The keyer measures the radio's real keying speed too now, not only the Msg buttons.
+                // Same light smoothing, so one odd reading cannot swing the estimate.
+                measured =>
+                {
+                    if (measured >= 5 && measured <= 80)
+                    {
+                        cwLearnedWpm = (cwLearnedWpm * 0.4) + (measured * 0.6);
+                        cwWpmMeasured = true;
+                    }
+                },
+                ShowCwTextEditDialog,
+                // Its first four buttons ARE the four Msg buttons - the same texts, shown twice.
+                GetCwMessageText,
+                (number, text) =>
+                {
+                    SetCwMessageText(number, text);
+                    UpdateMessageButtonLabel(GetMessageButton(number), number, isCw: true);
+                })
             {
                 Owner = this,
                 Icon = Icon
@@ -3157,11 +3335,29 @@ namespace HolyLogger
                 }
             }
 
-            string cwText = GetCwMessageText(messageNumber);
+            string storedText = GetCwMessageText(messageNumber);
+
+            if (string.IsNullOrWhiteSpace(storedText))
+            {
+                HolyMessageBox.ShowWarning("CW text " + messageNumber + " is empty. Right-click the button to edit it.", "CW Text", this);
+                return;
+            }
+
+            // A macro with nothing behind it is said plainly here, rather than keyed as a silence in
+            // the middle of the message.
+            string macroProblem = DescribeCwMacroProblem(storedText);
+
+            if (macroProblem != null)
+            {
+                HolyMessageBox.ShowWarning("CW text " + messageNumber + " cannot be sent: " + macroProblem + ".", "CW Text", this);
+                return;
+            }
+
+            string cwText = ExpandCwMacros(storedText);
 
             if (string.IsNullOrWhiteSpace(cwText))
             {
-                HolyMessageBox.ShowWarning("CW text " + messageNumber + " is empty. Right-click the button to edit it.", "CW Text", this);
+                HolyMessageBox.ShowWarning("CW text " + messageNumber + " has nothing to send.", "CW Text", this);
                 return;
             }
 
@@ -3251,6 +3447,7 @@ namespace HolyLogger
                     {
                         // Light smoothing so a single odd reading doesn't swing the estimate.
                         cwLearnedWpm = (cwLearnedWpm * 0.4) + (measuredWpm * 0.6);
+                        cwWpmMeasured = true;
                     }
                 }
             }
@@ -9987,12 +10184,16 @@ namespace HolyLogger
             WhatsNewWindow.ShowIfAny(this, null, file.Trim());
         }
 
-        // THE FIRST RUN OF A NEW VERSION SHOWS WHAT CHANGED, BY ITSELF. Everything since the version
-        // this operator was last running, not merely the newest - somebody who skips three releases
-        // and then updates is told what happened in all three.
+        // THE FIRST RUN AFTER AN INSTALL SHOWS WHAT CHANGED, BY ITSELF - and the first run after ANY
+        // install, not merely after one that carried a new version number. Reinstalling, repairing,
+        // or being handed a rebuilt MSI whose number never moved all used to show nothing at all,
+        // because the only question asked was whether the version had changed.
         //
-        // A first-ever install shows nothing: there is no "before" to report on, and greeting a new
-        // operator with a list of repairs to a program he has never used explains nothing.
+        // So the install itself is the flag now: the moment the program file was written. An
+        // installer sets that simply by putting the file there and cannot forget to.
+        //
+        // The version is still watched as well, for the one case the stamp cannot cover - a program
+        // updated by some other means than a run of the installer.
         private async Task ShowWhatsNewIfVersionChanged()
         {
             try
@@ -10000,14 +10201,24 @@ namespace HolyLogger
                 string current = ReleaseNotes.CurrentVersion;
                 if (string.IsNullOrWhiteSpace(current)) return;
 
+                string stamp = ReleaseNotes.CurrentInstallStamp;
+                bool freshInstall = !string.IsNullOrEmpty(stamp)
+                                 && !string.Equals(stamp, ReleaseNotes.SeenInstallStamp, StringComparison.Ordinal);
+
                 string seen = ReleaseNotes.LastSeenVersion;
-                if (string.Equals(seen, current, StringComparison.Ordinal)) return;
+                bool newVersion = !string.Equals(seen, current, StringComparison.Ordinal);
+
+                if (!freshInstall && !newVersion) return;
 
                 // Written FIRST, and whatever happens next. If the fetch fails, or the file has nothing
                 // for this version, the operator must not be asked the same question at every startup
                 // for ever after.
                 ReleaseNotes.LastSeenVersion = current;
-                if (string.IsNullOrWhiteSpace(seen)) return;   // first ever install
+                if (!string.IsNullOrEmpty(stamp)) ReleaseNotes.SeenInstallStamp = stamp;
+
+                // A FIRST-EVER INSTALL IS GREETED TOO. It used to be passed over on the grounds that
+                // there is no "before" to report on - but a new operator is exactly the one who has
+                // never seen what the program can do, and the news file is where that is written down.
 
                 // THE WHOLE HISTORY HERE TOO. This window used to show only what had changed since the
                 // version that was running - defensible, and not what was asked for. A release with

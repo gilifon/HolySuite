@@ -690,7 +690,7 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
-                    <MenuItem x:Name="CwKeyboardMenuItem" Header="CW Keyboard (Ctrl+K)" ToolTip="Type CW and send it as you type - the radio has to be in CW" Click="CwKeyboardMenuItem_Click"/>
+                    <MenuItem x:Name="CwKeyboardMenuItem" Header="CW Keyer (Ctrl+K)" ToolTip="Type CW and send it as you type - the radio has to be in CW" Click="CwKeyboardMenuItem_Click"/>
                     <Separator />
                     <MenuItem x:Name="EntireLogQrzServiseMenuItem" Header="Full-Log QRZ Service" ToolTip="Try to get QRZ info for the entire log" Click="EntireLogQrzServiseMenuItem_Click">
                         <MenuItem.Icon>

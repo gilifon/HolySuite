@@ -228,12 +228,66 @@ namespace HolyLogger
         // behind, and the one thing this must be right about is what he has and has not seen.
         private static string SeenFile
         {
+            get { return System.IO.Path.Combine(SeenFolder, "whatsnew.seen"); }
+        }
+
+        private static string SeenFolder
+        {
             get
             {
-                string dir = System.IO.Path.Combine(
+                return System.IO.Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "4Z1KD", "HolyLogger");
-                return System.IO.Path.Combine(dir, "whatsnew.seen");
+            }
+        }
+
+        // WHICH INSTALL THIS OPERATOR HAS ALREADY BEEN GREETED FOR.
+        //
+        // The version number is not enough. Reinstalling the same version, or repairing it, or being
+        // handed a rebuilt MSI that never got its number bumped, all leave the version identical and
+        // the news unread. What changes on EVERY install without fail is the program file itself, so
+        // the moment it was written IS the flag - set by the installer, in the only way an installer
+        // cannot forget to do, simply by putting the file there.
+        private static string InstallFile
+        {
+            get { return System.IO.Path.Combine(SeenFolder, "whatsnew.install"); }
+        }
+
+        // The stamp of the program now running: when its own file was last written.
+        public static string CurrentInstallStamp
+        {
+            get
+            {
+                try
+                {
+                    string exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
+                    if (string.IsNullOrEmpty(exe) || !System.IO.File.Exists(exe)) return string.Empty;
+                    return System.IO.File.GetLastWriteTimeUtc(exe).ToString("O");
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return string.Empty; }
+            }
+        }
+
+        public static string SeenInstallStamp
+        {
+            get
+            {
+                try
+                {
+                    return System.IO.File.Exists(InstallFile)
+                         ? System.IO.File.ReadAllText(InstallFile).Trim()
+                         : "";
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); return ""; }
+            }
+            set
+            {
+                try
+                {
+                    System.IO.Directory.CreateDirectory(SeenFolder);
+                    System.IO.File.WriteAllText(InstallFile, value ?? string.Empty);
+                }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
             }
         }
 

@@ -1,26 +1,36 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
+using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Newtonsoft.Json;
 
 namespace HolyLogger
 {
     /// <summary>
-    /// THE CW KEYBOARD: what is typed here goes out of the radio as it is typed.
+    /// THE CW KEYER: what is typed here goes out of the radio as it is typed.
     ///
     /// Its own window, and not the main one, for the same reason every contest logger does it that
     /// way: the entry form already owns every keystroke, and a keyboard that stole them would break
     /// logging.
     ///
     /// TWO ROWS, AND THE TEXT FALLS FROM ONE TO THE OTHER. The top row is what has NOT gone out yet;
-    /// the row below is what HAS. A character is not copied down, it MOVES down, the moment it is
-    /// handed to the radio - so the top row is always exactly the backlog, and the row below is the
-    /// record of what was sent. That is also why nothing needs to defend the sent text from Backspace
-    /// any more: it is not in the typing row to be deleted.
+    /// the row below is what HAS. A character is not copied down, it MOVES down - and it moves when
+    /// the radio has KEYED it, not when the radio was handed it. Those are seconds apart: a CAT
+    /// command carrying a dozen characters is accepted at once and then takes several seconds to go
+    /// on air. Moving on the handover emptied the top row before a single dit had been sent, so the
+    /// operator never saw what he had just pressed.
+    ///
+    /// So a chunk given to the radio waits in the top row until its keying time is up, and only then
+    /// drops to the row below. The top row therefore reads as what is still to come - some of it in
+    /// the radio's hands, the rest still only typed - which is why Backspace has to be held back from
+    /// the part already handed over: see _handedUpTo.
     ///
     /// HOW THE TEXT GETS OUT. The radio is keyed by CAT, and a CAT command carries a handful of
     /// characters at a time (Icom takes thirty, the KY radios about two dozen). So the typing is not
@@ -41,6 +51,16 @@ namespace HolyLogger
     /// below, because it has gone. Enter does NOT close the window: the operator carries on typing
     /// the next thing. The window closes on the X, on Ctrl+K, or when the radio leaves CW.
     ///
+    /// EIGHT BUTTONS ALONG THE BOTTOM, for the things said over and over. Mouse only - no F-keys,
+    /// because those already belong to the four Msg buttons on the main window and a key that means
+    /// two things depending on which window has the focus is a key nobody trusts. A left-click drops
+    /// the text into the typing row, so it goes out through the same paced sending as everything else
+    /// and lands in the same record; a right-click opens the same editor the Msg buttons use.
+    ///
+    /// THE FIRST FOUR ARE THE MSG BUTTONS. Not copies of them - the same four texts, shown in a second
+    /// place. Edit either and both change, because both read CwMsgText1..4. That is what makes it safe
+    /// to take the four Msg buttons off the main window one day: their texts do not live there.
+    ///
     /// N1MM closes its window on Enter and opens a fresh empty one next time, so it needs no history
     /// and nothing to tidy. This one stays open, so the sent text has somewhere to go.
     /// </summary>
@@ -52,12 +72,103 @@ namespace HolyLogger
         // Aborts whatever the radio is keying.
         private readonly Action _stopSending;
 
-        // The keying speed as the program currently understands it - it is learned from the canned
-        // messages, so it improves as the operator uses them.
+        // The keying speed as the program currently understands it - learned from real transmissions,
+        // so it improves the more the radio is used.
         private readonly Func<double> _currentWpm;
+
+        // Whether that speed has ever been measured. Until it has, the number above is only the figure
+        // the program started with, and a guess shown as a reading is worse than no reading.
+        private readonly Func<bool> _wpmMeasured;
 
         // How much a single CAT command may carry. The radio's own buffer, not a guess.
         private readonly int _maxChunk;
+
+        // Turns * and ! into callsigns. The stored text keeps the macro; only what goes on air is
+        // expanded, so a button reads the same next year when the callsign in the form is different.
+        private readonly Func<string, string> _expandMacros;
+
+        // Hands back a speed measured from a real transmission, so the program's idea of how fast the
+        // radio keys improves every time this window is used - not only when a Msg button is pressed.
+        private readonly Action<double> _learnWpm;
+
+        // Names the macro in a text that has nothing to fill it, or null when the text can be sent.
+        private readonly Func<string, string> _macroProblem;
+
+        // Opens the shared CW text editor (title, current text) and gives back the new text, or null
+        // when the operator cancelled.
+        private readonly Func<string, string, string> _editText;
+
+        // Reads and writes the four texts the Msg buttons own. Kept as callbacks rather than reading
+        // the settings here, so the main window can redraw its own four faces when one is edited from
+        // this side.
+        private readonly Func<int, string> _getSharedText;
+        private readonly Action<int, string> _setSharedText;
+
+        private const int ButtonCount = 8;
+
+        // Buttons 1..SharedButtons are the Msg buttons' texts; the rest are this window's own.
+        private const int SharedButtons = 4;
+        private readonly Button[] _buttons = new Button[ButtonCount];
+        private readonly string[] _buttonTexts;
+
+        // Is the radio keying THIS INSTANT? Null when nothing can be asked. The line below is
+        // finished a few seconds after this goes false, and not before.
+        private readonly Func<bool> _isTransmitting;
+
+        // Has the radio been seen KEYING since the last chunk was handed to it, and when did it stop.
+        //
+        // THE FLAG IS PER SEND, not per session, and that is the whole point of it. A radio takes a
+        // moment to key up after the CAT command lands, and during that moment it answers "not
+        // transmitting" - which is indistinguishable from "finished" unless you insist on having seen
+        // it transmitting first. Without that insistence every message was declared sent the instant
+        // it was handed over, and the text left the typing row before a dit had been keyed.
+        private bool _txSeenThisSend;
+        private DateTime _txStoppedUtc = DateTime.MaxValue;
+
+        // Asking the radio costs a CAT call, so it is asked no oftener than this - and only while
+        // something is actually on air or a line is waiting to be finished, never idly.
+        private DateTime _txAskedUtc = DateTime.MinValue;
+        private static readonly TimeSpan TxAskEvery = TimeSpan.FromMilliseconds(100);
+
+        // NOBODY KEYS SLOWER THAN THIS. Working the message out at five words a minute gives a time
+        // that CANNOT be beaten by any real station, so once it has passed the message is finished -
+        // whatever the radio does or does not say about its transmit state.
+        //
+        // It is deliberately not the learned speed. That is a guess, and a guess that runs SHORT
+        // takes the text off the screen early; this one only ever runs long, and it is only ever
+        // reached when the radio has told us nothing.
+        private const double SlowestPlausibleWpm = 5.0;
+
+        // AND NOBODY KEYS FASTER THAN THIS. Worked out at sixty words a minute it gives the EARLIEST
+        // the message could possibly have finished. Before that moment the radio saying "receive" is
+        // not the end of the message - it is the radio not having started yet - so it is ignored.
+        private const double FastestPlausibleWpm = 60.0;
+
+        // Morse spacing, in units: three between the letters of a word, seven between words.
+        private const double LetterGapUnits = 3.0;
+        private const double WordGapUnits = 7.0;
+
+        // The earliest everything handed over could possibly be finished.
+        private DateTime _earliestDoneUtc = DateTime.MinValue;
+
+        // What is needed to MEASURE the speed rather than guess at it: how much Morse was handed over
+        // for this transmission, and when the radio actually started keying it. Time divided by units
+        // is the speed, and that is the same sum the sending monitor does for the canned messages.
+        // The title bar says what speed the program believes the radio is keying at, so the operator
+        // can see it settle on the truth instead of taking it on faith. Redrawn only when the whole
+        // number changes, not on every tick.
+        // Draws the send line in its two colours; see where it is built for why the box itself does
+        // not draw at all.
+        private TextBlock _sendOverlay;
+
+        private TextBlock _titleText;
+        private int _shownWpm = -1;
+
+        private double _unitsThisSend;
+        private DateTime _txStartedUtc = DateTime.MinValue;
+
+        // When the radio must have finished everything handed to it, worked out at that speed.
+        private DateTime _worstCaseDoneUtc = DateTime.MinValue;
 
         // The backlog being typed, and below it the record of what has gone.
         private readonly TextBox _box;
@@ -76,6 +187,16 @@ namespace HolyLogger
         // The line being added to now - what the radio is sending, or has just sent - and the finished
         // ones under it, newest first. They are held as text rather than read back off the screen so
         // that the row count can change without the record changing with it.
+        // How many characters at the FRONT of the typing row have already been given to the radio.
+        // They are still on screen - the radio has not keyed them yet - but they cannot be taken back.
+        private int _handedUpTo;
+
+        // Each chunk handed over, with the moment the radio should have finished keying it. That is
+        // when it leaves the typing row and joins the record below.
+        // Each chunk handed to the radio, and whether the radio had ALREADY RUN DRY before it went.
+        // That second half is what the listener heard as a gap, and it is written into the record.
+        private readonly Queue<KeyValuePair<string, bool>> _inFlight = new Queue<KeyValuePair<string, bool>>();
+
         private string _openLine = string.Empty;
         private readonly List<string> _finishedLines = new List<string>();
 
@@ -94,14 +215,27 @@ namespace HolyLogger
             return brush;
         }
 
-        public CwKeyboardWindow(Func<string, bool> sendChunk, Action stopSending, Func<double> currentWpm, int maxChunk)
+        public CwKeyboardWindow(Func<string, bool> sendChunk, Action stopSending, Func<double> currentWpm,
+                                Func<bool> wpmMeasured, int maxChunk, Func<bool> isTransmitting,
+                                Func<string, string> expandMacros, Func<string, string> macroProblem,
+                                Action<double> learnWpm, Func<string, string, string> editText,
+                                Func<int, string> getSharedText, Action<int, string> setSharedText)
         {
             _sendChunk = sendChunk;
             _stopSending = stopSending;
             _currentWpm = currentWpm;
+            _wpmMeasured = wpmMeasured;
             _maxChunk = maxChunk < 4 ? 4 : maxChunk;
+            _isTransmitting = isTransmitting;
+            _expandMacros = expandMacros;
+            _macroProblem = macroProblem;
+            _learnWpm = learnWpm;
+            _editText = editText;
+            _getSharedText = getSharedText;
+            _setSharedText = setSharedText;
+            _buttonTexts = LoadButtonTexts();
 
-            Title = "CW Keyboard";
+            Title = "CW Keyer";
 
             // The window is as tall as its two rows, whatever the operator has set the history to -
             // change the number of history rows at the gear and the window grows or shrinks with it.
@@ -110,7 +244,10 @@ namespace HolyLogger
             // THE WIDTH IS THE OPERATOR'S, the height is not. Dragging the sides makes the line longer
             // or shorter and WindowBounds remembers it; the height is worked out from the rows.
             Width = 560;
-            MinWidth = 300;
+
+            // Four buttons across, each wide enough for eight characters of the face font, is what
+            // sets the floor now - narrower than this and the faces start losing characters.
+            MinWidth = 420;
             ResizeMode = ResizeMode.CanResize;
             ShowInTaskbar = false;
             WindowStartupLocation = WindowStartupLocation.CenterOwner;
@@ -144,6 +281,45 @@ namespace HolyLogger
             _box.PreviewKeyDown += Box_PreviewKeyDown;
             _box.PreviewTextInput += Box_PreviewTextInput;
 
+            // A TextBox paints all its text in one colour, so it paints none of it: what the operator
+            // sees comes from this TextBlock sitting exactly under the box, in two runs - blue for the
+            // characters the radio has already keyed, ordinary for the rest. The box keeps the caret,
+            // the typing and the selection; it just does not draw.
+            _sendOverlay = new TextBlock
+            {
+                FontSize = 20,
+                FontFamily = typeface,
+                VerticalAlignment = VerticalAlignment.Center,
+                IsHitTestVisible = false
+            };
+
+            var overlayShift = new TranslateTransform();
+            _sendOverlay.RenderTransform = overlayShift;
+            _box.AddHandler(ScrollViewer.ScrollChangedEvent,
+                new ScrollChangedEventHandler((s2, e2) => overlayShift.X = -_box.HorizontalOffset));
+
+            _box.Background = Brushes.Transparent;
+            _box.Foreground = Brushes.Transparent;
+            _box.BorderThickness = new Thickness(0);
+            _box.Padding = new Thickness(0);
+            _box.Margin = new Thickness(0);
+            _box.VerticalContentAlignment = VerticalAlignment.Center;
+            _box.SelectionOpacity = 0.35;
+            _box.SetResourceReference(System.Windows.Controls.Primitives.TextBoxBase.CaretBrushProperty, "TextBrush");
+
+            var sendLayers = new Grid { ClipToBounds = true };
+            sendLayers.Children.Add(_sendOverlay);
+            sendLayers.Children.Add(_box);
+
+            var sendFrame = new Border
+            {
+                BorderThickness = new Thickness(1),
+                Margin = new Thickness(10, 10, 10, 0),
+                Padding = new Thickness(4, 2, 4, 2),
+                Child = sendLayers
+            };
+            sendFrame.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
+
             // WHAT HAS GONE, in blue and a size smaller. Read-only rather than merely disabled, so the
             // operator can still select a line of it and copy it out; never reached by Tab, because the
             // only thing in this window worth having the focus is the row being typed into.
@@ -170,12 +346,16 @@ namespace HolyLogger
 
             var titleBar = BuildTitleBar();
             DockPanel.SetDock(titleBar, Dock.Top);
-            DockPanel.SetDock(_box, Dock.Top);
+            DockPanel.SetDock(sendFrame, Dock.Top);
             DockPanel.SetDock(_history, Dock.Top);
 
+            var buttonGrid = BuildButtons(typeface);
+            DockPanel.SetDock(buttonGrid, Dock.Top);
+
             body.Children.Add(titleBar);
-            body.Children.Add(_box);
+            body.Children.Add(sendFrame);
             body.Children.Add(_history);
+            body.Children.Add(buttonGrid);
 
             // WindowStyle.None takes the OS frame with it, so this border IS the window's visible edge.
             var frame = new Border { BorderThickness = new Thickness(1), Child = body };
@@ -235,35 +415,82 @@ namespace HolyLogger
                 // Swallowed on purpose. There is nothing for it to do - what is typed is already on
                 // its way out - and it must NOT close the window: the operator keeps typing.
                 e.Handled = true;
+                return;
+            }
+
+            // WHAT HAS GONE IS GONE. The front of this row is in the radio's hands even though it is
+            // still on the screen, so Backspace and Delete are not allowed to reach into it.
+            if ((e.Key == Key.Back || e.Key == Key.Delete) && _box.SelectionStart < _handedUpTo)
+            {
+                e.Handled = true;
             }
         }
 
         private void Pump_Tick(object sender, EventArgs e)
         {
+            // Whatever the radio has finished keying leaves the typing row first, so the row always
+            // shows what is still to come rather than what has just gone.
+            RefreshTitle();
+            RepaintSendLine();
+            DropWhatTheRadioHasKeyed();
+
             string text = _box.Text ?? string.Empty;
 
-            if (text.Length == 0)
+            // Everything in the row is already in the radio's hands; there is nothing new to hand it.
+            if (text.Length <= _handedUpTo)
             {
-                FinishLineIfSilent();
+                if (text.Length == 0) FinishLineIfSilent();
                 return;
             }
 
             // The radio still has enough to be going on with.
             if (DateTime.UtcNow + Lead < _radioBusyUntil) return;
 
-            int take = Math.Min(_maxChunk, text.Length);
+            int waiting = text.Length - _handedUpTo;
+            int take = Math.Min(_maxChunk, waiting);
 
             // CUT AT A SPACE, not at the twelfth character. If the radio ever runs dry at a chunk
             // boundary the gap is heard, and a gap in the middle of a word breaks the word in two.
             // At a space the gap is expected anyway, so it costs nothing. Only when the chunk is
             // full and more text follows - a short tail being typed is sent as it stands.
-            if (take == _maxChunk && take < text.Length)
+            if (take == _maxChunk && take < waiting)
             {
-                int lastSpace = text.LastIndexOf(' ', take - 1, take);
-                if (lastSpace > 0) take = lastSpace + 1;
+                int lastSpace = text.LastIndexOf(' ', _handedUpTo + take - 1, take);
+                if (lastSpace > _handedUpTo) take = lastSpace - _handedUpTo + 1;
             }
 
-            string chunk = text.Substring(0, take);
+            string chunk = text.Substring(_handedUpTo, take);
+
+            // TYPED TOO SLOWLY TO KEEP THE RADIO FED. The radio had finished everything it was given
+            // before this arrived, so it stopped keying - and a stop in the middle of a word is heard
+            // as the end of one word and the start of another. "GOODBYE" typed haltingly goes out as
+            // "GOO D BY E", and the operator has no way of knowing unless he is told.
+            //
+            // So the record shows what was HEARD, not what was typed: a space is written in wherever
+            // the keying actually stopped. Nothing extra is sent to the radio - the gap is already on
+            // air, this only makes it visible.
+            // HOW LONG IS TOO LONG IS NOT A GUESS. Morse puts three units between the letters of a
+            // word and seven between words, so four units of silence ON TOP of the normal letter gap
+            // is the moment one word becomes two in the listener's ear. At the speed the radio has
+            // been measured keying, that is a real number of seconds - and only a pause longer than
+            // it is written into the record. A few milliseconds of overrun is not a word break.
+            double gapWpm = 20.0;
+            try { if (_currentWpm != null) gapWpm = _currentWpm(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (gapWpm < 5) gapWpm = 5;
+
+            double heardAsWordGap = (WordGapUnits - LetterGapUnits) * 1.2 / gapWpm;
+
+            // Measured against WHAT HAS BEEN HANDED TO THE RADIO, not against the record below. The
+            // record fills only when the send line is cleared, which is seconds later - so while the
+            // first word was still sitting on the screen the record was empty, the test failed, and
+            // no gap was ever marked. What the radio has been given is the thing that went on air.
+            string handed = text.Substring(0, _handedUpTo);
+
+            bool ranDry = _handedUpTo > 0
+                       && DateTime.UtcNow >= _radioBusyUntil.AddSeconds(heardAsWordGap)
+                       && !handed.EndsWith(" ", StringComparison.Ordinal)
+                       && !chunk.StartsWith(" ", StringComparison.Ordinal);
 
             bool ok;
             try { ok = _sendChunk != null && _sendChunk(chunk); }
@@ -273,7 +500,22 @@ namespace HolyLogger
             // on the next tick rather than being silently lost.
             if (!ok) return;
 
-            MoveToHistory(chunk);
+            // THE GAP IS WRITTEN INTO THE LINE THE OPERATOR IS LOOKING AT, straight away, so he sees
+            // his own hesitation as he makes it rather than afterwards. It goes in AFTER the handed
+            // mark, where the radio can never reach it - the silence is already on air, and sending a
+            // space as well would put a second word gap there.
+            if (ranDry)
+            {
+                string before = _box.Text ?? string.Empty;
+                int at = _handedUpTo;
+                int caret = _box.CaretIndex;
+
+                _box.Text = before.Substring(0, at) + " " + before.Substring(at);
+                _box.CaretIndex = caret >= at ? caret + 1 : caret;
+                _handedUpTo = at + 1;
+            }
+
+            _handedUpTo += take;
 
             double wpm = 20.0;
             try { if (_currentWpm != null) wpm = _currentWpm(); }
@@ -283,19 +525,91 @@ namespace HolyLogger
             double seconds = CwSendMonitorWindow.ComputeTotalUnits(chunk) * 1.2 / wpm;
             DateTime from = _radioBusyUntil > DateTime.UtcNow ? _radioBusyUntil : DateTime.UtcNow;
             _radioBusyUntil = from.AddSeconds(seconds);
+
+            // It comes off the screen when the radio is done with it, not now.
+            _inFlight.Enqueue(new KeyValuePair<string, bool>(chunk, ranDry));
+
+            // The time by which even a five-words-a-minute station would have finished this chunk,
+            // chained onto whatever is already queued ahead of it.
+            double worstSeconds = CwSendMonitorWindow.ComputeTotalUnits(chunk) * 1.2 / SlowestPlausibleWpm;
+            DateTime worstFrom = _worstCaseDoneUtc > DateTime.UtcNow ? _worstCaseDoneUtc : DateTime.UtcNow;
+            _worstCaseDoneUtc = worstFrom.AddSeconds(worstSeconds);
+
+            _unitsThisSend += CwSendMonitorWindow.ComputeTotalUnits(chunk);
+
+            double bestSeconds = CwSendMonitorWindow.ComputeTotalUnits(chunk) * 1.2 / FastestPlausibleWpm;
+            DateTime bestFrom = _earliestDoneUtc > DateTime.UtcNow ? _earliestDoneUtc : DateTime.UtcNow;
+            _earliestDoneUtc = bestFrom.AddSeconds(bestSeconds);
+
+            // THE WATCH STARTS AGAIN HERE. Without this, the moment the radio last went back to
+            // receive - from the PREVIOUS transmission - still counted as "back in receive", and the
+            // text dropped off the screen the instant it was handed over, before a dit was keyed.
+            // A radio takes a moment to key up after a CAT command; until it does, and until it has
+            // come back down again, nothing has been sent as far as this window is concerned.
+            // ONLY IF THE RADIO IS NOT ALREADY ON AIR. A long message goes over in several chunks, and
+            // they are one transmission, not several: resetting here restarted the clock the colouring
+            // measures from while the character count went on running from the first letter, so the
+            // tail of a message was never reached and never turned blue.
+            if (!_txSeenThisSend || _txStoppedUtc != DateTime.MaxValue)
+            {
+                _txSeenThisSend = false;
+                _txStoppedUtc = DateTime.MaxValue;
+            }
         }
 
-        // The chunk leaves the typing row and joins the record below it. The caret comes back the same
-        // number of characters, so text taken from in front of it does not move the cursor out from
-        // under the operator's fingers mid-word.
-        private void MoveToHistory(string chunk)
+        // Every chunk whose keying time is up leaves the typing row and joins the record below it.
+        // The caret comes back the same number of characters, so text taken from in front of it does
+        // not move the cursor out from under the operator's fingers mid-word.
+        private void DropWhatTheRadioHasKeyed()
         {
-            int caret = _box.CaretIndex;
-            _box.Text = (_box.Text ?? string.Empty).Substring(chunk.Length);
-            _box.CaretIndex = Math.Max(0, caret - chunk.Length);
+            if (_inFlight.Count == 0) return;
 
-            _openLine += chunk;
-            RenderHistory();
+            WatchTransmitState();
+
+            // THE RADIO SAYS WHEN IT HAS FINISHED - it is asked whether it is back in receive, and
+            // until it says so nothing moves, however long this program's own arithmetic thought the
+            // keying would take. The arithmetic is a guess at a speed; this is the radio itself.
+            // TOO SOON TO BE OVER. Not even a sixty-words-a-minute station could have finished this
+            // yet, so whatever the radio says about being in receive, it has not sent the message.
+            if (DateTime.UtcNow < _earliestDoneUtc) return;
+
+            bool backInReceive = _txStoppedUtc != DateTime.MaxValue;
+
+            // A radio that reports going ON air but never reports coming OFF it would hold the text
+            // on screen for ever. So there is a ceiling: the time the message would take at five
+            // words a minute. Nothing real is slower, so once that has passed it is over.
+            if (!backInReceive && DateTime.UtcNow < _worstCaseDoneUtc) return;
+
+            // AND THEN THE OPERATOR'S OWN SECONDS. Sending has ended; the text stays where it was
+            // typed for as long as he asked for, so he can read back what just went out, and only
+            // then drops to the record. That is what "Clear send line after sending ended" means.
+            DateTime endedAt = backInReceive ? _txStoppedUtc : _worstCaseDoneUtc;
+            if (DateTime.UtcNow < endedAt.AddSeconds(BreakSeconds())) return;
+
+            bool moved = false;
+
+            while (_inFlight.Count > 0)
+            {
+                var sent = _inFlight.Dequeue();
+                string chunk = sent.Key;
+
+                string text = _box.Text ?? string.Empty;
+
+                // The space written in for a heard gap sits in front of the chunk and comes off with
+                // it, though the radio was never given it.
+                int drop = Math.Min(chunk.Length + (sent.Value ? 1 : 0), text.Length);
+
+                int caret = _box.CaretIndex;
+                _box.Text = text.Substring(drop);
+                _box.CaretIndex = Math.Max(0, caret - drop);
+                _handedUpTo = Math.Max(0, _handedUpTo - drop);
+
+                if (sent.Value) _openLine += " ";
+                _openLine += chunk;
+                moved = true;
+            }
+
+            if (moved) RenderHistory();
         }
 
         // The radio has stopped and stayed stopped for as long as the operator asked for. The line
@@ -308,13 +622,234 @@ namespace HolyLogger
             int seconds = BreakSeconds();
             if (seconds <= 0) return;                       // nought: the line runs on for ever
 
-            // _radioBusyUntil is when the radio is expected to stop keying what it was given. The
-            // count starts there and not at the moment the characters were handed over, or a long
-            // sentence would be broken up while it was still going out.
-            if (DateTime.UtcNow < _radioBusyUntil.AddSeconds(seconds)) return;
+            WatchTransmitState();
+
+            // THE COUNT STARTS WHEN THE RADIO ACTUALLY STOPS KEYING, which is a thing the radio can
+            // be asked. It used to start from _radioBusyUntil - the program's ESTIMATE of when the
+            // keying would end - and that estimate runs long: the speed behind it defaults to 20 wpm
+            // and is only ever corrected by the canned F-key messages, never by this window, so a
+            // radio keying at 25 or 30 left the estimate seconds adrift and three seconds became six.
+            // The estimate is still the fallback, for a radio that will not say whether it is keying.
+            DateTime silentSince;
+
+            if (_txStoppedUtc != DateTime.MaxValue && _txSeenThisSend)
+            {
+                // The radio said so itself: this is the moment it stopped keying.
+                silentSince = _txStoppedUtc;
+            }
+            else if (_txSeenThisSend && DateTime.UtcNow < _worstCaseDoneUtc)
+            {
+                // It says it is still keying and even the slowest possible station would not have
+                // finished yet, so it is taken at its word.
+                return;
+            }
+            else
+            {
+                // NO USABLE READING, so the ORDINARY estimate decides - the one worked out at the
+                // speed the radio is believed to be keying at.
+                //
+                // NOT the five-words-a-minute ceiling. That ceiling exists so text is never taken off
+                // the screen early, and being generous costs nothing there. Here it would be added to
+                // the operator's own three seconds and make the wait thirteen - which is why every
+                // message ran on into the same blue line instead of pushing it down.
+                silentSince = _radioBusyUntil;
+            }
+
+            if (DateTime.UtcNow < silentSince.AddSeconds(seconds)) return;
+
+            FinishLineNow();
+        }
+
+        // Reads the radio's transmit state, no oftener than TxAskEvery, and remembers the moment it
+        // last went from keying to not. MaxValue means "keying now, or never seen keying" - either
+        // way the count above has not started.
+        private void WatchTransmitState()
+        {
+            if (_isTransmitting == null) return;
+            if (DateTime.UtcNow - _txAskedUtc < TxAskEvery) return;
+            _txAskedUtc = DateTime.UtcNow;
+
+            bool keying;
+            try { keying = _isTransmitting(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return; }
+
+            if (keying)
+            {
+                if (!_txSeenThisSend) _txStartedUtc = DateTime.UtcNow;
+                _txSeenThisSend = true;
+                _txStoppedUtc = DateTime.MaxValue;
+            }
+            else if (_txSeenThisSend && _txStoppedUtc == DateTime.MaxValue)
+            {
+                // Seen on air, and now off it: THIS is the moment the message ended.
+                _txStoppedUtc = DateTime.UtcNow;
+                LearnSpeedFromThisSend();
+            }
+        }
+
+        // THE SEND LINE HOLDS THE NEWEST MESSAGE AND NOTHING ELSE. When a new one is pressed while
+        // the last is still sitting there waiting out its few seconds, the old one does not wait any
+        // longer: it goes down to the record at once, so the line the operator is looking at is
+        // always the thing he has just sent.
+        private void FlushHandedText()
+        {
+            bool moved = false;
+
+            while (_inFlight.Count > 0)
+            {
+                var sent = _inFlight.Dequeue();
+                string chunk = sent.Key;
+
+                string text = _box.Text ?? string.Empty;
+                int drop = Math.Min(chunk.Length + (sent.Value ? 1 : 0), text.Length);
+
+                _box.Text = text.Substring(drop);
+                _handedUpTo = Math.Max(0, _handedUpTo - drop);
+
+                if (sent.Value) _openLine += " ";
+                _openLine += chunk;
+                moved = true;
+            }
+
+            if (moved) RenderHistory();
+        }
+
+        // HOW FAST THE RADIO REALLY KEYS, worked out from what just happened rather than assumed.
+        // The message is a known number of Morse units and the radio was on air for a known number of
+        // seconds; one divided by the other is the speed. The keyer used to take no part in this - only
+        // the canned Msg buttons did - so a station that never pressed one was timed at the default
+        // twenty for ever, and every judgement resting on that ran wrong in the same direction.
+        private void LearnSpeedFromThisSend()
+        {
+            double units = _unitsThisSend;
+            _unitsThisSend = 0;
+
+            if (_learnWpm == null || units <= 0) return;
+            if (_txStartedUtc == DateTime.MinValue || _txStoppedUtc == DateTime.MaxValue) return;
+
+            double seconds = (_txStoppedUtc - _txStartedUtc).TotalSeconds;
+            if (seconds <= 0.2) return;      // too short to measure anything from
+
+            try { _learnWpm(units * 1.2 / seconds); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // THE MESSAGE GOES BLUE AS IT IS KEYED, a character at a time, the same way the sending
+        // monitor walks the canned messages. The radio cannot be asked which character it is on, so it
+        // is worked out from the clock: how long it has been transmitting, at the speed it has been
+        // measured keying, in Morse units - and units are what the timing is built on throughout.
+        //
+        // Only once that speed has actually been MEASURED. Running this off the default twenty would
+        // paint the line at a speed the radio is not sending at, and a cursor that is confidently in
+        // the wrong place is worse than no cursor.
+        private void RepaintSendLine()
+        {
+            if (_sendOverlay == null) return;
+
+            string text = _box.Text ?? string.Empty;
+            int keyed = KeyedSoFar(text);
+
+            _sendOverlay.Inlines.Clear();
+
+            if (keyed > 0)
+            {
+                _sendOverlay.Inlines.Add(new Run(text.Substring(0, keyed)) { Foreground = SentBrush });
+            }
+
+            if (keyed < text.Length)
+            {
+                var pending = new Run(text.Substring(keyed));
+                pending.SetResourceReference(TextElement.ForegroundProperty, "TextBrush");
+                _sendOverlay.Inlines.Add(pending);
+            }
+        }
+
+        // How many characters of the send line the radio has had time to key. Never past what has
+        // actually been handed to it, however long it has been transmitting.
+        private int KeyedSoFar(string text)
+        {
+            if (text.Length == 0 || _handedUpTo <= 0) return 0;
+            if (!_txSeenThisSend || _txStartedUtc == DateTime.MinValue) return 0;
+
+            bool measured = false;
+            try { measured = _wpmMeasured != null && _wpmMeasured(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (!measured) return 0;
+
+            double wpm = 20.0;
+            try { if (_currentWpm != null) wpm = _currentWpm(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            if (wpm < 5) wpm = 5;
+
+            // THE RADIO HAS STOPPED, so everything it was given HAS been keyed - there is nothing left
+            // to work out. Walking the clock for this case left the last character short: its timing
+            // includes the gap that follows it, and that gap is over once the radio drops, so the
+            // arithmetic never quite reached the end of the message.
+            if (_txStoppedUtc != DateTime.MaxValue) return Math.Min(_handedUpTo, text.Length);
+
+            DateTime until = DateTime.UtcNow;
+            double elapsed = (until - _txStartedUtc).TotalSeconds;
+            if (elapsed <= 0) return 0;
+
+            double unitsDone = elapsed * wpm / 1.2;
+            double running = 0;
+            int limit = Math.Min(_handedUpTo, text.Length);
+
+            for (int i = 0; i < limit; i++)
+            {
+                running += CwSendMonitorWindow.ComputeTotalUnits(text[i].ToString());
+                if (running > unitsDone) return i;
+            }
+
+            return limit;
+        }
+
+        private void RefreshTitle()
+        {
+            if (_titleText == null || _currentWpm == null) return;
+
+            // NOTHING UNTIL THERE IS SOMETHING TO SAY. At startup the speed is the default the program
+            // was built with, not the radio's - so the title carries no number at all until a real
+            // transmission has been timed.
+            bool measured = false;
+            try { measured = _wpmMeasured == null || _wpmMeasured(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (!measured)
+            {
+                if (_shownWpm == -1) return;
+                _shownWpm = -1;
+                _titleText.Inlines.Clear();
+                _titleText.Inlines.Add(new Run("CW Keyer"));
+                return;
+            }
+
+            double wpm;
+            try { wpm = _currentWpm(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return; }
+
+            int shown = (int)Math.Round(wpm);
+            if (shown == _shownWpm) return;
+
+            _shownWpm = shown;
+
+            // Bigger than the title beside it and in the same blue as the sent text, because it is a
+            // reading the operator glances at mid-QSO - not a caption.
+            _titleText.Inlines.Clear();
+            _titleText.Inlines.Add(new Run("CW Keyer      "));
+            _titleText.Inlines.Add(new Run(shown + " WPM") { FontSize = 20, Foreground = SentBrush });
+        }
+
+        // Puts the line being added to at the top of the finished ones and starts a new one, with no
+        // reference to the clock. FinishLineIfSilent is this, once the radio has been quiet long
+        // enough; a button press calls it outright.
+        private void FinishLineNow()
+        {
+            if (_openLine.Length == 0) return;
 
             _finishedLines.Insert(0, _openLine);
             if (_finishedLines.Count > MaxFinishedLines) _finishedLines.RemoveRange(MaxFinishedLines, _finishedLines.Count - MaxFinishedLines);
+
             _openLine = string.Empty;
             RenderHistory();
         }
@@ -324,11 +859,16 @@ namespace HolyLogger
         private void RenderHistory()
         {
             var text = new StringBuilder();
-            text.Append(_openLine);
+
+            // NOTHING IS WRITTEN FOR A LINE THAT HAS NOT STARTED. Between one transmission and the
+            // next the open line is empty, and writing it anyway left a blank row at the top of the
+            // list, pushing everything down a row before there was anything to push it for. The row
+            // appears when there is something to put in it.
+            if (_openLine.Length > 0) text.Append(_openLine);
 
             foreach (string line in _finishedLines)
             {
-                text.Append('\n');
+                if (text.Length > 0) text.Append('\n');
                 text.Append(line);
             }
 
@@ -347,6 +887,11 @@ namespace HolyLogger
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
             _radioBusyUntil = DateTime.MinValue;
+            _worstCaseDoneUtc = DateTime.MinValue;
+            _earliestDoneUtc = DateTime.MinValue;
+            _unitsThisSend = 0;
+            _inFlight.Clear();
+            _handedUpTo = 0;
             _box.Text = string.Empty;
         }
 
@@ -369,7 +914,7 @@ namespace HolyLogger
             {
                 int rows = Properties.Settings.Default.CwKeyboardHistoryRows;
                 if (rows < 1) rows = 1;
-                if (rows > 10) rows = 10;
+                if (rows > 5) rows = 5;
                 return rows;
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return 3; }
@@ -385,6 +930,266 @@ namespace HolyLogger
             _history.ScrollToHome();
         }
 
+        // Two rows of four. One row of eight would need close to eight hundred pixels to show eight
+        // characters a button, which is half again as wide as this window wants to be.
+        private UniformGrid BuildButtons(FontFamily typeface)
+        {
+            var grid = new UniformGrid
+            {
+                Rows = 2,
+                Columns = 4,
+                Margin = new Thickness(7, 0, 7, 7)
+            };
+
+            for (int i = 0; i < ButtonCount; i++)
+            {
+                int number = i;
+
+                var button = new Button
+                {
+                    FontSize = 16,
+                    FontFamily = typeface,
+                    Height = 32,
+                    Margin = new Thickness(3),
+                    Padding = new Thickness(2, 0, 2, 0),
+
+                    // Stretch, not centre: the text block has to be handed the whole width before it
+                    // can work out how much of the message fits and where to put the ellipsis.
+                    HorizontalContentAlignment = HorizontalAlignment.Stretch
+                };
+
+                button.Click += (s, e) => SendButton(number);
+
+                // Right-click edits, exactly as it does on the four Msg buttons. Handled here so the
+                // click does not also go looking for a context menu that does not exist.
+                button.PreviewMouseRightButtonUp += (s, e) => { EditButton(number); e.Handled = true; };
+
+                // Built as the tooltip opens, not when the face was drawn: what a macro comes out as
+                // changes with every callsign typed into the entry form, and a tooltip written half
+                // an hour ago would be telling the operator about the station before last.
+                button.ToolTipOpening += (s, e) => button.ToolTip = BuildButtonTooltip(number);
+
+                _buttons[i] = button;
+                grid.Children.Add(button);
+                RefreshButtonFace(i);
+            }
+
+            return grid;
+        }
+
+        // The first few characters of what the button holds, or just its number when it holds nothing
+        // - an empty button that looked like a full one would be pressed once and never again.
+        private void RefreshButtonFace(int index)
+        {
+            var button = _buttons[index];
+            if (button == null) return;
+
+            string text = _buttonTexts[index] ?? string.Empty;
+
+            // AS MUCH OF IT AS THE BUTTON CAN HOLD, and an ellipsis where it runs out - not a fixed
+            // eight characters, which cut "CQ CQ DE * * K" down to "CQ CQ DE" while there was still
+            // room beside it. Drag the window wider and more of every message comes into view.
+            if (text.Length == 0)
+            {
+                button.Content = (index + 1).ToString();
+                button.SetResourceReference(ForegroundProperty, "MutedTextBrush");
+            }
+            else
+            {
+                button.Content = new TextBlock
+                {
+                    Text = text,
+                    TextTrimming = TextTrimming.CharacterEllipsis,
+                    TextAlignment = TextAlignment.Center,
+                    VerticalAlignment = VerticalAlignment.Center
+                };
+                button.SetResourceReference(ForegroundProperty, "TextBrush");
+            }
+
+            // Something has to be here for ToolTipOpening to fire at all; the real one is built there.
+            button.ToolTip = BuildButtonTooltip(index);
+        }
+
+        // WHAT IT HOLDS, AND WHAT THAT WOULD SEND. The two are the same line for a plain message and
+        // two different lines for one with a macro in it, which is the whole point of showing both.
+        private string BuildButtonTooltip(int index)
+        {
+            string text = _buttonTexts[index] ?? string.Empty;
+
+            if (text.Length == 0) return "Empty - right-click to give it some text";
+
+            var lines = new StringBuilder();
+            lines.Append(text);
+
+            string problem = _macroProblem != null ? _macroProblem(text) : null;
+
+            if (problem != null)
+            {
+                lines.Append("\nCannot send: ").Append(problem);
+            }
+            else
+            {
+                string sends = _expandMacros != null ? _expandMacros(text) : text;
+                if (!string.Equals(sends, text, StringComparison.Ordinal))
+                {
+                    lines.Append("\nSends: ").Append(sends);
+                }
+            }
+
+            lines.Append("\nRight-click to edit");
+            return lines.ToString();
+        }
+
+        // A left-click puts the text in the typing row rather than firing it at the radio itself. One
+        // sending path, one record, and Escape still stops it half way like anything else typed.
+        private void SendButton(int index)
+        {
+            string stored = _buttonTexts[index] ?? string.Empty;
+
+            if (stored.Trim().Length == 0)
+            {
+                HolyMessageBox.ShowWarning("Button " + (index + 1) + " is empty. Right-click it to give it some text.",
+                                           "CW Keyer", this);
+                return;
+            }
+
+            // A macro with nothing behind it stops the send and says which one, rather than keying a
+            // hole where the number or the callsign should have been.
+            if (_macroProblem != null)
+            {
+                string problem = _macroProblem(stored);
+                if (problem != null)
+                {
+                    HolyMessageBox.ShowWarning("Button " + (index + 1) + " cannot be sent: " + problem + ".",
+                                               "CW Keyer", this);
+                    return;
+                }
+            }
+
+            string text = _expandMacros != null ? _expandMacros(stored) : stored;
+            text = (text ?? string.Empty).ToUpperInvariant();
+
+            // Whatever a macro brought in is held to the same rule as typing: only what a keyer can
+            // actually send gets through.
+            text = new string(text.Where(IsSendable).ToArray()).Trim();
+
+            if (text.Length == 0)
+            {
+                HolyMessageBox.ShowWarning("Nothing to send: the callsign this text asks for is empty.",
+                                           "CW Keyer", this);
+                return;
+            }
+
+            // A PRESS IS A LINE. The timer decides where typing breaks, because typing has no edges
+            // the program can see; a button press has one, so it does not need guessing at. Pressing
+            // three buttons gives three rows, newest at the top, however fast they are pressed.
+            //
+            // Unless the radio is still working through the last one: then this is the tail of the
+            // same transmission and belongs on the same row.
+            FlushHandedText();
+            FinishLineNow();
+
+            _box.Text = (_box.Text ?? string.Empty) + text;
+            _box.CaretIndex = _box.Text.Length;
+            _box.Focus();
+        }
+
+        private void EditButton(int index)
+        {
+            if (_editText == null) return;
+
+            // The first four say which F-key they are, because they ARE that message - the operator
+            // should not have to wonder whether he is editing the same text twice.
+            string title = index < SharedButtons
+                ? "Edit CW Text " + (index + 1) + " (F" + (index + 5) + ")"
+                : "Edit CW Keyer Text " + (index + 1);
+
+            string updated = _editText(title, _buttonTexts[index] ?? string.Empty);
+            if (updated == null) return;
+
+            _buttonTexts[index] = updated;
+            SaveButtonText(index, updated);
+            RefreshButtonFace(index);
+        }
+
+        // All eight in ONE setting, the way WindowBoundsJson holds every window's placement: a ninth
+        // button later costs nothing, and a profile that snapshots the settings takes them all along.
+        private string[] LoadButtonTexts()
+        {
+            var texts = new string[ButtonCount];
+            for (int i = 0; i < ButtonCount; i++) texts[i] = string.Empty;
+
+            // The last four, in one setting of their own, the way WindowBoundsJson holds every
+            // window's placement. The first four slots are written empty and never read: those texts
+            // belong to the Msg buttons and are fetched below.
+            try
+            {
+                string json = Properties.Settings.Default.CwKeyerButtonsJson;
+                if (!string.IsNullOrWhiteSpace(json))
+                {
+                    var saved = JsonConvert.DeserializeObject<string[]>(json);
+                    if (saved != null)
+                    {
+                        for (int i = SharedButtons; i < ButtonCount && i < saved.Length; i++)
+                        {
+                            texts[i] = saved[i] ?? string.Empty;
+                        }
+                    }
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+            if (_getSharedText != null)
+            {
+                for (int i = 0; i < SharedButtons; i++)
+                {
+                    try { texts[i] = _getSharedText(i + 1) ?? string.Empty; }
+                    catch (Exception swallowed) { Log.Swallow(swallowed); }
+                }
+            }
+
+            return texts;
+        }
+
+        // The Msg buttons keep their own four; only the rest go in this window's setting.
+        private void SaveButtonText(int index, string text)
+        {
+            if (index < SharedButtons)
+            {
+                if (_setSharedText == null) return;
+                try { _setSharedText(index + 1, text); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                return;
+            }
+
+            var own = new string[ButtonCount];
+            for (int i = 0; i < ButtonCount; i++)
+            {
+                own[i] = i < SharedButtons ? string.Empty : (_buttonTexts[i] ?? string.Empty);
+            }
+
+            try
+            {
+                Properties.Settings.Default.CwKeyerButtonsJson = JsonConvert.SerializeObject(own);
+                Properties.Settings.Default.Save();
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // Called by the main window when one of the four Msg texts was edited over there, so the same
+        // four faces in here do not go on showing what they used to say.
+        internal void RefreshSharedButtons()
+        {
+            if (_getSharedText == null) return;
+
+            for (int i = 0; i < SharedButtons; i++)
+            {
+                try { _buttonTexts[i] = _getSharedText(i + 1) ?? string.Empty; }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+                RefreshButtonFace(i);
+            }
+        }
+
         // Our own caption: the title, then the gear, then the X. The gear is the way in to anything
         // this window ever needs asking about - today the history rows, tomorrow whatever else.
         private Border BuildTitleBar()
@@ -394,7 +1199,7 @@ namespace HolyLogger
                 Content = "",
                 FontSize = 16,
                 Style = Application.Current.Resources["CaptionButtonStyle"] as Style,
-                ToolTip = "CW keyboard settings"
+                ToolTip = "CW keyer settings"
             };
             System.Windows.Shell.WindowChrome.SetIsHitTestVisibleInChrome(gearBtn, true);
             gearBtn.Click += (s, e) => ShowSettings();
@@ -413,20 +1218,21 @@ namespace HolyLogger
             right.Children.Add(gearBtn);
             right.Children.Add(closeBtn);
 
-            var title = new TextBlock
+            _titleText = new TextBlock
             {
-                Text = "CW Keyboard",
+                Text = "CW Keyer",
                 FontSize = 16,
                 FontWeight = FontWeights.Bold,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(10, 0, 0, 0)
             };
-            title.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
-            DockPanel.SetDock(title, Dock.Left);
+            _titleText.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            DockPanel.SetDock(_titleText, Dock.Left);
+            RefreshTitle();
 
             var bar = new DockPanel { LastChildFill = false };
             bar.Children.Add(right);
-            bar.Children.Add(title);
+            bar.Children.Add(_titleText);
 
             var border = new Border { Height = 32, Child = bar };
             border.SetResourceReference(Border.BackgroundProperty, "TitleBarBg");
@@ -456,14 +1262,7 @@ namespace HolyLogger
             };
             label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
 
-            var hint = new TextBlock
-            {
-                Text = "1 to 10. The window grows and shrinks to match.",
-                FontSize = 16,
-                Margin = new Thickness(0, 10, 0, 0)
-            };
-            hint.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-
+            
             var row = new DockPanel { LastChildFill = false };
             DockPanel.SetDock(label, Dock.Left);
             DockPanel.SetDock(rowsBox, Dock.Left);
@@ -481,7 +1280,7 @@ namespace HolyLogger
 
             var secondsLabel = new TextBlock
             {
-                Text = "Start a new line this many seconds after sending ended:",
+                Text = "Clear send line after sending ended",
                 FontSize = 16,
                 VerticalAlignment = VerticalAlignment.Center,
                 Margin = new Thickness(0, 0, 10, 0)
@@ -490,7 +1289,7 @@ namespace HolyLogger
 
             var secondsHint = new TextBlock
             {
-                Text = "0 never starts a new line - everything sent stays on one.",
+                Text = "0 never clears it - everything sent stays on the one line.",
                 FontSize = 16,
                 Margin = new Thickness(0, 10, 0, 0)
             };
@@ -499,8 +1298,20 @@ namespace HolyLogger
             var secondsRow = new DockPanel { LastChildFill = false, Margin = new Thickness(0, 18, 0, 0) };
             DockPanel.SetDock(secondsLabel, Dock.Left);
             DockPanel.SetDock(secondsBox, Dock.Left);
+            // The unit sits after the number, where it is read: "... ended [3] Seconds".
+            var secondsUnit = new TextBlock
+            {
+                Text = "Seconds",
+                FontSize = 16,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(10, 0, 0, 0)
+            };
+            secondsUnit.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            DockPanel.SetDock(secondsUnit, Dock.Left);
+
             secondsRow.Children.Add(secondsLabel);
             secondsRow.Children.Add(secondsBox);
+            secondsRow.Children.Add(secondsUnit);
 
             var okBtn = new Button { Content = "OK", FontSize = 16, Width = 90, Height = 32, IsDefault = true };
             var cancelBtn = new Button { Content = "Cancel", FontSize = 16, Width = 90, Height = 32, IsCancel = true, Margin = new Thickness(10, 0, 0, 0) };
@@ -516,15 +1327,19 @@ namespace HolyLogger
 
             var stack = new StackPanel { Margin = new Thickness(16) };
             stack.Children.Add(row);
-            stack.Children.Add(hint);
             stack.Children.Add(secondsRow);
             stack.Children.Add(secondsHint);
+            stack.Children.Add(BuildHelp());
             stack.Children.Add(buttons);
 
             var dialog = new Window
             {
-                Title = "CW Keyboard Settings",
-                SizeToContent = SizeToContent.WidthAndHeight,
+                Title = "CW Keyer Settings",
+
+                // A fixed width and a height that follows the content: the help below wraps its
+                // second column, and a column that may wrap has to be told how wide it is.
+                Width = 560,
+                SizeToContent = SizeToContent.Height,
                 ResizeMode = ResizeMode.NoResize,
                 ShowInTaskbar = false,
                 WindowStartupLocation = WindowStartupLocation.CenterOwner,
@@ -537,17 +1352,17 @@ namespace HolyLogger
             {
                 // A number in range or nothing at all. Anything else leaves the setting as it was
                 // rather than quietly picking a row count the operator did not ask for.
-                if (!int.TryParse((rowsBox.Text ?? string.Empty).Trim(), out int rows) || rows < 1 || rows > 10)
+                if (!int.TryParse((rowsBox.Text ?? string.Empty).Trim(), out int rows) || rows < 1 || rows > 5)
                 {
-                    HolyMessageBox.ShowWarning("Type a whole number of rows, from 1 to 10.",
-                                               "CW Keyboard Settings", dialog);
+                    HolyMessageBox.ShowWarning("Type a whole number of rows, from 1 to 5.",
+                                               "CW Keyer Settings", dialog);
                     return;
                 }
 
                 if (!int.TryParse((secondsBox.Text ?? string.Empty).Trim(), out int seconds) || seconds < 0)
                 {
                     HolyMessageBox.ShowWarning("Type a whole number of seconds, or 0 to never start a new line.",
-                                               "CW Keyboard Settings", dialog);
+                                               "CW Keyer Settings", dialog);
                     return;
                 }
 
@@ -561,6 +1376,131 @@ namespace HolyLogger
 
             dialog.ShowDialog();
             _box.Focus();
+        }
+
+        // WHAT THE KEYS DO, in the one place the operator already opens to change how this window
+        // behaves. Every line here is something the window does that nothing on its face announces -
+        // a key with no button, or a button whose second meaning is on the right mouse button.
+        private UIElement BuildHelp()
+        {
+            var pairs = new[]
+            {
+                new[] { "Ctrl+K",       "Closes this window. On the main window it opens it." },
+                new[] { "Escape",       "Stops the radio now and drops whatever has not gone out. What has already gone stays in the record." },
+                new[] { "Backspace",    "Takes back only what has not gone out yet." },
+                new[] { "Mouse click",  "Puts that button's text into the typing row, and it goes out from there." },
+                new[] { "Right-click",  "Edits that button's text." },
+                new[] { "*",            "In a text: your Station Callsign." },
+                new[] { "!",            "In a text: the DX Callsign." },
+                new[] { "#",            "In a text: the serial number you are sending. Needs contest mode." },
+                new[] { "$",            "In a text: the rest of your sent exchange. Needs contest mode." }
+            };
+
+            var grid = new Grid();
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(12) });
+            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+            for (int i = 0; i < pairs.Length; i++)
+            {
+                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+                var key = new TextBlock
+                {
+                    Text = pairs[i][0],
+                    FontSize = 16,
+                    FontWeight = FontWeights.Bold,
+                    Margin = new Thickness(0, 3, 0, 3)
+                };
+                key.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                Grid.SetRow(key, i);
+                Grid.SetColumn(key, 0);
+                grid.Children.Add(key);
+
+                var meaning = new TextBlock
+                {
+                    Text = pairs[i][1],
+                    FontSize = 16,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 3, 0, 3)
+                };
+                meaning.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                Grid.SetRow(meaning, i);
+                Grid.SetColumn(meaning, 2);
+                grid.Children.Add(meaning);
+            }
+
+            AddHelpExample(grid, pairs.Length);
+
+            var heading = new TextBlock
+            {
+                Text = "What the keys do",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 0, 0, 8)
+            };
+            heading.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+
+            var inner = new StackPanel();
+            inner.Children.Add(heading);
+            inner.Children.Add(grid);
+
+            var separated = new Border
+            {
+                BorderThickness = new Thickness(0, 1, 0, 0),
+                Margin = new Thickness(0, 18, 0, 0),
+                Padding = new Thickness(0, 14, 0, 0),
+                Child = inner
+            };
+            separated.SetResourceReference(Border.BorderBrushProperty, "MutedTextBrush");
+            return separated;
+        }
+
+        // ONE LINE OF IT ACTUALLY DONE, with this station's own callsign in it rather than a made-up
+        // one - the macros are far easier to believe when the answer on the right is the operator's
+        // own call. A station callsign that is not filled in yet leaves the example unexpanded.
+        private void AddHelpExample(Grid grid, int row)
+        {
+            const string before = "CQ CQ DE ";
+            const string after = " K";
+
+            string mine = _expandMacros != null ? (_expandMacros("*") ?? string.Empty).Trim() : string.Empty;
+            if (mine.Length == 0) return;   // no Station Callsign yet - an example with a hole in it teaches nothing
+
+            grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+
+            var label = new TextBlock
+            {
+                Text = "Example",
+                FontSize = 16,
+                FontWeight = FontWeights.Bold,
+                Margin = new Thickness(0, 10, 0, 3)
+            };
+            label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+            Grid.SetRow(label, row);
+            Grid.SetColumn(label, 0);
+            grid.Children.Add(label);
+
+            var line = new TextBlock
+            {
+                FontSize = 16,
+                FontFamily = new FontFamily("Consolas"),
+                TextWrapping = TextWrapping.Wrap,
+                Margin = new Thickness(0, 10, 0, 3)
+            };
+            line.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            // The * on the left and the callsign it turned into on the right are both in the same
+            // blue, so the eye pairs them without a word of explanation.
+            line.Inlines.Add(new Run(before));
+            line.Inlines.Add(new Run("*") { Foreground = SentBrush });
+            line.Inlines.Add(new Run(after + "  =  " + before));
+            line.Inlines.Add(new Run(mine) { Foreground = SentBrush });
+            line.Inlines.Add(new Run(after));
+            Grid.SetRow(line, row);
+            Grid.SetColumn(line, 2);
+            grid.Children.Add(line);
         }
 
         protected override void OnClosed(EventArgs e)

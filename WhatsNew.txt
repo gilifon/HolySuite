@@ -1,0 +1,33 @@
+== 8.9.1 ==
+
+CW KEYER (was "CW Keyboard")
+
+* The keyer opens by itself the moment the radio goes to CW, and closes when it leaves CW.
+* Ctrl+K opens and closes it. Enter no longer closes it - you carry on typing.
+* Two rows: what is still to be sent on top, what has already gone below it in blue.
+* The text stays on the top row while the radio is keying it and turns blue character by
+  character as it goes out, then drops to the row below.
+* Each thing you send becomes its own line, pushing the earlier lines down.
+* Type too slowly and the radio runs dry in the middle of a word, which the listener hears
+  as two words. When that happens a space is written into the line so you can see it.
+* The title bar shows the keying speed the program has measured from your radio. It appears
+  only after a real transmission has been timed.
+* Eight buttons along the bottom for the things you send over and over. Left-click sends,
+  right-click edits. The first four are the same four texts as the Msg buttons.
+* The window remembers where you put it and how wide you made it.
+* A gear in the title bar sets how many rows of sent text to show, how long the sent text
+  stays on the send line, and lists what every key does.
+
+CW TEXT MACROS - on the Msg buttons and the keyer buttons alike
+
+*   your Station Callsign
+!   the DX Callsign
+#   the serial number you are sending (contest mode)
+$   the rest of your sent exchange (contest mode)
+
+The editor shows a second row with exactly what will go on air, so you can check a macro
+before you use it. If a macro has nothing to fill it, the send is refused and says why.
+
+OTHER
+
+* What's New is shown on the first run after every install, whatever the version number.
