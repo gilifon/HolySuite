@@ -28,6 +28,14 @@ $   the rest of your sent exchange (contest mode)
 The editor shows a second row with exactly what will go on air, so you can check a macro
 before you use it. If a macro has nothing to fill it, the send is refused and says why.
 
+CW TIMING
+
+* The program worked out the length of a Morse message about a seventh too long. Two things
+  came out of that: the keying speed it reported was too fast (a radio set to 20 was shown
+  as 23), and the moving cursor reached the last letter after you had already heard it. Both
+  are fixed, on the Msg buttons as well as in the keyer.
+* The speed shown now settles instead of moving after every message.
+
 OTHER
 
 * What's New is shown on the first run after every install, whatever the version number.
