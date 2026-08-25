@@ -496,12 +496,39 @@ namespace HolyLogger
             return panel;
         }
 
+        // THE FIRST FEW WORDS ARE THE SUBJECT, AND THEY ARE BOLD. An operator reads a release
+        // looking for the one thing he cares about, so every item names its subject first and that
+        // name is set bold: the eye stops on it, and only then reads the sentence after it. The
+        // dash is bold too, so the left edge of the list reads as a list.
+        //
+        // The subject is whatever stands before the first colon - but ONLY when that colon comes
+        // early. A colon in the middle of a sentence ("...marks that are filled in when you send:
+        // * your Station Callsign") is not a subject, and bolding up to it would put half the item
+        // in bold. When there is no early colon nothing is bolded and the item reads as before.
+        private const int SubjectMaxChars = 40;
+        private const int SubjectMaxWords = 6;
+
+        private static int SubjectLength(string words)
+        {
+            int colon = words.IndexOf(':');
+            if (colon <= 0) return 0;                       // nothing before it
+            if (colon + 1 >= words.Length) return 0;        // nothing after it
+            if (colon + 1 > SubjectMaxChars) return 0;      // too far in to be a subject
+
+            int count = words.Substring(0, colon)
+                             .Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;
+            if (count > SubjectMaxWords) return 0;
+
+            return colon + 1;                               // the colon belongs to the subject
+        }
+
         private static UIElement BuildBullet(string words)
         {
             var dash = new TextBlock
             {
                 Text = "\u2013",
                 FontSize = 16,
+                FontWeight = FontWeights.Bold,
                 LineHeight = 24,
                 Width = 16,
                 VerticalAlignment = VerticalAlignment.Top
@@ -510,12 +537,22 @@ namespace HolyLogger
 
             var body = new TextBlock
             {
-                Text = words,
                 FontSize = 16,
                 LineHeight = 24,
                 TextWrapping = TextWrapping.Wrap
             };
             body.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+
+            int subject = SubjectLength(words);
+            if (subject > 0)
+            {
+                body.Inlines.Add(new Run(words.Substring(0, subject)) { FontWeight = FontWeights.Bold });
+                body.Inlines.Add(new Run(words.Substring(subject)));
+            }
+            else
+            {
+                body.Inlines.Add(new Run(words));
+            }
 
             var row = new DockPanel { LastChildFill = true, Margin = new Thickness(0, 0, 0, 2) };
             DockPanel.SetDock(dash, Dock.Left);
