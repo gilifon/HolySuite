@@ -884,6 +884,16 @@
                         </MenuItem.Icon>
                     </MenuItem>
                     <Separator />
+                    <!-- THE SITE, REACHABLE FROM INSIDE THE PROGRAM. Everything about HolyLogger that
+                         is not in the program itself lives there, and an operator who has only ever
+                         been handed the MSI has no way of knowing the page exists. -->
+                    <MenuItem x:Name="VisitSiteMenuItem" Header="Visit HolyLogger site"
+                              ToolTip="4z1kd.github.io/HolyLogger" Click="VisitSiteMenuItem_Click">
+                        <MenuItem.Icon>
+                            <Image Source="Images/HolyLogger icon.png" Stretch="UniformToFill" Width="16" Height="16"/>
+                        </MenuItem.Icon>
+                    </MenuItem>
+                    <Separator />
                     <MenuItem x:Name="AboutMenuItem" Header="About" ToolTip="Some semi-important info.." Click="AboutMenuItem_Click">
                         <MenuItem.Icon>
                             <Image Source="Images/about.png" Stretch="UniformToFill" Width="16" Height="16"/>

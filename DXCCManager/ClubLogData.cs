@@ -20,6 +20,13 @@ namespace DXCCManager
         public bool ExactCall;       // matched a full-callsign exception, not merely a prefix
         public int MatchedLength;    // how many characters of the callsign the match covered
         public bool Historic;        // no record covered the date; this is the last one that did
+
+        // The window of the record that answered. MinValue / MaxValue when it is open at that end.
+        // Carried out of here because WHEN a record applies is the whole reason Club Log is consulted
+        // and the caller has to be able to see it (see CountryLookup.Resolve): a record that closed
+        // years ago is a statement about that era, not about today.
+        public DateTime Start;
+        public DateTime End;
     }
 
     // A date-aware DXCC lookup built from Club Log's prefix and exception database (cty.xml, by G7VJR).
@@ -527,7 +534,9 @@ namespace DXCCManager
                 Invalid = r.Adif == 0 && string.Equals(r.Entity, "INVALID", StringComparison.OrdinalIgnoreCase),
                 DeletedEntity = deletedByCode.TryGetValue(r.Adif, out deleted) && deleted,
                 ExactCall = exactCall,
-                MatchedLength = matchedLength
+                MatchedLength = matchedLength,
+                Start = r.Start,
+                End = r.End
             };
         }
 

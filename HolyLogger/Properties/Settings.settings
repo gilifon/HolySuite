@@ -751,5 +751,20 @@
     </Setting>
     <Setting Name="CwKeyerButtonsJson" Type="System.String" Scope="User">
       <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="AiApiKey" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="AiProvider" Type="System.String" Scope="User">
+      <Value Profile="(Default)">Gemini</Value>
+    </Setting>
+    <Setting Name="AiApiKeyOpenRouter" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="AiModelGemini" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
+    </Setting>
+    <Setting Name="AiModelOpenRouter" Type="System.String" Scope="User">
+      <Value Profile="(Default)" />
     </Setting>  </Settings>
 </SettingsFile>

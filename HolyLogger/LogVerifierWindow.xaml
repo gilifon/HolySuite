@@ -51,12 +51,65 @@
                             FontSize="16" FontWeight="Bold" IsEnabled="False" Click="Btn_Fix_Click"
                             Background="#2E7D32" Foreground="White" BorderBrush="#1B5E20"
                             BorderThickness="1.5" Content="Fix selected"/>
+                    <!-- BETWEEN THE TWO, and docked right like them, so the order on screen reads
+                         Show all kinds, Check with AI, Fix selected: look at everything, ask about
+                         the one pile that needs judgement, then write. Declared after Fix because a
+                         DockPanel lays right-docked children out from the right inwards. -->
+                    <Button x:Name="Btn_Ai" DockPanel.Dock="Right" Height="38" MinWidth="170"
+                            Margin="0,0,10,0" FontSize="16" Click="Btn_Ai_Click"
+                            Content="Check with AI"/>
                     <Button x:Name="Btn_ShowAll" DockPanel.Dock="Right" Height="38" MinWidth="150"
                             Margin="0,0,10,0" FontSize="16" Visibility="Collapsed" Click="Btn_ShowAll_Click"
                             Content="Show all kinds"/>
-                    <TextBlock x:Name="TB_KindsSummary" VerticalAlignment="Center" FontSize="16"
-                               Foreground="{DynamicResource MutedTextBrush}"
-                               TextTrimming="CharacterEllipsis"/>
+                    <!-- THE SPINNER FROM THE SPLASH SCREEN, seconds and all.
+                         A sliding bar says only "something is happening"; this says how long it has
+                         been happening, which is the thing an operator actually wants while an AI
+                         thinks. It is drawn by the program on the program's own thread, so when it
+                         stops turning the program really has stopped - an animated picture would go
+                         on spinning cheerfully over a window that had died.
+                         Two columns: the words take what they need, the spinner stands immediately
+                         after them rather than away at the far end of the row. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <!-- 34, THE WIDTH OF THE TICK-BOX COLUMN in the list of kinds above. The
+                             line started at the frame's edge and the buttons start after their tick
+                             boxes, so the two were a box-width out of step down the left-hand side.
+                             Same number, so they cannot drift apart. -->
+                        <TextBlock x:Name="TB_KindsSummary" Grid.Column="0" VerticalAlignment="Center"
+                                   Margin="34,0,0,0"
+                                   FontSize="16" Foreground="{DynamicResource MutedTextBrush}"
+                                   TextTrimming="CharacterEllipsis"/>
+
+                        <!-- 38, THE HEIGHT OF THE BUTTONS BESIDE IT. At 40 the row grew by two
+                             pixels the moment the spinner appeared and shrank again when it went,
+                             so the whole frame twitched at the start and end of every run. -->
+                        <StackPanel x:Name="PB_Ai" Grid.Column="1" Orientation="Horizontal"
+                                    HorizontalAlignment="Left" VerticalAlignment="Center"
+                                    Margin="12,0,0,0" Visibility="Collapsed">
+                        <Grid Width="38" Height="38" VerticalAlignment="Center">
+                            <Ellipse Width="34" Height="34" HorizontalAlignment="Center" VerticalAlignment="Center"
+                                     Stroke="{DynamicResource AccentBrush}" StrokeThickness="3" Opacity="0.25"/>
+                            <Canvas Width="38" Height="38" RenderTransformOrigin="0.5,0.5">
+                                <Path Stroke="{DynamicResource AccentBrush}" StrokeThickness="3"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                                      Data="M 19,2 A 17,17 0 0 1 36,19"/>
+                                <Canvas.RenderTransform>
+                                    <RotateTransform x:Name="AiSpinnerRotate" Angle="0"/>
+                                </Canvas.RenderTransform>
+                            </Canvas>
+                            <TextBlock x:Name="AiSeconds" Text="0"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center"
+                                       FontSize="16" FontWeight="Bold"
+                                       Foreground="{DynamicResource TextBrush}"/>
+                        </Grid>
+                        <TextBlock Text="seconds" VerticalAlignment="Center" Margin="8,0,0,0"
+                                   FontSize="16" Foreground="{DynamicResource MutedTextBrush}"/>
+                        </StackPanel>
+                    </Grid>
                 </DockPanel>
                 <!-- Capped and scrollable: there are a dozen kinds today and nothing says there will
                      not be twenty, and this frame must never grow until it squeezes out the table. -->

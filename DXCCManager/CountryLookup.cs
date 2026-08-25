@@ -185,12 +185,50 @@ namespace DXCCManager
         // read. Keeps every caller from repeating the same parsing before a dated lookup.
         public static DateTime QsoDate(string adifDate)
         {
+            return QsoDate(adifDate, null);
+        }
+
+        // THE HOUR MATTERS, and leaving it out got a country wrong.
+        //
+        // Club Log's records carry a time, not just a day. NH8S from Swains Island opens at
+        // 2012-09-07T04:00Z; a QSO logged that same day at 18:27 is inside it. Asked with the date
+        // alone the program asked about 00:00 - four hours BEFORE the operation began - so Club Log
+        // answered "not in effect", the program fell back to the NH8 prefix and recommended American
+        // Samoa for a contact that was plainly Swains Island. Every DXpedition that starts or ends
+        // part-way through a day has the same trap on its first and last day.
+        //
+        // So the QSO's own time is used when the log has one. ADIF writes it as HHMMSS or HHMM;
+        // anything else, and a missing time, falls back to midnight - which is what this did before
+        // and is still the right answer when there is nothing better.
+        public static DateTime QsoDate(string adifDate, string adifTime)
+        {
             DateTime when;
             if (!string.IsNullOrWhiteSpace(adifDate) &&
                 DateTime.TryParseExact(adifDate.Trim(), "yyyyMMdd", CultureInfo.InvariantCulture,
                     DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out when))
-                return when;
+            {
+                return when.Add(TimeOfDay(adifTime));
+            }
             return DateTime.UtcNow;
+        }
+
+        private static TimeSpan TimeOfDay(string adifTime)
+        {
+            string t = (adifTime ?? string.Empty).Trim();
+            if (t.Length == 0) return TimeSpan.Zero;
+
+            // Some logs write 18:27:09; the digits are what matter.
+            t = t.Replace(":", string.Empty);
+
+            DateTime parsed;
+            if (t.Length == 6 && DateTime.TryParseExact(t, "HHmmss", CultureInfo.InvariantCulture,
+                                                        DateTimeStyles.None, out parsed))
+                return parsed.TimeOfDay;
+            if (t.Length == 4 && DateTime.TryParseExact(t, "HHmm", CultureInfo.InvariantCulture,
+                                                        DateTimeStyles.None, out parsed))
+                return parsed.TimeOfDay;
+
+            return TimeSpan.Zero;
         }
 
         // Today's answer - for live use (typing a call, cluster spots) where the date is now.
@@ -286,12 +324,60 @@ namespace DXCCManager
                 && clubLog.CallsignRecordsAllStartAfter(callsign, whenUtc))
                 return Combine(cl, fromCty);
 
+            // ...AND NOT WHEN CLUB LOG'S SHORT MATCH IS A CLOSED CHAPTER OF HISTORY.
+            //
+            // A two-letter match is treated as a weak fallback because it usually is - a whole call
+            // block that says nothing about the station. But when the record that answered has an END
+            // DATE that has already passed, it is not a fallback at all: it is Club Log saying "in
+            // those years, these letters were that country", which is exactly the question being
+            // asked. UB4WZA in April 1992 is the case: Club Log holds UB = Ukraine until 31 December
+            // 1994, while cty.dat matches the longer UB4W and reports European Russia, because that is
+            // what UB4W is TODAY. The contact was made in the Ukraine of 1992.
+            //
+            // Still-open records (no end date) are left as fallbacks, which is what keeps R1FJ right:
+            // Club Log's "R1" is current, not historical, so cty.dat's Franz Josef Land wins there.
+            bool clubIsHistoryOfThatEra = cl.End < DateTime.UtcNow;
+
             if (!cl.ExactCall && cl.MatchedLength <= BlockFallback
                 && fromCty != null && fromCty.MatchedLength > cl.MatchedLength
-                && fromCty.Name != "Unknown")
+                && fromCty.Name != "Unknown"
+                && !clubIsHistoryOfThatEra
+                && !CtyIsDescribingTheFuture(callsign, whenUtc, cl.MatchedLength))
                 return WithEntityNumber(fromCty);   // cty.dat's country, Club Log's number for it
 
             return Combine(cl, fromCty);
+        }
+
+        // A LONGER MATCH IS NOT A BETTER ONE WHEN IT BELONGS TO A LATER YEAR.
+        //
+        // cty.dat carries no dates: a prefix written into it is written for ever, and reading it back
+        // for an old QSO answers with today's map. CQ14EEN, worked in June 2004, is the case. cty.dat
+        // matches CQ1 and says Azores; Club Log matches CQ and says Portugal - two characters, so the
+        // rule above would hand it to cty.dat on length alone. But Club Log also knows WHY it stopped
+        // at two: its CQ1 = Azores record does not begin until 1 June 2009, five years after the
+        // contact. In 2004 CQ1 was not the Azores at all, and CQ14EEN was a Portuguese special-event
+        // callsign for the European football championship.
+        //
+        // So before length decides, Club Log is asked whether the longer prefix cty.dat leaned on was
+        // in effect that day. A record that had not STARTED yet means cty.dat is describing the
+        // future, and its longer match is worth nothing here.
+        //
+        // Only the not-yet-started direction counts. A record that has EXPIRED leaves cty.dat as the
+        // fresher witness, which is what keeps R1FJ right: Club Log's R1FJ record ran out in January
+        // 2010, so for a QSO today cty.dat's Franz Josef Land still wins.
+        private bool CtyIsDescribingTheFuture(string callsign, DateTime whenUtc, int clubMatchedLength)
+        {
+            try
+            {
+                ClubLogData.NearMiss near =
+                    clubLog.LongerRecordNotInEffect(callsign, whenUtc, clubMatchedLength);
+                return near != null && near.Start > whenUtc;
+            }
+            catch (Exception)
+            {
+                // An explanation that cannot be fetched must not change the answer.
+                return false;
+            }
         }
 
         // Turns a Club Log match into the answer the rest of the program sees, saying it in cty.dat's
@@ -443,14 +529,17 @@ namespace DXCCManager
 
                     if (!string.IsNullOrEmpty(ClubNearKey))
                     {
+                        // THE HOUR IS SHOWN WHEN THERE IS ONE. Club Log's windows open and close at a
+                        // time of day - Swains Island 2012 began at 04:00 UTC - and printing only the
+                        // date made the note contradict itself: "not in effect" beside a range whose
+                        // first day IS the QSO's day. With the time there, the reason is on the line.
                         string when;
                         if (ClubNearFrom > DateTime.MinValue && ClubNearTo < DateTime.MaxValue)
-                            when = "only between " + ClubNearFrom.ToString("dd-MM-yyyy")
-                                   + " and " + ClubNearTo.ToString("dd-MM-yyyy");
+                            when = "only between " + Moment(ClubNearFrom) + " and " + Moment(ClubNearTo);
                         else if (ClubNearFrom > DateTime.MinValue)
-                            when = "only from " + ClubNearFrom.ToString("dd-MM-yyyy");
+                            when = "only from " + Moment(ClubNearFrom);
                         else
-                            when = "only until " + ClubNearTo.ToString("dd-MM-yyyy");
+                            when = "only until " + Moment(ClubNearTo);
 
                         lines.Add("Club Log knows **" + ClubNearKey + "** = "
                                   + (ClubNearCode > 0 ? ClubNearName + " (" + ClubNearCode + ")" : ClubNearName)
@@ -475,6 +564,14 @@ namespace DXCCManager
 
             // The same, with the emphasis markers taken out, for anywhere that shows plain text.
             public string PlainSentence { get { return (Sentence ?? "").Replace("**", ""); } }
+
+            // A date, and the time of day with it when it is not plain midnight.
+            private static string Moment(DateTime t)
+            {
+                return t.TimeOfDay == TimeSpan.Zero
+                    ? t.ToString("dd-MM-yyyy")
+                    : t.ToString("dd-MM-yyyy HH:mm") + " UTC";
+            }
 
             // "Portugal (272)", and the number is never left off - it is the part that counts.
             private static string Named(int code, string name)

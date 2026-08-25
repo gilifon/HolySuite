@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -342,6 +343,15 @@ namespace HolyLogger
         //
         // And only the columns that some finding TOUCHES are built at all: a scan that turned up no
         // band trouble shows no Band column. That is what keeps a table this wide readable.
+        // WHICH OF THE TWO LINES THE AI CAME DOWN ON. Nothing until it has been asked; then the
+        // upper half (the log as it stands) or the lower half (what HolyLogger proposes), or Unsure
+        // when it looked and could not tell - which is an answer, and is shown as one.
+        // NEITHER: the AI worked the country out and it is not the one in the log NOR the one
+        // HolyLogger proposes. It wears the same face as Unsure - a "?" on the row, nothing tickable,
+        // nothing written - because in both cases the program has no value it may safely put in. What
+        // differs is the reason, and there it names the country it believes.
+        private enum AiSide { None, Now, Then, Neither, Unsure }
+
         private sealed class Cell : INotifyPropertyChanged
         {
             // PROPERTIES, NOT FIELDS. WPF binds to properties only, and says nothing when it cannot
@@ -422,11 +432,54 @@ namespace HolyLogger
             }
             public event PropertyChangedEventHandler PropertyChanged;
 
+            // THE AI'S VOTE, WORN BY THE CELL. The row holds the verdict; each cell that is actually
+            // part of the argument wears it, and the cells that are only along for the ride - the
+            // date, the callsign - keep their ordinary colours. A whole row going green would say the
+            // AI had approved the contact, and it has approved one field of it.
+            private AiSide ai = AiSide.None;
+            public void SetAi(AiSide side)
+            {
+                if (ai == side) return;
+                ai = side;
+                Raise("NowBg"); Raise("ThenBg"); Raise("NowFg"); Raise("ThenFg");
+            }
+
+            // Only a cell with something at stake changes colour: one that is red, or one that has a
+            // proposal under it. Anything else is untouched log data and stays looking like it.
+            private bool InPlay { get { return Wrong || Proposed.Length > 0; } }
+
             // Filled only where there is something to say. Everywhere else the cell is transparent and
             // the row reads as ordinary log data, which is exactly what it is.
-            public Brush NowBg { get { return Wrong ? WrongBg : Brushes.Transparent; } }
-            public Brush ThenBg { get { return Proposed.Length > 0 ? RightBg : Brushes.Transparent; } }
-            public Brush NowFg { get { return Wrong ? WrongFg : DimFg; } }
+            public Brush NowBg
+            {
+                get
+                {
+                    if (InPlay && ai == AiSide.Now) return RightBg;
+                    if (InPlay && ai == AiSide.Then) return DeadBg;
+                    return Wrong ? WrongBg : Brushes.Transparent;
+                }
+            }
+            public Brush ThenBg
+            {
+                get
+                {
+                    if (Proposed.Length == 0) return Brushes.Transparent;
+                    return ai == AiSide.Now ? DeadBg : RightBg;
+                }
+            }
+            public Brush NowFg
+            {
+                get
+                {
+                    if (InPlay && ai == AiSide.Now) return RightFg;
+                    if (InPlay && ai == AiSide.Then) return DeadFg;
+                    return Wrong ? WrongFg : DimFg;
+                }
+            }
+            // The lower half's text used to be green in the template itself, which left a greyed-out
+            // proposal reading as green writing on a grey ground - the one combination that says
+            // nothing at all.
+            public Brush ThenFg { get { return ai == AiSide.Now ? DeadFg : RightFg; } }
             public FontWeight ThenWeight { get { return Proposed.Length > 0 ? FontWeights.Bold : FontWeights.Normal; } }
 
             // A proper alarm red, not the pale wash it started as - a fault has to look like one.
@@ -434,6 +487,11 @@ namespace HolyLogger
             private static readonly Brush RightBg = Freeze(Color.FromRgb(0xA5, 0xE8, 0xA8));
             private static readonly Brush WrongFg = Freeze(Color.FromRgb(0x5D, 0x00, 0x00));
             private static readonly Brush DimFg = Freeze(Color.FromRgb(0x33, 0x33, 0x33));
+            // THE LOSING SIDE. Grey, not white: the value is still there to be read - the operator may
+            // well disagree with the AI - it has simply stopped being the answer.
+            private static readonly Brush DeadBg = Freeze(Color.FromRgb(0xDE, 0xDE, 0xDE));
+            private static readonly Brush DeadFg = Freeze(Color.FromRgb(0x6E, 0x6E, 0x6E));
+            private static readonly Brush RightFg = Freeze(Color.FromRgb(0x0B, 0x4A, 0x0E));
             private static Brush Freeze(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
         }
 
@@ -469,7 +527,103 @@ namespace HolyLogger
                 if (!any)
                     foreach (var kv in Cells)
                         if (kv.Value.UserEdited && kv.Value.Proposed.Trim().Length > 0) { any = true; break; }
-                Fixable = any;
+                // AND NOT WHEN THE AI HAS BACKED THE LOG. There is nothing left to write: the value
+                // the row would put in is the one the screen has just greyed out. A row left tickable
+                // here is a trap - tick the lot, press Fix, and the contact the AI said was right gets
+                // overwritten with the one it rejected.
+                Fixable = any && !AiBacksLog;
+            }
+
+            // WHAT THE AI SAID ABOUT THIS ROW, AND WHAT THE ROW DOES ABOUT IT.
+            //
+            // The verdict is worn by every cell that is part of the argument, so the two halves change
+            // colour together across the country, its entity number and its continent rather than one
+            // cell at a time. And when the vote goes to the log, the row's tick is dropped as well as
+            // greyed: a tick set before the AI was asked must not survive the answer.
+            private AiSide aiSide = AiSide.None;
+            public string AiReason { get; private set; }
+
+            // WHICH AI SAID IT, kept on the row and not once for the window. Two services can answer
+            // the same log in one sitting - the free allowance runs out and the paid one takes over,
+            // or he simply wants a second opinion - and they do NOT always agree: Gemini said 5 and 1
+            // where OpenRouter said 4 and 2 on the same six QSOs. A verdict whose author is not
+            // recorded cannot be weighed later, or traced when it turns out to be wrong.
+            public string AiWho { get; private set; }
+            public bool AiBacksLog { get { return aiSide == AiSide.Now; } }
+            public bool AiAsked { get { return aiSide != AiSide.None; } }
+            public bool AiCouldNotTell { get { return aiSide == AiSide.Unsure; } }
+            public bool AiSaysNeither { get { return aiSide == AiSide.Neither; } }
+
+            // THE VERDICT IN WORDS. On screen it is a tick standing beside one of the two values,
+            // which says everything and can be written down nowhere. The report needs it as a
+            // sentence, and the reasoning it came with is the whole point of putting it there.
+            public string AiSaid
+            {
+                get
+                {
+                    if (aiSide == AiSide.None) return string.Empty;
+
+                    // "BACKS THE LOG" IS THE LANGUAGE OF A COMMITTEE VOTE, and a man reading a
+                    // report about his own log should not have to work out who is backing whom. What
+                    // he wants to know is which of the two values is right, so that is what it says -
+                    // in the same words as the tally he was shown when the run finished.
+                    string who = aiSide == AiSide.Now ? "your log is correct"
+                               : aiSide == AiSide.Then ? "HolyLogger's correction is right"
+                               : aiSide == AiSide.Neither ? "neither country is right"
+                               : "no answer";
+
+                    return AiReason.Length > 0 ? who + " - " + AiReason : who;
+                }
+            }
+
+            public void SetAi(AiSide side, string reason, string who)
+            {
+                aiSide = side;
+                AiReason = (reason ?? string.Empty).Trim();
+                AiWho = (who ?? string.Empty).Trim();
+
+                foreach (var kv in Cells) kv.Value.SetAi(side);
+
+                if (side == AiSide.Now) Apply = false;
+                Recompute();
+
+                Raise("AiOnNow"); Raise("AiOnThen"); Raise("AiUnsure"); Raise("AiNeither");
+                Raise("AiReason"); Raise("AiReasonVisible");
+            }
+
+            public Visibility AiOnNow
+            {
+                get { return aiSide == AiSide.Now ? Visibility.Visible : Visibility.Collapsed; }
+            }
+            public Visibility AiOnThen
+            {
+                get { return aiSide == AiSide.Then ? Visibility.Visible : Visibility.Collapsed; }
+            }
+            public Visibility AiUnsure
+            {
+                get { return aiSide == AiSide.Unsure ? Visibility.Visible : Visibility.Collapsed; }
+            }
+            // A MARK OF ITS OWN, because it is not a shrug. "? AI" says the AI looked and could not
+            // tell; this says it DID tell, and the answer is that both countries on the row are
+            // wrong. Wearing the same "?" would bury the most useful thing it ever says under the
+            // least useful one.
+            public Visibility AiNeither
+            {
+                get { return aiSide == AiSide.Neither ? Visibility.Visible : Visibility.Collapsed; }
+            }
+
+            public Visibility AiReasonVisible
+            {
+                get
+                {
+                    return aiSide != AiSide.None && !string.IsNullOrEmpty(AiReason)
+                        ? Visibility.Visible : Visibility.Collapsed;
+                }
+            }
+
+            private void Raise(string name)
+            {
+                if (PropertyChanged != null) PropertyChanged(this, new PropertyChangedEventArgs(name));
             }
 
             private bool apply;
@@ -762,7 +916,7 @@ namespace HolyLogger
             if (call.Length == 0) return;
 
             CountryLookup.Explanation x;
-            try { x = CountryLookup.Shared.Explain(call, CountryLookup.QsoDate(row.Qso.Date)); }
+            try { x = CountryLookup.Shared.Explain(call, CountryLookup.QsoDate(row.Qso.Date, row.Qso.Time)); }
             catch (Exception ex)
             {
                 Log.Swallow(ex);
@@ -775,7 +929,70 @@ namespace HolyLogger
             // this, and two places composing the same paragraph is how they come to differ.
             string text = x.Report(Text(row.Qso.Country), row.Qso.DxccCode, FormatDate(row.Qso.Date));
 
+            // AND WHAT THE AI MADE OF IT, WHERE HE IS ALREADY LOOKING.
+            //
+            // The "?" is where an operator comes to settle this row, so everything bearing on it
+            // belongs in this one window: what each database matched, and then the opinion that was
+            // fetched precisely because those two could not agree. Kept in a tooltip, the reasoning is
+            // read by accident or not at all - and it is the reasoning, not the verdict, that lets him
+            // disagree with the AI on grounds of his own.
+            string said = AiParagraph(row);
+            if (said.Length > 0) text = text.TrimEnd() + Environment.NewLine + Environment.NewLine + said;
+
             HolyMessageBox.Show(text, "Why this country?", HolyMsgType.Info, this, 640);
+        }
+
+        // WHAT THE AI SAID ABOUT THIS ROW, WRITTEN OUT. Empty when it was never asked, which is every
+        // row until the button is pressed and most rows afterwards - the AI is only ever put the one
+        // question, and only about the contacts where the two databases disagree.
+        //
+        // The country is named rather than left as "the log's value": a man reading this window has
+        // two countries in front of him and the whole point is which of the two was chosen.
+        private static string AiParagraph(FixRow row)
+        {
+            if (row == null || !row.AiAsked) return string.Empty;
+
+            Cell country;
+            row.Cells.TryGetValue("Country", out country);
+
+            string backed = country == null
+                ? string.Empty
+                : Text(row.AiBacksLog ? country.Current : country.Proposed);
+
+            var sb = new StringBuilder();
+            sb.AppendLine(row.AiWho.Length > 0
+                ? "What the AI said (" + row.AiWho + ")"
+                : "What the AI said");
+            sb.AppendLine();
+
+            if (row.AiSaysNeither)
+                sb.AppendLine("It worked the country out from the callsign and the date, and it is "
+                              + "NEITHER of the two on this row. What it believes is in the reason "
+                              + "below. Nothing here can be ticked, because the program has no value "
+                              + "it may safely write - that decision is yours.");
+            else if (row.AiCouldNotTell)
+                sb.AppendLine("It weighed the two and could not tell which is right. The decision "
+                              + "is yours, and nothing here has been changed.");
+            else if (row.AiBacksLog)
+                sb.AppendLine("The country already in your log is the correct one"
+                              + (backed.Length > 0 ? ", " + backed : string.Empty)
+                              + " - so this row cannot be ticked, and Fix will leave it alone.");
+            else
+                sb.AppendLine("HolyLogger's correction is the right one"
+                              + (backed.Length > 0 ? ", " + backed : string.Empty)
+                              + " - tick the row and Fix writes it.");
+
+            if (row.AiReason.Length > 0)
+            {
+                sb.AppendLine();
+                sb.AppendLine("Why: " + row.AiReason);
+            }
+
+            sb.AppendLine();
+            sb.AppendLine("An AI can be wrong. It is one more opinion beside the two databases, "
+                          + "not a ruling over them.");
+
+            return sb.ToString().TrimEnd();
         }
 
         private static Finding Difference(QSO q, string problem, string field, string current, string proposed)
@@ -910,7 +1127,7 @@ namespace HolyLogger
             if (found.Count > 0)
             {
                 List<Finding> forReport = found;
-                await Task.Run(() => WriteFixerReport(forReport));
+                await Task.Run(() => WriteFixerReport(forReport, null, null));   // the path is not needed here
             }
         }
 
@@ -934,11 +1151,15 @@ namespace HolyLogger
         // the sentence beside its chip in the window - and the country explanation is
         // Explanation.PlainReport, which is the "?" dialog's own text with the emphasis markers taken
         // out. Two places composing the same paragraph is exactly how they come to differ.
-        private void WriteFixerReport(List<Finding> found)
+        // `aiSaid` IS EMPTY THE FIRST TIME AND FULL THE SECOND. The report is written once when the
+        // scan ends, before the AI has been asked anything, and again after it has answered - so the
+        // second file holds the whole argument: what each database matched, and what the AI made of
+        // the two of them. The first is left where it is; both were true when they were written.
+        private string WriteFixerReport(List<Finding> found, Dictionary<QSO, string> aiSaid, string aiWho)
         {
             try
             {
-                if (found == null || found.Count == 0) return;
+                if (found == null || found.Count == 0) return null;
 
                 var sb = new StringBuilder();
                 sb.AppendLine("HolyLogger — Log Fixer report");
@@ -954,6 +1175,14 @@ namespace HolyLogger
                 sb.AppendLine();
                 sb.AppendLine("Nothing in this file has been changed in your log. The Log Fixer only");
                 sb.AppendLine("reports; a QSO is altered when you tick it and press Fix selected.");
+                if (aiSaid != null && aiSaid.Count > 0)
+                {
+                    sb.AppendLine();
+                    if (!string.IsNullOrEmpty(aiWho))
+                        sb.AppendLine("Answered by " + aiWho);
+                    sb.AppendLine("The AI was asked about the QSOs where the two databases disagree.");
+                    sb.AppendLine("Its verdict and its reasoning are under those rows, marked AI.");
+                }
                 sb.AppendLine();
 
                 // Biggest kind first: the size of a group is the first thing worth knowing about it.
@@ -992,7 +1221,7 @@ namespace HolyLogger
                             if (g.Qso == null) continue;
                             string gc = Text(g.Qso.DXCall);
                             if (gc.Length == 0) continue;
-                            try { why[g] = CountryLookup.Shared.Explain(gc, CountryLookup.QsoDate(g.Qso.Date)); }
+                            try { why[g] = CountryLookup.Shared.Explain(gc, CountryLookup.QsoDate(g.Qso.Date, g.Qso.Time)); }
                             catch (Exception swallowed) { Log.Swallow(swallowed); }
                         }
                     }
@@ -1137,6 +1366,25 @@ namespace HolyLogger
                         // harder to run an eye down, not easier: "Country spelled differently" alone is
                         // 4,369 rows. Decided per finding rather than per section, so a section that
                         // happens to hold one long row is spaced only around that row.
+                        // WHAT THE AI MADE OF IT, AND WHY IT SAID SO.
+                        //
+                        // The rest of this row is the argument: the log's value, HolyLogger's, and what
+                        // each database matched to reach them. This is the last word in it - the one
+                        // that was asked for precisely because the two databases could not agree - and
+                        // without it the file stops at the disagreement and leaves the reader where the
+                        // operator was before he pressed the button.
+                        //
+                        // Indented under the row rather than squeezed into a column: the reasoning is a
+                        // sentence of ordinary English and there is no width that would hold it.
+                        string verdict;
+                        if (aiSaid != null && f.Qso != null
+                            && aiSaid.TryGetValue(f.Qso, out verdict) && verdict.Length > 0)
+                        {
+                            foreach (string piece in WrapFor("AI: " + verdict, 92))
+                                sb.AppendLine("      " + piece);
+                            manyLines = true;
+                        }
+
                         if (manyLines) sb.AppendLine();
                     }
 
@@ -1147,10 +1395,34 @@ namespace HolyLogger
                     sb.AppendLine();
                 }
 
-                Reports.Write("holylogger_fixer_report_"
-                              + DateTime.Now.ToString("yyyy-MM-dd_HHmm") + ".txt", sb.ToString());
+                return Reports.Write("holylogger_fixer_report_"
+                                     + DateTime.Now.ToString("yyyy-MM-dd_HHmm") + ".txt", sb.ToString());
             }
-            catch (Exception swallowed) { Log.Swallow(swallowed); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
+        }
+
+        // ONE LONG SENTENCE BROKEN TO THE PAGE, at spaces and never inside a word. The report is a
+        // plain text file meant to be read in a window or printed, and a line that runs to three
+        // hundred characters is a line that is read by scrolling sideways, which nobody does.
+        private static List<string> WrapFor(string text, int width)
+        {
+            var lines = new List<string>();
+            string rest = (text ?? string.Empty).Trim();
+
+            while (rest.Length > width)
+            {
+                int cut = rest.LastIndexOf(' ', width);
+
+                // A single word longer than the whole width - a callsign list, an address - is let
+                // out past the margin rather than chopped in half.
+                if (cut <= 0) { lines.Add(rest); return lines; }
+
+                lines.Add(rest.Substring(0, cut));
+                rest = rest.Substring(cut + 1).TrimStart();
+            }
+
+            if (rest.Length > 0) lines.Add(rest);
+            return lines;
         }
 
         // "cty.dat matched R which is European Russia (54)" -> "R which is European Russia (54)".
@@ -2124,7 +2396,7 @@ namespace HolyLogger
                     + "Foreground='#8C8C8C' IsHitTestVisible='False'/>"
                     + "<TextBox Text='{Binding Cells[" + safe + "].Proposed, Mode=TwoWay, "
                     + "UpdateSourceTrigger=PropertyChanged}' Background='Transparent' BorderThickness='0' "
-                    + "Padding='3,2,3,2' Foreground='#0B4A0E' "
+                    + "Padding='3,2,3,2' Foreground='{Binding Cells[" + safe + "].ThenFg}' "
                     + "FontWeight='{Binding Cells[" + safe + "].ThenWeight}'/></Grid></Border>"
                     + "</Grid></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>";
                 var col = (DataGridTemplateColumn)XamlReader.Parse(xaml);
@@ -2134,6 +2406,76 @@ namespace HolyLogger
                 col.ClipboardContentBinding = new System.Windows.Data.Binding("Cells[" + key + "].Current");
                 FindingsGrid.Columns.Add(col);
             }
+
+            AddAiColumn(columns);
+        }
+
+        // THE COLUMNS A VERDICT FROM THE AI IS ABOUT. It is asked one question and one only - which of
+        // two countries it believes - and these are the cells that question moves.
+        private static readonly string[] AiAnswersAbout = { "Country", "Country Code", "Continent" };
+
+        // THE AI'S MARK, BESIDE THE VALUES IT IS AN OPINION ABOUT.
+        //
+        // Two halves like every other column, so the tick lands on the LINE it belongs to: against the
+        // log's own value on top, against HolyLogger's proposal underneath. That is the whole message -
+        // which of the two it came down on - and putting it anywhere but level with the value would
+        // leave the operator working it out from the colours.
+        //
+        // AND BESIDE THEM SIDEWAYS TOO, which it was not. A new column goes at the far right, and this
+        // one did - out past DX Locator and Comment, columns the AI is never asked about. So the man
+        // reading the red and green country cells had the verdict on those cells outside his field of
+        // vision, and a tick nobody looks at might as well not be there. It now goes straight after
+        // the last country column on show, and falls back to the far right only when a scan turned up
+        // no country columns at all - there being nothing then for it to sit beside.
+        //
+        // Empty until the button is pressed, and empty afterwards for any contact the AI did not
+        // answer about. A blank here means nobody said anything, which is different from a "?" - and
+        // the "?" is what it says when it looked and could not tell.
+        private void AddAiColumn(List<string> columns)
+        {
+            const string xaml =
+                "<DataGridTemplateColumn xmlns='http://schemas.microsoft.com/winfx/2006/xaml/presentation' "
+                + "Header='AI' Width='Auto' MinWidth='58' CanUserSort='False'>"
+                + "<DataGridTemplateColumn.CellTemplate><DataTemplate>"
+                + "<Grid ToolTip='{Binding AiReason}'>"
+                + "<Grid.RowDefinitions><RowDefinition Height='Auto'/><RowDefinition Height='Auto'/>"
+                + "</Grid.RowDefinitions>"
+                + "<Border Grid.Row='0' Padding='7,3,7,3' MinHeight='24' "
+                + "BorderBrush='#C0C0C0' BorderThickness='0,0,0,1'>"
+                + "<Grid>"
+                + "<TextBlock Text='&#x2714; AI' Visibility='{Binding AiOnNow}' "
+                + "FontWeight='Bold' Foreground='#0B4A0E'/>"
+                // The doubt sits on the upper line for want of a better place: it belongs to the row,
+                // not to either value, and the top is where the eye starts.
+                + "<TextBlock Text='? AI' Visibility='{Binding AiUnsure}' "
+                + "FontWeight='Bold' Foreground='#8A6D00'/>"
+                // NEITHER OF THEM. Red, and an exclamation rather than a question: the row needs
+                // looking at, and it needs looking at more than the ones the AI simply agreed with.
+                + "<TextBlock Text='&#x2260; AI' Visibility='{Binding AiNeither}' "
+                + "FontWeight='Bold' Foreground='#B00020'/>"
+                + "</Grid></Border>"
+                + "<Border Grid.Row='1' Padding='7,3,7,3' MinHeight='24'>"
+                + "<TextBlock Text='&#x2714; AI' Visibility='{Binding AiOnThen}' "
+                + "FontWeight='Bold' Foreground='#0B4A0E'/>"
+                + "</Border>"
+                + "</Grid></DataTemplate></DataGridTemplateColumn.CellTemplate></DataGridTemplateColumn>";
+
+            var col = (DataGridTemplateColumn)XamlReader.Parse(xaml);
+            col.ClipboardContentBinding = new System.Windows.Data.Binding("AiReason");
+
+            int after = -1;
+            if (columns != null)
+                for (int i = 0; i < columns.Count; i++)
+                    if (AiAnswersAbout.Contains(columns[i], StringComparer.OrdinalIgnoreCase))
+                        after = i;
+
+            if (after < 0) { FindingsGrid.Columns.Add(col); return; }
+
+            // The columns standing ahead of the data ones - the tick box and the "?" - are COUNTED
+            // rather than assumed to be two. Adding a third one day would otherwise slide this
+            // column quietly one place left and nobody would connect the two changes.
+            int lead = FindingsGrid.Columns.Count - columns.Count;
+            FindingsGrid.Columns.Insert(lead + after + 1, col);
         }
 
         // THE WINDOW OPENS WIDE ENOUGH TO READ THE KINDS PANEL IN ONE LINE EACH.
@@ -2277,6 +2619,9 @@ namespace HolyLogger
                     if (r.Has(kind.Name)) r.Apply = kind.Checked;
             }
             finally { _syncingKind = false; }
+
+            SelectExactly(_rows.Where(r => r.Apply).ToList());
+
             UpdateFixButton();
             UpdateFixAllBox();
             UpdateKindBoxes();
@@ -2369,6 +2714,8 @@ namespace HolyLogger
                     foreach (FixRow r in rows) r.Apply = tickAll;
                 }
                 finally { _syncingKind = false; }
+
+                SelectExactly(rows.Where(r => r.Apply).ToList());
             }
             catch (Exception ex) { Log.Swallow(ex); }
 
@@ -2376,6 +2723,29 @@ namespace HolyLogger
             UpdateFixAllBox();
             UpdateKindBoxes();
             ShowFirstTickedRow();
+        }
+
+        // THE HIGHLIGHT MUST END UP SAYING WHAT THE TICKS SAY.
+        //
+        // The row-by-row sync is switched off during a bulk tick - it would otherwise run once for
+        // every one of four thousand rows - so nothing brought the selection into line afterwards. A
+        // row the operator had merely CLICKED ON, to read it, stayed blue while its box was empty:
+        // blue in this table means "this one is going to be fixed", so the window was saying the
+        // opposite of the truth about a row the AI had just told him to leave alone.
+        //
+        // Done once, at the end of a bulk tick, instead of never.
+        private void SelectExactly(List<FixRow> ticked)
+        {
+            if (FindingsGrid == null) return;
+            try
+            {
+                _syncingApply = true;
+                FindingsGrid.SelectedItems.Clear();
+                if (ticked != null)
+                    foreach (FixRow r in ticked) FindingsGrid.SelectedItems.Add(r);
+            }
+            catch (Exception ex) { Log.Swallow(ex); }
+            finally { _syncingApply = false; }
         }
 
         // AFTER A BULK TICK, SHOW A TICKED ROW. The list opens on the report-only findings - the ones
@@ -2464,6 +2834,424 @@ namespace HolyLogger
         private void Btn_ShowAll_Click(object sender, RoutedEventArgs e)
         {
             ApplyKindFilter(null);
+        }
+
+        // ─── ASKING THE AI, FOR THE ONE PILE WORTH ASKING ABOUT ────────────────────────────────────
+        //
+        // Not the whole table. Of everything Verify reports, almost all of it is settled by a table
+        // the program already holds: a grid that is not a grid, a continent that does not follow its
+        // country, a spelling. Sending those to an AI would replace an answer with an opinion, and
+        // spend the day's allowance doing it - 4,370 spellings would be 437 requests.
+        //
+        // What is left is the pile where cty.dat and Club Log disagree, and there the program itself
+        // says the operator must decide. Those are the rows this button asks about, and no others.
+        private CancellationTokenSource _aiRunning;
+
+        // WHICH AI OR AIS ANSWERED WHAT IS IN THIS REPORT. Usually one, and named. It can be two -
+        // a free allowance that ran out mid-log and a paid service that finished it - and then both
+        // are named, because a report that says "answered by the AI" answers nothing at all.
+        private string AiAuthors()
+        {
+            var names = new List<string>();
+
+            foreach (FixRow r in _rows)
+            {
+                if (r == null || !r.AiAsked) continue;
+                if (r.AiWho.Length == 0) continue;
+                if (!names.Contains(r.AiWho)) names.Add(r.AiWho);
+            }
+
+            if (names.Count == 0) return string.Empty;
+            if (names.Count == 1) return names[0];
+            return string.Join(", ", names.Take(names.Count - 1)) + " and " + names[names.Count - 1];
+        }
+
+        // A count set against the widest of the counts beside it, so their units share an edge.
+        private static string Count(int value, int widest)
+        {
+            return value.ToString(CultureInfo.InvariantCulture).PadLeft(widest);
+        }
+
+        // THE VERDICTS AS THEY STAND, TAKEN HERE AND NOT IN THE WRITER. The report is written off the
+        // UI thread - the country explanations are two database lookups apiece - and the rows it would
+        // have to read them from are the window's own, changing as he ticks. Copied out first, what
+        // the writer sees is one moment, whole.
+        private Dictionary<QSO, string> AiVerdicts()
+        {
+            var said = new Dictionary<QSO, string>();
+
+            foreach (FixRow r in _rows)
+            {
+                if (r == null || r.Qso == null || !r.AiAsked) continue;
+
+                string words = r.AiSaid;
+                if (words.Length > 0) said[r.Qso] = words;
+            }
+
+            return said;
+        }
+
+        private async void Btn_Ai_Click(object sender, RoutedEventArgs e)
+        {
+            // PRESSED WHILE IT IS RUNNING, THE BUTTON STOPS IT.
+            //
+            // It used to do nothing at all - the button was greyed and the press went nowhere - so a
+            // run that hung left the operator with no way out of it but killing the program. The
+            // token was there the whole time and nobody ever pulled it.
+            if (_aiRunning != null)
+            {
+                try { _aiRunning.Cancel(); }
+                catch (Exception swallowed) { Log.Swallow(swallowed); }
+
+                TB_KindsSummary.Text = "Stopping...";
+                return;
+            }
+
+            // Written out rather than escaped into the sentences: these messages are long, and a
+            // paragraph break is easier to see as a name than as a pair of characters inside a string.
+            string gap = Environment.NewLine + Environment.NewLine;
+
+            var ofThisKind = _rows.Where(r => r.Has(CountryNeedsDecision)).ToList();
+            if (ofThisKind.Count == 0)
+            {
+                HolyMessageBox.Show(
+                    "There is nothing here for the AI to settle." + gap
+                    + "It is only asked about the QSOs where cty.dat and Club Log disagree - the "
+                    + "kind marked '" + CountryNeedsDecision + "'. Everything else in this list the "
+                    + "program knows exactly, and a second opinion could only make it worse.",
+                    "Check with AI", HolyMsgType.Info, this);
+                return;
+            }
+
+            // ASKED ONCE, NOT ONCE PER PRESS.
+            //
+            // The window stays open after a run, and pressing the button again used to send every
+            // contact of this kind back for a second opinion - including the ones already answered,
+            // whose question had not changed by a word: nothing is written to the log until Fix, so
+            // the AI would be shown the same two countries and asked the same thing. On a free
+            // allowance of twenty requests a day, that is paying twice for one answer.
+            //
+            // The verdicts already given are kept exactly as they are. This asks about the rest.
+            var rows = ofThisKind.Where(r => !r.AiAsked).ToList();
+            int already = ofThisKind.Count - rows.Count;
+
+            if (rows.Count == 0)
+            {
+                HolyMessageBox.Show(
+                    "The AI has already answered about all " + already + " of them." + gap
+                    + "Its verdict is the green line on each row, and pressing ? on a row shows what "
+                    + "it said and why. Nothing is asked again: the question has not changed, because "
+                    + "nothing is written to your log until you press Fix selected.",
+                    "Check with AI", HolyMsgType.Info, this);
+                return;
+            }
+
+            // THE KEY BOX ITSELF, HERE, NOT DIRECTIONS TO WHERE IT LIVES.
+            //
+            // This used to say "right-click any QSO and choose 'Ask AI to check this QSO' - that
+            // window asks for the key once" : an errand across the program, through a window he did
+            // not want, to reach a box that fits perfectly well right here. He pressed a button; the
+            // one thing standing between him and the answer should be put in front of him.
+            //
+            // The chooser was made a window of its own for exactly this - so it can be opened
+            // wherever the need turns up - and it also says which service the missing key belongs
+            // to, since a key saved for another one is the usual reason to be standing here.
+            if (!AiQsoCheck.HasKey)
+            {
+                new AiServiceWindow(this).ShowDialog();
+
+                // He may have pasted a key, picked a service that already had one, or closed it and
+                // thought better of the whole thing. Only the first two mean carrying on, and asking
+                // again is how we tell.
+                if (!AiQsoCheck.HasKey) return;
+            }
+
+            // WHAT IT WILL COST, BEFORE IT IS SPENT. The free allowance is counted in requests per
+            // day, and an operator who has just watched it run out deserves the number in front of him
+            // rather than behind him.
+            // THREE SHORT LINES, IN HIS OWN WORDS. This was a paragraph explaining how the colours
+            // work and what a request costs, put in front of a man whose question is only "how many,
+            // will it touch my log, and how long". Everything else it said is true and is said
+            // elsewhere - the colours in the window itself, the reasoning under "?".
+            //
+            // The count of those already answered stays, and only when there are any: without it the
+            // number on the first line is five where he can plainly see six, and he would be right to
+            // wonder what happened to the other one.
+            // THE SERVICE IS PART OF THE QUESTION, so it is named here and can be changed here.
+            // AiRunPrompt is this dialog with the chooser standing in it.
+            string asking =
+                  rows.Count + " QSO" + (rows.Count == 1 ? "" : "s") + " will be checked by AI."
+                + (already > 0
+                    ? Environment.NewLine + already + (already == 1 ? " has" : " have")
+                      + " been answered already and will not be asked again."
+                    : string.Empty)
+                + Environment.NewLine + "No QSO will be changed."
+                + Environment.NewLine + "The process may take a few minutes.";
+
+            if (!AiRunPrompt.Ask(this, asking)) return;
+
+            var questions = new List<AiCountryVote.Question>();
+            foreach (FixRow r in rows)
+            {
+                Cell c;
+                // The country cell is what the two halves on screen are showing; without it there is
+                // no question to ask, only a row to leave alone.
+                if (!r.Cells.TryGetValue("Country", out c) || c == null) { questions.Add(null); continue; }
+                questions.Add(new AiCountryVote.Question
+                {
+                    Qso = r.Qso,
+                    Logged = c.Current,
+                    Suggested = c.Proposed
+                });
+            }
+
+            // Rows with no country cell drop out here, and the rows list drops with them so the two
+            // stay in step - the answers come back keyed by position, and a list that has slipped by
+            // one would paint every verdict onto the wrong contact.
+            for (int i = questions.Count - 1; i >= 0; i--)
+                if (questions[i] == null) { questions.RemoveAt(i); rows.RemoveAt(i); }
+
+            if (questions.Count == 0) return;
+
+            _aiRunning = new CancellationTokenSource();
+
+            // "REQUEST 1 OF 12" IS ONLY WORTH SAYING IF THE 12 CAN BE READ.
+            //
+            // The progress used to be written into the button itself, which is 170 pixels wide and
+            // holds "Check with AI". "Asking the AI - request 1 of 12..." does not fit in that, and a
+            // button clips what it cannot show - so the operator watched a count with the total cut
+            // off the end, which is the half that tells him whether to wait or go and make coffee.
+            //
+            // The summary line beside it runs the width of the frame and is doing nothing while the
+            // AI is out, so the progress goes there and the button just stays a button.
+            string wasSummary = TB_KindsSummary.Text;
+
+            // The button stays alive and becomes the way out. Everything the run has already been
+            // given - the rows it answered before it hung - is kept.
+            object wasAiLabel = Btn_Ai.Content;
+            Btn_Ai.Content = "Stop AI check";
+
+            // A LINE THAT NEVER CHANGES IS A WINDOW THAT LOOKS HUNG.
+            //
+            // Ten QSOs go into each request, so the ordinary run is ONE request: the errand says what
+            // it is doing, once, and then that sentence sits there motionless for as long as the AI
+            // takes to think - half a minute, longer if the allowance makes it wait. That is an exact
+            // picture of a frozen program, and it is what it looked like.
+            //
+            // The seconds live INSIDE the spinner now, the way they do on the splash screen, rather
+            // than being written onto the end of the sentence. The words say what is being done; the
+            // turning ring and the number in it say it is still being done, and for how long.
+            DateTime started = DateTime.UtcNow;
+
+            PB_Ai.Visibility = Visibility.Visible;
+            AiSeconds.Text = "0";
+
+            var turn = new System.Windows.Media.Animation.DoubleAnimation(
+                0, 360, new Duration(TimeSpan.FromSeconds(1.1)))
+            {
+                RepeatBehavior = System.Windows.Media.Animation.RepeatBehavior.Forever
+            };
+            AiSpinnerRotate.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, turn);
+
+            // Four times a second, so the number turns over close to when it should: a one-second
+            // timer competing with a busy window can be most of a second late.
+            var ticker = new System.Windows.Threading.DispatcherTimer(
+                System.Windows.Threading.DispatcherPriority.Render)
+            {
+                Interval = TimeSpan.FromMilliseconds(250)
+            };
+            ticker.Tick += (t, a) =>
+                AiSeconds.Text = ((int)(DateTime.UtcNow - started).TotalSeconds)
+                                     .ToString(CultureInfo.InvariantCulture);
+            ticker.Start();
+
+            // THE SPINNER MUST STOP BEFORE ANYTHING IS SHOWN ON TOP OF IT.
+            //
+            // Every message this run puts up - the tally, a refusal, "stopped" - is a modal dialog
+            // opened from inside the run, and the tidying-up used to wait in the finally underneath
+            // it. So the bar went on turning and the seconds went on climbing BEHIND the window that
+            // said the work was done, and the operator reading "6 of 6" could see the program still
+            // apparently searching. Called the moment there is an answer, and again from the finally
+            // in case something threw before it got here - which is why it can be called twice.
+            // NAMED BEFORE THE RUN, NOT AS EACH ANSWER LANDS. He can work the service dropdown while
+            // the request is in the air, and a verdict labelled with the service he switched TO would
+            // be a lie about who said it.
+            string who = AiServices.Current.ShortName + " (" + AiServices.Current.Model + ")";
+
+            bool settled = false;
+            Action settle = () =>
+            {
+                if (settled) return;
+                settled = true;
+
+                ticker.Stop();
+                AiSpinnerRotate.BeginAnimation(System.Windows.Media.RotateTransform.AngleProperty, null);
+                PB_Ai.Visibility = Visibility.Collapsed;
+                TB_KindsSummary.Text = wasSummary;
+                Btn_Ai.Content = wasAiLabel;
+                Btn_Ai.IsEnabled = true;
+            };
+
+            try
+            {
+                Dictionary<int, AiCountryVote.Answer> answers =
+                    await AiCountryVote.AskAsync(questions,
+                        text => Dispatcher.Invoke(new Action(() => TB_KindsSummary.Text = text)),
+                        _aiRunning.Token,
+
+                        // EACH VERDICT PAINTED AS IT ARRIVES. The answers come back one line at a
+                        // time now, so the first row turns green while the model is still writing
+                        // about the second. The tally at the end still walks every row - this is
+                        // what he watches, that is what he is told.
+                        (index, a) => Dispatcher.Invoke(new Action(() =>
+                        {
+                            if (a == null || index < 0 || index >= rows.Count) return;
+                            switch (a.Backs)
+                            {
+                                case AiCountryVote.Backs.Log:
+                                    rows[index].SetAi(AiSide.Now, a.Reason, who); break;
+                                case AiCountryVote.Backs.Suggested:
+                                    rows[index].SetAi(AiSide.Then, a.Reason, who); break;
+                                case AiCountryVote.Backs.Neither:
+                                    rows[index].SetAi(AiSide.Neither, a.Reason, who); break;
+                                default:
+                                    rows[index].SetAi(AiSide.Unsure, a.Reason, who); break;
+                            }
+                        })));
+
+                settle();
+
+                int backedLog = 0, backedUs = 0, neither = 0, unsure = 0;
+                for (int i = 0; i < rows.Count; i++)
+                {
+                    AiCountryVote.Answer a;
+                    // A contact the AI never answered about is left exactly as it was. Silence is not
+                    // agreement, and colouring it either way would say something nobody said.
+                    if (!answers.TryGetValue(i, out a) || a == null) continue;
+
+                    switch (a.Backs)
+                    {
+                        case AiCountryVote.Backs.Log:
+                            rows[i].SetAi(AiSide.Now, a.Reason, who); backedLog++; break;
+                        case AiCountryVote.Backs.Suggested:
+                            rows[i].SetAi(AiSide.Then, a.Reason, who); backedUs++; break;
+                        case AiCountryVote.Backs.Neither:
+                            rows[i].SetAi(AiSide.Neither, a.Reason, who); neither++; break;
+                        default:
+                            rows[i].SetAi(AiSide.Unsure, a.Reason, who); unsure++; break;
+                    }
+                }
+
+                int silent = rows.Count - backedLog - backedUs - neither - unsure;
+
+                // THE WHOLE ARGUMENT, WRITTEN DOWN.
+                //
+                // The report was made when the scan finished, before the AI had been asked anything -
+                // so what it holds is two databases disagreeing and nothing to settle it. Now there is
+                // a verdict and the reasoning behind it, and a tooltip is no place to keep reasoning:
+                // it cannot be printed, searched, or read through a hundred contacts at a time. So the
+                // report is written again with all of it in. The first file is left alone.
+                Dictionary<QSO, string> verdicts = AiVerdicts();
+                List<Finding> withAi = _findings.ToList();
+                string reportPath = await Task.Run(() => WriteFixerReport(withAi, verdicts, AiAuthors()));
+
+                // THE THREE ANSWERS, ONE TO A LINE, WITH THE COUNT AT THE END OF EACH.
+                //
+                // It was a sentence - "backed your log on 5, HolyLogger on 1, and could not tell on
+                // 0" - and a sentence has to be read through to be counted. Three lines are read at a
+                // glance, and the one that matters, the number of contacts he now has to look at, is
+                // at the end of its own line instead of buried in the middle of a clause.
+                // THE TALLY IS A TABLE AND IS DRAWN AS ONE, by the dialog, in two real columns.
+                // Written into the message as label-spaces-number it lined up in no font this
+                // program uses. Related: BuildCounts in HolyMessageBox.
+                var counts = new List<KeyValuePair<string, int>>
+                {
+                    new KeyValuePair<string, int>("The AI thinks your log is correct", backedLog),
+                    new KeyValuePair<string, int>("The AI suggests a correction", backedUs),
+                    new KeyValuePair<string, int>("The AI says it is a different country", neither),
+                    new KeyValuePair<string, int>("The AI has no answer for you", unsure),
+                };
+
+                if (silent > 0)
+                    counts.Add(new KeyValuePair<string, int>("Never answered, and left untouched", silent));
+
+                // THREE SHORT LINES, ONE FACT EACH, and the last of them the one that matters most:
+                // that none of this has touched his log yet. A paragraph saying the same thing has
+                // to be read to the end before it says so.
+                string message =
+                      "Green is the one the AI thinks is correct." + Environment.NewLine
+                    + "Grey is the one it does not recommend." + Environment.NewLine
+                    + "Your log has not been changed yet.";
+
+                // AND WHO SAID IT. He ran the same six QSOs past two services and got two different
+                // answers, and this window - the one he actually reads - was the only place that did
+                // not say which of them he was looking at.
+                string author = AiAuthors();
+                if (author.Length > 0) message += gap + "Answered by " + author;
+
+                // THE PATH IS THE BUTTON. A report announced as words in a folder is a report the
+                // operator has to go and find; printed as a link it is one press away, and still
+                // readable and copyable as a path.
+                if (!string.IsNullOrEmpty(reportPath))
+                {
+                    var links = new List<KeyValuePair<string, string>>
+                    {
+                        new KeyValuePair<string, string>(
+                            "The full report on this log, with what the AI said and why:", reportPath)
+                    };
+                    HolyMessageBox.ShowWithLinks(message, "Check with AI", HolyMsgType.Success, this,
+                                                 links, ShowInFolder, 620, null, counts);
+                }
+                else
+                {
+                    HolyMessageBox.ShowWithLinks(message, "Check with AI", HolyMsgType.Success, this,
+                                                 null, null, 620, null, counts);
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                // STOPPED ON PURPOSE, OR THE WINDOW WENT AWAY UNDER IT. Only the first is worth a
+                // word, and only while there is still a window to say it in. What matters to him is
+                // that stopping cost him nothing: the verdicts already given are on the rows, and
+                // the next press asks about the rest and no more.
+                settle();
+
+                if (IsLoaded)
+                    HolyMessageBox.Show(
+                        "Stopped." + gap
+                        + "Whatever the AI had already answered is kept. Press Check with AI again "
+                        + "and it will ask about the ones it never got to.",
+                        "Check with AI", HolyMsgType.Info, this);
+            }
+            catch (Exception ex)
+            {
+                settle();
+
+                Log.Warn("Log Fixer, check with AI: " + ex.GetType().Name + ": " + ex.Message);
+
+                // AN ALLOWANCE THAT HAS RUN OUT IS NOT NEWS, IT IS A DECISION TO MAKE. Saying so and
+                // leaving him with an OK button means he has to go and find the chooser himself - so
+                // the offer is made here, and taking it opens the thing.
+                bool spent = ex.Message.IndexOf("allowance", StringComparison.OrdinalIgnoreCase) >= 0;
+                if (spent && HolyMessageBox.ShowConfirm(
+                        ex.Message + gap + "Choose a different AI service now?",
+                        "Check with AI", HolyMsgType.Warning, this))
+                {
+                    new AiServiceWindow(this).ShowDialog();
+                }
+                else if (!spent)
+                {
+                    HolyMessageBox.ShowWarning(ex.Message, "Check with AI", this);
+                }
+            }
+            finally
+            {
+                if (_aiRunning != null) { _aiRunning.Dispose(); _aiRunning = null; }
+                settle();
+                // The ticks may have moved under it: every row the AI gave to the log has just lost
+                // its own, so the count on the Fix button is no longer the one it was showing.
+                UpdateFixButton();
+            }
         }
 
         private void ApplyKindFilter(string kindName)
@@ -3181,6 +3969,27 @@ namespace HolyLogger
                 showItem.Click += (s, a) => ShowQsoReadOnly(row);
                 menu.Items.Add(showItem);
 
+                // AND WHAT AN AI MAKES OF IT. This window says what the program's own rules found;
+                // this line asks a second opinion about the same contact, on the things rules cannot
+                // settle - an expedition callsign, a grid that belongs to another country, a comment
+                // that contradicts the fields. It reports and never writes, exactly as this window does.
+                if (row != null && row.Qso != null)
+                {
+                    var aiItem = new MenuItem { Header = RowMenuParts.MakeAiHeader() };
+                    aiItem.Icon = new TextBlock
+                    {
+                        Text = "",
+                        FontFamily = new FontFamily("Segoe MDL2 Assets"),
+                        FontSize = 16,
+                        Foreground = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0)),
+                        VerticalAlignment = VerticalAlignment.Center,
+                        HorizontalAlignment = HorizontalAlignment.Center
+                    };
+                    QSO forAi = row.Qso;
+                    aiItem.Click += (s, a) => OpenAiQsoCheck(forAi);
+                    menu.Items.Add(aiItem);
+                }
+
                 menu.Items.Add(new Separator());
             }
 
@@ -3188,6 +3997,32 @@ namespace HolyLogger
             menu.Items.Add(GridCopy.CopyRowsItem(FindingsGrid));
 
             FindingsGrid.ContextMenu = menu;
+        }
+
+        // ONE AI WINDOW AT A TIME, and it belongs to this one - the same rule the log's and the
+        // Workshop's menus follow.
+        private AiQsoCheckWindow _aiCheckWindow;
+
+        private void OpenAiQsoCheck(QSO qso)
+        {
+            if (qso == null) return;
+            try
+            {
+                if (_aiCheckWindow != null)
+                {
+                    _aiCheckWindow.Close();
+                    _aiCheckWindow = null;
+                }
+
+                var window = new AiQsoCheckWindow(qso, this);
+                window.Closed += (s, e) => { if (ReferenceEquals(_aiCheckWindow, window)) _aiCheckWindow = null; };
+                _aiCheckWindow = window;
+                window.Show();
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError("Could not open the AI check: " + ex.Message, "AI check", this);
+            }
         }
 
         // The QSO on screen exactly as the editor shows it, frozen. Nothing is written back, so unlike

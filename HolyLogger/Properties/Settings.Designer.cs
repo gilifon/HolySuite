@@ -3025,5 +3025,65 @@ namespace HolyLogger.Properties {
                 this["CwKeyerButtonsJson"] = value;
             }
         }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string AiApiKey {
+            get {
+                return ((string)(this["AiApiKey"]));
+            }
+            set {
+                this["AiApiKey"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("Gemini")]
+        public string AiProvider {
+            get {
+                return ((string)(this["AiProvider"]));
+            }
+            set {
+                this["AiProvider"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string AiApiKeyOpenRouter {
+            get {
+                return ((string)(this["AiApiKeyOpenRouter"]));
+            }
+            set {
+                this["AiApiKeyOpenRouter"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string AiModelGemini {
+            get {
+                return ((string)(this["AiModelGemini"]));
+            }
+            set {
+                this["AiModelGemini"] = value;
+            }
+        }
+
+        [global::System.Configuration.UserScopedSettingAttribute()]
+        [global::System.Diagnostics.DebuggerNonUserCodeAttribute()]
+        [global::System.Configuration.DefaultSettingValueAttribute("")]
+        public string AiModelOpenRouter {
+            get {
+                return ((string)(this["AiModelOpenRouter"]));
+            }
+            set {
+                this["AiModelOpenRouter"] = value;
+            }
+        }
     }
 }

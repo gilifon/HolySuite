@@ -50,7 +50,7 @@
 
         <!-- Audio Alerts: both sound options plus a single shared output-device picker, so alerts can
              go to the speakers instead of a USB radio codec. Left-justified with the checkboxes. -->
-        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,460,0,0" Width="580" FontSize="16">
+        <GroupBox Header="Audio Alerts" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,486,0,0" Width="580" FontSize="16">
             <StackPanel Margin="4,4,4,4">
                 <!-- Beep when typing -->
                 <CheckBox x:Name="CBX_NonEnglishKeyBeep" HorizontalAlignment="Left" IsChecked="{Binding Default.NonEnglishKeyBeep, Mode=TwoWay, Source={StaticResource Settings}}" FontSize="16" Margin="0,2,0,0" Click="HasChanged_Click">

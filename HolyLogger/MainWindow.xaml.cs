@@ -482,6 +482,10 @@ namespace HolyLogger
 
             // Runs ONCE per newly-installed version: user.config lives in a per-version folder, so a new
             // build starts with UpdateSettings=true, pulls the previous settings forward, then clears it.
+            // Remembered before the flag is cleared: the mirror below needs to know whether this is the
+            // first start in a brand-new settings folder.
+            bool firstRunOfThisIdentity = Properties.Settings.Default.UpdateSettings;
+
             if (Properties.Settings.Default.UpdateSettings)
             {
                 Properties.Settings.Default.Upgrade();
@@ -502,9 +506,11 @@ namespace HolyLogger
             // Settings.Upgrade() above only bridges versions WITHIN one install identity; when the
             // installed path/identity changes between releases it carries nothing, blanking the online-
             // service logins. Restore any that are missing from the identity-independent mirror, then
-            // refresh the mirror so it always reflects the current logins. Runs every start (not only on
-            // a version change), so the mirror recovers even a store that a bad upgrade left half-empty.
-            CredentialStore.RestoreMissing();
+            // refresh the mirror so it always reflects the current logins. The credential half runs every
+            // start, so the mirror recovers even a store that a bad upgrade left half-empty; the general
+            // "every other setting" half runs only on the first start in a new settings folder, or it
+            // undoes choices that happen to match a default (see CredentialStore.RestoreMissing).
+            CredentialStore.RestoreMissing(firstRunOfThisIdentity);
             Log.Step("ctor: credentials restored");
             CredentialStore.Backup();
 
@@ -3918,6 +3924,15 @@ namespace HolyLogger
             searchItem.Click += (s, e) => OpenSearchWindow(qso.DXCall);
             menu.Items.Add(searchItem);
 
+            // ONE QSO, READ BY AN AI. It reports and never writes - the same rule the Verify tool
+            // follows. Deferred like Delete below: the menu is still dismissing when the click
+            // arrives, and a window opened under it starts life behind a closing menu.
+            var aiItem = new MenuItem { Header = RowMenuParts.MakeAiHeader(), Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            aiItem.Click += (s, e) =>
+                Dispatcher.BeginInvoke(new Action(() => OpenAiQsoCheck(qso)),
+                                       System.Windows.Threading.DispatcherPriority.Background);
+            menu.Items.Add(aiItem);
+
             var copyItem = new MenuItem { Header = "Copy QSO Info", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
             copyItem.Click += (s, e) =>
             {
@@ -4901,6 +4916,33 @@ namespace HolyLogger
             return t;
         }
 
+        // ONE WINDOW AT A TIME, and it belongs to this one. Opening a second for the same row would
+        // leave two reports on screen with no way to tell which QSO each is about; asking again in
+        // the window that is already up re-reads the row as it stands now.
+        private AiQsoCheckWindow _aiCheckWindow;
+
+        private void OpenAiQsoCheck(QSO qso)
+        {
+            if (qso == null) return;
+            try
+            {
+                if (_aiCheckWindow != null)
+                {
+                    _aiCheckWindow.Close();
+                    _aiCheckWindow = null;
+                }
+
+                var window = new AiQsoCheckWindow(qso, this);
+                window.Closed += (s, e) => { if (ReferenceEquals(_aiCheckWindow, window)) _aiCheckWindow = null; };
+                _aiCheckWindow = window;
+                window.Show();
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError("Could not open the AI check: " + ex.Message, "AI check", this);
+            }
+        }
+
         private void EditQsoFromContextMenu(QSO qso)
         {
             if (qso == null) return;
@@ -5680,9 +5722,24 @@ namespace HolyLogger
             UpdateVoiceMessageButtonHighlight();
         }
 
+        // THE WHOLE CAT STATE, NOT ONLY THE MESSAGE ROW.
+        //
+        // The Manual/CAT pill and the red frame round the frequency box are both worked out from
+        // Rig.Status, and until now they were repainted ONLY by OmniRig's StatusChange/ParamsChange -
+        // plus one look during Window_Loaded. When no event arrives (OmniRig does not always raise one
+        // for a rig that was already on-line before HolyLogger started, and the log shows whole runs
+        // with not a single event), that one look decided the rest of the session: the program came up
+        // saying Manual, with the frequency box framed red, while CAT was chosen and the radio was
+        // answering perfectly well. Nothing the operator could do put it right - clicking CAT is
+        // refused while the program believes there is no rig.
+        //
+        // This tick already asks the rig for its status every five seconds for the message row. Asking
+        // for the rest of the CAT state in the same breath costs a couple of COM reads and puts the
+        // program back in step within five seconds, event or no event. ShowRigParams refreshes the
+        // message row itself on every path it takes, so the row is still handled.
         private void VoiceMessageAvailabilityTimer_Tick(object sender, EventArgs e)
         {
-            UpdateVoiceMessageAvailabilityState();
+            ShowRigParams();
         }
 
         // True when sending CW/voice messages to the radio is actually possible (CAT online). The Msg
@@ -6644,7 +6701,7 @@ namespace HolyLogger
                     try
                     {
                         DXCC editDxcc = CountryLookup.Shared.Resolve((QsoToUpdate.DXCall ?? string.Empty).Trim(),
-                                                                    CountryLookup.QsoDate(QsoToUpdate.Date));
+                                                                    CountryLookup.QsoDate(QsoToUpdate.Date, QsoToUpdate.Time));
                         if (string.IsNullOrWhiteSpace(TB_ITUZone.Text) && editDxcc.ItuZone > 0)
                             TB_ITUZone.Text = editDxcc.ItuZone.ToString();
                         if (string.IsNullOrWhiteSpace(TB_CQZone.Text) && editDxcc.CqZone > 0)
@@ -6930,14 +6987,25 @@ namespace HolyLogger
             _settingFreqModeRadios = true;
             try
             {
-                // Show MANUAL whenever the frequency is typed. With no CAT it used to show "CAT"
-                // selected but greyed, which claimed the frequency came from a radio that wasn't
-                // connected. Note this only changes what is DISPLAYED: the isManualMode setting is left
-                // alone, so when the radio comes online the program returns to CAT by itself.
-                RB_ManualMode.IsChecked = typed;
-                RB_CatMode.IsChecked = !typed;
-
                 bool chosenManual = Properties.Settings.Default.isManualMode;
+
+                // THE PILL SHOWS THE MODE THAT WAS CHOSEN - nothing else. Close the program in CAT and
+                // it opens in CAT.
+                //
+                // It used to show whichever source the frequency happened to have at that instant, so
+                // "CAT is not answering right now" and "you chose Manual" looked identical. That instant
+                // is the wrong thing to draw: OmniRig is asked for the rig's status once during startup,
+                // and it reports a CHANGE only when one happens - a radio already switched on and left
+                // untouched reports nothing at all. So a status read a moment too early stuck the program
+                // in Manual for the rest of the session, with CAT chosen and the radio answering
+                // perfectly well, and the operator could not get out of it (see ToggleManualMode).
+                //
+                // Nothing is promised by this: while the radio isn't answering, CAT dims, the frequency
+                // box keeps its red frame (see UpdateStatus) and the frequency stays typed. Those say
+                // "no radio yet". The pill says "this is the mode you are in", which is a different
+                // question and now has a straight answer.
+                RB_ManualMode.IsChecked = chosenManual;
+                RB_CatMode.IsChecked = !chosenManual;
 
                 // CAT is ALWAYS clickable, even with no radio connected: a greyed-out, unpressable CAT
                 // button left a station whose rig was offline (or has no CAT at all) with no way to select
@@ -6963,7 +7031,9 @@ namespace HolyLogger
                 // when CAT can't be used (no radio, or the rig has stopped responding): there is no dial
                 // to read, so Manual takes focus by itself and CAT is left unselected. Only when CAT is
                 // truly live and selected does Manual drop to regular weight.
-                RB_ManualMode.FontWeight = typed ? FontWeights.Bold : FontWeights.Normal;
+                // Bold marks the mode that is chosen, the same thing the dot marks.
+                RB_ManualMode.FontWeight = chosenManual ? FontWeights.Bold : FontWeights.Normal;
+                RB_CatMode.FontWeight = chosenManual ? FontWeights.Normal : FontWeights.Bold;
                 RB_ManualMode.ToolTip = chosenManual
                     ? "Manual: you type the frequency and pick the mode yourself, and the program leaves "
                       + "them alone even when a radio is online."
@@ -6983,20 +7053,25 @@ namespace HolyLogger
         // "Change mode" context item both come through here.
         private void ToggleManualMode()
         {
-            // CAT needs a radio. Trying to switch from Manual to CAT with none connected does nothing:
-            // there is no dial to read, so pressing CAT must leave Manual exactly as it was — still
-            // chosen, still bold, CAT never lit. (The CAT button stays clickable, not greyed; the click
-            // simply has no effect until a radio is actually there.) Only the Manual->CAT direction is
-            // guarded — leaving CAT for Manual is always allowed.
-            bool wouldChooseCat = Properties.Settings.Default.isManualMode;
-            if (wouldChooseCat && !IsCatFrequencyAvailable)
-            {
-                UpdateFreqModeRadios();   // re-assert Manual (selected + bold); undo the radio's own click
-                RB_ManualMode?.Focus();   // and take focus off CAT, which never became the mode
-                return;
-            }
-
+            // CAT CAN ALWAYS BE CHOSEN, radio there or not.
+            //
+            // This used to refuse the Manual->CAT direction whenever the program could not see a rig at
+            // that moment, silently: the click did nothing at all. Together with a status read taken a
+            // moment too early during startup, that shut the door - the program showed Manual, the
+            // operator pressed CAT, nothing happened, and Manual was what got saved on the way out. So
+            // it opened in Manual the next time too, and the time after that.
+            //
+            // Choosing CAT with no radio promises nothing that is not already visible: CAT dims, the
+            // frequency box stays framed in red, and the frequency stays typed until a radio answers.
+            // What it does do is settle the question of which mode this station is in - and that is
+            // remembered, so the program comes back up the way it was left.
             Properties.Settings.Default.isManualMode = !Properties.Settings.Default.isManualMode;
+
+            // AND IT IS WRITTEN DOWN NOW. The mode used to reach the disk only if some later save
+            // happened to carry it there, which is not a promise: choose the mode, close the program,
+            // and it could come back in the other one.
+            try { Properties.Settings.Default.Save(); }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
             // Drive the radios from the setting, not from their own click, so they follow the state
             // however it was changed.
             UpdateFreqModeRadios();
@@ -9689,7 +9764,7 @@ namespace HolyLogger
                 {
                     // Each QSO is resolved on its own date: a prefix that no longer exists (4N = Serbia)
                     // still counts as that country worked.
-                    var dxcc = CountryLookup.Shared.Resolve(qso.DXCall.Trim(), CountryLookup.QsoDate(qso.Date));
+                    var dxcc = CountryLookup.Shared.Resolve(qso.DXCall.Trim(), CountryLookup.QsoDate(qso.Date, qso.Time));
                     if (dxcc != null && !string.IsNullOrWhiteSpace(dxcc.Entity) && dxcc.Entity != "-1")
                     {
                         workedCountries.Add(dxcc.Entity);
@@ -10197,6 +10272,28 @@ namespace HolyLogger
         //
         // Fetched fresh every time. The file is a few hundred bytes and the operator asking deserves
         // the current answer, not whatever was true the day he installed.
+        // HELP > VISIT HOLYLOGGER SITE. The address is written once, here, and nowhere else in the
+        // program - a URL kept in two places is a URL that is right in one of them.
+        private const string SiteUrl = "https://4z1kd.github.io/HolyLogger/";
+
+        private void VisitSiteMenuItem_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                System.Diagnostics.Process.Start(SiteUrl);
+            }
+            catch (Exception ex)
+            {
+                // A machine with no browser registered, or one that refuses to start it. The address
+                // is given in full so it can be typed or copied, rather than a shrug.
+                Log.Swallow(ex);
+                HolyMessageBox.ShowWarning(
+                    "The browser could not be opened." + Environment.NewLine + Environment.NewLine
+                    + "The address is " + SiteUrl,
+                    "Visit HolyLogger site", this);
+            }
+        }
+
         private async void WhatsNewMenuItem_Click(object sender, RoutedEventArgs e)
         {
             string file = await ReleaseNotes.FetchAsync();
@@ -11780,7 +11877,7 @@ namespace HolyLogger
             // always supplies the wording and the ITU zone. A QSO being edited is resolved on its own
             // date, not today's.
             DateTime lookupWhen = (state == State.Edit && QsoToUpdate != null)
-                ? CountryLookup.QsoDate(QsoToUpdate.Date)
+                ? CountryLookup.QsoDate(QsoToUpdate.Date, QsoToUpdate.Time)
                 : DateTime.UtcNow;
             DXCC dXCC = CountryLookup.Shared.Resolve(dxCallText, lookupWhen);
             Country = dXCC.Name;

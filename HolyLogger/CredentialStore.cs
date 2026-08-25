@@ -50,6 +50,13 @@ namespace HolyLogger
         {
             "UpdateSettings",   // the run-once flag that drives Settings.Upgrade; per-version by design
             "ActiveLogId",      // a row id in this machine's log database, not a preference
+            // THE FREQUENCY SOURCE IS NOT CARRIED BETWEEN INSTALLS. A fresh install starts on CAT,
+            // which is what the setting's own default says and what a station with a radio expects.
+            // Carried in the mirror, a Manual chosen once on some earlier install came back on every
+            // new one - the operator installs, and the program is in Manual again for no reason he can
+            // see. Within one install the choice is remembered as usual (it lives in user.config, and
+            // Settings.Upgrade carries it from version to version).
+            "isManualMode",
         };
 
         private static string FilePath
@@ -93,7 +100,10 @@ namespace HolyLogger
         // right AFTER Settings.Upgrade() - so it only supplies what the per-version upgrade could not
         // carry (e.g. after the install identity changed). A group is skipped entirely when its primary
         // credential is already present, so nothing the operator set this session is disturbed.
-        public static void RestoreMissing()
+        // firstRunOfThisIdentity: true only when this start is the first for this version/install folder
+        // (the run that also does Settings.Upgrade). The general pass below runs ONLY then - see the
+        // comment on it for what happened when it ran on every start.
+        public static void RestoreMissing(bool firstRunOfThisIdentity)
         {
             try
             {
@@ -118,11 +128,26 @@ namespace HolyLogger
                     }
                 }
 
-                // ...then everything else this store has never had a value for. A setting still sitting
-                // at its compiled-in default was never set HERE, so filling it from the mirror takes
-                // nothing away; a setting the operator has touched differs from that default and is left
-                // exactly as it is. The credential pass above runs first, so anything it restored is no
-                // longer at its default and this pass steps over it.
+                // ...then everything else, but ONLY on the first start in a new settings folder.
+                //
+                // "Still at its compiled-in default" was read as "never set here". It is not. Choosing a
+                // setting's default value IS setting it, and the two are indistinguishable afterwards -
+                // so on every later start this pass quietly put the mirror's older value back and saved
+                // it. The Manual/CAT mode is the plain case: CAT is isManualMode = false, which is also
+                // the default, so a station that chose CAT was handed Manual again at the next start,
+                // from a mirror written when Manual was last in use - and again the start after that.
+                // Nothing the operator did could break the loop, because the loop ran before they could
+                // see it.
+                //
+                // On a genuinely new settings folder there is nothing to lose: every value really is a
+                // default, and filling them from the mirror is the whole point of this class - an
+                // upgrade or a reinstall must not blank what was typed. That is the one moment it runs.
+                if (!firstRunOfThisIdentity)
+                {
+                    if (changed) s.Save();
+                    return;
+                }
+
                 foreach (System.Configuration.SettingsProperty prop in s.Properties)
                 {
                     if (prop == null || NeverMirrored.Contains(prop.Name)) continue;

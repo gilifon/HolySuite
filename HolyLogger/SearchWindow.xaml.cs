@@ -1,4 +1,4 @@
-﻿using HolyParser;
+using HolyParser;
 using DXCCManager;
 using System;
 using System.Collections.Generic;
@@ -386,6 +386,32 @@ namespace HolyLogger
             };
         }
 
+        // ONE AI WINDOW AT A TIME, and it belongs to this one. A second report for another row, side
+        // by side with the first, is two windows the operator has to tell apart by reading them.
+        private AiQsoCheckWindow _aiCheckWindow;
+
+        private void OpenAiQsoCheck(QSO qso)
+        {
+            if (qso == null) return;
+            try
+            {
+                if (_aiCheckWindow != null)
+                {
+                    _aiCheckWindow.Close();
+                    _aiCheckWindow = null;
+                }
+
+                var window = new AiQsoCheckWindow(qso, this);
+                window.Closed += (s, e) => { if (ReferenceEquals(_aiCheckWindow, window)) _aiCheckWindow = null; };
+                _aiCheckWindow = window;
+                window.Show();
+            }
+            catch (Exception ex)
+            {
+                HolyMessageBox.ShowError("Could not open the AI check: " + ex.Message, "AI check", this);
+            }
+        }
+
         private ContextMenu BuildRowContextMenu(QSO qso, DataGridRow row)
         {
             var res = CtxRes;
@@ -407,6 +433,17 @@ namespace HolyLogger
             var qrz = new MenuItem { Header = "Search QRZ", Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
             qrz.Click += (s, e) => OpenQrz(qso.DXCall);
             menu.Items.Add(qrz);
+
+            // ONE QSO, READ BY AN AI. Reports only; it never writes to the log. The same item, with the
+            // same caption, sits in the main window's row menu and in Verify's.
+            var ai = new MenuItem { Header = RowMenuParts.MakeAiHeader(), Style = itemStyle, Icon = MakeMenuGlyph("", blue) };
+            ai.Click += (s, e) =>
+            {
+                _hlKeep = true;
+                Dispatcher.BeginInvoke(new Action(() => OpenAiQsoCheck(qso)),
+                                       System.Windows.Threading.DispatcherPriority.Background);
+            };
+            menu.Items.Add(ai);
 
             // Edit / Delete are deferred until the menu has fully closed (the editor is modal; running it
             // while the menu is still dismissing and holding mouse capture leaves it unable to take the

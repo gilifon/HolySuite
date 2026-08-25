@@ -48,7 +48,7 @@
         </GroupBox>
         <!-- Placed below the Color Theme box; the options pages sit in a ScrollViewer, so content
              past the design height is reachable rather than cut off. -->
-        <GroupBox Header="Log and Search tables" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,560,0,0" Width="360" FontSize="16">
+        <GroupBox Header="Log and Search tables" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="0,586,0,0" Width="360" FontSize="16">
             <StackPanel Margin="10,6,10,8">
                 <!-- Same wording and the same RowLotwBg sample as the cluster's own checkbox, because
                      it is the same mark in the same colour, just applied to the log tables. -->

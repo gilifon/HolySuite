@@ -1,6 +1,7 @@
-using System;
+﻿using System;
 using System.Runtime.InteropServices;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
@@ -265,6 +266,52 @@ namespace HolyLogger
                    left <= vsRight - 100 && top <= vsBottom - 60;
         }
 
+        // Two columns: the label, then the count at the END of the row with every count ending on the
+        // same edge. The number column is right-aligned and given a floor of its own so a run of
+        // single digits does not sit hard against the words beside it.
+        private static System.Windows.Controls.Grid BuildCounts(
+            System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, int>> counts)
+        {
+            var table = new System.Windows.Controls.Grid();
+            table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = GridLength.Auto });
+            table.ColumnDefinitions.Add(new System.Windows.Controls.ColumnDefinition { Width = GridLength.Auto });
+
+            int row = 0;
+            foreach (var entry in counts)
+            {
+                table.RowDefinitions.Add(new System.Windows.Controls.RowDefinition { Height = GridLength.Auto });
+
+                var label = new TextBlock
+                {
+                    Text = entry.Key,
+                    FontSize = 18,
+                    Margin = new Thickness(0, 0, 24, 3),
+                };
+                label.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                System.Windows.Controls.Grid.SetRow(label, row);
+                System.Windows.Controls.Grid.SetColumn(label, 0);
+                table.Children.Add(label);
+
+                var number = new TextBlock
+                {
+                    Text = entry.Value.ToString(System.Globalization.CultureInfo.CurrentCulture),
+                    FontSize = 18,
+                    FontWeight = FontWeights.Bold,
+                    TextAlignment = TextAlignment.Right,
+                    MinWidth = 34,
+                    Margin = new Thickness(0, 0, 0, 3),
+                };
+                number.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                System.Windows.Controls.Grid.SetRow(number, row);
+                System.Windows.Controls.Grid.SetColumn(number, 1);
+                table.Children.Add(number);
+
+                row++;
+            }
+
+            return table;
+        }
+
         private void OkBtn_Click(object sender, RoutedEventArgs e) => Close();
         private void YesBtn_Click(object sender, RoutedEventArgs e) { Confirmed = true; Close(); }
         private void NoBtn_Click(object sender, RoutedEventArgs e) { Confirmed = false; Close(); }
@@ -279,10 +326,21 @@ namespace HolyLogger
 
         // width, like Show's: a question carrying a list - the changes in a new version, say - reads
         // as a wall of text at the default 460.
+        // YES AND NO ARE THE ANSWERS TO A QUESTION; OK AND CANCEL ARE THE ANSWERS TO A STATEMENT.
+        //
+        // "Delete these three QSOs?" is a question and Yes/No is right. "6 QSOs will be checked by AI"
+        // is not a question, and answering a statement with "Yes" reads as a mistake in the program.
+        // So the two words can be named per dialog. Left unnamed they are Yes and No, which is what
+        // every other confirm in the program already asks.
         public static bool ShowConfirm(string message, string title = "HolyLogger",
-            HolyMsgType type = HolyMsgType.Warning, Window owner = null, double width = 0)
+            HolyMsgType type = HolyMsgType.Warning, Window owner = null, double width = 0,
+            string yesText = null, string noText = null)
         {
             var dlg = new HolyMessageBox(message, title, type, owner, confirm: true, width);
+
+            if (!string.IsNullOrWhiteSpace(yesText)) dlg.YesBtn.Content = yesText;
+            if (!string.IsNullOrWhiteSpace(noText)) dlg.NoBtn.Content = noText;
+
             dlg.ShowDialog();
             return dlg.Confirmed;
         }
@@ -305,9 +363,39 @@ namespace HolyLogger
         // how a file gets opened rather than this dialog deciding for it.
         public static void ShowWithLinks(string message, string title, HolyMsgType type, Window owner,
                                          System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, string>> links,
-                                         Action<string> onLink, double width = 0, string footer = null)
+                                         Action<string> onLink, double width = 0, string footer = null,
+                                         System.Collections.Generic.List<System.Collections.Generic.KeyValuePair<string, int>> counts = null)
         {
             var dlg = new HolyMessageBox(message, title, type, owner, confirm: false, width);
+
+            // A TALLY IS A TABLE, AND A TABLE CANNOT BE MADE OUT OF SPACES.
+            //
+            // Counts written into the message - "The AI thinks your log is correct:   4" - line up
+            // only in a typewriter font, and nothing here is one. However many spaces go in front of
+            // the number, each label is a different width on the screen and the numbers come out
+            // scattered. So the tally is laid out as two real columns and put above the message: the
+            // labels as wide as the widest of them, and the numbers ending on one edge.
+            if (counts != null && counts.Count > 0)
+            {
+                var table = BuildCounts(counts);
+                var holder = new System.Windows.Documents.InlineUIContainer(table);
+
+                if (dlg.MessageText.Inlines.FirstInline != null)
+                {
+                    // TWO BREAKS: a blank line between the tally and the words under it. One left
+                    // the sentence sitting against the bottom row of numbers, so the four of them
+                    // read as a single block and the eye had nowhere to stop.
+                    dlg.MessageText.Inlines.InsertBefore(dlg.MessageText.Inlines.FirstInline,
+                                                         new System.Windows.Documents.LineBreak());
+                    dlg.MessageText.Inlines.InsertBefore(dlg.MessageText.Inlines.FirstInline,
+                                                         new System.Windows.Documents.LineBreak());
+                    dlg.MessageText.Inlines.InsertBefore(dlg.MessageText.Inlines.FirstInline, holder);
+                }
+                else
+                {
+                    dlg.MessageText.Inlines.Add(holder);
+                }
+            }
 
             if (links != null)
                 foreach (var entry in links)

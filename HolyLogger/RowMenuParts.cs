@@ -59,6 +59,23 @@ namespace HolyLogger
             return panel;
         }
 
+        // "Ask AI to check this QSO", with AI in bold - the caption for the item that sends one QSO to
+        // an AI for an opinion (see AiQsoCheck). Built here because three menus carry it now: the main
+        // log's, the Log Workshop's and the Verify window's, and a caption written out three times is a
+        // caption that ends up worded three ways.
+        //
+        // A TextBlock rather than a plain string, because only part of the line is bold. Everything else
+        // - size, colour, spacing - is left to the menu item's own style, so it still looks like its
+        // neighbours; the exception is the bold run itself.
+        public static UIElement MakeAiHeader()
+        {
+            var text = new TextBlock();
+            text.Inlines.Add(new System.Windows.Documents.Run("Ask "));
+            text.Inlines.Add(new System.Windows.Documents.Run("AI") { FontWeight = FontWeights.Bold });
+            text.Inlines.Add(new System.Windows.Documents.Run(" to check this QSO"));
+            return text;
+        }
+
         // The line under the callsign: which contact with that station this is. Only the parts actually
         // filled in, so a QSO with no mode logged doesn't show a stray separator.
         //

@@ -141,7 +141,7 @@ namespace HolyParser
                 int dxccCode = qso.DxccCode;
                 if (dxccCode <= 0)
                 {
-                    try { dxccCode = CountryLookup.Shared.EntityCodeForCountry(qso.Country, CountryLookup.QsoDate(qso.Date)); }
+                    try { dxccCode = CountryLookup.Shared.EntityCodeForCountry(qso.Country, CountryLookup.QsoDate(qso.Date, qso.Time)); }
                     catch (Exception) { dxccCode = 0; }
                 }
                 if (dxccCode > 0)

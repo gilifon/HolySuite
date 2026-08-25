@@ -142,8 +142,63 @@ namespace HolyLogger
 
         //ImportItem_Selected
 
+        // WHERE THE AI IS CHOSEN WHEN NOBODY IS IN THE MIDDLE OF USING IT.
+        //
+        // Until now the only way to pick a service or paste a key was to be standing in front of a
+        // question - the check window on one QSO, or the box the Log Fixer puts up when it finds no
+        // key. An operator who simply wants to see which service he is on, or move from the free
+        // allowance to the paid one before he starts, had nowhere to go. This is that place.
+        //
+        // Built the first time the page is opened, not when the window is: it costs a web call to
+        // show what credit is left, and Options is opened for a dozen reasons that are not this one.
+        private AiServicePanel _aiPanel;
+
+        private void AiItem_Selected(object sender, RoutedEventArgs e)
+        {
+            HideAllControls();
+
+            if (_aiPanel == null)
+            {
+                var heading = new TextBlock
+                {
+                    Text = "Which AI answers when you ask about a QSO",
+                    FontSize = 18,
+                    FontWeight = FontWeights.Bold,
+                    TextWrapping = TextWrapping.Wrap,
+                    Margin = new Thickness(0, 0, 0, 4),
+                };
+                heading.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                AiHostInstance.Children.Add(heading);
+
+                var note = new TextBlock
+                {
+                    Text = "Used by Ask AI to check this QSO, and by Check with AI in the Log "
+                         + "Fixer. The key is kept on this computer only, and each service keeps its "
+                         + "own - so moving between them never means fetching a key twice.",
+                    FontSize = 16,
+                    TextWrapping = TextWrapping.Wrap,
+                    Opacity = 0.85,
+                    Margin = new Thickness(0, 0, 0, 12),
+                };
+                note.SetResourceReference(TextBlock.ForegroundProperty, "TextBrush");
+                AiHostInstance.Children.Add(note);
+
+                _aiPanel = new AiServicePanel(showModel: true);
+                AiHostInstance.Children.Add(_aiPanel);
+            }
+            else
+            {
+                // The key may have been pasted, or the service changed, in one of the other windows
+                // since this page was last looked at.
+                _aiPanel.Refresh();
+            }
+
+            AiHostInstance.Visibility = Visibility.Visible;
+        }
+
         private void HideAllControls()
         {
+            AiHostInstance.Visibility = Visibility.Hidden;
             QRZServicesControlInstance.Visibility = Visibility.Hidden;
             EqslServiceControlInstance.Visibility = Visibility.Hidden;
             ClublogServiceControlInstance.Visibility = Visibility.Hidden;
