@@ -46,7 +46,10 @@ namespace HolyLogger
             try { ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; }
             catch (Exception swallowed) { Log.Swallow(swallowed); }
 
-            return new HttpClient { Timeout = TimeSpan.FromSeconds(180) };
+            // TEN MINUTES, not three. Thinking at "high" has taken over two minutes for six QSOs,
+            // and a batch of ten with more to weigh up can take longer - a timeout that fires while
+            // the model is still working throws away the answer AND the allowance spent on it.
+            return new HttpClient { Timeout = TimeSpan.FromMinutes(10) };
         }
 
         internal static string ApiKey
@@ -196,17 +199,45 @@ namespace HolyLogger
                     generation_config = new
                     {
                         temperature = Temperature,
-                        // One QSO is not deep work, and a short wait matters more here than the last
-                        // ounce of reasoning.
-                        thinking_level = "low"
-                    }
+                        // HIGH. THE OPERATOR'S CHOICE, MADE WITH THE PRICE IN FRONT OF HIM.
+                        //
+                        // Thinking is where the time goes: six QSOs took 142 seconds here while a
+                        // browser doing none answered in two, and the report in between cost 23 ms.
+                        // Cutting it to "minimal" would buy back nearly all of that.
+                        //
+                        // He would rather wait. A wrong country written into a log kept for thirty
+                        // years outlives any amount of waiting, and three AIs have already been
+                        // caught voting against their own stated reasons at lower settings. So this
+                        // asks for the most thought the endpoint offers, and the window is built to
+                        // sit out the wait: a spinner, a count of seconds, and a Stop button.
+                        thinking_level = "high"
+                    },
+                    // ASKED FOR IN SO MANY WORDS, rather than left to a default.
+                    //
+                    // Google serves this API in tiers now. "flex" has a stated target of ONE TO
+                    // FIFTEEN MINUTES, and the 142 seconds measured here sits inside that band -
+                    // while the same question in a browser came back in two. The documentation says
+                    // an omitted tier means standard, but it does not say what a FREE key is served
+                    // as, and best-effort is what free usually means. So it is named.
+                    //
+                    // If nothing changes, the free tier itself is the ceiling, and that is worth
+                    // knowing too - it is the difference between a bug and a price.
+                    service_tier = "standard"
                 });
 
             // ASKED FOR AS A STREAM ONLY WHEN SOMEBODY IS LISTENING LINE BY LINE. Added to the body
             // after it is built rather than written into both shapes above: it is the same one word
             // for either service, and duplicating it into two anonymous objects would mean two places
             // to forget it.
-            if (onLine != null)
+            // STREAMING IS OFF WHILE WE FIND OUT WHY GEMINI GOES QUIET.
+            //
+            // The same question answered in three seconds in a browser and timed out three times from
+            // here, after the streaming change and nothing else. So this is switched off in one place
+            // rather than unpicked: with it false, `onLine` is dropped and the request is exactly the
+            // one that worked before - one question, one answer at the end.
+            const bool AskForAStream = false;
+
+            if (onLine != null && AskForAStream)
             {
                 try
                 {
@@ -216,6 +247,12 @@ namespace HolyLogger
                 }
                 catch (Exception swallowed) { Log.Swallow(swallowed); onLine = null; }
             }
+            else
+            {
+                onLine = null;
+            }
+
+            SavePrompt(system, input, service);
 
             using (var request = new HttpRequestMessage(HttpMethod.Post, service.Endpoint))
             {
@@ -277,6 +314,51 @@ namespace HolyLogger
 
                 return ReadReport(text);
             }
+        }
+
+        // EVERY QUESTION, KEPT AS A FILE.
+        //
+        // The whole worth of this feature turns on how the question is worded, and until now the
+        // wording lived only inside the program - so an operator who wanted to put the same question
+        // to another AI, or to see for himself what his log was being asked about, had no way to get
+        // at it. Now each question is written out beside the reports, exactly as it was sent: the
+        // instructions first, then the contacts.
+        //
+        // Never allowed to stop a check. A folder that cannot be written to is a nuisance; a check
+        // that refuses to run because of it would be a fault.
+        private static void SavePrompt(string system, string input, AiService service)
+        {
+            try
+            {
+                var sb = new StringBuilder();
+                string rule = new string('=', 78);
+
+                sb.AppendLine(rule);
+                sb.AppendLine("HolyLogger - the question put to the AI");
+                sb.AppendLine(DateTime.Now.ToString("dddd d MMMM yyyy, HH:mm:ss"));
+                if (service != null)
+                    sb.AppendLine("Asked of " + service.ShortName + " (" + service.Model + ")");
+                sb.AppendLine(rule);
+                sb.AppendLine();
+                sb.AppendLine("THE INSTRUCTIONS (sent as the system prompt)");
+                sb.AppendLine(rule);
+                sb.AppendLine();
+                sb.AppendLine(system ?? string.Empty);
+                sb.AppendLine();
+                sb.AppendLine(rule);
+                sb.AppendLine("THE QUESTION (sent as one message after the instructions)");
+                sb.AppendLine(rule);
+                sb.AppendLine();
+                sb.AppendLine(input ?? string.Empty);
+
+                // Seconds in the name, because a run of several batches asks several questions
+                // within the same minute and each of them is worth keeping on its own.
+                string name = "holylogger_ai_prompt_"
+                            + DateTime.Now.ToString("yyyy-MM-dd_HHmmss") + ".txt";
+
+                File.WriteAllText(Path.Combine(Reports.Folder, name), sb.ToString());
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         // WHAT THE AI IS ASKED TO BE. Short lines, ordinary words, and no invented certainty - a

@@ -1395,8 +1395,12 @@ namespace HolyLogger
                     sb.AppendLine();
                 }
 
+                // SECONDS IN THE NAME. Two runs inside one minute wrote to the same file and the
+                // second quietly replaced the first - which is exactly what happens when several
+                // models are put to the same question one after another, and it cost a comparison
+                // that had already been paid for.
                 return Reports.Write("holylogger_fixer_report_"
-                                     + DateTime.Now.ToString("yyyy-MM-dd_HHmm") + ".txt", sb.ToString());
+                                     + DateTime.Now.ToString("yyyy-MM-dd_HHmmss") + ".txt", sb.ToString());
             }
             catch (Exception swallowed) { Log.Swallow(swallowed); return null; }
         }
@@ -3153,7 +3157,17 @@ namespace HolyLogger
                 // report is written again with all of it in. The first file is left alone.
                 Dictionary<QSO, string> verdicts = AiVerdicts();
                 List<Finding> withAi = _findings.ToList();
+
+                // TIMED SEPARATELY FROM THE AI. This report is built from every finding in the log -
+                // 4,522 of them on a real log - and the country sections cost two database lookups a
+                // row. It is written BEFORE the result is shown, so its time is time the operator
+                // spends staring at nothing and blaming the AI for.
+                var reportClock = System.Diagnostics.Stopwatch.StartNew();
+
                 string reportPath = await Task.Run(() => WriteFixerReport(withAi, verdicts, AiAuthors()));
+
+                Log.Warn("Log Fixer, check with AI: the report took " + reportClock.ElapsedMilliseconds
+                         + " ms for " + withAi.Count + " finding(s)");
 
                 // THE THREE ANSWERS, ONE TO A LINE, WITH THE COUNT AT THE END OF EACH.
                 //
@@ -3186,8 +3200,17 @@ namespace HolyLogger
                 // AND WHO SAID IT. He ran the same six QSOs past two services and got two different
                 // answers, and this window - the one he actually reads - was the only place that did
                 // not say which of them he was looking at.
+                // BOLD, AND WITH THE TIME IT TOOK. Which model answered is the difference between
+                // 5-1 and 4-2 on the same six QSOs, so it is the line worth finding at a glance -
+                // and how long it took is what he decides the next run on.
                 string author = AiAuthors();
-                if (author.Length > 0) message += gap + "Answered by " + author;
+                if (author.Length > 0)
+                {
+                    int seconds = (int)(DateTime.UtcNow - started).TotalSeconds;
+
+                    message += gap + "Answered by **" + author + "**"
+                             + ", in " + seconds + (seconds == 1 ? " second." : " seconds.");
+                }
 
                 // THE PATH IS THE BUTTON. A report announced as words in a folder is a report the
                 // operator has to go and find; printed as a link it is one press away, and still

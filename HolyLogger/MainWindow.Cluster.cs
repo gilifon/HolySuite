@@ -1180,7 +1180,7 @@ namespace HolyLogger
             freqTextBlockFactory.SetValue(TextBlock.FontWeightProperty, FontWeights.Bold);
             freqColumnTemplate.VisualTree = freqTextBlockFactory;
 
-            var freqColumn = new DataGridTemplateColumn { Header = freqHeaderText, HeaderStyle = freqHeaderStyle, CellTemplate = freqColumnTemplate, SortMemberPath = "FreqDisplayText", Width = DataGridLength.Auto };
+            var freqColumn = new DataGridTemplateColumn { Header = freqHeaderText, HeaderStyle = freqHeaderStyle, CellTemplate = freqColumnTemplate, SortMemberPath = "FreqMhz", Width = DataGridLength.Auto };
 
             // UTC column
             var utcHeaderStyle = new Style(typeof(DataGridColumnHeader), clusterColumnHeaderStyle);

@@ -93,8 +93,15 @@ namespace HolyLogger
 
             "Rules:\n" +
             "- Answer every number you were given, in the same order, and no others.\n" +
-            "- Settle each number completely before you begin the next, and write its line the " +
-            "moment you have decided it. Do not weigh them all up first and answer at the end.\n" +
+            "- Take your time and reason it out properly before you write anything. This is not " +
+            "a race: a wrong country goes into a log somebody has kept for thirty years.\n" +
+            "- BEFORE YOU WRITE EACH LINE, READ YOUR OWN REASON BACK AND CHECK IT SUPPORTS YOUR " +
+            "VERDICT. Answering SUGGESTED while your reason argues for the country in the log " +
+            "is worse than useless - it is a wrong answer wearing the evidence for the right " +
+            "one. If the reason and the verdict do not match, the reason is right: change the " +
+            "verdict.\n" +
+            "- If a date range is your evidence, check the QSO date really falls inside it " +
+            "before you answer, and outside it if that is what you are arguing.\n" +
             "- Plain text. No markdown, no headings, no bullet characters.\n" +
             "- UNSURE and NEITHER are proper answers and cost nothing. A guess dressed as a " +
             "decision costs the operator a wrong country in a log he has kept for twenty " +
@@ -152,10 +159,15 @@ namespace HolyLogger
                 // request, so most runs are a single one, and counting to one is a strange way of
                 // saying how much work there is. When there is only the one, the number of contacts
                 // is the figure worth showing; when there are several, the count of requests is.
+                // NAMED, NOT "THE AI". Which model is answering is the difference between 5-1 and
+                // 4-2 on the same six QSOs, and it is the thing he is choosing between - so the line
+                // he watches for a minute or two says which one he is watching.
+                string who = AiServices.Current.Model;
+
                 if (say != null)
                     say(batches == 1
-                        ? count + " QSO" + (count == 1 ? " is" : "s are") + " verified by AI"
-                        : "Asking the AI - request " + (b + 1) + " of " + batches + "...");
+                        ? count + " QSO" + (count == 1 ? " is" : "s are") + " verified by " + who
+                        : "Asking " + who + " - request " + (b + 1) + " of " + batches + "...");
 
                 // EVERY ANSWER THE MOMENT IT IS WRITTEN, not the whole list at the end.
                 //
@@ -175,12 +187,22 @@ namespace HolyLogger
 
                     if (answered != null) answered(index, answer);
                     if (say != null)
-                        say("The AI has answered " + settled + " of " + questions.Count + "...");
+                        say(who + " has answered " + settled + " of " + questions.Count + "...");
                 };
 
                 string input = Describe(questions, from, count);
+
+                // TIMED, BECAUSE "IT FELT SLOW" IS NOT EVIDENCE. The same question answered in two
+                // seconds in a browser and seemed to take twenty here - and between the answer
+                // arriving and the operator seeing it, this program also writes a report of several
+                // hundred kilobytes. One of those is the wait; guessing which has cost enough time.
+                var clock = System.Diagnostics.Stopwatch.StartNew();
+
                 string reply = await AiQsoCheck.AskAsync(SystemPrompt, input, cancel, say, onLine)
                                                .ConfigureAwait(false);
+
+                Log.Warn("AI country vote: the service answered in " + clock.ElapsedMilliseconds
+                         + " ms (" + count + " QSO(s), question " + input.Length + " chars)");
 
                 // AND READ WHOLE AFTERWARDS AS WELL. A line the stream broke in a place nobody
                 // expected, or an answer the model wrote without a newline after it, is picked up

@@ -35,6 +35,18 @@ namespace HolyLogger
         // of those is one more thing to read at a moment when nobody is choosing a model.
         private readonly bool _showModel;
 
+        // Set when the model box is built; null when this panel has none.
+        private Action _commitModel;
+
+        /// <summary>
+        /// Stores whatever stands in the model box, as though Save model had been pressed. For a
+        /// host with an OK button of its own: a choice made and then not saved is a choice ignored.
+        /// </summary>
+        internal void CommitModel()
+        {
+            if (_commitModel != null) _commitModel();
+        }
+
         internal AiServicePanel() : this(false) { }
 
         internal AiServicePanel(bool showModel)
@@ -213,7 +225,15 @@ namespace HolyLogger
                 Foreground = ThemeManager.Brush("TextBrush"),
                 Margin = new Thickness(0, 6, 0, 0),
             };
-            line.Inlines.Add(new System.Windows.Documents.Run("Add credit, or see what you have spent: "));
+            // WORDED FOR THE SERVICE IT BELONGS TO. One of them keeps a balance this window can show
+            // and count down; the other counts days and reports no figure at all. "Add credit, or
+            // see what you have spent" over a service that has no such page would be a promise the
+            // page does not keep.
+            line.Inlines.Add(new System.Windows.Documents.Run(
+                string.IsNullOrEmpty(service.AllowanceUrl)
+                    ? "The free allowance is a daily one. To go past it, turn on billing for the "
+                      + "key's project: "
+                    : "Add credit, or see what you have spent: "));
 
             string where = service.TopUpUrl;
             var link = new System.Windows.Documents.Hyperlink(
@@ -247,12 +267,69 @@ namespace HolyLogger
         //
         // Empty means the built-in default, and it says so: a blank box that silently means something
         // is a blank box people fill in with guesses.
+        // ONE PLACE THAT TURNS "id|what it is" INTO ROWS, used for the built-in list and for the
+        // fetched one, so the two can never come to look different from each other.
+        private static void FillModels(ComboBox box, AiService service, string[] choices)
+        {
+            if (box == null || choices == null) return;
+
+            box.Items.Clear();
+
+            foreach (string choice in choices)
+            {
+                if (string.IsNullOrWhiteSpace(choice)) continue;
+
+                int bar = choice.IndexOf('|');
+                string id = (bar < 0 ? choice : choice.Substring(0, bar)).Trim();
+                string what = bar < 0 ? string.Empty : choice.Substring(bar + 1).Trim();
+
+                if (id.Length == 0) continue;
+
+                bool isDefault = service != null
+                    && string.Equals(id, service.DefaultModel, StringComparison.OrdinalIgnoreCase);
+
+                box.Items.Add(new ComboBoxItem
+                {
+                    Content = id + (what.Length > 0 ? "   -   " + what : string.Empty)
+                                 + (isDefault ? "   (used unless you change it)" : string.Empty),
+                    Tag = id,
+                    FontSize = 16,
+                });
+            }
+        }
+
+        // TODAY'S LIST, FETCHED AFTER THE PAGE IS ALREADY UP.
+        //
+        // The same rule as the credit line: a web call on the way to drawing a window is a window
+        // that does not appear. The box is usable from the first moment with what the program was
+        // built with, and is quietly refilled when the service answers.
+        //
+        // WHATEVER HE HAS TYPED SURVIVES. Refilling the list must not take the name out from under
+        // an operator in the middle of choosing, so the text is put back exactly as it was.
+        private async void RefreshModels(ComboBox box, AiService service)
+        {
+            if (box == null || service == null || string.IsNullOrEmpty(service.ModelsUrl)) return;
+
+            string[] live = await AiModelList.ChoicesAsync(service);
+            if (live == null || live.Length == 0) return;
+
+            // He may have moved to another service, or closed the window, while it was in the air.
+            if (!ReferenceEquals(service, AiServices.Current)) return;
+            if (!_serviceHelp.Children.Contains(box.Parent as UIElement)) return;
+
+            // Clearing the items wipes the text of an editable box, so what he had is put back -
+            // and put back LAST, after the box has done its own tidying up.
+            string typed = box.Text;
+            FillModels(box, service, live);
+            box.Dispatcher.BeginInvoke(new Action(() => box.Text = typed),
+                                       System.Windows.Threading.DispatcherPriority.Input);
+        }
+
         private void ShowModelBox(AiService service)
         {
             if (!_showModel || service == null || service.WriteModel == null) return;
 
-            var label = Line("Model (leave empty for " + service.DefaultModel + "):",
-                             italic: false, dim: false);
+            var label = Line("Which model answers:", italic: false, dim: false);
             label.Margin = new Thickness(0, 10, 0, 2);
             _serviceHelp.Children.Add(label);
 
@@ -268,17 +345,74 @@ namespace HolyLogger
             DockPanel.SetDock(save, Dock.Right);
             row.Children.Add(save);
 
-            var box = new TextBox
+            // THE NAMES ARE OFFERED, NOT DEMANDED.
+            //
+            // This was an empty box under the words "leave empty for nvidia/nemotron-3-ultra-...".
+            // To use a better model an operator had to already know that anthropic/claude-opus-5
+            // exists, that it goes in that box, and how it is spelled - none of which the window
+            // said. He was being asked to guess, and a program should never ask that.
+            //
+            // Editable, so a name that is not on the list can still be typed: the list is what the
+            // program knows today, not a fence.
+            var box = new ComboBox
             {
+                IsEditable = true,
                 FontSize = 16,
                 Padding = new Thickness(4),
-                Text = (service.ReadModel() ?? string.Empty).Trim(),
             };
+
+            string current = (service.ReadModel() ?? string.Empty).Trim();
+
+            FillModels(box, service, service.ModelChoices ?? new string[0]);
+
+            // AND THEN TODAY'S LIST, WHEN IT ARRIVES. The box opens filled from what the program was
+            // built with so it is never empty, and is refilled the moment the service says what it
+            // really has - fetched at most once a day and kept on disk, the same as cty.dat. A model
+            // retired last year stops being offered; one released last month starts being.
+            RefreshModels(box, service);
+
+            // SET WHEN THE BOX IS ON SCREEN, NOT BEFORE IT.
+            //
+            // An editable ComboBox has no text box to write into until its template is applied, so a
+            // Text set here is written into nothing and the box comes up empty - which is what it
+            // did: a model picked and saved was invisible when the page was opened again, and the
+            // operator could not tell whether it had been saved at all.
+            string showing = current.Length > 0 ? current : service.DefaultModel;
+            box.Loaded += (s2, e2) => box.Text = showing;
+
+            // Picking from the list puts the NAME in the box, not the sentence beside it - the
+            // sentence is there to choose by, and would be refused as a model name.
+            // AFTER THE BOX HAS FINISHED ITS OWN UPDATE, NOT DURING IT.
+            //
+            // An editable ComboBox writes the chosen item Content into its text box itself, and it
+            // does so AFTER SelectionChanged returns - so a Text set inside the handler was being
+            // overwritten a moment later, and picking a model left the box empty. Posting it back to
+            // the dispatcher puts this line last, which is the only way it wins.
+            //
+            // It has to be the name alone: the words beside it are there to choose by, and would be
+            // sent to the service as a model name and refused.
+            box.SelectionChanged += (s2, e2) =>
+            {
+                var picked = box.SelectedItem as ComboBoxItem;
+                if (picked == null) return;
+
+                string id = (string)picked.Tag;
+                box.Dispatcher.BeginInvoke(new Action(() => box.Text = id),
+                                           System.Windows.Threading.DispatcherPriority.Input);
+            };
+
             row.Children.Add(box);
 
             Action store = () =>
             {
-                service.WriteModel((box.Text ?? string.Empty).Trim());
+                string typed = (box.Text ?? string.Empty).Trim();
+
+                // The default typed back in means "the default" - stored empty, so a changed
+                // default in a later version reaches him instead of being frozen here.
+                if (string.Equals(typed, service.DefaultModel, StringComparison.OrdinalIgnoreCase))
+                    typed = string.Empty;
+
+                service.WriteModel(typed);
                 try { Properties.Settings.Default.Save(); }
                 catch (Exception swallowed) { Log.Swallow(swallowed); }
 
@@ -286,13 +420,22 @@ namespace HolyLogger
                     Say(service.Model + " will be used from the next question onwards.");
             };
 
-            save.Click += (s, e) => store();
-            box.KeyDown += (s, e) => { if (e.Key == Key.Enter) store(); };
+            // PRESSING OK MUST NOT THROW THE CHOICE AWAY.
+            //
+            // The box was only written to settings by the Save model button, so in the run dialog an
+            // operator could pick a model, press OK, and be answered by the previous one - four runs
+            // in a row reported opus-5 while he was choosing something else each time. Whoever hosts
+            // this panel can now commit the box themselves, and the dialog does it on OK.
+            _commitModel = store;
+
+            save.Click += (s2, e2) => store();
+            box.KeyDown += (s2, e2) => { if (e2.Key == Key.Enter) store(); };
 
             _serviceHelp.Children.Add(row);
 
-            var note = Line("The names are on the service's own website. A name it does not know is "
-                          + "refused with a message saying so - nothing is spent on it.",
+            var note = Line("Pick one and press Save model. Any other name from the service's own "
+                          + "website can be typed in as well; a name it does not know is refused "
+                          + "with a message saying so, and nothing is spent on it.",
                             italic: true, dim: true);
             note.Margin = new Thickness(0, 4, 0, 0);
             _serviceHelp.Children.Add(note);

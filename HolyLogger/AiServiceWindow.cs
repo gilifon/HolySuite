@@ -151,7 +151,13 @@ namespace HolyLogger
             };
             root.Children.Add(what);
 
-            var panel = new AiServicePanel();
+            // THE MODEL IS PART OF THE ANSWER, so it is named here and can be changed here.
+            //
+            // This dialog said which SERVICE would be asked and never which model - and the model is
+            // what actually answers: the same six QSOs came back 5-1 from one and 4-2 from another,
+            // both through OpenRouter. Naming the service alone told him almost nothing, and made
+            // him close the window and go to Options to change the one thing he wanted to change.
+            var panel = new AiServicePanel(showModel: true);
             root.Children.Add(panel);
 
             _warning = new TextBlock
@@ -180,7 +186,10 @@ namespace HolyLogger
                 IsDefault = true,
                 Margin = new Thickness(0, 0, 10, 0),
             };
-            _ok.Click += (s2, e2) => { Confirmed = true; Close(); };
+            // OK MEANS "ASK WITH WHAT THE WINDOW IS SHOWING", model included. Without this the box
+            // was decoration: he picked a model, pressed OK, and the run went out with whatever had
+            // been saved before.
+            _ok.Click += (s2, e2) => { panel.CommitModel(); Confirmed = true; Close(); };
             buttons.Children.Add(_ok);
 
             var cancel = new Button

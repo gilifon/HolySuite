@@ -10,12 +10,14 @@
         Background="White">
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="180" />
+            <!-- 210, not 180: the list was set to the program's smallest allowed size of 16 and
+                 "Import Settings" no longer fitted the old width. -->
+            <ColumnDefinition Width="210" />
             <ColumnDefinition Width="*" />
         </Grid.ColumnDefinitions>
 
         <DockPanel x:Name="TreeViewPanel" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Grid.Column="0">
-            <TreeView x:Name="treeView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch">
+            <TreeView x:Name="treeView" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" FontSize="16">
                 <TreeViewItem x:Name="GeneralItem" Header="General" Selected="GeneralItem_Selected" />
                 <TreeViewItem x:Name="UlItem" Header="User Interface" Selected="UserInterfaceItem_Selected" />
                 <TreeViewItem x:Name="PersonalInfoItem" Header="Personal Info" Selected="PersonalInfoItem_Selected" />
