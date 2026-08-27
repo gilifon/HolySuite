@@ -1038,7 +1038,7 @@ namespace HolyLogger
         //
         // No country name begins with a digit, so leading digits are always a number and never part
         // of a name.
-        private static void ReadCountryText(string typed, out int code, out string name)
+        internal static void ReadCountryText(string typed, out int code, out string name)
         {
             code = 0;
             name = (typed ?? string.Empty).Trim();

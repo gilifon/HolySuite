@@ -153,6 +153,34 @@ namespace DXCCManager
         // Deleted is Club Log's own <deleted> flag, not "this name is absent from the current list".
         // The name is cty.dat's wherever the two are bridged, so the page reads in the same words as the
         // log does, and Club Log's (title-cased) only for entities cty.dat cannot name at all.
+        // WHAT cty.dat KNOWS ABOUT A COUNTRY AS A WHOLE, found by its ARRL entity number instead of by a
+        // callsign - continent, the entity's own CQ and ITU zones, and the middle of it as a grid square.
+        //
+        // Everything else here starts from a callsign, because a callsign is what an operator has. This
+        // is for the one case where he has not got one he trusts: he NAMES the country himself, and the
+        // fields that hang off a country then have to follow the country he named rather than the one
+        // the callsign suggested.
+        //
+        // ZONES ARE THE ENTITY'S, NOT THE STATION'S. A country wide enough to span zones - the United
+        // States, Russia, Australia - has one default here and stations all over it. So this answers
+        // "what does this country default to", which is the only honest answer to a question asked with
+        // no callsign in it, and never "which zone is that station in".
+        //
+        // Null when the number is unknown or cty.dat cannot name it, so a caller can leave its fields
+        // alone rather than write a guess into them.
+        public DXCC EntityDetails(int dxccCode)
+        {
+            if (dxccCode <= 0 || cty == null) return null;
+            try
+            {
+                string ctyEntity;
+                if (!ctyEntityByCode.TryGetValue(dxccCode, out ctyEntity)) return null;
+                DXCC found = cty.GetDXCCbyEntityCode(ctyEntity);
+                return found != null && found.Name != "Unknown" ? found : null;
+            }
+            catch { return null; }
+        }
+
         public IEnumerable<EntityRecord> AllEntities()
         {
             if (clubLog == null) yield break;

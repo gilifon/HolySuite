@@ -1944,7 +1944,12 @@ namespace HolyLogger
                 qso.ITUZone = TB_ITUZone.Text;
                 qso.State = TB_State.Text;          // ADIF STATE - now stored with the QSO
                 qso.Qth = TB_QTH.Text;              // ADIF QTH - the worked station's town
-                qso.DxccCode = EntityCodeForCall(qso.DXCall, qso.Date);   // the country's identity
+                // The country's identity. Worked out from the callsign - unless the operator picked a
+                // country in the box himself, which is him overruling the callsign, and the number must
+                // then be the one he chose or the log says one country and counts as another.
+                qso.DxccCode = _countryPickedCode > 0
+                             ? _countryPickedCode
+                             : EntityCodeForCall(qso.DXCall, qso.Date);
                 qso.Name = FName.Length > 25 ? FName.Substring(0,25): FName;
                 qso.MyCall = TB_MyCallsign.Text;
                 qso.Operator = TB_Operator.Text;
@@ -2057,7 +2062,9 @@ namespace HolyLogger
                 QsoToUpdate.ITUZone = TB_ITUZone.Text;
                 QsoToUpdate.State = TB_State.Text;   // ADIF STATE - now stored with the QSO
                 QsoToUpdate.Qth = TB_QTH.Text;       // ADIF QTH - the worked station's town
-                QsoToUpdate.DxccCode = EntityCodeForCall(QsoToUpdate.DXCall, QsoToUpdate.Date);
+                QsoToUpdate.DxccCode = _countryPickedCode > 0
+                                     ? _countryPickedCode
+                                     : EntityCodeForCall(QsoToUpdate.DXCall, QsoToUpdate.Date);
                 QsoToUpdate.Name = TB_DX_Name.Text.Length > 25 ? TB_DX_Name.Text.Substring(0, 25) : TB_DX_Name.Text; //FName.Length > 25 ? FName.Substring(0, 25) : FName;
                 QsoToUpdate.MyCall = TB_MyCallsign.Text;
                 QsoToUpdate.Operator = TB_Operator.Text;
@@ -2128,7 +2135,7 @@ namespace HolyLogger
         // named this Image and the blinking text caret, and nothing else.
         private void ShowNewDXCC()
         {
-            var dups = from qso in Qsos where qso.Country == TB_DXCC.Text select qso;
+            var dups = from qso in Qsos where qso.Country == CB_DXCC.Text select qso;
             if (dups.Count() == 1) //if there is only one -> it is the one we just added -> it was a new one!
             {
                 try
@@ -2244,6 +2251,11 @@ namespace HolyLogger
             FName = string.Empty;
             Country = string.Empty;
             UpdateCountryFlag(null);
+            // A country chosen by hand belongs to ONE contact. This runs when that contact has been
+            // logged (Add ends here) and when the form is thrown away with F9 - either way the contact
+            // is over, and the next callsign is answered by the databases again.
+            CB_DXCC.SelectedItem = null;
+            _countryPickedCode = 0;
 
             ShowDxccCode(0);
             ClearQrzPhoto();
@@ -6779,7 +6791,7 @@ namespace HolyLogger
             TB_QTH.Background = backgroundColor;
             TB_DXLocator.Background = backgroundColor;
             TB_Comment.Background = backgroundColor;
-            TB_DXCC.Background = backgroundColor;
+            CB_DXCC.Background = backgroundColor;
             // The activity row's "other program" pair belongs to the QSO like every box above it, so it
             // wears the edit-mode colour too - and is as editable in edit mode as it is when logging.
             CB_ActivitySig.Background = backgroundColor;
@@ -11764,7 +11776,9 @@ namespace HolyLogger
                 {
                     FName = string.Empty;
                     ClearDXLocator();
-                    TB_DXCC.Text = "";
+                    CB_DXCC.Text = "";
+                    CB_DXCC.SelectedItem = null;   // or the box redraws the country he last picked
+                    _countryPickedCode = 0;
                     TB_DX_Name.Text = "";
                     TB_State.Text = "";
                     TB_QTH.Text = "";
@@ -11882,22 +11896,39 @@ namespace HolyLogger
                 ? CountryLookup.QsoDate(QsoToUpdate.Date, QsoToUpdate.Time)
                 : DateTime.UtcNow;
             DXCC dXCC = CountryLookup.Shared.Resolve(dxCallText, lookupWhen);
-            Country = dXCC.Name;
-            UpdateCountryFlag(dXCC.Name);
-            ShowDxccCode(dXCC.IsDxccEntity ? (dXCC.DxccCode > 0 ? dXCC.DxccCode : EntityCodeForCall(dxCallText, null)) : 0);
-            // "XX" is the resolver saying it did not recognise the prefix, not a continent. Storing it
-            // puts a placeholder in the QSO that every screen then has to read as data - it turned up in
-            // the Log Workshop's Continent filter sitting among AF, AS, EU and the rest, as though the
-            // operator had worked a place called XX. Blank is the honest answer, and it is the same rule
-            // the parser, the Log Verifier and the QSO editor already follow.
-            Continent = string.Equals(dXCC.Continent, "XX", StringComparison.OrdinalIgnoreCase)
-                ? string.Empty
-                : dXCC.Continent;
-            QRZGrid = dXCC.Locator;
-            // Fill ITU/CQ zones offline from cty.dat (entity default or the prefix-specific
-            // override). A later QRZ.com lookup, when available, overrides these as the gold source.
-            TB_ITUZone.Text = dXCC.ItuZone > 0 ? dXCC.ItuZone.ToString() : "";
-            TB_CQZone.Text = dXCC.CqZone > 0 ? dXCC.CqZone.ToString() : "";
+
+            // A COUNTRY CHOSEN BY HAND OUTLIVES THE NEXT KEYSTROKE ON THE CALLSIGN.
+            //
+            // Picking a country IS the operator saying the databases have this contact wrong. He then
+            // goes on filling the form in - correcting the callsign he mistyped, very often, which is
+            // why he had to pick a country in the first place - and every character of that used to
+            // resolve the callsign again and put the database's answer straight back over his own.
+            //
+            // So his choice stands until the contact is over: logged with Add, or thrown away with F9.
+            // Both go through ClearBtn_Click, and that is where it is forgotten.
+            //
+            // ONLY THE COUNTRY IS HELD BACK. Everything else this method goes on to do - the azimuth,
+            // the QRZ.com lookup, the duplicate check, the band and mode work - still belongs to the
+            // callsign that was just typed, so this is a skipped block and not an early return.
+            if (_countryPickedCode == 0)
+            {
+                Country = dXCC.Name;
+                UpdateCountryFlag(dXCC.Name);
+                ShowDxccCode(dXCC.IsDxccEntity ? (dXCC.DxccCode > 0 ? dXCC.DxccCode : EntityCodeForCall(dxCallText, null)) : 0);
+                // "XX" is the resolver saying it did not recognise the prefix, not a continent. Storing it
+                // puts a placeholder in the QSO that every screen then has to read as data - it turned up in
+                // the Log Workshop's Continent filter sitting among AF, AS, EU and the rest, as though the
+                // operator had worked a place called XX. Blank is the honest answer, and it is the same rule
+                // the parser, the Log Verifier and the QSO editor already follow.
+                Continent = string.Equals(dXCC.Continent, "XX", StringComparison.OrdinalIgnoreCase)
+                    ? string.Empty
+                    : dXCC.Continent;
+                QRZGrid = dXCC.Locator;
+                // Fill ITU/CQ zones offline from cty.dat (entity default or the prefix-specific
+                // override). A later QRZ.com lookup, when available, overrides these as the gold source.
+                TB_ITUZone.Text = dXCC.ItuZone > 0 ? dXCC.ItuZone.ToString() : "";
+                TB_CQZone.Text = dXCC.CqZone > 0 ? dXCC.CqZone.ToString() : "";
+            }
             Prefix = dxCallText.Length >= 2 ? dxCallText.Substring(0, 2) : "";
 
             // Capture all UI-thread values needed for background computation.
@@ -13247,6 +13278,153 @@ namespace HolyLogger
                 return d.DxccCode > 0 ? d.DxccCode : CountryLookup.Shared.EntityCodeForCountry(d.Name);
             }
             catch (System.Exception swallowed) { Log.Swallow(swallowed); return 0; }
+        }
+
+        // ── THE COUNTRY BOX ─────────────────────────────────────────────────────────────────────
+        //
+        // The country is normally worked out from the callsign, and that answer is right nearly every
+        // time. Nearly. A DXpedition on a callsign no database knows yet, a station whose prefix was
+        // reassigned last month - somebody has to be able to say what country this contact really was.
+        //
+        // It was a free text box, so he could. But then the flag beside it and the entity number after
+        // it went on showing what the CALLSIGN said, and the QSO was saved with a name from one place
+        // and a number from another. The box now offers the countries themselves: what he picks is a
+        // real entity, and its name, its flag and its number are set from that one choice.
+
+        // Every DXCC entity there is, not only the ones this log has worked - the whole point of typing
+        // here is a country the program did not work out for itself.
+        private System.Windows.Data.ListCollectionView _dxccView;
+        private string _dxccFilter = string.Empty;
+
+        // THE NUMBER OF THE COUNTRY HE CHOSE BY HAND, 0 when he has not chosen one.
+        //
+        // Saving a QSO works the entity number out from the callsign, deliberately: the name is words
+        // and the number is the identity, and the identity should not depend on how a country happens
+        // to be spelled. But a country chosen here IS the operator overruling the callsign, and the
+        // callsign winning anyway would leave the log saying one country and counting as another - the
+        // very fault the Log Fixer exists to find. So his choice is remembered until the callsign is
+        // resolved again, which is to say until the contact he chose it for is over.
+        private int _countryPickedCode;
+
+        // BUILT THE FIRST TIME THE BOX IS USED, not at startup. It is some four hundred entities and a
+        // flag apiece, and the great majority of contacts never touch this box at all - the callsign
+        // answers for them. Nobody should pay for it while waiting for the program to open.
+        private void EnsureCountryList()
+        {
+            if (_dxccView == null) BuildCountryList();
+        }
+
+        private void CB_DXCC_DropDownOpened(object sender, EventArgs e)
+        {
+            EnsureCountryList();
+        }
+
+        private void BuildCountryList()
+        {
+            try
+            {
+                var items = CountryLookup.Shared.AllEntities()
+                    .Select(e => (e.Name ?? string.Empty).Trim())
+                    .Where(n => n.Length > 0)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(n => n, StringComparer.OrdinalIgnoreCase)
+                    .Select(n => new SearchCountryItem(n))
+                    .ToList();
+
+                if (items.Count == 0) return;   // no country database yet: leave it a plain typing box
+
+                _dxccView = new System.Windows.Data.ListCollectionView(items);
+                _dxccView.Filter = o =>
+                {
+                    if (_dxccFilter.Length == 0) return true;
+                    var item = (SearchCountryItem)o;
+                    int code; string name;
+                    SearchWindow.ReadCountryText(_dxccFilter, out code, out name);
+
+                    // BEGINS WITH, never contains. "Ir" must offer Iran, Iraq and Ireland - not every
+                    // country with an "ir" buried in it, which is a list nobody can read down.
+                    if (code > 0 && name.Length > 0) return item.Code == code;   // already picked
+                    if (code > 0) return item.CodeText.StartsWith(code.ToString(CultureInfo.InvariantCulture),
+                                                                  StringComparison.Ordinal);
+                    return item.Name.StartsWith(name, StringComparison.OrdinalIgnoreCase);
+                };
+                CB_DXCC.ItemsSource = _dxccView;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // KeyUp, because it arrives from the inner text box AFTER the character is in it - so the list
+        // is filtered on what is now on screen rather than on what was there a keystroke ago.
+        private void CB_DXCC_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            EnsureCountryList();
+            if (_dxccView == null) return;
+
+            switch (e.Key)
+            {
+                // The keys that MOVE through the list or leave it, rather than adding to what is typed.
+                // Filtering on these would rebuild the list under the very row he is walking down.
+                case System.Windows.Input.Key.Enter:
+                case System.Windows.Input.Key.Escape:
+                case System.Windows.Input.Key.Tab:
+                case System.Windows.Input.Key.Up:
+                case System.Windows.Input.Key.Down:
+                case System.Windows.Input.Key.Left:
+                case System.Windows.Input.Key.Right:
+                case System.Windows.Input.Key.LeftCtrl:  case System.Windows.Input.Key.RightCtrl:
+                case System.Windows.Input.Key.LeftShift: case System.Windows.Input.Key.RightShift:
+                case System.Windows.Input.Key.LeftAlt:   case System.Windows.Input.Key.RightAlt:
+                case System.Windows.Input.Key.LWin:      case System.Windows.Input.Key.RWin:
+                    return;
+            }
+
+            try
+            {
+                _dxccFilter = CB_DXCC.Text ?? string.Empty;
+                _dxccView.Refresh();
+                // Only while something is typed. An empty box dropping the whole world open the moment
+                // it is rubbed out is a list in the way of the next thing he wants to do.
+                CB_DXCC.IsDropDownOpen = _dxccFilter.Length > 0;
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
+        }
+
+        // HIS CHOICE, APPLIED TO ALL THREE PLACES AT ONCE. The name in the box, the flag beside it and
+        // the number after it come from the one entity he picked, so they cannot disagree.
+        private void CB_DXCC_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            var picked = CB_DXCC.SelectedItem as SearchCountryItem;
+            if (picked == null) return;
+
+            try
+            {
+                _dxccFilter = string.Empty;
+                if (_dxccView != null) _dxccView.Refresh();
+
+                Country = picked.Name;
+                UpdateCountryFlag(picked.Name);
+                ShowDxccCode(picked.Code);
+                _countryPickedCode = picked.Code;
+
+                // AND EVERYTHING THAT HANGS OFF THE COUNTRY. The continent and the zones came from the
+                // callsign, and he has just said the callsign was wrong about the country - so leaving
+                // them would log a contact whose continent belongs to one country and whose name belongs
+                // to another.
+                //
+                // These are the ENTITY's zones, which is all a country by itself can tell you: a station
+                // in the United States may be in CQ 3, 4 or 5, and cty.dat names one of them. A later
+                // QRZ.com lookup still overrides them as it always did, and both stay editable.
+                DXCC entity = CountryLookup.Shared.EntityDetails(picked.Code);
+                if (entity != null)
+                {
+                    if (!string.IsNullOrEmpty(entity.Continent) &&
+                        !string.Equals(entity.Continent, "XX", StringComparison.OrdinalIgnoreCase))
+                        Continent = entity.Continent;
+                    if (entity.CqZone > 0) TB_CQZone.Text = entity.CqZone.ToString(CultureInfo.InvariantCulture);
+                    if (entity.ItuZone > 0) TB_ITUZone.Text = entity.ItuZone.ToString(CultureInfo.InvariantCulture);
+                }
+            }
+            catch (System.Exception swallowed) { Log.Swallow(swallowed); }
         }
 
         private void UpdateCountryFlag(string countryName)

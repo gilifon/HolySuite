@@ -3824,11 +3824,20 @@ namespace HolyLogger
             {
                 var goneIds = new HashSet<int>(gone.Select(q => q.id));
                 _qsos.RemoveAll(q => goneIds.Contains(q.id));
+            }
 
+            // AND THE LOG TABLE MUST SHOW WHAT WAS JUST WRITTEN - after a CORRECTION as well as after a
+            // removal. It was reloaded only when contacts had been deleted, so a country put right here
+            // appeared in the Log Workshop and stayed wrong in the main window's table behind it: the
+            // same contact, two countries, on one screen. QSO.Country is a plain property that tells
+            // nobody it has changed, so nothing on that grid could ever have noticed by itself.
+            //
+            // ReloadActiveLogQsos re-reads the log table AND re-points the Log Workshop at the fresh
+            // collection, so one call covers both windows.
+            if (written > 0)
+            {
                 try
                 {
-                    // ReloadActiveLogQsos re-reads the log table AND re-points the Log Workshop at the
-                    // fresh collection, so one call covers both windows.
                     var main = Application.Current == null ? null
                              : Application.Current.Windows.OfType<MainWindow>().FirstOrDefault();
                     if (main != null) main.ReloadActiveLogQsos();
@@ -3844,7 +3853,8 @@ namespace HolyLogger
                 + (removed > 0 && corrected > 0 ? "\n" : "")
                 + (corrected > 0 ? corrected.ToString("N0") + " QSO" + (corrected == 1 ? "" : "s")
                                    + " fixed." : "")
-                + "\n\nClose and reopen the log window to see the new values."
+                // It used to say "Close and reopen the log window to see the new values", which was true
+                // and is not any more: the log table is reloaded above.
                 + (backup == null ? "" :
                     "\n\nChanged your mind? A copy of your database from just before this was saved. "
                     + "Open **Tools → Backups & Restore**, pick the newest one — it says "
