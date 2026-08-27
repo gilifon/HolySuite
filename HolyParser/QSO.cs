@@ -198,6 +198,22 @@ namespace HolyParser
         // 2 = permanently rejected. Not serialized to the contest server.
         public int ClublogStatus { get; set; }
 
+        // WHAT THE LOG FIXER HAS ALREADY DONE ABOUT THIS CONTACT.
+        //
+        //   0 - never reviewed. The Fixer reports it whenever it finds something.
+        //   1 - reviewed and corrected. It was ticked and the correction was written.
+        //   2 - reviewed and left as it was. He looked, and decided the log is right.
+        //
+        // 1 and 2 both mean silence. The Fixer has already put this row to him once and been answered,
+        // and raising the same row on every run is how a useful check turns into a list nobody reads.
+        // Only 0 is offered again - the Fixer's own "Include the ones I left" box brings the rest back
+        // for anyone who wants to look at them a second time.
+        //
+        // NOT AN ADIF FIELD, and never exported: it is a note about this operator's own reviewing, not
+        // a fact about the contact, and it means nothing in anybody else's log.
+        [JsonIgnore]
+        public int ReviewState { get; set; }
+
         // LoTW CONFIRMATION: 1 when the other station has confirmed this QSO in Logbook of The World.
         // Not the same thing as LotwStatus, which only says whether WE uploaded it - a QSO can be
         // uploaded for years and never confirmed. Set from the confirmations LoTW returns.

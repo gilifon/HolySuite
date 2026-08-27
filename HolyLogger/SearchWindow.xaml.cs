@@ -71,6 +71,11 @@ namespace HolyLogger
         private static readonly Brush ClearActiveBrush = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
         private static readonly Brush ClearIdleBrush   = new SolidColorBrush(Color.FromRgb(0x75, 0x75, 0x75));
 
+        // The Search button's own blue and its darker edge, the pair it is given in the XAML. Held here
+        // because the button now changes colour with the filters and something has to put them back.
+        private static readonly Brush SearchActiveBrush = new SolidColorBrush(Color.FromRgb(0x15, 0x65, 0xC0));
+        private static readonly Brush SearchBorderBrush = new SolidColorBrush(Color.FromRgb(0x0D, 0x47, 0xA1));
+
         // A click on a callsign in the results opens that station's QRZ.com page in the default
         // browser — the callsign acts like a web link (hand cursor + "QRZ" tooltip in the XAML).
         // Gated on ClickCount==1 so a double-click opens the page once, not twice.
@@ -1146,6 +1151,10 @@ namespace HolyLogger
 
             var picked = CB_Country.SelectedItem as SearchCountryItem;
             if (picked != null) ShowCountryAsPicked(picked);
+
+            // Picking a country with the mouse fires no keystroke, so nothing else here would notice
+            // that a filter has just been set - and Search would stay grey over a chosen country.
+            UpdateClearButton();
         }
 
         // KeyUp bubbles up from the internal text box AFTER the text is already updated.
@@ -1170,6 +1179,10 @@ namespace HolyLogger
             }
 
             CB_Country.IsDropDownOpen = !string.IsNullOrEmpty(CB_Country.Text);
+
+            // The country box is a ComboBox, not a TextBox, so no TextChanged brings this on. Typing
+            // into it - and rubbing it out again - has to move the Search button like every other box.
+            UpdateClearButton();
         }
 
         // What to do with a keystroke when the whole edit box is selected depends on WHAT is selected:
@@ -1359,6 +1372,10 @@ namespace HolyLogger
             // blank form. Filters then narrow it down.
             RunSearch();
 
+            // Search starts grey and dead, because nothing is filled in yet. Without this the window
+            // opened with a blue Search button over a form with no filter in it.
+            UpdateClearButton();
+
             TB_Prefix.Focus();
             Keyboard.Focus(TB_Prefix);
         }
@@ -1425,6 +1442,11 @@ namespace HolyLogger
             // would wipe every filter instead - and rebuild the grid underneath a row that was still
             // in edit. Cancelling an edit is what Esc means at that moment.
             if (_cellInEdit) return;
+
+            // AND ESC DOES WHAT THE CLEAR BUTTON DOES - INCLUDING NOTHING. With no filter set the button
+            // is dead, so the key must be dead too, or the same window answers the same request two
+            // different ways. Left unhandled here it also stays available to whatever else wants it.
+            if (!Btn_Clear.IsEnabled) return;
 
             ClearAll();
             e.Handled = true;
@@ -1579,14 +1601,12 @@ namespace HolyLogger
             TB_Prefix.Text          = "";
             TB_Suffix.Text          = "";
             CB_Country.IsDropDownOpen = false;
-            CB_Country.SelectedItem = null;   // must come before Text= so WPF doesn't fight the clear
-            CB_Country.Text         = "";
-            // Setting ComboBox.Text="" doesn't reliably wipe the visible edit box when the
-            // user typed free text, so clear the internal text box directly as well.
-            if (_countryEditBox != null)
-                _countryEditBox.Text = "";
-            _countryFilter          = "";
-            _countriesView.Refresh();
+            // BACK TO THE TYPING FACE, not merely emptied. The Country box wears two faces: an editable
+            // one for typing, and a plain one that can draw the flag beside the name once a country has
+            // been picked. Picking one turns IsEditable off - and clearing used only to blank the text,
+            // so the box kept the picked face: grey and unlike every other box on the row, over nothing
+            // at all. This is the one call that empties it AND puts its face back.
+            ReturnCountryToTyping("");
 
             // Clear means clear EVERYTHING, including the second row of filters - otherwise a band or
             // date left set from the previous search silently narrows the next one.
@@ -1610,6 +1630,7 @@ namespace HolyLogger
             if (CB_Eqsl.Items.Count > 0)    CB_Eqsl.SelectedIndex = 0;
             if (CB_Clublog.Items.Count > 0) CB_Clublog.SelectedIndex = 0;
             if (CB_Paper.Items.Count > 0)   CB_Paper.SelectedIndex = 0;
+            if (CB_Review.Items.Count > 0)  CB_Review.SelectedIndex = 0;
 
             // Back to the whole log, not to an empty grid - clearing a filter should reveal everything
             // again, exactly as removing a spreadsheet filter does.
@@ -1619,6 +1640,12 @@ namespace HolyLogger
         }
 
         // Blue while any filter is set (so it's clearly clickable), gray when everything is empty.
+        //
+        // SEARCH FOLLOWS THE SAME RULE, and is switched off as well as greyed. With nothing filled in
+        // there is nothing to search for: the window already shows the whole log, and pressing Search
+        // redrew the same rows and looked like a button that did nothing. Grey and dead until the first
+        // filter is set, then blue - so the colour coming up is itself the sign that the box just filled
+        // in has been noticed.
         private void UpdateClearButton()
         {
             bool hasContent = !string.IsNullOrEmpty(TB_Prefix.Text) ||
@@ -1651,8 +1678,21 @@ namespace HolyLogger
                               SelectedFilter(CB_Qrz) != null ||
                               SelectedFilter(CB_Eqsl) != null ||
                               SelectedFilter(CB_Clublog) != null ||
-                              SelectedFilter(CB_Paper) != null;
+                              SelectedFilter(CB_Paper) != null ||
+                              SelectedFilter(CB_Review) != null;
+            // SWITCHED OFF, NOT ONLY GREYED. With no filter set there is nothing to clear, and a button
+            // that can be pressed to no effect is a button that teaches the operator to distrust the
+            // window. Worse, the two greys had come to mean different things - Search's grey was dead
+            // and Clear's grey was alive, in the same shade, side by side.
+            Btn_Clear.IsEnabled = hasContent;
             Btn_Clear.Background = hasContent ? ClearActiveBrush : ClearIdleBrush;
+
+            if (Btn_Search != null)
+            {
+                Btn_Search.IsEnabled = hasContent;
+                Btn_Search.Background = hasContent ? SearchActiveBrush : ClearIdleBrush;
+                Btn_Search.BorderBrush = hasContent ? SearchBorderBrush : ClearIdleBrush;
+            }
         }
 
         // Choices offered by the Band and Mode cell dropdowns. Deliberately the SAME lists the
@@ -1993,6 +2033,7 @@ namespace HolyLogger
             string eqsl      = SelectedFilter(CB_Eqsl);
             string clublog   = SelectedFilter(CB_Clublog);
             string paper     = SelectedFilter(CB_Paper);
+            string review    = SelectedFilter(CB_Review);
 
             // No filter set means show the WHOLE log, the way a spreadsheet shows every row until you
             // filter it. An empty grid told the operator nothing about what was in the log and made the
@@ -2010,7 +2051,8 @@ namespace HolyLogger
                               string.IsNullOrEmpty(satName) && string.IsNullOrEmpty(soapbox) &&
                               string.IsNullOrEmpty(time) && string.IsNullOrEmpty(state) &&
                               string.IsNullOrEmpty(qth) &&
-                              qrz == null && eqsl == null && clublog == null && paper == null;
+                              qrz == null && eqsl == null && clublog == null && paper == null &&
+                              review == null;
 
             var results = _allQsos.AsEnumerable();
 
@@ -2118,6 +2160,15 @@ namespace HolyLogger
             if (eqsl != null)    { bool w = eqsl == LotwConfirmed;    results = results.Where(q => (q.EqslQslRcvd == 1) == w); }
             if (clublog != null) { bool w = clublog == LotwConfirmed; results = results.Where(q => (q.ClublogQslRcvd == 1) == w); }
             if (paper != null)   { bool w = paper == LotwConfirmed;   results = results.Where(q => (q.PaperQslRcvd == 1) == w); }
+
+            // Whether the Log Fixer has actually written to this contact. Yes is the log as the Fixer
+            // left it; No is everything it has not corrected - the ones never checked and the ones the
+            // operator looked at and decided were right already.
+            if (review != null)
+            {
+                bool wantFixed = review == FixedYes;
+                results = results.Where(q => (q.ReviewState == 1) == wantFixed);
+            }
 
             // Comments are free text, so this is a "contains" match - the useful thing is finding the
             // QSO where you noted something, not matching how the note began.
@@ -2264,10 +2315,20 @@ namespace HolyLogger
             // every QSO happens to be confirmed, and the other way round.
             foreach (var cb in new[] { CB_Lotw, CB_Qrz, CB_Eqsl, CB_Clublog, CB_Paper })
                 SetItems(cb, new List<string> { AnyItem, LotwConfirmed, LotwNotConfirmed });
+
+            // Fixed choices too, and only two of them: has the Log Fixer written to this QSO or not.
+            // The database keeps three states - never reviewed, corrected, reviewed and left alone -
+            // but the question this box answers is the plain one, so "No" is everything that was not
+            // corrected, whether it was ever looked at or not.
+            SetItems(CB_Review, new List<string> { AnyItem, FixedYes, FixedNo });
         }
 
         private const string LotwConfirmed = "Confirmed";
         private const string LotwNotConfirmed = "Not confirmed";
+
+        // Was this QSO put right by the Log Fixer? Yes is review_state 1; No is everything else.
+        private const string FixedYes = "Yes";
+        private const string FixedNo = "No";
 
         // Dropdown / date-picker changes only refresh the Clear button. The search still runs on
         // Search, Enter or Esc, so picking a band does not fire a search through a half-typed callsign.

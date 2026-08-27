@@ -245,8 +245,21 @@
                   </StackPanel>
                   </Border>
 
-                  <!-- Row 3: my callsign, operator, my grid, my square - light blue background. -->
-                  <Border Background="#DCEBFB" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">
+                  <!-- Row 3: TWO BARS SIDE BY SIDE on one line, not one bar with a stranger in it.
+                       The blue bar is about the station that made the QSO - my callsign, the operator,
+                       my grid, my square. Fixed is about what the LOG FIXER has done to the record
+                       afterwards, which is a different subject entirely, so it gets its own yellow bar
+                       that ends where its own contents end. The gap between them is what says they are
+                       two things rather than one long row.
+
+                       Blue is docked left and sized by its own contents. Yellow is the LAST CHILD, so it
+                       takes everything that is left: it begins a few pixels after the blue bar ends and
+                       runs out to the same right-hand edge as the bars above and below it, which is what
+                       makes the four look like one block rather than four ragged strips. Fixed itself
+                       does not move - it sits at the left of its bar, where the bar starts. -->
+                  <DockPanel HorizontalAlignment="Stretch" Margin="0,6,0,0">
+
+                  <Border DockPanel.Dock="Left" Background="#DCEBFB" CornerRadius="4" Padding="6,5">
                   <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,0,20,0">
                       <TextBlock Text="My callsign:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
@@ -274,6 +287,22 @@
                     </StackPanel>
                   </StackPanel>
                   </Border>
+
+                  <!-- WHETHER THE LOG FIXER HAS PUT THIS CONTACT RIGHT. Once the Fixer has been
+                       answered about a QSO it stops raising it, which is what makes it worth opening a
+                       second time - and this is where the ones it has already changed can be found
+                       afterwards. -->
+                  <Border Background="#F5DE5E" CornerRadius="4" Padding="6,5" Margin="10,0,0,0">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                      <TextBlock Text="Fixed:" FontSize="16" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,6,0"
+                                 ToolTip="Whether the Log Fixer has corrected this QSO"/>
+                      <ComboBox x:Name="CB_Review" Width="90" FontSize="16" VerticalAlignment="Center"
+                                ToolTip="Whether the Log Fixer has corrected this QSO"
+                                SelectionChanged="Filter_Changed"/>
+                    </StackPanel>
+                  </Border>
+
+                  </DockPanel>
 
                   <!-- Row 4: the confirmation sources - light red background. -->
                   <Border Background="#FBE1E1" CornerRadius="4" Padding="6,5" Margin="0,6,0,0">

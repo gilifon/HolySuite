@@ -664,6 +664,7 @@ namespace HolyLogger
 
         private readonly List<QSO> _qsos;
         private readonly string _logName;
+
         private readonly ObservableCollection<Finding> _findings = new ObservableCollection<Finding>();
         private readonly ObservableCollection<ProblemKind> _kinds = new ObservableCollection<ProblemKind>();
 
@@ -1096,6 +1097,26 @@ namespace HolyLogger
             // runs off the UI thread - a 40,000-QSO log would otherwise freeze the window.
             List<Finding> found = await Task.Run(() => Scan(snapshot));
 
+            // ── THE ONES THE FIXER HAS ALREADY PUT RIGHT ────────────────────────────────────────
+            //
+            // Dropped AFTER the scan, never before it. Duplicates are found by comparing contacts with
+            // each other, so a log with a corrected QSO taken out of the scan would stop seeing the pair
+            // it belongs to - and report the survivor as fine. Everything is scanned; what has already
+            // been dealt with is simply not shown.
+            // ONLY 1 - CORRECTED - HIDES A ROW. Not "anything other than 0": a build that asked on the
+            // way out whether to stop showing the untouched rows wrote 2 into thousands of contacts, and
+            // that question is gone. Reading 2 as silence would let a mark nothing can set any more go
+            // on hiding a log for good.
+            var kept = new List<Finding>(found.Count);
+            var hidden = new HashSet<QSO>();
+            foreach (Finding f in found)
+            {
+                if (f.Qso != null && f.Qso.ReviewState == 1) { hidden.Add(f.Qso); continue; }
+                kept.Add(f);
+            }
+            int settled = hidden.Count;
+            found = kept;
+
             // Before anything is drawn: the locators this machine cannot answer are asked of QRZ, so
             // the table appears with those suggestions already in it rather than with a button to go
             // and fetch them.
@@ -1109,15 +1130,30 @@ namespace HolyLogger
             BuildKinds(found);
 
             int suggested = found.Count(f => f.Fixable);
-            TB_Header.Text = found.Count == 0
-                ? "No problems found in " + _qsos.Count.ToString("N0") + " QSOs."
-                : found.Count.ToString("N0") + " problem" + (found.Count == 1 ? "" : "s")
-                  + " found in " + _qsos.Count.ToString("N0") + " QSOs";
+
+            // AN EMPTY TABLE MUST SAY WHY IT IS EMPTY.
+            //
+            // "No problems found in 28,580 QSOs" over an empty table is the right sentence only when the
+            // scan really found nothing. When the problems were found and then held back because the
+            // Fixer has already corrected those contacts, that sentence is untrue in the way that
+            // matters most: it tells a man his log is clean when what happened is that it was tidied.
+            TB_Header.Text =
+                found.Count > 0
+                    ? found.Count.ToString("N0") + " problem" + (found.Count == 1 ? "" : "s")
+                      + " found in " + _qsos.Count.ToString("N0") + " QSOs"
+                    : settled > 0
+                        ? "Nothing left to fix. " + settled.ToString("N0") + " QSO"
+                          + (settled == 1 ? " was" : "s were") + " put right already."
+                        : "No problems found in " + _qsos.Count.ToString("N0") + " QSOs.";
+
+            // ONE INSTRUCTION, AND NOTHING ELSE. This line used to carry the tally as well - so many can
+            // be put right, so many are for you to judge - and every one of those numbers is already on
+            // the screen, counted by kind, in the panel above. Saying them twice made a line nobody
+            // finished reading, and the one thing on it that is NOT written anywhere else is how to open
+            // a QSO. So that is all it says.
             TB_Summary.Text = found.Count == 0
                 ? "Nothing to fix."
-                : suggested.ToString("N0") + " can be put right here, "
-                  + (found.Count - suggested).ToString("N0") + " are for you to judge. "
-                  + "Double-click a row to open the QSO.";
+                : "Double-click a row to open the QSO.";
             UpdateFixButton();
 
             // THE WHOLE LIST, IN A FILE. The window answers one row at a time; a log with hundreds of
@@ -2624,7 +2660,7 @@ namespace HolyLogger
             }
             finally { _syncingKind = false; }
 
-            SelectExactly(_rows.Where(r => r.Apply).ToList());
+            ClearStaleHighlight();
 
             UpdateFixButton();
             UpdateFixAllBox();
@@ -2719,7 +2755,7 @@ namespace HolyLogger
                 }
                 finally { _syncingKind = false; }
 
-                SelectExactly(rows.Where(r => r.Apply).ToList());
+                ClearStaleHighlight();
             }
             catch (Exception ex) { Log.Swallow(ex); }
 
@@ -2729,24 +2765,27 @@ namespace HolyLogger
             ShowFirstTickedRow();
         }
 
-        // THE HIGHLIGHT MUST END UP SAYING WHAT THE TICKS SAY.
+        // THE HIGHLIGHT MUST END UP SAYING WHAT THE TICKS SAY - AND IT SAYS IT BY GETTING OUT OF THE WAY.
         //
-        // The row-by-row sync is switched off during a bulk tick - it would otherwise run once for
-        // every one of four thousand rows - so nothing brought the selection into line afterwards. A
-        // row the operator had merely CLICKED ON, to read it, stayed blue while its box was empty:
-        // blue in this table means "this one is going to be fixed", so the window was saying the
-        // opposite of the truth about a row the AI had just told him to leave alone.
+        // The row-by-row sync is switched off during a bulk tick, so a row the operator had merely
+        // CLICKED ON, to read it, stayed blue while its box was empty: blue in this table means "this
+        // one is going to be fixed", so the window said the opposite of the truth about a row the AI had
+        // just told him to leave alone. That is what this call is for.
         //
-        // Done once, at the end of a bulk tick, instead of never.
-        private void SelectExactly(List<FixRow> ticked)
+        // IT USED TO ADD EVERY TICKED ROW TO THE SELECTION, and that was the coffee break: one click on
+        // the header box selected 4,370 rows one at a time, and SelectedItems.Add on a twelve-column
+        // template grid is quadratic - the same measurement that put SelectAll at 2.3 seconds on this
+        // very table. Nothing was gained by it either. A ticked row is already painted by the RowStyle
+        // trigger on Apply, which costs nothing because WPF styles only the rows on screen. So the
+        // selection is simply emptied: what is blue afterwards is exactly what is ticked, and getting
+        // there touches nothing but the handful of rows that were selected before.
+        private void ClearStaleHighlight()
         {
             if (FindingsGrid == null) return;
             try
             {
                 _syncingApply = true;
                 FindingsGrid.SelectedItems.Clear();
-                if (ticked != null)
-                    foreach (FixRow r in ticked) FindingsGrid.SelectedItems.Add(r);
             }
             catch (Exception ex) { Log.Swallow(ex); }
             finally { _syncingApply = false; }
@@ -3746,6 +3785,30 @@ namespace HolyLogger
                 }
             }
 
+            // ── WRITTEN, AND REMEMBERED AS WRITTEN ───────────────────────────────────────────────
+            //
+            // These are settled: he was shown the problem, he ticked it, and the correction is in the
+            // log. The scan should never put them to him again - and if a later country file disagrees
+            // with the value he has just chosen, that is a fresh argument he can ask for with "Include
+            // the ones I left", not one to be reopened behind his back on the next run.
+            //
+            // The contacts that were REMOVED are left out: there is no row left to mark. So are the ones
+            // held back for the comment question - a group he chose to skip there was not written at
+            // all, and calling that "corrected" would bury a duplicate pair he has not decided about.
+            try
+            {
+                var goneNow = new HashSet<QSO>(gone);
+                List<QSO> settledRows = rows.Where(r => r.Qso != null && !goneNow.Contains(r.Qso)
+                                                      && !held.Contains(r))
+                                          .Select(r => r.Qso).Distinct().ToList();
+                if (settledRows.Count > 0)
+                {
+                    dal.SetReviewState(settledRows.Select(q => q.id), 1);
+                    foreach (QSO q in settledRows) q.ReviewState = 1;
+                }
+            }
+            catch (Exception swallowed) { Log.Swallow(swallowed); }
+
             // THE PATH IS CLICKABLE, so "where is my safety copy" is answered by pressing it rather
             // than by copying a line of text into Explorer. Clicking selects the file in its folder,
             // which is what somebody who wants to keep it, move it or restore it needs to see.
@@ -4126,6 +4189,27 @@ namespace HolyLogger
         {
             Close();
         }
+
+        // ── REMEMBERING WHAT HE DECIDED ─────────────────────────────────────────────────────────
+        //
+        // The Fixer used to start every run from nothing. A man who had been through four hundred rows,
+        // corrected forty and deliberately left the rest, opened it a month later and was shown the same
+        // three hundred and sixty all over again - and the ones he had already thought about buried the
+        // ones he had not. That is how a check people trust turns into a list they stop opening.
+        //
+        // So each QSO carries what he settled about it: 1 corrected, 2 looked at and left as it was.
+        // Neither is offered again unless he asks for it with "Include the ones I left".
+
+        // NOTHING IS DECIDED BY CLOSING A WINDOW.
+        //
+        // Closing the Fixer used to ask whether the rows he had not ticked should stop being shown,
+        // and that was wrong twice over. It is not a decision - a man opens this window to look, or is
+        // called away from it - and a question nobody asked for, standing between him and the door,
+        // gets answered by whichever button the Enter key happens to be on. It silenced 4,522 contacts
+        // that way on its first outing.
+        //
+        // So Close closes. A QSO is remembered only when something really was settled about it: the
+        // Fix wrote to it. Not fixing is not an answer, and the program no longer pretends it is.
     }
 }
 

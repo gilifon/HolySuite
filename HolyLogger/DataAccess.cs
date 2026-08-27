@@ -1873,7 +1873,8 @@ Environment.NewLine +
                             cEqslDeleted = Ordinal(rdr, "eqsl_deleted_entity"),
                             cClublogRcvd = Ordinal(rdr, "clublog_qsl_rcvd"), cClublogRDate = Ordinal(rdr, "clublog_qsl_rdate"),
                             cClublogDeleted = Ordinal(rdr, "clublog_deleted_entity"),
-                            cPaperRcvd = Ordinal(rdr, "paper_qsl_rcvd");
+                            cPaperRcvd = Ordinal(rdr, "paper_qsl_rcvd"),
+                            cReviewState = Ordinal(rdr, "review_state");
 
                         while (rdr.Read())
                         {
@@ -1921,6 +1922,7 @@ Environment.NewLine +
                             if (cClublogRDate >= 0 && !rdr.IsDBNull(cClublogRDate)) q.ClublogQslRDate = rdr.GetValue(cClublogRDate).ToString();
                             if (cClublogDeleted >= 0 && !rdr.IsDBNull(cClublogDeleted)) q.ClublogDeletedEntity = Convert.ToInt32(rdr.GetValue(cClublogDeleted));
                             if (cPaperRcvd >= 0 && !rdr.IsDBNull(cPaperRcvd)) q.PaperQslRcvd = Convert.ToInt32(rdr.GetValue(cPaperRcvd));
+                            if (cReviewState >= 0 && !rdr.IsDBNull(cReviewState)) q.ReviewState = Convert.ToInt32(rdr.GetValue(cReviewState));
                             if (cClublogStatus >= 0 && !rdr.IsDBNull(cClublogStatus)) q.ClublogStatus = Convert.ToInt32(rdr.GetValue(cClublogStatus));
                             q.StandartizeQSO();
                             qso_list.Add(q);
@@ -2057,6 +2059,7 @@ Environment.NewLine +
                         if (rdr["clublog_qsl_rdate"] != null && rdr["clublog_qsl_rdate"] != DBNull.Value) q.ClublogQslRDate = rdr["clublog_qsl_rdate"].ToString();
                         if (rdr["clublog_deleted_entity"] != null && rdr["clublog_deleted_entity"] != DBNull.Value) q.ClublogDeletedEntity = Convert.ToInt32(rdr["clublog_deleted_entity"]);
                         if (rdr["paper_qsl_rcvd"] != null && rdr["paper_qsl_rcvd"] != DBNull.Value) q.PaperQslRcvd = Convert.ToInt32(rdr["paper_qsl_rcvd"]);
+                        if (rdr["review_state"] != null && rdr["review_state"] != DBNull.Value) q.ReviewState = Convert.ToInt32(rdr["review_state"]);
                         if (rdr["clublog_status"] != null && rdr["clublog_status"] != DBNull.Value) q.ClublogStatus = Convert.ToInt32(rdr["clublog_status"]);
                         q.StandartizeQSO();
                         qso_list.Add(q);
@@ -3788,6 +3791,32 @@ Environment.NewLine +
             }
         }
 
+        // WHAT THE LOG FIXER HAS SETTLED ABOUT THESE CONTACTS: 1 corrected, 2 left as they were.
+        //
+        // Written for a whole batch in one statement, because that is how the Fixer works - a man goes
+        // through a table of eighty rows and answers all of them at once, and eighty round trips to say
+        // so would be eighty commits for one decision.
+        //
+        // The QSO objects the caller is holding are NOT touched here; the caller sets ReviewState on
+        // them itself, so the window it is showing agrees with the database without re-reading the log.
+        public void SetReviewState(IEnumerable<int> qsoIds, int state)
+        {
+            if (qsoIds == null) return;
+            var ids = qsoIds.Where(id => id > 0).Distinct().ToList();
+            if (ids.Count == 0) return;
+
+            lock (_dbLock)
+            {
+                if (con == null || con.State != System.Data.ConnectionState.Open) return;
+                using (var cmd = new SQLiteCommand(
+                    "UPDATE qso SET review_state = @s WHERE Id IN (" + string.Join(",", ids) + ")", con))
+                {
+                    cmd.Parameters.Add(new SQLiteParameter("@s", state));
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
         // The log a QSO belongs to (captured just before a delete so an undo can restore it to the SAME
         // log - the Search window can be searching a log that is not the active one). -1 if not found.
         public long GetQsoLogId(int id)
@@ -5466,6 +5495,10 @@ Environment.NewLine +
             AddClublogConfirmationColumns();
             AddPaperConfirmationColumn();
             AddClublogColumn();
+            // WHAT THE LOG FIXER HAS ALREADY BEEN TOLD ABOUT THIS CONTACT: 0 never reviewed, 1 reviewed
+            // and corrected, 2 reviewed and deliberately left alone. Every existing QSO starts at 0,
+            // which is right - nothing in an old database has been through the Fixer's question yet.
+            AddColToTable("qso", "review_state", "INTEGER NOT NULL DEFAULT 0");
             AddColToTable("qso", "log_id", "INTEGER NULL");  // each QSO belongs to a named Log
             EnsureLogsTable();
             EnsureLogStateTable();

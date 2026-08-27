@@ -374,15 +374,20 @@
             </DataGrid.Columns>
         </DataGrid>
 
-        <DockPanel Grid.Row="3" Margin="0,12,0,0">
+        <!-- A GRID, NOT A DOCKPANEL, so Close sits on the row's true centre. Docked, it could only be
+             pushed to one end or centred in whatever gap the summary happened to leave. Here both are
+             laid out against the FULL width of the row: the line of text keeps the left, the button
+             stands in the middle of the window whatever the text beside it says. -->
+        <Grid Grid.Row="3" Margin="0,12,0,0">
+            <TextBlock x:Name="TB_Summary" HorizontalAlignment="Left" VerticalAlignment="Center"
+                       FontSize="16" Margin="0,0,12,0"
+                       Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
             <!-- NOT IsCancel. Escape belongs to the table here - it clears the highlight - and a
                  window that shuts on the same key would throw away a page of ticks the moment an
                  operator tried to deselect a row. Closing is this button, or the title bar. -->
-            <Button x:Name="Btn_Close" Content="Close" DockPanel.Dock="Right" Width="120" Height="38"
+            <Button x:Name="Btn_Close" Content="Close" HorizontalAlignment="Center" Width="120" Height="38"
                     FontSize="16" Click="Btn_Close_Click"/>
-            <TextBlock x:Name="TB_Summary" VerticalAlignment="Center" FontSize="16"
-                       Foreground="{DynamicResource MutedTextBrush}" TextTrimming="CharacterEllipsis"/>
-        </DockPanel>
+        </Grid>
 
         <!-- WHILE IT IS WRITING. A line of small text at the foot of the window was not enough: an
              operator who ticked 4,376 spellings watched "fixing…" in the corner and reasonably decided
