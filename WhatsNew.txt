@@ -11,16 +11,6 @@ New
   the ones it has not.
 - Search and Clear stay grey until a filter is set, and turn blue together. Escape does what
   Clear does, including nothing.
-
-Fixed
-- The log table now shows a correction the moment the Log Fixer writes it. A country put right
-  appeared in the Log Workshop and stayed wrong in the main window behind it.
-- Ticking the Fix box in the table header was a coffee break on a big log. It is immediate.
-- Clearing the Workshop left the Country box grey instead of white.
-
-== 8.9.1 ==
-
-New
 - Ask an AI: right-click a QSO and choose Ask AI to check this QSO. It reads the fields and
   writes back what it makes of them.
 - Check with AI: in the Log Fixer, the QSOs where cty.dat and Club Log disagree can be put to
@@ -58,6 +48,10 @@ New
 - Sun and propagation: the figures now come from IARC.
 
 Fixed
+- The log table now shows a correction the moment the Log Fixer writes it. A country put right
+  appeared in the Log Workshop and stayed wrong in the main window behind it.
+- Ticking the Fix box in the table header was a coffee break on a big log. It is immediate.
+- Clearing the Workshop left the Country box grey instead of white.
 - Custom image: choosing it no longer throws the file explorer open by itself.
 - Options: the Browse button was too short for its own text.
 - CW: the program worked out the length of a Morse message about a seventh too long, so the
